@@ -1,3 +1,43 @@
+// [INTENT] PrintObjectSlice.cpp: Implements the posSlice step — the first and most
+// fundamental step in the PrintObject pipeline. Converts 3D mesh volumes into a
+// stack of 2D ExPolygon layers.
+//
+// Key pipeline:
+//   PrintObject::slice()
+//     ├─ update_layer_height_profile()     — applies variable layer height profile
+//     ├─ generate_object_layers()          — computes Z coordinates for each layer
+//     ├─ new_layers()                      — allocates Layer objects, links prev/next
+//     ├─ slice_volumes()                   — per-volume mesh slicing (calls TriangleMeshSlicer)
+//     │    └─ slice_volumes_inner()        — per-volume, per-range slicing dispatch
+//     │         └─ slice_volume()          — calls slice_mesh_ex() from TriangleMeshSlicer
+//     ├─ _transform_hole_to_polyholes()    — circle-to-polyhole compensation
+//     ├─ groupingVolumesForBrim()          — groups first-layer slices by volume for brim
+//     └─ parallel_for over layers:
+//          lslices_bboxes, backup_untyped_slices()
+//
+// Coordinate system note:
+//   - Z values passed to slice_volume() are UNSCALED float mm (coordf_t = double).
+//   - XY output (ExPolygons) is SCALED int32 (1 unit = 1e-6 mm, Clipper coordinates).
+//   - The transform (object_trafo) includes the m_center_offset translation so that
+//     Clipper int32 values stay within a safe range far from INT32_MAX/MIN.
+//
+// [MEMORY] Layer objects are heap-allocated in new_layers() and stored in m_layers
+// (raw pointer vector). clear_layers() manually deletes them. The Layer linked list
+// (prev/upper_layer pointers) is also manually managed — no smart pointers.
+//
+// [CONCURRENCY] slice_volumes_inner() calls slice_volume() per ModelVolume sequentially.
+// Within each volume, slice_mesh_ex() uses TBB internally (parallel_for per layer in
+// TriangleMeshSlicer). The final bounding-box pass is a TBB parallel_for over layers.
+//
+// [HAZARD] Spiral vase mode changes the SlicingMode to PositiveLargestContour for
+// all layers except the bottom_shell_layers count (forced Regular). The mode switch
+// threshold is computed from bottom_shell_thickness and must stay in sync with
+// LayerRegion::make_perimeters() spiral_mode logic or geometry will mismatch.
+//
+// [HAZARD] apply_mm_segmentation() (multi-material painting) runs AFTER slice_volumes()
+// and overwrites LayerRegion slices in place. If mm-painted regions are re-sorted by
+// extruder ID and the parent region count changes between apply calls, the
+// it_painted_region_begin iterator can become stale.
 #include <boost/log/trivial.hpp>
 
 #include <tbb/parallel_for.h>
@@ -117,6 +157,19 @@ static inline bool model_volume_needs_slicing(const ModelVolume &mv)
 // Apply closing radius.
 // Apply positive XY compensation to ModelVolumeType::MODEL_PART and ModelVolumeType::PARAMETER_MODIFIER, not to ModelVolumeType::NEGATIVE_VOLUME.
 // Apply contour simplification.
+// [INTENT] slice_volumes_inner(): Iterates all ModelVolumes of the object, applies
+// per-volume transformations, selects the appropriate SlicingMode (Regular, EvenOdd,
+// PositiveLargestContour for spiral vase), and dispatches to slice_volume().
+// Returns one VolumeSlices struct per sliced volume.
+//
+// [STATE] SlicingMode::PositiveLargestContour is spiral-vase mode — only the outermost
+// contour is kept per layer. The bottom layers (below slicing_mode_normal_below_layer)
+// use Regular mode to create a solid base before the spiral kicks in.
+//
+// [HAZARD] params_base.resolution is hardcoded to 0.0025mm when config resolution > 0.001.
+// This is a lossy simplification applied to ALL meshes regardless of individual volume
+// complexity. The BBS comment says it's safe for arc fitting (0.0125mm default), but
+// high-frequency surface features below 0.0025mm are silently dropped.
 static std::vector<VolumeSlices> slice_volumes_inner(
     const PrintConfig                                        &print_config,
     const PrintObjectConfig                                  &print_object_config,
@@ -786,6 +839,32 @@ void groupingVolumesForBrim(PrintObject* object, LayerPtrs& layers, int firstLay
 // 5) Applies size compensation (offsets the slices in XY plane)
 // 6) Replaces bad slices by the slices reconstructed from the upper/lower layer
 // Resulting expolygons of layer regions are marked as Internal.
+// [INTENT] PrintObject::slice(): Implements the posSlice step. The full flow:
+//   1. update_layer_height_profile() — resolves the variable layer height profile
+//      from the user-painted height map; fills layer_height_profile with (z, height) pairs.
+//   2. generate_object_layers() — converts the height profile to a flat array of
+//      [bottom_z, top_z, bottom_z, top_z, ...] pairs (coordf_t, unscaled mm).
+//      precise_z_height config adjusts Z snapping to nozzle increments.
+//   3. new_layers() — creates Layer objects and doubly-links them (upper_layer/lower_layer).
+//   4. slice_volumes() — calls slice_volumes_inner() → TriangleMeshSlicer for each volume.
+//   5. _transform_hole_to_polyholes() — compensates circles for FDM hole-shrinkage.
+//   6. groupingVolumesForBrim() — groups first-layer slices by volume; needed because
+//      brim generation (in Print.cpp) iterates volumes independently.
+//   7. TBB parallel_for: builds lslices_bboxes and calls backup_untyped_slices() on
+//      each layer (saves the raw slice before perimeter generation modifies it).
+//
+// [STATE] m_typed_slices is reset to false here. It is set to true by
+//   detect_surfaces_type() after perimeters classify surfaces. If posSlice is
+//   re-invalidated, untyped slices are already backed up and restore_untyped_slices()
+//   in make_perimeters() restores them.
+//
+// [HAZARD] If m_layers ends up empty (no geometry above raft, or model too small),
+//   a SlicingError exception is thrown (L839). This is caught in Print::process() and
+//   propagated as a user-visible error. The error message is localised (L() macro).
+//
+// [MEMORY] clear_layers() is called at the top to release any previous Layer* objects
+//   before re-allocating. If slice() is called twice without invalidation, the first
+//   call's layers are leaked — but set_started() guards against re-entry.
 void PrintObject::slice()
 {
     if (! this->set_started(posSlice))
