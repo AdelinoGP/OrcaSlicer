@@ -1,3 +1,6 @@
+// [INTENT] Entry point for both GUI mode (wxWidgets app) and headless CLI mode (slicing pipeline).
+// The compile-time flag SLIC3R_GUI selects between the two codepaths.
+// The single binary serves both purposes; no code is shared via shared libraries at runtime.
 #ifdef WIN32
     // Why?
     #define _WIN32_WINNT 0x0502
@@ -9,8 +12,9 @@
     #ifdef SLIC3R_GUI
     extern "C"
     {
-        // Let the NVIDIA and AMD know we want to use their graphics card
-        // on a dual graphics card system.
+        // [INTENT] GPU selection hint for Windows Optimus (NVIDIA) and PowerXpress (AMD) dual-GPU
+        // systems. Without these, the integrated GPU is used, causing degraded 3D viewport
+        // performance. These symbols are read by the GPU driver at process load time.
         __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
         __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
     }
@@ -172,8 +176,20 @@ typedef struct _sliced_info {
     std::vector<std::string> upward_machines;
     std::vector<std::string> downward_machines;
 }sliced_info_t;
+// [STATE] Global warning accumulator. CLI mode collects all slicing warnings here because
+// there is no live UI to display them incrementally. Flushed to result.json on exit.
+// [HAZARD] Not thread-safe: written from the slicing thread via cli_status_callback(),
+// read from the main thread after process() returns. Safe only because slicing completes
+// before the main thread reads g_slicing_warnings.
 std::vector<PrintBase::SlicingStatus> g_slicing_warnings;
 
+// [INTENT] Linux-only: progress reporting over a named FIFO pipe.
+// The parent process (e.g., Bambu Cloud infrastructure) opens the FIFO for reading.
+// OrcaSlicer opens it for writing and sends JSON progress messages.
+// [CONCURRENCY] A dedicated background thread (m_thread) handles blocking pipe writes
+// so the slicing thread is never blocked by slow pipe consumers.
+// [HAZARD] POSIX-specific; no equivalent on Windows. A cross-platform port should use
+// stdout/stderr callbacks or a socket instead.
 #if defined(__linux__) || defined(__LINUX__)
 #define PIPE_BUFFER_SIZE 512
 
@@ -189,6 +205,9 @@ typedef struct _cli_callback_mgr {
     bool                m_started {false};
     boost::thread               m_thread;
     // Mutex and condition variable to synchronize m_thread with the UI thread.
+    // [CONCURRENCY] m_mutex guards m_started, m_data_ready, m_exit, m_progress,
+    // m_total_progress, m_message, m_warning_step. All writes from update() hold
+    // this lock; thread_proc() waits on m_condition.
     std::mutex                  m_mutex;
     std::condition_variable     m_condition;
     int                 m_pipe_fd{-1};
@@ -252,6 +271,10 @@ typedef struct _cli_callback_mgr {
         m_condition.notify_one();
         boost::this_thread::sleep(boost::posix_time::milliseconds(20));
         BOOST_LOG_TRIVIAL(info) << "cli_callback_mgr_t::thread_proc started.";
+        // [CONCURRENCY] Producer-consumer loop. Blocks on condition variable until
+        // either new data is available (m_data_ready) or shutdown is requested (m_exit).
+        // The 20ms initial sleep allows the spawning thread to release the lock before
+        // the first wait, avoiding a lost-wakeup race at startup.
         while(1) {
             lck.lock();
             m_condition.wait(lck, [this](){ return m_data_ready || m_exit; });
@@ -286,6 +309,14 @@ typedef struct _cli_callback_mgr {
         }
         int old_total_progress = m_total_progress;
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": percent="<<percent<< ", warning_step=" << warning_step << ", plate_index = "<< m_plate_index<<", plate_count="<< m_plate_count<<", message="<<message;
+        // [INTENT] Map per-plate progress (0-100) to a global total_progress (0-100).
+        // The formula reserves the first 3% for file loading and the last 7% for export.
+        // Slicing occupies [3..93]% (90% of the bar), distributed evenly across plates.
+        // Single plate: total = 3 + 0.9 * plate_percent
+        // Multi plate:  total = 3 + (completed_plates * 90 / plate_count) + (current_plate_percent * 0.9 / plate_count)
+        // [HAZARD] warning_step == -1 is used as a sentinel to distinguish progress updates
+        // from warning events. This coupling of progress and warning channels via a single
+        // callback is fragile; a port should use separate typed events.
         if (warning_step == -1) {
             m_progress = percent;
             if ((m_plate_count <= 1) && (m_plate_index >= 1))
@@ -386,7 +417,14 @@ static PrinterTechnology get_printer_technology(const DynamicConfig &config)
     return (opt == nullptr) ? ptUnknown : opt->value;
 }
 
-//BBS: add flush and exit
+// [INTENT] Unified error-exit macro used throughout CLI::run().
+// Performs three cleanup actions before returning an error code:
+//   1. (Linux only) Stops the progress pipe background thread
+//   2. Flushes stdout/stderr so the parent process sees all output before process exit
+//   3. Removes temporary backup paths created during model loading
+// [HAZARD] This macro uses 'return' which means it only works inside CLI::run().
+// Any refactoring that moves error-handling to a helper function will break this macro.
+// A port should replace this with a proper RAII cleanup object or exception handler.
 #if defined(__linux__) || defined(__LINUX__)
 #define flush_and_exit(ret)     { boost::nowide::cout << __FUNCTION__ << " found error, return "<<ret<<", exit..." << std::endl;\
     g_cli_callback_mgr.stop();\
@@ -1174,6 +1212,23 @@ static void load_downward_settings_list_from_config(std::string config_file, std
     }
 }
 
+// [INTENT] Main entry point for both GUI and headless CLI mode.
+// Responsibilities (in order of execution within this single ~6000-line function):
+//   1. Platform environment setup (UTF-8 filesystem, X11 threads, GPU hints)
+//   2. Argument parsing via CLI::setup()
+//   3. Config loading: printer preset, process preset, filament presets (from .json or .3mf)
+//   4. Model loading: STL/OBJ/3MF/AMF files, multi-plate structure reconstruction
+//   5. Optional: auto-arrange, auto-orient, scale-to-fit
+//   6. Per-plate slicing loop: Print::process() → GCode export
+//   7. Post-processing, thumbnail generation, result.json writing
+//
+// [STATE] CLI object holds: m_config (parsed args), m_print_config (merged preset config),
+// m_models (loaded Model objects), m_actions (list of CLI actions to perform).
+// [COUPLING] Despite being the CLI entry, this function directly creates GUI types:
+// PartPlateList, Camera, GLCanvas3D — because the plate/thumbnail system lives in the GUI layer.
+// [HAZARD] This function is ~6000 lines long and mixes 7+ distinct concerns. A port must
+// decompose it; the current structure makes it impossible to use the slicing pipeline without
+// pulling in the entire GUI dependency.
 int CLI::run(int argc, char **argv)
 {
     // Mark the main thread for the debugger and for runtime checks.
@@ -7422,6 +7477,11 @@ extern "C" {
     }
 }
 #else /* _MSC_VER */
+// [INTENT] POSIX/GCC entry point. Constructs a transient CLI object on the stack and
+// delegates entirely to CLI::run(). The CLI object owns all model and config state
+// for the duration of the process; it is destroyed at return.
+// [MEMORY] All heap allocations made during CLI::run() are freed by destructors of
+// m_models, m_print_config, etc. when the CLI object goes out of scope.
 int main(int argc, char **argv)
 {
     return CLI().run(argc, argv);

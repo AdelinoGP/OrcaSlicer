@@ -1,3 +1,17 @@
+// [INTENT] Core mesh slicing module. Converts a 3D triangle mesh into per-layer 2D contours.
+// Algorithm overview:
+//   Phase 1 (slice_make_lines): Per-triangle plane-sweep. For each triangle, binary search
+//           finds which Z planes it straddles, then linear interpolation yields intersection
+//           line segments. TBB parallel_for distributes triangles across threads.
+//   Phase 2 (chain_lines_by_triangle_connectivity): Hash-map based line chaining. Segments
+//           are connected into polylines by matching endpoint references (vertex or edge IDs).
+//   Phase 3 (Clipper union): Connected polylines are closed into ExPolygons using Clipper
+//           boolean union to handle non-manifold and degenerate input geometry.
+// [MEMORY] Float (32-bit) coordinates in mesh space; scaled int32 in 2D polygon space.
+//          Conversion happens at slice output time via scale_() macro.
+// [CONCURRENCY] Phase 1 is fully parallel (TBB). Phases 2-3 are currently per-layer parallel.
+//               A 64-slot mutex array shards the output lines[] array by (slice_id % 64)
+//               to reduce lock contention between threads writing different layers.
 #include "ClipperUtils.hpp"
 #include "Geometry.hpp"
 #include "Tesselate.hpp"
@@ -55,6 +69,14 @@ bool is_equal(const Vec3f &lh, const Vec3f &rh) {
     return is_equal(lh[0], rh[0]) && is_equal(lh[1], rh[1]) && is_equal(lh[2], rh[2]);
 }
 
+// [INTENT] Identifies where an intersection point lives in the mesh topology.
+// Either it is exactly on a mesh vertex (point_id set) or on a mesh edge midpoint
+// (edge_id set). Never both. This "topological address" is the key used by
+// chain_lines_by_triangle_connectivity() to stitch adjacent line segments in O(1)
+// via sorted lookup — no geometric distance comparison needed.
+// [MEMORY] Used inline in IntersectionPoint and IntersectionLine (no heap alloc per point).
+// [HAZARD] If both fields are -1 after construction, the point is unclassified —
+// this can happen for degenerate triangles or floating-point snap-to-vertex cases.
 class IntersectionReference
 {
 public:
@@ -68,6 +90,11 @@ public:
     int edge_id { -1 };
 };
 
+// [INTENT] A 2D point (scaled int32 coord_t) that also knows its topological
+// origin in the 3D mesh. Used during line construction before chaining;
+// discarded after IntersectionLine is assembled.
+// [MEMORY] XY from Point (coord_t, scaled 1e-6 mm). Z is not stored — only
+// needed during intersection computation, not after.
 class IntersectionPoint : public Point, public IntersectionReference
 {
 public:
@@ -77,6 +104,18 @@ public:
     // Inherits coord_t x, y
 };
 
+// [INTENT] A directed 2D line segment (scaled int32 coords) representing the intersection
+// of one triangle with a slicing plane. The direction is chosen so that the solid interior
+// of the mesh is to the right of the segment (consistent with Clipper CCW convention).
+// The {a,b}_id / edge_{a,b}_id fields carry the topological "address" of each endpoint
+// (see IntersectionReference), enabling chain_lines_by_triangle_connectivity() to stitch
+// adjacent segments in O(log N) without any floating-point distance comparisons.
+// [STATE] flags bitmask tracks: which edges had no neighbor (boundary edges), which are
+// fold candidates, whether this segment can be a loop seed, and whether it has been consumed.
+// [HAZARD] reverse() swaps both the geometric points AND the ID fields — callers must not
+// cache stale pointers to a_id/b_id after calling reverse().
+// [MEMORY] Stored in std::vector<IntersectionLine> (one per layer); the full set is only
+// alive during the chaining phase and is then discarded when loops are emitted.
 class IntersectionLine : public Line
 {
 public:
@@ -508,6 +547,15 @@ void slice_facet_at_zs(
 }
 
 template<typename TransformVertex, typename ThrowOnCancel>
+// [INTENT] Phase 1 of mesh slicing: generate one IntersectionLine per triangle-plane
+// intersection for each of the N slicing planes. This is the hot path — called for
+// every triangle in the mesh against every slice plane it straddles.
+// [CONCURRENCY] Uses tbb::parallel_for to distribute triangles across CPU cores.
+// Output lines[] array has one IntersectionLines per Z plane; concurrent writes to
+// different layers are sharded by (layer_id % 64) mutex to reduce contention.
+// Cancellation is checked every 65536 triangles via throw_on_cancel_fn().
+// [MEMORY] lines[] lives for the duration of Phase 1+2 then is consumed by make_loops().
+// [HAZARD] throw_on_cancel_fn() throws — callers must be exception-safe.
 static inline std::vector<IntersectionLines> slice_make_lines(
     const std::vector<stl_vertex>                   &vertices,
     const TransformVertex                           &transform_vertex_fn,
@@ -1057,6 +1105,20 @@ struct OpenPolyline {
 
 // called by make_loops() to connect sliced triangles into closed loops and open polylines by the triangle connectivity.
 // Only connects segments crossing triangles of the same orientation.
+// [INTENT] Phase 2 of mesh slicing: stitch the unordered IntersectionLines from Phase 1
+// into closed polygons (loops) or open polylines. Uses the topological address fields
+// (edge_a_id, a_id etc.) rather than geometric proximity for stitching.
+// Algorithm: greedy loop extraction — pick an unused seed line, follow its endpoint's
+// topological key through sorted lookup tables (by_edge_a_id, by_a_id) until the loop
+// closes or no continuation is found.
+// [MEMORY] by_edge_a_id and by_a_id are sorted pointer arrays into the input lines[] vector.
+// No copy of the line data; only pointers. Lines are marked SKIP when consumed.
+// [STATE] lines are mutated in-place (set_skip()). Completed loops are moved into output.
+// Open polylines are collected separately for a second pass (chain_open_polylines_exact).
+// [CONCURRENCY] Designed for single-threaded use per layer. Called from within a
+// per-layer parallel_for in the public slice_mesh_ex() API.
+// [HAZARD] The greedy approach can fail on genuinely non-manifold meshes; the Clipper
+// union in Phase 3 is the fallback to clean up the result.
 static void chain_lines_by_triangle_connectivity(IntersectionLines &lines, Polygons &loops, std::vector<OpenPolyline> &open_polylines)
 {
     // Build a map of lines by edge_a_id and a_id.
@@ -1938,6 +2000,18 @@ std::vector<Polygons> slice_mesh(
 }
 
 // Specialized version for a single slicing plane only, running on a single thread.
+// [INTENT] Public API: slice an indexed_triangle_set at a single Z plane and return
+// all closed contours as Polygons (scaled int32 coords).
+// Orchestrates the full 5-step pipeline for a single plane:
+//   Step 1: Classify vertices as below/on/above the plane (O(V))
+//   Step 2: Mark faces that straddle the plane (O(F))
+//   Step 3: Compute shared edge IDs for only those faces (needed for chaining) (O(F_crossed))
+//   Step 4: Generate IntersectionLines via slice_make_lines (single-threaded for 1 plane) (O(F_crossed))
+//   Step 5: Chain lines → polygons via make_loops() → chain_lines + Clipper union (O(F_crossed log F_crossed))
+// [MEMORY] face_mask and vertex_side are transient O(V)+O(F) allocations, freed at end of scope.
+// [HAZARD] XY coordinates are scaled to int32 (1 unit = 1e-6 mm) inside the lambda passed to
+// slice_make_lines. Z is left unscaled to match plane_z. Mixing scaled/unscaled Z between
+// callers is a recurring source of off-by-one slicing bugs.
 Polygons slice_mesh(
     const indexed_triangle_set       &mesh,
     // Unscaled Zs
