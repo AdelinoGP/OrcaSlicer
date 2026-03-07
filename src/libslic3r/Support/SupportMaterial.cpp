@@ -1,3 +1,30 @@
+// [INTENT] Normal (non-tree) support material generator for OrcaSlicer.
+// Implements the full support pipeline:
+//   detect overhangs → build contact layers → project downward →
+//   allocate intermediate layers → fill polygons → trim by object →
+//   generate interface layers → build raft → assemble SupportLayer objects →
+//   fill toolpaths.
+//
+// [MEMORY] All SupportGeneratorLayer objects are arena-allocated from a
+// std::deque<SupportGeneratorLayer> (SupportGeneratorLayerStorage).  Pointers
+// into the deque are stable because deque never invalidates existing elements
+// on push_back.  The SupportGeneratorLayersPtr vectors hold raw pointers into
+// this arena.  The arena lives until the end of PrintObjectSupportMaterial::generate().
+//
+// [CONCURRENCY] Three separate TBB parallel_for passes are used:
+//   1. detect_overhangs()         – per-layer, fully independent
+//   2. generate_base_layers()     – per-intermediate-layer, independent within range
+//   3. trim_support_layers_by_object() – per-support-layer, independent
+// detect_bottom_contacts() and project_support_to_grid() run as tbb::task_group
+// pairs inside the serial layer-descending loop of bottom_contact_layers_and_layer_support_areas().
+//
+// [COUPLING] Reads BBS-specific per-layer fields: Layer::sharp_tails,
+// Layer::sharp_tails_height, Layer::cantilevers.  These are written during
+// overhang detection and read during small-overhang cluster filtering.
+//
+// [HAZARD] SUPPORT_USE_AGG_RASTERIZER is hardcoded ON (line 21).
+// The EdgeGrid fallback path is compiled but never executed in production builds.
+
 #include "ClipperUtils.hpp"
 #include "ExtrusionEntity.hpp"
 #include "ExtrusionEntityCollection.hpp"
@@ -18,6 +45,11 @@
 #include <tbb/spin_mutex.h>
 #include <tbb/task_group.h>
 
+// [INTENT] When defined, contact-area rasterization uses the Anti-Grain Geometry
+// library instead of the EdgeGrid SDF approach.  AGG rasterizes the polygons into a
+// pixel grid, then performs a "seed fill" flood-fill within each oversampled macro-block
+// up to the trimming boundary, and finally re-vectorizes the result with
+// contours_simplified().  This is faster and more robust for complex shapes.
 #define SUPPORT_USE_AGG_RASTERIZER
 
 #ifdef SUPPORT_USE_AGG_RASTERIZER
@@ -51,7 +83,10 @@
 
 namespace Slic3r {
 
-// how much we extend support around the actual contact area
+// [INTENT] XY expansion margin around contact area (in mm).
+// Increasing this makes support more stable but uses more material.
+// BBS reduced this from the PrusaSlicer default of 1.5 to 1.2.
+// [HAZARD] FIXME note says this should scale with nozzle diameter but it doesn't.
 //FIXME this should be dependent on the nozzle diameter!
 // BBS: change from 1.5 to 1.2
 #define SUPPORT_MATERIAL_MARGIN 1.2
@@ -63,10 +98,15 @@ namespace Slic3r {
 #define PILLAR_SIZE (2.5)
 #define PILLAR_SPACING 10
 
+// [INTENT] Offset join type for expanding/contracting support polygons.
+// jtSquare keeps corners sharp, avoiding the rounded bumps that jtRound produces.
+// The "0." miter limit is unused by jtSquare but must be provided syntactically.
 //#define SUPPORT_SURFACES_OFFSET_PARAMETERS ClipperLib::jtMiter, 3.
 //#define SUPPORT_SURFACES_OFFSET_PARAMETERS ClipperLib::jtMiter, 1.5
 #define SUPPORT_SURFACES_OFFSET_PARAMETERS ClipperLib::jtSquare, 0.
 
+// [INTENT] When false, no sheath extrusion is added around support base columns.
+// Sheath was originally a solid outer wall to prevent peeling; disabled for print speed.
 static constexpr bool support_with_sheath = false;
 
 #ifdef SLIC3R_DEBUG
@@ -167,6 +207,15 @@ void export_print_z_polygons_and_extrusions_to_svg(
 #endif /* SLIC3R_DEBUG */
 
 #ifdef SUPPORT_USE_AGG_RASTERIZER
+// [INTENT] rasterize_polygons() converts a vector of Clipper polygons into a
+// flat grayscale byte-map using Anti-Grain Geometry's AA scanline rasterizer.
+// Output grid pixel = 255 if inside any polygon, 0 otherwise.
+// Used to create the oversampled support grid: support areas are rasterized,
+// then a seed-fill expands them up to the trimming boundary.
+//
+// [MEMORY] Returned vector is owned by the caller; grid_size.x * grid_size.y bytes.
+// [HAZARD] No bounds checking on grid_size; extremely large support areas or
+// very fine pixel_size could produce multi-GB allocations.
 static std::vector<unsigned char> rasterize_polygons(const Vec2i32 &grid_size, const double pixel_size, const Point &left_bottom, const Polygons &polygons)
 {
     std::vector<unsigned char>                  data(grid_size.x() * grid_size.y());
@@ -200,6 +249,21 @@ static std::vector<unsigned char> rasterize_polygons(const Vec2i32 &grid_size, c
     agg::render_scanlines(rasterizer, scanline, renderer);
     return data;
 }
+// [INTENT] Re-vectorize the pixel grid back into Clipper polygons.
+// Algorithm:
+//   1. Optional hole-filling: a pixel is marked inside if either its left+right or
+//      top+bottom neighbors are both filled (eliminates 1-pixel holes from thin walls).
+//   2. Marching-squares-style edge extraction: walks pixel boundary transitions
+//      collecting directed line segments.
+//   3. Chain segments into closed polygons by following start-point lookup.
+//      At ambiguous corners (two possible continuations), pick the one that makes
+//      a convex (rightward) turn.
+//   4. Scale pixel coordinates back to world coordinates and shrink each corner
+//      inward by `offset` to prevent re-expansion on the next rasterization pass.
+//
+// [HAZARD] The corner-offset logic (step 4) assumes a rectilinear polygon
+// (axis-aligned edges only), which holds for a pixel grid but could silently
+// misbehave if the algorithm were ever called with other data.
 // Grid has to have the boundary pixels unset.
 static Polygons contours_simplified(const Vec2i32 &grid_size, const double pixel_size, Point left_bottom, const std::vector<unsigned char> &grid, coord_t offset, bool fill_holes)
 {
@@ -329,6 +393,8 @@ static Polygons contours_simplified(const Vec2i32 &grid_size, const double pixel
 }
 #endif // SUPPORT_USE_AGG_RASTERIZER
 
+// [INTENT] Constructor: simply caches observing pointers + precomputed parameter structs.
+// SupportParameters computes nozzle/flow/spacing values used throughout.
 PrintObjectSupportMaterial::PrintObjectSupportMaterial(const PrintObject *object, const SlicingParameters &slicing_params) :
     m_print_config          (&object->print()->config()),
     m_object_config         (&object->config()),
@@ -338,6 +404,8 @@ PrintObjectSupportMaterial::PrintObjectSupportMaterial(const PrintObject *object
 {
 }
 
+// [INTENT] Single-threaded layer allocator.  Uses std::deque so pointer stability
+// is guaranteed (deque never relocates existing elements on push_back).
 // Using the std::deque as an allocator.
 inline SupportGeneratorLayer& layer_allocate(
     std::deque<SupportGeneratorLayer> &layer_storage, 
@@ -348,6 +416,11 @@ inline SupportGeneratorLayer& layer_allocate(
     return layer_storage.back();
 }
 
+// [INTENT] Thread-safe variant: acquires spin_mutex before push_back.
+// [CONCURRENCY] tbb::spin_mutex is appropriate here because the critical section
+// is extremely short (a single deque push_back + pointer capture).
+// The layer_type assignment happens outside the lock on the captured pointer,
+// which is safe because the pointer is not shared until after this function returns.
 inline SupportGeneratorLayer& layer_allocate(
     std::deque<SupportGeneratorLayer> &layer_storage,
     tbb::spin_mutex                                 &layer_storage_mutex,
@@ -361,16 +434,26 @@ inline SupportGeneratorLayer& layer_allocate(
     return *layer_new;
 }
 
+// [INTENT] Convenience append for merging two SupportGeneratorLayersPtr vectors.
 inline void layers_append(SupportGeneratorLayersPtr &dst, const SupportGeneratorLayersPtr &src)
 {
     dst.insert(dst.end(), src.begin(), src.end());
 }
 
+// [INTENT] Identifies the five layer types that carry dense interface material
+// (as opposed to sparse base support).  Used to distinguish interface from base
+// in toolpath and merging decisions.
 // Support layer that is covered by some form of dense interface.
 static constexpr const std::initializer_list<SupporLayerType> support_types_interface { 
     SupporLayerType::RaftInterface, SupporLayerType::BottomContact, SupporLayerType::BottomInterface, SupporLayerType::TopContact, SupporLayerType::TopInterface
 };
 
+// [INTENT] Main support generation pipeline entry point.
+// Sequential orchestration of all sub-steps; each step is documented below.
+// Returns early if the print job is canceled at strategic checkpoints.
+// [STATE] All intermediate data (contact layers, intermediate layers, etc.)
+// lives in local variables.  Nothing is stored on the class itself — this
+// method is effectively stateless with respect to the object after it returns.
 void PrintObjectSupportMaterial::generate(PrintObject &object)
 {
     BOOST_LOG_TRIVIAL(info) << "Support generator - Start";
@@ -614,6 +697,11 @@ Polygons collect_slices_outer(const Layer &layer)
     return out;
 }
 
+// [INTENT] SupportGridParams bundles the resolved numeric parameters needed by
+// SupportGridPattern.  Constructed from PrintObjectConfig + flow at the call site
+// so the grid class stays config-agnostic.
+// [HAZARD] support_closing_radius is hardcoded to 2.0 regardless of
+// object_config.support_closing_radius — the config field is commented out.
 struct SupportGridParams {
     SupportGridParams(const PrintObjectConfig &object_config, const Flow &support_material_flow) :
         style(object_config.support_style.value),
@@ -634,6 +722,20 @@ struct SupportGridParams {
     coord_t                 expansion_to_propagate;
 };
 
+// [INTENT] Stretches sparse support islands into a printable grid pattern and re-vectorizes
+// them back to Clipper polygons. Two operating modes:
+//   smsGrid  — rasterize→flood-fill→contour (SUPPORT_USE_AGG_RASTERIZER path, always active)
+//   smsSnug  — morphological close + smooth outward (no raster grid)
+// Tree-style variants (smsTreeSlim/Strong/Hybrid/Organic) are silently demoted to smsGrid
+// at construction time; extract_support() asserts false and returns empty for them.
+// [COUPLING] Depends on SupportGridParams (caller-supplied), AGG rasterize_polygons(),
+// seed_fill_block(), and contours_simplified() helpers defined above in this file.
+// [MEMORY] m_grid2 is a heap-allocated byte pixel grid (grid_size.x * grid_size.y bytes).
+//          m_support_polygons / m_trimming_polygons are non-owning observers; rotated copies
+//          are stored in m_support_polygons_rotated / m_trimming_polygons_rotated when
+//          support_angle != 0, so the class IS the lifetime owner of those rotated copies.
+// [HAZARD] The class stores raw pointers to the caller's Polygons — if the caller
+//          moves or destroys them before extract_support() is called, UB follows.
 class SupportGridPattern
 {
 public:
@@ -1123,6 +1225,16 @@ private:
 #endif /* SLIC3R_DEBUG */
 };
 
+// [INTENT] Namespace grouping low-level bridge-detection helpers used by detect_overhangs()
+// and trim_support_layers_by_object().  None of these functions modify any slicer state.
+// [COUPLING] Reads ExtrusionLoop/ExtrusionPath roles (erOverhangPerimeter,
+// erBridgeInfill, erInternalBridgeInfill) and Layer::regions() field.
+// has_bridging_extrusions()  — returns true if any region of the layer has bridging perims
+//                              or stBottomBridge fill surfaces with bridging extrusions.
+// collect_bridging_perimeter_areas() — expands overhang-perimeter ExtrusionPaths by
+//     half their width + expansion_scaled, producing trimming polygons for support generation.
+// remove_bridges_from_contacts() — subtracts inferred bridge areas from diff_polygons so
+//     that supports are not generated under self-supporting bridges.
 namespace SupportMaterialInternal {
     static inline bool has_bridging_perimeters(const ExtrusionLoop &loop)
     {
@@ -1294,6 +1406,16 @@ namespace SupportMaterialInternal {
     }
 }
 
+// [INTENT] Builds a per-object-layer cumulative union of all slice polygons below each
+// layer.  Used for "support on build plate only" mode to prevent supports from being
+// generated above already-solid regions.
+// [STATE] Returns std::vector<Polygons> indexed by object layer id; entry [i] contains
+// the union of all slices from layers 0..(i-1).  Empty vector if buildplate_only is false.
+// [HAZARD] FIXME comment in the code acknowledges this should be a parallel prefix-sum
+// but is implemented as a serial loop: O(n²) in the worst case as each union() call
+// operates on an ever-growing polygon set.  Slow for tall objects.
+// [MEMORY] The returned vector can be large — one Polygons per layer, each potentially
+// holding the full object footprint.
 std::vector<Polygons> PrintObjectSupportMaterial::buildplate_covered(const PrintObject &object) const
 {
     // Build support on a build plate only? If so, then collect and union all the surfaces below the current layer.
@@ -1321,6 +1443,15 @@ std::vector<Polygons> PrintObjectSupportMaterial::buildplate_covered(const Print
     return buildplate_covered;
 }
 
+// [INTENT] Aggregates support enforcer/blocker polygon slices plus custom-facet projections
+// into per-layer polygon vectors.  Constructed once at the start of top_contact_layers().
+// [STATE] enforcers_layers[i] and blockers_layers[i] are indexed by object layer id.
+//         buildplate_covered is a const reference to the precomputed coverage vector.
+// [COUPLING] Calls object.slice_support_enforcers/blockers() and
+//     object.project_and_append_custom_facets() — reads GUI-painted support data.
+// [HAZARD] Blocker polygons are expanded by 1000*SCALED_EPSILON to prevent thin residues
+//     after diff operations; this expansion may eat into legitimate overhang areas if
+//     the blocker mesh is placed close to an overhang edge.
 struct SupportAnnotations
 {
     SupportAnnotations(const PrintObject &object, const std::vector<Polygons> &buildplate_covered) :
@@ -1347,6 +1478,13 @@ struct SupportAnnotations
     const std::vector<Polygons>&  buildplate_covered;
 };
 
+// [INTENT] Lazy cache for the trimming polygons derived from the lower object layer.
+// Avoids recomputing the offset2() expansion when detect_contacts() processes multiple
+// LayerRegions with the same slices_margin_offset value within the same layer.
+// [STATE] offset == -1 sentinel means "not yet computed".  polygons holds the trimming
+// set (potentially merged with buildplate_covered mask).  all_polygons is a backup of
+// polygons WITHOUT the buildplate mask, used when support enforcers are present (they
+// must be trimmed without the "build plate only" restriction).
 struct SlicesMarginCache
 {
     float       offset { -1 };
@@ -1356,6 +1494,17 @@ struct SlicesMarginCache
     Polygons    all_polygons;
 };
 
+// [INTENT] BBS-specific threshold constants for sharp-tail and small-overhang detection.
+// length_thresh_well_supported / area_thresh_well_supported: a region is "well supported"
+//   if its bounding box exceeds 6×6mm in both axes — if smaller it may be a sharp tail.
+// sharp_tail_xy_gap: XY trim gap applied to sharp-tail expolygons (smaller than normal
+//   gap_xy so supports stay closer to the object near slender protrusions).
+// no_overlap_xy_gap: XY trim gap for object regions that do NOT overlap the support layer
+//   (e.g. bridging extrusions a layer above).
+// sharp_tail_max_support_height: accumulated height cap for sharp-tail propagation (16mm);
+//   above this height a previously-flagged sharp tail is considered "connected" to the body.
+// [HAZARD] sharp_tail_xy_gap and no_overlap_xy_gap are declared as `double` but initialized
+//   with float literals (0.2f) — this is harmless in practice but inconsistent.
 // BBS
 static const double length_thresh_well_supported = scale_(6);  // min: 6mm
 static const double area_thresh_well_supported = SQ(length_thresh_well_supported);  // min: 6x6=36mm^2
@@ -1363,6 +1512,35 @@ static const double sharp_tail_xy_gap = 0.2f;
 static const double no_overlap_xy_gap = 0.2f;
 static const double sharp_tail_max_support_height = 16.f;
 
+// [INTENT] First-pass overhang detector.  For each layer region, computes the polygon
+// set that overhangs the lower layer beyond the configured threshold angle or overlap.
+// Also performs BBS-specific sharp-tail detection (first pass) and cantilever detection,
+// writing results into mutable Layer fields (Layer::sharp_tails, sharp_tails_height,
+// Layer::cantilevers).
+//
+// Pipeline per non-raft layer:
+//   1. Compute lower_layer_offset from threshold_rad or support_threshold_overlap.
+//   2. Diff current layer against lower layer (expanded by lower_layer_offset) → diff_polygons.
+//   3. BBS sharp-tail pass: for each raw_slice that has no overlap below, if small enough
+//      mark it as sharp_tail and add its overhang area to diff_polygons.
+//   4. Apply support blockers (clip diff_polygons by blockers_layers[layer_id]).
+//   5. Remove bridges if bridge_no_support is set.
+//   6. Apply xy_expansion.
+//   7. Detect cantilevers: any overhang ExPolygon whose farthest point is >3mm from the
+//      lower-layer boundary is recorded as a cantilever.
+//
+// [STATE] Writes to layer.sharp_tails, layer.sharp_tails_height, layer.cantilevers —
+//   mutable fields on an otherwise const-accessed object.  This is safe only because
+//   top_contact_layers() calls detect_overhangs() inside a tbb::parallel_for with
+//   each layer processed by exactly one thread.
+// [CONCURRENCY] Called from tbb::parallel_for in top_contact_layers(); each invocation
+//   operates on a distinct layer object, so no data races on layer fields.  annotations
+//   (enforcers/blockers) is read-only once constructed.
+// [HAZARD] lower_layer_expolys is rebuilt every call by filtering lower_layer.lslices
+//   through an inward offset — this filter is shared across all regions of the layer, but
+//   uses only the FIRST region's extrusion width (fw).  Multi-region objects with varying
+//   nozzle diameters may get incorrect filtering.
+// [COUPLING] Reads g_config_support_sharp_tails global (set from print config before call).
 // Tuple: overhang_polygons, contact_polygons, enforcer_polygons, no_interface_offset
 // no_interface_offset: minimum of external perimeter widths
 static inline ExPolygons detect_overhangs(
@@ -1544,6 +1722,30 @@ static inline ExPolygons detect_overhangs(
     return overhang_areas;
 }
 
+// [INTENT] Second-pass contact geometry builder. Given the already-computed overhang
+// polygons, computes the actual contact_polygons (regions where support material will
+// physically touch the object bottom) and enforcer_polygons (regions from explicit
+// enforcer meshes).
+//
+// Key differences from detect_overhangs():
+//   - detect_overhangs() decides WHAT needs support (shape / topology criterion)
+//   - detect_contacts() decides WHERE support meets the object (gap, expansion, trim)
+//
+// Pipeline:
+//   1. Layer 0: contact = raft_expansion-expanded overhang polygons.
+//   2. Non-raft layers: for each LayerRegion, intersect overhang_polygons with the region
+//      slices, then subtract slices_margin (trimming with lower layer + optional buildplate
+//      mask).  slices_margin_update() is a lazy-evaluated lambda that recomputes margins
+//      only when the offset changes.
+//   3. If has_enforcer: project enforcer mesh onto this layer, subtract expanded lower
+//      layer, and append to both overhang_polygons and contact_polygons.
+//
+// [STATE] Mutates overhang_polygons (passed by ref) to include enforcer regions.
+// [COUPLING] Uses SlicesMarginCache for lazy margin computation. Reads
+//   annotations.buildplate_covered[layer_id] and annotations.enforcers_layers[layer_id].
+// [HAZARD] no_interface_offset is computed as the minimum external perimeter width across
+//   all regions — used in offset2() inside slices_margin_update().  The FIXME comment
+//   notes the exponent 0.6 is not geometrically derived.
 // Tuple: overhang_polygons, contact_polygons, enforcer_polygons, no_interface_offset
 // no_interface_offset: minimum of external perimeter widths
 static inline std::tuple<Polygons, Polygons, double> detect_contacts(
@@ -1672,6 +1874,18 @@ static inline std::tuple<Polygons, Polygons, double> detect_contacts(
     return std::make_tuple(std::move(contact_polygons), std::move(enforcer_polygons), no_interface_offset);
 }
 
+// [INTENT] Snaps a support contact layer's print_z to the nearest object layer boundary
+// so that when independent_support_layer_height is OFF, support layers are always
+// co-planar with object layers.
+// [STATE] Walks the doubly-linked Layer list (lower_layer / upper_layer pointers)
+//   accumulating layer heights until gap_support_object is reached.  Returns the
+//   object Layer whose print_z is closest to layer.print_z ± gap_support_object.
+// [HAZARD] If the linked list is not fully built (lower_layer/upper_layer null for
+//   intermediate layers during initialization), the while-loop exits prematurely and
+//   returns a stale pointer.  Callers must ensure the layer graph is complete.
+// [UNCLEAR] The post-correction logic (comparing gap_synced - last_valid_gap_layer->height
+//   vs gap_synced - gap_support_object) is subtle: it picks the neighbour layer that
+//   minimizes the gap overshoot without a clear comment explaining the geometry.
 // find the object layer that is closest to the {layer.bottom_z-gap_support_object} for top contact,
 // or {layer.print_z+gap_object_support} for bottom contact
 Layer* sync_gap_with_object_layer(const Layer& layer, const coordf_t gap_support_object, bool is_top_contact)
@@ -1716,6 +1930,22 @@ Layer* sync_gap_with_object_layer(const Layer& layer, const coordf_t gap_support
     }
 }
 
+// [INTENT] Allocates one or two SupportGeneratorLayer objects for the top contact zone
+// of the given object layer.  Returns (main_layer, bridging_layer); bridging_layer is
+// nullptr unless thick_bridges is enabled AND the layer has bridging extrusions AND
+// independent_support_layer_height is on.
+//
+// Z-height decision tree:
+//   - layer_id == 0 (raft contact): use slicing_params.raft_contact_top_z
+//   - soluble_interface: align with layer.bottom_z (contact synced to object)
+//   - independent_support_layer_height ON: print_z = layer.bottom_z - gap_support_object
+//   - otherwise (BBS adaptive layers): use sync_gap_with_object_layer() to snap to
+//     the nearest object layer boundary
+//
+// [COUPLING] Calls SupportMaterialInternal::has_bridging_extrusions() which walks all
+//   layer regions' extrusion paths — O(extrusions per layer).
+// [HAZARD] If print_z < first_print_layer_height - EPSILON, returns (nullptr, nullptr)
+//   signalling the contact layer is unprintable.  Callers MUST check for nullptr.
 // Allocate one, possibly two support contact layers.
 // For "thick" overhangs, one support layer will be generated to support normal extrusions, the other to support the "thick" extrusions.
 static inline std::pair<SupportGeneratorLayer*, SupportGeneratorLayer*> new_contact_layer(
@@ -1822,6 +2052,27 @@ static inline std::pair<SupportGeneratorLayer*, SupportGeneratorLayer*> new_cont
     return std::make_pair(&new_layer, bridging_layer);
 }
 
+// [INTENT] Fills new_layer.polygons and new_layer.contact_polygons by stretching
+// contact_polygons into a SupportGridPattern and extracting two polygon sets:
+//   contact_polygons  → new_layer.contact_polygons (propagation footprint, slightly
+//                       smaller than grid cells, used by bottom_contact_layers)
+//   dense_interface   → new_layer.polygons (sliced interface to actually extrude,
+//                       expanded by expansion_to_slice)
+//
+// If reduce_interfaces is true (non-snug style, non-raft, non-soluble), the dense
+// interface is restricted to the sub-area that actually overhangs by >60% (controlled
+// by lower_layer_polygons_for_dense_interface lazy lambda).
+//
+// Support enforcers get their own separate SupportGridPattern pass using
+// slices_margin.all_polygons (without buildplate-only mask).
+//
+// [COUPLING] Instantiates SupportGridPattern twice (once for contact, once for
+//   dense interface) — each construction rasterizes and flood-fills the polygon grid.
+// [STATE] Writes new_layer.polygons, .contact_polygons, .overhang_polygons,
+//   .enforcer_polygons (all unique_ptr<Polygons>).
+// [HAZARD] lower_layer_polygons_for_dense_interface_cache is initialized inside a
+//   lambda but shared between two code paths; if both paths call it concurrently
+//   (they don't currently, but a future refactor could introduce a race).
 static inline void fill_contact_layer(
     SupportGeneratorLayer &new_layer,
     size_t                   layer_id,
@@ -1973,6 +2224,13 @@ static inline void fill_contact_layer(
         new_layer.enforcer_polygons = std::make_unique<Polygons>(std::move(enforcer_polygons));
 }
 
+// [INTENT] Post-processing pass over the contact_out vector from top_contact_layers():
+// sorts by print_z, then merges layers that are closer together than
+// support_layer_height_min (typically 0.05mm).  Also snaps all layers that fall below
+// first_print_layer_height into a single merged layer at that exact height.
+// [HAZARD] In-place compaction using two indices (i, k) to avoid reallocating.
+//   Assumes layers are sorted after the initial sort step; if sort() produces a
+//   non-stable order for equal print_z values, the snapping may behave unexpectedly.
 // Merge close contact layers conservatively: If two layers are closer than the minimum allowed print layer height (the min_layer_height parameter),
 // the top contact layer is merged into the bottom contact layer.
 static void merge_contact_layers(const SlicingParameters &slicing_params, double support_layer_height_min, SupportGeneratorLayersPtr &layers)
@@ -2019,6 +2277,27 @@ static void merge_contact_layers(const SlicingParameters &slicing_params, double
 }
 
 
+// [INTENT] Groups spatially and vertically adjacent overhang ExPolygons across all
+// layers into clusters.  A cluster represents one logical overhanging feature.
+// Used by top_contact_layers() with config_remove_small_overhangs to suppress support
+// generation for isolated, small, non-cantilever, non-sharp-tail overhangs.
+//
+// Membership criterion (intersects()):
+//   - The candidate overhang (dilated by offset_scaled = 1 extrusion width) must overlap
+//     the cluster's merged_overhangs_dilated.
+//   - layer_nr must be within [min_layer-1, max_layer+1] (i.e., adjacent layers only).
+//
+// [STATE] merged_overhangs_dilated is the running union of all inserted overhangs
+//   expanded by offset_scaled.  This is NOT reverted when overhangs are later "removed"
+//   — once an overhang is added, the dilated footprint grows monotonically.
+// [HAZARD] add_overhang() iterates clusters[] linearly to find a match.  O(C) per call
+//   where C = number of clusters so far.  For objects with many small overhangs across
+//   many layers, this is O(N²) in total (N = number of overhangs) and may be slow.
+// [HAZARD] add_overhang() stores raw pointers (ExPolygon*) into cluster.layer_overhangs.
+//   Those pointers reference elements of overhangs_per_layers[layer_id] which is a
+//   std::vector<ExPolygon>.  If that vector is ever reallocated, pointers become dangling.
+//   Currently safe because overhangs_per_layers is not modified after construction, but
+//   fragile.
 struct OverhangCluster {
     std::map<int, std::vector<ExPolygon*>> layer_overhangs;
     ExPolygons merged_overhangs_dilated;
@@ -2087,6 +2366,29 @@ static OverhangCluster* add_overhang(std::vector<OverhangCluster>& clusters, ExP
     return cluster;
 };
 
+// [INTENT] Top-level orchestrator for generating top contact layers (the support zones
+// that directly touch the object from below).
+//
+// Pipeline:
+//   1. Early-exit if tree support is selected (not normal support).
+//   2. Build SupportAnnotations (enforcer/blocker slices).
+//   3. tbb::parallel_for: call detect_overhangs() on each layer → overhangs_per_layers[].
+//   4. Serial sharp-tail second pass: propagate sharp_tails upward layer by layer
+//      (checks bbox size, area growth, accumulated height cap at 16mm).
+//   5. Optional small-overhang removal: build OverhangCluster groups, mark small
+//      non-cantilever non-sharp-tail clusters, zero out their overhangs.
+//   6. Serial loop: for each layer call detect_contacts(), new_contact_layer(),
+//      fill_contact_layer(), store results in contact_out[layer_id*2] and [*2+1].
+//   7. Compact contact_out (remove nullptrs).
+//   8. merge_contact_layers() to snap thin gaps.
+//
+// [CONCURRENCY] Step 3 is parallel (tbb::parallel_for).  Steps 4/5/6 are serial.
+//   detect_overhangs() writes to Layer::sharp_tails — safe because each layer is
+//   processed by one thread.
+// [MEMORY] contact_out pre-allocated at 2×num_layers to hold possible bridging copies;
+//   most entries will be nullptr and are compacted away at step 7.
+// [COUPLING] Reads m_object_config, m_print_config, m_slicing_params, m_support_params.
+//   Calls buildplate_covered() result (pre-computed by generate()).
 // Generate top contact layers supporting overhangs.
 // For a soluble interface material synchronize the layer heights with the object, otherwise leave the layer height undefined.
 // If supports over bed surface only are requested, don't generate contact layers over an object.
@@ -2366,6 +2668,28 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::top_contact_layers(
     return contact_out;
 }
 
+// [INTENT] For a given object layer, finds top surface regions (stTop) that are
+// "touched" by support projections coming from above, and creates a BottomContact
+// SupportGeneratorLayer to represent that support-to-object interface.
+//
+// Algorithm:
+//   1. Collect stTop polygons for this layer.
+//   2. Intersect with supports_projected → "touching" regions.
+//   3. Allocate a new BottomContact layer; set print_z/height using
+//      sync_gap_with_object_layer() or gap_object_support directly.
+//   4. Expand touching by support_material_flow.scaled_width() for the polygon footprint.
+//   5. Snap print_z to the nearest top_contact layer to avoid sub-minimum-height gaps.
+//   6. Trim layer_support_areas above this layer by the touching region (prevent
+//      double-stacking of supports through bottom interfaces).
+//
+// [CONCURRENCY] Called from a tbb::task_group inside bottom_contact_layers_and_layer_support_areas().
+//   Uses allocate_unguarded() (no mutex) because each layer is processed by exactly
+//   one task at a time.  layer_support_areas[] is indexed by layer_id — tasks process
+//   different layer_ids so no concurrent write to the same element.
+// [HAZARD] Trimming loop at step 6 modifies layer_support_areas for layers ABOVE the
+//   current layer.  If another task is concurrently reading those entries, there is a
+//   data race.  The current code is safe only because the outer loop is serial
+//   (tasks are serialized by tbb::task_group::wait before the next iteration).
 // Find the bottom contact layers above the top surfaces of this layer.
 static inline SupportGeneratorLayer* detect_bottom_contacts(
     const SlicingParameters                          &slicing_params,
@@ -2504,6 +2828,20 @@ static inline SupportGeneratorLayer* detect_bottom_contacts(
     return &layer_new;
 }
 
+// [INTENT] Projects a set of overhang polygons onto the current layer using a
+// SupportGridPattern, returning two polygon sets:
+//   out.first  = layer_support_area (grid-stretched, expansion_to_slice — what to extrude)
+//   out.second = overhangs_projection (grid-trimmed, expansion_to_propagate — what to
+//                project further down to the next layer)
+//
+// Trimming removes areas already covered by the object slice (or buildplate_covered),
+// preventing supports from occupying space inside the object body.
+//
+// [CONCURRENCY] Uses an inner tbb::task_group to compute out.first and out.second
+//   in parallel — both are independent SupportGridPattern::extract_support() calls
+//   on the same grid instance.  The grid is read-only after construction.
+// [COUPLING] Constructs a SupportGridPattern inline — this triggers the full
+//   rasterize → flood-fill pipeline.  O(grid_size²) work per call.
 // Returns polygons to print + polygons to propagate downwards.
 // Called twice: First for normal supports, possibly trimmed by "on build plate only", second for support enforcers not trimmed by "on build plate only".
 static inline std::pair<Polygons, Polygons> project_support_to_grid(const Layer &layer, const SupportGridParams &grid_params, const Polygons &overhangs, Polygons *layer_buildplate_covered
@@ -2584,6 +2922,31 @@ static inline std::pair<Polygons, Polygons> project_support_to_grid(const Layer 
     return out;
 }
 
+// [INTENT] Two-in-one function: generates bottom contact layers AND computes
+// layer_support_areas (the per-object-layer support footprints used by generate_base_layers).
+//
+// Algorithm — iterates object layers top-to-bottom (layer_id from total_layer_count-2 to 0):
+//   1. Collect contact_polygons from all top_contacts with print_z > current layer.print_z
+//      into overhangs_projection (consuming the contact_polygons unique_ptrs).
+//   2. Union and snapshot overhangs_projection_raw.
+//   3. tbb::task_group fires two concurrent tasks:
+//      a. detect_bottom_contacts() → appends to bottom_contacts if touching stTop surfaces.
+//      b. project_support_to_grid() → writes layer_support_area[layer_id] and updates
+//         overhangs_projection for the next iteration.
+//   4. Optionally a third task for enforcer-only projection.
+//   5. After all layers: std::reverse(bottom_contacts) (built in descending order).
+//   6. trim_support_layers_by_object() applied to bottom_contacts.
+//
+// [CONCURRENCY] Each iteration fires up to 3 concurrent tasks via tbb::task_group.
+//   overhangs_projection is updated by task (b) and read by task (a) in the NEXT
+//   iteration — safe because task_group::wait() is called before the next iteration.
+// [HAZARD] bottom_contacts.push_back() is called inside a task_group lambda while
+//   bottom_contacts is a local vector.  Since at most one detect_bottom_contacts task
+//   runs per iteration (guarded by the outer serial loop), there is no concurrent
+//   push_back.  However, if the code were refactored to parallelize across multiple
+//   layers simultaneously, this would be a data race.
+// [STATE] layer_support_areas is an out-parameter (pre-allocated by caller to total_layer_count).
+//   buildplate_covered is consumed (moved from) per layer by project_support_to_grid.
 // Generate bottom contact layers supporting the top contact layers.
 // For a soluble interface material synchronize the layer heights with the object, 
 // otherwise set the layer height to a bridging flow of a support interface nozzle.
@@ -2729,6 +3092,13 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::bottom_contact_layers_and_
     return bottom_contacts;
 }
 
+// [INTENT] Parallel post-processing pass: trims top_contact layers by any overlapping
+// bottom_contact layers to prevent them from occupying the same vertical space.
+// Uses idx_lower_or_equal binary-search cache (idx_bottom_overlapping_first) to avoid
+// re-scanning the entire bottom_contacts vector for each top contact.
+// [CONCURRENCY] tbb::parallel_for across top_contacts; the idx_bottom_overlapping_first
+//   cache is per-thread (declared inside the lambda).  Since layer_top.polygons is only
+//   modified by its own thread index, there are no write races.
 // Trim the top_contacts layers with the bottom_contacts layers if they overlap, so there would not be enough vertical space for both of them.
 void PrintObjectSupportMaterial::trim_top_contacts_by_bottom_contacts(
     const PrintObject &object, const SupportGeneratorLayersPtr &bottom_contacts, SupportGeneratorLayersPtr &top_contacts) const
@@ -2755,6 +3125,24 @@ void PrintObjectSupportMaterial::trim_top_contacts_by_bottom_contacts(
         });
 }
 
+// [INTENT] Generates the raft layers and all intermediate support layers (the "trunk"
+// columns between top/bottom contact layers).
+//
+// Algorithm:
+//   1. Build "extremes" — the sorted set of all bottom-of-top-contacts and
+//      top-of-bottom-contacts (the Z heights where support columns must begin/end).
+//   2. For each gap between consecutive extremes, fill with intermediate layers:
+//      - If synchronize_layers: align intermediate layers to object layer heights.
+//      - Otherwise: divide the gap evenly into steps of ≤ max_suport_layer_height.
+//   3. Top contact layers with height==0 get their height assigned here (step = dist/n).
+//   4. Raft layers are prepended if needed.
+//
+// [STATE] Returns new SupportGeneratorLayer* objects allocated from layer_storage.
+//   Callers (generate()) will subsequently fill polygons via generate_base_layers().
+// [HAZARD] If extr1->print_z + support_layer_height_min > extr1->bottom_z + step, a
+//   special first-layer is generated before recomputing step.  The nested "continue"
+//   that skips when n_layers_extra==0 could theoretically miss the TopContact height
+//   assignment if step geometry is degenerate.
 SupportGeneratorLayersPtr PrintObjectSupportMaterial::raft_and_intermediate_support_layers(
     const PrintObject   &object,
     const SupportGeneratorLayersPtr   &bottom_contacts,
@@ -2943,6 +3331,27 @@ SupportGeneratorLayersPtr PrintObjectSupportMaterial::raft_and_intermediate_supp
     return intermediate_layers;
 }
 
+// [INTENT] Fills intermediate_layers[i].polygons for all intermediate layers (the
+// support column bodies between contact layers).  Called after
+// raft_and_intermediate_support_layers() creates the layer objects.
+//
+// Algorithm (tbb::parallel_for over intermediate_layers):
+//   Each thread processes a range of intermediate layers in descending index order.
+//   Per layer:
+//   1. Binary-search idx_object_layer_above: find the highest object layer ≤ this layer's
+//      print_z.  This index caches across iterations (decreasing) to avoid re-scanning.
+//   2. Collect top_contact layers whose bottom_z ≤ layer.print_z into polygons_trimming.
+//   3. Load polygons_new = layer_support_areas[idx_object_layer_above]
+//      (precomputed by bottom_contact_layers_and_layer_support_areas).
+//   4. Collect bottom_contact layers whose print_z ≤ layer.print_z into polygons_trimming.
+//   5. diff(polygons_new, polygons_trimming) → layer.polygons.
+//   6. Call trim_support_layers_by_object() after the parallel section.
+//
+// [CONCURRENCY] tbb::parallel_for; each thread owns 3 binary-search cache indices
+//   (idx_top_contact_above, idx_bottom_contact_overlapping, idx_object_layer_above).
+//   These are thread-local (declared inside the lambda), so no races.
+// [STATE] intermediate_layers[i].polygons is written; all other arrays are read-only.
+// [COUPLING] Reads layer_support_areas[] computed by bottom_contact_layers_and_layer_support_areas().
 // At this stage there shall be intermediate_layers allocated between bottom_contacts and top_contacts, but they have no polygons assigned.
 // Also the bottom/top_contacts shall have a layer thickness assigned already.
 void PrintObjectSupportMaterial::generate_base_layers(
@@ -3098,6 +3507,22 @@ void PrintObjectSupportMaterial::generate_base_layers(
     this->trim_support_layers_by_object(object, intermediate_layers, m_slicing_params.gap_support_object, m_slicing_params.gap_object_support, m_support_params.gap_xy);
 }
 
+// [INTENT] Parallel XY trim pass: removes object body polygons (expanded by XY gap)
+// from all non-empty support layers above the raft contact z.
+//
+// XY gap selection (BBS tri-state logic per ExPolygon):
+//   - Sharp-tail expolygon: sharp_tail_xy_gap (0.2mm) — stay closer to slender features
+//   - Overlapping layer:    gap_xy_scaled (user-configured, typically 0.2–0.35mm)
+//   - Non-overlapping:      no_overlap_xy_gap (0.2mm) — bridging fills a layer above
+//
+// Additionally, if thick_bridges is enabled, bridging fill surfaces from layers above
+// are also added to polygons_trimming (with their own bridging_height offset).
+//
+// [CONCURRENCY] tbb::parallel_for over nonempty_layers.  Per-thread binary-search
+//   cache idx_object_layer_overlapping (size_t(-1) = not initialized).  Thread-safe
+//   because each support layer is processed by exactly one thread.
+// [COUPLING] Reads object_layer.sharp_tails (written by detect_overhangs()).  Reads
+//   region->fill_surfaces and region->perimeters for bridging fill polygons.
 void PrintObjectSupportMaterial::trim_support_layers_by_object(
     const PrintObject   &object,
     SupportGeneratorLayersPtr         &support_layers,
@@ -3199,6 +3624,13 @@ void PrintObjectSupportMaterial::trim_support_layers_by_object(
     BOOST_LOG_TRIVIAL(debug) << "PrintObjectSupportMaterial::trim_support_layers_by_object() in parallel - end";
 }
 
+// [INTENT] Dead code — pillar-based support from the original Slic3r Perl era.
+// clip_by_pillars() and clip_with_shape() were never ported from Perl to C++.
+// The C++ function signature for clip_by_pillars is declared but the body is
+// commented out; clip_with_shape is still written in Perl syntax inside a C++ comment.
+// [HAZARD] The clip_by_pillars() signature references `LayersPtr` which is an older
+// type alias — if the alias changes this would fail to compile if ever uncommented.
+// These functions are safe to delete in a full rewrite — they provide no runtime behaviour.
 /*
 void PrintObjectSupportMaterial::clip_by_pillars(
     const PrintObject   &object,
