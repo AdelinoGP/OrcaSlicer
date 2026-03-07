@@ -1279,6 +1279,9 @@ int CLI::run(int argc, char **argv)
         return CLI_ENVIRONMENT_ERROR;
     }
 
+    // [INTENT] Phase 1 of CLI::run(): parse CLI args into m_config/m_actions/m_input_files.
+    // setup() calls optparse-style parsing; any unknown option triggers a fatal error here.
+    // GUI path taken if m_actions is empty AND downward_check is false (see start_gui below).
     if (!this->setup(argc, argv))
     {
         boost::nowide::cerr << "setup params error" << std::endl;
@@ -1288,6 +1291,13 @@ int CLI::run(int argc, char **argv)
     std::string temp_path = wxFileName::GetTempDir().utf8_str().data();
     set_temporary_dir(temp_path);
 
+    // [INTENT] m_extra_config holds --key=value overrides from CLI. Applying it to m_config
+    // then calling normalize_fdm() ensures derived fields (e.g. layer height ranges) are
+    // recalculated. normalize_fdm() must run BEFORE any profile is loaded, otherwise
+    // the override may be silently ignored.
+    // [HAZARD] ForwardCompatibilitySubstitutionRule is hardcoded to Enable (see L1319);
+    // an older profile format is silently upgraded rather than failing. A refactored tool
+    // should make this policy explicit and configurable.
     m_extra_config.apply(m_config, true);
     m_extra_config.normalize_fdm();
 
@@ -1330,6 +1340,12 @@ int CLI::run(int argc, char **argv)
     if (downward_check_option)
         downward_check = downward_check_option->value;
 
+    // [INTENT] GUI branch: if no --slice/--export action was given, launch the wxWidgets GUI.
+    // downward_check mode suppresses GUI even with empty m_actions (used for compatibility
+    // checks in CI/batch workflows). Input files are split into gcode vs. model files so
+    // the GUI viewer vs. plater mode can be selected before the window opens.
+    // [COUPLING] Slic3r::GUI::GUI_Run() swallows the rest of CLI::run(); this function
+    // never returns to the CLI dispatch loop once the GUI path is taken.
     bool start_gui = m_actions.empty() && !downward_check;
     if (start_gui) {
         BOOST_LOG_TRIVIAL(info) << "no action, start gui directly" << std::endl;
@@ -5632,6 +5648,19 @@ int CLI::run(int argc, char **argv)
                 //Print       fff_print;
                 std::vector<size_t> plate_triangle_counts(partplate_list.get_plate_count(), 0);
 
+                // [INTENT] Outer while(!finished) loop implements a two-pass strategy:
+                //   Pass 1 (pre_check == true, multi-plate): validate all plates
+                //     — triangle count, object bounds, filament mapping — without slicing.
+                //     Any validation failure calls flush_and_exit immediately.
+                //   Pass 2 (pre_check == false): actually slice and export G-code.
+                // On single-plate jobs pre_check is skipped; finished=true after first pass.
+                // [STATE] 'finished' is set to true at L6254 when pre_check is cleared OR
+                // when there is only one plate. The outer while guards re-entry for the
+                // two-pass design — it is NOT a retry loop.
+                // [HAZARD] plate_to_slice==0 means "all plates"; plate_to_slice==N means
+                // "only plate N (1-indexed)". The inner loop uses continue to skip other
+                // plates. A refactored tool should represent this as a plate filter, not a
+                // magic zero sentinel.
                 while(!finished)
                 {
                     //BBS: slice every partplate one by one
@@ -5654,6 +5683,23 @@ int CLI::run(int argc, char **argv)
                         long long start_time = 0, end_time = 0, temp_time = 0, time_using_cache = 0;
                         start_time = (long long)Slic3r::Utils::get_current_time_utc();
                         //get the current partplate
+                        // [INTENT] Per-plate slicing sub-pipeline:
+                        //   1. get_print() — retrieves or creates the Print object for this plate
+                        //   2. update_print_volume_state() — marks each ModelInstance as
+                        //      Inside/Outside/PartlyOutside relative to the build volume
+                        //   3. Pre-check: validate triangle count, skip list, filament mapping
+                        //   4. print->apply(model, config) — diffing config change triggers
+                        //      step invalidation in PrintObject (lazy re-computation)
+                        //   5. print->validate() — catches config conflicts before processing
+                        //   6. print->process() (or load_cached_data + process) — runs all
+                        //      PrintObject steps: slice → perimeters → infill → support → gcode
+                        //   7. export_gcode() — serialises toolpaths to .gcode file
+                        //   8. export_cached_data() — optional: persist per-plate slice cache
+                        // [COUPLING] PartPlate owns both the Print* and GCodeResult*. The CLI
+                        // accesses them through get_print(). PartPlate is a GUI class —
+                        // this is the primary GUI-in-CLI coupling hazard.
+                        // [STATE] print_fff is a non-owning raw pointer alias into PartPlate.
+                        // It is valid only for the current loop iteration.
                         Slic3r::GUI::PartPlate* part_plate = partplate_list.get_plate(index);
                         part_plate->get_print(&print, &gcode_result, &print_index);
 
@@ -5937,6 +5983,15 @@ int CLI::run(int argc, char **argv)
                         //BOOST_LOG_TRIVIAL(info) << boost::format("print_volume {%1%,%2%,%3%}->{%4%, %5%, %6%}, has %7% printables") % print_volume.min(0) % print_volume.min(1)
                         //    % print_volume.min(2) % print_volume.max(0) % print_volume.max(1) % print_volume.max(2) % count << std::endl;
 #endif
+                        // [INTENT] Build the per-plate effective config by layering:
+                        //   base m_print_config (global) → plate override config → CLI extra_config.
+                        // This three-layer merge implements plate-level setting overrides.
+                        // [HAZARD] new_print_config is a value copy; changes after print->apply()
+                        // are not propagated. The filament_map resize at L5985-5990 must happen
+                        // BEFORE apply() or the mapping array will be undersized.
+                        // [STATE] print->apply() performs a config diff and marks affected
+                        // PrintObject steps as invalidated (needs_recompute). This is the entry
+                        // point to the incremental recompute system.
                         DynamicPrintConfig new_print_config = m_print_config;
                         new_print_config.apply(*part_plate->config());
                         new_print_config.apply(m_extra_config, true);
@@ -6093,6 +6148,20 @@ int CLI::run(int argc, char **argv)
                                 const PrintConfig& print_config = print_fff->config();
                                 Model::setExtruderParams(m_print_config, filament_count);
                                 Model::setPrintSpeedTable(m_print_config, print_config);
+                                // [INTENT] Cache path: load pre-computed slice data from disk
+                                // (binary serialisation of all PrintObject steps). If loading
+                                // succeeds, print->process(nullptr, true) only runs post-slice
+                                // steps (toolpath generation, G-code post-processing).
+                                // If loading fails (e.g. stale cache), falls back to full
+                                // print->process() which re-runs all steps from scratch.
+                                // [STATE] load_cached_data() sets internal step states to
+                                // "done" without executing the step logic. process(nullptr,true)
+                                // relies on those state flags being accurate — corrupt cache can
+                                // cause silent incorrect output.
+                                // [HAZARD] time_using_cache accumulates wall-clock seconds spent
+                                // inside the cache path. It is reported to record_exit_reson() as
+                                // a diagnostic but is NOT subtracted from sliced_plate_info.sliced_time,
+                                // so timing metrics in result.json are inconsistent.
                                 if (load_slicedata) {
                                     std::string plate_dir = load_slice_data_dir+"/"+std::to_string(index+1);
                                     int ret = print->load_cached_data(plate_dir);
@@ -6157,6 +6226,19 @@ int CLI::run(int argc, char **argv)
                                     }
                                     sliced_plate_info.triangle_count = plate_triangle_counts[index];
 
+                                    // [INTENT] G-code export: determines output path, calls
+                                    // Print::export_gcode() which serialises all toolpaths
+                                    // (ExtrusionEntityCollection) to a text .gcode file and
+                                    // populates gcode_result with the parsed toolpath for
+                                    // the in-process G-code conflict checker.
+                                    // [STATE] outfile path priority: outfile_dir explicit >
+                                    // part_plate->get_tmp_gcode_path() (temp in app data dir).
+                                    // After export, part_plate->update_slice_result_valid_state(true)
+                                    // marks the plate as having valid cached output.
+                                    // [HAZARD] gcode_check_result.error_code uses bit-field
+                                    // encoding: bits [4:2] = single-extruder unprintable area;
+                                    // bits [1:0] = multi-extruder unprintable area. A refactored
+                                    // tool should use an explicit enum, not a raw bitmask.
                                     // The outfile is processed by a PlaceholderParser.
                                     //outfile = part_plate->get_tmp_gcode_path();
                                     if (outfile_dir.empty()) {
