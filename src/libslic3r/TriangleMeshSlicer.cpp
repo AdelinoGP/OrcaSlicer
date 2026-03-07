@@ -191,6 +191,27 @@ enum class FacetSliceType {
     Cutting = 2
 };
 
+// [INTENT] Per-triangle intersection test: intersect one triangle with a Z cutting plane
+// and emit zero or one IntersectionLine into line_out.
+// Returns FacetSliceType::NoSlice if the triangle does not cross the plane (e.g. tangent at one vertex).
+// Returns FacetSliceType::Slicing for a general cut (emits a line useful for building the slice polygon).
+// Returns FacetSliceType::Cutting for a horizontal or boundary edge (useful for cut_mesh() cap generation but filtered out by slice_mesh()).
+//
+// Algorithm:
+//   Iterates the 3 edges (reordered so edge 0 starts at the lowest-Z vertex).
+//   For each edge determines whether endpoints are exactly on-plane, or the edge crosses the plane.
+//   Accumulates up to 2 IntersectionPoints.  When exactly 2 are found, outputs the directed line
+//   with a→b chosen so that the solid interior is to the right (Clipper CCW convention when looking down +Z).
+//
+// [MEMORY] IntersectionPoints are stack-allocated (max 3; assert(num_points < 3) guards this).
+//   line_out is written by the caller — no heap allocation here.
+// [HAZARD] XY coords of line_out are already scaled to int32 (scale_() applied by the caller's
+//   transform_vertex_fn). Z is left unscaled — MUST match slice_z's scale.
+// [HAZARD] Zero-length edges CAN be produced by int rounding (see FIXME at line ~335);
+//   the downstream chain_lines_by_triangle_connectivity() silently accepts them, but they
+//   may cause stitch artifacts in degenerate meshes.
+// [UNCLEAR] The duplicate `slice_facet_for_cut_mesh()` below differs only in the
+//   floating-point equality test (1e-3 epsilon vs bit-exact ==). This split is a maintenance hazard.
 // Return true, if the facet has been sliced and line_out has been filled.
 static FacetSliceType slice_facet(
     // Z height of the slice in XY plane. Scaled or unscaled (same as vertices[].z()).
@@ -1088,6 +1109,16 @@ static inline void remove_tangent_edges(std::vector<IntersectionLine> &lines)
 }
 #endif
 
+// [INTENT] Accumulator for an open polyline segment that failed to close into a loop
+// during the greedy Phase 2 chain pass. These are common for non-manifold or open meshes.
+// Fields: start/end carry topological IDs (edge or vertex) for exact reconnection attempts.
+// `length` is used to seed longest-first reconnection in chain_open_polylines_close_gaps().
+// [STATE] `consumed` flag is used to avoid double-processing in multi-pass reconnection.
+// [MEMORY] `points` are heap-allocated via std::move from the loop building code in
+// chain_lines_by_triangle_connectivity(). Ownership is clear; no external references survive.
+// [HAZARD] When try_connect_reversed=true, chain_open_polylines_exact() swaps the start/end
+// IntersectionReferences between polylines — this mutates the by_id lookup table in-place.
+// A port must replicate this carefully to avoid stale iterators.
 struct OpenPolyline {
     OpenPolyline() = default;
     OpenPolyline(const IntersectionReference &start, const IntersectionReference &end, Points &&points) : 
@@ -1236,6 +1267,25 @@ std::vector<OpenPolyline*> open_polylines_sorted(std::vector<OpenPolyline> &open
     return out;
 }
 
+// [INTENT] Second-pass open polyline stitcher using exact topological matching.
+// After chain_lines_by_triangle_connectivity() leaves open polylines, this function
+// attempts to join them by matching their IntersectionReference IDs (topological addresses).
+// Run twice from make_loops(): first with try_connect_reversed=false (same orientation only),
+// then with try_connect_reversed=true (allows joining reversed segments, for non-manifold meshes).
+//
+// Algorithm: builds a by_id sorted array of OpenPolylineEnd structs, then iterates
+// longest-first, extending each polyline greedily until it closes or no continuation exists.
+// A loop closes when start.edge_id == end.edge_id (or start.point_id == end.point_id).
+// Orientation recovery: when try_connect_reversed=true and a multi-segment polygon has
+// negative area, reverse the points to recover a consistent CCW winding.
+//
+// [STATE] `consumed` flag marks polylines as processed; by_id entries are swapped in-place
+//   when try_connect_reversed=true to track updated endpoint positions.
+// [HAZARD] The find_polyline_end() linear scan inside a binary-search range is O(duplicates)
+//   per lookup. For meshes with many coincident edge IDs (star-shaped vertices) this could
+//   be O(degree²) per vertex.
+// [UNCLEAR] A `goto found` is used inside the inner loop — same porting concern as
+//   the PressureEqualizer goto. Refactor to a lambda or flag in a port.
 // called by make_loops() to connect remaining open polylines across shared triangle edges and vertices.
 // Depending on "try_connect_reversed", it may or may not connect segments crossing triangles of opposite orientation.
 static void chain_open_polylines_exact(std::vector<OpenPolyline> &open_polylines, Polygons &loops, bool try_connect_reversed)
@@ -1334,6 +1384,23 @@ static void chain_open_polylines_exact(std::vector<OpenPolyline> &open_polylines
     }
 }
 
+// [INTENT] Third-pass open polyline stitcher using geometric proximity (gap bridging).
+// After exact topological stitching by chain_open_polylines_exact(), any still-open polylines
+// are joined by geometric distance using a ClosestPointInRadiusLookup spatial index.
+// max_gap = 2.0 mm (hardcoded) — segments whose endpoints are within 2 mm of each other
+// are bridged, creating small "virtual" edges across mesh holes or seam discontinuities.
+// Run twice: same-direction, then reversed — same rationale as chain_open_polylines_exact.
+//
+// Heuristic: if the current loop can close itself by a gap ≤ max_gap AND the closing distance
+// is less than 30% of the polyline length, prefer closing. Otherwise prefer extending.
+// [HAZARD] max_gap is hardcoded at 2 mm — not configurable by user. Very coarse meshes with
+//   actual holes > 2 mm will produce open contours that fall through to Clipper union,
+//   potentially generating incorrect extrusion geometry.
+// [STATE] ClosestPointInRadiusLookup invalidation: consumed polylines return nullptr from
+//   OpenPolylineEndAccessor, providing implicit removal without explicit erasure. However
+//   the erase() call is still needed when try_connect_reversed=true and endpoints shift.
+// [MEMORY] ClosestPointInRadiusLookup uses a fixed-radius spatial hash — O(1) average
+//   lookup but O(N) worst-case for clustered endpoints. Not a concern at typical mesh densities.
 // called by make_loops() to connect remaining open polylines across shared triangle edges and vertices, 
 // possibly closing small gaps.
 // Depending on "try_connect_reversed", it may or may not connect segments crossing triangles of opposite orientation.
@@ -1442,6 +1509,20 @@ static void chain_open_polylines_close_gaps(std::vector<OpenPolyline> &open_poly
     }
 }
 
+// [INTENT] Single-layer loop builder: orchestrates the 3-pass open-polyline recovery pipeline.
+//   Pass 1: chain_lines_by_triangle_connectivity() — topological greedy stitching (Phase 2)
+//   Pass 2: chain_open_polylines_exact(false) — exact topological match, same orientation
+//   Pass 3: chain_open_polylines_exact(true) — exact match, also try reversed orientation
+//   Pass 4: chain_open_polylines_close_gaps(max_gap=2mm, false then true) — geometric proximity
+// [STATE] lines[] has flags mutated in-place by chain_lines_by_triangle_connectivity().
+// [MEMORY] Returns by value; Polygons is std::vector<Polygon>. Lines are consumed/moved into
+//   loops — callers should not reuse the lines vector after this call.
+// [COUPLING] Calls chain_lines_by_triangle_connectivity(), chain_open_polylines_exact(), and
+//   chain_open_polylines_close_gaps() in strict order. Each pass consumes what the previous
+//   could not close, preventing double-processing via the OpenPolyline::consumed flag.
+// [HAZARD] The 2mm max_gap is hardcoded here (see Hazard #74). The commented-out block above
+//   shows a prior escalating-gap strategy {EPSILON, 0.001, 0.1, 1., 2.} that was replaced
+//   with the single 2mm limit — a deliberate regression for performance.
 static Polygons make_loops(
     // Lines will have their flags modified.
     IntersectionLines   &lines)
@@ -1542,6 +1623,17 @@ static Polygons make_loops(
     return loops;
 }
 
+// [INTENT] Multi-layer parallel loop builder: applies the single-layer make_loops() to all
+// layers simultaneously via TBB parallel_for, then applies SlicingMode post-processing.
+// SlicingMode::Positive → reorient all loops CCW (outer contours and holes become CCW).
+// SlicingMode::PositiveLargestContour → keep only the largest loop per layer, make it CCW.
+// SlicingMode::EvenOdd / default → loops are left as-is; Clipper fill rule handles winding later.
+// [CONCURRENCY] Each layer's make_loops() is independently processed; no inter-layer state.
+//   The throw_on_cancel() call inside the loop (every 0xffff layers) ensures responsive cancellation.
+// [STATE] The per-layer params.mode and params.mode_below split allows a different slicing mode
+//   below params.slicing_mode_normal_below_layer (used for raft/support boundary differentiation).
+// [COUPLING] Calls single-layer make_loops() per layer; both overloads share the same name.
+//   This is the public-facing multi-layer entry point used by slice_mesh().
 template<typename ThrowOnCancel>
 static std::vector<Polygons> make_loops(
     // Lines will have their flags modified.
@@ -1594,6 +1686,24 @@ static std::vector<Polygons> make_loops(
     return layers;
 }
 
+// [INTENT] Slab loop builder used by slice_mesh_slabs() to produce top/bottom projection polygons.
+// For each slab (the region between two adjacent Z planes), assembles a combined IntersectionLine
+// set from three sources and chains them into closed loops:
+//   - at_slice[slice_below]: lines from the bottom cutting plane (exclude FacetEdgeType::Top)
+//   - between_slices[line_idx]: slab-crossing lines (FacetEdgeType::Slab), pre-classified
+//   - at_slice[slice_above]: lines from the top cutting plane (exclude FacetEdgeType::Bottom),
+//     reversed so their direction is compatible with stitching, edge IDs offset by num_edges
+// The ProjectionFromTop template bool controls which of slice_below/slice_above are in-bounds,
+// enabling the same code to handle both top and bottom projection without runtime branching.
+// [CONCURRENCY] TBB parallel_for over slab layers; each iteration is independent.
+//   throw_on_cancel() called every 0xffff iterations.
+// [STATE] The `in` accumulator is assembled per-iteration; lines are copied (not moved).
+//   At-slice lines for the top plane are reversed in-place in the copy — source data is unmodified.
+// [HAZARD] assert(open_polylines.empty()) at line ~1780: slab lines should form perfect loops
+//   (manifold mesh + proper classification). Failures are only logged, not recovered from.
+//   On non-manifold meshes this silently produces incomplete projections.
+// [COUPLING] Depends on slice_slabs_make_lines() having already set FacetEdgeType::Slab
+//   for between-slice lines and pre-incremented their top-plane edge IDs by num_edges.
 // used by slice_mesh_slabs() to produce loops from on-slice lines and between-slices lines.
 template<bool ProjectionFromTop, typename ThrowOnCancel>
 static std::vector<Polygons> make_slab_loops(
@@ -1722,6 +1832,19 @@ static std::vector<Polygons> make_slab_loops(
     return layers;
 }
 
+// [INTENT] Simplified ExPolygon builder used exclusively by cut_mesh() for cap triangulation.
+// Classifies closed loops from make_loops() by area sign: positive area → outer contour,
+// negative area → hole. Assigns each hole to the smallest enclosing outer contour by
+// point-in-polygon test on the first hole point.
+// Returns ExPolygons (contour + assigned holes), not requiring Clipper union.
+// [COUPLING] Called only by triangulate_slice() → cut_mesh() pipeline; NOT used by the main
+//   slice_mesh() pipeline (which uses make_expolygons() with Clipper). The two paths produce
+//   structurally similar output but via different algorithms.
+// [HAZARD] The hole assignment uses a linear scan over all slices to find the smallest enclosing
+//   contour — O(holes × contours) in the worst case. Fine for cap triangulation (few slices),
+//   but would be prohibitive for the main slicing path with hundreds of layers and many contours.
+// [STATE] If no enclosing contour is found for a hole (slice_idx == -1), the hole is silently
+//   dropped. This can occur on non-manifold meshes; see the commented-out assert below.
 // Used to cut the mesh into two halves.
 static ExPolygons make_expolygons_simple(std::vector<IntersectionLine> &lines)
 {
@@ -1797,6 +1920,24 @@ static ExPolygons make_expolygons_simple(std::vector<IntersectionLine> &lines)
     return slices;
 }
 
+// [INTENT] Phase 3 of the main slicing pipeline: convert raw Polygon loops into clean ExPolygons
+// using Clipper boolean union with optional morphological closing and extra offset.
+// This handles non-manifold mesh artifacts where Phase 1+2 may produce self-intersecting or
+// overlapping contours that need to be merged into valid ExPolygons.
+// Offset strategy (closing_radius ≥ extra_offset):
+//   offset_out = +closing_radius, offset_in = -(closing_radius - extra_offset) → morphological close
+// Offset strategy (closing_radius < extra_offset):
+//   offset_out = +extra_offset, offset_in = 0 → pure expansion
+// fill_type controls how Clipper interprets winding: NonZero (default), EvenOdd, Positive.
+// [COUPLING] Called from slice_mesh_ex() only (not from cut_mesh, which uses make_expolygons_simple).
+//   fill_type is derived from MeshSlicingParamsEx::mode in slice_mesh_ex().
+// [MEMORY] expolygons_append() appends to the *slices output parameter — caller owns the lifetime.
+// [HAZARD] Extensive commented-out sorting code (winding-order based) was tried and abandoned due
+//   to issue #661. The current union_ex() + Clipper approach is the settled workaround. Any
+//   future refactor must understand why the sorted approach produced wrong polygons.
+// [UNCLEAR] The original "safety offset" value 0.0499 mm was changed to a closing_radius parameter.
+//   The historical motivation (issues #520, #1029, #1364) is preserved in comments but the exact
+//   numerical choice is not explained in the code.
 static void make_expolygons(const Polygons &loops, const float closing_radius, const float extra_offset, ClipperLib::PolyFillType fill_type, ExPolygons* slices)
 {
     /*
@@ -1899,6 +2040,16 @@ static inline bool is_identity(const Transform3d &trafo)
     return trafo.matrix() == Transform3d::Identity().matrix();
 }
 
+// [INTENT] Vertex pre-processing for multi-Z slicing: copy all mesh vertices, scale XY by
+// SCALING_FACTOR (1e6), optionally apply a Transform3d, and leave Z unscaled.
+// Used only when slicing at >1 Z planes (single-Z takes a faster inline lambda path instead).
+// [HAZARD] Z is deliberately NOT scaled here. This preserves the invariant that Z values
+//   in IntersectionLine are unscaled mm, while XY are scaled int32. Any refactoring that
+//   mistakenly scales Z will produce silently wrong intersection points (see Hazard #77).
+// [MEMORY] Returns a new vector<stl_vertex> (O(V) allocation). Caller is responsible for
+//   lifetime. The original mesh.vertices are NOT modified.
+// [COUPLING] Called exclusively from slice_mesh(multi-Z). The identity-trafo branch avoids
+//   creating a Transform3f object; the non-identity branch uses prescale to merge scale+trafo.
 static std::vector<stl_vertex> transform_mesh_vertices_for_slicing(const indexed_triangle_set &mesh, const Transform3d &trafo)
 {
     // Copy and scale vertices in XY, don't scale in Z.
@@ -1923,6 +2074,21 @@ static std::vector<stl_vertex> transform_mesh_vertices_for_slicing(const indexed
     return out;
 }
 
+// [INTENT] Public API: slice an indexed_triangle_set at multiple Z planes, returning one
+// Polygons per layer. Orchestrates the full Phase 1 + Phase 2 pipeline for N planes:
+//   - Computes its_face_edge_ids (shared edge ID assignment for all faces)
+//   - If ≤1 Z plane: applies the transform inline via lambda (avoids vertex copy)
+//   - If >1 Z planes: pre-transforms all vertices via transform_mesh_vertices_for_slicing(),
+//     then passes identity lambda — amortizes the transform cost over all planes
+//   - Calls slice_make_lines() (TBB parallel Phase 1) → make_loops() (TBB parallel Phase 2)
+// [CONCURRENCY] Both slice_make_lines() and make_loops() use TBB internally.
+//   throw_on_cancel is propagated to both. Throws CanceledException on user cancel.
+// [HAZARD] its_face_edge_ids() is noted in a FIXME as "likely not needed and costly to calculate."
+//   The edge ID approach was inherited from PrusaSlicer and has not been refactored out.
+//   Any alternative stitching approach (e.g., sorted vertex pairs) would need careful validation.
+// [MEMORY] face_edge_ids: O(F) — freed after Phase 1. lines: O(F × N) peak — freed after Phase 2.
+//   Returned layers vector: O(F × N) of Polygons — caller owns.
+// [COUPLING] Called by PrintObjectSlice via posSlice. Also called by slice_mesh_ex().
 std::vector<Polygons> slice_mesh(
     const indexed_triangle_set       &mesh,
     // Unscaled Zs
@@ -2074,6 +2240,16 @@ Polygons slice_mesh(
     return layers.front();
 }
 
+// [INTENT] Public API: slice mesh at multiple Z planes, returning clean ExPolygons per layer.
+// Extends slice_mesh() by running a second TBB parallel_for to apply make_expolygons() (Phase 3:
+// Clipper union + offset) and optional polygon simplification per layer.
+// The PositiveLargestContour mode is downgraded to Positive for the first pass (slice_mesh()),
+// then keep_largest_contour_only() is applied per-layer in this second pass.
+// [CONCURRENCY] Two serial TBB passes; throw_on_cancel() checked inside each inner loop.
+// [COUPLING] Bridges the raw Polygons world of slice_mesh() to the ExPolygons world consumed
+//   by PrintObjectSlice and all higher-level consumers (perimeters, infill, supports).
+// [HAZARD] resolution simplification is applied after Clipper union — simplifying before union
+//   could cause geometrically valid but topologically incorrect results.
 std::vector<ExPolygons> slice_mesh_ex(
     const indexed_triangle_set       &mesh,
     const std::vector<float>         &zs,
@@ -2123,6 +2299,48 @@ std::vector<ExPolygons> slice_mesh_ex(
     return layers;
 }
 
+// [INTENT] slice_mesh_slabs() — Public API: produce top-facing and/or bottom-facing polygon
+// projections for a mesh sliced by a set of Z slab boundaries.
+//
+// Conceptual model:
+//   Given N+1 Z values [z0, z1, ..., zN], this function produces N "slab" layers.
+//   For each slab [z_i, z_{i+1}]:
+//     - out_top[i]    = all upward-facing (normal.z > 0) triangles projected to XY
+//     - out_bottom[i] = all downward-facing (normal.z < 0) triangles projected to XY
+//
+//   This mirrors how the printer skin detection works: top surfaces are where the
+//   current layer sticks out above the layer below; bottom surfaces are the inverse.
+//   But unlike the layer-differencing approach used in PrintObjectSlice.cpp, this
+//   function works directly on the raw triangle mesh for sparse-fill regions.
+//
+// Pipeline (3 stages):
+//   Stage 1: transform_mesh_vertices_for_slicing() — XY scaled to coord_t, Z unscaled (float)
+//   Stage 2: slice_slabs_make_lines() — per-face orientation classification + edge-wise slab
+//            intersection, dispatched via FaceOrientation {Up, Down, Vertical, Degenerate}.
+//            Uses `face_neighbors` and `face_edge_ids` for topological stitching.
+//   Stage 3: make_slab_loops<true/false>() — template dispatch: assembles IntersectionLines
+//            into closed Polygons per slab. <true> = top projection, <false> = bottom.
+//
+// [STATE] face_orientation[] is computed here (not in slice_slabs_make_lines) because
+//   orientation depends on the transformed 2D signed-area cross product, which requires
+//   the mirrored_sign correction for meshes with a negative-determinant transform (mirror).
+//
+// [CONCURRENCY] slice_slabs_make_lines internally uses TBB parallel_for; this outer
+//   function is single-threaded coordination.
+//
+// [COUPLING] out_top / out_bottom sized == zs.size() - 1 (N slabs for N+1 planes).
+//   Caller must ensure this invariant; no bounds check is performed.
+//
+// [HAZARD] vertical_points parameter (BBS addition): collects face center + normal for
+//   all Vertical faces; used by the seam placement / support contact detection in
+//   PrintObjectSlice.cpp. The parameter is optional (null = skip collection).
+//   Because vertical face normals are not normalized until the push_back call, any
+//   degenerate triangle (zero-area) that mis-classifies as Vertical will produce
+//   an undefined normalized() result. The adjacent Degenerate guard should prevent
+//   this, but there is no explicit zero-cross-product check before normalization.
+//
+// [MEMORY] vertices_transformed is a full copy of the mesh vertex array (scaled).
+//   For large meshes this doubles the vertex memory budget during the call lifetime.
 // Slice a triangle set with a set of Z slabs (thick layers).
 // The effect is similar to producing the usual top / bottom layers from a sliced mesh by 
 // subtracting layer[i] from layer[i - 1] for the top surfaces resp.
@@ -2231,6 +2449,52 @@ void slice_mesh_slabs(
         *out_bottom = make_slab_loops<false>(lines.second, num_edges, throw_on_cancel);
 }
 
+// [INTENT] triangulate_slice() — Post-process a half-mesh produced by cut_mesh() to:
+//   1. Deduplicate vertices added on the cut plane (multiple edges may have yielded the
+//      same XY position with different vertex indices due to independent interpolation).
+//   2. Optionally fill the cap: run make_expolygons_simple() on the IntersectionLines at the
+//      cut plane, triangulate the resulting ExPolygons, and stitch new triangles into the mesh.
+//
+// [STATE] Input contract:
+//   - `its` already contains all faces above (or below) the cut plane, plus newly added
+//     vertices on the cut (indices >= num_original_vertices).
+//   - `lines` = IntersectionLines at the cut plane (from slice_facet_for_cut_mesh).
+//   - `slice_vertices` = all vertex indices that lie on the cut plane (may have duplicates).
+//   - `section_vertices_map` (BBS addition) = map from original mesh vertex index → 3D position
+//     for vertices that coincide exactly with the cut plane (is_equal check).
+//
+// [INTENT] Deduplication pass (always runs):
+//   - Builds `map_vertex_to_index`: sorted (x, y) → vertex index.
+//   - Merges all new vertices within is_equal() epsilon to the lowest-index representative.
+//   - Walks all faces, remaps vertices, drops degenerate faces (i == j or i == k or j == k).
+//
+// [INTENT] Triangulation pass (when triangulate == true):
+//   - Calls make_expolygons_simple() to form ExPolygons from the intersection lines.
+//   - Calls triangulate_expolygons_3d() → Pointf3s (flat list of triangle vertices, 3 per tri).
+//   - For each new triangle vertex, uses a 3-pass lookup:
+//       Pass A: section_vertices_map (BBS addition) — O(N) linear scan of original vertices
+//               that exactly hit the plane; handles degenerate case where interpolation is skipped.
+//       Pass B: forward scan from lower_bound in map_vertex_to_index using is_equal() epsilon.
+//       Pass C: backward scan from lower_bound in map_vertex_to_index using is_equal() epsilon.
+//       Pass D: linear scan of newly added cap vertices (idx_vertex_new_first..end).
+//       Fallback: insert a new vertex (rare; should not happen for a clean mesh).
+//   - Appends each non-degenerate triangle to its.indices.
+//
+// [HAZARD] O(N) worst case: Passes A, B, C, D are all linear scans. For large meshes with
+//   many cut-plane vertices this is O(V^2) per triangulation call. However, in practice the
+//   number of cut-plane vertices is small relative to total mesh size. (Hazard 75)
+//
+// [HAZARD] is_equal() uses 1e-3 mm epsilon (unlike main slice_facet() which uses bit-exact ==).
+//   This means two genuinely distinct vertices within 1mm of each other could be merged.
+//   For tiny or highly detailed meshes this can produce incorrect topology. (Hazard 73)
+//
+// [COUPLING] normals_down controls the winding order of the cap triangles: upper half → normals
+//   face down (NORMALS_DOWN = true), lower half → normals face up (NORMALS_UP = false).
+//   This is passed directly from cut_mesh()'s call sites.
+//
+// [MEMORY] its_compactify_vertices() at the end removes all unreferenced vertices;
+//   this is a full re-index pass — O(V + F) but necessary to keep the output mesh clean.
+//
 // Remove duplicates of slice_vertices, optionally triangulate the cut.
 static void triangulate_slice(
     indexed_triangle_set    &its,
@@ -2367,12 +2631,30 @@ static void triangulate_slice(
     // its_remove_degenerate_faces(its);
 }
 
+// [INTENT] project_mesh() — Thin wrapper over slice_mesh_slabs() that projects the entire
+// mesh to top and/or bottom polygon footprints in the XY plane.
+//
+// Mechanism:
+//   Uses a single Z slab spanning [-1e10, 1e10] (i.e., the whole mesh height range),
+//   so slice_mesh_slabs() captures every upward-facing or downward-facing triangle.
+//   The first element of the top result is the top-facing projection;
+//   the last element of the bottom result is the bottom-facing projection.
+//   These should be equivalent for a closed manifold mesh (they represent the silhouette
+//   from above and below respectively).
+//
+// [INTENT] The two-argument overload (returns Polygons) takes the union of top + bottom
+//   projections. This is typically used for collision avoidance and support base footprints
+//   where the complete 2D shadow of the mesh is required.
+//
+// [COUPLING] Callers in PrintObjectSlice.cpp and SupportMaterial.cpp rely on this for:
+//   - Raft/brim outline generation
+//   - Support pillar placement collision detection
+//
+// [HAZARD] zs = {-1e10, 1e10}: These are unscaled float Z values. The extreme values
+//   should safely bracket any real mesh, but if a mesh vertex exceeds ±1e10 mm
+//   (physically impossible but representationally possible after bad transform), this
+//   would silently miss those triangles.
 void project_mesh(
-    const indexed_triangle_set       &mesh,
-    const Transform3d                &trafo,
-    Polygons                         *out_top,
-    Polygons                         *out_bottom,
-    std::function<void()>             throw_on_cancel)
 {
     std::vector<Polygons> top, bottom;
     std::vector<float>    zs { -1e10, 1e10 };
@@ -2394,6 +2676,74 @@ Polygons project_mesh(
     return union_(top.front(), bottom.back());
 }
 
+// [INTENT] cut_mesh() — Split an indexed_triangle_set at a horizontal Z plane into
+// upper and/or lower halves. Each output half is a new indexed_triangle_set that can be
+// exported, rendered, or sliced independently.
+//
+// High-level algorithm:
+//   For each face in the mesh:
+//     - Compute min_z / max_z of the triangle's three vertices.
+//     - If entirely above z: copy face to `upper` unchanged.
+//     - If entirely below z: copy face to `lower` unchanged.
+//     - If straddling z: call slice_facet_for_cut_mesh() to get the IntersectionLine,
+//       then split the triangle into 2–3 sub-triangles (one isolated vertex side gets 1
+//       triangle; the other side gets 2 triangles forming a quad).
+//
+// Coordinate contract:
+//   - Input vertices are unscaled (mm float), unlike the main slicing pipeline.
+//   - scale_() is applied only to XY inside the straddling-face block for
+//     slice_facet_for_cut_mesh() (which uses scaled XY, unscaled Z).
+//   - The new intersection vertices v0v1 / v2v0 are produced by unscaling line.a / line.b
+//     back to mm float — maintaining the original vertex coordinate system.
+//
+// [STATE] Copies all mesh.vertices into upper->vertices and lower->vertices upfront,
+//   then appends new intersection vertices. Final its_compactify_vertices() (inside
+//   triangulate_slice) removes unreferenced entries. This means both upper and lower
+//   temporarily hold ALL original vertices (2× memory), then compact to only those used.
+//
+// [STATE] section_vertices_map (BBS addition): Pre-scanned map of vertex indices whose
+//   Z exactly equals the cut plane (is_equal(z, vertices[i].z())). Used by
+//   triangulate_slice() as a faster first-pass lookup to handle degenerate cases where
+//   a vertex lands exactly on the plane and no edge interpolation occurs.
+//
+// [INTENT] isolated_vertex / isolated_vertex_option (BBS addition):
+//   The "isolated vertex" is the vertex on the minority side of the cut plane (1 vertex
+//   above if the other two are below, or vice versa). In the standard case this is
+//   unambiguous, but BBS added `isolated_vertex_option` as a fallback for degenerate
+//   triangles where one vertex exactly straddles the plane — the choice of which vertex
+//   is "isolated" affects which face group (upper vs. lower) each sub-triangle ends up in.
+//   The `calc_isolated_vertex` lambda validates the choice against the intersection line's
+//   edge IDs; if the first choice fails, it tries the option.
+//
+// [INTENT] new_vertex lambda: for each intersection vertex (v0v1, v2v0), checks if the
+//   computed cut point coincides with any existing vertex (v0, v1, or v2) within is_equal()
+//   epsilon. If so, reuses the original vertex index instead of inserting a new one.
+//   This deduplication prevents duplicate vertices at exact corners.
+//
+// [INTENT] Face dispatch by is_new_vertex_v0v1 / is_new_vertex_v2v0 booleans:
+//   - Both new: standard 1+2 triangle split (one isolated + one quad)
+//   - Only v0v1 new: triangle rests exactly on v2v0 vertex — 1+1 triangle split
+//   - Only v2v0 new: triangle rests exactly on v0v1 vertex — 1+1 triangle split
+//   - Neither new: the entire cut segment lies on pre-existing vertices (degenerate
+//     case); no new faces are emitted here — handled separately by triangulate_slice.
+//
+// [COUPLING] After the main loop, triangulate_slice() is called on both upper and lower
+//   to: (1) deduplicate cut-plane vertices, (2) optionally fill the cap with triangles.
+//   `triangulate_caps` parameter controls whether the cap fill happens.
+//
+// [HAZARD] Uses is_equal() (1e-3 epsilon) throughout for float comparisons — including
+//   min_z/max_z classification and new vertex lookup. See Hazard 73.
+//
+// [HAZARD] No cancellation callback: unlike slice_mesh(), cut_mesh() has no
+//   throw_on_cancel mechanism. For very large meshes this can stall the UI thread if
+//   called on the main thread. Callers in PrintObject should verify their threading model.
+//
+// [CONCURRENCY] Single-threaded. The face loop could be parallelized but currently
+//   is not (no TBB usage). Upper/lower are shared mutable state across the loop.
+//
+// [MEMORY] Both upper->vertices and lower->vertices start as full copies of mesh.vertices.
+//   For a 1M-vertex mesh with triangulate_caps=true, peak memory is approximately
+//   4× the original mesh vertex array before compaction.
 void cut_mesh(const indexed_triangle_set& mesh, float z, indexed_triangle_set* upper, indexed_triangle_set* lower, bool triangulate_caps)
 {
     assert(upper || lower);
