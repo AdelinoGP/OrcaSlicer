@@ -670,3 +670,101 @@ Marked as DEAD CODE — `#else TREE_SUPPORT_ORGANIC_NUDGE_NEW` branch is never c
 
 1. `src/libslic3r/Support/TreeModelVolumes.cpp` — collision/avoidance volume cache used by TreeSupport3D
 2. `src/libslic3r/GCode/PressureEqualizer.cpp` — linear advance / pressure equalizer post-processor
+
+---
+
+## Session 8 — PressureEqualizer + TreeModelVolumes full annotation
+
+**Files annotated:**
+- `src/libslic3r/GCode/PressureEqualizer.cpp` (1060 lines after annotations)
+- `src/libslic3r/GCode/PressureEqualizer.hpp` (260 lines after annotations)
+- `src/libslic3r/Support/TreeModelVolumes.cpp` (additional constructor + batch dispatcher)
+
+---
+
+### PressureEqualizer Architecture
+
+PressureEqualizer is a G-code post-processor inserted in the TBB pipeline between the per-layer G-code generator and CoolingBuffer. It enforces a user-configurable maximum volumetric extrusion rate slope (mm³/s²) to prevent abrupt pressure changes in the hot end.
+
+**Pipeline position:** GCode.cpp TBB stage → PressureEqualizer → CoolingBuffer
+
+**1-layer lookahead:** The public `process_layer(LayerResult&&)` overload buffers the current layer and emits the previous one. The caller must inject a NOP `LayerResult` at end-of-print to flush the final layer.
+
+**In-band tags:** GCode.cpp injects plain-text comment tags into the G-code stream to communicate with PressureEqualizer:
+- `;_EXTRUSION_ROLE:N` — update current role; line is consumed and NOT forwarded
+- `;_EXTRUDE_SET_SPEED` — open an adjustable-flow block
+- `;_EXTRUDE_END` — close an adjustable-flow block
+- `;_EXTERNAL_PERIMETER` — tag next G1 line for Klipper PA awareness
+
+Only G1 lines inside an open `EXTRUDE_SET_SPEED` block have `adjustable_flow=true` and can have their feedrate modified.
+
+**Algorithm per layer (process_layer(string)):**
+1. Parse each line → `GCodeLine` struct; EXTRUSION_ROLE_TAG lines consumed silently
+2. Find contiguous extrusion segments, optionally bridging ≤3 mm travel gaps
+3. For each segment, apply sliding-window `adjust_volumetric_rate(start, end)`:
+   - Backward pass: propagate deceleration constraints backward from slow segments
+   - Forward pass: propagate acceleration constraints forward from slow segments
+4. `output_gcode_line()` re-serialises each modified line, splitting into sub-segments if needed
+
+**Three emission modes in output_gcode_line():**
+- Case A (trivial delta < 10 mm³/min): single line, average feedrate
+- Case B (accel-peak-decel): quadratic solver → accel + steady + decel sub-segments
+- Case C (`single_slope_fallback`): monotone ramp, linear interpolation
+
+**Key hazards found:**
+- `goto single_slope_fallback` at line ~618 — only goto in the G-code pipeline
+- `m_layer_results` is public raw-pointer queue — manual memory management
+- feedrate quantized to 1 mm/s steps — sub-mm/s adjustments silently discarded
+- `is_just_line_with_extrude_set_speed_tag()` has inverted `empty()` check — latent logic bug
+- `output_buffer` never shrinks — peak memory from largest layer retained
+- Z-hop ignored by `advance_segment_beyond_small_gap()` when computing gap distance
+- `volumetric_correction_avg()` upper bound is 1.00000001 — allows tiny super-correction
+
+**Key constants (not configurable):**
+- `max_look_back_limit = 128` lines
+- `max_ignored_gap_between_extruding_segments = 3` mm
+- `NON_TRIVIAL_RATE_DELTA = 10` mm³/min
+
+---
+
+### TreeModelVolumes Session 8 Additions
+
+**Constructor hazard cross-reference:**
+The constructor populates `m_anti_overhang` from `slice_support_blockers()`. Due to the `processing_last_mesh` bug in `calculateCollision()` (documented in Session 8 annotation), anti_overhang is never actually applied for single-mesh prints, making support blocker meshes functionally ineffective in the tree support path.
+
+**`calculateCollision` batch dispatcher:**
+`calculateCollision(vector<RadiusLayerPair>)` is a thin outer TBB parallel_for wrapper. The real work happens in `calculateCollision(coord_t, LayerIndex)`. Both are now annotated.
+
+---
+
+### Key Findings — Session 8
+
+1. **goto in G-code pipeline** — `PressureEqualizer.cpp:~618` contains the only `goto` in the entire G-code generation pipeline. It is a degenerate-case fallback in the accel-peak-decel solver. Must be refactored to early-return into a helper before any port.
+
+2. **Public raw-pointer queue** — `m_layer_results` in PressureEqualizer is publicly accessible, directly coupled to GCode.cpp's TBB pipeline. Both ownership and lifecycle of `LayerResult*` pointers depend on correct ordering of pipeline stages and the mandatory end-of-print NOP injection.
+
+3. **is_just_line_with_extrude_set_speed_tag() bug** — inverted `empty()` check at line ~978. Functionally harmless today (if truly empty, function still returns false), but the code reads as backwards and is a maintenance hazard.
+
+4. **anti_overhang silently skipped** — the `processing_last_mesh` bug (outline index == mesh count, not last-in-order) prevents support blockers from taking effect in tree supports for all single-mesh prints. A silent correctness issue.
+
+5. **1 mm/s feedrate quantization** — `push_line_to_output()` rounds feedrate to nearest 60 mm/min. Very gradual rate ramps (< 1 mm/s steps) are flattened to plateaus. This is intentional for G-code size but limits smoothing precision.
+
+---
+
+### Open Questions (Session 8)
+
+1. `[UNCLEAR]` `adjust_volumetric_rate()` has commented-out cross-role rate-propagation code at lines ~840 and ~900. The current code always uses `line.volumetric_extrusion_rate_start` regardless of iRole match. Was the per-role tracking intentionally removed or accidentally commented out?
+
+2. `[UNCLEAR]` `volumetric_correction_avg()` upper bound 1.00000001 — is this a deliberate floating-point rounding allowance, or could it admit genuine rate increases? No logic in adjust_volumetric_rate() sets start/end above the nominal rate.
+
+3. `[UNCLEAR]` `extrusion_rate_smoothing_external_perimeter_only` — when true, only `erExternalPerimeter` and `erOverhangPerimeter` are smoothed. Bridge infill is excluded regardless. Is bridge exclusion intentional (bridges use different mechanics) or an oversight?
+
+---
+
+### Next Annotation Targets (Session 9+)
+
+1. `src/libslic3r/TriangleMeshSlicer.cpp` — core mesh-to-layer-contours algorithm (high priority)
+2. `src/libslic3r/GCode/AvoidCrossingPerimeters.cpp` — travel path optimization
+3. `src/libslic3r/GCode/GCodeProcessor.cpp` — G-code simulation and statistics
+4. `src/libslic3r/GCode/FanMover.cpp` — fan control post-processor
+5. `src/libslic3r/Arachne/` — variable-width perimeter engine internals

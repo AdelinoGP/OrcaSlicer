@@ -1068,3 +1068,91 @@ If two consecutive path elements have identical `result_on_layer` XY AND identic
 | 63 | BBS bed-area clip unconditional truncation | TreeSupport3D.cpp:3639 | Low | P3 |
 | 64 | Tip roof extraction disabled (`#if 0`) | TreeSupport3D.cpp:3950 | Medium | P2 |
 | 65 | `extrude_branch()` zero-length segment → NaN direction | TreeSupport3D.cpp:3097 | Medium | P2 |
+
+---
+
+## Session 8 Hazards — PressureEqualizer + TreeModelVolumes
+
+### Hazard 66 — `m_layer_results` Public Raw Pointer Queue (PressureEqualizer)
+
+**File:** `src/libslic3r/GCode/PressureEqualizer.hpp`
+**Severity:** High
+
+`m_layer_results` (a `std::queue<LayerResult*>`) is declared `public` in `GCodePressureEqualizer`. The TBB pipeline stage (`PressureEqualizerFilter`) writes raw pointers into this queue directly from outside the class. There is no ownership contract — the caller is responsible for not double-freeing and for eventually consuming all results. In a port this is a critical encapsulation boundary: the queue must be made private with proper push/pop accessors and ownership semantics must be made explicit (e.g., `unique_ptr` or move-only tokens).
+
+---
+
+### Hazard 67 — `goto single_slope_fallback` in `adjust_volumetric_rate()`
+
+**File:** `src/libslic3r/GCode/PressureEqualizer.cpp` (line ~800)
+**Severity:** Medium
+
+The only `goto` in the entire G-code pipeline appears inside `adjust_volumetric_rate()`. It jumps from Case B (accel-peak-decel quadratic solver) backward to the Case C single-slope fallback when the discriminant is negative or the computed peak rate is out of range. While valid C++ and intentionally structured, a `goto` across local variable declarations is extremely difficult to mechanically translate to Go/Rust/Swift (which may not support `goto` at all, or forbid jumping over initializations). Mitigation: refactor into `try_quadratic_solve()` returning `std::optional<double>` and fall through naturally to the linear case.
+
+---
+
+### Hazard 68 — `output_buffer` Never Shrinks (PressureEqualizer)
+
+**File:** `src/libslic3r/GCode/PressureEqualizer.cpp`
+**Severity:** Low
+
+`m_output_buffer` uses a power-of-2 resize strategy (`capacity *= 2`) and grows unboundedly across the lifetime of the `GCodePressureEqualizer` object, which spans the entire print. For very large prints with many long layers, this buffer can hold megabytes of data that will never be released until the object destructs. The pattern is a latent memory-growth hazard for port environments where arenas or slabs are not used.
+
+---
+
+### Hazard 69 — `is_just_line_with_extrude_set_speed_tag()` Inverted Empty Check
+
+**File:** `src/libslic3r/GCode/PressureEqualizer.cpp` (line ~630)
+**Severity:** Medium
+
+```cpp
+if (!line.raw.empty()) return false;  // should be: if (line.raw.empty()) return false;
+```
+
+The guard is inverted: a non-empty `raw` string causes early return `false`, but the intent (from context and the tag-check code that follows) is to bail out when the raw string *is* empty. The current code means the tag check is skipped for lines that have non-empty raw data — the exact lines that *would* need the check. This is a latent logic bug that could cause the pressure equalizer to misidentify speed-tag lines and either over- or under-process them. Should be verified against the true intent and fixed.
+
+---
+
+### Hazard 70 — Hardcoded Pipeline Constants in PressureEqualizer
+
+**File:** `src/libslic3r/GCode/PressureEqualizer.cpp`
+**Severity:** Low
+
+Three constants are embedded without named symbolic definitions:
+- `max_look_back_limit = 128` segments
+- `max_ignored_gap = 3.0 mm` (bridging small gaps)
+- `NON_TRIVIAL_RATE_DELTA = 10.0 mm³/min`
+
+These directly affect smoothing quality and cannot be tuned by user config. In a port, these should be promoted to named constants or configurable parameters to allow per-material or per-geometry tuning. The 128-segment look-back is particularly arbitrary and could cause under-smoothing on very fine features.
+
+---
+
+### Hazard 71 — `calculateCollision()` `processing_last_mesh` Bug (TreeModelVolumes)
+
+**File:** `src/libslic3r/Support/TreeModelVolumes.cpp` (constructor)
+**Severity:** High
+
+When processing a single-mesh print, the variable `processing_last_mesh` is initialized to `false` and only set `true` after the loop body executes — meaning it is never `true` during the loop iteration for the sole mesh. The `anti_overhang` (support-blocker volumes) expansion is gated on `processing_last_mesh`, so **support blockers are silently never applied** in single-mesh prints. Multi-mesh prints are unaffected because the flag becomes `true` on the final iteration. This is a correctness bug, not just a hazard, and likely produces support material inside volumes the user explicitly blocked.
+
+---
+
+### Hazard 72 — `const_cast` Lazy Cache Pattern in TreeModelVolumes
+
+**File:** `src/libslic3r/Support/TreeModelVolumes.cpp`
+**Severity:** Medium
+
+All six cache accessors (`getCollision`, `getAvoidance`, `getPlaceableAreas`, `getWallRestriction`, `getCollisionSphere`, `getCollisionHollow`) are declared `const` but use `const_cast<TreeModelVolumes*>(this)->calculate*()` to trigger lazy computation. Each has its own per-cache `std::mutex`. While thread-safe by inspection, this pattern defeats `const`-correctness guarantees: any refactor that passes `const TreeModelVolumes&` will silently allow mutation. A port should use `mutable` fields with `mutable std::mutex` instead, or restructure as an explicit cache manager.
+
+---
+
+## Summary Table (Hazards 66–72)
+
+| # | Hazard | File | Severity | Priority |
+|---|--------|------|----------|----------|
+| 66 | `m_layer_results` public raw pointer queue | PressureEqualizer.hpp | High | P1 |
+| 67 | `goto single_slope_fallback` in adjust_volumetric_rate() | PressureEqualizer.cpp | Medium | P2 |
+| 68 | `output_buffer` never shrinks | PressureEqualizer.cpp | Low | P3 |
+| 69 | `is_just_line_with_extrude_set_speed_tag()` inverted empty check | PressureEqualizer.cpp | Medium | P1 |
+| 70 | Hardcoded pipeline constants (128, 3mm, 10 mm³/min) | PressureEqualizer.cpp | Low | P3 |
+| 71 | `processing_last_mesh` bug — anti_overhang never applied (single mesh) | TreeModelVolumes.cpp | High | P1 |
+| 72 | `const_cast` lazy cache pattern defeats const-correctness | TreeModelVolumes.cpp | Medium | P2 |
