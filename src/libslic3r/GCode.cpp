@@ -1,3 +1,98 @@
+// [INTENT] G-code serialisation module: converts sliced layer data (ExtrusionEntityCollection)
+// into a stream of G-code commands written to a .gcode file.
+//
+// Top-level entry points:
+//   GCode::do_export()     — public entry point called from Print::export_gcode() (GCode.cpp:1993)
+//                            Writes to a .tmp file atomically; renames on success.
+//                            Sets up GCodeProcessor (inline analyser/time estimator) in a tee.
+//   GCode::_do_export()    — internal driver (GCode.cpp:2393). Emits file header, config block,
+//                            thumbnails, start G-code, then calls process_layers().
+//   GCode::process_layers() — two overloads:
+//                            (a) ByLayer print sequence (GCode.cpp:3533): all objects per layer.
+//                            (b) ByObject print sequence (GCode.cpp:3635): all layers per object.
+//                            Both build a TBB parallel_pipeline with stages:
+//                              generator → [spiral_mode] → [pressure_equalizer] → cooling →
+//                              fan_mover → [pa_processor] → output
+//
+// Per-layer pipeline stages:
+//   generator (serial)       — calls process_layer() per layer; emits LayerResult (std::string gcode)
+//   spiral_mode (optional)   — transforms Z coordinates to make walls spiral continuously upward
+//   pressure_equalizer (opt) — rebalances extrusion speeds to equalise volumetric pressure (LA-like)
+//   cooling (serial)         — CoolingBuffer: adjusts fan speeds and print speeds per-layer
+//   fan_mover (optional)     — shifts fan commands earlier in the stream (fan_speedup_time config)
+//   pa_processor (optional)  — AdaptivePAProcessor: injects Klipper pressure_advance per segment
+//   output (serial)          — writes std::string to GCodeOutputStream (tee to file + GCodeProcessor)
+//
+// Key internal methods:
+//   _extrude()          — single ExtrusionPath → G-code (GCode.cpp:6114). Sets accel/jerk,
+//                         computes e_per_mm from mm3_per_mm + flow ratios, sets speed per role.
+//   travel_to()         — generates a travel move (retract/lift if needed), calls
+//                         AvoidCrossingPerimeters when reduce_crossing_wall is set (GCode.cpp:7012).
+//   retract()           — wipe + retract + optional Z-lift. Uses RetractLiftEnforceType enum
+//                         to decide if lift applies (surface-type gated) (GCode.cpp:7305).
+//   set_extruder()      — toolchange sequence: retract → filament_end_gcode → ooze_prevention
+//                         → wipe tower → prime → filament_start_gcode (GCode.cpp:7363).
+//   extrude_loop()      — seam placement + loop clipping + _extrude() (GCode.cpp:5542).
+//   change_layer()      — emits Z-move; manages first-layer-done flags (GCode.cpp:5483).
+//
+// [STATE] GCode object is long-lived (one per Print::export_gcode() call). Key mutable state:
+//   m_writer           — GCodeWriter: tracks current extruder position, E value, active filament.
+//   m_last_pos         — last XY position in scaled print coords (Point, int32). Undefined at start.
+//   m_last_pos_defined — false until the first extrusion move is emitted. travel_to() handles
+//                        the undefined initial position case specially.
+//   m_layer_index      — current layer counter (0-based), incremented in change_layer().
+//   m_nominal_z        — planned Z for the current layer (set in change_layer()). Used by
+//                        ExtrusionPathSloped / scarf joint Z interpolation.
+//   m_cooling_buffer   — owns CoolingBuffer; alive for the duration of process_layers().
+//   m_spiral_vase      — unique_ptr<SpiralVase>; non-null only when spiral_mode config is set.
+//   m_pressure_equalizer — unique_ptr<PressureEqualizer>; non-null when max_volumetric_extrusion_rate_slope > 0.
+//   m_pa_processor     — unique_ptr<AdaptivePAProcessor>; always created but is a no-op when
+//                        adaptive PA is not configured.
+//   m_wipe             — Wipe: stores the last extrusion path for wipe-on-retract.
+//   m_processor        — GCodeProcessor: inline analyser feeding time estimation and viewer data.
+//
+// [CONCURRENCY] do_export() is single-threaded from the Print step scheduler's perspective.
+//   process_layers() uses a TBB parallel_pipeline, but ALL filters are serial_in_order —
+//   the pipeline provides pipelining (overlap of I/O and string building) not true parallelism.
+//   m_writer / m_last_pos / m_wipe are NOT thread-safe; safe only because all filters are serial.
+//
+// [COUPLING] GCode depends on:
+//   Print, PrintObject, Layer, ExtrusionEntity  — for geometry input
+//   GCodeWriter                                  — low-level move/E/temp command emission
+//   GCodeProcessor                               — inline tee for analysis / time estimation
+//   ToolOrdering                                 — which extruder for which layer
+//   WipeTowerIntegration                         — wipe tower injection between object layers
+//   CoolingBuffer, SpiralVase, PressureEqualizer, FanMover, AdaptivePAProcessor — post-processing
+//   SeamPlacer                                   — seam position on loops
+//   AvoidCrossingPerimeters                      — travel path planning
+//
+// [HAZARD] do_export() early-returns silently if psGCodeExport step is already done AND the
+//   .gcode file exists (GCode.cpp:2004). If the file exists but is stale/corrupt, the export
+//   is skipped without error. Cache invalidation relies entirely on PrintStep state.
+//
+// [HAZARD] process_layers() builds 4 different pipeline configurations at runtime (lines 3621-3628).
+//   The combination of active post-processors (spiral+pressure, spiral only, pressure only, none)
+//   selects one of four hardcoded tbb::parallel_pipeline expressions. Adding a new post-processor
+//   stage requires adding 2^N new pipeline variants — a combinatorial maintenance burden.
+//
+// [HAZARD] _extrude() computes e_per_mm as a chain of multiplications from mm3_per_mm (path
+//   property), print_flow_ratio, filament_flow_ratio, and up to 2 additional role-based ratios.
+//   Multiplier application order is significant; changing the order produces different extrusion
+//   amounts. The filament_flow_ratio is divided back out at line 6260 after being applied
+//   implicitly via m_writer.filament()->e_per_mm3() — this is not obvious without reading both
+//   GCode.cpp and GCodeWriter to understand what e_per_mm3() includes.
+//
+// [HAZARD] Global file-scope variables travel_point_1/2/3 (GCode.cpp:94-96) hold AMS cutter
+//   path points. They are set by get_path_of_change_filament() and read in set_extruder().
+//   These are not protected by any mutex — safe only because _do_export() is single-threaded.
+//
+// [HAZARD] PlaceholderParser template processing in placeholder_parser_process() can throw.
+//   Failures are deferred via m_placeholder_parser_integration.failed_templates and surfaced
+//   via check_placeholder_parser_failed() (GCode.cpp:3510) inside the pipeline generator.
+//   A template failure aborts the entire G-code export at the next layer boundary, not immediately.
+//
+// [UNCLEAR] g_max_label_object = 64 (GCode.cpp:92) caps the number of exclude-object labels
+//   in BBL firmware mode. It is not validated against firmware limits or documented in config.
 #include "BoundingBox.hpp"
 #include "Config.hpp"
 #include "Polygon.hpp"
@@ -1990,6 +2085,22 @@ bool GCode::is_QIDI_Printer()
     return false;
 }
 
+// [INTENT] Public entry point for G-code export. Called once per plate from Print::export_gcode().
+// Writes G-code to `path` via a .tmp file; renames to final path after successful close.
+// Sets up GCodeProcessor (inline tee that produces GCodeProcessorResult for time estimation
+// and the G-code viewer). Validates custom G-code for reserved keywords before export.
+//
+// [STATE] Initialises m_curr_print, resets GCodeProcessor, opens GCodeOutputStream.
+//   GCodeOutputStream wraps a FILE* + GCodeProcessor tee — every write() call also feeds the processor.
+//
+// [HAZARD] Early return at line ~2099: if psGCodeExport is already done AND the file exists,
+//   export is silently skipped. Stale files are not re-validated. This is intentional for caching
+//   but means a corrupt .gcode file is never re-generated until the step is invalidated.
+//
+// [HAZARD] After _do_export() completes, m_processor.finalize() is called to post-process
+//   the in-memory G-code result (time estimation passes, layer time annotation, placeholder
+//   substitution for print-time and filament-usage tags). If finalize() throws, the .tmp file
+//   is already closed and renamed — partial output may be used by callers.
 void GCode::do_export(Print* print, const char* path, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
 {
     PROFILE_CLEAR();
@@ -2390,6 +2501,37 @@ static BambuBedType to_bambu_bed_type(BedType type)
     return bambu_bed_type;
 }
 
+// [INTENT] Internal G-code export driver. Called by do_export() after file setup.
+// Emits the complete G-code sequence for one plate in order:
+//   1. file_start_gcode (optional user template, very first bytes in file)
+//   2. HEADER_BLOCK (generator comment, time/layer placeholders, exclude-object label list)
+//   3. CONFIG_BLOCK (full serialised config for BBL printers; thumbnails for others)
+//   4. Thumbnails (PNG/QOI/BTT_TFT encoded in base64 comments)
+//   5. Machine envelope (M201/M203/M204/M205 kinematic limits)
+//   6. First-layer bed/extruder temperature commands
+//   7. start_gcode (machine-level startup sequence, placeholder-processed)
+//   8. Skirt + brim (if any)
+//   9. Per-layer G-code via process_layers() (bulk of the output)
+//  10. End-of-print G-code, final extruder temperature off, fan off
+//
+// [STATE] Resets all per-export GCode state: m_last_height, m_last_layer_z, m_last_width,
+//   m_is_role_based_fan_on, m_layer_count, m_toolchange_count, etc.
+//   Constructs optional post-processors: SpiralVase, PressureEqualizer,
+//   SmallAreaInfillFlowCompensator, CoolingBuffer, AdaptivePAProcessor, WipeTowerIntegration.
+//
+// [COUPLING] Reads from Print::objects(), Print::config(), ToolOrdering, WipeTower.
+//   Writes entirely via GCodeOutputStream (which tees to GCodeProcessor for analysis).
+//
+// [HAZARD] m_layer_count is computed by counting unique Z values across all objects (lines 2519-2571).
+//   The de-duplication uses std::unique (requires sorted input, produces run-length-1 groups)
+//   followed by a manual decrement for values within EPSILON. The two passes can conflict:
+//   std::unique collapses exact duplicates, but the EPSILON pass separately decrements near-
+//   duplicates — if both apply to the same pair, the count is decremented twice (under-count).
+//
+// [HAZARD] BTT_TFT thumbnail mode suppresses the HEADER_BLOCK entirely (line ~2608).
+//   The HEADER_BLOCK contains time and layer count placeholders. Without it, BBL firmware-
+//   dependent features (skipping objects, progress) will not function correctly on BBL printers.
+//   The BTT_TFT check is based on a substring search in the thumbnails config string.
 void GCode::_do_export(Print& print, GCodeOutputStream &file, ThumbnailsGeneratorCallback thumbnail_cb)
 {
     PROFILE_FUNC();
@@ -3530,6 +3672,25 @@ size_t GCode::get_extruder_id(unsigned int filament_id) const
 // Process all layers of all objects (non-sequential mode) with a parallel pipeline:
 // Generate G-code, run the filters (vase mode, cooling buffer), run the G-code analyser
 // and export G-code into file.
+//
+// [INTENT] ByLayer print sequence pipeline (all objects printed per-Z-slice).
+//   Builds a TBB parallel_pipeline with serial_in_order filters for safe G-code ordering.
+//   Pipeline stages (runtime-selected based on active features):
+//     generator → [spiral_mode] → [pressure_equalizer] → cooling → fan_mover → [pa_processor] → output
+//
+// [CONCURRENCY] All filters are serial_in_order. No true parallelism — the pipeline provides
+//   pipelining overlap (CPU + I/O), not concurrent layer processing. All GCode member state
+//   (m_writer, m_last_pos, etc.) is safe to access without locks.
+//
+// [HAZARD] The pipeline is assembled from 4 hardcoded combinations (lines ~3760-3768). Each
+//   new optional post-processor stage doubles the number of required pipeline expressions.
+//   Current matrix: {spiral × pressure_equalizer} = 4 pipelines. Adding fan_mover or pa_processor
+//   as truly optional (rather than always-on no-op) would require 8 or 16 pipelines.
+//
+// [HAZARD] pressure_equalizer injects a NOP layer at end-of-stream (1-layer lookahead buffer).
+//   This is handled by the generator emitting one extra LayerResult::make_nop_layer_result()
+//   when layer_to_print_idx == layers_to_print.size(). If this NOP is not emitted correctly,
+//   the last real layer's pressure-equalised G-code is silently dropped from output.
 void GCode::process_layers(
     const Print                                                         &print,
     const ToolOrdering                                                  &tool_ordering,
@@ -6111,6 +6272,40 @@ double GCode::calc_max_volumetric_speed(const double layer_height, const double 
     return res;
 }
 
+// [INTENT] Core per-path G-code emitter. Converts a single ExtrusionPath (a polyline with
+// role, width, height, mm3_per_mm) into a sequence of G1 move commands with F (feed rate)
+// and E (extrusion amount) values.
+//
+// Algorithm:
+//   1. Handle ExtrusionPathSloped (scarf joint): compute target Z at path start/end.
+//   2. Travel to path start point via travel_to() if not already there.
+//   3. Unretract (if previously retracted).
+//   4. Set acceleration and jerk (role-based lookup table; Klipper gets combined command).
+//   5. Compute e_per_mm:
+//      - Start from path.mm3_per_mm (geometric cross-section × path length ratio).
+//      - Multiply by print_flow_ratio, filament_flow_ratio.
+//      - Multiply by role-specific flow ratio (top_solid, bottom, internal_bridge, scarf).
+//      - Multiply by per-role overrides if set_other_flow_ratios is enabled.
+//      - Multiply by first_layer_flow_ratio on layer 0 (non-brim/skirt).
+//      - Convert to E-per-mm via m_writer.filament()->e_per_mm3() (= filament_flow_ratio /
+//        cross_sectional_area). Divide back out filament_flow_ratio to avoid double-application.
+//   6. Compute speed (role-based lookup; overridden by dynamic speed if enabled).
+//   7. Emit G1 segments, handling small-area-infill flow compensation per-segment.
+//
+// [HAZARD] e_per_mm computation (step 5) applies filament_flow_ratio twice then divides once.
+//   The chain: e_per_mm3 (contains filament_flow_ratio) × _mm3_per_mm (contains filament_flow_ratio)
+//   ÷ filament_flow_ratio. This is intentional but extremely fragile — changing the order of
+//   operations or adding another multiplier without understanding the cancellation will
+//   produce incorrect extrusion amounts without any error.
+//
+// [HAZARD] Speed for erSkirt uses external perimeter speed if detect_overhang_wall is on and
+//   skirt touches overhang. The skirt speed selection falls through to the else-branch at the
+//   end of the speed lookup chain if no special case matches. Missing a role in the chain
+//   causes silent use of the default speed regardless of config.
+//
+// [COUPLING] Reads m_nominal_z (set by change_layer()) for sloped path Z interpolation.
+//   If change_layer() is not called before _extrude(), m_nominal_z may be stale — the Z
+//   on sloped paths will be incorrect for the current layer.
 std::string GCode::_extrude(const ExtrusionPath &path, std::string description, double speed)
 {
     std::string gcode;
@@ -7008,6 +7203,23 @@ std::string GCode::_encode_label_ids_to_base64(std::vector<size_t> ids)
     return encodeBase64(bitset);
 }
 
+// [INTENT] Generate a travel move from current position to `point` (print coords).
+// Decides whether to retract and lift, optionally reroutes through AvoidCrossingPerimeters.
+//
+// Decision flow:
+//   1. needs_retraction() — checks travel length vs min_travel, whether travel crosses perimeters.
+//   2. If reduce_crossing_wall and position is clear: AvoidCrossingPerimeters::travel_to()
+//      replans the path inside the safe region (multi-hop).
+//   3. Re-evaluate needs_retraction on the replanned path.
+//   4. If retraction needed: emit retract() then the travel G1 moves.
+//   5. If no retraction: emit travel G1 moves directly.
+//
+// [COUPLING] Reads m_last_pos (must be valid); reads m_avoid_crossing_perimeters for path
+//   replanning; calls retract() which reads m_writer.filament() state.
+//
+// [HAZARD] `z` parameter defaults to DBL_MAX meaning "no Z change during travel". Only
+//   ExtrusionPathSloped callers pass a real Z. If a caller accidentally passes 0.0 instead
+//   of DBL_MAX, a spurious Z=0 command will be emitted — crashing the nozzle into the bed.
 // This method accepts &point in print coordinates.
 std::string GCode::travel_to(const Point& point, ExtrusionRole role, std::string comment, double z/* = DBL_MAX*/)
 {
@@ -7302,6 +7514,25 @@ bool GCode::needs_retraction(const Polyline &travel, ExtrusionRole role, LiftTyp
     return true;
 }
 
+// [INTENT] Emit filament retraction (and optional Z-lift) before a travel move or toolchange.
+// Sequence: wipe-path retraction (partial E retract while wiping) → full retraction → reset_e →
+// conditional Z-lift.
+//
+// Z-lift gating (RetractLiftEnforceType):
+//   rletAllSurfaces   — always lift
+//   rletTopOnly       — lift only after top-infill or ironing layers
+//   rletBottomOnly    — lift only on first layer (layer_index == 0)
+//   rletTopAndBottom  — lift on top infill or first layer
+//   (default)         — no lift
+//
+// [HAZARD] Hilbert Curve infill pattern suppresses retraction on first layer and top solid
+//   infill (line ~7523). This is a special-case workaround for a specific infill pattern
+//   producing excessive retraction count. Removing this condition breaks Hilbert Curve quality.
+//
+// [HAZARD] wipe path: wipe retraction lengths are split into before-wipe and during-wipe portions
+//   by Wipe::calculateWipeRetractionLengths(). After wipe, m_writer.retract() is called again
+//   to ensure the full retraction length is honoured even if the wipe path was shorter than needed.
+//   If the split calculation is wrong, the filament is either over- or under-retracted.
 std::string GCode::retract(bool toolchange, bool is_last_retraction, LiftType lift_type, bool apply_instantly, ExtrusionRole role)
 {
     std::string gcode;
@@ -7360,6 +7591,36 @@ std::string GCode::retract(bool toolchange, bool is_last_retraction, LiftType li
     return gcode;
 }
 
+// [INTENT] Generate a complete toolchange (filament switch) sequence. Called by process_layer()
+// when the next extrusion requires a different filament. NOT called when wipe tower handles
+// the toolchange — in that case WipeTowerIntegration inserts the wipe tower G-code instead.
+//
+// Single-extruder fast path (lines ~7604-7420): no actual toolchange needed; just update
+//   PlaceholderParser variables and emit filament_start_gcode + pressure advance config.
+//
+// Multi-extruder full path:
+//   1. retract(toolchange=true) — full retraction with wipe.
+//   2. Emit filament_end_gcode (placeholder-processed for old filament).
+//   3. OozePrevention: park nozzle, set standby temperature.
+//   4. Emit T<n> toolchange command via m_writer.toolchange().
+//   5. Apply temperature target for new filament (with optional toolchange_temp_override).
+//   6. Emit filament_start_gcode (placeholder-processed for new filament).
+//   7. Emit prime (purge line) for new filament.
+//   8. unretract().
+//
+// [COUPLING] toolchange_temp_override is used by WipeTowerIntegration to set a specific
+//   temperature during wipe tower purge. The WipeTower and this method must agree on
+//   temperature sequencing — if WipeTower emits its own T command, set_extruder() must not
+//   also emit one (coordination via m_wipe_tower check in process_layer).
+//
+// [HAZARD] m_toolchange_count is incremented before the retract (line ~7617). If an exception
+//   is thrown during retraction or gcode emission, the count will be off by one for any
+//   subsequent recovery attempt, misaligning toolchange-indexed config lookups.
+//
+// [HAZARD] filament_id vs extruder_id: new_filament_id is the logical filament slot (0-based),
+//   new_extruder_id = get_extruder_id(new_filament_id) is the physical hardware extruder.
+//   On single-nozzle multi-material, extruder_id is always 0. Confusing these two produces
+//   wrong T<n> commands and incorrect per-filament config lookups.
 std::string GCode::set_extruder(unsigned int new_filament_id, double print_z, bool by_object, int toolchange_temp_override)
 {
     int new_extruder_id = get_extruder_id(new_filament_id);

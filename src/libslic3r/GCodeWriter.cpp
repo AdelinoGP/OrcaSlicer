@@ -1,3 +1,62 @@
+// [INTENT] Low-level G-code command emitter. Translates high-level printer actions
+// (move to XY, extrude dE, retract, set temperature, toolchange) into G-code text strings.
+// All output is flavour-aware — a GCodeFlavor enum selects Marlin/Klipper/RepRap/Smoothie/etc.
+// specific command variants. GCodeWriter is stateful: it tracks current position, lift state,
+// and current filament/extruder.
+//
+// Key responsibilities:
+//   travel_to_xy()    — G1 XY move, no extrusion. Updates m_pos(0..1).
+//   travel_to_z()     — G1 Z move (or deferred via m_to_lift). Updates m_pos(2).
+//   lazy_lift()       — deferred Z-hop: sets m_to_lift; actual move injected by travel_to_xyz().
+//   eager_lift()      — immediate Z-hop: emits spiral or linear Z move right away.
+//   extrude_to_xy()   — G1 XYE move for extrusion. Applies m_x_offset/m_y_offset plate shift.
+//   retract()         — calls _retract(); uses filament retract_before_wipe factor if before_wipe.
+//   retract_for_toolchange() — same but uses retract_length_toolchange and restart_extra_toolchange.
+//   _retract()        — actual G1 E<retracted> F<retract_speed> emit. Delegates to
+//                       Filament::retract() which tracks the current retraction state.
+//   unretract()       — G1 E<original> with restart extra if configured.
+//   unlift()          — emits the pending deferred lift (m_to_lift → travel_to_z call).
+//   set_temperature() — M109/M104 with flavour-specific variants (M116, M6, etc.)
+//   toolchange()      — T<n> command. Also calls init_extruder() for first-use initialisation.
+//
+// [STATE] GCodeWriter holds:
+//   m_pos           — Vec3d current printer position in print coords (NOT including plate offset).
+//                     Plate offset (m_x_offset, m_y_offset) is subtracted at emit time.
+//   m_lifted        — current applied Z-lift amount (mm).
+//   m_to_lift       — pending deferred Z-lift amount (0 if no deferred lift).
+//   m_to_lift_type  — LiftType enum for deferred lift (SpiralLift or NormalLift).
+//   filaments_      — vector<Filament>, indexed by filament_id. Each Filament tracks E position.
+//   m_current_filament_idx — index into filaments_ for active filament.
+//   full_gcode_comment — static bool; when true, G-code comments are appended to commands.
+//
+// [CONCURRENCY] GCodeWriter is not thread-safe. It is owned exclusively by the GCode object
+//   and used single-threaded inside the TBB serial_in_order pipeline stages.
+//
+// [HAZARD] Plate offset (m_x_offset, m_y_offset) is subtracted from XY coordinates at emit
+//   time in travel_to_xy(), extrude_to_xy(), etc. m_pos always stores un-offset coordinates.
+//   Any code reading m_pos for geometry decisions gets correct coordinates; any code reading
+//   the emitted G-code text assumes offset-adjusted output. Mixing the two silently produces
+//   wrong positions.
+//
+// [HAZARD] lazy_lift() sets m_to_lift but emits nothing. The lift is injected by
+//   travel_to_xyz() when the next XYZ move occurs. If travel is cancelled or skipped,
+//   the lift is never emitted and the printer head stays at the current Z for the next
+//   extrusion — no error is raised. unlift() clears m_to_lift without emitting if no
+//   actual lift occurred (m_lifted == 0).
+//
+// [HAZARD] _retract() uses the Filament::retract() return value (dE). If the filament is
+//   already fully retracted (retraction state tracking), dE == 0 and no G-code is emitted.
+//   This is correct behaviour, but if Filament state is corrupted (e.g., by a missed unretract),
+//   subsequent retracts will silently not emit and the filament will be under-retracted.
+//
+// [HAZARD] use_firmware_retraction mode: _retract() emits G10/G22 instead of G1 E moves.
+//   In this mode, `length` is forced to 1.0 to bypass the zero-length skip check. The actual
+//   retract length is firmware-controlled. Mixing software and firmware retraction modes
+//   mid-print (e.g., changing the config option during export) will desync filament state.
+//
+// [COUPLING] GCodeWriter::config is a direct reference to PrintConfig. Config values are read
+//   on every method call — there is no snapshot. If config changes during export (not currently
+//   possible), emitted G-code would reflect the new values from mid-export onward.
 #include "GCodeWriter.hpp"
 #include "CustomGCode.hpp"
 #include "PrintConfig.hpp"
