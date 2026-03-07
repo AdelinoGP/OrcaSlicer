@@ -469,3 +469,97 @@ The accumulation of E-axis distances in `GCode.cpp` uses `double`, which is crit
 | FP precision contracts | Low | Low | P3 |
 | Localization indirection | Low | Low | P3 |
 | Large monolithic files | Low | High | P3 |
+
+---
+
+## New Hazards (Sessions 3 & 4)
+
+### 25. `const_cast` UB in ToolOrdering (ToolOrdering.cpp)
+
+**Location:** `src/libslic3r/GCode/ToolOrdering.cpp` — `collect_extruders()`.
+
+**Hazard:** `collect_extruders()` receives a `const Print&` argument but uses `const_cast<Print&>` to call `PrintObject::invalidate_step()`, which mutates state. This is undefined behaviour if the original object was declared `const`. Compilers are permitted to cache reads through `const` references and never observe the mutation.
+
+**Translation risk:** Any language with explicit mutability (Rust, Swift) will reject this pattern at the type level. In C++ the UB is silent.
+
+**Mitigation:** Change `collect_extruders()` to take `Print&` (non-const). Audit all callers.
+
+---
+
+### 26. Extruder ID 0-vs-1 Index Confusion (ToolOrdering.cpp)
+
+**Location:** `src/libslic3r/GCode/ToolOrdering.cpp` — multiple sites in `collect_extruders()`, `fill_wipe_tower_partitions()`, tool-change loops.
+
+**Hazard:** Extruder IDs switch between 0-based (internal array indices) and 1-based (config/display values) without a type-level distinction. Mixing the two produces off-by-one array access or wrong extruder selection.
+
+**Translation risk:** Any port that normalizes to one convention will break callers that assumed the other. The mixing is viral — fixing one site exposes others.
+
+**Mitigation:** Introduce a typed wrapper `ExtruderIdx0` vs `ExtruderIdx1` (or a newtype/enum in the target language) and audit every conversion.
+
+---
+
+### 27. WipeTower2 Global Static Side Effect (WipeTower2.cpp)
+
+**Location:** `src/libslic3r/GCode/WipeTower2.cpp` — `WipeTowerWriter2` constructor.
+
+**Hazard:** `GCodeProcessor::s_IsBBLPrinter = false` is set inside `WipeTowerWriter2`'s constructor. This is a process-wide global static that affects G-code output format for all downstream processing. Any BBL printer that goes through WipeTower2 gets its mode silently overridden.
+
+**Translation risk:** Global mutable statics are a concurrency hazard (not mutex-protected) and make testing impossible without re-initializing global state between tests.
+
+**Mitigation:** Pass printer type as a parameter through the call stack; remove the global static entirely.
+
+---
+
+### 28. WipeTower2 Dry-Run Hazard in `save_on_last_wipe()` (WipeTower2.cpp)
+
+**Location:** `src/libslic3r/GCode/WipeTower2.cpp:save_on_last_wipe()`.
+
+**Hazard:** `save_on_last_wipe()` calls `tool_change()` and `finish_layer()` as a dry run to measure `total_extrusion_length_in_plane()`. The generated G-code strings are discarded, but all writer side effects run (including used-filament accounting, `m_num_tool_changes` increments, etc.). Any new side effect added to these functions will silently corrupt the dry-run accounting.
+
+**Translation risk:** In a port, this pattern is opaque — it looks like normal execution but is actually a measurement pass. Must be refactored into a side-effect-free measurement API.
+
+**Mitigation:** Extract a `measure_layer_extrusion()` function that computes the depth/length without any state mutation.
+
+---
+
+### 29. SeamPlacer `end_index` Comment Inversion (SeamPlacer.cpp)
+
+**Location:** `src/libslic3r/GCode/SeamPlacer.cpp` — `Perimeter::end_index`.
+
+**Hazard:** The field is commented "inclusive!" but all consuming code treats it as exclusive (past-the-end C++ convention). A refactor that takes the comment literally and adjusts loop bounds by ±1 will produce off-by-one seam placement errors.
+
+**Mitigation:** Correct the comment to "exclusive (past-the-end)". Add a unit test covering the boundary case.
+
+---
+
+### 30. SeamPlacer Score Overflow in `spAlignedBack` Mode (SeamPlacer.cpp)
+
+**Location:** `src/libslic3r/GCode/SeamPlacer.cpp` — `spAlignedBack` score override.
+
+**Hazard:** In `spAlignedBack` mode the visibility score is pushed above 1.0 to override other modes. This breaks the [0,1] unit interpretation and implicitly couples `spAlignedBack` to be the highest-priority mode. Any new mode added that also pushes > 1.0 would silently conflict.
+
+**Mitigation:** Replace the score override with an explicit priority/mode enum field in the seam point data structure.
+
+---
+
+### 31. CoolingBuffer G1-Only Removal Bug (Pre-existing) (CoolingBuffer.cpp)
+
+**Location:** `src/libslic3r/GCode/CoolingBuffer.cpp` — G1-line removal logic.
+
+**Hazard:** The removal check scans the entire buffer rather than just the last line, potentially matching and removing incorrect G1 lines. This is a pre-existing PrusaSlicer upstream bug. Under OrcaSlicer's pressure-advance post-processor, the impact may be different from upstream.
+
+**Mitigation:** Scope the check to the last N lines only. Add regression test with a buffer containing multiple G1 lines.
+
+---
+
+### Updated Risk Matrix (Sessions 3 & 4 additions)
+
+| Hazard | Severity | Difficulty to Port | Priority |
+|--------|----------|--------------------|----------|
+| `const_cast` UB in ToolOrdering | High | Low | P1 |
+| Extruder ID 0-vs-1 confusion | High | Medium | P1 |
+| WipeTower2 global static side effect | High | Low | P1 |
+| WipeTower2 dry-run in save_on_last_wipe | Medium | Medium | P2 |
+| SeamPlacer end_index comment inversion | Medium | Low | P2 |
+| SeamPlacer spAlignedBack score overflow | Low | Low | P3 |
+| CoolingBuffer G1-only removal bug | Medium | Medium | P2 |

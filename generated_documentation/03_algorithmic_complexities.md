@@ -241,3 +241,80 @@ Smooths rapid changes in extrusion rate to reduce pressure advance artifacts. Sc
 #### Arc Fitting (`ArcFitter.cpp`)
 
 Converts sequences of short line segments to arc commands (`G2`/`G3`) where the polyline approximates a circular arc within tolerance.
+
+---
+
+## 7. SeamPlacer Algorithm (Sessions 3 Details)
+
+**File:** [`src/libslic3r/GCode/SeamPlacer.cpp`](../src/libslic3r/GCode/SeamPlacer.cpp)
+
+### Visibility Scoring
+
+1. **Surface sampling:** 30,000 points are sampled on the mesh surface using Poisson-disk distribution.
+2. **Per-sample raycasting:** For each sample point, 25 rays are cast (5×5 hemisphere grid) using the `Frame` class to rotate hemisphere directions into world space.
+3. **Visibility score:** Number of rays that hit another surface / 25. Low score = hidden = preferred seam location.
+
+### Angle Penalty
+
+`compute_angle_penalty(angle)` combines:
+- A **Gaussian trough** for concave corners (negative angle) → very low penalty.
+- A **sigmoid ramp** for convex corners (positive angle) → high penalty.
+
+The combined function strongly biases seam placement toward concave features (the natural "hiding spot").
+
+### Cross-Layer Alignment
+
+`align_seam_points()` fits a B-spline to the seam positions across layers, using Z as the spline parameter. This creates a vertical seam line. The alignment assumes Z increases monotonically within each seam string (hazard for non-monotonic print orders).
+
+### Complexity
+
+| Operation | Complexity | Notes |
+|-----------|------------|-------|
+| Surface sampling | O(V) | V = mesh vertex count |
+| Per-sample raycasting | O(30,000 × 25) = O(750,000) | TBB parallel_for |
+| Per-perimeter scoring | O(P × V_p) | P = perimeters, V_p = vertices per perimeter |
+| B-spline alignment | O(L²) | L = layers with aligned seams |
+
+---
+
+## 8. WipeTower2 Planning Algorithm (Session 4 Details)
+
+**File:** [`src/libslic3r/GCode/WipeTower2.cpp`](../src/libslic3r/GCode/WipeTower2.cpp)
+
+### Two-Phase Architecture
+
+**Phase 1 — Planning (run 5× for convergence):**
+1. `plan_toolchange()` builds `m_plan[layer].tool_changes[]` with `required_depth = ramming_depth + wiping_depth`.
+2. `plan_tower()` propagates depths downward: lower layers must be at least as deep as deeper layers above (O(n²) depth propagation).
+3. `save_on_last_wipe()` steals finish_layer extrusion volume from the last wipe on each layer to reduce total tower height.
+
+**Phase 2 — Generation:**
+1. `generate()` iterates `m_plan` once, calling `tool_change()` and `finish_layer()` per layer.
+2. Each `tool_change()` sequences: `toolchange_Unload()` → `toolchange_Change()` → `toolchange_Load()` → `toolchange_Wipe()`.
+3. `finish_layer()` and adjacent toolchange TCR are merged via `merge_tcr()`.
+
+### Wipe Volume → Tower Depth Conversion
+
+```
+length_to_extrude = wipe_volume / (layer_height × (perimeter_width - layer_height × (1 - π/4))) × filament_area
+rows = ceil(length_to_extrude / tower_width)
+depth = rows × perimeter_width × extra_spacing
+```
+
+### Ramming Speed Profile
+
+The ramming speed is defined as a `std::vector<float>` of speeds, one entry per 0.25-second segment. The total ramming distance is the integral: `Σ(speed_i × 0.25)` mm.
+
+### Cooling Move Schedule
+
+For SEMM printers, `N = cooling_moves` back-and-forth moves are made across the cooling tube. Speed ramps linearly from `cooling_initial_speed` to `cooling_final_speed` across the N moves.
+
+### Complexity
+
+| Operation | Complexity | Notes |
+|-----------|------------|-------|
+| plan_toolchange() | O(1) per call | Amortized; builds m_plan incrementally |
+| plan_tower() | O(n²) per run | n = number of layers; propagates depths downward |
+| save_on_last_wipe() | O(n × k) per run | n = layers, k = toolchanges per layer |
+| generate() | O(n × k) | One writer pass per layer-toolchange pair |
+| Full convergence | O(5 × n²) | 5 iterations of plan_tower |

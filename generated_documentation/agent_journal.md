@@ -225,3 +225,169 @@ do_export() → _do_export() → process_layers() → [TBB pipeline]:
 3. `src/libslic3r/GCode/SeamPlacer.cpp` — seam position selection algorithm
 4. `src/libslic3r/GCode/WipeTower2.cpp` — wipe tower G-code generation
 5. `src/libslic3r/Support/SupportMaterial.cpp` — support structure generation
+
+---
+
+## Session 3 — Annotation Phase (ToolOrdering, CoolingBuffer, SeamPlacer)
+
+### Files Annotated and Committed
+
+| Commit | Files | Key Findings |
+|--------|-------|-------------|
+| (session 3) | GCode/ToolOrdering.cpp | Extruder 0-vs-1-based hazard; const_cast UB; dead code; vector insertion hazard |
+| (session 3) | GCode/CoolingBuffer.cpp + .hpp | G1-only removal bug; fan priority chain; per-line state machine |
+| (session 3) | GCode/SeamPlacer.cpp + .hpp | 30k samples + 5×5 hemisphere raycasts; Gaussian+sigmoid angle penalty; multiple hazards |
+
+---
+
+### Key Discoveries (Session 3)
+
+#### ToolOrdering.cpp
+
+**Extruder ID indexing hazard:**
+Throughout `ToolOrdering.cpp`, extruder IDs switch between 0-based (internal array indices) and 1-based (config/human-facing values) with no systematic conversion. The mix appears at least 4 times in `collect_extruders()` and `fill_wipe_tower_partitions()`. A refactor must introduce an explicit conversion layer.
+
+**`const_cast` UB in `collect_extruders`:**
+`collect_extruders()` receives a `const Print&` but casts away constness via `const_cast<Print&>` to call `PrintObject::invalidate_step()`. This is undefined behaviour if the original object was declared `const`. The mutation should be refactored to a non-const ref or a separate API.
+
+**Dead code in `generate_first_layer_tool_order`:**
+Several local variables are declared and computed but never used in `generate_first_layer_tool_order()`. Indicates copy-paste residue or partially-reverted refactoring.
+
+**`fill_wipe_tower_partitions` vector insertion hazard:**
+The function inserts new `LayerTools` entries into `m_layer_tools` by index (`std::vector::insert`) while iterating by index. If the vector reallocates, all indices are still correct (integer index), but the insert invalidates iterators if any are held. Currently safe (index-based), but fragile if iterators are ever stored.
+
+**Timelapse hack:**
+Smooth timelapse mode forces a wipe-tower visit on every layer that contains object content, regardless of whether a toolchange occurs. This is implemented as a synthetic toolchange (same extruder in/out) in `fill_wipe_tower_partitions()`.
+
+#### CoolingBuffer.cpp
+
+**Fan priority chain (highest to lowest):**
+1. Overhang fan speed
+2. Internal bridge fan speed
+3. Support interface fan speed
+4. Ironing fan speed
+5. Force-resume fan (from previous layer's bridge)
+6. Base fan speed (from cooling settings)
+
+**Pre-existing PrusaSlicer G1-only removal bug:**
+`CoolingBuffer` attempts to remove redundant G1 moves from the buffer, but the check scans the entire buffer rather than just the last line. On large buffers this can match incorrect lines and produce corrupted G-code. This is a known upstream bug inherited from PrusaSlicer.
+
+**Per-line state machine:**
+Each G-code line is parsed into a `CoolingLine` struct with flags (`TYPE_G1`, `TYPE_G4`, `TYPE_SET_TOOL`, etc.). The state machine processes lines in order, accumulating time-on-layer for fan ramp calculations.
+
+#### SeamPlacer.cpp
+
+**Algorithm overview:**
+1. Sample 30,000 points on the mesh surface (Poisson-disk sampled).
+2. For each sample, cast 25 rays (5×5 hemisphere grid) to compute a visibility score.
+3. Per-perimeter loop: score each vertex using weighted visibility + angle penalty.
+4. Placement: pick lowest-scored (most concave, least visible) vertex.
+
+**`compute_angle_penalty()` — Gaussian + sigmoid:**
+Negative angles (concave corners) get very low penalty; positive angles (convex) get high penalty via a combined Gaussian trough + sigmoid ramp. This biases seam placement toward concave features.
+
+**`Frame` class:**
+Builds an orthonormal coordinate frame from a surface normal vector, used to rotate hemisphere ray directions into world space.
+
+**`end_index` comment hazard:**
+The `end_index` field on `Perimeter` struct is commented "inclusive!" but all code treats it as exclusive (past-the-end). The comment is wrong and would mislead a refactor.
+
+**`seam_align_mm_per_segment` type mismatch:**
+Declared `size_t` but initialized with float literal `4.0f`. The float is silently truncated to `size_t(4)`. If the design intent was fractional values, this is a silent precision loss.
+
+**Dead code: `sample_sphere_uniform` and `sample_power_cosine_hemisphere`:**
+These two sampling functions exist in the file but are never called — only `sample_hemisphere_uniform` is used. They are likely development artifacts.
+
+**`spAlignedBack` visibility score > 1.0:**
+In `spAlignedBack` mode, the code pushes the visibility score above 1.0 to override other placement modes. This breaks the [0,1] unit interpretation of visibility scores and adds implicit mode coupling.
+
+**`calculate_point_visibility()` weight sign hazard:**
+Weights used in visibility accumulation can go negative for geometry where sample normals are off-plane. Negative visibility would incorrectly bias toward visible areas.
+
+**Staggered inner seam infinite-loop risk:**
+The staggered-inner-seams walk iterates over loop segments; if a segment has zero length, the code can loop indefinitely. Protected by a length check but the check condition was fragile.
+
+**B-spline alignment Z-coordinate assumption:**
+`align_seam_points()` uses the Z coordinate as the spline parameter, assuming Z increases monotonically within each seam string. This fails for vase-mode or non-monotonic printing orders.
+
+**`align_seam_points()` subtle decrement:**
+A `global_index--` decrement at the end of the B-spline loop is semantically correct (re-processes the boundary point) but appears to be an off-by-one infinite-loop risk to future maintainers.
+
+---
+
+### Open Questions (Session 3)
+
+1. `[UNCLEAR]` How does `CoolingBuffer`'s "G1-only removal" interact with pressure-advance G-code sequences? PrusaSlicer bug may manifest differently under OrcaSlicer's PA processor.
+2. `[UNCLEAR]` The 30,000 sample count in SeamPlacer is hardcoded. Is this tuned for typical model sizes? Very large models may have insufficient coverage; very small models waste memory.
+3. `[UNCLEAR]` `spAlignedBack` score > 1.0 override — is this intentional design or an undocumented hack? No comment explaining the rationale.
+
+---
+
+## Session 4 — Annotation Phase (WipeTower2)
+
+### Files Annotated and Committed
+
+| Commit | Files | Key Findings |
+|--------|-------|-------------|
+| `e6211edf43` | GCode/WipeTower2.cpp + WipeTower2.hpp | Two-phase SEMM/multi-tool architecture; 5-iteration planning loop; MK4MMU3 cold ramming; global static side effect |
+
+---
+
+### Key Discoveries (Session 4)
+
+#### WipeTower2.cpp + WipeTower2.hpp
+
+**Architecture (two-phase):**
+- **Phase 1 (Planning):** `plan_toolchange()` builds `m_plan`; `plan_tower()` propagates depths; `save_on_last_wipe()` steals finish_layer volume from last wipe. `generate()` runs this loop 5 times to convergence.
+- **Phase 2 (Generation):** `generate()` iterates `m_plan`, calling `tool_change()` (→ Unload→Change→Load→Wipe) + `finish_layer()` for each layer. Results are merged via `merge_tcr()`.
+
+**SEMM vs. multi-tool-head divergence:**
+- SEMM: full ramming + cooling tube retract + back-and-forth cooling moves + parking dwell + load moves.
+- Multi-tool-head: firmware handles load/unload; WipeTower2 only does `[change_filament_gcode]` placeholder + wipe.
+
+**`GCodeProcessor::s_IsBBLPrinter = false` (global static side effect):**
+WipeTowerWriter2's constructor sets this global static, changing G-code output format for the entire process. Any BBL-flavoured printer passing through WipeTower2 gets its processing mode overridden.
+
+**`construct_tcr()` always initializes `tool_change_start_pos`:**
+ORCA fix: the original PrusaSlicer code left this field undefined in certain paths, causing undefined-variable travel in `post_process_wipe_tower_moves`. Now always initialized to `start_pos`.
+
+**MK4MMU3 cold ramming path:**
+Before ramming, temperature is dropped by 20°C via a blocking `M109` wait. This stiffens the filament tip for cleaner ramming but adds latency to each toolchange.
+
+**Stamping (MK4MMU3):**
+Between cooling moves, the filament is pushed ("stamped") into the melt zone then retracted. This distributes potential blobs along the full tower width rather than concentrating them.
+
+**`plan_tower()` O(n²) depth propagation:**
+For each layer, all prior layers are scanned to enforce minimum depth constraints. Acceptable for typical print counts but may be slow for very tall prints (>2000 layers with many toolchanges).
+
+**Wipe speed ramp:**
+`toolchange_Wipe()` uses a hardcoded multi-threshold step function to ramp from 33% to 100% of target speed. This is calibrated for expected extrusion pressure behaviour and must be re-tuned for different nozzle/filament combinations.
+
+**ORCA spacing fix:**
+`plan_toolchange()` and `save_on_last_wipe()` both apply the same spacing correction: first layer uses `m_extra_flow` spacing, later layers use `m_extra_spacing_wipe`. Without this fix, the reserved tower depth mismatches the consumed depth on the first layer.
+
+**Wall types:**
+- `wtwNormal`: plain rectangle perimeter.
+- `wtwRib`: diagonal X-brace ribs (computed by `generate_rib_polygon()`).
+- `wtwCone`: tapered cone base for stability at height (computed by `generate_support_cone_wall()`).
+
+**Brim generation:**
+On the first layer, `finish_layer()` extrudes concentric brim loops using `Polygon::offset()`. The actual brim width is saved to `m_wipe_tower_brim_width_real` for use by the skirt/brim planner.
+
+**`save_on_last_wipe()` dry-run hazard:**
+Calls `tool_change()` and `finish_layer()` as a dry run just to measure `total_extrusion_length_in_plane()`. The generated G-code strings are discarded, but all side effects of `WipeTowerWriter2` accumulation run. If writer side effects ever include non-discardable state, this will silently corrupt output.
+
+---
+
+### Open Questions (Session 4)
+
+1. `[UNCLEAR]` `#if 1` guard around the 5-iteration loop in `generate()` — suggests this was temporarily disabled during debugging and never cleaned up. Is 5 iterations always sufficient for convergence?
+2. `[UNCLEAR]` `first_toolchange_to_nonsoluble()` ORCA change always returns index 0 (not -1) for non-wipe-tower-filament configs. This means finish_layer is always merged with the first toolchange, not the first non-soluble one. Intent unclear.
+3. `[UNCLEAR]` `m_internal_rotation` always flips 180° but `m_current_shape` is always `SHAPE_NORMAL` (alternating logic commented out). Are rotation and fill-direction supposed to work together? Current state is inconsistent.
+
+---
+
+### Next Annotation Targets
+
+1. `src/libslic3r/Support/SupportMaterial.cpp` — traditional pillar support generation
+2. `src/libslic3r/Support/TreeSupport.cpp` — organic tree support generation
