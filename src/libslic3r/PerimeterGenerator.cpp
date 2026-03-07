@@ -1,3 +1,70 @@
+// [INTENT] Perimeter (wall) generation from sliced layer regions. Implements two independent
+// algorithms selected at runtime by the `wall_generator` config option:
+//
+//   process_classic()  — Traditional Clipper-offset shrink approach (Slic3r lineage).
+//                        Produces constant-width perimeters via iterative polygon insets.
+//                        Dispatch site: LayerRegion.cpp:123
+//
+//   process_arachne()  — Variable-width Arachne algorithm (via Arachne::WallToolPaths).
+//                        Produces optimally-wide perimeters using a medial-axis / straight-
+//                        skeleton approach. Better thin-wall handling but slower.
+//                        Dispatch site: LayerRegion.cpp:121
+//                        Only active when wall_generator == PerimeterGeneratorType::Arachne
+//                        AND spiral_vase mode is OFF.
+//
+// Dispatch logic (LayerRegion::make_perimeters, LayerRegion.cpp:120):
+//   if (wall_generator == Arachne && !spiral_mode)
+//       g.process_arachne();
+//   else
+//       g.process_classic();
+//
+// Key internal structures:
+//   PerimeterGeneratorLoop — tree node for Classic perimeter hierarchy (polygon + depth + children).
+//     depth=0 → external perimeter (outermost wall). Children are holes or inner contours.
+//   traverse_loops()     — recursively converts PerimeterGeneratorLoop tree → ExtrusionEntityCollection.
+//   detect_steep_overhang() — clips extrusion against offset lower slices; returns bool flags
+//     for contour/hole overhang reversal when overhang_reverse is enabled.
+//
+// Important constants:
+//   SMALLER_EXT_INSET_OVERLAP_TOLERANCE = 0.22 — when ExPolygon width < ext_perimeter_width +
+//     ext_perimeter_spacing*(1-0.22), it is treated as a "small detail area" and gets reduced
+//     line width in Arachne mode.
+//   overhang_sampling_number = 6 — number of samples used for overhang degree detection.
+//   narrow_loop_length_threshold = 10mm — loops shorter than this are treated as narrow.
+//
+// [STATE] PerimeterGenerator is constructed per-LayerRegion per-call (not persistent across layers).
+//         Output is written into the LayerRegion's perimeters, thin_fills, fill_surfaces, etc.
+//         m_mm3_per_mm / m_ext_mm3_per_mm / m_mm3_per_mm_overhang are set at start of each
+//         process_classic() / process_arachne() call.
+//         m_lower_slices_polygons: grown lower layer polygons for overhang detection; only
+//         populated when detect_overhang_wall=true and lower_slices is non-null.
+//
+// [CONCURRENCY] Each PerimeterGenerator runs single-threaded.  process_classic() and
+//               process_arachne() are called from a TBB parallel_for loop in PrintObject.cpp
+//               (one task per LayerRegion). PerimeterGenerator instances do not share mutable state.
+//
+// [COUPLING] process_classic() reads from this->slices (input layer surfaces) and writes to
+//            this->perimeters / this->thin_fills / this->fill_surfaces / this->fill_no_overlap.
+//            Consumers (infill, G-code) expect fill_surfaces to be typed (stTop/stBottom etc.)
+//            after detect_surfaces_type() runs later in the pipeline.
+//
+// [HAZARD] precise_outer_wall config option is only honoured when wall_sequence == InnerOuter.
+//          In OuterInner or combined modes, ext_perimeter_spacing2 uses flow spacing (not width).
+//          Forgetting this conditional during refactoring produces subtle wall-gap errors.
+//
+// [HAZARD] Arachne WallToolPaths accepts loop_number+1 perimeter count. The "+1" converts
+//          from 0-indexed (Classic) to 1-indexed (Arachne) count. Off-by-one here produces
+//          one extra or one missing wall without any error or warning.
+//
+// [HAZARD] spiral_vase mode forces process_classic() regardless of wall_generator setting.
+//          The spiral_vase SlicingMode switch must stay in sync with PrintObjectSlice.cpp's
+//          threshold (see existing annotation there). Changing one without the other breaks
+//          spiral vase geometry.
+//
+// [HAZARD] split_top_surfaces() splits the top-surface regions for separate top-solid infill.
+//          It is called by both process_classic and process_arachne only when top_one_wall_type
+//          or only_one_wall_top is configured. Missing the call leaves top surfaces un-split,
+//          causing incorrect solid infill on multi-region objects.
 #include "PerimeterGenerator.hpp"
 #include "AABBTreeLines.hpp"
 #include "BridgeDetector.hpp"
@@ -1113,6 +1180,31 @@ static void reorient_perimeters(ExtrusionEntityCollection &entities, bool steep_
     }
 }
 
+// [INTENT] Classic Clipper-offset perimeter generation pipeline:
+//   1. group_region_by_fuzzify() — assigns fuzzy-skin regions if fuzzy_skin is enabled.
+//   2. For each surface island:
+//      a. Iterative Clipper shrink (offset by -perimeter_spacing) to generate N concentric loops.
+//      b. PerimeterGeneratorLoop tree built from contours + holes at each depth level.
+//      c. traverse_loops() converts the tree to ExtrusionEntityCollection with correct roles.
+//      d. Gap fill: medial axis is run on thin regions between loop offsets → thin_fills.
+//      e. split_top_surfaces() separates top/bottom regions for solid infill differentiation.
+//   3. apply_extra_perimeters() adds additional loops where the infill area is too wide.
+//
+// [STATE] Writes: this->perimeters (ExtrusionEntityCollection), this->thin_fills,
+//         this->fill_surfaces, this->fill_no_overlap.
+//         Reads: this->slices (input surfaces), lower_slices (for overhang detection).
+//
+// [HAZARD] precise_outer_wall is only applied when wall_sequence == InnerOuter.
+//          In other wall_sequence modes, the outer wall width calculation uses spacing (not
+//          the physical extrusion width), creating a slight gap between outer wall and infill.
+//
+// [HAZARD] INSET_OVERLAP_TOLERANCE shrinks min_spacing slightly to allow Clipper offset to
+//          produce loops even when the geometry is borderline (prevents missing walls).
+//          Too large a tolerance produces overlapping perimeters; too small misses thin features.
+//
+// [HAZARD] The loop_number cap: if the polygon is too small to fit even one perimeter after
+//          inset, the island is skipped silently. Thin features narrower than ext_perimeter_width
+//          produce no output at all (no error, no gap fill fallback at that level).
 void PerimeterGenerator::process_classic()
 {
     group_region_by_fuzzify(*this);
@@ -2071,6 +2163,36 @@ void bringContoursToFront(std::vector<PerimeterGeneratorArachneExtrusion>& order
 
 // Thanks, Cura developers, for implementing an algorithm for generating perimeters with variable width (Arachne) that is based on the paper
 // "A framework for adaptive width control of dense contour-parallel toolpaths in fused deposition modeling"
+// [INTENT] Arachne variable-width perimeter generation pipeline:
+//   1. group_region_by_fuzzify() — assigns fuzzy-skin regions.
+//   2. process_no_bridge() — removes bridge surfaces from perimeter computation area.
+//   3. For each surface island:
+//      a. Constructs Arachne::WallToolPaths with bead_width_0 = ext_perimeter_spacing and
+//         the configured wall_loops count (converted to 1-indexed for Arachne API).
+//      b. WallToolPaths internally runs a medial-axis / straight-skeleton algorithm to
+//         compute variable-width toolpaths (ThickPolylines).
+//      c. split_top_surfaces() separates top/bottom regions.
+//      d. Extrusion roles (erExternalPerimeter, erPerimeter) are assigned by wall index.
+//      e. Region ordering controlled by is_outer_wall_first (wall_sequence config).
+//
+// [STATE] Same as process_classic(). Writes perimeters, thin_fills, fill_surfaces, fill_no_overlap.
+//
+// [COUPLING] Arachne::WallToolPaths is in src/libslic3r/Arachne/. It is constructed with:
+//   last_p (input polygon), bead_width_0 (outer bead), perimeter_spacing (inner bead),
+//   loop_number+1 (wall count), wall_0_inset (extra outer inset), layer_height, input_params.
+//   Any change to these parameters must be validated against Arachne's internal constraints.
+//
+// [HAZARD] Arachne wall count is loop_number+1 (1-indexed). Classic uses loop_number (0-indexed).
+//          Off-by-one when reading loop_number from config produces the wrong wall count
+//          for one of the two generators — silent geometry difference between Arachne and Classic.
+//
+// [HAZARD] Arachne sometimes produces zero-length extrusions (two identical endpoints).
+//          These are explicitly skipped at line ~452. If the skip condition is removed or
+//          broadened, degenerate G-code moves appear in the output without error.
+//
+// [HAZARD] Only one_wall_first_layer / only_one_wall_top are evaluated inside process_arachne()
+//          by modifying loop_number. These same conditions must also be applied in process_classic()
+//          or the two generators diverge in behaviour for bottom/top layers.
 void PerimeterGenerator::process_arachne()
 {
     group_region_by_fuzzify(*this);

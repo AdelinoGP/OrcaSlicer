@@ -1,3 +1,64 @@
+// [INTENT] Infill pattern generation layer. Converts typed layer surfaces (SurfaceType::stTop,
+// stBottom, stInternal, etc.) into filled ExtrusionEntityCollections (toolpaths).
+//
+// Main entry point: Layer::make_fills() (line ~1192)
+//   1. group_fills(*this) — clusters compatible surfaces across LayerRegions into SurfaceFill
+//      groups to enable batch infill generation (minimises filler object construction overhead).
+//   2. For each SurfaceFill group:
+//      a. Fill::new_from_type(pattern) — polymorphic factory creates the correct filler.
+//         Dispatch table is in FillBase.cpp:40 (switch on InfillPattern enum).
+//      b. Filler is configured (bounding box, angle, octree for adaptive/lightning fills).
+//      c. fill_surface() or generate_toolpaths() produces Polylines/ExtrusionEntities.
+//   3. Results are stored into LayerRegion::fills (ExtrusionEntityCollection).
+//
+// Infill pattern → implementation class map (from FillBase.cpp::new_from_type):
+//   ipConcentric       → FillConcentric
+//   ipHoneycomb        → FillHoneycomb
+//   ip3DHoneycomb      → Fill3DHoneycomb
+//   ipGyroid           → FillGyroid
+//   ipTpmsD/FK         → FillTpmsD/FK   (from Creality Print lineage)
+//   ipRectilinear      → FillRectilinear
+//   ipMonotonic        → FillMonotonic
+//   ipMonotonicLine    → FillMonotonicLines  (Orca, replaces BBS implementation)
+//   ipAdaptiveCubic    → FillAdaptive::Filler  (octree-based adaptive density)
+//   ipSupportCubic     → FillAdaptive::Filler  (uses support_fill_octree, not adaptive_fill_octree)
+//   ipLightning        → FillLightning::Filler (requires lightning_generator pre-built per object)
+//   ipConcentricInternal → FillConcentricInternal  (solid infill only)
+//   + 10+ more patterns
+//
+// infill rotation angle:
+//   calculate_infill_rotation_angle() (line ~52) implements a mini metalanguage for rotating
+//   infill across layers. The template string grammar supports absolute/relative angles,
+//   repetition (*Z), sinus/cubic/random joint interpolation (N,Z,$,U,Q,~,^), and length
+//   units (mm,cm,m,",',%). When template_string is empty, falls back to fixed_infill_angle.
+//   [UNCLEAR] The grammar is undocumented in the codebase; the comment at line 25 is the only
+//   authoritative description. It is not covered by any automated tests.
+//
+// Surface grouping (group_fills()):
+//   Surfaces are bucketed by (pattern, density, flow, angle, bridge) so that adjacent
+//   regions with identical fill parameters are merged and filled in a single pass.
+//   [HAZARD] If two surfaces differ by a single parameter (e.g., slightly different angle due
+//   to floating-point rounding in calculate_infill_rotation_angle), they are NOT merged and
+//   each gets a separate filler instance — potential performance regression for many regions.
+//
+// [COUPLING] Layer::make_fills() receives adaptive_fill_octree, support_fill_octree, and
+//   lightning_generator as raw pointers. These are built during PrintObject::process() and
+//   passed through. If the object has no adaptive/lightning infill, these may be nullptr —
+//   each fill type must null-check its optional dependency before use.
+//
+// [CONCURRENCY] make_fills() is called from a TBB parallel_for in PrintObject.cpp (one per layer).
+//   Filler objects are created locally per call — no shared mutable state between threads.
+//   FillAdaptive::Octree is read-only during fill generation (built before the parallel section).
+//
+// [HAZARD] FillLightning::Filler stores a raw pointer to lightning_generator (line ~1235:
+//   dynamic_cast<FillLightning::Filler*>(f.get())->generator = lightning_generator).
+//   If generator is destroyed before fill generation completes, the pointer dangles.
+//   The lifetime is currently safe (generator outlives make_fills calls) but fragile.
+//
+// [HAZARD] dynamic_cast used for FillConcentricInternal, FillConcentric, FillLightning::Filler
+//   to set extra fields not in the Fill base class. If Fill::new_from_type() returns a
+//   different subtype for those patterns, the casts silently return nullptr and the extra
+//   config is never applied — infill is generated with default parameters.
 #include <assert.h>
 #include <stdio.h>
 #include <memory>
