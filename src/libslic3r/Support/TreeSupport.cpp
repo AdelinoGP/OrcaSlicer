@@ -1,3 +1,25 @@
+// [INTENT] TreeSupport.cpp — Slim/Strong/Hybrid tree support generation for OrcaSlicer.
+// This file implements the non-organic tree support pipeline (smsTreeSlim, smsTreeStrong, smsTreeHybrid).
+// Organic mode (smsTreeOrganic) is immediately delegated to TreeSupport3D.cpp in generate() and does
+// not use any of the algorithms in this file.
+//
+// Pipeline summary (all methods on class TreeSupport):
+//   1. detect_overhangs()         — mark which layer regions need support
+//   2. generate_contact_points()  — create initial SupportNode* at overhang surfaces (TBB parallel)
+//   3. plan_layer_heights()        — compute adaptive support layer heights
+//   4. drop_nodes()               — propagate nodes downward layer-by-layer toward build plate (serial)
+//   5. smooth_nodes()             — Laplacian smoothing over branch chains (serial)
+//   6. draw_circles()             — rasterise node positions into support polygon layers (TBB parallel)
+//   7. generate_toolpaths()        — convert polygons to extruder paths (TBB parallel)
+//
+// [COUPLING] Depends on: TreeSupportData (collision/avoidance cache), TreeSupport3D (organic mode),
+//            MinimumSpanningTree (branch merging), libnest2d EdgeCache (contour sampling),
+//            TBB (parallelism), Clipper/ClipperUtils (polygon boolean ops), AGG (not used here — see SupportMaterial.cpp).
+//
+// [MEMORY] All SupportNode objects are owned by TreeSupportData::contact_nodes (vector of unique_ptr).
+//          Raw SupportNode* pointers are used everywhere for traversal — safe as long as contact_nodes
+//          vector is not cleared while raw pointers are live.
+
 #include <chrono>
 #include <math.h>
 
@@ -34,27 +56,41 @@
 #endif
 #define TAU (2.0 * M_PI)
 #define NO_INDEX (std::numeric_limits<unsigned int>::max())
+// [HAZARD] USE_SUPPORT_3D is hardcoded to 0. All #if USE_SUPPORT_3D blocks are permanently dead code.
+// If this macro were ever flipped to 1, untested code paths would activate. Do not rely on them.
 #define USE_SUPPORT_3D 0
 
 //#define SUPPORT_TREE_DEBUG_TO_SVG
 
+// [INTENT] Debug-only SVG rendering helpers. Only compiled when SUPPORT_TREE_DEBUG_TO_SVG is defined.
+// draw_contours_and_nodes_to_svg: Draws overhang polygons, avoidance regions, object outlines, and
+//   current/previous layer support nodes to an SVG file for visual inspection of one layer's state.
+// draw_layer_mst: Draws the minimum spanning tree edges used for branch merging, overlaid on the object outline.
+// [COUPLING] Uses SVG class (src/libslic3r/SVG.hpp) and libnest2d/nlohmann-json for coordinate output.
 #ifdef SUPPORT_TREE_DEBUG_TO_SVG
 #include "nlohmann/json.hpp"
 #endif
 namespace Slic3r
 {
+// [INTENT] Local unscale macro: converts Clipper integer coordinates (1 unit = 1e-6 mm) to mm (float).
+// Avoids calling the global scale_() inverse — keeps arithmetic readable.
 #define unscale_(val) ((val) * SCALING_FACTOR)
 
+// [INTENT] Dot product of two Clipper integer Points computed in mm-space to avoid integer overflow.
+// Raw integer dot products of large coordinates would overflow int64. Unscaling first keeps values in ~[0..250] mm range.
 inline double dot_with_unscale(const Point a, const Point b)
 {
     return unscale_(a(0)) * unscale_(b(0)) + unscale_(a(1)) * unscale_(b(1));
 }
 
+// [INTENT] Squared magnitude of a Point vector, computed in mm-space (see dot_with_unscale).
 inline double vsize2_with_unscale(const Point pt)
 {
     return dot_with_unscale(pt, pt);
 }
 
+// [INTENT] Rotate a 2D Point 90 degrees counter-clockwise (swap axes, negate x).
+// Used when computing inward normals to polygon edges.
 inline Point turn90_ccw(const Point pt)
 {
     Point ret;
@@ -64,6 +100,8 @@ inline Point turn90_ccw(const Point pt)
     return ret;
 }
 
+// [INTENT] Return pt scaled so its magnitude equals `scale` (i.e. normalise then rescale).
+// scale is in Clipper integer units. Returns pt unchanged if length is ~0 (degenerate case).
 inline Point normal(Point pt, double scale)
 {
     double length = scale_(sqrt(vsize2_with_unscale(pt)));
@@ -74,6 +112,8 @@ inline Point normal(Point pt, double scale)
     return pt * (scale / length);
 }
 
+// [INTENT] Enum used by TreeSupportProfiler to bucket timing into pipeline stages for performance diagnostics.
+// STAGE_total is used for the overall wall-clock timer. NUM_STAGES is the array bound sentinel.
 enum TreeSupportStage {
     STAGE_DETECT_OVERHANGS,
     STAGE_GENERATE_CONTACT_NODES,
@@ -89,6 +129,11 @@ enum TreeSupportStage {
     NUM_STAGES
 };
 
+// [INTENT] Simple wall-clock profiler for tree support pipeline stages.
+// Records start/end times per stage and accumulates incremental durations via tic()/toc()/stage_add().
+// Used to measure and log performance of each pipeline phase.
+// [HAZARD] This class is NOT thread-safe. stage_durations[], tic_time, and toc_time are all unsynchronised.
+// Concurrent writes from multiple TBB threads (e.g. inside parallel_for) will cause data races.
 class TreeSupportProfiler
 {
 public:
@@ -153,8 +198,17 @@ public:
 private:
     boost::posix_time::ptime m_stage_start_times[NUM_STAGES];
 };
+// [HAZARD] File-scope global — one shared TreeSupportProfiler per translation unit (not per PrintObject).
+// If OrcaSlicer ever slices multiple objects concurrently on separate threads, stage_durations will be
+// corrupted by concurrent reads/writes. This is a latent data race for multi-object scenarios.
+// [STATE] Accumulates timing across the full lifetime of the process (never reset between objects).
 TreeSupportProfiler profiler;
 
+// [INTENT] Convert a collection of MinimumSpanningTree objects into a flat Lines vector.
+// Used to render MST edges to SVG for debugging (draw_layer_mst) and for any downstream
+// consumer that needs line segments rather than the MST graph structure.
+// [STATE] to_ignore set tracks already-visited vertices to avoid emitting duplicate edges
+//         (each MST edge would otherwise be visited twice, once from each endpoint).
 Lines spanning_tree_to_lines(const std::vector<MinimumSpanningTree>& spanning_trees)
 {
     Lines polylines;
@@ -272,6 +326,14 @@ static void draw_layer_mst
 
 #endif
 
+// [INTENT] Project point `from` onto the boundary of `polygon` and optionally move it inward by `distance` mm.
+// Special case: distance=0 → snap to nearest boundary point.
+// distance>0 → move inside; distance<0 → move outside.
+// [MEMORY] Mutates `from` in-place on success; returns false if no valid projection found within max_move_distance.
+// [COUPLING] Called by move_inside_expolys (multi-polygon wrapper) and directly in generate_contact_points.
+// [HAZARD] The TODO comment at line 281 (original) notes this is copied from Cura's moveInside(Polygons).
+//   The `is_already_on_correct_side_of_boundary` flag check (line 388) has a BBS-removed condition —
+//   the original Cura code had a more conservative inner distance check that was deliberately removed here.
 // Move point from inside polygon if distance>0, outside if distance<0.
 // Special case: distance=0 means find the nearest point of from on the polygon contour.
 // The max move distance should not excceed max_move_distance.
@@ -399,6 +461,12 @@ static bool move_inside_expoly(const ExPolygon &polygon, Point& from, double dis
     return false;
 }
 
+// [INTENT] Multi-polygon version of move_inside_expoly. Iterates over all polygons in `polygons`,
+// finds the nearest boundary point across all of them, and moves `from` inward by `distance` mm.
+// [STATE] valid_pts accumulates candidate projections for commented-out multi-direction blend logic
+//   (the averaging block is commented out — only the single best projection is used).
+// [HAZARD] The commented-out blending block at lines 506-512 would blend contributions from multiple
+//   polygon boundaries; removing it means nodes near polygon corners may snap to one arbitrary edge.
 /*
  * Implementation assumes moving inside, but moving outside should just as well be possible.
  */
@@ -527,6 +595,9 @@ static bool move_inside_expolys(const ExPolygons& polygons, Point& from, double 
     return false;
 }
 
+// [INTENT] Find the nearest point on any contour/hole boundary of `polygons` to `from`.
+// Returns the closest vertex (not interpolated mid-edge point) — uses Polygon::closest_point().
+// [COUPLING] Used in move_out_expolys as a fallback direction finder.
 static Point find_closest_ex(Point from, const ExPolygons& polygons)
 {
     Point closest_pt;
@@ -546,11 +617,15 @@ static Point find_closest_ex(Point from, const ExPolygons& polygons)
     return closest_pt;
 }
 
+// [INTENT] Thin wrapper: move point outside polygons by `distance` mm.
+// Negates both arguments and delegates to move_inside_expolys (negative distance = outward).
 static bool move_outside_expolys(const ExPolygons& polygons, Point& from, double distance, double max_move_distance)
 {
     return move_inside_expolys(polygons, from, -distance, -max_move_distance);
 }
 
+// [INTENT] Point-in-ExPolygon test with BoundingBox early-out for performance.
+// The BBox check avoids the expensive winding-number test for clearly distant points.
 static bool is_inside_ex(const ExPolygon &polygon, const Point &pt)
 {
     if (!get_extents(polygon).contains(pt))
@@ -559,6 +634,8 @@ static bool is_inside_ex(const ExPolygon &polygon, const Point &pt)
     return polygon.contains(pt);
 }
 
+// [INTENT] Point-in-any-ExPolygon test — returns true if pt is inside any polygon in the collection.
+// Short-circuits on first match.
 static bool is_inside_ex(const ExPolygons &polygons, const Point &pt)
 {
     for (const ExPolygon &poly : polygons) {
@@ -569,6 +646,15 @@ static bool is_inside_ex(const ExPolygons &polygons, const Point &pt)
     return false;
 }
 
+// [INTENT] Move `from` outward from `polygons` by `distance` mm using projection_onto (more accurate than
+// move_outside_expolys but more expensive — O(polygon_vertices) for the projection step).
+// First dilates polygons by `distance`, then projects `from` onto the dilated boundary to find the exit direction.
+// Five cases handled:
+//   5: already outside dilated polygon → no move needed
+//   4: inside dilated but outside original → move to projected boundary point
+//   default: inside original → move to pt_max if pt_max exits original polygon, else fail
+// [HAZARD] `from0` is saved but never used after assignment (dead variable — `from` is modified via `from = pt`).
+//   The original Cura version used from0 for distance clamping; its removal here is a mild semantic change.
 // use project_onto which is more accurate but more expensive
 static bool move_out_expolys(const ExPolygons& polygons, Point& from, double distance, double max_move_distance)
 {
@@ -600,11 +686,27 @@ static bool move_out_expolys(const ExPolygons& polygons, Point& from, double dis
     }
 }
 
+// [INTENT] Return the midpoint of a BoundingBox. Used for centering operations.
 static Point bounding_box_middle(const BoundingBox &bbox)
 {
     return (bbox.max + bbox.min) / 2;
 }
 
+// [INTENT] TreeSupport constructor. Initialises all per-object configuration parameters
+// from the PrintObject and SlicingParameters, then pre-computes the machine border polygon
+// (bed shape minus excluded areas, translated to align with the current print plate origin).
+//
+// [STATE] Sets:
+//   - diameter_angle_scale_factor: controls how quickly branch radius widens with depth
+//   - is_slim / is_strong: style flags used to gate algorithm variations throughout the pipeline
+//   - base_radius: minimum branch tip radius (lower-clamped to MIN_BRANCH_RADIUS)
+//   - with_infill: whether to generate fill patterns inside support columns
+//   - m_machine_border: bed boundary ExPolygon in object-local Clipper coordinates
+//   - top_z_distance: vertical air gap between top of support and underside of object
+//
+// [COUPLING] Reads PrintConfig (bed shape, plate origin), PrintObjectConfig (all support params).
+// [HAZARD] diameter_angle_scale_factor is a static member of TreeSupport — writing it in the constructor
+//   means the last-constructed TreeSupport object wins in concurrent multi-object slicing scenarios.
 TreeSupport::TreeSupport(PrintObject& object, const SlicingParameters &slicing_params)
     : m_object(&object), m_slicing_params(slicing_params), m_support_params(object), m_object_config(&object.config())
 {
@@ -637,6 +739,24 @@ TreeSupport::TreeSupport(PrintObject& object, const SlicingParameters &slicing_p
 }
 
 
+// [INTENT] Pipeline stage 1: Identify which layer regions require support and store them in Layer::loverhangs.
+// Also detects sharp tails (small floating features) and cantilever overhangs for special handling.
+// When check_support_necessity=true, runs in probe mode — called by the support auto-detection UI path.
+//
+// Algorithm overview:
+//   Pass 1 (TBB parallel_for): Per layer, compute overhang regions by differencing current layer lslices
+//     against previous layer lslices expanded by threshold_rad tangent. Marks bridges, enforcers, blockers.
+//     Also marks sharp tails (layer 0 small features and "floating" expolygons with no support below).
+//   Pass 2 (serial): Propagates sharp-tail membership upward layer by layer via ExPolygon set intersection.
+//   Pass 3 (serial): Groups overhangs into OverhangClusters, classifies cantilevers and small overhangs.
+//   Pass 4 (serial): For each small overhang cluster, removes overhangs from layers if they don't need support.
+//
+// [HAZARD] config_detect_sharp_tails can be toggled false mid-parallel-run via a 30-second timeout escape.
+//   Threads already executing within the tbb::parallel_for do NOT see the updated flag until they
+//   check it on the next iteration — so some layers may use sharp-tail detection and others may not.
+//
+// [COUPLING] Writes Layer::loverhangs (used by generate_contact_points) and sets m_highest_overhang_layer,
+//   max_cantilever_dist (used in generate()).
 #define SUPPORT_SURFACES_OFFSET_PARAMETERS ClipperLib::jtSquare, 0.
 void TreeSupport::detect_overhangs(bool check_support_necessity/* = false*/)
 {
@@ -675,6 +795,16 @@ void TreeSupport::detect_overhangs(bool check_support_necessity/* = false*/)
     double support_tree_tip_diameter = 0.8;
     auto   enforcer_overhang_offset  = scaled<double>(support_tree_tip_diameter);
 
+    // [INTENT] OverhangCluster groups spatially connected overhang regions across adjacent layers
+    // into a single logical unit, allowing the pipeline to classify and optionally suppress small
+    // overhangs as a whole rather than per-layer.
+    //
+    // [STATE] layer_overhangs: raw pointers into Layer::loverhangs — valid only while loverhangs vector
+    //   is not reallocated. [HAZARD] If loverhangs is modified after clustering, pointers dangle.
+    // [STATE] merged_poly: union of all member ExPolygons (dilated by `offset`) for spatial queries.
+    // [STATE] merged_bbox: cumulative bounding box of merged_poly for fast overlap rejection.
+    // [HAZARD] find_and_insert_cluster does an O(N) linear scan over all existing clusters per new
+    //   overhang. For a print with many disconnected overhangs, N can be large — O(N²) total cost.
     // for small overhang removal
     struct OverhangCluster {
         std::map<int, const ExPolygon*> layer_overhangs;
@@ -1315,6 +1445,17 @@ static void make_perimeter_and_infill(ExtrusionEntitiesPtr& dst, const ExPolygon
     }
 }
 
+// [INTENT] Pipeline stage 7: Convert support layer polygons (from draw_circles) into extruder paths.
+// Handles raft layers, raft-to-object transition layers, and tree support layers.
+// For interface layers: uses make_perimeter_and_inner_brim() to generate walls + dense infill.
+// For base layers: uses make_perimeter_and_infill() to generate walls + sparse infill.
+//
+// [CONCURRENCY] Outer loop is a TBB parallel_for over non-raft support layers.
+//   Each iteration operates on a different SupportLayer — no shared mutable state within the loop body.
+//
+// [COUPLING] Reads draw_circles() output (SupportLayer::support_fills, ::support_interface_fills).
+//   Writes ExtrusionEntityCollection objects back to the same SupportLayer.
+//   Flow calculations mirror SupportMaterial.cpp (see "coconut" comment at line 1460).
 void TreeSupport::generate_toolpaths()
 {
     const PrintObjectConfig &object_config = m_object->config();
@@ -1655,10 +1796,23 @@ void TreeSupport::move_bounds_to_contact_nodes(std::vector<TreeSupport3D::Suppor
     }
 }
 
+// [INTENT] Main entry point for tree support generation. Orchestrates the full pipeline:
+//   detect_overhangs → generate_contact_points → plan_layer_heights → drop_nodes
+//   → smooth_nodes → draw_circles → generate_toolpaths.
+//
+// [COUPLING] Organic mode (smsTreeOrganic) immediately delegates to TreeSupport3D::generate_tree_support_3D()
+//   and returns — no code in this file executes for organic mode.
+// [STATE] Allocates m_ts_data (TreeSupportData) via PrintObject::alloc_tree_support_preview_cache().
+//   m_ts_data outlives generate() — it is kept for the UI preview cache after slicing completes.
+// [HAZARD] move_bounds (vector of SupportElements) is allocated here but only passed to TreeSupport3D
+//   in the deleted #if USE_SUPPORT_3D block. With USE_SUPPORT_3D=0 it is declared but never populated —
+//   a dead variable that wastes memory proportional to m_highest_overhang_layer.
 void TreeSupport::generate()
 {
     if (!is_tree(m_object_config->support_type.value)) return;
 
+    // [INTENT] Organic mode bypass: immediately delegate to the TreeSupport3D pipeline and return.
+    // None of the slim/strong/hybrid logic below runs for organic mode.
     if (m_support_params.support_style == smsTreeOrganic) {
         generate_tree_support_3D(*m_object, this, this->throw_on_cancel);
         return;
@@ -1712,6 +1866,11 @@ void TreeSupport::generate()
     BOOST_LOG_TRIVIAL(info) << "tree support time " << profiler.report();
 }
 
+// [INTENT] Overload 1 of calc_branch_radius: layer-count-based taper.
+// Branch grows linearly from tip (0 radius) to base_radius over `tip_layers` layers,
+// then continues growing by diameter_angle_scale_factor per layer above that.
+// Slim mode doubles the tip taper distance (tip_layers * 2) making slimmer, pointier tips.
+// Both overloads clamp result to [MIN_BRANCH_RADIUS, MAX_BRANCH_RADIUS].
 coordf_t TreeSupport::calc_branch_radius(coordf_t base_radius, size_t layers_to_top, size_t tip_layers, double diameter_angle_scale_factor)
 {
     double radius;
@@ -1732,6 +1891,11 @@ coordf_t TreeSupport::calc_branch_radius(coordf_t base_radius, size_t layers_to_
     return radius;
 }
 
+// [INTENT] Overload 2 of calc_branch_radius: mm-based taper (used in draw_circles path).
+// Computes a 45-degree tip cone when mm_to_top <= base_radius (radius == mm_to_top),
+// then widens linearly above that height by diameter_angle_scale_factor.
+// Also ensures radius >= base_radius when interface layers are enabled (to guarantee
+// interface layer width is never smaller than the tip).
 coordf_t TreeSupport::calc_branch_radius(coordf_t base_radius, coordf_t mm_to_top,  double diameter_angle_scale_factor, bool use_min_distance)
 {
     double radius;
@@ -1751,11 +1915,18 @@ coordf_t TreeSupport::calc_branch_radius(coordf_t base_radius, coordf_t mm_to_to
     return radius;
 }
 
+// [INTENT] Convenience wrapper: computes branch radius from mm_to_top using the object's
+// configured base_radius and diameter_angle_scale_factor.
 coordf_t TreeSupport::calc_radius(coordf_t mm_to_top)
 {
     return calc_branch_radius(base_radius, mm_to_top, diameter_angle_scale_factor);
 }
 
+// [INTENT] Returns the cached radius of a SupportNode, computing and caching it on first call.
+// [STATE] node->radius is mutable — lazily populated on first call to get_radius().
+// [CONCURRENCY] If two threads call get_radius() on the same node concurrently, both may compute
+//   and write node->radius. Since both write the same value (deterministic calc), this is a benign
+//   data race in practice — but technically undefined behaviour under C++ memory model.
 coordf_t TreeSupport::get_radius(const SupportNode* node)
 {
     if (node->radius == 0)
@@ -1763,6 +1934,9 @@ coordf_t TreeSupport::get_radius(const SupportNode* node)
     return node->radius;
 }
 
+// [INTENT] get_avoidance / get_collision / get_collision_polys — thin wrappers with #if USE_SUPPORT_3D branching.
+// [HAZARD] USE_SUPPORT_3D is always 0 — the #if USE_SUPPORT_3D branches are permanently dead code.
+//   They would delegate to TreeSupport3D::TreeModelVolumes if enabled; currently always use m_ts_data.
 ExPolygons TreeSupport::get_avoidance(coordf_t radius, size_t obj_layer_nr)
 {
 #if USE_SUPPORT_3D
@@ -1909,6 +2083,23 @@ Polygons TreeSupport::get_trim_support_regions(
     return polygons_trimming;
 }
 
+// [INTENT] Pipeline stage 6: Rasterise each SupportNode's position into a polygon on its SupportLayer.
+// Each node becomes a circle (polygon approximation) whose radius is computed from dist_mm_to_top.
+// Circles are unioned together per layer to form support column cross-sections.
+// Interface layers (roof/floor) receive distinct polygon sets from base layers.
+// After the main TBB loop, an optional secondary pass generates lightning infill (global fill mode),
+// or propagates holes through support layers if infill is not desired.
+//
+// [CONCURRENCY] Main loop is TBB parallel_for over all support layers.
+//   Each iteration reads from contact_nodes[layer_nr] (read-only after drop_nodes) and writes
+//   to the corresponding SupportLayer — different iterations write different layers (safe).
+//
+// [STATE] branch_circle: pre-generated N-vertex polygon approximation of a unit circle.
+//   Uses 100 vertices normally; degrades to 4 (diamond) if avg_node_per_layer > 200 (performance mode).
+//
+// [HAZARD] The hole-propagation loop at the end of draw_circles() uses raw Polygon* keys in
+//   holePropagationInfos (an std::map<Polygon*, ...>). If the underlying ExPolygons vector is
+//   reallocated between the key-insertion and the lookup, these pointers dangle.
 void TreeSupport::draw_circles()
 {
     const PrintObjectConfig &config = m_object->config();
@@ -2414,6 +2605,23 @@ void TreeSupport::draw_circles()
 
 double SupportNode::diameter_angle_scale_factor;
 
+// [INTENT] Pipeline stage 4: Propagate SupportNodes from contact layer downward to the build plate.
+// Processes layers top→bottom (fully serial). At each layer:
+//   1. Pre-computes avoidance in a TBB parallel_for.
+//   2. Groups nodes by "part" (which ExPolygon island they belong to).
+//   3. Builds an MST per group to decide which nodes can merge.
+//   4. Two sub-passes: (a) merge nearby nodes, (b) move nodes toward neighbours or outward.
+//   5. Nodes that reach buildplate are terminated; nodes that can't move far enough are kept stationary.
+//
+// [STATE] SupportNode::diameter_angle_scale_factor is a static class member written at line 2624.
+//   [HAZARD] This is last-writer-wins if multiple PrintObjects are sliced concurrently.
+//   During this function: contact_nodes[layer_nr] is the working set for the current layer;
+//   contact_nodes[layer_nr - 1] is the output being populated.
+//
+// [HAZARD] insert_dropped_node() does std::find — O(N) scan per call, O(N²) on dense layers.
+//
+// [COUPLING] Reads avoidance/collision from TreeSupportData; calls get_avoidance(), get_collision(),
+//   get_collision_polys() — all of which write to concurrent_unordered_maps on first call.
 void TreeSupport::drop_nodes()
 {
     const PrintObjectConfig &config = m_object->config();
@@ -2932,6 +3140,16 @@ void TreeSupport::drop_nodes()
     BOOST_LOG_TRIVIAL(debug) << "after m_avoidance_cache.size()=" << m_ts_data->m_avoidance_cache.size();
 }
 
+// [INTENT] Pipeline stage 5: Laplacian smoothing of branch chains in XY.
+// For each branch chain (root-to-tip traversal via node->parent links), runs 100 iterations of
+// Laplacian averaging on the intermediate node positions. The tip and base nodes are held fixed.
+// Also sets node->need_extra_wall based on branch height and dist_mm_to_top thresholds.
+//
+// [STATE] Reuses node->is_processed flag: first clears all flags, then sets them when a branch is visited.
+//   This prevents double-processing shared nodes (nodes with multiple parents in merged branches).
+//
+// [COUPLING] Purely in-memory mutation of SupportNode::position fields.
+//   Runs fully serially — no parallelism. Safe since drop_nodes() has completed before this runs.
 void TreeSupport::smooth_nodes()
 {
     for (int layer_nr = 0; layer_nr < contact_nodes.size(); layer_nr++) {
@@ -3142,6 +3360,26 @@ std::vector<LayerHeightData> TreeSupport::plan_layer_heights()
     return layer_heights;
 }
 
+// [INTENT] Pipeline stage 2: Generate the initial set of SupportNode* contact points at each overhang layer.
+// For each overhang ExPolygon, creates nodes at:
+//   1. Polygon corners where the interior angle > 135 degrees (is_corner=true flag set).
+//   2. Points along contour edges, sampled at `point_spread` intervals using libnest2d EdgeCache.
+//   3. Interior grid points (from the 22°-rotated grid) that fall inside the eroded overhang.
+// Sharp-tail overhangs skip interior grid points (step 3 only).
+// Vertical enforcer points (from paint-on support) are also injected here.
+//
+// After contact node generation, post-processing:
+//   - avg_node_per_layer and nodes_angle (orientation by linear regression) are computed.
+//   - nodes_angle is used by draw_circles to orient the 4-vertex branch circle in performance mode.
+//
+// [CONCURRENCY] TBB parallel_for over layers. Uses tbb::spin_mutex for thread-safe node insertion
+//   into contact_nodes[layer_nr] via insert_point lambda.
+//
+// [STATE] all_nodes: flat Vec3crd vector accumulating all node XY+Z positions for the regression.
+//   avg_node_per_layer, nodes_angle: member variables written after the parallel_for (serial, safe).
+//
+// [COUPLING] Reads Layer::loverhangs (from detect_overhangs), vertical_enforcer_points_by_layers,
+//   and m_ts_data->m_layer_outlines (for buildplate-only collision checks).
 void TreeSupport::generate_contact_points()
 {
     const PrintObjectConfig &config = m_object->config();
@@ -3374,6 +3612,11 @@ void TreeSupport::generate_contact_points()
     }
 }
 
+// [INTENT] Try to add p_node to nodes_layer. If p_node is already present (identity check via
+// std::find on pointer value), merge its metadata into the existing entry rather than duplicating.
+// Merges: distance_to_top and support_roof_layers_below take the max of both nodes.
+// [HAZARD] Uses std::find (O(N) scan). Called from drop_nodes() once per dropped node.
+//   For a densely packed layer with N nodes, this is O(N²) — a known performance hazard.
 void TreeSupport::insert_dropped_node(std::vector<SupportNode*>& nodes_layer, SupportNode* p_node)
 {
     std::vector<SupportNode*>::iterator conflicting_node_it = std::find(nodes_layer.begin(), nodes_layer.end(), p_node);
@@ -3388,6 +3631,20 @@ void TreeSupport::insert_dropped_node(std::vector<SupportNode*>& nodes_layer, Su
     conflicting_node->support_roof_layers_below = std::max(conflicting_node->support_roof_layers_below, p_node->support_roof_layers_below);
 }
 
+// [INTENT] TreeSupportData constructor. Pre-computes per-layer data for collision and avoidance queries:
+//   - m_max_move_distances[layer_nr]: maximum XY movement allowed for a branch at this layer height,
+//     derived from layer->height * branch_scale_factor (tangent of the branch angle).
+//   - m_layer_outlines[layer_nr]: simplified ExPolygons of the object slice (used for collision).
+//   - m_layer_outlines_below[layer_nr]: cumulative union of all object outlines up to and including
+//     this layer (used for "is this point supported from below?" queries).
+//
+// [STATE] m_layer_outlines_below is built serially as a running prefix-union (cumulative union).
+//   [HAZARD] This is O(N²) in the number of polygon vertices for a large object — there's a FIXME
+//   comment in the original code noting it should be a parallel prefix-sum. For objects with many
+//   complex layers, this constructor can be a bottleneck.
+//
+// [MEMORY] m_layer_outlines and m_layer_outlines_below both hold full ExPolygons per layer —
+//   memory cost is proportional to total outline complexity across all layers.
 TreeSupportData::TreeSupportData(const PrintObject &object, coordf_t xy_distance, coordf_t radius_sample_resolution)
     : m_xy_distance(xy_distance), m_radius_sample_resolution(radius_sample_resolution)
 {
@@ -3411,6 +3668,12 @@ TreeSupportData::TreeSupportData(const PrintObject &object, coordf_t xy_distance
     }
 }
 
+// [INTENT] Collision cache lookup. Returns the cached ExPolygons for a (radius, layer_nr) pair,
+// computing and caching on first miss. The radius is first snapped to m_radius_sample_resolution
+// via ceil_radius() so nearby radii share cache entries.
+// [CONCURRENCY] m_collision_cache is a tbb::concurrent_unordered_map — safe for concurrent reads/writes.
+//   However, two threads may simultaneously call calculate_collision for the same key, computing
+//   and inserting it twice. The second insert is a no-op (map semantics), but the work is duplicated.
 const ExPolygons& TreeSupportData::get_collision(coordf_t radius, size_t layer_nr) const
 {
     profiler.tic();
@@ -3422,6 +3685,16 @@ const ExPolygons& TreeSupportData::get_collision(coordf_t radius, size_t layer_n
     return collision;
 }
 
+// [INTENT] Avoidance cache lookup. Avoidance = region a branch tip must avoid at a given layer
+// to remain reachable from the build plate without colliding with the object.
+// Computed recursively: avoidance(layer_nr) = shrink(avoidance(layer_nr-1), max_move_dist) ∪ collision(layer_nr).
+// [HAZARD] The recursion depth could be O(layer_count) for a tall object. The max_recursion_depth=100
+//   cap pre-forces calculation of layer_nr - 100 first, bounding the immediate stack depth to ≤100 frames.
+//   But if layer_nr - 100 is also uncalculated, that recursive call triggers another depth-100 recursion,
+//   so worst-case call depth is still O(layer_count / 100) * 100 = O(layer_count).
+// [CONCURRENCY] m_avoidance_cache is a tbb::concurrent_unordered_map. Same duplicate-compute race as get_collision.
+//   The commented-out assert(ret.second) would fire if the same key were inserted twice — the comment
+//   acknowledges this and suppresses the assert.
 const ExPolygons& TreeSupportData::get_avoidance(coordf_t radius, size_t layer_nr, int recursions) const
 {
     profiler.tic();
@@ -3434,6 +3707,8 @@ const ExPolygons& TreeSupportData::get_avoidance(coordf_t radius, size_t layer_n
     return avoidance;
 }
 
+// [INTENT] Returns only outer contours (not holes) of the object slice at layer_nr.
+// Used when only the outer boundary matters (e.g. checking if a branch is inside the object boundary).
 Polygons TreeSupportData::get_contours(size_t layer_nr) const
 {
     Polygons contours;
@@ -3444,6 +3719,8 @@ Polygons TreeSupportData::get_contours(size_t layer_nr) const
     return contours;
 }
 
+// [INTENT] Returns all contours and holes of the object slice at layer_nr.
+// Used when a full winding-number test across all polygon rings is needed.
 Polygons TreeSupportData::get_contours_with_holes(size_t layer_nr) const
 {
     Polygons contours;
@@ -3454,6 +3731,17 @@ Polygons TreeSupportData::get_contours_with_holes(size_t layer_nr) const
     return contours;
 }
 
+// [INTENT] Factory method for creating a new SupportNode, thread-safely appended to contact_nodes.
+// Uses a raw mutex (not scoped_lock) — the unlock is unconditional at line 3738 (3 lines later).
+// Raw pointer is extracted before the unique_ptr is moved into the vector.
+// parent->movement is set outside the lock (safe: parent is not shared mutable state here).
+//
+// [CONCURRENCY] m_mutex protects the contact_nodes vector from concurrent push_back/reallocation.
+//   Raw pointer returned is stable because contact_nodes holds unique_ptrs — reallocation of the
+//   outer vector does not invalidate the pointed-to SupportNode objects.
+//
+// [MEMORY] SupportNode ownership: unique_ptr in contact_nodes. Raw pointers everywhere else.
+//   Callers must not hold raw pointers past the lifetime of the TreeSupportData object.
 SupportNode* TreeSupportData::create_node(const Point position, const int distance_to_top, const int obj_layer_nr, const int support_roof_layers_below, const bool to_buildplate, SupportNode* parent, coordf_t print_z_, coordf_t height_, coordf_t dist_mm_to_top_, coordf_t radius_)
 {
     // this function may be called from multiple threads, need to lock
@@ -3467,12 +3755,18 @@ SupportNode* TreeSupportData::create_node(const Point position, const int distan
     return raw_ptr;
 }
 
+// [INTENT] Clear all SupportNode objects. Called at start of generate() to reset between slices.
+// Uses scoped_lock (RAII) unlike create_node's manual lock/unlock.
 void TreeSupportData::clear_nodes()
 {
     tbb::spin_mutex::scoped_lock guard(m_mutex);
     contact_nodes.clear();
 }
 
+// [INTENT] Round radius up to the nearest multiple of m_radius_sample_resolution.
+// This quantises radius values so nearby radii map to the same cache bucket, improving cache hit rate
+// and avoiding cache explosion from floating-point radius variations.
+// [STATE] Stateless pure function; result depends only on input radius and m_radius_sample_resolution.
 coordf_t TreeSupportData::ceil_radius(coordf_t radius) const
 {
     size_t factor = (size_t)(radius / m_radius_sample_resolution);
@@ -3485,6 +3779,12 @@ coordf_t TreeSupportData::ceil_radius(coordf_t radius) const
     }
 }
 
+// [INTENT] Compute collision polygon for (radius, layer_nr): the region a branch of given radius
+// cannot enter without colliding with the object (object outline inflated by radius + xy_distance).
+// Result is simplified at m_radius_sample_resolution for cache efficiency, then inserted into
+// m_collision_cache. The commented-out line would also add the machine border to collision.
+// [CONCURRENCY] Called from get_collision() on cache miss. Concurrent callers for the same key
+//   may both compute and try to insert — concurrent_unordered_map::insert is safe but one result is discarded.
 const ExPolygons& TreeSupportData::calculate_collision(const RadiusLayerPair& key) const
 {
     assert(key.layer_nr < m_layer_outlines.size());
@@ -3496,6 +3796,13 @@ const ExPolygons& TreeSupportData::calculate_collision(const RadiusLayerPair& ke
     return ret.first->second;
 }
 
+// [INTENT] Compute avoidance polygon for (radius, layer_nr): the region a branch must stay within
+// to guarantee it can reach the build plate without collision.
+// Formula: avoidance(L) = union(shrink(avoidance(L-1), max_move_dist[L-1]), collision(L))
+// i.e. wherever avoidance was at L-1, it can only reach positions within max_move_dist in one layer,
+// and it also must include the object collision at L.
+// [HAZARD] Recursive — tall objects produce deep call stacks. Capped by the max_recursion_depth=100
+//   pre-warm trick (see comment at calculate_avoidance body).
 const ExPolygons& TreeSupportData::calculate_avoidance(const RadiusLayerPair& key) const
 {
     const auto &radius = key.radius;
