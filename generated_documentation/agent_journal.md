@@ -391,3 +391,137 @@ Calls `tool_change()` and `finish_layer()` as a dry run just to measure `total_e
 
 1. `src/libslic3r/Support/SupportMaterial.cpp` — traditional pillar support generation
 2. `src/libslic3r/Support/TreeSupport.cpp` — organic tree support generation
+
+---
+
+## Session 5 — Annotation Phase (SupportMaterial.cpp + SupportMaterial.hpp)
+
+### Files Annotated and Committed
+
+| Commit | Files | Key Findings |
+|--------|-------|-------------|
+| (session 5) | Support/SupportMaterial.cpp + SupportMaterial.hpp | 97 annotation tags; AGG rasterizer always-on; serial orchestration pipeline; sharp-tail detection; OverhangCluster hazards; dead Perl-era code |
+
+---
+
+### Key Discoveries (Session 5)
+
+#### SupportMaterial.cpp Architecture
+
+**`SUPPORT_USE_AGG_RASTERIZER` hardcoded ON:**
+The preprocessor macro `SUPPORT_USE_AGG_RASTERIZER` is `#define`-d unconditionally at the top of the file. The entire EdgeGrid-based `SupportGridPattern` fallback code path is `#ifdef`-guarded and **never compiled** in any production build. The EdgeGrid path exists solely as dead historical code.
+
+**`SupportGridPattern` class — two live modes:**
+1. `smsGrid` — AGG scanline raster fill → marching-squares vectorization.
+2. `smsSnug` — morphological closing (polygon offset expand+shrink) to produce tight-fitting support outlines.
+- Tree-style variants (`smsTreeSlim`, `smsTreeStrong`, `smsTreeHybrid`, `smsOrganic`) all `assert(false)` and return empty — they are dispatch stubs that route to `TreeSupport`, not implemented in `SupportGridPattern`.
+
+**`SupportGridParams::support_closing_radius` hardcoded to `2.0`:**
+The config field for this value is commented out in `PrintConfig.hpp`. The struct member is populated with a literal `2.0` in the constructor. Any attempt to make this user-configurable requires uncommenting the config field and adding an invalidation entry.
+
+**`rasterize_polygons()` — AGG anti-aliased scanline rasterizer:**
+Polygon interiors are rendered into a `uint8_t` byte grid using AGG's `agg::renderer_scanline_aa_solid`. Each byte represents one cell of the support grid. Cells with value > `threshold_alpha` (128) are considered "inside" support coverage.
+
+**`contours_simplified()` — marching-squares re-vectorization:**
+The byte grid is converted back to polygons. Optional hole-fill suppresses inner contours below a size threshold. Corner offset logic in `contours_simplified()` assumes strictly axis-aligned (rectilinear) input polygons — diagonal grid cells produce slightly off-axis corners.
+
+**`seed_fill_block()` — PROPAGATION_STEP macro flood fill:**
+Flood fill propagation is implemented via a C macro `PROPAGATION_STEP` that expands inline 4-directional propagation steps within oversampled macro-blocks. The fill is bounded by a dilated trimming mask (the object body expanded outward). Oversampling factor is `SUPPORT_GRID_OVERSAMPLING = 4` — the byte grid is 4× the logical support grid resolution.
+
+#### SupportMaterial `generate()` Pipeline
+
+The main orchestration function `generate()` is **fully serial** (no top-level parallelism). Its 11 sub-steps:
+
+1. `detect_overhangs()` — find regions exceeding angle threshold; BBS sharp-tail detection pass
+2. `detect_contacts()` — compute contact polygon geometry for each overhang
+3. `new_contact_layer()` — allocate `SupportLayer` objects for each contact z
+4. `bottom_contact_layers_and_layer_support_areas()` — bottom contacts + downward projection
+5. `generate_base_layers()` — propagate support body from contacts to build plate
+6. `generate_interface_layers()` — dense interface layers at model contact surface
+7. `generate_base_interface_layers()` — lighter interface layers below dense interface
+8. `trim_support_layers_by_object()` — remove support volume that intersects object body
+9. `generate_support_toolpaths()` — fill support layers with extrusion paths
+10. `generate_raft_base()` — optional raft layers
+11. `buildplate_covered()` — cumulative mask of already-supported areas
+
+#### BBS Sharp-Tail Detection
+
+Two-pass algorithm in `detect_overhangs()`:
+
+**Pass 1 (parallel, per-layer):**
+- Layer 0: Any small-footprint polygon (area < `sharp_tail_min_area = 0.5 mm²`) is marked as a sharp tail seed.
+- Layer N > 0: An expolygon is a "floating" sharp tail if its bbox centroid lies over empty space on the layer below and its area is small enough.
+
+**Pass 2 (serial, upward):**
+- For each layer, check if a polygon's bbox intersects a known sharp-tail region below.
+- If yes, propagate sharp-tail membership upward if:
+  - Bbox width AND height are both < `sharp_tail_max_support_width = 2.5 mm`
+  - Area growth rate < 50% per layer
+  - Accumulated height < `sharp_tail_max_support_height = 16 mm`
+- Sharp-tail regions get enforced bottom-contact support regardless of overhang angle.
+
+#### `OverhangCluster` Hazards
+
+`OverhangCluster` is a struct that clusters adjacent overhang polygons across layers. Two hazards:
+
+1. **O(N²) scan hazard:** Membership test uses a linear scan over all existing clusters per new polygon. For models with many small overhangs (e.g., lattice structures), this becomes O(N²) where N = overhang polygon count.
+
+2. **Dangling raw pointer hazard:** `OverhangCluster` stores `ExPolygon*` raw pointers into a `std::vector<ExPolygon>` that is built during `detect_overhangs()`. The vector is not modified after construction (safe currently), but any reallocation of that vector would invalidate all stored pointers silently.
+
+#### `detect_overhangs()` vs. `detect_contacts()`
+
+Clean separation of concerns:
+- `detect_overhangs()`: Answers "what regions need support?" — produces a set of `ExPolygon` overhang regions per layer.
+- `detect_contacts()`: Answers "what is the contact geometry?" — given overhang regions, computes the actual contact polygon (clipped, expanded, contracted) that the support will touch.
+
+The separation allows the overhang detection to be reused by visualisation tools without triggering full support generation.
+
+#### `sync_gap_with_object_layer()`
+
+Walks the linked-list of `Layer` objects (via `Layer::lower_layer` pointer) to snap each contact z-coordinate to the nearest object layer boundary. This prevents support layers from being inserted at z-heights that don't align with object layers, which would cause seam artifacts.
+
+#### `new_contact_layer()`
+
+May allocate **two** `SupportLayer` objects per object layer when `thick_bridges` config is enabled (one for normal flow, one for bridging flow). Returns `nullptr` if no contact is needed. Callers must null-check the return value.
+
+#### `bottom_contact_layers_and_layer_support_areas()`
+
+Parallel processing with a key ordering subtlety:
+- Iterates layers **top-to-bottom**.
+- Runs `detect_bottom_contacts()` and `project_support_to_grid()` as concurrent `tbb::task_group` pairs for each layer.
+- The resulting `bottom_contacts` vector is built in **descending z order**, then `std::reverse()`-d at the end to produce ascending order.
+
+#### `generate_base_layers()`
+
+Parallel fill using `tbb::parallel_for` over layers. Each thread maintains **three binary-search cache indices** that count downward to avoid O(log N) re-searches for already-visited layers. These caches are thread-local (on the stack inside the lambda).
+
+#### `trim_support_layers_by_object()`
+
+Three distinct XY gap zones:
+- **Sharp-tail regions:** `sharp_tail_xy_gap = 0.2 mm` (smaller gap — support closer to model)
+- **Normal overlap regions:** `gap_xy_scaled` (from config)
+- **Non-overlap / floating regions:** `no_overlap_xy_gap = 0.2 mm`
+
+#### `buildplate_covered()`
+
+Serial cumulative union — each layer's covered area is the union of the current layer's object footprint and the layer below's covered area. The code has a `// FIXME` comment noting this should be a **parallel prefix-sum** but is not. For tall prints (>500 layers), this serial pass may be a bottleneck.
+
+#### Dead / Commented-Out Code at EOF
+
+A large block of commented-out C++ at the end of `SupportMaterial.cpp` corresponds to `clip_by_pillars()` and `clip_with_shape()` functions from the Perl-era Slic3r codebase. They were never ported to OrcaSlicer's C++ data structures. Safe to delete entirely in a rewrite.
+
+---
+
+### Open Questions (Session 5)
+
+1. `[UNCLEAR]` `SUPPORT_USE_AGG_RASTERIZER` — is the EdgeGrid path intentionally preserved for future fallback, or is it safe to delete? The macro is unconditional so no build currently exercises it.
+2. `[UNCLEAR]` `smsTreeSlim` / `smsTreeStrong` / `smsTreeHybrid` / `smsOrganic` dispatch stubs in `SupportGridPattern` — do these ever reach the assert(false), or does the caller always redirect to `TreeSupport` before calling `SupportGridPattern`? Need to trace caller.
+3. `[UNCLEAR]` `support_closing_radius = 2.0` hardcode — is `2.0 mm` correct for all nozzle diameters? Fine for 0.4 mm nozzle, but for 0.8 mm nozzle this may produce over-thick support interfaces.
+4. `[UNCLEAR]` `buildplate_covered()` serial FIXME — is the serial order intentional (each layer's output depends on the layer below) or is a parallel-prefix approach actually safe here?
+
+---
+
+### Next Annotation Targets
+
+1. `src/libslic3r/Support/TreeSupport.cpp` — organic tree support generation (3527 lines)
+2. `src/libslic3r/Support/TreeSupport.hpp`

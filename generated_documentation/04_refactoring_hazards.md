@@ -563,3 +563,122 @@ The accumulation of E-axis distances in `GCode.cpp` uses `double`, which is crit
 | SeamPlacer end_index comment inversion | Medium | Low | P2 |
 | SeamPlacer spAlignedBack score overflow | Low | Low | P3 |
 | CoolingBuffer G1-only removal bug | Medium | Medium | P2 |
+
+---
+
+## New Hazards (Session 5 — SupportMaterial)
+
+### 32. `OverhangCluster` O(N²) Membership Scan (SupportMaterial.cpp)
+
+**Location:** `src/libslic3r/Support/SupportMaterial.cpp` — `OverhangCluster` struct, `detect_overhangs()`.
+
+**Hazard:** For each new overhang polygon, all existing clusters are scanned linearly to find a matching cluster. On models with many small overhangs (lattice structures, organic shapes), this is O(N²) where N = total overhang polygon count across all layers. For a model with 10,000 overhang polygons, this performs ~50 million comparisons.
+
+**Translation risk:** Any port that naively replicates this scan will have quadratic performance on complex geometries. A spatial index (KD-tree, grid hash) is needed.
+
+**Mitigation:** Replace the linear scan with a spatial hash map keyed by layer index + approximate centroid. O(1) average lookup.
+
+---
+
+### 33. `OverhangCluster` Dangling Raw Pointer (SupportMaterial.cpp)
+
+**Location:** `src/libslic3r/Support/SupportMaterial.cpp` — `OverhangCluster::expolygons` member.
+
+**Hazard:** `OverhangCluster` stores `ExPolygon*` raw pointers into a `std::vector<ExPolygon>` that was built during `detect_overhangs()`. The vector is not modified after construction (currently safe), but any future change that reallocates this vector (e.g., pushing more elements after cluster construction) would silently invalidate all stored pointers, causing use-after-free.
+
+**Translation risk:** Any language with reference stability guarantees (Rust borrow checker) will catch this; languages with GC (Java, Python, Go) are safe by default. Raw pointer storage is specific to C++.
+
+**Mitigation:** Replace `ExPolygon*` with indices into the source vector, or store copies rather than pointers.
+
+---
+
+### 34. `new_contact_layer()` Nullable Return (SupportMaterial.cpp)
+
+**Location:** `src/libslic3r/Support/SupportMaterial.cpp` — `new_contact_layer()`.
+
+**Hazard:** `new_contact_layer()` returns `nullptr` when no contact is needed. When `thick_bridges` is enabled, it may return two allocated layers. Callers must null-check but there is no `[[nodiscard]]` or similar enforcement — a caller that forgets the null check will dereference a null pointer.
+
+**Translation risk:** Languages that use `Option<T>` / `Maybe<T>` / nullable types will surface this explicitly. A port should use an optional return type to force callers to handle the no-contact case.
+
+**Mitigation:** Return `std::optional<SupportLayer*>` (or a small `struct` with two optionals for the thick-bridges case).
+
+---
+
+### 35. `buildplate_covered()` Serial FIXME (SupportMaterial.cpp)
+
+**Location:** `src/libslic3r/Support/SupportMaterial.cpp` — `buildplate_covered()`.
+
+**Hazard:** The cumulative union of build-plate coverage is computed **serially** layer-by-layer. The codebase has a `// FIXME` comment acknowledging this should be a parallel prefix-sum. For tall prints (500+ layers, complex geometry), this serial pass creates a sequential bottleneck that cannot be parallelized by TBB.
+
+**Translation risk:** A port should implement the parallel prefix-sum from the start. The serial version is a known performance debt.
+
+**Mitigation:** Implement as `tbb::parallel_scan` (parallel prefix) with union as the associative operation.
+
+---
+
+### 36. `SupportGridParams::support_closing_radius` Hardcoded (SupportMaterial.cpp)
+
+**Location:** `src/libslic3r/Support/SupportMaterial.cpp` — `SupportGridParams` constructor; `PrintConfig.hpp` — commented-out field.
+
+**Hazard:** `support_closing_radius` is hardcoded to `2.0` (mm). The corresponding config field in `PrintConfig.hpp` is commented out. This value may be inappropriate for non-standard nozzle diameters (e.g., 0.8 mm nozzle where 2.0 mm closing radius produces overly thick support interfaces). There is no way for users to override this value.
+
+**Translation risk:** A port that copies this hardcode perpetuates an unexposed tuning parameter. The correct fix is to restore the config field.
+
+**Mitigation:** Uncomment the config field, add to invalidation list for `posSupportMaterial`, and expose in UI.
+
+---
+
+### 37. `SUPPORT_USE_AGG_RASTERIZER` Dead Code Path (SupportMaterial.cpp)
+
+**Location:** `src/libslic3r/Support/SupportMaterial.cpp` — top of file; `SupportGridPattern` class.
+
+**Hazard:** The entire EdgeGrid-based `SupportGridPattern` code path is conditionally compiled out by `#ifdef SUPPORT_USE_AGG_RASTERIZER`, which is unconditionally defined. The EdgeGrid path represents a large body of dead code that is never tested. If the macro is ever removed or conditioned on runtime state, the EdgeGrid path would need independent validation.
+
+**Translation risk:** A port should either delete the dead EdgeGrid path entirely or explicitly mark it as "not ported / not validated."
+
+**Mitigation:** Delete the `#else` branch of `SUPPORT_USE_AGG_RASTERIZER` in `SupportGridPattern`. Document the AGG path as the only supported production code path.
+
+---
+
+### 38. Sharp-Tail Detection Non-Configurable Constants (SupportMaterial.cpp)
+
+**Location:** `src/libslic3r/Support/SupportMaterial.cpp` — `detect_overhangs()` BBS sharp-tail pass.
+
+**Hazard:** The sharp-tail algorithm uses several magic constants:
+- `sharp_tail_min_area = 0.5 mm²` — minimum footprint to trigger sharp-tail detection
+- `sharp_tail_max_support_width = 2.5 mm` — maximum bbox dimension for propagation
+- `sharp_tail_max_support_height = 16 mm` — maximum height to propagate sharp-tail support
+- Area growth rate threshold: 50% per layer
+
+These are not exposed as config options. A model with unusual geometry (very thin tall spires, miniature figurines) may need different thresholds. There is no override path.
+
+**Translation risk:** A port should either expose these as config parameters or document them as algorithm-level constants with justification for the specific values.
+
+**Mitigation:** Move constants to a `SupportMaterialConfig` struct with documented defaults and override hooks.
+
+---
+
+### 39. Commented-Out Perl-Era Dead Code at EOF (SupportMaterial.cpp)
+
+**Location:** `src/libslic3r/Support/SupportMaterial.cpp` — end of file (`clip_by_pillars`, `clip_with_shape`).
+
+**Hazard:** A large block of commented-out C++ code at the end of `SupportMaterial.cpp` represents functions from the original Perl Slic3r codebase that were never ported to the C++ data structures. This code is not compiled, not tested, and not reachable. It creates confusion for maintainers trying to understand the active support algorithm.
+
+**Translation risk:** A naïve line-by-line port might attempt to translate the commented code as if it were active logic.
+
+**Mitigation:** Delete the commented block entirely. The git history preserves the original Perl lineage for reference.
+
+---
+
+### Updated Risk Matrix (Session 5 additions)
+
+| Hazard | Severity | Difficulty to Port | Priority |
+|--------|----------|--------------------|----------|
+| OverhangCluster O(N²) scan | High | Medium | P1 |
+| OverhangCluster dangling raw pointer | High | Low | P1 |
+| `new_contact_layer()` nullable return | Medium | Low | P2 |
+| `buildplate_covered()` serial FIXME | Medium | Medium | P2 |
+| `support_closing_radius` hardcoded | Low | Low | P3 |
+| `SUPPORT_USE_AGG_RASTERIZER` dead path | Low | Low | P3 |
+| Sharp-tail non-configurable constants | Low | Low | P3 |
+| Commented-out Perl-era dead code | Low | Low | P3 |

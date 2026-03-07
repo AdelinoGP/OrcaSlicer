@@ -165,6 +165,78 @@ A newer BBS addition: estimates which extrusions will curl upward due to cooling
 
 **COUPLING:** `SupportMaterial` directly accesses `PrintObject` internal state (`m_layers`), making it tightly coupled to the print pipeline.
 
+### Traditional Support Pipeline Detail (Session 5)
+
+**File:** [`src/libslic3r/Support/SupportMaterial.cpp`](../src/libslic3r/Support/SupportMaterial.cpp)
+
+#### `generate()` — 11-Step Serial Orchestration
+
+```
+detect_overhangs()
+  → detect_contacts()
+  → new_contact_layer()
+  → bottom_contact_layers_and_layer_support_areas()
+  → generate_base_layers()
+  → generate_interface_layers()
+  → generate_base_interface_layers()
+  → trim_support_layers_by_object()
+  → generate_support_toolpaths()
+  → generate_raft_base()
+  → buildplate_covered()
+```
+
+The top-level orchestration is **fully serial**. Parallelism occurs **inside** individual steps.
+
+#### `detect_overhangs()` — BBS Sharp-Tail Detection
+
+**Pass 1 (TBB parallel_for, per-layer):**
+- Layer 0: marks small-footprint polygons (area < 0.5 mm²) as sharp-tail seeds.
+- Layer N: marks "floating" expolygons (centroid over empty space below, small area) as sharp-tail seeds.
+
+**Pass 2 (serial, upward from layer 1):**
+- Propagates sharp-tail membership upward layer-by-layer.
+- Propagation conditions: bbox < 2.5 mm in both dimensions, area growth < 50%/layer, accumulated height < 16 mm.
+- Sharp-tail regions force bottom-contact support regardless of overhang angle.
+
+#### `SupportGridPattern` — Two Active Modes
+
+| Mode | Algorithm | Use Case |
+|------|-----------|----------|
+| `smsGrid` | AGG scanline rasterize → marching-squares vectorize | Standard grid support pattern |
+| `smsSnug` | Clipper morphological close (expand + shrink) | Tight-fitting organic support outline |
+
+Note: `smsTreeSlim`, `smsTreeStrong`, `smsTreeHybrid`, `smsOrganic` all `assert(false)` — routing stubs only; tree support handled by `TreeSupport.cpp`.
+
+#### AGG Rasterization Path
+
+1. Polygon boundary rendered into `uint8_t` byte grid at `SUPPORT_GRID_OVERSAMPLING × 4` resolution using AGG anti-aliased scanline fill.
+2. Cells with value > 128 are marked inside.
+3. `seed_fill_block()` flood-fills from seeds within macro-blocks, bounded by dilated trimming mask.
+4. `contours_simplified()` runs marching-squares over the byte grid to produce polygon outlines.
+
+#### `bottom_contact_layers_and_layer_support_areas()` — Parallel Pairs
+
+Iterates **top-to-bottom** with concurrent `tbb::task_group` pairs per layer:
+```
+detect_bottom_contacts(layer)   ← concurrent with →   project_support_to_grid(layer)
+```
+Result vector built descending, then `std::reverse()`-d.
+
+#### Complexity Summary
+
+| Step | Complexity | Notes |
+|------|------------|-------|
+| `detect_overhangs()` pass 1 | O(L × P) parallel | L = layers, P = polygons/layer |
+| `detect_overhangs()` pass 2 | O(L) serial | Upward propagation walk |
+| `OverhangCluster` membership | O(N²) worst case | N = total overhang polygons |
+| `rasterize_polygons()` | O(W × H) | W×H = grid resolution |
+| `contours_simplified()` | O(W × H) | Marching-squares |
+| `generate_base_layers()` | O(L × P) parallel | TBB parallel_for |
+| `trim_support_layers_by_object()` | O(L × P × log P) | Clipper per-layer |
+| `buildplate_covered()` | O(L × P) serial | Known FIXME: should be parallel prefix |
+
+---
+
 ### Tree Support (`Support/TreeSupport.cpp`, `TreeSupport3D.cpp`)
 
 A Bambu Lab addition implementing tree-like organic support structures:
