@@ -505,3 +505,84 @@ For SEMM printers, `N = cooling_moves` back-and-forth moves are made across the 
 | save_on_last_wipe() | O(n × k) per run | n = layers, k = toolchanges per layer |
 | generate() | O(n × k) | One writer pass per layer-toolchange pair |
 | Full convergence | O(5 × n²) | 5 iterations of plan_tower |
+
+---
+
+## Section 10 — TreeSupport3D Organic Pipeline
+
+**File:** `src/libslic3r/Support/TreeSupport3D.cpp`
+
+### Overview
+
+`TreeSupport3D` implements the organic tree support mode (`smsTreeOrganic`). It is only called via the thin adapter `generate_tree_support_3D()` from `TreeSupport.cpp`. The pipeline runs on one `PrintObject` at a time, in a single call to `generate_support_areas()`.
+
+### Pipeline Steps
+
+```
+generate_overhangs()        — DEAD CODE (#if 0). Active code uses TreeSupport::detect_overhangs().
+generate_initial_areas()    — TBB parallel: place contact circles at overhang tips
+create_layer_pathing()      — Top-down serial: grow & merge influence areas layer by layer
+set_points_on_areas()       — Propagate result_on_layer bottom-up from children to parents
+set_to_model_contact_to_model_gracious() — Walk up to highest valid layer for model-contact
+create_nodes_from_area()    — Bottom-up serial: finalize result_on_layer points
+organic_smooth_branches_avoid_collisions() — 100-iter TBB sphere nudge + Laplacian smooth
+organic_draw_branches()     — Flatten to paths → extrude_branch() → slice → union → merge
+```
+
+### Influence Area Propagation
+
+Each element at layer L has an **influence area** — the set of XY positions reachable on layer L-1 while respecting the support angle and collision constraints. The propagation loop in `increase_areas_one_layer()` tries up to 4 `AreaIncreaseSettings` configurations per element in priority order:
+
+1. Slow move, increase radius
+2. Slow move, keep radius
+3. Fast move, increase radius
+4. Fast move, keep radius
+
+Each configuration calls `increase_single_area()`, which:
+1. Optionally grows the element's radius (`effective_radius_height += 1`)
+2. Optionally offsets the area by `maximum_move_distance` (fast) or `maximum_move_distance_slow` (slow)
+3. Clips against `getAvoidance()` (build-plate path) and/or `getCollision()` (model-contact path)
+4. Returns `std::nullopt` if the result is below `tiny_area_threshold`
+
+### Sphere Smoothing Algorithm (`organic_smooth_branches_avoid_collisions`)
+
+After `create_nodes_from_area()` places `result_on_layer` XY positions, the smoothing pass refines them to avoid collisions and produce a smooth organic tube shape.
+
+**Data structures:**
+- `CollisionSphere`: one per element in `elements_with_link_down`. Stores current XY position, radius, neighbor links, and Z span for collision testing.
+- `LayerCollisionCache`: one per layer. Contains `vector<Linef>` (object contour edges) + `AABBTreeIndirect::Tree` for fast nearest-line query.
+
+**Per-iteration (100 iterations max):**
+```
+parallel_for each unlocked sphere:
+  1. Scan collision cache layers within [layer_begin, layer_end)
+     - Compute 2D cross-section radius at each layer (sphere slice)
+     - AABBTree nearest-line query
+     - If closest line is inside the sphere, record collision depth
+  2. If collision detected: nudge XY away by min(depth + 0.1mm, 0.5mm)
+  3. Laplacian smooth: weighted avg of neighbor positions → shift by min(|Δ|, 0.2mm)
+  Stop early if num_moved == 0
+```
+
+**Complexity:** O(100 × N × L) where N = elements, L = layers per element's Z span. For tall complex prints, L can be large (hundreds of layers), making this the dominant cost.
+
+### Mesh Generation (`extrude_branch`)
+
+Each branch path (list of `SupportElement*` sorted bottom→top) is turned into a 3D capsule tube:
+
+1. **Bottom hemisphere:** fan of `discretize_circle()` rings around path[0], stepping from polar angle 0 → π/2
+2. **Body:** `discretize_circle()` ring at each intermediate waypoint; rings stitched by `triangulate_strip()`
+3. **Top hemisphere:** fan of rings around path[-1], stepping from π/2 → 0
+
+The cross-section normal at waypoints is the bisector direction: `(v1 + v2).normalized()`. Capsule geometry is assembled into `indexed_triangle_set` and then sliced layer-by-layer to produce 2D support polygons.
+
+### Complexity Summary
+
+| Operation | Complexity | Notes |
+|-----------|------------|-------|
+| `generate_initial_areas()` | O(N_tips × M_rotations) | TBB parallel; M = 1 (22° grid fixed) |
+| `increase_areas_one_layer()` | O(N × 4 × Clipper) | 4 settings tried per element per layer |
+| `merge_influence_areas()` | O(N log N) amortized | Divide-and-conquer with AABBTree |
+| `organic_smooth_branches_avoid_collisions()` | O(100 × N × L) | Dominant cost for tall complex models |
+| `extrude_branch()` | O(path_len × nsteps) | nsteps ∝ 1/eps ≈ 50–200 vertices/ring |
+| `organic_draw_branches()` TBB slice | O(B × layer_count) | B = number of branches |

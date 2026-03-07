@@ -850,3 +850,221 @@ These are not exposed as config options. A model with unusual geometry (very thi
 | `get_radius()` mutable UB data race | Low | Low | P3 |
 | `USE_SUPPORT_3D 0` dead code throughout | Low | Low | P3 |
 | `move_out_expolys()` dead variable `from0` | Low | Low | P3 |
+
+---
+
+## TreeSupport3D Hazards (Hazards 52–65)
+
+### Hazard 52 — `discretize_circle()` Degenerate Normal (NaN Vertices)
+
+**File:** `src/libslic3r/Support/TreeSupport3D.cpp` (line ~3056)
+**Severity:** High
+
+```cpp
+Vec3f x = normal.cross(Vec3f(0.f, -1.f, 0.f)).normalized();
+```
+
+If `normal ≈ (0, ±1, 0)` (a near-vertical branch segment in the XZ plane), the cross product approaches zero. After `normalized()`, the result is NaN or undefined. All circle vertices emitted in the subsequent loop become NaN. The resulting mesh is silently invalid — the slicer may emit empty or garbage cross-sections for that branch, producing missing or malformed support.
+
+**Fix:** Before computing `x`, test `|normal.y| > threshold` and fall back to crossing with `(1, 0, 0)` instead.
+
+---
+
+### Hazard 53 — `discretize_circle()` Zero/Negative Radius
+
+**File:** `src/libslic3r/Support/TreeSupport3D.cpp` (line ~3051)
+**Severity:** Medium
+
+```cpp
+float angle_step = 2. * acos(1. - eps / radius);
+```
+
+If `radius ≤ 0`, the argument to `acos` goes outside `[-1, 1]`, returning NaN. `nsteps` via `ceil` of NaN is undefined. The subsequent loop body may be skipped entirely, leaving `extrude_branch()` with an empty strip range `{begin, begin}` which causes assertion failures in `triangulate_strip()`.
+
+**Fix:** Assert `radius > 0` at the call site in `extrude_branch()` before each `discretize_circle()` call.
+
+---
+
+### Hazard 54 — `organic_smooth_branches_avoid_collisions()` `min_element_radius` Always Zero
+
+**File:** `src/libslic3r/Support/TreeSupport3D.cpp` (line ~3211–3212)
+**Severity:** Medium
+
+```cpp
+// FIXME
+l.min_element_radius = 0;
+```
+
+The `min_element_radius` field is computed correctly from all elements at that layer, but then unconditionally overwritten to 0 immediately after. `get_collision_lower_bound_area()` is then called with radius 0, fetching the maximally conservative (tightest) avoidance polygon regardless of actual sphere size. The intent was to use the smallest sphere radius at each layer for a tighter fit that would allow more room to route branches. This FIXME has been present since the feature was written.
+
+---
+
+### Hazard 55 — `organic_smooth_branches_avoid_collisions()` Nudge Distance Double-Applied
+
+**File:** `src/libslic3r/Support/TreeSupport3D.cpp` (line ~3337–3338)
+**Severity:** Medium
+
+```cpp
+double nudge_dist = std::min(std::max(0., ...), max_nudge_collision_avoidance);
+Vec2d nudge_vector = (...).normalized() * nudge_dist;
+collision_sphere.position.head<2>() += (nudge_vector * nudge_dist).cast<float>();
+```
+
+`nudge_vector` is already `normalized * nudge_dist`. Multiplying it by `nudge_dist` again squares the nudge distance. For a 0.5mm nudge cap, the actual displacement is at most 0.25mm² of movement in the normalized direction — which has no coherent physical meaning. The collision nudge is less effective than designed, potentially requiring more iterations.
+
+**Fix:** Change to either `+= nudge_vector.cast<float>()` or `+= (normalized_dir * nudge_dist).cast<float>()`.
+
+---
+
+### Hazard 56 — `generate_support_infill_lines()` Operator Precedence Bug
+
+**File:** `src/libslic3r/Support/TreeSupport3D.cpp` (line ~651, in the infill lines generator)
+**Severity:** High
+
+```cpp
+(support_params.interface_angle + (layer_idx & 1) ? float(-M_PI/4.) : float(+M_PI/4.))
+```
+
+Due to C++ operator precedence, the ternary binds to the entire addition, not just `(layer_idx & 1)`. The actual evaluation is:
+```
+(support_params.interface_angle + (layer_idx & 1)) ? -π/4 : +π/4
+```
+Since `interface_angle + 0` or `interface_angle + 1` is almost always non-zero (truthy), the result is always `-π/4`. The `+π/4` branch and `interface_angle` are both completely ignored. Interface fill lines always use a fixed -45° angle.
+
+**Fix:** Add parentheses: `support_params.interface_angle + ((layer_idx & 1) ? float(-M_PI/4.) : float(+M_PI/4.))`.
+
+---
+
+### Hazard 57 — `ensure_maximum_distance_polyline()` O(N²) Inner Loop for Closed Polylines
+
+**File:** `src/libslic3r/Support/TreeSupport3D.cpp` (line ~473)
+**Severity:** Medium
+
+The function resamples a polyline so no two consecutive points are farther apart than `distance`. For closed polylines, it searches the full polyline for the optimal insertion point, making the inner pass O(N). Combined with the outer O(N) walk, the total is O(N²) for closed polylines. For open polylines it is O(N). For large polygons with many vertices, this is a bottleneck in `generate_initial_areas()`.
+
+---
+
+### Hazard 58 — `group_meshes()` Multi-Group Logic Disabled
+
+**File:** `src/libslic3r/Support/TreeSupport3D.cpp` (line ~186)
+**Severity:** Low
+
+```cpp
+#if 0
+    // group objects by similar TreeSupportSettings
+#endif
+```
+
+The `#if 0` block that groups multiple `PrintObject`s with identical settings (to share influence area computation) is permanently disabled. Each object always gets its own group. For prints with many identical objects, this is a significant missed optimization — all influence area and collision data is recomputed per object.
+
+---
+
+### Hazard 59 — `generate_overhangs()` Entirely Dead Code
+
+**File:** `src/libslic3r/Support/TreeSupport3D.cpp` (line ~277)
+**Severity:** Low
+
+```cpp
+#if 0
+static void generate_overhangs(...) { ... }
+#endif
+```
+
+The overhang detection function in TreeSupport3D is completely disabled. Active code delegates to `TreeSupport::detect_overhangs()` from the non-3D tree support class. The `#if 0` block was presumably a work-in-progress that was superseded.
+
+---
+
+### Hazard 60 — OpenVDB Collision Nudge Path Dead
+
+**File:** `src/libslic3r/Support/TreeSupport3D.cpp` (line ~3386–3487)
+**Severity:** Low
+
+```cpp
+#else // TREE_SUPPORT_ORGANIC_NUDGE_NEW
+static void organic_smooth_branches_avoid_collisions(...) { /* OpenVDB */ }
+#endif
+```
+
+The entire OpenVDB-based collision smoothing path is dead code (`TREE_SUPPORT_ORGANIC_NUDGE_NEW=1` at line ~45). The OpenVDB path builds a full signed-distance field from the mesh and uses `ClosestSurfacePoint<FloatGrid>::searchAndReplace()`. It is functionally correct but extremely slow. When porting to another language, this entire `#else` block can be omitted.
+
+---
+
+### Hazard 61 — `convert_lines_to_internal()` Silently Drops Invalid Points
+
+**File:** `src/libslic3r/Support/TreeSupport3D.cpp` (line ~371)
+**Severity:** Medium
+
+Points in a support contour line that cannot reach either the build plate OR the model are silently dropped, causing the original support line to be split into multiple shorter segments. This can produce support structures with unexpected gaps. No warning or log message is emitted; the caller receives fewer line segments than input without indication of loss.
+
+---
+
+### Hazard 62 — `TreeSupportSettings::soluble` Static Member Race
+
+**File:** `src/libslic3r/Support/TreeSupportCommon.hpp`
+**Severity:** High
+
+`TreeSupportSettings::soluble` is declared `static`, meaning it is shared across all instances. In multi-object prints where objects have different `TreeSupportSettings` (e.g., one object uses soluble support, another does not), concurrent access or even sequential construction could overwrite the previous object's setting. Same hazard as `diameter_angle_scale_factor` in `TreeSupport.cpp`.
+
+---
+
+### Hazard 63 — BBS Bed-Area Clip Hack (`generate_support_areas()`)
+
+**File:** `src/libslic3r/Support/TreeSupport3D.cpp` (line ~3639)
+**Severity:** Low
+
+```cpp
+// BBS: clip the support areas to the bed area
+for (auto& slice : support_layer.support_fills.entities)
+    ...
+```
+
+All support polygons are clipped to `volumes.m_bed_area` at the end of generation. This is a BBS-specific workaround for issue #4769 where organic support could extend slightly outside the physical bed boundary. The clip is applied unconditionally and can silently truncate support structures for objects placed near the bed edge.
+
+---
+
+### Hazard 64 — `organic_draw_branches()` Tip Roof Extraction Disabled
+
+**File:** `src/libslic3r/Support/TreeSupport3D.cpp` (line ~3950)
+**Severity:** Medium
+
+```cpp
+#if 0
+    // Extract roof tips (interface layers above contact point)
+#endif
+```
+
+The code that would generate interface (roof) layers for tip contact points is disabled. All branch tips use the base support material. This means organic tree supports do not benefit from interface layers at contact points, potentially causing worse surface quality at the contact face. The feature was planned but never completed.
+
+---
+
+### Hazard 65 — `extrude_branch()` Zero-Length Segment NaN Direction
+
+**File:** `src/libslic3r/Support/TreeSupport3D.cpp` (line ~3097)
+**Severity:** Medium
+
+```cpp
+v1 = (p2 - p1).normalized();
+```
+
+If two consecutive path elements have identical `result_on_layer` XY AND identical layer Z (i.e., duplicate points), `(p2 - p1)` is the zero vector and `normalized()` returns NaN. The branch normal `nprev = v1` becomes NaN, which propagates through `discretize_circle()`, emitting NaN vertices and producing a fully invisible/broken tube in the mesh. This could occur if `create_nodes_from_area()` places two consecutive nodes at the same position (e.g., due to integer rounding of very small movements).
+
+---
+
+## Summary Table (Hazards 52–65)
+
+| # | Hazard | File | Severity | Priority |
+|---|--------|------|----------|----------|
+| 52 | `discretize_circle()` degenerate normal → NaN mesh | TreeSupport3D.cpp:3056 | High | P1 |
+| 53 | `discretize_circle()` zero radius → empty ring + assertion | TreeSupport3D.cpp:3051 | Medium | P2 |
+| 54 | `min_element_radius` FIXME always 0 | TreeSupport3D.cpp:3212 | Medium | P2 |
+| 55 | Nudge distance double-applied (squared) | TreeSupport3D.cpp:3338 | Medium | P2 |
+| 56 | Operator precedence bug in `generate_support_infill_lines()` | TreeSupport3D.cpp:651 | High | P1 |
+| 57 | `ensure_maximum_distance_polyline()` O(N²) closed polyline | TreeSupport3D.cpp:473 | Medium | P2 |
+| 58 | `group_meshes()` multi-group `#if 0` disabled | TreeSupport3D.cpp:186 | Low | P3 |
+| 59 | `generate_overhangs()` entirely dead `#if 0` | TreeSupport3D.cpp:277 | Low | P3 |
+| 60 | OpenVDB nudge path dead (`#else` branch) | TreeSupport3D.cpp:3386 | Low | P3 |
+| 61 | `convert_lines_to_internal()` silently drops points | TreeSupport3D.cpp:371 | Medium | P2 |
+| 62 | `TreeSupportSettings::soluble` static race | TreeSupportCommon.hpp | High | P1 |
+| 63 | BBS bed-area clip unconditional truncation | TreeSupport3D.cpp:3639 | Low | P3 |
+| 64 | Tip roof extraction disabled (`#if 0`) | TreeSupport3D.cpp:3950 | Medium | P2 |
+| 65 | `extrude_branch()` zero-length segment → NaN direction | TreeSupport3D.cpp:3097 | Medium | P2 |

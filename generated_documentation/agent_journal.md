@@ -610,3 +610,63 @@ One takes layer count, one takes mm distance. Both implement the same taper logi
 
 1. `src/libslic3r/Support/TreeSupport3D.cpp` — organic 3D tree support (delegated from TreeSupport.cpp for smsTreeOrganic)
 2. `src/libslic3r/GCode/PressureEqualizer.cpp` — linear advance / pressure equalizer post-processor
+
+---
+
+## Session 7 — TreeSupport3D.cpp Annotation Completion
+
+**Files:** `src/libslic3r/Support/TreeSupport3D.cpp`, `src/libslic3r/Support/TreeSupport3D.hpp`
+**Commit:** `3a3ba01e87`
+
+### Functions Annotated This Session
+
+**`increase_single_area()`** (line ~1709)
+Core workhorse for the influence-area propagation loop. Takes a parent element, one `AreaIncreaseSettings` configuration, and probes whether a viable area exists on the layer below. Returns `std::optional<SupportElementState>` — the caller (`increase_areas_one_layer`) tries multiple settings in priority order and takes the first success. Three hazards documented:
+- Radius expansion inner loop (`getRadiusNextCeil`) can be infinite if the lookup table is non-monotone (a TreeModelVolumes bug)
+- `planned_foot_increase` divides by `foot_radius_increase`; if bp ≤ branch radius, `foot_radius_increase` = 0 and the result is ±infinity — `increase_bp_foot` is always false but the division itself is UB
+- `ceil_radius_before` recheck path re-runs avoidance subtraction, potentially shrinking the area to below threshold and logging "Area lost catching up radius"
+
+**`triangulate_fan<flip_normals>()`** (line ~2965)
+Fills a triangle fan (cone cap) from an apex vertex to a ring of vertices. Used to close the bottom and top hemispheres of each organic branch tube. `flip_normals=false` for bottom (face outward downward), `true` for top. Purely additive to `indexed_triangle_set`.
+
+**`triangulate_strip()`** (line ~2982)
+Stitches two circular rings into a quad-strip of triangles. Alignment: finds closest vertex on ring2 to first vertex of ring1, then zig-zag walks with greedy shortest-diagonal. Ring-size mismatch produces a non-manifold mesh but does not crash.
+
+**`discretize_circle()`** (line ~3048)
+Tessellates a 3D circle into a polygon ring. Two hazards:
+- **DEGENERATE NORMAL**: `x = normal × (0,-1,0)`. If `normal ≈ (0,±1,0)`, cross product → near-zero → NaN after `normalized()`. All emitted vertices become NaN, silently producing a garbage mesh. No guard present.
+- **ZERO RADIUS**: If `radius ≤ 0`, `acos(1 - eps/radius)` goes out of range; `nsteps` could be ≤ 0; the ring emits nothing, causing downstream `triangulate_strip` assertion failures.
+
+**`extrude_branch()`** (line ~3074)
+Generates the full 3D mesh tube for one branch path: bottom hemisphere + body cylinders + top hemisphere. Normal at junctions is the bisector of adjacent segment directions (`(v1+v2).normalized()`). Two hazards:
+- If `result_on_layer` differences are zero at any step (duplicate XY positions), `v1` becomes NaN.
+- Dead `#if 0` block for `circles_intersect()`: when adjacent cross-sections overlap (rapidly widening branch near build plate), the tube can self-intersect. The fix was designed but never completed.
+
+**`organic_smooth_branches_avoid_collisions()` — new AABB version** (line ~3174)
+100-iteration TBB-parallel sphere-nudging + Laplacian smoothing using per-layer AABB line trees. Three hazards:
+- `min_element_radius` is always overwritten to 0 immediately after being computed (FIXME comment at line ~3212). This forces the maximally conservative collision polygon rather than the tightest fit for the actual sphere radius.
+- Nudge formula at line ~3337-3338 applies `nudge_dist` twice: `position += (nudge_vector * nudge_dist)` where `nudge_vector` is already `normalized() * nudge_dist`. This squares the nudge — a likely bug.
+- Neighbor lookup via `linear_data_layers` offsets has no bounds-checking.
+
+**`organic_smooth_branches_avoid_collisions()` — old OpenVDB version** (line ~3386, dead code)
+Marked as DEAD CODE — `#else TREE_SUPPORT_ORGANIC_NUDGE_NEW` branch is never compiled. Serial loop, uses full OpenVDB SDF construction, slow for complex meshes. Retained as algorithm reference.
+
+### Key Findings — Session 7
+
+1. **`discretize_circle()` degenerate-normal hazard** — the `(0,-1,0)` cross product axis produces NaN for vertical branches. This would manifest as invisible support structures that print as nothing.
+2. **Nudge distance double-applied** — the new AABB smoothing may be nudging nodes less than intended due to squaring of the distance. This could explain residual collisions that require many iterations.
+3. **`min_element_radius = 0` FIXME** — all collision lookups use zero radius. The original intent was to use the smallest sphere radius at each layer for a tighter fit. This is the most impactful known unfixed bug in the organic support pipeline.
+4. **OpenVDB dead code preserved** — the old version is kept as a commented-out reference. When porting to another language, it can be safely removed unless OpenVDB integration is desired.
+
+### Open Questions (Session 7)
+
+1. `[UNCLEAR]` Is the `nudge_dist` double-application at line ~3338 intentional? The multiplied `nudge_dist` vs `nudge_dist²` could explain the 100-iteration convergence being needed.
+2. `[UNCLEAR]` `discretize_circle()` — is the `(0,-1,0)` choice deliberate (it works for all non-vertical normals)? Or was it meant to be `(0,0,1)` which is safer for the typical near-horizontal branch normal?
+3. `[UNCLEAR]` The `extrude_branch()` dead `circles_intersect` block — would reactivating it require significant geometry work? The existing `triangulate_strip` zig-zag should handle mild overlaps without artifacts.
+
+---
+
+### Next Annotation Targets (Session 8+)
+
+1. `src/libslic3r/Support/TreeModelVolumes.cpp` — collision/avoidance volume cache used by TreeSupport3D
+2. `src/libslic3r/GCode/PressureEqualizer.cpp` — linear advance / pressure equalizer post-processor
