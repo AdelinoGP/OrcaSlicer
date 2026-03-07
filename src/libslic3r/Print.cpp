@@ -1,3 +1,31 @@
+// [INTENT] Print.cpp: Top-level FFF (Fused Filament Fabrication) print orchestration.
+// Owns all PrintObject instances, print-level config, wipe tower, skirt/brim, and the
+// G-code export step. The Print object is the root of the per-plate processing graph.
+//
+// Key responsibilities:
+//   1. Config diffing (invalidate_state_by_config_options) — maps changed option keys
+//      to the minimal set of PrintStep / PrintObjectStep invalidations.
+//   2. Object deduplication (process() shared-object logic) — objects with identical
+//      geometry share slice data; only one is actually sliced.
+//   3. Step sequencing (process()) — drives each PrintObject through its step pipeline
+//      in the correct dependency order.
+//   4. Print-level steps (psWipeTower, psSkirtBrim, psGCodeExport) run after all
+//      PrintObject steps complete.
+//
+// [STATE] PrintStep enum (from Print.hpp):
+//   psWipeTower → psSkirtBrim → psGCodeExport
+// [STATE] PrintObjectStep enum (from Print.hpp):
+//   posSlice → posPerimeters → posEstimateCurledExtrusions → posPrepareInfill →
+//   posInfill → posIroning → posSupportMaterial → posSimplifyPath →
+//   posSimplifySupportPath → posDetectOverhangsForLift → posSimplifyWall →
+//   posSimplifyInfill
+//
+// [CONCURRENCY] TBB is used for generate_support_material() (parallel_for over objects)
+// and within each PrintObject step for per-layer work. The state_mutex() protects step
+// state transitions (set_started/set_done). Cancellation is checked via throw_if_canceled().
+//
+// [MEMORY] Print owns m_objects (raw PrintObject* vector — manual delete in clear()).
+// m_print_regions (unique_ptr vector). PrintObject holds Layer* raw pointers.
 #include "Config.hpp"
 #include "Exception.hpp"
 #include "Print.hpp"
@@ -89,6 +117,26 @@ bool Print::has_tpu_filament() const
     return false;
 }
 
+// [INTENT] Maps changed config option keys to the minimum set of PrintStep /
+// PrintObjectStep invalidations. This is the heart of the incremental-recompute
+// system: only the steps affected by a changed option are re-run.
+//
+// Design:
+//   - `steps_gcode`: options that only affect G-code text output (temperatures,
+//     speeds, fan curves, start/end scripts). Invalidates only psGCodeExport.
+//   - `steps_ignore`: options with zero effect on output (notes, metadata).
+//   - Everything else: explicitly mapped to the earliest step that must re-run.
+//     A fallback at the end invalidates ALL steps for unknown keys (conservative).
+//
+// [HAZARD] The static sets steps_gcode / steps_ignore are initialized once at first
+// call (Meyers singleton). If the option list grows in a future config schema version,
+// new keys that are not in either set will silently invalidate ALL steps, degrading
+// performance. A refactored tool should use a declarative config schema to drive this.
+//
+// [COUPLING] This function is called by Print::apply() (in PrintApply.cpp) after
+// the config diff. It must stay in sync with the PrintObjectStep enum ordering —
+// invalidating a step automatically cascades to dependent steps via
+// PrintObject::invalidate_step() (see PrintObject.cpp:1348).
 // Called by Print::apply().
 // This method only accepts PrintConfig option keys.
 bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* new_config */, const std::vector<t_config_option_key> &opt_keys)
@@ -2028,6 +2076,40 @@ std::map<ObjectID, unsigned int> getObjectExtruderMap(const Print& print) {
 }
 
 // Slicing process, running at a background thread.
+// [INTENT] Main per-plate slicing pipeline. Drives all PrintObject steps in dependency
+// order, then runs the print-level steps (wipe tower, skirt/brim, G-code export).
+//
+// Two execution modes:
+//   use_cache=false (default): Full slicing. Objects are deduplicated by geometry
+//     (is_print_object_the_same lambda). Only unique objects are processed; duplicates
+//     get their layers copied from the primary object (copy_layers_from_shared_object).
+//   use_cache=true: Post-cache path. Layer data was loaded from disk by load_cached_data().
+//     Only objects that failed to load (re_slicing_objects) are re-sliced. All others
+//     have their steps marked done without executing them.
+//
+// Step execution order (use_cache=false, non-shared objects only):
+//   1. make_perimeters()  → posSlice (calls slice() internally) + posPerimeters
+//   2. estimate_curled_extrusions() → posEstimateCurledExtrusions
+//   3. infill()           → posPrepareInfill + posInfill
+//   4. ironing()          → posIroning
+//   5. generate_support_material() → posSupportMaterial [TBB parallel_for over objects]
+//   6. detect_overhangs_for_lift() → posDetectOverhangsForLift
+//   7. copy_layers_from_shared_object() — propagate to duplicate objects
+//   Then print-level steps:
+//   8. psWipeTower, psSkirtBrim, psGCodeExport
+//
+// [CONCURRENCY] generate_support_material is the only step parallelised across
+// objects (L2187 tbb::parallel_for). All other steps run sequentially over objects
+// but use parallel_for internally over layers.
+//
+// [MEMORY] m_objects is a raw pointer vector; objects are owned by Print.
+// Shared-object copies (copy_layers_from_shared_object) shallow-copy Layer* pointers
+// — both the primary and the shared object point to the same Layer instances.
+// Destruction must happen only once (the primary object owns the layers).
+//
+// [HAZARD] The is_print_object_the_same lambda compares mesh_ptr() by pointer equality
+// for deduplication (L2065). This means a mesh loaded from a different address (e.g.
+// after a reload) will NOT be deduplicated even if geometrically identical.
 void Print::process(long long *time_cost_with_cache, bool use_cache)
 {
     long long start_time = 0, end_time = 0;

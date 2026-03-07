@@ -1,3 +1,27 @@
+// [INTENT] PrintObject.cpp: Represents a single model object within a plate's print.
+// Owns all Layer* and SupportLayer* instances for this object. Implements all
+// PrintObjectStep processing methods (slice, perimeters, infill, support, etc.).
+//
+// Key design points:
+//   - One PrintObject per ModelObject instance placement on the plate. Multiple
+//     instances (copies) of the same object share one PrintObject (via m_instances).
+//   - m_center_offset: translates the object to a coordinate-friendly origin for
+//     Clipper (smaller int32 values = fewer overflow risks in 2D polygon math).
+//   - m_trafo: full 3D transform applied before slicing. XY centering is baked in.
+//   - m_shared_regions: reference-counted, shared between identical PrintObjects
+//     (same geometry) on the same plate. Ref-counted with manual delete (not shared_ptr).
+//
+// [MEMORY] Layer* and SupportLayer* are owned by this object (raw pointers).
+//   clear_layers() / clear_support_layers() perform manual deletion.
+//   m_shared_regions is manually ref-counted (m_ref_cnt, see destructor at L114).
+//
+// [CONCURRENCY] All per-layer operations use tbb::parallel_for over m_layers.
+//   throw_if_canceled() is called inside tight loops to support cancellation.
+//   state_mutex() from PrintBase protects step state transitions.
+//
+// [COUPLING] PrintObject holds a back-pointer to its owning Print (m_print).
+//   Many step methods call m_print->set_status() and m_print->throw_if_canceled().
+//   This creates tight coupling — a refactored tool should inject these as callbacks.
 #include "Exception.hpp"
 #include "Print.hpp"
 #include "BoundingBox.hpp"
@@ -414,6 +438,24 @@ std::vector<std::set<int>> PrintObject::detect_extruder_geometric_unprintables()
 // 1) Merges typed region slices into stInternal type.
 // 2) Increases an "extra perimeters" counter at region slices where needed.
 // 3) Generates perimeters, gap fills and fill regions (fill regions of type stInternal).
+// [INTENT] Drives posSlice (via this->slice()) then posPerimeters.
+// slice() is a prerequisite — make_perimeters() is the public entry point that
+// callers invoke for both steps. If posSlice was already done (set_started returns
+// false) it short-circuits.
+//
+// Perimeter generation for each layer:
+//   1. restore_untyped_slices() — reverting typed surface classification back to raw
+//      slices (required because classify_regions / detect_surfaces_type run before
+//      infill, not before perimeters; typed info is stale on re-run).
+//   2. Extra perimeter loop detection (disabled via BBS comment, always skipped).
+//   3. tbb::parallel_for over layers → PerimeterGenerator or ArachneGenerator
+//      per LayerRegion (depending on config().perimeter_generator).
+//
+// [STATE] m_typed_slices tracks whether restore_untyped_slices() is needed.
+//   Set to false after restoring, set to true after detect_surfaces_type().
+//
+// [COUPLING] Calls m_print->set_status(15, ...) and m_print->throw_if_canceled()
+// — tight coupling to the owning Print for progress reporting and cancellation.
 void PrintObject::make_perimeters()
 {
     // prerequisites
@@ -1345,6 +1387,24 @@ bool PrintObject::invalidate_state_by_config_options(
     return invalidated;
 }
 
+// [INTENT] Implements the step dependency DAG for a PrintObject.
+// Invalidating a step cascades forward to all steps that depend on its output.
+// The cascade rules encode the data-flow DAG:
+//
+//   posSlice → posPerimeters → posPrepareInfill → posInfill → posIroning
+//           ↘ posSupportMaterial → posSimplifySupportPath
+//   posSlice → psSkirtBrim (print-level)
+//   posPerimeters → psSkirtBrim
+//   posInfill → psSkirtBrim
+//   posSupportMaterial → psSkirtBrim
+//   ANY step → psWipeTower + psGCodeExport (wipe tower depends on extruder ordering)
+//
+// [STATE] m_slicing_params.valid is cleared when posSlice or posSupportMaterial is
+// invalidated, forcing SlicingParameters to be recomputed before the next slice.
+//
+// [HAZARD] Every PrintObject step invalidation also triggers psWipeTower invalidation
+// (L1374). This is conservative — many step changes don't affect wipe tower geometry.
+// A refactored tool should track wipe-tower dependencies more selectively.
 bool PrintObject::invalidate_step(PrintObjectStep step)
 {
 	bool invalidated = Inherited::invalidate_step(step);
