@@ -525,3 +525,88 @@ A large block of commented-out C++ at the end of `SupportMaterial.cpp` correspon
 
 1. `src/libslic3r/Support/TreeSupport.cpp` — organic tree support generation (3527 lines)
 2. `src/libslic3r/Support/TreeSupport.hpp`
+
+---
+
+## Session 6 — TreeSupport.cpp + TreeSupport.hpp Full Annotation
+
+### Files Processed
+- `src/libslic3r/Support/TreeSupport.hpp` (~600 lines)
+- `src/libslic3r/Support/TreeSupport.cpp` (~3527 lines)
+
+---
+
+### Key Discoveries
+
+**Organic Mode Bypass**
+`TreeSupport::generate()` checks `smsTreeOrganic` first. If active, it immediately delegates to `generate_tree_support_3D()` (in `TreeSupport3D.cpp`) and returns. `TreeSupport.cpp` only handles `smsTreeSlim`, `smsTreeStrong`, and `smsTreeHybrid` variants.
+
+**`USE_SUPPORT_3D` Macro Hardcoded to 0**
+`#define USE_SUPPORT_3D 0` at the top of the file. Every `#if USE_SUPPORT_3D` branch is dead code. Functions like `get_avoidance()`, `get_collision()`, and `get_collision_polys()` all always take the `#else` path. The dead branches can be removed entirely in a port.
+
+**`SupportNode` Struct**
+Single node in the branch graph. `radius` and `max_move_dist` are `mutable double`, updated lazily. `diameter_angle_scale_factor` is a `static double` — class-wide constant that is **NOT thread-safe** if two `PrintObject` instances are sliced concurrently with different configs.
+
+**`TreeSupportData` — Collision/Avoidance Cache**
+Per-object collision/avoidance cache using `tbb::concurrent_unordered_map<RadiusLayerPair, Polygons>`. `calculate_avoidance()` is recursive, pre-computing layer N-100 to cap call depth. The constructor builds `m_layer_outlines_below` as serial O(N²) cumulative union (FIXME noted in code — should be parallel prefix-sum).
+
+**`detect_overhangs()` — Two-Pass + Timeout Escape**
+Two TBB parallel passes over layers, followed by serial sharp-tail propagation and serial overhang-cluster grouping. Contains a wall-clock timeout escape hatch: if `config_detect_sharp_tails` detection takes >30 seconds, it forcibly disables the flag mid-run. This means prints that approach the timeout threshold may produce inconsistent support depending on machine speed.
+
+**`generate_contact_points()` — Rotated Grid**
+TBB parallel_for. Generates a 22°-rotated grid of candidate contact points over the overhang region. Uses `tbb::spin_mutex` for thread-safe insertion into the shared node list. Grid rotation is a deliberate design choice to avoid aligning with model geometry.
+
+**`plan_layer_heights()` — Negative Sentinel**
+Pre-plans adaptive support layer heights. After planning, remaps contact_nodes to new support layer indices. Uses `node->distance_to_top = -num_layers` as a sentinel encoding a multi-layer gap. All consumers of `distance_to_top` must handle negative values correctly.
+
+**`drop_nodes()` — Fully Serial, O(N²) Hazard**
+The most performance-critical phase. Proceeds top→bottom, one layer at a time (fully serial). Before starting, pre-computes avoidance in a TBB parallel_for. Groups nodes by ExPolygon island ("part"). Uses MST per group to decide merge candidates. Two passes per layer: (1) merge nearby nodes, (2) move nodes toward neighbors/outside. `insert_dropped_node()` uses `std::find` — O(N) per call, making the overall drop O(N²) on dense-support layers.
+
+**`smooth_nodes()` — Laplacian 100 Iterations**
+100 iterations of Laplacian smoothing along each branch chain. Sets `need_extra_wall` flag on nodes that shifted significantly during smoothing.
+
+**`draw_circles()` — TBB Parallel, Dangling Pointer Risk**
+TBB parallel_for over layers. Pre-generates a `branch_circle` polygon (100 vertices normally, 4 vertices if avg_node_per_layer > 200 — performance fallback). After the main loop, a hole-propagation loop uses raw `Polygon*` as keys in `holePropagationInfos` map. If the underlying vector reallocates between iterations, these pointers dangle.
+
+**`generate_toolpaths()` — TBB Parallel**
+TBB parallel_for over non-raft layers. Handles raft layers, raft interface layers, base layers between raft and object, then normal tree support layers. Uses `make_perimeter_and_inner_brim()` for roof/floor interface layers, `make_perimeter_and_infill()` for base layers.
+
+**`TreeSupportProfiler` Global Instance**
+File-scope global `profiler` at line 156. Tracks timing data for the pipeline stages. NOT thread-safe if two `PrintObject` instances are processed concurrently — both would write to the same profiler instance.
+
+**`get_radius()` — Lazy Mutable Cache UB**
+`SupportNode::radius` is `mutable`, computed lazily. If two threads simultaneously read a node with an unset radius, both compute the same value and write it. Practically benign (same value), but technically undefined behavior under the C++ memory model (concurrent write to non-atomic memory without synchronization).
+
+**`create_node()` — Raw lock/unlock**
+Acquires `m_mutex.lock()` at top of function, releases with `m_mutex.unlock()` at bottom. If any exception is thrown between the lock and unlock, the mutex is never released — permanent deadlock. Should be replaced with `std::lock_guard` or `std::scoped_lock`.
+
+**`_make_loops()` Concentric Shrinking**
+Generates concentric wall loops by iteratively shrinking ExPolygons using `offset2_ex` (shrink + expand to prevent topology collapse). Stops when the shrunk result is empty.
+
+**`move_out_expolys()` Dead Variable**
+Local variable `from0` is assigned at the start of the function but is never referenced again after the assignment. Dead code.
+
+**`avoid_object_remove_extra_small_parts()`**
+After clipping a candidate support circle against the avoidance region, keeps only the single largest ExPolygon. Small satellite fragments are discarded to prevent spurious tiny support islands.
+
+**`move_bounds_to_contact_nodes()`**
+Bridge function from TreeSupport3D organic mode back into this class's node graph — used purely for preview/visualization purposes, not for actual toolpath generation.
+
+**`calc_branch_radius()` Two Overloads**
+One takes layer count, one takes mm distance. Both implement the same taper logic: `slim` mode doubles the `tip_layers` taper range. Both clamp output to `[MIN_BRANCH_RADIUS, MAX_BRANCH_RADIUS]`.
+
+---
+
+### Open Questions (Session 6)
+
+1. `[UNCLEAR]` `diameter_angle_scale_factor` static — is multi-object concurrent slicing with different tree-support configs actually supported? If so, this is a silent correctness bug, not just a theoretical hazard.
+2. `[UNCLEAR]` `holePropagationInfos` map with `Polygon*` keys — the vector being pointed into is `branch_circle` variants pre-computed per node. Is the vector guaranteed not to reallocate between the main loop and the hole-propagation loop? Needs confirmation.
+3. `[UNCLEAR]` `plan_layer_heights()` negative sentinel — which downstream consumers of `distance_to_top` check for negatives? Any that skip the check could misinterpret a gap-encoded node as a normally-positioned node.
+4. `[UNCLEAR]` `config_detect_sharp_tails` timeout at 30s — what happens to the already-processed layers when the flag is disabled? The partial state may leave some layers with sharp-tail annotations and others without, producing mixed output.
+
+---
+
+### Next Annotation Targets
+
+1. `src/libslic3r/Support/TreeSupport3D.cpp` — organic 3D tree support (delegated from TreeSupport.cpp for smsTreeOrganic)
+2. `src/libslic3r/GCode/PressureEqualizer.cpp` — linear advance / pressure equalizer post-processor

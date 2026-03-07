@@ -349,6 +349,121 @@ The combined function strongly biases seam placement toward concave features (th
 
 ---
 
+## 9. TreeSupport Pipeline Algorithm (Session 6 Details)
+
+**File:** [`src/libslic3r/Support/TreeSupport.cpp`](../src/libslic3r/Support/TreeSupport.cpp)
+**Header:** [`src/libslic3r/Support/TreeSupport.hpp`](../src/libslic3r/Support/TreeSupport.hpp)
+
+### Pipeline Overview
+
+`TreeSupport::generate()` runs 7 serial stages:
+
+```
+detect_overhangs()
+  → generate_contact_points()
+    → plan_layer_heights()
+      → drop_nodes()
+        → smooth_nodes()
+          → draw_circles()
+            → generate_toolpaths()
+```
+
+`smsTreeOrganic` short-circuits immediately to `generate_tree_support_3D()` (TreeSupport3D.cpp). Only `smsTreeSlim`, `smsTreeStrong`, `smsTreeHybrid` run this pipeline.
+
+### Stage 1 — `detect_overhangs()`
+
+- Two TBB `parallel_for` passes over all layers.
+- Serial pass: sharp-tail propagation (bottom-up, layer by layer).
+- Serial pass: overhang-cluster grouping (`OverhangCluster` O(N²) scan).
+- **Timeout escape hatch**: if sharp-tail detection exceeds 30 wall-clock seconds, `config_detect_sharp_tails` is disabled mid-run. Partial state may leave some layers with annotations and others without.
+
+### Stage 2 — `generate_contact_points()`
+
+- TBB `parallel_for` over overhang layers.
+- Generates candidate contact points on a 22°-rotated grid over the overhang polygon.
+- Grid rotation deliberately avoids alignment with model geometry.
+- `tbb::spin_mutex` guards insertion into shared node list.
+
+### Stage 3 — `plan_layer_heights()`
+
+- Computes adaptive support layer heights.
+- Remaps `contact_nodes` to new support layer indices after planning.
+- **Negative sentinel**: `node->distance_to_top = -num_layers` encodes a multi-layer gap. Any consumer of `distance_to_top` must handle negative values.
+
+### Stage 4 — `drop_nodes()` (Performance Critical)
+
+The most CPU-intensive stage. Proceeds **fully serial** top→bottom.
+
+Pre-computation phase (parallel):
+- TBB `parallel_for` pre-computes avoidance radii for all layers.
+
+Per-layer serial phases:
+1. Group nodes by ExPolygon island ("part").
+2. Compute MST per group to find merge candidates.
+3. **Pass 1**: Merge nodes closer than `merge_radius`.
+4. **Pass 2**: Move nodes toward neighbors and/or toward exterior.
+
+**`insert_dropped_node()` O(N²) hazard**: uses `std::find` — O(N) per call — making the full drop O(N²) on layers with many support nodes.
+
+### Stage 5 — `smooth_nodes()`
+
+- 100 Laplacian smoothing iterations per branch chain.
+- Sets `need_extra_wall` flag on nodes displaced beyond a threshold.
+
+### Stage 6 — `draw_circles()`
+
+- TBB `parallel_for` over layers.
+- Generates `branch_circle` polygon:
+  - 100 vertices normally.
+  - 4 vertices if `avg_node_per_layer > 200` (performance fallback for very dense support).
+- After main TBB loop: serial hole-propagation loop uses raw `Polygon*` as map keys — **dangling pointer risk** if the vector backing those pointers reallocates.
+- Optional lightning infill generation in global mode.
+
+### Stage 7 — `generate_toolpaths()`
+
+- TBB `parallel_for` over non-raft layers.
+- Handles: raft layers, raft interface layers, base layers between raft and object, then tree support layers.
+- `make_perimeter_and_inner_brim()` for roof/floor interface layers.
+- `make_perimeter_and_infill()` for base layers.
+
+### `TreeSupportData` — Collision/Avoidance Cache
+
+```
+tbb::concurrent_unordered_map<RadiusLayerPair, Polygons>
+  m_collision_cache
+  m_avoidance_cache
+```
+
+- `calculate_collision()` / `calculate_avoidance()`: recursive, capped at depth 100 via pre-computing layer N-100.
+- Constructor builds `m_layer_outlines_below` as serial O(N²) cumulative union.
+- `ceil_radius()`: snaps radius to the nearest pre-defined step to maximize cache hit rate.
+
+### `calc_branch_radius()` — Taper Profile
+
+Two overloads (layer-count-based and mm-based):
+```
+if layer < tip_layers:
+    radius = min_radius + (target_radius - min_radius) × (layer / tip_layers)
+else:
+    radius = target_radius + (layer - tip_layers) × diameter_angle_scale_factor
+```
+- `slim` mode doubles the `tip_layers` range (slower taper).
+- Output clamped to `[MIN_BRANCH_RADIUS, MAX_BRANCH_RADIUS]`.
+
+### Complexity Summary
+
+| Stage | Parallelism | Complexity | Notes |
+|-------|-------------|------------|-------|
+| detect_overhangs | TBB parallel_for (2 passes) | O(L × P) | L=layers, P=polygon ops per layer |
+| generate_contact_points | TBB parallel_for | O(L × A/g²) | A=overhang area, g=grid spacing |
+| plan_layer_heights | Serial | O(L) | simple height planning |
+| drop_nodes | Serial (avoidance: TBB) | O(L × N²) worst case | N=nodes per layer; insert_dropped_node O(N) |
+| smooth_nodes | Serial | O(100 × chains × len) | 100 Laplacian iterations |
+| draw_circles | TBB parallel_for | O(L × N × V) | V=vertices per circle |
+| generate_toolpaths | TBB parallel_for | O(L × N) | per-layer polygon ops |
+
+---
+
 ## 8. WipeTower2 Planning Algorithm (Session 4 Details)
 
 **File:** [`src/libslic3r/GCode/WipeTower2.cpp`](../src/libslic3r/GCode/WipeTower2.cpp)

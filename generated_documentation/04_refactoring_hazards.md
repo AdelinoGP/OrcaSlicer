@@ -682,3 +682,171 @@ These are not exposed as config options. A model with unusual geometry (very thi
 | `SUPPORT_USE_AGG_RASTERIZER` dead path | Low | Low | P3 |
 | Sharp-tail non-configurable constants | Low | Low | P3 |
 | Commented-out Perl-era dead code | Low | Low | P3 |
+
+---
+
+## Session 6 — TreeSupport Hazards
+
+### 40. `SupportNode::diameter_angle_scale_factor` Static — Multi-Object Race Condition
+
+**Location:** `src/libslic3r/Support/TreeSupport.hpp` — `SupportNode` struct.
+
+**Hazard:** `diameter_angle_scale_factor` is declared `static double`. This is a class-wide variable shared across all `SupportNode` instances. If OrcaSlicer ever slices two `PrintObject` instances concurrently with different tree-support angle configurations, whichever thread writes last wins — the other object silently uses the wrong value.
+
+**Translation risk:** A port that parallelizes per-object slicing would trigger this race. The fix is to make this an instance variable or pass it explicitly through the call chain.
+
+**Mitigation:** Convert to a non-static instance member; initialize it in `SupportNode`'s constructor from a config parameter.
+
+---
+
+### 41. `TreeSupportProfiler` File-Scope Global — Not Thread-Safe
+
+**Location:** `src/libslic3r/Support/TreeSupport.cpp` — line ~156 `TreeSupportProfiler profiler;`
+
+**Hazard:** `profiler` is a file-scope (translation-unit global) instance of `TreeSupportProfiler`. Multiple concurrent `PrintObject` slicing operations all write to this same profiler. Timing data from interleaved operations will be corrupted, and any non-atomic write to shared members may produce UB.
+
+**Translation risk:** In any port that parallelizes multi-object slicing, this global must be removed or replaced with per-object instances or TLS.
+
+**Mitigation:** Pass a `profiler` reference as a parameter to `TreeSupport::generate()` or use `thread_local` storage.
+
+---
+
+### 42. `USE_SUPPORT_3D` Macro Hardcoded to 0 — Dead Code Throughout
+
+**Location:** `src/libslic3r/Support/TreeSupport.cpp` — top of file `#define USE_SUPPORT_3D 0`.
+
+**Hazard:** Every `#if USE_SUPPORT_3D` block in the file is permanently dead code. This includes alternate implementations of `get_avoidance()`, `get_collision()`, `get_collision_polys()`, and `SupportNode` usage patterns. The dead branches may contain outdated or incorrect logic that would confuse a port author.
+
+**Translation risk:** A naïve port may translate the dead branches as if they were active alternatives, leading to ambiguity about the correct implementation.
+
+**Mitigation:** Delete all `#if USE_SUPPORT_3D` dead branches before porting. The active `#else` path is the only one that matters.
+
+---
+
+### 43. `insert_dropped_node()` O(N) std::find — O(N²) Hazard on Dense Layers
+
+**Location:** `src/libslic3r/Support/TreeSupport.cpp` — `insert_dropped_node()`.
+
+**Hazard:** `insert_dropped_node()` calls `std::find` to check for duplicates before inserting a node into a `std::vector`. This is O(N) per insertion. `drop_nodes()` calls this for every node on every layer, making the total `drop_nodes()` phase O(L × N²) where N is the number of nodes per layer. For models with many support contacts, this is a significant performance bottleneck.
+
+**Translation risk:** A port that reproduces the same data structure (linear scan vector) will inherit the same quadratic behavior.
+
+**Mitigation:** Replace the `std::vector` + `std::find` combination with an `std::unordered_set` for O(1) duplicate detection.
+
+---
+
+### 44. `calculate_avoidance()` Deep Recursion — Stack Depth Risk
+
+**Location:** `src/libslic3r/Support/TreeSupportData` — `calculate_avoidance()`.
+
+**Hazard:** `calculate_avoidance()` is recursive: to compute avoidance for layer N, it calls itself for layer N-1. The code pre-computes layer N-100 first to cap the recursion depth. However, if pre-computation is bypassed or the cache miss triggers a re-entry, the call stack can grow to depth 100. On platforms with small default stacks (e.g., 1 MB), this is borderline safe at 100 frames but becomes a risk with any additional nesting from callers.
+
+**Translation risk:** Languages with limited stack sizes (e.g., Java default 512 KB, JavaScript) will need this rewritten as an iterative bottom-up computation.
+
+**Mitigation:** Rewrite as iterative, processing layers bottom-up and populating the cache in order.
+
+---
+
+### 45. `m_layer_outlines_below` Serial O(N²) Cumulative Union in Constructor
+
+**Location:** `src/libslic3r/Support/TreeSupportData` constructor.
+
+**Hazard:** `m_layer_outlines_below[i]` = union of all object outlines from layer 0 to layer i. This is computed serially: each layer's entry depends on the layer below. For a 500-layer print, this is 500 union operations in sequence, and each union operation itself is potentially O(P) where P is polygon complexity. The FIXME comment in the code acknowledges this should be a parallel prefix-sum but is not.
+
+**Translation risk:** Identical to the `buildplate_covered()` hazard in `SupportMaterial.cpp` (Hazard 36).
+
+**Mitigation:** Parallel prefix-sum: compute all intermediate unions in O(log N) rounds using a binary-tree reduction.
+
+---
+
+### 46. `config_detect_sharp_tails` Timeout Disables Detection Mid-Parallel-Run
+
+**Location:** `src/libslic3r/Support/TreeSupport.cpp` — `detect_overhangs()`.
+
+**Hazard:** A wall-clock timer runs during sharp-tail detection. If 30 seconds elapse before all layers are processed, `config_detect_sharp_tails` is set to `false` and detection stops. This means:
+- Layers processed before the timeout have sharp-tail annotations.
+- Layers processed after the timeout do not.
+- The output is non-deterministic — the same model on a faster machine may produce different support structures.
+
+**Translation risk:** Any port that reproduces this timeout logic will inherit the same non-determinism. A port that removes the timeout may be significantly slower on complex models.
+
+**Mitigation:** Either remove the timeout and accept the latency, or abort the detection entirely (rather than partial application) when the timeout triggers, then disable sharp-tail for the full run.
+
+---
+
+### 47. `plan_layer_heights()` Negative Sentinel for Multi-Layer Gap
+
+**Location:** `src/libslic3r/Support/TreeSupport.cpp` — `plan_layer_heights()`.
+
+**Hazard:** `node->distance_to_top = -num_layers` is used as a sentinel value indicating that a support node spans multiple adaptive layers (a "gap node"). The field's type is presumably numeric, and negative values encode special semantics. Any consumer of `distance_to_top` that does not explicitly check for negative values will misinterpret gap nodes as nodes at positive layer positions.
+
+**Translation risk:** In a port with a typed enum or domain-restricted integer, this sentinel encoding would be illegal. The semantics must be made explicit.
+
+**Mitigation:** Replace the negative sentinel with a dedicated `bool is_gap_node` field or a `std::optional<int>` distance.
+
+---
+
+### 48. `draw_circles()` Hole-Propagation Loop — Dangling `Polygon*` Keys
+
+**Location:** `src/libslic3r/Support/TreeSupport.cpp` — `draw_circles()` post-main-loop hole-propagation.
+
+**Hazard:** After the main TBB parallel_for loop, a serial hole-propagation loop builds a `std::map<Polygon*, HolePropagationInfo>`. The keys are raw `Polygon*` pointers into vectors that were populated during the main loop. If any of those vectors reallocate between the main loop and the serial loop, the pointer keys dangle. The current code likely avoids this by reserving vector capacity upfront, but this is a fragile invariant with no explicit assertion or comment.
+
+**Translation risk:** A port that modifies the vector population strategy (e.g., uses different append patterns) may silently introduce use-after-free.
+
+**Mitigation:** Replace raw pointer keys with stable identifiers (e.g., layer + node index pair), or restructure to avoid the two-phase pointer pattern entirely.
+
+---
+
+### 49. `get_radius()` Lazy Mutable Cache — Technically UB Data Race
+
+**Location:** `src/libslic3r/Support/TreeSupport.hpp` — `SupportNode::get_radius()`.
+
+**Hazard:** `radius` is declared `mutable`. `get_radius()` checks if `radius == 0`, computes it if so, and stores the result. If two threads simultaneously call `get_radius()` on the same node with `radius == 0`, both compute the same value and write it to the same memory location without synchronization. The value written is always the same (the computation is deterministic), so the result is practically correct. However, concurrent write to a non-atomic variable without synchronization is undefined behavior under the C++ memory model.
+
+**Translation risk:** Languages with strict memory models (Java, Rust) would require either `AtomicDouble` or a mutex here.
+
+**Mitigation:** Add `std::atomic<double>` with a compare-exchange pattern, or use a mutex around the lazy initialization.
+
+---
+
+### 50. `create_node()` Raw Mutex lock/unlock — Exception-Safety Deadlock Risk
+
+**Location:** `src/libslic3r/Support/TreeSupportData::create_node()`.
+
+**Hazard:** `m_mutex.lock()` is called at the top of `create_node()`, and `m_mutex.unlock()` is called at the bottom. If any exception is thrown between the lock and unlock (e.g., from a memory allocation inside the node construction), `unlock()` is never reached, and the mutex remains locked permanently — deadlocking all future threads that try to acquire it.
+
+**Translation risk:** In Rust, this pattern is impossible (RAII enforced). In Go, it is idiomatic to use `defer`. In Java/C#, a `finally` block is required. Any port must address this.
+
+**Mitigation:** Replace with `std::lock_guard<std::mutex> guard(m_mutex);` for RAII-safe automatic unlock.
+
+---
+
+### 51. `move_out_expolys()` Dead Variable `from0`
+
+**Location:** `src/libslic3r/Support/TreeSupport.cpp` — `move_out_expolys()`.
+
+**Hazard:** Local variable `from0` is assigned at the beginning of the function and is never referenced again. It represents dead code — likely a leftover from a refactoring where the logic was changed but the variable was not removed.
+
+**Translation risk:** Minor. A port author may incorrectly infer that `from0` carries semantic meaning and attempt to use it.
+
+**Mitigation:** Delete the `from0` variable. Run with compiler warnings enabled (`-Wunused-variable`) to catch similar issues across the codebase before porting.
+
+---
+
+### Updated Risk Matrix (Session 6 additions)
+
+| Hazard | Severity | Difficulty to Port | Priority |
+|--------|----------|--------------------|----------|
+| `diameter_angle_scale_factor` static race | High | Low | P1 |
+| `insert_dropped_node()` O(N²) hazard | High | Medium | P1 |
+| `create_node()` raw lock/unlock deadlock risk | High | Low | P1 |
+| `TreeSupportProfiler` global not thread-safe | High | Low | P1 |
+| `holePropagationInfos` dangling Polygon* keys | High | Medium | P1 |
+| `config_detect_sharp_tails` timeout non-determinism | Medium | Medium | P2 |
+| `plan_layer_heights()` negative sentinel | Medium | Low | P2 |
+| `calculate_avoidance()` deep recursion | Medium | Medium | P2 |
+| `m_layer_outlines_below` serial O(N²) | Medium | Medium | P2 |
+| `get_radius()` mutable UB data race | Low | Low | P3 |
+| `USE_SUPPORT_3D 0` dead code throughout | Low | Low | P3 |
+| `move_out_expolys()` dead variable `from0` | Low | Low | P3 |
