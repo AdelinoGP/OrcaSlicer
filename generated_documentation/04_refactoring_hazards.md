@@ -1156,3 +1156,84 @@ All six cache accessors (`getCollision`, `getAvoidance`, `getPlaceableAreas`, `g
 | 70 | Hardcoded pipeline constants (128, 3mm, 10 mm³/min) | PressureEqualizer.cpp | Low | P3 |
 | 71 | `processing_last_mesh` bug — anti_overhang never applied (single mesh) | TreeModelVolumes.cpp | High | P1 |
 | 72 | `const_cast` lazy cache pattern defeats const-correctness | TreeModelVolumes.cpp | Medium | P2 |
+
+---
+
+## TriangleMeshSlicer.cpp Hazards (Session 9)
+
+### Hazard 73 — Dual `slice_facet` / `slice_facet_for_cut_mesh` Divergence
+
+**File:** `src/libslic3r/TriangleMeshSlicer.cpp` (~line 216 and ~line 383)
+**Severity:** Medium
+
+Two nearly-identical functions handle triangle-plane intersection: `slice_facet()` uses bit-exact float equality (`==`) for vertex-on-plane detection, while `slice_facet_for_cut_mesh()` uses `is_equal()` with a 1e-3 mm epsilon. Both implement the same conceptual algorithm but have diverged in their epsilon handling, edge-ID assignment, and some degenerate-case branches. Any bug fix or behavioural improvement applied to one is very likely to be needed in the other. A refactor should unify them into a single templated or parameterized function with an epsilon policy parameter.
+
+**Mitigation:** Extract shared logic into a single `slice_facet_impl<EpsilonPolicy>()` template. The `cut_mesh()` path uses epsilon for better robustness on real meshes with floating-point near-misses; the normal slicing path uses exact equality for determinism. Both policies should coexist cleanly under a single implementation.
+
+---
+
+### Hazard 74 — Hardcoded 2mm Gap in `chain_open_polylines_close_gaps()`
+
+**File:** `src/libslic3r/TriangleMeshSlicer.cpp` (~line 1407)
+**Severity:** Low
+
+The third-pass open-polyline stitcher uses a hardcoded maximum gap of 2mm (passed as `max_gap` from `make_loops()`). This value is not derived from any mesh quality metric or user setting. For very fine-detail meshes or meshes with deliberate thin walls close to but not touching, this may incorrectly bridge across intentional gaps. For very coarse or damaged meshes, 2mm may be insufficient.
+
+**Mitigation:** Expose this as a `MeshSlicingParams` field with a default of 2mm, or derive it from the layer height × a scale factor.
+
+---
+
+### Hazard 75 — `triangulate_slice()` O(N²) Vertex Lookup
+
+**File:** `src/libslic3r/TriangleMeshSlicer.cpp` (`triangulate_slice()`, ~line 2411)
+**Severity:** Medium
+
+The triangulation pass inside `triangulate_slice()` performs a 4-pass vertex lookup for each new cap triangle vertex:
+1. Linear scan of `section_vertices_map` (O(V_section))
+2. Forward scan from `lower_bound` in sorted `map_vertex_to_index` using `is_equal()` (O(V_section) worst case)
+3. Backward scan from `lower_bound` (O(V_section) worst case)
+4. Linear scan of newly added cap vertices (O(V_cap))
+
+For a mesh cut that produces N intersection vertices, this yields O(N²) per `triangulate_slice()` call. In practice the intersection vertex count is small (typically hundreds), but for meshes with many coplanar faces at the cut height, this degrades significantly.
+
+**Mitigation:** Replace pass 1 with an O(1) hash map. Passes 2/3 could be replaced by a spatial hash or sorted range with true O(log N) lookup once the epsilon comparison is encapsulated.
+
+---
+
+### Hazard 76 — `slice_facet()` Zero-Length Edges From Integer Rounding
+
+**File:** `src/libslic3r/TriangleMeshSlicer.cpp` (`slice_facet()`, ~line 335)
+**Severity:** Medium
+
+A `// FIXME` comment at this location acknowledges that when two interpolated intersection points round to the same integer scaled coordinate, a zero-length `IntersectionLine` segment is produced. This degenerate line is passed into `chain_lines_by_triangle_connectivity()`, where it can create a zero-area loop or break the stitching chain. The FIXME has been present since the PrusaSlicer codebase and is not yet resolved. The exact trigger requires two edges of the same triangle to intersect the Z plane at XY positions within 1 scaled unit (1e-6 mm) of each other — extremely rare in practice but possible for very thin triangles.
+
+**Mitigation:** Filter zero-length IntersectionLines immediately after `slice_facet()` returns, before adding to the `IntersectionLines` output vector.
+
+---
+
+### Hazard 77 — Mixed Scaled/Unscaled Z Contract Between Callers
+
+**File:** `src/libslic3r/TriangleMeshSlicer.cpp` (all public API functions)
+**Severity:** High
+
+The slicing API has a subtle and undocumented coordinate contract:
+- `slice_mesh()` / `slice_mesh_ex()` / `slice_mesh_slabs()` / `project_mesh()`: accept **unscaled Z** (mm float) in their `zs` parameter vectors.
+- Inside `slice_facet()`: XY coordinates are **scaled** (`coord_t`, ×1e6), but Z is **unscaled** (mm float).
+- Inside `cut_mesh()`: the `z` parameter is **unscaled** mm float.
+- `transform_mesh_vertices_for_slicing()`: scales XY only, leaves Z as-is.
+
+This asymmetry means a caller passing a scaled Z value (e.g., `scale_(layer_z)`) to `slice_mesh()` will produce geometrically nonsensical results with no runtime error or assertion. The asymmetry exists for numerical reasons (Z comparisons use float arithmetic with EPSILON, XY uses integer arithmetic for exactness), but it is not enforced by the type system.
+
+**Mitigation:** Introduce strongly-typed wrappers: `ScaledCoord` for XY integer coordinates and `UnscaledZ` (or just `float`) for Z, and enforce at all public API boundaries. Alternatively, document the contract prominently at each function signature with a `// Z is UNSCALED mm float` comment.
+
+---
+
+## Summary Table (Hazards 73–77)
+
+| # | Hazard | File | Severity | Priority |
+|---|--------|------|----------|----------|
+| 73 | Dual `slice_facet`/`slice_facet_for_cut_mesh` divergence | TriangleMeshSlicer.cpp | Medium | P2 |
+| 74 | Hardcoded 2mm gap in `chain_open_polylines_close_gaps()` | TriangleMeshSlicer.cpp | Low | P3 |
+| 75 | `triangulate_slice()` O(N²) vertex lookup | TriangleMeshSlicer.cpp | Medium | P2 |
+| 76 | Zero-length edges from integer rounding in `slice_facet()` | TriangleMeshSlicer.cpp | Medium | P2 |
+| 77 | Mixed scaled/unscaled Z contract at public API boundaries | TriangleMeshSlicer.cpp | High | P1 |

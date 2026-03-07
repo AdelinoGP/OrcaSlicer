@@ -768,3 +768,146 @@ The constructor populates `m_anti_overhang` from `slice_support_blockers()`. Due
 3. `src/libslic3r/GCode/GCodeProcessor.cpp` — G-code simulation and statistics
 4. `src/libslic3r/GCode/FanMover.cpp` — fan control post-processor
 5. `src/libslic3r/Arachne/` — variable-width perimeter engine internals
+
+---
+
+## Session 9
+
+**Date:** 2026-03-07
+**Branch:** agent/analysis
+**Files annotated:** `src/libslic3r/TriangleMeshSlicer.cpp` (final 4 functions — full file now complete)
+**Commits this session:** 1 source annotation commit, 1 docs commit
+
+### Scope
+
+Session 9 completed the full annotation of `TriangleMeshSlicer.cpp`. The previous session had annotated all functions up through `slice_mesh_ex()`; this session covered the remaining four public/private functions at the bottom of the file:
+
+- `slice_mesh_slabs()` — the slab-projection public API
+- `triangulate_slice()` — private cap-triangulation helper for `cut_mesh()`
+- `project_mesh()` (both overloads) — thin wrappers over `slice_mesh_slabs()`
+- `cut_mesh()` — full mesh-splitting at a Z plane
+
+Additionally: Hazards 73–77 were appended to `04_refactoring_hazards.md`.
+
+---
+
+### Annotations Added — Session 9
+
+#### `slice_mesh_slabs()` (line ~2302 after Session 8 annotations)
+
+**What it does:** Public API for producing per-slab top-facing and/or bottom-facing polygon projections. Given N+1 Z boundaries, produces N slabs. Each slab captures the XY footprint of all upward-facing triangles (for `out_top`) or downward-facing triangles (for `out_bottom`).
+
+**Key architecture notes:**
+- `FaceOrientation` classification happens in `slice_mesh_slabs()` itself (not in the helper), because it requires the `mirrored_sign` correction. The cross-product sign is computed in integer arithmetic (`int64_t`) from scaled XY coordinates to avoid float precision issues.
+- `vertical_points` is a BBS addition: collects (center, normal) for all `FaceOrientation::Vertical` faces for use by seam placement and support contact detection.
+- `slice_slabs_make_lines()` (not annotated this session — it's a large TBB-parallel helper) is the workhorse; the outer function orchestrates setup and calls `make_slab_loops<true/false>()` for final loop assembly.
+- Memory: `vertices_transformed` is a full copy of the vertex array (XY scaled, Z unscaled). For a 1M-vertex mesh this is ~12MB of temporary allocation.
+
+**[HAZARD noted]:** The `vertical_points` normalization call (`normalized()`) is not guarded against zero-length vectors. A face that mis-classifies as `Vertical` due to floating-point borderline cross-product would produce NaN normals. The adjacent `Degenerate` guard should prevent this but it's not explicitly checked.
+
+---
+
+#### `triangulate_slice()` (line ~2411 after annotations)
+
+**What it does:** Post-processes a half-mesh produced by `cut_mesh()` to: (1) deduplicate vertices added at the cut plane, (2) optionally fill the open cap with triangulated polygons.
+
+**Key architecture notes:**
+
+**Deduplication pass (always runs):**
+- Builds `map_vertex_to_index`: sorted array of (XY position → vertex index) for all cut-plane vertices.
+- Groups entries by `is_equal()` epsilon proximity; all duplicates within the group get remapped to the lowest-index representative.
+- Walks all face indices and remaps; drops faces that become degenerate (two or more identical indices).
+
+**Triangulation pass (when `triangulate == true`):**
+- Calls `make_expolygons_simple(lines)` to form ExPolygons from the cut-plane intersection lines.
+- Calls `triangulate_expolygons_3d()` to get the flat triangle vertex list.
+- For each triangle vertex, performs a **4-pass lookup**:
+  1. `section_vertices_map` (BBS addition): O(N) scan of original vertices exactly on the cut plane.
+  2. Forward scan from `lower_bound` in `map_vertex_to_index` using `is_equal()`.
+  3. Backward scan from `lower_bound` (handles sort edge cases).
+  4. Linear scan of newly added cap vertices (`idx_vertex_new_first`..end).
+  5. Fallback: insert new vertex (should be rare).
+- Appends non-degenerate triangles to `its.indices`.
+- Calls `its_compactify_vertices()` at the end to remove unreferenced vertices.
+
+**Design insight:** The reason for the `section_vertices_map` (BBS addition) is that original mesh vertices that exactly hit the cut plane are not added to `slice_vertices` by the caller (since no edge interpolation occurs for them). Without this map, the triangulator would fail to match those vertices and insert spurious duplicates.
+
+---
+
+#### `project_mesh()` (lines ~2546 and ~2562 after annotations)
+
+**What it does:** Thin wrapper over `slice_mesh_slabs()` that uses a single Z slab spanning `[-1e10, 1e10]` to capture the entire mesh. The first element of the top result and the last element of the bottom result give the full XY shadow of the mesh from above and below respectively.
+
+**Two overloads:**
+- `void project_mesh(mesh, trafo, out_top, out_bottom, cancel)` — writes to two separate output Polygon vectors.
+- `Polygons project_mesh(mesh, trafo, cancel)` — returns `union_(top.front(), bottom.back())` for the complete 2D silhouette.
+
+**Usage:** Raft/brim outline generation, support pillar collision detection, bounding footprint queries.
+
+---
+
+#### `cut_mesh()` (line ~2573 after annotations)
+
+**What it does:** Splits a triangle mesh at a horizontal Z plane into upper and/or lower halves, each as a new `indexed_triangle_set`. Optionally fills the cut caps with triangulated polygons (`triangulate_caps` flag).
+
+**Algorithm:**
+1. Pre-scan all faces; build `section_vertices_map` for vertices exactly at Z (BBS addition).
+2. For each face:
+   - Entirely above Z → copy to upper unchanged.
+   - Entirely below Z → copy to lower unchanged.
+   - Straddling Z → call `slice_facet_for_cut_mesh()` to compute intersection line; then dispatch into 2–3 sub-triangles based on `is_new_vertex_v0v1` / `is_new_vertex_v2v0` booleans.
+3. Collect intersection lines into `upper_lines` / `lower_lines` and `upper_slice_vertices` / `lower_slice_vertices`.
+4. Call `triangulate_slice()` on each half to deduplicate + optionally cap.
+
+**BBS additions:**
+- `isolated_vertex_option`: fallback for degenerate triangles where a vertex exactly on the cut plane makes the "isolated vertex" ambiguous. The `calc_isolated_vertex` lambda validates against intersection line edge IDs.
+- `section_vertices_map`: passed through to `triangulate_slice()` for first-pass vertex lookup.
+
+**Coordinate contract:** Input uses unscaled mm float for vertex positions. The `z` parameter is unscaled mm float. Inside the straddling-face block, XY is temporarily scaled to `coord_t` for `slice_facet_for_cut_mesh()`, then the intersection points are `unscale()`d back to mm float for the new vertex positions. This scale/unscale round-trip introduces a small error (relative to direct float interpolation) but ensures consistency with the main slicing pipeline's numeric regime.
+
+**No cancellation callback** — unlike `slice_mesh()`, `cut_mesh()` provides no way for the caller to interrupt a long-running operation. For very large meshes this can block the calling thread.
+
+---
+
+### Hazards Added — Session 9
+
+| # | Hazard | Severity |
+|---|--------|----------|
+| 73 | Dual `slice_facet`/`slice_facet_for_cut_mesh` logic divergence | Medium |
+| 74 | Hardcoded 2mm gap in open-polyline stitcher | Low |
+| 75 | `triangulate_slice()` O(N²) vertex lookup | Medium |
+| 76 | Zero-length edges from integer rounding (FIXME comment) | Medium |
+| 77 | Mixed scaled/unscaled Z contract at all public API boundaries | High |
+
+---
+
+### Key Findings — Session 9
+
+1. **`cut_mesh()` has no cancellation** — This is a regression risk if cut operations are ever moved to the main thread or exposed more heavily in the UI (e.g., mesh repair tools). Recommend adding `throw_on_cancel` parity with `slice_mesh()`.
+
+2. **`section_vertices_map` is an O(N) scan, not an O(1) map** — The name is misleading. It is a `std::map<int, Vec3f>` keyed by vertex index but iterated linearly with `is_equal()` comparisons inside the triangulation loop. Rename or restructure for clarity.
+
+3. **scale/unscale round-trip in `cut_mesh()`** — Intersection vertex positions are computed by `slice_facet_for_cut_mesh()` in scaled integer space, then unscaled back to float. This double conversion (`float → int → float`) introduces ~1e-6 mm error per coordinate. For normal cut operations this is harmless, but for meshes that require watertight caps (e.g., FFF support interfaces), this may produce barely-open edges that defeat the `its_num_open_edges` debug assertion.
+
+4. **TriangleMeshSlicer.cpp fully annotated** — All 30+ functions and structs in this 2809-line file now carry [INTENT]/[STATE]/[HAZARD]/[COUPLING]/[MEMORY]/[CONCURRENCY] annotations. This completes the most complex file in the slicing pipeline.
+
+---
+
+### Open Questions (Session 9)
+
+1. `[UNCLEAR]` `slice_slabs_make_lines()` (lines ~700–1050, not annotated this session) — the large internal TBB helper that does the per-face slab intersection. Its interaction with `face_neighbors` and `face_edge_ids` for topological edge stitching is complex and would benefit from a dedicated annotation pass in a future session.
+
+2. `[UNCLEAR]` `remove_tangent_edges()` (~line 1051) — removes edges that are tangent to the slicing plane from the IntersectionLines set before loop-building. The exact definition of "tangent" here and why it's needed before stitching but not before open-polyline recovery is not fully clear from the code comments.
+
+3. `[UNCLEAR]` Why does `cut_mesh()` use `slice_facet_for_cut_mesh()` (epsilon-based) while `slice_mesh()` uses `slice_facet()` (bit-exact)? The epsilon version was presumably introduced to handle real-world meshes with near-plane vertices, but this asymmetry is undocumented. Are there cases where bit-exact would be preferred for cut operations?
+
+---
+
+### Next Annotation Targets (Session 10+)
+
+1. `src/libslic3r/GCode/AvoidCrossingPerimeters.cpp` — travel path optimization (Seam-adjacent travel avoidance, contour following)
+2. `src/libslic3r/GCode/GCodeProcessor.cpp` — G-code simulation/statistics (large file, ~5000 lines)
+3. `src/libslic3r/GCode/FanMover.cpp` — fan control post-processor
+4. `src/libslic3r/GCode/AdaptivePAProcessor.cpp` — adaptive pressure advance
+5. `src/libslic3r/Arachne/` directory — variable-width perimeter internals
+6. `slice_slabs_make_lines()` back-fill annotation (within TriangleMeshSlicer.cpp)
