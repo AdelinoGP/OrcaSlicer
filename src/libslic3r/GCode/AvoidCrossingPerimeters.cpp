@@ -1,3 +1,54 @@
+// [INTENT] AvoidCrossingPerimeters.cpp — Travel-path planner that routes nozzle moves along
+// perimeter contours instead of cutting across them, minimising stringing and ooze artifacts.
+//
+// ARCHITECTURE OVERVIEW
+// ─────────────────────
+//  Public entry point: AvoidCrossingPerimeters::travel_to()  (called once per travel move from GCode.cpp)
+//  Per-layer setup:    AvoidCrossingPerimeters::init_layer()  (called at the start of each new layer)
+//
+//  Two routing modes:
+//    m_internal  — travel inside the current object's layer; boundaries are inward-offset perimeter
+//                  contours of the *current* PrintObject (computed by get_boundary()).
+//    m_external  — travel between objects; boundaries are expanded holes of *all* PrintObjects at
+//                  this Z (computed by get_boundary_external()).  Activated when m_use_external_mp or
+//                  m_use_external_mp_once is set.
+//
+// [STATE] The Boundary struct (see AvoidCrossingPerimeters.hpp) holds:
+//    boundaries        — Polygons that define crossing-forbidden zones.
+//    grid              — EdgeGrid::Grid for O(1) spatial queries against those polygons.
+//    boundaries_params — Per-polygon cumulative arc-length lookup table (used by get_shortest_direction).
+//    bbox              — Floating-point bounding box; used for fast out-of-bounds early-exit.
+//
+// ALGORITHM (avoid_perimeters_inner, ~line 549)
+// ─────────────────────────────────────────────
+//  1. Fire AllIntersectionsVisitor along the direct travel line → sorted Intersection list.
+//  2. Extend intersections via extend_for_closest_lines() for cases where start/end are already
+//     inside an offset boundary (no intersection found by direct ray cast).
+//  3. For each entry/exit pair on the same boundary, call get_shortest_direction() and walk
+//     along the polygon forward or backward, emitting offset waypoints (SCALED_EPSILON inward).
+//  4. Simplify the resulting TravelPoint path with simplify_travel() — greedy skip using
+//     FirstIntersectionVisitor to verify each shortcut doesn't re-introduce a crossing.
+//
+// DEAD CODE WARNING  [HAZARD-78]
+//    Lines 1340–1729 are wrapped in `#if 0`.  This block contains an entire parallel
+//    implementation: a second avoid_perimeters_inner, a simplify_travel_heuristics optimiser,
+//    a second avoid_perimeters, and a second init_layer / travel_to with different boundary logic.
+//    It diverged from the active code without coordinated maintenance.
+//
+// COORDINATE SYSTEM
+//    All points are in scaled integer space (coord_t, 1 unit = 1e-6 mm).
+//    travel_to() applies a scaled_origin offset to convert between object-space and world-space
+//    when use_external is true.
+//
+// [COUPLING] Reads gcodegen.layer(), gcodegen.last_pos(), gcodegen.config(), gcodegen.writer()
+//            and gcodegen.origin() — tightly coupled to GCode state machine.
+//
+// [CONCURRENCY] No TBB parallelism; called from single GCode generation thread.
+//
+// Key callers:
+//    GCode::travel_to()  →  AvoidCrossingPerimeters::travel_to()
+//    GCode::layer_change_oop()  →  AvoidCrossingPerimeters::init_layer()
+
 #include "../Layer.hpp"
 #include "../GCode.hpp"
 #include "../EdgeGrid.hpp"
@@ -15,6 +66,11 @@
 
 namespace Slic3r {
 
+// [INTENT] A waypoint in the rerouted travel path.
+// border_idx == -1 means the point is free-space (start/end of travel or interior detour).
+// Points with border_idx >= 0 lie on, or just inward of, a boundary polygon.
+// [STATE] do_not_remove prevents simplify_travel() from collapsing this waypoint — used for
+//         synthetic points injected by extend_for_closest_lines().
 struct TravelPoint
 {
     Point point;
@@ -24,6 +80,10 @@ struct TravelPoint
     bool do_not_remove = false;
 };
 
+// [INTENT] One crossing of the travel line with a boundary polygon edge.
+// distance is the cumulative arc-length from the first vertex of the boundary polygon to this
+// intersection, enabling fast forward/backward comparison in get_shortest_direction().
+// [STATE] Sorted along the travel direction by avoid_perimeters_inner() before processing.
 struct Intersection
 {
     // Index of the polygon containing this point of intersection.
@@ -38,6 +98,9 @@ struct Intersection
     bool do_not_remove = false;
 };
 
+// [INTENT] The nearest point on a boundary edge to a query point.
+// Used by MinDistanceVisitor and extend_for_closest_lines() to handle the case where the
+// travel start or end is already inside an offset boundary (no ray intersection exists).
 struct ClosestLine
 {
     // Index of the polygon containing this line.
@@ -48,6 +111,10 @@ struct ClosestLine
     Point  point;
 };
 
+// [INTENT] EdgeGrid visitor that collects ALL intersections between the travel line and every
+// boundary edge.  The deduplication set (intersection_set) prevents the same edge from being
+// reported twice when the travel line clips a grid cell corner.
+// [COUPLING] Depends on EdgeGrid::Grid cell_data_range() / line() API.
 // Finding all intersections of a set of contours with a line segment.
 struct AllIntersectionsVisitor
 {
@@ -88,6 +155,9 @@ struct AllIntersectionsVisitor
     std::unordered_set<std::pair<size_t, size_t>, boost::hash<std::pair<size_t, size_t>>> intersection_set;
 };
 
+// [INTENT] EdgeGrid visitor for a fast yes/no collision check.  Returns false (stops traversal)
+// the moment any boundary edge intersects the test segment [pt_current, pt_next].
+// Used by simplify_travel() to validate that a shortcut doesn't introduce a new perimeter crossing.
 // Visitor to check for any collision of a line segment with any contour stored inside the edge_grid.
 struct FirstIntersectionVisitor
 {
@@ -118,6 +188,10 @@ struct FirstIntersectionVisitor
     bool                  intersect  = false;
 };
 
+// [INTENT] EdgeGrid visitor that finds all boundary edges within a bounding-box radius of a
+// query point (center).  Deduplication via closest_lines_set ensures each edge appears once.
+// Results are sorted by distance from center in get_closest_lines_in_radius().
+// Used by extend_for_closest_lines() to handle start/end points already inside offset boundaries.
 // Visitor to create a list of closet lines to a defined point.
 struct MinDistanceVisitor
 {
@@ -156,6 +230,8 @@ struct MinDistanceVisitor
     double                                                                                max_distance_squared = std::numeric_limits<double>::max();
 };
 
+// [INTENT] Convenience wrapper: fires MinDistanceVisitor over a square bounding box of side
+// 2*search_radius, then returns results sorted nearest-first.  O(k) where k = edges in radius.
 // Returns sorted list of closest lines to a passed point within a passed radius
 static std::vector<ClosestLine> get_closest_lines_in_radius(const EdgeGrid::Grid &grid, const Point &center, float search_radius)
 {
@@ -169,6 +245,15 @@ static std::vector<ClosestLine> get_closest_lines_in_radius(const EdgeGrid::Grid
     return visitor.closest_lines;
 }
 
+// [INTENT] Fallback handler for the case where the direct travel line finds no boundary crossings
+// because start or end (or both) are already fully inside an offset boundary zone.
+// Strategy:
+//   1. If both endpoints are near the *same* boundary, discard all existing intersections and
+//      synthesise a clean {start_closest, end_closest} pair routed entirely on that boundary.
+//   2. Otherwise, try to replace or prepend/append a closer ClosestLine for the start/end that
+//      shares a border_idx with an existing Intersection, to reduce the total detour.
+// [HAZARD] The O(N*M) nested search (endpoints_close_to_same_boundary) is bounded in practice
+//          because search_radius = 2 * perimeter_spacing limits candidate counts.
 // When the offset is too big, then original travel doesn't have to cross created boundaries.
 // For these cases, this function adds another intersection with lines around the start and the end point of the original travel.
 static std::vector<Intersection> extend_for_closest_lines(const std::vector<Intersection>         &intersections,
@@ -385,6 +470,11 @@ static void export_travel_to_svg(const Polygons                  &boundary,
 }
 #endif /* AVOID_CROSSING_PERIMETERS_DEBUG_OUTPUT */
 
+// [INTENT] Given two intersection points on the same boundary polygon, compute whether going
+// forward (increasing arc-length) or backward (decreasing arc-length) around the polygon is the
+// shorter route.  Subtracts the partial segments at each endpoint so only full-vertex-to-full-vertex
+// arc length is compared — avoids choosing the wrong direction when intersections are near vertices.
+// [STATE] Uses Boundary::boundaries_params (cumulative arc-length table) so no per-call polygon walk.
 // Returns a direction of the shortest path along the polygon boundary
 enum class Direction { Forward, Backward };
 // Returns a direction of the shortest path along the polygon boundary
@@ -431,6 +521,12 @@ Polyline ConvertBBoxToPolyline(const BoundingBoxf &bbox)
 }
 
 
+// [INTENT] Greedy waypoint-elimination pass on a TravelPoint path.
+// Iterates forward: at each point, tries to jump as far ahead as possible while still being
+// able to draw a straight line without re-crossing any boundary (validated via FirstIntersectionVisitor).
+// do_not_remove points (synthetic intersections from extend_for_closest_lines) are preserved.
+// [HAZARD] Two FIXME notes in the code suggest binary search and tangent-point optimizations
+//          that have not been implemented — worst-case O(N²) waypoint checks.
 // Straighten the travel path as long as it does not collide with the contours stored in edge_grid.
 static std::vector<TravelPoint> simplify_travel(const AvoidCrossingPerimeters::Boundary &boundary, const std::vector<TravelPoint> &travel)
 {
@@ -476,6 +572,8 @@ static std::vector<TravelPoint> simplify_travel(const AvoidCrossingPerimeters::B
     return simplified_path;
 }
 
+// [INTENT] Average scaled nozzle diameter across all extruders used by this PrintObject.
+// Fallback spacing when no non-empty LayerRegion is found.
 // called by get_perimeter_spacing() / get_perimeter_spacing_external()
 static inline float get_default_perimeter_spacing(const PrintObject &print_object)
 {
@@ -488,6 +586,8 @@ static inline float get_default_perimeter_spacing(const PrintObject &print_objec
     return avg_extruder;
 }
 
+// [INTENT] Average scaled perimeter-flow spacing across all non-empty LayerRegions of *this* layer.
+// Used to compute the inward-offset distance for m_internal boundary construction.
 // called by get_boundary() / avoid_perimeters_inner()
 static float get_perimeter_spacing(const Layer &layer)
 {
@@ -507,6 +607,9 @@ static float get_perimeter_spacing(const Layer &layer)
     return perimeter_spacing;
 }
 
+// [INTENT] Same as get_perimeter_spacing() but averages over *all* PrintObjects present at this Z.
+// Used for m_external boundary construction where multiple objects may be co-printed.
+// [COUPLING] Iterates over the entire Print's object list, querying layer existence at print_z.
 // called by get_boundary_external()
 static float get_perimeter_spacing_external(const Layer &layer)
 {
@@ -546,6 +649,24 @@ static float get_external_perimeter_width(const Layer &layer)
     return perimeter_width;
 }
 
+// [INTENT] CORE ROUTING FUNCTION.  Computes a detour path from start_point to end_point that
+// avoids crossing the boundary polygons stored in 'boundary'.
+//
+// Algorithm:
+//  1. Fire AllIntersectionsVisitor on the direct line → sorted Intersection list.
+//  2. If no intersections, retry with a 1.5× perimeter_spacing expanded line (handles the case
+//     where start/end are inside an offset zone and the direct line never reaches the boundary).
+//  3. Assign arc-length distances to each intersection.
+//  4. Call extend_for_closest_lines() to fix edge cases where both endpoints are inside boundary.
+//  5. For each (entry, farthest-exit) pair on the same boundary:
+//       - Insert start-of-boundary point (offset SCALED_EPSILON inward).
+//       - Walk polygon vertices forward or backward (get_shortest_direction), emitting offset waypoints.
+//       - Insert end-of-boundary point.
+//  6. Call simplify_travel() to straighten the resulting path.
+//  Returns: number of intersections found (used by need_wipe() to decide on retract/wipe).
+//
+// [HAZARD] search_radius = 2 * perimeter_spacing is hardcoded; may be wrong for very wide or
+//          very narrow extrusions (see Hazard 80 notes).
 static size_t avoid_perimeters_inner(
     const AvoidCrossingPerimeters::Boundary &boundary, const Point &start_point, const Point &end_point, const Layer &layer, std::vector<TravelPoint> &result_out)
 {
@@ -687,6 +808,8 @@ static size_t avoid_perimeters_inner(
     return intersections.size();
 }
 
+// [INTENT] Thin public-facing wrapper around avoid_perimeters_inner().
+// Converts the TravelPoint vector to a Polyline and returns the intersection count.
 // Called by AvoidCrossingPerimeters::travel_to()
 static size_t avoid_perimeters(const AvoidCrossingPerimeters::Boundary &boundary,
                                const Point                             &start,
@@ -765,6 +888,14 @@ static bool any_expolygon_contains(const ExPolygons &ex_polygons, const std::vec
     return false;
 }
 
+// [INTENT] Determines if a wipe/retract is needed after the travel move.
+// Logic:
+//   - If 0 intersections: travel was entirely inside/outside object → no wipe needed.
+//   - z_lift enabled: wipe only if the rerouted path goes above holes (not fully contained
+//     within lslices_offset).  If the original direct travel was already outside → always wipe.
+//   - z_lift disabled: wipe if the rerouted travel is NOT fully inside lslices_offset.
+// [COUPLING] Reads gcodegen.config().z_hop and gcodegen.writer().filament().
+// [STATE] lslices_offset / lslices_offset_bboxes / grid_lslices_offset are precomputed by init_layer().
 static bool need_wipe(const GCode                    &gcodegen,
                       const ExPolygons               &lslices_offset,
                       const std::vector<BoundingBox> &lslices_offset_bboxes,
@@ -1009,6 +1140,13 @@ static std::vector<float> contour_distance(const EdgeGrid::Grid     &grid,
     return out;
 }
 
+// [INTENT] Per-vertex variable inward offset that avoids over-shrinking at narrow constrictions.
+// Tries up to 3 progressively looser min_contour_width values.  For each:
+//   - Builds a local EdgeGrid, calls contour_distance() to measure wall thickness at every vertex.
+//   - Maps distance → per-vertex offset amount (0 if wall too thin, full offset if wide enough).
+//   - Calls variable_offset_inner_ex().  If result fragmented, takes largest fragment.
+// [HAZARD] Operates on each ExPolygon independently (comment: "ExPolygons could intersect").
+// [COUPLING] Depends on variable_offset_inner_ex() from ClipperUtils.
 // Polygon offset which ensures that if a polygon breaks up into several separate parts, the original polygon will be used in these places.
 // ExPolygons are handled one by one so returned ExPolygons could intersect.
 static ExPolygons inner_offset(const ExPolygons &ex_polygons, double offset_dis)
@@ -1096,6 +1234,14 @@ static ExPolygons inner_offset(const ExPolygons &ex_polygons, double offset_dis)
 
 //#define INCLUDE_SUPPORTS_IN_BOUNDARY
 
+// [INTENT] Builds the m_internal crossing-forbidden boundary for a single PrintObject layer.
+// Steps:
+//   1. inner_offset(layer.lslices, 1.5 * perimeter_spacing) → shrunk zones travel must stay within.
+//   2. For SupportLayer, also adds the layer below (to guide support-travel around model perimeters).
+//   3. Subtracts top-surface areas (offset inward by 1.2 * perimeter_offset) to allow free travel
+//      over completed top skins without triggering a wipe.
+// Returns ExPolygons (not yet Polygons) — caller (travel_to) calls to_polygons().
+// [COUPLING] Dynamic-casts to SupportLayer — tight coupling to layer type hierarchy.
 // called by AvoidCrossingPerimeters::travel_to()
 static ExPolygons get_boundary(const Layer &layer, float perimeter_spacing)
 {
@@ -1133,6 +1279,11 @@ static ExPolygons get_boundary(const Layer &layer, float perimeter_spacing)
     return boundary;
 }
 
+// [INTENT] Builds the m_external crossing-forbidden boundary for multi-object printing.
+// Iterates over ALL PrintObjects at this print_z, collecting their contour holes (expanded by
+// perimeter_offset) plus the layer below for support layers.  Reversed so normals face outward.
+// [COUPLING] Reads every PrintObject in the Print — O(N_objects × N_layers) during init.
+// [HAZARD] FIXME comment inside: layers at different heights across objects may not align.
 // called by AvoidCrossingPerimeters::travel_to()
 static Polygons get_boundary_external(const Layer &layer)
 {
@@ -1191,6 +1342,9 @@ static Polygons get_boundary_external(const Layer &layer)
     return boundary;
 }
 
+// [INTENT] Populates Boundary::boundaries_params — cumulative arc-length per polygon vertex.
+// Index [i] = arc-length from vertex 0 to vertex i; back() = full perimeter length.
+// Used by get_shortest_direction() to compare forward vs backward routing distance.
 static void init_boundary_distances(AvoidCrossingPerimeters::Boundary *boundary)
 {
     boundary->boundaries_params.assign(boundary->boundaries.size(), std::vector<float>());
@@ -1198,6 +1352,10 @@ static void init_boundary_distances(AvoidCrossingPerimeters::Boundary *boundary)
         precompute_polygon_distances(boundary->boundaries[poly_idx], boundary->boundaries_params[poly_idx]);
 }
 
+// [INTENT] Constructs a Boundary from a set of polygons: clear old state, store polygons,
+// compute bounding box with SCALED_EPSILON padding, build EdgeGrid (1mm cells), precompute arc-lengths.
+// Overload 1: bbox tightly wraps the boundary polygons.
+// [HAZARD-79] Hardcoded 1mm grid — see FIXME comment.  May be too coarse for fine details.
 void init_boundary(AvoidCrossingPerimeters::Boundary *boundary, Polygons &&boundary_polygons)
 {
     boundary->clear();
@@ -1212,6 +1370,10 @@ void init_boundary(AvoidCrossingPerimeters::Boundary *boundary, Polygons &&bound
     init_boundary_distances(boundary);
 }
 
+// [INTENT] Overload 2 (used by travel_to): bbox is expanded to also contain start and end points
+// of the travel move (merge_points), padded by bbox.radius().  This ensures that even when start
+// or end lie outside the polygon extents, the grid and bbox cover the full travel arc.
+// [HAZARD-79] Lazy re-init triggered when start/end fall outside current bbox — see travel_to().
 static void init_boundary(AvoidCrossingPerimeters::Boundary *boundary, Polygons &&boundary_polygons, const std::vector<Point>& merge_poins)
 {
     boundary->clear();
@@ -1229,6 +1391,17 @@ static void init_boundary(AvoidCrossingPerimeters::Boundary *boundary, Polygons 
     init_boundary_distances(boundary);
 }
 
+// [INTENT] PUBLIC API: plan a single travel move from gcodegen.last_pos() to `point`.
+// Steps:
+//   1. Determine coordinate system (object-space vs world-space) based on use_external.
+//   2. If travel is entirely within m_lslices_offset (no perimeter at risk) AND not a support
+//      layer, return direct line — no detour needed.
+//   3. Lazy-init m_internal or m_external (including bbox expansion for start/end).
+//   4. Call avoid_perimeters() → rerouted Polyline.
+//   5. Enforce max_travel_detour_distance: revert to direct line if detour is too long.
+//   6. Set *could_be_wipe_disabled via need_wipe() for the caller to suppress wipe retract.
+// [STATE] Modifies m_internal/m_external lazily; clears and rebuilds if start/end outside bbox.
+// [HAZARD-79] Re-init triggers full get_boundary() + inner_offset() recomputation per miss.
 // Plan travel, which avoids perimeter crossings by following the boundaries of the layer.
 Polyline AvoidCrossingPerimeters::travel_to(const GCode &gcodegen, const Point &point, bool *could_be_wipe_disabled)
 {
@@ -1314,6 +1487,15 @@ Polyline AvoidCrossingPerimeters::travel_to(const GCode &gcodegen, const Point &
 }
 
 // ************************************* AvoidCrossingPerimeters::init_layer() *****************************************
+// [INTENT] PUBLIC API: called once per layer at the start of G-code generation for that layer.
+// Resets m_internal and m_external (so they are rebuilt lazily on the first travel that needs them).
+// Always precomputes m_lslices_offset (inward-offset layer slices) and m_grid_lslice:
+//   - m_lslices_offset: tries coefficients 0.6, 0.5, 0.45 × external_perimeter_width until non-empty.
+//     Used by travel_to() to short-circuit routing when travel stays inside the offset region.
+//   - m_grid_lslice: EdgeGrid over m_lslices_offset, used by any_expolygon_contains() and need_wipe().
+// [HAZARD-80] m_grid_lslice uses hardcoded 1mm cell size (FIXME comment inside).
+// [STATE] After this call, m_internal.boundaries and m_external.boundaries are both empty.
+//         They are populated lazily on the first matching travel_to() call.
 
 void AvoidCrossingPerimeters::init_layer(const Layer &layer)
 {
@@ -1337,6 +1519,14 @@ void AvoidCrossingPerimeters::init_layer(const Layer &layer)
     m_grid_lslice.create(m_lslices_offset, coord_t(scale_(1.)));
 }
 
+// [HAZARD-78] DEAD CODE BLOCK — entire alternative implementation disabled with #if 0.
+// Contains: travel_length(), a second avoid_perimeters_inner() (simpler — no extend_for_closest_lines
+// fallback), simplify_travel_heuristics() (more aggressive multi-segment shortcut pass),
+// a second avoid_perimeters() (calls simplify_travel_heuristics forward + backward), and a second
+// init_layer() that eagerly builds both m_internal and m_external at layer start.
+// This represents a prior design iteration with eager init vs the current lazy-init approach.
+// [UNCLEAR] Neither variant has a comment explaining why the newer approach was chosen.
+// Maintenance risk: if the active code is changed without auditing this block, the two diverge further.
 #if 0
 static double travel_length(const std::vector<TravelPoint> &travel) {
     double total_length = 0;
