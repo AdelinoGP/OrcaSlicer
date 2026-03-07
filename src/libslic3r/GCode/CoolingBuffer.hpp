@@ -1,3 +1,12 @@
+// [INTENT] CoolingBuffer: A standalone G-code post-processor for layer cooling control.
+// Buffers support-layer G-code until an object layer is ready to flush, then runs a
+// three-phase pipeline: parse → slow-down → re-serialise with fan commands.
+// [STATE] m_gcode: accumulated G-code text for current layer group (cleared on flush).
+// [STATE] m_current_pos: 7-element float vector [X,Y,Z,E,F,I,J] tracking printer state.
+// [STATE] m_fan_speed / m_additional_fan_speed: last emitted fan command values (-1 = unknown).
+// [COUPLING] Holds a const reference to GCode::m_config (PrintConfig slice); assumes it
+//   is immutable during post-processing (safe — see comment in header).
+// [CONCURRENCY] Not thread-safe; must be called from a single serial context.
 #ifndef slic3r_CoolingBuffer_hpp_
 #define slic3r_CoolingBuffer_hpp_
 

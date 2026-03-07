@@ -1,3 +1,30 @@
+// [INTENT] CoolingBuffer: Post-processing pass that modifies the G-code for a complete
+// layer to enforce two constraints:
+//   1. Minimum layer time — slow down extrusion moves so that the printed layer takes at
+//      least slow_down_layer_time seconds, giving the previous layer time to cool.
+//   2. Fan control — emit M106/M107 commands at the right points in the G-code stream to
+//      ramp up/down cooling fan speeds based on layer time and feature type (overhang,
+//      support interface, bridge, ironing).
+//
+// Architecture:
+//   process_layer() buffers incoming G-code until flush=true (an object layer), then:
+//   1. parse_layer_gcode()         — tokenise G-code into CoolingLine structs
+//   2. calculate_layer_slowdown()  — compute new feedrates to meet layer time minimums
+//   3. apply_layer_cooldown()      — re-serialise G-code with modified F values + fan cmds
+//
+// [STATE] Operates on a single layer's G-code at a time.  Support layers are buffered into
+// m_gcode between object layers and flushed all at once when the next object layer arrives.
+// [MEMORY] The input G-code string is moved into m_gcode (zero-copy) when the buffer is
+// empty, then appended for subsequent support layers.
+// [CONCURRENCY] Not thread-safe — called from a single serial G-code post-processing pass
+// after the TBB parallel per-layer processing in GCode.cpp.
+// [COUPLING] Requires GCode to inject ";_EXTRUDE_SET_SPEED", ";_EXTRUDE_END",
+// ";_EXTERNAL_PERIMETER", ";_WIPE", ";_OVERHANG_FAN_START/END" etc. comment markers at
+// the right points in the G-code stream (see GCode.cpp writer methods).
+// [HAZARD] The parser re-implements G-code parsing with atof/from_chars — any G-code
+// variant that places the 'F' parameter in an unexpected position will not be adjusted.
+// [HAZARD] Arc moves (G2/G3) require arc length computation for time calculation; the I/J
+// center coordinates must already be absolute when the buffer receives them.
 #include "../GCode.hpp"
 #include "CoolingBuffer.hpp"
 #include <boost/algorithm/string/predicate.hpp>
@@ -43,6 +70,17 @@ void CoolingBuffer::reset(const Vec3d &position)
     m_current_fan_speed = -1;
 }
 
+// [INTENT] CoolingLine: lightweight struct representing one parsed G-code line within a
+// layer.  Only lines relevant to timing or fan control are stored; all others are passed
+// through verbatim in apply_layer_cooldown().
+// [STATE] line_start/line_end are byte offsets into the original G-code string — used to
+// splice the modified output back around the unchanged portions.
+// [STATE] length/feedrate/time/time_max are in mm and mm/s.  time_max is the duration at
+// minimum allowed feedrate; slowdown=true means this line was actually slowed down.
+// [HAZARD] TYPE_ADJUSTABLE is only set on the "speed modifier" G-code line (the one with
+// ";_EXTRUDE_SET_SPEED").  Subsequent G1/G2/G3 move lines within the same speed block
+// accumulate their length/time into that single CoolingLine rather than being stored
+// individually — so the line count is smaller than the G-code line count.
 struct CoolingLine
 {
     enum Type {
@@ -104,6 +142,17 @@ struct CoolingLine
     bool    slowdown;
 };
 
+// [INTENT] PerExtruderAdjustments: per-extruder aggregate of all CoolingLine entries for
+// the current layer.  The slow-down algorithm works on this aggregate rather than on the
+// raw G-code text.
+// [STATE] After sort_lines_by_decreasing_feedrate() the lines vector is reordered — the
+// first n_lines_adjustable entries are adjustable, sorted from fastest to slowest, so the
+// non-proportional slowdown can walk them in order.
+// [HAZARD] sort_lines_by_decreasing_feedrate() must be called before the slow_down_*
+// helpers; calling them in the wrong order leaves idx_line_begin/idx_line_end undefined.
+// [HAZARD] slow_down_to_feedrate() uses a max(1.f, ...) guard but only updates
+// time_total for the first n_lines_adjustable entries — the remaining lines' time is
+// tracked in time_non_adjustable and must be added by the caller.
 // Calculate the required per extruder time stretches.
 struct PerExtruderAdjustments
 {
@@ -256,6 +305,12 @@ struct PerExtruderAdjustments
     size_t                      idx_line_end        = 0;
 };
 
+// [INTENT] Solve for a common target feedrate f' such that slowing all lines currently
+// faster than min_feedrate down to f' adds exactly time_stretch seconds to the layer.
+// Uses Newton-Raphson style fixed-point iteration (up to max_iter rounds).
+// [HAZARD] Uses goto for two control-flow labels (not_finished_yet / finished).
+// [HAZARD] If the iterative solver does not converge, it silently returns the last
+// approximation — the layer time target may not be exactly met.
 // Calculate a new feedrate when slowing down by time_stretch for segments faster than min_feedrate.
 // Used by non-proportional slow down.
 float new_feedrate_to_reach_time_stretch(
@@ -313,6 +368,12 @@ finished:
 	return new_feedrate;
 }
 
+// [INTENT] Entry point: buffer support-layer G-code until flush=true (object layer or
+// end-of-print), then run the three-phase slowdown + fan-control pipeline.
+// Returns an empty string for non-flush calls; returns the modified G-code on flush.
+// [STATE] m_gcode accumulates G-code across calls; cleared after flushing.
+// [MEMORY] The first call after a flush moves the input string via std::move (zero copy).
+// Subsequent support-layer calls use += (copy).
 std::string CoolingBuffer::process_layer(std::string &&gcode, size_t layer_id, bool flush)
 {
     // Cache the input G-code.
@@ -333,6 +394,22 @@ std::string CoolingBuffer::process_layer(std::string &&gcode, size_t layer_id, b
     return out;
 }
 
+// [INTENT] Phase 1: Walk the G-code text character by character, identify G0/G1/G2/G3
+// motion lines, G4 dwell, tool-change markers, and the slicer's special comment tokens
+// (;_EXTRUDE_SET_SPEED, ;_OVERHANG_FAN_START, etc.).  Build a vector of CoolingLine
+// structs grouped by extruder.
+// [STATE] Writes per_extruder_adjustments and advances current_pos in place.
+// [COUPLING] The parser depends on exact comment token strings emitted by GCode.cpp.
+//   Any future change to those strings (e.g. ;_EXTRUDE_SET_SPEED) must be mirrored here.
+// [HAZARD] The parser uses atof() which is locale-dependent.  The assert
+//   is_decimal_separator_point() guards against locale misconfiguration, but this is a
+//   fragile runtime check rather than a compile-time guarantee.
+// [HAZARD] Moves before the first extrusion on a layer (e.g. homing, purge line travel)
+//   have their time forced to zero — this is an OrcaSlicer-specific heuristic that may
+//   cause incorrect fan/slow-down behaviour if the preamble contains meaningful moves.
+// [HAZARD] G2/G3 arc length is calculated via ArcSegment::calc_arc_length using I/J
+//   centre coords.  If the upstream GCode writer ever emits R-form arcs (arc by radius),
+//   this parser will compute zero length and the line will be excluded from slowdown.
 // Parse the layer G-code for the moves, which could be adjusted.
 // Return the list of parsed lines, bucketed by an extruder.
 std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::string &gcode, std::vector<float> &current_pos) const
@@ -557,6 +634,13 @@ std::vector<PerExtruderAdjustments> CoolingBuffer::parse_layer_gcode(const std::
     return per_extruder_adjustments;
 }
 
+// [INTENT] Non-proportional slowdown strategy: slow down extruders that have a higher
+// feedrate first (so they are reduced furthest from their original speed), and stop when
+// the cumulative time stretch equals time_stretch.  Different extruders may have different
+// minimum speeds; those with a higher minimum are "saturated" first.
+// [COUPLING] Calls new_feedrate_to_reach_time_stretch() for the iterative solve.
+// [HAZARD] The inner loop modifies idx_line_begin/idx_line_end on each PerExtruderAdjustments
+// — these are temporary indices that are only valid for the duration of this function call.
 // Slow down an extruder range to slow_down_layer_time.
 // Return the total time for the complete layer.
 static inline void extruder_range_slow_down_non_proportional(
@@ -635,6 +719,14 @@ static inline void extruder_range_slow_down_non_proportional(
     }
 }
 
+// [INTENT] Phase 2: Determine the actual slowdown factor needed to meet each extruder's
+// slow_down_layer_time constraint.  Extruders are processed from lowest to highest
+// slow_down_layer_time threshold; once the cumulative time already satisfies an extruder's
+// threshold, no slowdown is needed for that one.
+// [STATE] Mutates per_extruder_adjustments in place (feedrate/time on each CoolingLine).
+// Returns the total layer time after all slowdowns are applied.
+// [HAZARD] The slow_down_layer_time * 1.001f fudge factor prevents trivial floating point
+// differences from triggering unnecessary slowdowns.
 // Calculate slow down for all the extruders.
 float CoolingBuffer::calculate_layer_slowdown(std::vector<PerExtruderAdjustments> &per_extruder_adjustments)
 {
@@ -692,6 +784,25 @@ float CoolingBuffer::calculate_layer_slowdown(std::vector<PerExtruderAdjustments
     return elapsed_time_total0;
 }
 
+// [INTENT] Phase 3: Re-serialise the G-code, splicing in:
+//   - Modified F values (feedrate overrides for slowed-down moves).
+//   - Fan speed M106 commands at the correct positions (based on layer_time and feature
+//     type: overhang, internal bridge, support interface, ironing, force-resume).
+// Fan speed changes are deferred via fan_speed_change_requests to avoid redundant M106
+// commands (OrcaSlicer optimisation, inspired by SuperSlicer).
+// [STATE] Mutates m_fan_speed, m_current_fan_speed, m_current_extruder.
+// [COUPLING] Calls GCodeWriter::set_fan() / set_additional_fan() — depends on gcode_flavor
+// config to select the correct fan command syntax.
+// [HAZARD] The "redundant F removal" logic removes F-only G1 lines, but the test
+// `new_gcode == "G1"` checks the entire accumulated buffer — this is likely checking only
+// the last two characters and will be incorrect if multiple lines were accumulated. This
+// is a pre-existing bug from PrusaSlicer.
+// [HAZARD] apply_layer_cooldown pre-allocates new_gcode at 2× the source size. For large
+// layer G-codes this doubles peak memory usage during the G-code post-processing pass.
+// [HAZARD] Fan priorities: overhang > internal bridge > support interface > ironing >
+// force-resume > base fan.  If multiple regions overlap (e.g. an overhang over a support
+// interface), the first matching request in the priority list wins.  This is an implicit
+// priority system — not documented in the original code.
 // Apply slow down over G-code lines stored in per_extruder_adjustments, enable fan if needed.
 // Returns the adjusted G-code.
 std::string CoolingBuffer::apply_layer_cooldown(
