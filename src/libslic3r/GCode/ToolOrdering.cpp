@@ -1,3 +1,27 @@
+// [INTENT] ToolOrdering: Determines for each printed layer which filament/extruder
+// is used, in what order, and coordinates with WipeTower2 to insert purge partitions.
+// The central data structure is std::vector<LayerTools> (m_layer_tools), one entry per
+// unique Z height across all PrintObjects. Each LayerTools holds the ordered list of
+// extruder IDs needed on that layer.
+//
+// High-level algorithm:
+//  1. initialize_layers()   - collect all Z heights, merge near-equal ones (EPSILON)
+//  2. collect_extruders()   - for each layer, determine which extruders are required
+//                             from region config (wall_filament, solid_infill_filament, etc.)
+//  3. handle_dontcare_extruder() - replace extruder_id==0 ("don't care") placeholders
+//                             with the most recently used extruder, to avoid unnecessary
+//                             tool changes; also special-cases soluble first-layer and
+//                             user-specified first_layer_print_sequence
+//  4. reorder_extruders_for_minimum_flush_volume() - reorder extruders on each layer
+//                             to minimize total purge volume (flush matrix optimization)
+//  5. fill_wipe_tower_partitions() - count wipe tower segments needed per layer
+//  6. collect_extruder_statistics() - per-extruder summary for G-code export
+//
+// [COUPLING] Tightly coupled to Print, PrintObject, PrintRegion, WipeTower2, GCode.
+// [HAZARD] Extruder IDs switch between 0-based and 1-based throughout. Many functions
+// receive/return 1-based but store 0-based internally. See assert(extruder_id > 0)
+// before the -- decrement in handle_dontcare_extruder().
+
 #include "ExtrusionEntity.hpp"
 #include "Print.hpp"
 #include "ToolOrdering.hpp"
@@ -33,9 +57,19 @@ namespace Slic3r {
 #define _L(s) Slic3r::I18N::translate(s)
 #endif
 
+// [STATE] File-scope flag: "wipe into objects" feature disabled at compile time.
+// [HAZARD] Hardcoded false — changing to true would enable infill wiping which is
+// partially implemented but disabled, potentially producing incorrect G-code.
 const static bool g_wipe_into_objects = false;
+
+// [INTENT] Threshold for CIEDE2000 color distance. Filaments with ΔE < 20 are
+// considered "similar color" and may share purge volume calculations.
 constexpr double similar_color_threshold_de2000 = 20.0;
 
+// [INTENT] Helper: filter the list of used filament IDs to only those matching a
+// given type string (e.g. "PLA", "TPU"). Used in BBL-specific compatibility checks.
+// [COUPLING] Calls print_config->filament_type.get_at() — relies on filament_type
+// being a ConfigOptionStrings (indexed by filament slot, not by logical type).
 static std::set<int>get_filament_by_type(const std::vector<unsigned int>& used_filaments, const PrintConfig* print_config, const std::string& type)
 {
     std::set<int> target_filaments;
@@ -64,6 +98,11 @@ bool LayerTools::is_extruder_order(unsigned int a, unsigned int b) const
     return false;
 }
 
+// [INTENT] BBL-specific compatibility check: verifies that each filament used in
+// the print can physically be loaded into the extruder it has been assigned to.
+// `filament_printable` is a bitmask — bit 0 = can print on extruder 0 (left), bit 1 = extruder 1 (right).
+// [HAZARD] Throws RuntimeError with a localized string — caller must catch to report.
+// Localization strings here make libslic3r depend on I18N.hpp.
 bool check_filament_printable_after_group(const std::vector<unsigned int> &used_filaments, const std::vector<int> &filament_maps, const PrintConfig *print_config)
 {
     for (unsigned int filament_id : used_filaments) {
@@ -79,6 +118,13 @@ bool check_filament_printable_after_group(const std::vector<unsigned int> &used_
     return true;
 }
 
+// [INTENT] Query functions: return the 0-based extruder index to use for a given
+// material role (wall, sparse infill, solid infill). All config values are 1-based
+// so the function subtracts 1 before returning. If extruder_override is set (multi-
+// material painting mode), all roles use the same override extruder.
+// [HAZARD] The -1 conversion from 1-based config to 0-based index is done here.
+// Any call site that forgets to call these accessors and reads config().wall_filament.value
+// directly will be 1-based where 0-based is expected.
 // Return a zero based extruder from the region, or extruder_override if overriden.
 unsigned int LayerTools::wall_filament(const PrintRegion &region) const
 {
@@ -98,6 +144,13 @@ unsigned int LayerTools::solid_infill_filament(const PrintRegion &region) const
 	return ((this->extruder_override == 0) ? region.config().solid_infill_filament.value : this->extruder_override) - 1;
 }
 
+// [INTENT] Determine the 0-based extruder ID for an entire ExtrusionEntityCollection
+// based on what roles it contains. Priority: solid infill > sparse infill > wall.
+// If the collection is a wall (no infill roles), use wall_filament config.
+// [HAZARD] Returns 0 when extruder config is 0 (meaning "inherit"), but 0 is also
+// a valid extruder index. Callers must distinguish: extruder==0 returned when
+// extruder config==0 means "unassigned"; extruder==0 returned when config==1 means
+// "first extruder". This ambiguity exists in the original PrusaSlicer design.
 // Returns a zero based extruder this eec should be printed with, according to PrintRegion config or extruder_override if overriden.
 unsigned int LayerTools::extruder(const ExtrusionEntityCollection &extrusions, const PrintRegion &region) const
 {
@@ -501,6 +554,20 @@ static void apply_first_layer_order(const DynamicPrintConfig* config, std::vecto
     }
 }
 
+// [INTENT] BBL addition: determine the first-layer tool order to maximize bed adhesion.
+// For each extruder used on the first layer, find the "minimum area" contour it would
+// print (the smallest expolygon that is not too thin to survive offsetting by 0.2*line_width).
+// Extruders assigned to larger minimum-area contours print first — this ensures the
+// smallest, most delicate features (likely thin walls) are printed last, when the
+// previous filament layers have warmed the bed enough for adhesion.
+//
+// [HAZARD] The area heuristic is a proxy for "most likely to detach" — it assumes
+// small footprint = fragile. This can produce suboptimal ordering for tall thin objects
+// with large footprints on subsequent layers.
+// [COUPLING] Calls offset_ex() (Clipper) to test whether each contour survives a
+// negative offset of 0.2*initial_layer_line_width — a geometry operation inside
+// what is conceptually a "planning" function.
+// [STATE] initial_extruder_id and max_minimal_area variables declared but unused — dead code.
 // BBS
 std::vector<unsigned int> ToolOrdering::generate_first_layer_tool_order(const Print& print)
 {
@@ -630,6 +697,13 @@ std::vector<unsigned int> ToolOrdering::generate_first_layer_tool_order(const Pr
     return tool_order;
 }
 
+// [INTENT] Merge all per-object Z heights into a single sorted, deduplicated list of
+// LayerTools entries. Near-duplicate Z values within EPSILON are merged by averaging,
+// preventing floating-point noise from creating phantom layers.
+// [HAZARD] `sort_remove_duplicates` is a Slic3r helper that sorts + calls std::unique.
+// If two Z values are within EPSILON but not exact duplicates, they are merged here.
+// This merge changes the Z of all layers within the group to the average — a small
+// coordinate shift applied to every subsequent computation on those layers.
 void ToolOrdering::initialize_layers(std::vector<coordf_t> &zs)
 {
     sort_remove_duplicates(zs);
@@ -645,6 +719,25 @@ void ToolOrdering::initialize_layers(std::vector<coordf_t> &zs)
     }
 }
 
+// [INTENT] For each layer in the object, determine which extruders (filament slots) are
+// required. The result populates LayerTools::extruders (the ordered extruder list for
+// that layer). Three sources:
+//   1. Per-layer extruder switches from CustomGCode (user-painted assignments)
+//   2. Region config (wall_filament, solid_infill_filament, sparse_infill_filament)
+//   3. Support extruders (support_filament, support_interface_filament)
+//
+// wiping_extrusions().is_overriddable_and_mark() marks which extrusion entities can be
+// reassigned to a different extruder for in-object wiping (when wipe_into_objects is
+// enabled). Only non-overriddable extrusions force an extruder change at the layer level.
+//
+// [STATE] Writes to `layer_tools.extruders` (mutates m_layer_tools).
+// [STATE] Writes to `object.object_first_layer_wall_extruders` via const_cast — BBL addition
+//         that mutates PrintObject from a function conceptually only reading it.
+// [HAZARD] const_cast on a const& is undefined behavior if the actual object was declared
+//          const. In practice PrintObject is never truly const-constructed, so this is
+//          a bug with tolerated behavior rather than a formal UB.
+// [COUPLING] Directly iterates layer->regions() and support_layer->support_fills —
+//            tightly coupled to the Layer/LayerRegion/SupportLayer internal structure.
 // Collect extruders reuqired to print layers.
 void ToolOrdering::collect_extruders(const PrintObject &object, const std::vector<std::pair<double, unsigned int>> &per_layer_extruder_switches)
 {
@@ -789,6 +882,27 @@ void ToolOrdering::collect_extruders(const PrintObject &object, const std::vecto
 }
 
 
+// [INTENT] Calculate how many wipe tower "partitions" (print segments) are needed per
+// layer. A partition corresponds to one tool change plus its associated purge volume.
+// The number of partitions is: count(extruders on layer) - 1 if first extruder matches
+// the previously active extruder, otherwise count(extruders).
+//
+// Propagation logic: wipe tower partitions propagate downward — if layer N needs K
+// partitions, all layers below also need at least K partitions. This ensures the wipe
+// tower is printed to a sufficient height to support layers above.
+//
+// has_wipe_tower is also set for:
+//  - Layers below raft (fills wipe tower during raft-to-object gap)
+//  - Smooth timelapse mode (every layer with object extrusions)
+//  - Wrapping detection layers (BBL: config.wrapping_detection_layers)
+//
+// [HAZARD] The comment "FIXME this is a hack to get the ball rolling" at line ~915 has
+// persisted since PrusaSlicer days. The timelapse condition forces a wipe tower on every
+// single layer with object content regardless of whether a tool change occurred — this
+// can significantly increase print time for smooth timelapse mode.
+// [HAZARD] A raft gap > max_layer_height triggers insertion of a new LayerTools entry
+// into m_layer_tools mid-iteration. Insertions into std::vector invalidate all iterators
+// but the outer loop uses indices, not iterators — correct here, but fragile if refactored.
 void ToolOrdering::fill_wipe_tower_partitions(const PrintConfig &config, coordf_t object_bottom_z, coordf_t max_layer_height)
 {
     if (m_layer_tools.empty())
@@ -894,6 +1008,15 @@ void ToolOrdering::fill_wipe_tower_partitions(const PrintConfig &config, coordf_
         }
 }
 
+// [INTENT] Populate summary statistics: first/last extruder used across all layers,
+// and the union of all extruders used (m_all_printing_extruders). Called after
+// reorder_extruders_for_minimum_flush_volume so the order already reflects flush optimisation.
+// [STATE] Writes m_first_printing_extruder, m_last_printing_extruder,
+// m_all_printing_extruders — these are queried by GCode.cpp to emit initial tool-select
+// and prime sequences.
+// [HAZARD] If prime_multi_material is true the function reorders m_all_printing_extruders
+// so that m_first_printing_extruder ends last, then re-assigns m_first_printing_extruder
+// to the new front — this mutates the extruder sequence used for priming.
 void ToolOrdering::collect_extruder_statistics(bool prime_multi_material)
 {
     m_first_printing_extruder = (unsigned int)-1;
@@ -1028,6 +1151,12 @@ bool ToolOrdering::has_non_support_filament(const PrintConfig &config) {
     return false;
 }
 
+// [INTENT] Helper: generate all unique bipartitions of an extruder set.
+// Used by the flush-minimisation solver to enumerate how filaments can be split
+// between two nozzles. Returns a set of (group1, group2) pairs where group1.size()
+// <= group2.size() to avoid duplicates.
+// [HAZARD] Complexity is O(2^n / 2 * n) — only practical for small n (BBL printers
+// have at most ~16 filaments, so n <= 16 in practice).
 std::set<std::pair<std::vector<unsigned int>, std::vector<unsigned int>>> generate_combinations(const std::vector<unsigned int> &extruders)
 {
     int                                                                       n = extruders.size();
@@ -1061,6 +1190,10 @@ std::set<std::pair<std::vector<unsigned int>, std::vector<unsigned int>>> genera
     return unique_combinations;
 }
 
+// [INTENT] Compute total flush volume for a single layer given a filament-to-nozzle map.
+// Iterates each nozzle's filament sequence and sums consecutive transition costs from the
+// flush matrix.  Used to score candidate filament orderings in the optimiser.
+// [COUPLING] nozzle_flush_mtx is a vector-of-matrices indexed [nozzle][from][to].
 float get_flush_volume(const std::vector<int> &filament_maps, const std::vector<unsigned int> &extruders, const std::vector<FlushMatrix> &matrix, size_t nozzle_nums)
 {
     std::vector<std::vector<unsigned int>> nozzle_filaments;
@@ -1080,6 +1213,20 @@ float get_flush_volume(const std::vector<int> &filament_maps, const std::vector<
     return flush_volume;
 }
 
+// [INTENT] BBL-specific: Recommend a filament-to-nozzle assignment (filament map) to
+// minimise flush waste across the full print.  Invoked only for BBL 2-nozzle printers;
+// falls back to identity map (filament i → nozzle i) for non-BBL multi-extruder printers.
+// [STATE] Does NOT mutate m_layer_tools — pure computation returning a vector<int> indexed
+// by filament ID with 0-based nozzle IDs as values.
+// [COUPLING] Delegates to FilamentGroup / FilamentGroupUtils subsystem which implements
+// the combinatorial optimiser (FlushMode vs MatchMode strategies).
+// [HAZARD] Calls get_recommended_filament_maps which may also call
+// check_filament_printable_after_group — that throws RuntimeError on incompatible groupings.
+// [HAZARD] master_extruder_id is stored 1-based in config but converted here with -1 to
+// 0-based before passing to FilamentGroupContext — the same conversion hazard as elsewhere.
+// [HAZARD] TPU filament special-case bypasses the normal FilamentGroup solver entirely
+// and uses calc_filament_group_for_tpu instead — mixing TPU and non-TPU may fall through
+// both branches and return master_extruder_id defaults.
 std::vector<int> ToolOrdering::get_recommended_filament_maps(const std::vector<std::vector<unsigned int>>& layer_filaments, const Print* print,  const FilamentMapMode mode,const std::vector<std::set<int>>&physical_unprintables,const std::vector<std::set<int>>&geometric_unprintables)
 {
     using namespace FilamentGroupUtils;
@@ -1208,6 +1355,27 @@ FilamentChangeStats ToolOrdering::get_filament_change_stats(FilamentChangeMode m
     return m_stats_by_single_extruder;
 }
 
+// [INTENT] Main flush-optimisation entry point.  Builds a per-nozzle flush cost matrix
+// from config, determines which filaments are unprintable on each nozzle (geometric and
+// physical constraints), computes or reads the filament-to-nozzle map, then calls
+// reorder_filaments_for_minimum_flush_volume() to permute each layer's extruder list so
+// that consecutive tool changes consume the least purge volume.  The reordered sequences
+// are written back into m_layer_tools[i].extruders.
+// [STATE] Mutates: m_layer_tools[*].extruders, m_stats_by_single_extruder,
+// m_stats_by_multi_extruder_curr, m_stats_by_multi_extruder_best.
+// [STATE] Side-effects on Print: may call m_print->update_filament_maps_to_config()
+// to persist the computed filament map back into the live config.
+// [COUPLING] Depends on: Print::get_filament_maps(), get_filament_map_mode(),
+// get_geometric_unprintable_filaments(), get_physical_unprintable_filaments(),
+// get_recommended_filament_maps(), reorder_filaments_for_minimum_flush_volume().
+// [HAZARD] filament_maps values are toggled between 0-based and 1-based multiple times
+// in the same function (transform +1, then transform -1).  A refactor that breaks this
+// symmetry will silently mis-map filaments.
+// [HAZARD] For non-BBL single extruder mode the filament map is all-zeros, so
+// nozzle_flush_mtx[0] is the only matrix used — multi-nozzle path is skipped entirely.
+// [HAZARD] When print_sequence == ByObject AND there is more than one object, filament
+// map checking is skipped (the check is deferred to Print.cpp) — inconsistent split of
+// responsibility.
 void ToolOrdering::reorder_extruders_for_minimum_flush_volume(bool reorder_first_layer)
 {
     const PrintConfig* print_config = m_print_config_ptr;
@@ -1382,6 +1550,13 @@ void ToolOrdering::reorder_extruders_for_minimum_flush_volume(bool reorder_first
     for (size_t i = 0; i < filament_sequences.size(); ++i)
         m_layer_tools[i].extruders = std::move(filament_sequences[i]);
 }
+// [INTENT] Mark which layers need a skirt / draft-shield segment.  The first layer always
+// gets one.  Intermediate layers (between consecutive object layers) are marked if the gap
+// to the previous skirt layer exceeds max_layer_height, so the draft shield maintains
+// structural continuity without leaving large unsupported jumps.
+// [HAZARD] Empty layers (no extruders) are silently skipped — if the entire layer range
+// is empty, the function exits without printing a skirt (with a "FIXME throw?" note left
+// by the original author).
 // Layers are marked for infinite skirt aka draft shield. Not all the layers have to be printed.
 void ToolOrdering::mark_skirt_layers(const PrintConfig &config, coordf_t max_layer_height)
 {
@@ -1428,6 +1603,19 @@ void ToolOrdering::mark_skirt_layers(const PrintConfig &config, coordf_t max_lay
 // Ignore color changes, which are performed on a layer and for such an extruder, that the extruder will not be printing above that layer.
 // If multiple events are planned over a span of a single layer, use the last one.
 
+// [INTENT] Assigns user-defined custom G-code events (color change, pause, tool change,
+// arbitrary G-code) to the correct LayerTools entry, walking layers in reverse to know
+// which extruders are still printing above each point.
+// [STATE] Writes LayerTools::custom_gcode pointer (non-owning, points into the static
+// custom_gcode_per_print_z vector declared in this file).
+// [HAZARD] custom_gcode_per_print_z is a static file-scope variable — it is overwritten
+// every time assign_custom_gcodes() is called. If two plates are processed concurrently
+// this would race.  Currently safe because slicing is single-threaded at the plate level.
+// [HAZARD] Tool changes are ignored (filtered out by the iterator skip condition) when
+// mode / model_mode mismatch (mm vs non-mm), so a file saved with multi-material tool
+// changes will silently drop those events when re-opened in single-material mode.
+// [COUPLING] Reads from print.model().get_curr_plate_custom_gcodes() — tightly coupled
+// to the Model/Plate object hierarchy.
 // BBS: replace model custom gcode with current plate custom gcode
 static CustomGCode::Info custom_gcode_per_print_z;
 void ToolOrdering::assign_custom_gcodes(const Print &print)
@@ -1594,6 +1782,25 @@ bool WipingExtrusions::is_support_overriddable(const ExtrusionRole role, const P
     return false;
 }
 
+// [INTENT] Mark extrusion entities (infill / perimeter / support) that should be printed
+// using the new_extruder immediately after a tool change, consuming purge volume in the
+// process.  This avoids depositing waste plastic in the wipe tower by instead routing the
+// initial "dirty" extrusion of the new filament into regions that will be hidden inside
+// the print (infill) or are accepted as discoloured (flush_into_objects).
+// [STATE] Mutates entity_map, support_map, support_intf_map via set_extruder_override().
+// Writes something_overridden = true as soon as any override is registered.
+// [COUPLING] Reads lt.print_z to find matching Layer/SupportLayer in each PrintObject.
+// Relies on object print order for spatial proximity — objects with flush_into_objects=true
+// are sorted first so neighbouring infills minimise travel.
+// [HAZARD] The loop variable `i` is reset to -1 inside the loop body (perimeters_done
+// flip). This is intentional but hard to follow; refactoring to a state machine would
+// reduce confusion.
+// [HAZARD] volume_to_wipe can reach exactly 0.f inside the inner loop, causing an early
+// return 0.f.  Floating-point accumulation means the caller sees "0 remaining" but
+// actual purge may be slightly under.
+// [HAZARD] Soluble filaments and support filaments are excluded from wiping (return
+// volume_to_wipe unchanged), so prints using soluble supports still fully consume the
+// wipe tower for those transitions.
 // Following function iterates through all extrusions on the layer, remembers those that could be used for wiping after toolchange
 // and returns volume that is left to be wiped on the wipe tower.
 float WipingExtrusions::mark_wiping_extrusions(const Print& print, unsigned int old_extruder, unsigned int new_extruder, float volume_to_wipe)
@@ -1737,6 +1944,13 @@ float WipingExtrusions::mark_wiping_extrusions(const Print& print, unsigned int 
 
 
 
+// [INTENT] Post-processing pass after all toolchanges on a layer have been processed.
+// Ensures that any overriddable entity that was *not* overridden by mark_wiping_extrusions
+// is force-assigned to an extruder so that infill/perimeter print order invariants are
+// maintained.  Without this, an entity might be printed with its original extruder at the
+// wrong time (e.g. infill before perimeter when infill_first=false).
+// [HAZARD] The force-override may violate infill_first ordering in edge cases (noted as
+// FIXME in the code). This is a known limitation left from PrusaSlicer.
 // Called after all toolchanges on a layer were mark_infill_overridden. There might still be overridable entities,
 // that were not actually overridden. If they are part of a dedicated object, printing them with the extruder
 // they were initially assigned to might mean violating the perimeter-infill order. We will therefore go through
@@ -1800,6 +2014,18 @@ void WipingExtrusions::ensure_perimeters_infills_order(const Print& print)
     }
 }
 
+// [INTENT] Called from GCode::process_layer to retrieve the per-copy extruder override
+// list for a specific extrusion entity. Returns nullptr if the entity has no override.
+// When overrides exist, replaces all -1 sentinel values (meaning "print as usual") with
+// the encoding -(correct_extruder_id+1) so the caller can distinguish overridden copies
+// (non-negative) from regular copies (negative, encoded).
+// [STATE] Mutates the override vector in entity_map in place — calling this function twice
+// on the same entity changes the -1 sentinels a second time (double-encoding bug if called
+// after correct_extruder_id changes).
+// [HAZARD] The negative encoding -(n+1) means extruder 0 is stored as -1, which collides
+// with the sentinel.  The replace() call resolves this by replacing all -1 first, so the
+// sentinel is consumed before correct_extruder_id=-1 could be written. Nevertheless this
+// encoding is fragile; any future change to the sentinel value must update all decode sites.
 // Following function is called from GCode::process_layer and returns pointer to vector with information about which extruders should be used for given copy of this entity.
 // If this extrusion does not have any override, nullptr is returned.
 // Otherwise it modifies the vector in place and changes all -1 to correct_extruder_id (at the time the overrides were created, correct extruders were not known,
