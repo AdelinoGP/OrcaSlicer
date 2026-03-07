@@ -1,3 +1,55 @@
+// [INTENT] BambuLab-extended 3MF (BBS 3MF) parser and serialiser — OrcaSlicer's primary project file format.
+// Extends standard 3MF (see 3mf.cpp) with per-plate slicing data, filament info, thumbnails,
+// printer model/nozzle data, BambuLab cloud project metadata, and per-face paint gizmo data.
+//
+// Key extensions over standard 3MF:
+//   Metadata/model_settings.config  — per-object/volume BBS config (replaces Slic3r_PE_model.config)
+//   Metadata/plate_N.gcode          — pre-sliced G-code per plate (slice cache)
+//   Metadata/thumbnail_N.png        — per-plate preview thumbnails
+//   Metadata/top_N.png              — per-plate top-view thumbnails
+//   Metadata/pick_N.png             — per-plate pick images
+//   Metadata/pattern_N.png          — per-plate pattern images
+//   Metadata/slice_info.config      — JSON slice statistics (weight, time, filament usage per plate)
+//   Metadata/project_settings.config— project-level preset references
+//   3D/Objects/object_N.model       — per-object geometry files (split out from 3dmodel.model)
+//
+// Architecture:
+//   - _BBS_3MF_Importer class (SAX-style expat parser + miniz ZIP reader)
+//   - _BBS_3MF_Exporter class (miniz ZIP writer + streaming XML generation)
+//   - Both use TBB parallel_for for per-object geometry operations (vertex/index building).
+//   - ZipUnicodePathExtraField struct: ZIP Unicode Path Extra Field (0x7075) encoding/decoding
+//     for non-ASCII filenames inside ZIP archives.
+//   - OpenSSL MD5 is used for content hashing (BambuLab cloud project verification).
+//
+// Format version constants:
+//   VERSION_BBS_3MF = 1  (rolled back from 2; next change must use 3)
+//   BBS_3MF_VERSION metadata key: "BambuStudio:3mfVersion" (Prusa-compatible key name)
+//   BBS_3MF_VERSION1 metadata key: "bamboo_slicer:Version3mf" (older OrcaSlicer key)
+//
+// Load strategy enum (LoadStrategy) controls what is loaded:
+//   LoadStrategy::Restore — load everything including slice cache
+//   LoadStrategy::LoadModel — geometry + config only (no slice cache)
+//   LoadStrategy::CheckVersion — version check only
+//   plate_id=-1 — load all plates; plate_id=N — load only plate N (1-indexed)
+//
+// [COUPLING] load_bbs_3mf() requires all output pointers (plate_data_list, project_presets,
+//            is_bbl_3mf, file_version) to be non-null — no null checks inside importer.
+// [COUPLING] StoreParams is a struct bundling all export options (path, model, config, plates,
+//            presets, thumbnail data, export flags). Eliminates long parameter lists but makes
+//            the export API opaque — callers must know which fields are required.
+// [CONCURRENCY] TBB is used in geometry rebuilding, but the XML parsing itself is single-threaded.
+// [HAZARD] Per-plate G-code is stored inside the 3MF — importing a BBS 3MF that was sliced by
+//          an older OrcaSlicer version may load stale G-code that no longer matches current config.
+//          LoadStrategy controls whether stale cache is accepted or discarded.
+// [HAZARD] BBS 3MF uses OpenSSL MD5 for content checksums. If OpenSSL is unavailable or
+//          the linking changes, the MD5 calls will silently produce wrong hashes at runtime
+//          with no compile-time error (function signatures match stub implementations).
+// [HAZARD] release_PlateData_list() uses raw delete on vector<PlateData*> — caller must call
+//          this function or else the PlateData objects leak (PlateDataPtrs = vector<PlateData*>).
+// [HAZARD] _add_custom_gcode_per_print_z is commented out in 3mf.cpp but IS active here —
+//          custom G-code per height is stored in BBS 3MF only.
+// [MEMORY] EmbossShape / SVG data uses shared_ptr<string> for file content deduplication
+//          across volumes that reference the same SVG file within one 3MF archive.
 #include "../libslic3r.h"
 #include "../Exception.hpp"
 #include "../Model.hpp"
@@ -8571,8 +8623,17 @@ private:
 
 
 //BBS: add plate data list related logic
-bool load_bbs_3mf(const char* path, DynamicPrintConfig* config, ConfigSubstitutionContext* config_substitutions, Model* model, PlateDataPtrs* plate_data_list, std::vector<Preset*>* project_presets,
-                    bool* is_bbl_3mf, Semver* file_version, Import3mfProgressFn proFn, LoadStrategy strategy, BBLProject *project, int plate_id)
+ // [INTENT] Top-level BBS 3MF load entry point. Forces "C" locale, delegates to
+ //          _BBS_3MF_Importer::load_model_from_file().
+ // [STATE] On success populates: model (geometry), config (print/filament/printer settings),
+ //         plate_data_list (per-plate sliced data + G-code cache), project_presets (preset refs).
+ // [STATE] is_bbl_3mf is set to true if the file contains BambuLab-specific metadata keys.
+ // [COUPLING] strategy selects what data to load (see LoadStrategy enum in bbs_3mf.hpp).
+ //            plate_id=-1 loads all plates; plate_id=N loads only plate N (1-indexed).
+ // [HAZARD] Legacy handle_legacy_project_loaded() migration is disabled (commented out BBS note).
+ //          Config option migrations from older PrusaSlicer projects will not apply here.
+ bool load_bbs_3mf(const char* path, DynamicPrintConfig* config, ConfigSubstitutionContext* config_substitutions, Model* model, PlateDataPtrs* plate_data_list, std::vector<Preset*>* project_presets,
+                     bool* is_bbl_3mf, Semver* file_version, Import3mfProgressFn proFn, LoadStrategy strategy, BBLProject *project, int plate_id)
 {
     if (path == nullptr || config == nullptr || model == nullptr)
         return false;
@@ -8605,6 +8666,11 @@ bool load_gcode_3mf_from_stream(std::istream &data, DynamicPrintConfig *config, 
     return res;
 }
 
+// [INTENT] Top-level BBS 3MF export entry point. Forces "C" locale, delegates to
+//          _BBS_3MF_Exporter::save_model_to_file().
+// [COUPLING] All export parameters are bundled in StoreParams (path, model, config,
+//            plate_data_list, project_presets, thumbnail_data, export flags).
+// [HAZARD] Returns false on any ZIP write failure; partial archives may be left on disk.
 bool store_bbs_3mf(StoreParams& store_params)
 {
     // All export should use "C" locales for number formatting.
@@ -8622,6 +8688,12 @@ bool store_bbs_3mf(StoreParams& store_params)
 }
 
 //BBS: release plate data list
+// [INTENT] Manual destructor for PlateDataPtrs (vector<PlateData*>). Callers of load_bbs_3mf()
+//          are responsible for calling this when finished with plate_data_list.
+// [MEMORY] PlateData objects are heap-allocated (new) inside the importer.
+//          Failure to call this function leaks all PlateData objects.
+//          There is no RAII ownership — a refactor should replace PlateDataPtrs with
+//          vector<unique_ptr<PlateData>> to enforce automatic cleanup.
 void release_PlateData_list(PlateDataPtrs& plate_data_list)
 {
     //clear

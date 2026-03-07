@@ -1,3 +1,50 @@
+// [INTENT] 3MF (3D Manufacturing Format) parser and serialiser — PrusaSlicer/Slic3rPE dialect.
+// This file handles the standard 3MF subset used by PrusaSlicer. BambuLab extensions are in bbs_3mf.cpp.
+//
+// 3MF is a ZIP archive containing:
+//   3D/3dmodel.model        — geometry (vertices + triangles) as XML
+//   Metadata/Slic3r_PE.config              — DynamicPrintConfig key=value pairs
+//   Metadata/Slic3r_PE_model.config        — per-object/per-volume config + volume matrices
+//   Metadata/Slic3r_PE_layer_heights_profile.txt
+//   Metadata/Prusa_Slicer_layer_config_ranges.xml
+//   Metadata/Slic3r_PE_sla_support_points.txt
+//   Metadata/Slic3r_PE_sla_drain_holes.txt
+//   Metadata/Prusa_Slicer_custom_gcode_per_print_z.xml
+//
+// Format version history:
+//   v0: Files from older slic3r or 3rd-party tools — no version metadata.
+//   v1: Versioning introduced. No data changes.
+//   v2: Per-volume matrices + source data added to model.config. Meshes stored in volume-local space.
+//       NOTE: version rolled back to 1; next change must use v3.
+//
+// Painting gizmos versioning (FDM supports, seam, multi-material) are separately versioned at v1.
+//
+// Parsing architecture:
+//   - _3MF_Importer class owns an expat XML_Parser + state. Drives load_model_from_file().
+//   - _3MF_Exporter class owns a mz_zip_archive. Drives save_model_to_file().
+//   - PrusaFileParser: lightweight expat wrapper to detect PrusaSlicer origin of a 3MF.
+//   - get_transform_from_3mf_specs_string(): parses 4x3 column-major transform string.
+//     3MF spec stores transforms as 4x3 (row-major); loaded as Eigen 4x4 column-major.
+//     [HAZARD] The transpose is done manually in the parse loop — easy to invert by mistake.
+//   - get_unit_factor(): converts 3MF unit attribute to a float multiplier → mm.
+//     Default unit = millimeter (factor 1.0) per 3MF spec.
+//   - fast_float is used for coordinate parsing in get_attribute_value_float() for speed.
+//     [HAZARD] fast_float::from_chars does not set errno; errors produce value=0.0f silently.
+//
+// Public API (used from OrcaSlicer.cpp and GUI):
+//   load_3mf(path, config, config_substitutions, model, check_version)
+//   store_3mf(path, model, config, fullpath_sources, thumbnail_data, zip64)
+//
+// [COUPLING] _3MF_Exporter::_add_custom_gcode_per_print_z_file_to_archive() is ENTIRELY STUBBED
+//            (function body returns true immediately; real code is commented out).
+//            CustomGCode data is not written to standard 3MF by this path — only BBS 3MF writes it.
+//
+// [CONCURRENCY] Neither importer nor exporter is thread-safe. All parsing is single-threaded.
+// [MEMORY] Vertex/index data is streamed into indexed_triangle_set during XML parsing — no full
+//          in-memory buffer of the XML text.
+// [HAZARD] handle_legacy_project_loaded(): applies brim_object_gap migration from older PrusaSlicer
+//          files that stored elephant_foot_compensation as brim separation. Must stay in sync with
+//          any future config option renames.
 #include "../libslic3r.h"
 #include "../Exception.hpp"
 #include "../Model.hpp"
@@ -204,6 +251,12 @@ bool get_attribute_value_bool(const char** attributes, unsigned int attributes_s
     return (text != nullptr) ? (bool)::atoi(text) : true;
 }
 
+// [INTENT] Parse a 3MF transform string (12 space-separated floats) into an Eigen 4x4 matrix.
+// [HAZARD] 3MF spec stores the transform in column-major 4x3 layout (3 rotation/scale columns
+//          + 1 translation column). The loop transposes to Eigen row-major (r,c) order.
+//          If the column/row loop order is swapped during a refactor, transforms will be TRANSPOSED
+//          (rotations inverted, translations mis-placed) — producing silently wrong part placement.
+// [HAZARD] Invalid or missing strings silently return identity — no error is propagated.
 Slic3r::Transform3d get_transform_from_3mf_specs_string(const std::string& mat_str)
 {
     // check: https://3mf.io/3d-manufacturing-format/ or https://github.com/3MFConsortium/spec_core/blob/master/3MF%20Core%20Specification.md
@@ -3261,6 +3314,14 @@ static void handle_legacy_project_loaded(unsigned int version_project_file, Dyna
     }
 }
 
+// [INTENT] Top-level 3MF load entry point. Forces "C" numeric locale for the parse duration,
+//          then delegates to _3MF_Importer::load_model_from_file().
+// [STATE] On success: model is populated with geometry, config is updated from embedded configs,
+//         config_substitutions records any option keys that were not recognised or were migrated.
+// [COUPLING] handle_legacy_project_loaded() runs after import — applies brim_object_gap migration.
+//            check_version=true causes a version_error exception if the 3MF version exceeds
+//            VERSION_3MF_COMPATIBLE (currently 2).
+// [CONCURRENCY] Not thread-safe; importer state is single-threaded.
 bool load_3mf(const char* path, DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions, Model* model, bool check_version)
 {
     if (path == nullptr || model == nullptr)
@@ -3275,6 +3336,14 @@ bool load_3mf(const char* path, DynamicPrintConfig& config, ConfigSubstitutionCo
     return res;
 }
 
+// [INTENT] Top-level 3MF export entry point. Forces "C" numeric locale, then delegates to
+//          _3MF_Exporter::save_model_to_file().
+// [HAZARD] _add_custom_gcode_per_print_z_file_to_archive() is a no-op stub — CustomGCode data
+//          is NOT serialised into PrusaSlicer-format 3MF from this path. This is intentional
+//          for BambuLab's separate bbs_3mf.cpp exporter, but is an important data loss if
+//          this function is used for round-tripping OrcaSlicer projects.
+// [STATE] zip64 controls ZIP64 extension (required for archives > 4GB).
+// [COUPLING] thumbnail_data: if non-null, a PNG thumbnail is embedded at Metadata/thumbnail.png.
 bool store_3mf(const char* path, Model* model, const DynamicPrintConfig* config, bool fullpath_sources, const ThumbnailData* thumbnail_data, bool zip64)
 {
     // All export should use "C" locales for number formatting.

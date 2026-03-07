@@ -1,3 +1,26 @@
+// [INTENT] OBJ format loader/exporter. Converts Wavefront OBJ + optional MTL sidecar into
+// an indexed triangle set (ITS) suitable for OrcaSlicer's TriangleMesh.
+//
+// Loading pipeline:
+//   1. ObjParser::objparse()     — tokenises vertices, faces, usemtl directives
+//   2. ObjParser::mtlparse()     — reads MTL sidecar file(s) for material colours
+//   3. Face validation           — rejects polygons with >4 or <3 vertices
+//   4. ITS construction          — copies vertex coords; quads are split into 2 triangles
+//   5. Per-face colour mapping   — Ka+Kd blending or Kd fallback; UV map/PNG tracking
+//   6. Volume check              — negative volume → flip_triangles() for correct winding
+//
+// [STATE] load_obj(path, meshptr, ...) fills *meshptr in place.
+//         load_obj(path, model, ...)  calls the above then inserts into Model.
+//
+// [COUPLING] ObjInfo output struct carries per-face colours, UV coordinates, PNG references,
+//            and vertex colours — all consumed by the GUI import pipeline.
+//            ObjParser is a separate module (objparser.hpp); MTL parsing is also delegated there.
+//
+// [HAZARD] store_obj() always returns true even if the underlying WriteOBJFile() fails (known FIXME).
+// [HAZARD] MTL lookup via unordered map — missing material silently records lost_material_name
+//          but continues loading. Geometry is still imported with default colour.
+// [HAZARD] Quad triangulation (fan split: 0-1-2 and 0-2-3) is only correct for convex quads.
+//          Concave quads produce incorrect triangulation without warning.
 #include "../libslic3r.h"
 #include "../Model.hpp"
 #include "../TriangleMesh.hpp"
@@ -9,6 +32,7 @@
 
 #include <boost/log/trivial.hpp>
 
+// [INTENT] Platform-specific path separator for basename extraction.
 #ifdef _WIN32
 #define DIR_SEPARATOR '\\'
 #else
@@ -21,6 +45,12 @@
 
 namespace Slic3r {
 
+// [INTENT] Primary OBJ load function. Fills *meshptr with geometry parsed from `path`.
+//          Also populates obj_info with material/colour/UV metadata for GUI display.
+// [STATE] *meshptr is overwritten on success. On failure it may be partially written — caller
+//         should not use *meshptr after a false return.
+// [MEMORY] ObjParser::ObjData and MtlData are local temporaries; ITS is built inline and
+//          move-assigned into *meshptr at the end (line ~205).
 bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::string &message)
 {
     if (meshptr == nullptr)
@@ -33,6 +63,9 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
         message = _L("load_obj: failed to parse");
         return false;
     }
+    // [INTENT] Load all MTL sidecar files referenced by 'mtllib' directives in the OBJ.
+    // [COUPLING] MTL path resolution: try as absolute path first, then relative to OBJ dir.
+    // [HAZARD] If an MTL file is missing, logs a warning but continues without colours.
     bool exist_mtl = false;
     if (data.mtllibs.size() > 0) { // read mtl
         for (auto mtl_name : data.mtllibs) {
@@ -66,7 +99,10 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
             }
         }
     }
-    // Count the faces and verify, that all faces are triangular.
+    // [INTENT] First pass: count faces and validate polygon vertex counts.
+    //          data.vertices is a flat array of ObjVertex structs; coordIdx==-1 marks face boundaries.
+    // [HAZARD] Polygons with 5+ vertices immediately abort loading with an error.
+    //          Polygons with exactly 4 vertices (quads) are counted separately for index pre-allocation.
     size_t num_faces = 0;
     size_t num_quads = 0;
     for (size_t i = 0; i < data.vertices.size(); ++ i) {
@@ -91,7 +127,9 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
             i = j;
         }
     }
-    // Convert ObjData into indexed triangle set.
+    // [INTENT] Second pass: build indexed_triangle_set. Quads are fan-triangulated into 2 triangles.
+    // [HAZARD] Fan triangulation (0-1-2, 0-2-3) is only valid for convex quads.
+    //          Concave OBJ quads will produce incorrect geometry silently.
     indexed_triangle_set its;
     size_t               num_vertices = data.coordinates.size() / OBJ_VERTEX_LENGTH;
     its.vertices.reserve(num_vertices);
@@ -100,6 +138,8 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
         obj_info.is_single_mtl = data.usemtls.size() == 1 && mtl_data.new_mtl_unmap.size() == 1;
         obj_info.face_colors.reserve(num_faces + num_quads);
     }
+    // [INTENT] Copy vertex positions. OBJ_VERTEX_LENGTH = 7 (x, y, z, r, g, b, a) to support
+    //          per-vertex colours stored as extra coordinate fields in extended OBJ variants.
     bool has_color = data.has_vertex_color;
     for (size_t i = 0; i < num_vertices; ++ i) {
         size_t j = i * OBJ_VERTEX_LENGTH;
@@ -112,6 +152,8 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
     }
     int indices[ONE_FACE_SIZE];
     int uvs[ONE_FACE_SIZE];
+    // [INTENT] Walk the flat data.vertices array, collecting vertex indices per face
+    //          (terminated by coordIdx==-1 sentinel) and building triangle indices.
     for (size_t i = 0; i < data.vertices.size();)
         if (data.vertices[i].coordIdx == -1)
             ++ i;
@@ -137,6 +179,12 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
                 its.indices.emplace_back(indices[0], indices[1], indices[2]);
                 int  face_index =its.indices.size() - 1;
                 RGBA face_color;
+                // [INTENT] Resolve material colour for a face by name lookup.
+                //          Colour = Ka+Kd if their sum stays ≤1 per channel, else Kd only.
+                //          Alpha is taken from Tr (transparency) channel.
+                // [COUPLING] Reads mtl_data.new_mtl_unmap (map<string, MaterialData*>) built during MTL parse.
+                // [HAZARD] If material name is not in the map, face colour is silently skipped and
+                //          lost_material_name records the first missing name for UI warning.
                 auto set_face_color = [&uvs, &data, &mtl_data, &obj_info, &face_color](int face_index, const std::string mtl_name) {
                     if (mtl_data.new_mtl_unmap.find(mtl_name) != mtl_data.new_mtl_unmap.end()) {
                         bool is_merge_ka_kd = true;
@@ -176,6 +224,11 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
                         }
                     }
                 };
+                // [INTENT] Dispatch face colour assignment: single-material OBJ uses index 0;
+                //          multi-material OBJ does linear scan over usemtl ranges to find the
+                //          material active at face_index. O(materials) per face — not O(1).
+                // [HAZARD] Linear scan over usemtl ranges is O(M) per face. For large meshes with
+                //          many material sections this becomes O(F*M) overall — a performance hazard.
                 auto set_face_color_by_mtl = [&data, &set_face_color](int face_index) {
                     if (data.usemtls.size() == 1) {
                         set_face_color(face_index, data.usemtls[0].name);
@@ -193,6 +246,7 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
                     set_face_color_by_mtl(face_index);
                 }
                 if (cnt == 4) {
+                    // [INTENT] Second triangle of fan-triangulated quad: vertices 0, 2, 3.
                     its.indices.emplace_back(indices[0], indices[2], indices[3]);
                     int face_index = its.indices.size() - 1;
                     if (exist_mtl) {
@@ -202,17 +256,22 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
             }
         }
 
+    // [INTENT] Move-construct TriangleMesh from ITS. Avoids a deep copy of all vertex/index data.
     *meshptr = TriangleMesh(std::move(its));
     if (meshptr->empty()) {
         BOOST_LOG_TRIVIAL(error) << "load_obj: This OBJ file couldn't be read because it's empty. " << path;
         message = _L("This OBJ file couldn't be read because it's empty.");
         return false;
     }
+    // [INTENT] Negative signed volume means face winding is CW (inside-out).
+    //          Flip all triangles to restore CCW convention expected by the slicing engine.
     if (meshptr->volume() < 0)
         meshptr->flip_triangles();
     return true;
 }
 
+// [INTENT] Convenience overload: loads OBJ into a temporary mesh then inserts into Model.
+// [COUPLING] object_name_in follows same basename fallback as load_stl().
 bool load_obj(const char *path, Model *model, ObjInfo& obj_info, std::string &message, const char *object_name_in)
 {
     TriangleMesh mesh;
@@ -232,6 +291,8 @@ bool load_obj(const char *path, Model *model, ObjInfo& obj_info, std::string &me
     return ret;
 }
 
+// [INTENT] Write a TriangleMesh to OBJ format.
+// [HAZARD] Always returns true even if WriteOBJFile() fails (known FIXME).
 bool store_obj(const char *path, TriangleMesh *mesh)
 {
     //FIXME returning false even if write failed.
@@ -239,12 +300,14 @@ bool store_obj(const char *path, TriangleMesh *mesh)
     return true;
 }
 
+// [INTENT] Convenience overload: merges ModelObject volumes into a single mesh before writing.
 bool store_obj(const char *path, ModelObject *model_object)
 {
     TriangleMesh mesh = model_object->mesh();
     return store_obj(path, &mesh);
 }
 
+// [INTENT] Convenience overload: merges all Model objects into a single mesh before writing.
 bool store_obj(const char *path, Model *model)
 {
     TriangleMesh mesh = model->mesh();

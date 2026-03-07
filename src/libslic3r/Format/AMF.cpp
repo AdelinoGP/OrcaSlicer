@@ -1,3 +1,41 @@
+// [INTENT] AMF (Additive Manufacturing File Format) parser and serialiser.
+// AMF is an XML-based 3D file format (ISO/ASTM 52915). OrcaSlicer supports loading
+// both plain .amf XML files and .zip.amf (ZIP-compressed AMF) archives via miniz.
+//
+// Parsing architecture:
+//   - Uses expat (event-driven XML) via AMFParserContext, a SAX-style state machine.
+//   - AMFParserContext::m_path (vector<AMFNodeType>) tracks the current XML element path.
+//     startElement() pushes onto m_path; endElement() pops and finalises partial objects.
+//   - The parser directly constructs Model objects in place (no intermediate DOM).
+//
+// Format version history (see VERSION_AMF constants):
+//   v0: Legacy slic3r .amf files — no version metadata.
+//   v1: Versioning introduced. No data changes.
+//   v2: Added deltaz, rx/ry, scalex/y/z, mirrorx/y/z for instances.
+//   v3: Added per-volume matrices and source data. NOTE: version rolled back to 2 —
+//       next real change must use version 4. (See commented-out SLIC3RPE_AMF_VERSION.)
+//
+// AMF write support: store_amf() is ENTIRELY COMMENTED OUT (the function body is a block comment).
+// AMF is now read-only in OrcaSlicer. Export uses 3MF (bbs_3mf.cpp).
+//
+// Entry points:
+//   load_amf()          — detects ZIP vs plain XML by reading first 2 bytes ("PK" magic).
+//   load_amf_file()     — plain XML path, uses expat directly on file stream.
+//   load_amf_archive()  — ZIP path, extracts .amf entry from miniz archive then parses.
+//
+// [COUPLING] AMFParserContext holds raw pointers into the Model being constructed
+//            (m_object, m_volume, m_material, m_instance). These are never null-checked
+//            after creation — structural correctness depends on the XML being well-formed.
+// [HAZARD] expat error signalling: AMFParserContext::stop() sets m_error=true AND calls
+//          XML_StopParser(). After stop(), expat may still call handlers. Check m_error
+//          after every XML_Parse() return; do not rely on XML_GetError() alone.
+// [HAZARD] m_value[5] is a generic string buffer reused across different XML paths.
+//          Tag overlap or missing endElement calls can corrupt accumulated values silently.
+// [HAZARD] Unit conversion: BBS-added 'm_use_inches' flag converts coordinates on read.
+//          If a refactor separates coordinate ingestion from unit conversion, this flag
+//          must be carried through consistently or coordinates will be in the wrong scale.
+// [MEMORY] All ModelObject/ModelVolume/ModelMaterial pointers are owned by the Model.
+//          AMFParserContext holds only borrowed raw pointers — no RAII.
 #include <limits>
 #include <string.h>
 #include <map>
@@ -882,8 +920,13 @@ void AMFParserContext::endDocument()
     }
 }
 
-// Load an AMF file into a provided model.
-//BBS: add inches check logic
+    // [INTENT] Plain XML AMF loader. Uses expat streaming parse over 8KB read chunks.
+    // [COUPLING] AMFParserContext ctx holds a borrowed pointer to the Model — not owned here.
+    // [HAZARD] fread loop: XML_Parse is called with done=1 only on the last chunk.
+    //          If fread returns len=0 mid-file (e.g. on a read error), the parse loop breaks
+    //          without setting result=true, but expat state is already partially consumed.
+    // [CONCURRENCY] Not thread-safe; expat parser state is single-threaded.
+    //BBS: add inches check logic
 bool load_amf_file(const char *path, DynamicPrintConfig *config, ConfigSubstitutionContext *config_substitutions, Model *model, bool *use_inches)
 {
     if ((path == nullptr) || (model == nullptr))
@@ -1024,6 +1067,12 @@ bool extract_model_from_archive(mz_zip_archive& archive, const mz_zip_archive_fi
     return true;
 }
 
+// [INTENT] ZIP-archived AMF loader (.zip.amf). Extracts the inner .amf entry from the miniz
+//          archive using a streaming callback, feeding each chunk directly to expat.
+// [HAZARD] The extract callback throws Slic3r::FileIOError on XML parse errors — caught by
+//          the outer try/catch which logs and returns false. Exception message includes filename,
+//          line number, and expat error string for diagnosis.
+// [MEMORY] No full decompression buffer allocated; data is streamed chunk-by-chunk to expat.
 // Load an AMF archive into a provided model.
 bool load_amf_archive(const char* path, DynamicPrintConfig* config, ConfigSubstitutionContext* config_substitutions, Model* model, bool* use_inches)
 {
@@ -1091,6 +1140,16 @@ bool load_amf_archive(const char* path, DynamicPrintConfig* config, ConfigSubsti
     return true;
 }
 
+// [INTENT] Top-level AMF load entry point. Auto-detects ZIP vs plain XML by reading the
+//          first 2 bytes of the file: "PK" = ZIP magic → load_amf_archive(); else plain XML.
+// [STATE] CNumericLocalesSetter forces "C" locale for the duration of parsing so that
+//         floating-point numbers with '.' decimal separator parse correctly regardless of
+//         the user's system locale. Restored on destruction (RAII).
+// [COUPLING] config and config_substitutions may be nullptr (no config loading).
+//            use_inches is an output flag set by the parser on finding 'unit="inch"'.
+// [HAZARD] Only '.amf' extension is accepted. '.amf.xml' and '.zip.amf' variants from
+//          older Slic3r versions are NOT handled by this function — those must be renamed.
+//          (The ZIP detection by PK magic partially compensates for .zip.amf.)
 // Load an AMF file into a provided model.
 // If config is not a null pointer, updates it if the amf file/archive contains config data
 //BBS: refine the amf logic
