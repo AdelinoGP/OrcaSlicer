@@ -6,6 +6,28 @@
 // Copyright (c) 2021 Ultimaker B.V.
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
+// [INTENT] Organic tree support generation — handles only smsTreeOrganic mode.
+// The pipeline (all within generate_support_areas()):
+//   1. group_meshes()               — group PrintObjects by TreeSupportSettings
+//   2. detect_overhangs()           — delegated to TreeSupport (non-3D)
+//   3. precalculate()               — collision/avoidance volume precomputation
+//   4. generate_initial_areas()     — place tip influence areas at overhang layers (TBB)
+//   5. create_layer_pathing()       — propagate influence areas downward (serial)
+//   6. create_nodes_from_area()     — assign result_on_layer points (serial bottom-up)
+//   7. organic_draw_branches()      — 3D tube generation + slicing (TBB)
+//   8. generate_interface_layers()  — compute interface from top/bottom contacts
+//   9. generate_raft_base()         — raft layers
+//  10. generate_support_layers()    — merge all layer types
+//  11. generate_support_toolpaths() — fill each layer with toolpaths
+//
+// [CONCURRENCY] TBB parallel_for used in steps 4, 7. Steps 5–6 are fully serial.
+// [COUPLING] Depends on TreeModelVolumes (collision/avoidance cache), TreeSupport
+//            (overhang detection, vertical enforcer points), SupportCommon (raft/
+//            toolpath generation helpers), Fill::new_from_type() for infill.
+//
+// [HAZARD] TREE_SUPPORT_ORGANIC_NUDGE_NEW is hardcoded to 1 at line 45.
+//          The #else branch (OpenVDB-based nudge) is dead code — never compiled.
+
 #include "TreeSupport3D.hpp"
 #include "AABBTreeIndirect.hpp"
 #include "AABBTreeLines.hpp"
@@ -108,6 +130,9 @@ static inline void validate_range(const LineInformations &lines)
         validate_range(l);
 }
 
+// [INTENT] Debug-only helper: pops a Win32 MessageBox if self-intersecting edges
+// are found. No-op on non-Windows builds and when TREE_SUPPORT_SHOW_ERRORS is
+// not defined. Safe to call in release — entire body is compiled out.
 static inline void check_self_intersections(const Polygons &polygons, const std::string_view message)
 {
 #ifdef TREE_SUPPORT_SHOW_ERRORS_WIN32
@@ -122,6 +147,19 @@ static inline void check_self_intersections(const ExPolygon &expoly, const std::
 #endif // TREE_SUPPORT_SHOW_ERRORS_WIN32
 }
 
+// [INTENT] Groups PrintObjects into clusters that can share a single TreeSupportSettings.
+// Objects in the same group can use one avoidance/collision volume cache (TreeModelVolumes).
+//
+// [HAZARD] TreeSupportSettings::soluble is a static member — it is set here as a
+// side effect of iterating print_object_ids. If two PrintObjects with different
+// support_top_z_distance values are processed concurrently (e.g., multi-threaded
+// slicing), the last writer wins and all objects see the same soluble flag.
+// This is the same race documented in TreeSupport.cpp for diameter_angle_scale_factor.
+//
+// [HAZARD] The multi-group logic inside `#if 0` is DISABLED. Every object is placed
+// in its own group (one object per group). The FIXME comment says this is intentional
+// for now, but it means avoidance volumes are recomputed per object even when
+// multiple objects share the same settings — wasted CPU time on multi-object prints.
 static std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> group_meshes(const Print &print, const std::vector<size_t> &print_object_ids)
 {
     std::vector<std::pair<TreeSupportSettings, std::vector<size_t>>> grouped_meshes;
@@ -501,6 +539,17 @@ template<typename EvaluatePointFn>
     return std::pair<std::vector<std::vector<std::pair<Point, LineStatus>>>, std::vector<std::vector<std::pair<Point, LineStatus>>>>(keep, set_free);
 }
 
+// [INTENT] Ported from CuraEngine's PolygonUtils::getNextPointWithDistance().
+// Samples a point at exactly distance `dist` from `start_pt` along a polyline,
+// starting the search from segment (start_idx, start_idx+1).
+// Returns {sample_point, segment_index} or empty if no such point exists on the
+// remaining polyline.
+//
+// [STATE] Used by ensure_maximum_distance_polyline() to resample polylines to a
+// maximum inter-point spacing.
+//
+// [HAZARD] For large polylines with many segments, this can be O(N) per call.
+// Called in a loop inside ensure_maximum_distance_polyline() → potentially O(N²).
 // Ported from CURA's PolygonUtils::getNextPointWithDistance()
 // Sample a next point at distance "dist" from start_pt on polyline segment (start_idx, start_idx + 1).
 // Returns sample point and start index of its segment on polyline if such sample exists.
@@ -558,6 +607,17 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
  * \param min_points[in] The amount of points that have to be placed. If not enough can be placed the distance will be reduced to place this many points.
  * \return A Polygons object containing the evenly spaced points. Does not represent an area, more a collection of points on lines.
  */
+// [INTENT] Resamples polylines so consecutive points are at most `distance` apart.
+// Used by sample_overhang_area() and generate_initial_areas() to distribute tip
+// contact points evenly along overhang edges.
+//
+// [HAZARD] For closed (polygon-like) polylines, finds the two farthest vertices
+// to choose a start index — this uses an O(N²) double loop over all vertex pairs.
+// On dense contours this can be slow.
+//
+// [HAZARD] The `#if 0` block inside this function (alternative branch using
+// polyline_sample_next_point_at_distance for the open-polyline case) is dead.
+// The active path uses a simpler linear interpolation loop.
 [[nodiscard]] static Polylines ensure_maximum_distance_polyline(const Polylines &input, double distance, size_t min_points)
 {
     Polylines result;
@@ -662,6 +722,20 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
  *
  * \return A Polygons object that represents the resulting infill lines.
  */
+// [INTENT] Generates zig-zag infill lines for a support roof or base area.
+// Uses OrcaSlicer's Fill::new_from_type() to instantiate the correct infill type.
+// The angle alternates 90° between even/odd layers for roof, fixed for base.
+//
+// [HAZARD] OPERATOR PRECEDENCE BUG in interface angle computation:
+//   (support_params.interface_angle + (layer_idx & 1) ? float(-M_PI/4.) : float(+M_PI/4.))
+// Due to C++ operator precedence, the ternary binds to the ENTIRE addition expression,
+// not just to (layer_idx & 1). The correct intent is:
+//   support_params.interface_angle + ((layer_idx & 1) ? float(-M_PI/4.) : float(+M_PI/4.))
+// This means the actual angle passed is either -M_PI/4 or +M_PI/4, ignoring
+// interface_angle entirely when the sum is non-zero.
+//
+// [HAZARD] The `#if 0` branch using CuraEngine's Infill class is dead code.
+// The active code uses OrcaSlicer's Fill abstraction.
 [[nodiscard]] static Polylines generate_support_infill_lines(
     // Polygon to fill in with a zig-zag pattern supporting an overhang.
     const Polygons          &polygon,
@@ -754,6 +828,15 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
  * \param second[in] The second Polygon.
  * \return The union of both Polygons
  */
+// [INTENT] Workaround for a Clipper rounding bug: union_() can destroy very thin
+// polygons (e.g., influence areas that are only a few units wide) by rounding
+// them to zero. If the result is empty but inputs were non-empty, falls back to
+// a polyline offset by 0.002mm and re-unions.
+//
+// [HAZARD] This disguises the underlying Clipper rounding issue rather than fixing it.
+// The fallback path (offset polylines) changes the polygon shape slightly.
+// For translation: the correct fix is to use integer arithmetic throughout rather
+// than relying on coordinate range guards.
 [[nodiscard]] static Polygons safe_union(const Polygons first, const Polygons second = {})
 {
     // unionPolygons can slowly remove Polygons under certain circumstances, because of rounding issues (Polygons that have a thin area).
@@ -797,6 +880,19 @@ static std::optional<std::pair<Point, size_t>> polyline_sample_next_point_at_dis
  * \param min_amount_offset[in] How many steps have to be done at least. As this uses round offset this increases the amount of vertices, which may be required if Polygons get very small. Required as arcTolerance is not exposed in offset, which should result with a similar result.
  * \return The resulting Polygons object.
  */
+// [INTENT] Multi-step polygon offset that grows `me` outward by `distance` without
+// "teleporting through walls" — i.e., growing too far in one step can cause the
+// polygon to jump through a narrow obstacle. By stepping in increments of
+// safe_step_size, the intermediate diff-with-collision clips are applied at each step.
+//
+// Every 10 steps, polygons_simplify() is called to prevent vertex explosion from
+// repeated jtRound offsets on small polygons.
+//
+// [STATE] Returns a new Polygons — does not modify `me` or `collision`.
+//
+// [HAZARD] If `distance` is very large relative to `safe_step_size`, this loop
+// runs many iterations. O(N × iterations) where N = vertex count. Dense models
+// with large overhangs will trigger many steps.
 [[nodiscard]] static Polygons safe_offset_inc(const Polygons& me, coord_t distance, const Polygons& collision, coord_t safe_step_size, coord_t last_step_offset_without_check, size_t min_amount_offset)
 {
     bool do_final_difference = last_step_offset_without_check == 0;
@@ -1016,6 +1112,13 @@ private:
     std::vector<std::unordered_set<Point, PointHash>>   m_already_inserted;
 };
 
+// [INTENT] Generates the raft contact layer — a special support layer that
+// separates the raft from the first object layer. Created OUTSIDE the main
+// tree generation loop so trees are not grown for this layer.
+//
+// [STATE] Returns the index of the raft contact layer, or -1 if no raft.
+// Side-effect: allocates a SupportGeneratorLayer in layer_storage and registers
+// it as a top_contact in interface_placer.
 int generate_raft_contact(
     const PrintObject               &print_object,
     const TreeSupportSettings       &config,
@@ -1246,6 +1349,21 @@ void sample_overhang_area(
  * \param move_bounds[out] Storage for the influence areas.
  * \param storage[in] Background storage, required for adding roofs.
  */
+// [INTENT] Step 4 of the organic support pipeline.
+// For each overhang layer, determines where to place tree-tip influence areas.
+// A TBB parallel_for iterates over all layers with overhangs. For each layer:
+//   - Computes relevant_forbidden (collision + avoidance offset)
+//   - Computes overhang_regular by offsetting the overhang polygon outward
+//   - Separates roof overhangs from regular ones (area threshold)
+//   - Calls sample_overhang_area() for each ExPolygon to place actual tip points
+// Contact points are written to interface_placer and influence area stubs to move_bounds.
+//
+// [CONCURRENCY] TBB parallel_for over layers. Writes to move_bounds[] via
+// tbb::spin_mutex (one mutex per output element). Writes to interface_placer
+// via m_mutex_movebounds.
+//
+// [HAZARD] Rotated 22° contact-point grid is hardcoded. The grid spacing is
+// derived from line_width but the rotation is always 22° regardless of model.
 static void generate_initial_areas(
     const PrintObject               &print_object,
     const TreeModelVolumes          &volumes,
@@ -1588,21 +1706,46 @@ static Point move_inside_if_outside(const Polygons &polygons, Point from, int di
  * \param mergelayer[in] Will the merge method be called on this layer. This information is required as some calculation can be avoided if they are not required for merging.
  * \return A valid support element for the next layer regarding the calculated influence areas. Empty if no influence are can be created using the supplied influence area and settings.
  */
-[[nodiscard]] static std::optional<SupportElementState> increase_single_area(
-    const TreeModelVolumes      &volumes,
-    const TreeSupportSettings   &config,
-    const AreaIncreaseSettings  &settings,
-    const LayerIndex             layer_idx,
-    const SupportElement        &parent,
-    const Polygons              &relevant_offset,
-    Polygons                    &to_bp_data,
-    Polygons                    &to_model_data,
-    Polygons                    &increased,
-    const coord_t                overspeed,
-    const bool                   mergelayer)
-{
-    SupportElementState current_elem{ SupportElementState::propagate_down(parent.state) };
-    Polygons check_layer_data;
+ // [INTENT] Try to grow a single support element's influence area down by one layer.
+ // Applies ONE AreaIncreaseSettings configuration to 'parent' to see if a viable
+ // area exists on (layer_idx - 1). Returns the new SupportElementState on success,
+ // or std::nullopt if the resulting area is too tiny (<tiny_area_threshold).
+ //
+ // [STATE] Does NOT modify parent. All mutations go into out-params
+ //   (to_bp_data, to_model_data, increased) and the returned optional state.
+ //   Caller (increase_areas_one_layer) selects the best result from multiple
+ //   AreaIncreaseSettings trials and writes back to the element.
+ //
+ // [COUPLING] Reads three TreeModelVolumes caches: getAvoidance(), getCollision(),
+ //   getWallRestriction(). Each cache key is (radius, layer_idx, use_min_distance).
+ //   Calls safe_offset_inc() and safe_union() for Clipper-safe geometry ops.
+ //
+ // [MEMORY] 'increased', 'to_bp_data', 'to_model_data' are output Polygons passed
+ //   by reference. They are not cleared here; callers must manage lifetime.
+ //
+ // [HAZARD] Radius expansion loop (lines ~1797-1803) iterates with
+ //   getRadiusNextCeil() calls. If the lookup table has non-monotone entries
+ //   (a TreeModelVolumes bug), this loop can be infinite.
+ //
+ // [HAZARD] planned_foot_increase computation divides by foot_radius_increase.
+ //   If foot_radius_increase == 0 (bp_radius_increase_per_layer <=
+ //   branch_radius_increase_per_layer), the division result is -inf or 0 and
+ //   increase_bp_foot will always be false. This is intentional but fragile.
+ [[nodiscard]] static std::optional<SupportElementState> increase_single_area(
+     const TreeModelVolumes      &volumes,
+     const TreeSupportSettings   &config,
+     const AreaIncreaseSettings  &settings,
+     const LayerIndex             layer_idx,
+     const SupportElement        &parent,
+     const Polygons              &relevant_offset,
+     Polygons                    &to_bp_data,
+     Polygons                    &to_model_data,
+     Polygons                    &increased,
+     const coord_t                overspeed,
+     const bool                   mergelayer)
+ {
+     SupportElementState current_elem{ SupportElementState::propagate_down(parent.state) };
+     Polygons check_layer_data;
     if (settings.increase_radius)
         current_elem.effective_radius_height += 1;
     coord_t radius = support_element_collision_radius(config, current_elem);
@@ -2447,6 +2590,22 @@ static void merge_influence_areas(
  *
  * \param move_bounds[in,out] All currently existing influence areas
  */
+// [INTENT] Step 5 of the organic support pipeline — inherently SERIAL.
+// Walks top→bottom through move_bounds[]. For each layer:
+//   1. Calls increase_areas_one_layer() in TBB parallel_for to grow all areas down
+//      by one layer. Each area tries multiple AreaIncreaseSettings in priority order.
+//   2. Every `merge_every_x_layers` layers, calls merge_influence_areas() to union
+//      overlapping influence areas (divide-and-conquer, parallel within each level).
+//
+// [CONCURRENCY] Step 1 is TBB parallel; step 2 uses TBB parallel within merge.
+// The outer loop over layers is serial — required because layer N-1 depends on N.
+//
+// [STATE] After this function, move_bounds[layer_idx] contains SupportElements
+// with valid influence_area polygons. result_on_layer is NOT yet set.
+//
+// [HAZARD] merge_every_x_layers adaptively increases up to max_merge_every_x_layers
+// (capped at 64) — dense models may skip many merge steps, risking large unmerged
+// influence areas that are expensive to union later.
 static void create_layer_pathing(const TreeModelVolumes &volumes, const TreeSupportSettings &config, std::vector<SupportElements> &move_bounds, std::function<void()> throw_on_cancel)
 {
 #ifdef SLIC3R_TREESUPPORTS_PROGRESS
@@ -2690,6 +2849,27 @@ static void remove_deleted_elements(std::vector<SupportElements> &move_bounds)
  *
  * \param move_bounds[in,out] All currently existing influence areas
  */
+// [INTENT] Step 6 of the organic support pipeline — fully SERIAL, bottom-up.
+// Assigns the final 2D center point (result_on_layer) to every SupportElement.
+// For each layer (bottom → top):
+//   - Layer 0: place result_on_layer at a heuristic "split point" inside influence_area
+//   - Buildplate elements not yet initialized get a warning and are deleted
+//   - Non-gracious model contacts: use move_inside_if_outside (simple projection)
+//   - Gracious model contacts: set_to_model_contact_to_model_gracious walks UP
+//     the branch to find the highest valid placement, deleting lower nodes
+//   - set_points_on_areas() propagates result_on_layer from child → parent
+//   - remove_deleted_elements() compacts move_bounds (remapping parent indices)
+//
+// [STATE] After this function, every non-deleted SupportElement has a valid
+// result_on_layer. Elements with state.deleted == true are removed.
+//
+// [CONCURRENCY] Entirely serial. The propagation order (bottom-up) prevents
+// parallelism: parent placement depends on child's result_on_layer.
+//
+// [HAZARD] set_to_model_contact_to_model_gracious deletes intermediate nodes
+// (marks state.deleted=true) and calls remove_deleted_elements() which remaps
+// all parent indices. If a remapping bug exists, the branch graph is silently
+// corrupted — no assertion catches stale parent pointers at this stage.
 static void create_nodes_from_area(
     const TreeModelVolumes       &volumes,
     const TreeSupportSettings    &config,
@@ -2807,6 +2987,13 @@ static void create_nodes_from_area(
 #endif // NDEBUG
 }
 
+// [INTENT] Fill a triangle fan (cone cap) from a single apex vertex 'ifan' to a
+// ring of vertices [ibegin, iend). Used to close the bottom and top half-spheres
+// of each branch tube in extrude_branch().
+// template param flip_normals: true for top cap (outward normals face up),
+// false for bottom cap (outward normals face down).
+// [STATE] Purely additive — appends triangles to its.indices. Does not modify vertices.
+// [COUPLING] Called only from extrude_branch().
 template<bool flip_normals>
 void triangulate_fan(indexed_triangle_set &its, int ifan, int ibegin, int iend)
 {
@@ -2824,6 +3011,17 @@ void triangulate_fan(indexed_triangle_set &its, int ifan, int ibegin, int iend)
     }
 }
 
+// [INTENT] Stitch two circular rings of vertices (ring1: [ibegin1, iend1),
+// ring2: [ibegin2, iend2)) into a quad-strip of triangles.
+// Used to form the cylindrical body of a branch segment in extrude_branch().
+// Alignment: finds the closest vertex on ring2 to the first vertex of ring1,
+// then walks both rings in parallel with a greedy shortest-diagonal stitch.
+// [STATE] Purely additive — appends triangles to its.indices.
+// [COUPLING] Called only from extrude_branch(); rings are produced by discretize_circle().
+// [HAZARD] Both rings must have >= 3 vertices. The inner loop terminates only when
+// n1 == 0 && n2 == 0. If either ring wraps (cyclic), wrap-around indices via
+// modulo bring both counts to zero eventually. Ring size mismatch produces
+// a non-manifold mesh but does not crash.
 static void triangulate_strip(indexed_triangle_set &its, int ibegin1, int iend1, int ibegin2, int iend2)
 {
     // at least 3 vertices, increasing order.
@@ -2889,7 +3087,19 @@ static void triangulate_strip(indexed_triangle_set &its, int ibegin1, int iend1,
     }
 }
 
-// Discretize 3D circle, append to output vector, return ranges of indices of the points added.
+// [INTENT] Tessellate a 3D circle into a polygon ring and append the vertices to
+// 'pts'. Returns [begin, end) index range into 'pts'.
+// Adaptive step count: angle_step = 2*acos(1 - eps/radius) so that chord error <= eps.
+// [STATE] Purely additive — pts.size() grows by nsteps vertices.
+// [COUPLING] Called by extrude_branch() to generate cross-section rings.
+// [HAZARD] DEGENERATE NORMAL: x = normal × (0, -1, 0). If normal ≈ (0, ±1, 0),
+//   the cross product collapses to near-zero. After normalized(), the result is
+//   NaN or undefined, and ALL emitted vertices become NaN, silently producing
+//   a garbage mesh. No guard is present. A safe fallback would cross with (1,0,0)
+//   when |normal.y| > threshold.
+// [HAZARD] If radius <= 0 (degenerate element), acos argument goes out of [-1,1]
+//   and nsteps could be 0 or negative, then the loop emits nothing, leaving
+//   extrude_branch() with an empty strip range — leading to bad triangulate_strip assertions.
 static std::pair<int, int> discretize_circle(const Vec3f &center, const Vec3f &normal, const float radius, const float eps, std::vector<Vec3f> &pts)
 {
     // Calculate discretization step and number of steps.
@@ -2915,6 +3125,34 @@ static std::pair<int, int> discretize_circle(const Vec3f &center, const Vec3f &n
     return { begin, int(pts.size()) };
 }
 
+// [INTENT] Generate the 3D triangulated mesh tube for a single branch path.
+// 'path' is a list of SupportElement* sorted bottom-to-top (layer_idx ascending).
+// The tube consists of:
+//   - A hemispherical bottom cap (fan of rings around path[0])
+//   - A cylindrical body (strip rings along intermediate waypoints)
+//   - A hemispherical top cap (fan of rings around path.back())
+// The cross-section radius at each waypoint comes from support_element_radius().
+// The tube normal at each junction is the bisector of the two adjacent segment
+// directions (v1 + v2).normalized(), giving smooth junctions.
+//
+// [STATE] Mutates 'result' (indexed_triangle_set) — vertices and indices both grow.
+//   Returns the Z span [zmin, zmax] of the generated mesh for layer slicing.
+//
+// [COUPLING] Calls discretize_circle(), triangulate_fan(), triangulate_strip().
+//   Reads support element positions from result_on_layer and layer_z().
+//
+// [HAZARD] At the bottom cap, nprev = v1 (the first direction).
+//   If path has only 2 elements (a single segment), nprev is used both as
+//   bottom cap normal AND top cap normal (ncurrent = v1). This is correct.
+//   But if all elements lie at the same XY position, v1 = (0,0,1) and
+//   discretize_circle() will receive normal ≈ (0,0,1), which is fine.
+//   However if result_on_layer differences are zero (same XY), v1 is NaN.
+//
+// [HAZARD] Dead code at lines ~3155-3164 (#if 0): a circles_intersect() branch
+//   was intended to handle adjacent circles that overlap. Currently removed.
+//   Non-overlapping assumption means the tube can self-intersect for rapidly
+//   widening branches near the build plate.
+//
 // Returns Z span of the generated mesh.
 static std::pair<float, float> extrude_branch(
     const std::vector<const SupportElement*>&path,
@@ -3015,7 +3253,46 @@ static std::pair<float, float> extrude_branch(
 
 #ifdef TREE_SUPPORT_ORGANIC_NUDGE_NEW
 
-// New version using per layer AABB trees of lines for nudging spheres away from an object.
+// [INTENT] Iterative physical simulation: nudge tree support sphere nodes away from
+// object collision surfaces and apply Laplacian smoothing, running up to 100 iterations
+// until no node moves. This is the ACTIVE version (TREE_SUPPORT_ORGANIC_NUDGE_NEW=1).
+//
+// Algorithm per iteration:
+//   1. TBB parallel_for over all (unlocked) CollisionSphere nodes:
+//      a. Collision detection: scan layer_collision_cache layers within [layer_begin, layer_end).
+//         For each layer, use AABBTreeLines to find nearest object contour segment.
+//         If distance < sphere radius, record last_collision and depth.
+//      b. Nudge: push sphere XY away from last_collision by min(depth + 0.1mm, 0.5mm).
+//      c. Laplacian: compute weighted average of neighbors (parents above + child below).
+//         Shift toward average by min(|shift|, 0.2mm).
+//   2. If no node moved (num_moved == 0), terminate early.
+//   3. After all iterations, write back final XY positions to result_on_layer.
+//
+// [STATE] Mutates move_bounds[*].state.result_on_layer for all elements in
+//   elements_with_link_down (i.e., nodes with a downward link).
+//   'locked' nodes (tips without children, or root nodes above layer 0) are read-only.
+//
+// [CONCURRENCY] TBB parallel_for over collision_spheres. Nodes read prev_position
+//   (copied before the parallel pass) and write to position (disjoint per node).
+//   'num_moved' uses std::atomic<size_t>. No race conditions.
+//
+// [MEMORY] layer_collision_cache is a local vector (~1024 layers). Each entry stores
+//   a vector<Linef> + AABBTree. Can be several MB for complex meshes.
+//   CollisionSphere vector mirrors elements_with_link_down size.
+//
+// [HAZARD] min_element_radius is ALWAYS overwritten to 0 at line ~3212 (FIXME comment).
+//   This means all layers use radius=0 for collision lookup, fetching the maximally
+//   conservative (tightest) avoidance polygon. The intended behavior is to use the
+//   smallest sphere radius at each layer to allow a tighter fit.
+//
+// [HAZARD] nudge_vector formula at line ~3337-3338 applies nudge_dist TWICE:
+//   position += (nudge_vector * nudge_dist), where nudge_vector is already normalized*nudge_dist.
+//   This squares the nudge distance. Likely a bug — should be (nudge_vector) or
+//   (normalized * nudge_dist) but not both.
+//
+// [HAZARD] Smoothing neighbor lookup accesses collision_spheres[offset_above + iparent]
+//   and collision_spheres[offset_below + element_below_id] without bounds checking.
+//   linear_data_layers must be fully populated for this to be safe.
 static void organic_smooth_branches_avoid_collisions(
     const PrintObject                                   &print_object,
     const TreeModelVolumes                              &volumes,
@@ -3227,7 +3504,18 @@ static void organic_smooth_branches_avoid_collisions(
         elements_with_link_down[i].first->state.result_on_layer = scaled<coord_t>(to_2d(collision_spheres[i].position));
 }
 #else // TREE_SUPPORT_ORGANIC_NUDGE_NEW
-// Old version using OpenVDB, works but it is extremely slow for complex meshes.
+// [INTENT] DEAD CODE — Old version using OpenVDB signed-distance-field for collision nudging.
+// Same algorithm as the new version but uses openvdb::tools::ClosestSurfacePoint
+// instead of per-layer AABB trees. Works correctly but is extremely slow for
+// complex meshes (full VDB grid construction per invocation).
+// THIS BRANCH IS NEVER COMPILED because TREE_SUPPORT_ORGANIC_NUDGE_NEW=1 (line ~45).
+// Retained as a reference for the algorithm and for potential OpenVDB reactivation.
+// Key differences from the new version:
+//   - Uses 3D sphere-to-surface projection via OpenVDB (no layer-by-layer slicing)
+//   - Nudge and smoothing distances are scaled by 'scale=10.0' (VDB coordinate space)
+//   - collision_extra_gap = 1.0 * scale (10mm), max_nudge = 2.0 * scale (20mm) — much larger
+//   - Serial loop (no TBB) over projections — the bottleneck
+// [COUPLING] Depends on libopenvdb — not linked in production build.
 static void organic_smooth_branches_avoid_collisions(
     const PrintObject                                   &print_object,
     const TreeModelVolumes                              &volumes,
@@ -3338,6 +3626,26 @@ static void organic_smooth_branches_avoid_collisions(
  * \param storage The data storage where the mesh data is gotten from and
  * where the resulting support areas are stored.
  */
+// [INTENT] Top-level orchestrator for the organic tree support pipeline.
+// Called once per group of PrintObjects that share TreeSupportSettings.
+// Performs all 11 pipeline steps (see file header comment).
+//
+// [STATE] Allocates: layer_storage, top_contacts, bottom_contacts,
+// interface_layers, base_interface_layers, intermediate_layers — all local,
+// lifetime scoped to this function. Final output is stored on
+// print_object.support_layers() by generate_support_toolpaths().
+//
+// [COUPLING] Calls tree_support->detect_overhangs() for overhang data, then
+// reads tree_support->m_vertical_enforcer_points for additional tip placement.
+// This ties generate_support_areas to the non-3D TreeSupport class.
+//
+// [HAZARD] BBS hack at the end: a tbb::parallel_for_each clips all support
+// polygon layers to volumes.m_bed_area to prevent support outside the bed.
+// Comment refers to issue #4769 — this was a quick fix, not a proper fix in
+// the geometry pipeline.
+//
+// [HAZARD] Timing code with BOOST_LOG_TRIVIAL(info) is always active in release.
+// For large models with many layers, the log output can be verbose.
 static void generate_support_areas(Print &print, TreeSupport* tree_support, const BuildVolume &build_volume, const std::vector<size_t> &print_object_ids, std::function<void()> throw_on_cancel)
 {
     // Settings with the indexes of meshes that use these settings.
@@ -3591,6 +3899,36 @@ static void generate_support_areas(Print &print, TreeSupport* tree_support, cons
 //   storage.support.generated = true;
 }
 
+// [INTENT] Step 7 of the organic support pipeline.
+// Converts the abstract branch graph (SupportElements with result_on_layer points)
+// into actual support geometry (2D polygon layers in intermediate_layers[] and
+// bottom_contacts[]).
+//
+// Algorithm:
+//  1. Flatten move_bounds into a linear list with explicit child-links for TBB access.
+//  2. organic_smooth_branches_avoid_collisions(): 100-iter smoothing pass.
+//  3. volumes.clear_all_but_object_collision(): free avoidance data after smoothing.
+//  4. Tree traversal: unmark all nodes, then for each unvisited root collect Branch
+//     sequences using TreeVisitor::visit_recursive(). A Branch is a run of nodes
+//     from one bifurcation to the next.
+//  5. TBB parallel_for over trees: for each Branch, extrude_branch() triangulates
+//     a 3D tube mesh; slice_mesh() cuts it at mid-layer heights; each slice is
+//     clipped against collision(0) and bed_area. Non-gracious roots propagate
+//     down up to 5×bottom_radius / layer_height extra layers.
+//  6. Second TBB pass: union polygons within each Tree where multiple branches overlap.
+//  7. Merge all Tree slices into one global slices[] vector.
+//  8. Third TBB pass: smooth_outward + simplify base polygons; subtract top contacts;
+//     allocate SupportGeneratorLayer entries in layer_storage for bottom_contacts
+//     and intermediate_layers.
+//
+// [CONCURRENCY] TBB simple_partitioner (grain=1) for steps 5, 6, 8.
+// No mutex needed for intermediate_layers[] (each layer_idx written by exactly one thread).
+//
+// [HAZARD] The `#if 0` block for tip roof extraction (branch.has_tip) is disabled —
+// marked FIXME in source. Top contacts are populated by generate_initial_areas() instead.
+//
+// [HAZARD] Propagation distance for non-gracious roots: comment says "1.5×radius" but
+// code uses "5×bottom_radius / layer_height" layers. Comment is stale.
 // Organic specific: Smooth branches and produce one cummulative mesh to be sliced.
 void organic_draw_branches(
     PrintObject                     &print_object,
@@ -4007,6 +4345,13 @@ void organic_draw_branches(
 
 } // namespace TreeSupport3D
 
+// [INTENT] Public entry point — thin adapter from print_object to generate_support_areas().
+// Finds the index of print_object in print->objects(), converts bed polygon to
+// Pointfs (unscaled), constructs a BuildVolume, then delegates to the internal
+// generate_support_areas() pipeline.
+//
+// [COUPLING] Called exclusively from TreeSupport::generate() in TreeSupport.cpp
+// when config.support_style == smsTreeOrganic.
 void generate_tree_support_3D(PrintObject &print_object, TreeSupport* tree_support, std::function<void()> throw_on_cancel)
 {
     size_t idx = 0;

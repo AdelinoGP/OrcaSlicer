@@ -6,6 +6,24 @@
 // Copyright (c) 2021 Ultimaker B.V.
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
+// [INTENT] Public header for TreeSupport3D — the organic-mode tree support subsystem.
+// This file defines data types shared between TreeSupport3D.cpp and its callers.
+// The only external entry point is generate_tree_support_3D() (bottom of file).
+//
+// [COUPLING] TreeSupport3D is invoked exclusively from TreeSupport.cpp when
+// config.support_style == smsTreeOrganic. All other styles (slim/strong/hybrid)
+// are handled inside TreeSupport.cpp itself — this file is organic-only.
+//
+// [STATE] Key types defined here:
+//   AreaIncreaseSettings — packed strategy descriptor for one "attempt" at growing
+//                          an influence area downward one layer.
+//   SupportElementStateBits — bit-field of boolean flags; C++17 forbids in-place
+//                             bit initializers, so a ctor is provided (see comment).
+//   SupportElementState — full node state, inherits the bit fields.
+//   SupportElement — node in the branch graph: state + parent list + influence area.
+//   SupportElements — std::deque<SupportElement> (deque preserves pointer stability
+//                     during append, important since we store raw pointers).
+
 #ifndef slic3r_TreeSupport_hpp
 #define slic3r_TreeSupport_hpp
 
@@ -48,6 +66,14 @@ namespace TreeSupport3D
 {
 
 
+// [INTENT] Strategy descriptor for a single downward-propagation attempt in
+// increase_areas_one_layer(). For each node, a priority-ordered vector of these
+// is tried in sequence until one succeeds (see increase_single_area()). This
+// lets the propagator try "ideal" movements first (fast avoidance, no radius
+// change) and fall back to slower/wider settings if the ideal path is blocked.
+//
+// [MEMORY] Bit-packed to reduce the footprint of SupportElementState and
+// SupportElementMerging, which each store one AreaIncreaseSettings inline.
 struct AreaIncreaseSettings
 {
     AreaIncreaseSettings(
@@ -75,6 +101,20 @@ struct AreaIncreaseSettings
 
 #define TREE_SUPPORTS_TRACK_LOST
 
+// [INTENT] Bit-field of boolean state flags for a tree support node.
+// Separated from SupportElementState so C++17 can zero all bits via the ctor
+// (C++17 does not allow in-place default initializers for bit-field members).
+//
+// [STATE] Each flag documents a different constraint or debug annotation:
+//   to_buildplate       — this branch is trying to reach the build plate
+//   to_model_gracious   — branch can rest on a flat model/buildplate surface
+//   use_min_xy_dist     — may use minimum rather than preferred xy distance
+//   supports_roof       — this element or an ancestor carries a roof layer
+//   can_use_safe_radius — path is hole-free; can use holefree avoidance
+//   skip_ovalisation    — do not ovalise this element when drawing circles
+//   lost / verylost     — debug-only flags for lost-branch diagnostic (gated on TREE_SUPPORTS_TRACK_LOST)
+//   deleted             — soft-delete marker; compacted by remove_deleted_elements()
+//   marked              — general-purpose visited marker (reused across passes)
 // C++17 does not support in place initializers of bit values, thus a constructor zeroing the bits is provided.
 struct SupportElementStateBits {
     SupportElementStateBits() :
@@ -135,6 +175,30 @@ struct SupportElementStateBits {
     bool marked : 1;
 };
 
+// [INTENT] Full state of a single support-tree node at one layer.
+// Inherits the bit flags from SupportElementStateBits.
+//
+// [STATE] Key fields:
+//   target_height / target_position — the overhang point this branch is anchoring
+//   layer_idx                       — current layer (decrements each step down)
+//   effective_radius_height         — "age" used to compute the actual branch radius
+//                                     (radius grows linearly with distance from tip)
+//   distance_to_top                 — how many layers below the tip this node is
+//   result_on_layer                 — the final 2D center point placed by
+//                                     create_nodes_from_area() / set_points_on_areas()
+//                                     Sentinel: (INT_MAX, INT_MAX) means not yet set.
+//   increased_to_model_radius       — extra radius gained by merging with a
+//                                     to_model-only branch; used in merge accounting
+//   elephant_foot_increases         — float counter of how many times the base
+//                                     elephant-foot radius has been widened
+//   dont_move_until                 — distance_to_top below which the node is "locked"
+//                                     and should not move laterally (use locked() to query)
+//   last_area_increase              — the AreaIncreaseSettings that produced the
+//                                     current influence area; used for merging logic
+//   missing_roof_layers             — roof layers still owed (branch had to move)
+//
+// [CONCURRENCY] result_on_layer is written by create_nodes_from_area() in a
+// bottom-up serial pass. Prior to that it must not be read by other threads.
 struct SupportElementState : public SupportElementStateBits
 {
     int type = 0;
@@ -250,6 +314,24 @@ struct SupportElementState : public SupportElementStateBits
     return settings.getRadius(elem.effective_radius_height, elem.elephant_foot_increases);
 }
 
+// [INTENT] The fundamental node in the tree support branch graph.
+// One SupportElement exists per node per layer; the full graph is stored as
+// std::vector<SupportElements> move_bounds[layer_idx].
+//
+// [STATE]
+//   state          — all node properties (position, radius, flags etc.)
+//   parents        — indices into move_bounds[layer_idx + 1]; the nodes above
+//                    this one that this element is "growing toward"
+//   influence_area — the 2D polygon region inside which this node is allowed to
+//                    place its result_on_layer center point. Set by
+//                    create_layer_pathing(); consumed by create_nodes_from_area().
+//
+// [MEMORY] In Release mode, ParentIndices is boost::container::small_vector<int32_t, 4>
+// to avoid heap allocation for the common case of ≤4 parents. In Debug mode it
+// falls back to std::vector for easier inspection.
+//
+// [HAZARD] influence_area is only valid after create_layer_pathing(); it is empty
+// inside the createLayerPathing recursion itself. Do not read prematurely.
 struct SupportElement
 {
     using ParentIndices =
@@ -280,6 +362,10 @@ struct SupportElement
     Polygons                    influence_area;
 };
 
+// [INTENT] std::deque chosen over std::vector so that appending new elements
+// does not invalidate pointers to existing elements. The branch-traversal code
+// in organic_draw_branches() stores raw const SupportElement* pointers into
+// Branch::path, so pointer stability is required.
 using SupportElements = std::deque<SupportElement>;
 
 [[nodiscard]] inline coord_t support_element_radius(const TreeSupportSettings &settings, const SupportElement &elem)
@@ -292,6 +378,32 @@ using SupportElements = std::deque<SupportElement>;
     return support_element_collision_radius(settings, elem.state);
 }
 
+// [INTENT] Organic-mode final drawing pass.
+// After create_nodes_from_area() has placed result_on_layer points, this function:
+//  1. Flattens the per-layer deque into a linear list (elements_with_link_down)
+//     with explicit child indices, enabling parallel tree traversal.
+//  2. Calls organic_smooth_branches_avoid_collisions() — 100 iterations of
+//     collision nudge + Laplacian smoothing on all branch node positions.
+//  3. Traverses the tree graph, collecting Branch sequences (runs of nodes
+//     between bifurcations). Uses TreeVisitor::visit_recursive() with a
+//     state.marked flag to avoid double-visiting.
+//  4. TBB parallel_for over all trees: calls extrude_branch() to triangulate
+//     each Branch into a 3D mesh tube, then slices it with slice_mesh().
+//     Clips each slice against collision(0) and bed_area. Propagates "non-
+//     gracious" branch roots downward layer by layer until area < threshold.
+//  5. Second TBB pass: unions polygons within each Tree slice.
+//  6. Merges all Tree slices into a single flat slices[] vector.
+//  7. Third TBB pass: smooth_outward + simplify each layer's merged polygon,
+//     subtract top contacts, allocate bottom_contact and intermediate layers.
+//
+// [CONCURRENCY] Steps 4–7 use TBB parallel_for with simple_partitioner (grain=1).
+// intermediate_layers[] is written at indices [range.begin, range.end) with no
+// overlap — safe without a mutex.
+//
+// [HAZARD] The `#if 0` block inside step 4 (interface tip extraction via
+// branch.has_tip) is disabled and marked FIXME — top contact layers from the
+// organic pass are NOT populated here; they come from generate_initial_areas()
+// via interface_placer instead.
 // Organic specific: Smooth branches and produce one cummulative mesh to be sliced.
 void organic_draw_branches(
     PrintObject                     &print_object,
@@ -312,6 +424,15 @@ void organic_draw_branches(
 
 } // namespace TreeSupport3D
 
+// [INTENT] Public entry point — the only function called from outside this subsystem.
+// Called by TreeSupport::generate() when config.support_style == smsTreeOrganic.
+//
+// [COUPLING] Delegates to TreeSupport3D::generate_support_areas() after:
+//  - Finding the index of print_object in print->objects()
+//  - Converting machine border Points → Pointfs for BuildVolume
+//
+// [STATE] All support output (layers, contacts, toolpaths) is stored on
+// print_object.support_layers() via generate_support_toolpaths().
 void generate_tree_support_3D(PrintObject &print_object, TreeSupport* tree_support, std::function<void()> throw_on_cancel = []{});
 
 } // namespace Slic3r
