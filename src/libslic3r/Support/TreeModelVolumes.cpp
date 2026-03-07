@@ -130,6 +130,23 @@ static Polygons calculateMachineBorderCollision(Polygon machine_border)
 #endif
 }
 
+// [INTENT] Constructor — initialises the volume model for tree support.
+// Builds m_layer_outlines from the PrintObject's layer slices, simplified to
+// m_min_resolution, in parallel via TBB. The alternative multi-mesh path under
+// `#if 0` (CuraEngine multi-mesh merging) is disabled; only the single-mesh
+// PrintObject path is active.
+//
+// Key computed values stored from config:
+//   m_current_min_xy_dist / m_current_min_xy_dist_delta — XY clearance split into
+//     nominal and min variants (used to compute two-tier collision buckets).
+//   m_increase_until_radius — branch radius above which holefree cache is not needed.
+//   m_radius_0, m_raft_layers — used by ceilRadius() and precalculate().
+//
+// [CONCURRENCY] tbb::parallel_for over layer_idx to simplify outlines.
+// [HAZARD] m_anti_overhang (support blockers) is populated from slice_support_blockers(),
+//   but it is only applied in calculateCollision() when processing_last_mesh is true.
+//   Due to the processing_last_mesh bug documented in calculateCollision(), anti_overhang
+//   is never applied for single-mesh prints (see that function's [HAZARD] annotation).
 TreeModelVolumes::TreeModelVolumes(
     const PrintObject &print_object,
     const BuildVolume &build_volume,
@@ -536,6 +553,8 @@ const Polygons& TreeModelVolumes::getWallRestriction(const coord_t orig_radius, 
     return getWallRestriction(orig_radius, layer_idx, min_xy_dist); // Retrieve failed and correct result was calculated. Now it has to be retrieved.
 }
 
+// [INTENT] Batch dispatcher: parallel_for over keys, calling calculateCollision(radius, max_layer).
+// [CONCURRENCY] Outer tbb::parallel_for; each key dispatches a nested parallel call.
 void TreeModelVolumes::calculateCollision(const std::vector<RadiusLayerPair> &keys, std::function<void()> throw_on_cancel)
 {
     tbb::parallel_for(tbb::blocked_range<size_t>(0, keys.size()),

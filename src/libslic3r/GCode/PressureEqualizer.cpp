@@ -1,3 +1,41 @@
+// [INTENT] PressureEqualizer is a G-code post-processor that enforces a maximum
+// volumetric extrusion rate slope (mm³/s²) by adjusting feed rates on individual
+// G1 extrusion lines. It prevents the extruder pressure from changing too abruptly,
+// which would otherwise cause under/over-extrusion at role transitions (e.g. when
+// switching from a slow external perimeter to a fast infill line or vice-versa).
+//
+// The algorithm operates on a per-layer buffer of parsed GCodeLine structs:
+//   1. parse: process_layer(string) → parse all lines into m_gcode_lines
+//   2. segment: identify contiguous extrusion segments (ignoring small travel gaps)
+//   3. smooth: for each segment, call adjust_volumetric_rate(start, end) which
+//              runs BACKWARD (decel) then FORWARD (accel) to clamp rate slopes
+//   4. emit: output_gcode_line() re-serializes modified lines, splitting long
+//            lines into sub-segments to achieve a smooth speed ramp
+//
+// [STATE] Stateful across layers: m_current_pos[5] (XYZEF), m_current_extruder,
+//   m_retracted, m_current_extrusion_role all persist across process_layer() calls.
+//   m_gcode_lines also persists (lines from layer N are still in the buffer when
+//   layer N+1 is processed; they are emitted and erased at the next call).
+//
+// [COUPLING] PressureEqualizer sits in the TBB pipeline in GCode.cpp between the
+//   per-layer G-code generator and the CoolingBuffer. It receives one LayerResult
+//   at a time. The 1-layer lookahead buffer (m_layer_results queue + NOP injection)
+//   means the caller must inject a NOP layer at end-of-print to flush the last
+//   real layer.
+//
+// [MEMORY] output_buffer is a single char vector that only grows (never shrinks).
+//   The power-of-2 resize strategy amortises allocation cost. m_gcode_lines is
+//   a persistent vector; front entries are erased after emission.
+//
+// [HAZARD] `goto single_slope_fallback` on line ~549: the accel-peak-decel
+//   solver uses a goto to fall back to the simpler single-slope mode when the
+//   computed peak rate is degenerate. This is the only goto in the G-code pipeline.
+//   A port should replace this with early-return or a helper function.
+//
+// [HAZARD] m_layer_results is a public member (raw pointer queue). Callers can
+//   directly access or modify the queue, bypassing encapsulation. Public access
+//   is needed by the TBB pipeline in GCode.cpp; it creates a coupling hazard.
+
 #include <iostream>
 #include <memory.h>
 #include <cstring>
@@ -15,20 +53,34 @@
 
 namespace Slic3r {
 
+// [INTENT] In-band comment tags injected by GCode.cpp to communicate extrusion role
+// transitions to PressureEqualizer. These are not valid G-code; they are stripped
+// from output. EXTRUDE_SET_SPEED opens a "speed-adjustable block" and EXTRUDE_END
+// closes it — only lines inside such blocks have their feed rate modified.
+// EXTERNAL_PERIMETER_TAG tags external perimeter moves for Klipper PA tagging.
 static const std::string EXTRUSION_ROLE_TAG = ";_EXTRUSION_ROLE:";
 static const std::string EXTRUDE_END_TAG = ";_EXTRUDE_END";
 static const std::string EXTRUDE_SET_SPEED_TAG = ";_EXTRUDE_SET_SPEED";
 static const std::string EXTERNAL_PERIMETER_TAG = ";_EXTERNAL_PERIMETER";
 
-// For how many GCode lines back will adjust a flow rate from the latest line.
-// Bigger values affect the GCode export speed a lot, and smaller values could
-// affect how distant will be propagated a flow rate adjustment.
+// [INTENT] Sliding-window back-look limit for adjust_volumetric_rate(). 
+// The backward pass corrects deceleration needs: it looks back up to 128 G-code
+// lines to propagate a lower rate-start constraint from a future slow segment.
+// A larger limit means smoother deceleration over a longer distance but costs
+// O(N × max_look_back_limit) time per layer.
+// [HAZARD] 128 is not derived from any physical model — it is a fixed heuristic.
+// For very fine-resolution G-code (many short lines), 128 lines may cover only
+// a fraction of a millimetre; for coarse G-code it may span many centimetres.
 static constexpr int max_look_back_limit = 128;
 
-// Max non-extruding XY distance (travel move) in mm between two continous extrusions where we pretend
-// its all one continous extruded line. Above this distance we assume extruder pressure hits 0
-// This exists because often there's tiny travel moves between stuff like infill 
-// lines where some extruder pressure will remain (so we should equalize between these small travels)
+// [INTENT] Maximum XY travel distance (mm) between two extrusion segments that
+// is treated as "within the same extrusion" for pressure continuity purposes.
+// Rationale: at short travel gaps (e.g. between adjacent infill lines) the nozzle
+// retains some melt pressure, so pre-decelerating before the gap wastes print speed.
+// Above 3 mm, pressure is assumed to have equilibrated to zero and a fresh start
+// is modelled.
+// [HAZARD] Hardcoded constant — not exposed as a config option. Different nozzle
+// geometries / materials have different pressure decay rates; 3 mm is a heuristic.
 static constexpr long max_ignored_gap_between_extruding_segments = 3;
 
 PressureEqualizer::PressureEqualizer(const Slic3r::GCodeConfig &config) : m_use_relative_e_distances(config.use_relative_e_distances.value)
@@ -87,6 +139,22 @@ PressureEqualizer::PressureEqualizer(const Slic3r::GCodeConfig &config) : m_use_
 #endif
 }
 
+// [INTENT] process_layer(string) — Phase 1: parse a layer's raw G-code string into
+// m_gcode_lines, then identify contiguous extrusion segments and run the sliding-window
+// pressure-equalizer over each one.
+//
+// Flow:
+//   a) Tokenise the string line-by-line; call process_line() on each. Lines that are
+//      in-band tags (EXTRUSION_ROLE_TAG etc.) return false and are discarded from the
+//      vector — they have already updated class state.
+//   b) Walk m_gcode_lines to find "extrusion segments": runs of extruding lines that
+//      may be bridged across small travel gaps (≤3 mm) by advance_segment_beyond_small_gap().
+//   c) For each segment, apply adjust_volumetric_rate() in a sliding window of up to
+//      max_look_back_limit lines centred at the current line. This is the O(N * W) pass.
+//
+// [STATE] m_gcode_lines grows here; it is NOT cleared — lines from layer N survive until
+// they are emitted by the overloaded process_layer(LayerResult&&) caller.
+// opened_extrude_set_speed_block must be false at the end of each layer string (asserted).
 void PressureEqualizer::process_layer(const std::string &gcode)
 {
     if (!gcode.empty()) {
@@ -149,6 +217,15 @@ void PressureEqualizer::process_layer(const std::string &gcode)
     }
 }
 
+// [INTENT] advance_segment_beyond_small_gap — looks forward from the end of an extrusion
+// segment to see if the next extruding line is reachable via a travel move shorter than
+// max_ignored_gap_between_extruding_segments (3 mm). If yes, returns the index of that
+// next extruding line so the caller can extend the current segment across the gap.
+// If the gap is too large (or the end of the layer is reached), returns idx_orig unchanged.
+//
+// [STATE] Pure read on m_gcode_lines; does not modify any state.
+// [HAZARD] Uses dist_xy() which only sums XY distance; Z hops are ignored. A large Z-hop
+//          followed by an immediate XY move could be mis-classified as a small gap.
 long PressureEqualizer::advance_segment_beyond_small_gap(const long idx_orig)
 {
     // this should only be run on the last extruding line before a gap
@@ -171,6 +248,26 @@ long PressureEqualizer::advance_segment_beyond_small_gap(const long idx_orig)
      return idx_orig;
 }
 
+// [INTENT] process_layer(LayerResult&&) — Phase 2: the TBB-pipeline entry point.
+// Implements a 1-layer lookahead buffer using m_layer_results (a raw-pointer queue):
+//   - On the FIRST call: parse the layer into m_gcode_lines, buffer the LayerResult,
+//     return a NOP to signal "not ready yet".
+//   - On subsequent calls: parse the new layer (look-ahead), then EMIT the previously
+//     buffered layer by serialising m_gcode_lines[0..next_layer_first_idx) into
+//     output_buffer, then erase those lines from m_gcode_lines.
+//   - When a NOP LayerResult is injected by the caller (end-of-print flush): skip the
+//     parse phase, emit the last real layer, return it.
+//
+// [COUPLING] m_layer_results is a public std::queue<LayerResult*> (raw pointer ownership).
+//   The caller (GCode.cpp TBB pipeline) is responsible for injecting the end-of-print NOP.
+//   Failing to inject the NOP leaks the last layer in the buffer.
+//
+// [MEMORY] prev_layer_result is raw-`delete`d after copy-out. The returned LayerResult
+//   is a value copy — safe for TBB pipeline ownership transfer.
+//
+// [HAZARD] output_buffer is populated by output_gcode_line() in a tight loop; the result
+//   is then assigned as a string via output_buffer.data() which relies on a NUL byte
+//   inserted at output_buffer_length. The buffer must remain valid until the string copy.
 LayerResult PressureEqualizer::process_layer(LayerResult &&input)
 {
     const bool   is_first_layer       = m_layer_results.empty();
@@ -251,6 +348,28 @@ static inline float parse_float(const char *&line, const size_t line_length)
     return result;
 }
 
+// [INTENT] process_line — parse a single G-code line into a GCodeLine struct.
+// Returns false for lines that are in-band tags (EXTRUSION_ROLE_TAG) that must be
+// consumed to update state but should NOT appear in output. Returns true for all
+// other lines (G/M/T codes, comments, blanks).
+//
+// Side effects on class state (persist across calls):
+//   m_current_pos[5]  — updated for G0/G1/G92
+//   m_current_extruder — updated for T-codes
+//   m_current_extrusion_role — updated when EXTRUSION_ROLE_TAG is seen
+//   m_retracted — updated on retract/unretract/tool-change
+//   opened_extrude_set_speed_block — toggled by EXTRUDE_SET_SPEED_TAG / EXTRUDE_END_TAG
+//
+// [HAZARD] volumetric rate calculation (line ~438):
+//   rate = A_filament * F_xyz * sqrt(dE²/dXYZ²)
+//   This uses the feedrate from the CURRENT move (new_pos[4]), not the previous one.
+//   If a G1 line omits F, new_pos[4] is copied from m_current_pos[4] (last seen F).
+//   If no F has been seen at all, the rate is 0, which will never trigger smoothing.
+//
+// [COUPLING] adjustable_flow is set true only when opened_extrude_set_speed_block is
+//   active. That flag is set by EXTRUDE_SET_SPEED_TAG lines injected by GCode.cpp.
+//   This creates a tight coupling: the smoothing only works for lines that GCode.cpp
+//   has explicitly tagged as smoothable.
 bool PressureEqualizer::process_line(const char *line, const char *line_end, GCodeLine &buf)
 {
     const size_t len = line_end - line;
@@ -468,6 +587,33 @@ bool PressureEqualizer::process_line(const char *line, const char *line_end, GCo
     return true;
 }
 
+// [INTENT] output_gcode_line — serialise a single GCodeLine back to text in output_buffer.
+// If the line was NOT modified by adjust_volumetric_rate(), it is emitted verbatim.
+// If modified, the line is split into sub-segments to achieve a smooth speed ramp:
+//
+//   Case A — trivial rate change (delta < 10 mm³/min) or line too short for splitting:
+//     Emit a single line with feedrate = original_feedrate * volumetric_correction_avg().
+//
+//   Case B — accel-peak-decel (both start and end rates < peak rate):
+//     Compute the achievable peak rate using the quadratic formula:
+//       target_max = sqrt((2*max_sloped*sp*sn + sn*e0² + sp*e1²) / (sp+sn))
+//     If target_max is degenerate (≤ start or end), fall through to Case C (goto).
+//     Otherwise split into: [accel slope segments] + [steady segment] + [decel slope segments].
+//
+//   Case C (single_slope_fallback) — monotone ramp (accel-only or decel-only):
+//     Optionally emit a steady-feed prefix/suffix, then split the ramp into sub-segments
+//     interpolating feedrate at the centre of each.
+//
+// [HAZARD] goto single_slope_fallback (line ~618): the only goto in the G-code pipeline.
+//   It is a fallback from Case B when the peak rate is degenerate, jumping into Case C.
+//   A refactor should replace this with an early-return into a helper function.
+//
+// [HAZARD] pos_start/pos_end are mutated in-place during segment emission (memcpy chains).
+//   After output_gcode_line() returns, the GCodeLine struct is in an undefined intermediate
+//   state. This is safe only because the function is the last consumer of the struct.
+//
+// [HAZARD] NON_TRIVIAL_RATE_DELTA = 10 mm³/min is a hardcoded heuristic threshold.
+//   Below this threshold the line is emitted unsplit regardless of segment length.
 void PressureEqualizer::output_gcode_line(const size_t line_idx)
 {
     GCodeLine &line = m_gcode_lines[line_idx];
@@ -719,6 +865,43 @@ single_slope_fallback:
     }
 }
 
+// [INTENT] adjust_volumetric_rate — the core pressure-smoothing algorithm.
+// Operates on m_gcode_lines[first_line_idx..last_line_idx] in two passes:
+//
+//   BACKWARD PASS (deceleration constraint, lines ~800-845):
+//     Walks from last_line_idx down to first_line_idx.
+//     For each extrusion line, checks: given the rate at the START of the NEXT line
+//     and the negative slope limit, what is the maximum allowable rate at the END of
+//     this line? Clamps volumetric_extrusion_rate_end and propagates the constraint
+//     backward via the kinematic formula:
+//       rate_start = sqrt(rate_end² + 2 * rate * dist_xyz * slope / feedrate)
+//     This ensures no abrupt speed increase seen by the extruder as it approaches
+//     a slower segment.
+//
+//   FORWARD PASS (acceleration constraint, lines ~848-905):
+//     Walks from first_line_idx up to last_line_idx.
+//     Applies the positive slope limit symmetrically:
+//       rate_end = sqrt(rate_start² + 2 * rate * dist_xyz * slope / feedrate)
+//     Ensures the extruder cannot accelerate faster than the slope limit coming out
+//     of a slow segment.
+//
+//   Per-role slope limits: m_max_volumetric_extrusion_rate_slopes[iRole].{positive,negative}
+//   Each role can have independent slopes (e.g. external perimeter vs infill).
+//   feedrate_per_extrusion_role[] tracks the most recently seen rate for each role to
+//   allow cross-role slope constraints (deceleration before an upcoming slow role).
+//
+// [HAZARD] Bridge infill and ironing are explicitly skipped in both passes — their
+//   flow rates are never modified. Ironing is also excluded from feedrate_per_extrusion_role
+//   to prevent it from influencing adjacent segments.
+//
+// [CONCURRENCY] This function is called from the single-threaded process_layer() loop.
+//   No TBB parallelism inside; the whole G-code pipeline step is single-threaded per plate.
+//
+// [UNCLEAR] The commented-out lines (~840, ~900) use a different rate-clamping strategy
+//   for cross-role propagation. The current strategy always uses
+//   line.volumetric_extrusion_rate_start regardless of iRole match — the original
+//   per-role tracking is preserved only in the active code path. Unclear if the
+//   commented version was discarded intentionally or by accident.
 void PressureEqualizer::adjust_volumetric_rate(const size_t first_line_idx, const size_t last_line_idx)
 {
     // don't bother adjusting volumetric rate if there's no gcode to adjust
@@ -853,6 +1036,20 @@ void PressureEqualizer::adjust_volumetric_rate(const size_t first_line_idx, cons
     }
 }
 
+// [INTENT] push_to_output — low-level append-to-output_buffer helpers.
+// Three overloads: GCodeG1Formatter, std::string, and raw char* + length.
+// All three ultimately call the char* overload which:
+//   1. Ensures output_buffer is large enough using next-power-of-2 growth.
+//   2. memcpy's the text at output_buffer_length.
+//   3. Optionally appends '\n' (add_eol).
+//   4. Always writes a NUL byte at output_buffer_length to maintain C-string invariant.
+//
+// [MEMORY] output_buffer only grows, never shrinks. After a large layer it retains
+//   peak capacity for the rest of the print. This is intentional for performance but
+//   means peak memory usage is proportional to the largest single layer.
+//
+// [STATE] output_buffer_prev_length tracks the start of the LAST appended chunk to
+//   allow push_line_to_output() to erase a useless speed-only line (see below).
 inline void PressureEqualizer::push_to_output(GCodeG1Formatter &formatter)
 {
     return this->push_to_output(formatter.string(), false);
@@ -915,6 +1112,25 @@ inline bool is_just_line_with_extrude_set_speed_tag(const std::string &line)
     return p_line <= line_end && is_eol(*p_line);
 }
 
+// [INTENT] push_line_to_output — emit one G1 sub-segment with a new feedrate.
+// Protocol for in-band tags:
+//   1. Check if the previous output line was a "useless speed setter" (a G1 F... with
+//      only EXTRUDE_SET_SPEED_TAG and no XY/E move). If so, erase it by rewinding
+//      output_buffer_length to output_buffer_prev_length (O(1) rewind).
+//      Otherwise emit EXTRUDE_END_TAG to close the previous speed block.
+//   2. Emit a new "G1 F<new_feedrate> ;_EXTRUDE_SET_SPEED" line to open a new block,
+//      also appending EXTERNAL_PERIMETER_TAG if the role is external perimeter.
+//   3. Emit the actual G1 X Y Z E line for this sub-segment.
+//
+// [HAZARD] new_feedrate is quantized to 1 mm/s steps (rounded to nearest 60 mm/min)
+//   and floored at 60 mm/min (1 mm/s). This reduces G-code volume but means that
+//   very fine rate adjustments below 1 mm/s are silently discarded.
+//
+// [HAZARD] is_just_line_with_extrude_set_speed_tag() has a logic bug on its first
+//   check: `line.empty() && !boost::starts_with(...)` — the empty() check should be
+//   `!line.empty()`. In practice this bug is hidden because if the line is truly empty
+//   the function returns false (correct), but the intent reads as "non-empty AND starts
+//   with G1 AND ends with tag". A future maintainer may be confused.
 void PressureEqualizer::push_line_to_output(const size_t line_idx, float new_feedrate, const char *comment)
 {
     // Orca: sanity check, 1 mm/s is the minimum feedrate.

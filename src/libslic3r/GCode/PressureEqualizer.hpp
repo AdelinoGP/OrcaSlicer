@@ -1,6 +1,33 @@
 #ifndef slic3r_GCode_PressureEqualizer_hpp_
 #define slic3r_GCode_PressureEqualizer_hpp_
 
+// [INTENT] PressureEqualizer header — defines the G-code post-processor that enforces
+// a maximum volumetric extrusion rate slope (mm³/s²) to prevent abrupt pressure changes
+// in the hot end. It is inserted in the TBB pipeline in GCode.cpp between the per-layer
+// G-code generator and the CoolingBuffer.
+//
+// [STATE] The class is stateful across process_layer() calls:
+//   - m_current_pos[5]  (XYZEF) persists across layers
+//   - m_gcode_lines     persists across layers (1-layer lookahead buffer)
+//   - m_layer_results   public raw-pointer queue — see [COUPLING] below
+//
+// [COUPLING] m_layer_results and m_gcode_lines are declared public to allow direct access
+//   by the TBB pipeline in GCode.cpp. This bypasses encapsulation and creates a hard
+//   coupling between PressureEqualizer and the pipeline runner.
+//
+// [HAZARD] m_layer_results is a std::queue<LayerResult*> — raw owning pointers.
+//   The caller (GCode.cpp) must inject a NOP LayerResult at end-of-print to flush the
+//   last real layer. Failure to do so causes a memory leak and a missing last layer.
+//
+// [HAZARD] GCodeLine::volumetric_correction_avg() is capped to [0.05, 1.00000001].
+//   The upper bound > 1.0 suggests the intent is to allow tiny floating-point rounding
+//   above 1.0 without asserting. Any correction above 1.0 would increase the feedrate,
+//   which contradicts the purpose of the smoother (rates should only be lowered, not raised).
+//
+// Debug compile flags (both off by default):
+//   PRESSURE_EQUALIZER_STATISTIC — tracks min/max/avg volumetric rate per layer
+//   PRESSURE_EQUALIZER_DEBUG     — prints anomalously low flow rates to stdout
+
 #include "../libslic3r.h"
 #include "../PrintConfig.hpp"
 
@@ -58,8 +85,11 @@ private:
     struct Statistics m_stat;
 #endif
 
-    // Private configuration values
-    // How fast could the volumetric extrusion rate increase / decrase? mm^3/sec^2
+    // [INTENT] Per-role slope limits (mm³/min² in stored form; converted from mm³/s² in ctor).
+    // Each ExtrusionRole can have independent acceleration and deceleration limits.
+    // Roles not explicitly configured keep 0.0 (unlimited).
+    // m_max_volumetric_extrusion_rate_slope_{positive,negative} are the global fallback limits
+    // derived from config.max_volumetric_extrusion_rate_slope.
     struct ExtrusionRateSlope {
         float positive;
         float negative;
@@ -72,7 +102,7 @@ private:
     // Area of the crossestion of each filament. Necessary to calculate the volumetric flow rate.
     std::vector<float>              m_filament_crossections;
 
-    // Internal data.
+    // [STATE] Persistent G-code machine state. Updated by process_line() for every G0/G1/G92/T.
     // X,Y,Z,E,F
     float                           m_current_pos[5];
     size_t                          m_current_extruder;
@@ -102,6 +132,24 @@ private:
         GCODELINETYPE_EXTRUDE,
     };
 
+    // [INTENT] GCodeLine — parsed representation of a single G-code line, enriched with
+    // volumetric rate bookkeeping for the pressure-smoothing algorithm.
+    //
+    // Key fields for smoothing:
+    //   volumetric_extrusion_rate        — nominal rate for the whole line (mm³/min)
+    //   volumetric_extrusion_rate_start  — rate at the start of this segment (may be lowered)
+    //   volumetric_extrusion_rate_end    — rate at the end of this segment (may be lowered)
+    //   max_volumetric_extrusion_rate_slope_{positive,negative} — which slope limit was binding
+    //   adjustable_flow — true only if inside a EXTRUDE_SET_SPEED block; only these lines
+    //                     get their feedrate modified during output.
+    //   modified — set true by adjust_volumetric_rate() when start/end rates were clamped.
+    //
+    // [MEMORY] raw is a vector<char> kept persistent to avoid repeated allocation;
+    //   raw_length is the valid content length (raw.size() may be larger).
+    //
+    // [HAZARD] volumetric_correction_avg() upper-bound assert is 1.00000001 to tolerate
+    //   floating-point rounding. Any value above 1.0 would increase feedrate, which is
+    //   never the intent of the smoother.
     struct GCodeLine
     {
         GCodeLine() : 
@@ -201,8 +249,13 @@ private:
     void push_line_to_output(size_t line_idx, float new_feedrate, const char *comment);
 
 public:
+    // [COUPLING] Public raw-pointer queue. Ownership of LayerResult* is held here;
+    // caller is responsible for injecting a NOP at end-of-print to flush the last layer.
+    // Making this public is necessary for the TBB pipeline in GCode.cpp.
     std::queue<LayerResult*> m_layer_results;
 
+    // [COUPLING] Public parsed-line buffer. Exposed for the TBB pipeline to inspect
+    // pending lines. Grows during process_layer(string) and is pruned after emission.
     std::vector<GCodeLine> m_gcode_lines;
 };
 
