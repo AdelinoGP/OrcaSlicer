@@ -911,3 +911,124 @@ Additionally: Hazards 73–77 were appended to `04_refactoring_hazards.md`.
 4. `src/libslic3r/GCode/AdaptivePAProcessor.cpp` — adaptive pressure advance
 5. `src/libslic3r/Arachne/` directory — variable-width perimeter internals
 6. `slice_slabs_make_lines()` back-fill annotation (within TriangleMeshSlicer.cpp)
+
+---
+
+## Session 10 — AvoidCrossingPerimeters.cpp Full Annotation
+
+### Files Processed
+- `src/libslic3r/GCode/AvoidCrossingPerimeters.cpp` (1921 lines after annotation; ~190 lines of comments injected)
+
+### Commit
+- `f6d462b635` — `annotate: AvoidCrossingPerimeters.cpp — travel-path planner full annotation (Session 10)`
+
+---
+
+### Architecture Overview — AvoidCrossingPerimeters
+
+**Purpose:** Reroutes travel moves so the nozzle hugs perimeter contours rather than crossing them, minimising stringing/oozing artifacts. Called from `GCode::travel_to()` after tool change/wipe decisions are made.
+
+**Class structure:**
+```
+AvoidCrossingPerimeters
+  ├── m_internal : Boundary   ← current object's inward-offset perimeters
+  ├── m_external : Boundary   ← all objects' expanded holes (multi-object)
+  ├── m_grid_lslice           ← EdgeGrid for "is point inside slice?" queries
+  └── m_lslices_offset        ← inward-offset layer slices (for m_grid_lslice)
+```
+
+**`Boundary` struct fields:**
+- `boundaries` (Polygons): the actual contour lines to avoid crossing
+- `grid` (EdgeGrid::Grid): spatial index for O(1) edge-proximity queries
+- `boundaries_params` (std::vector<std::vector<float>>): cumulative arc-length per vertex per polygon; enables O(1) "distance along perimeter" lookups during path walking
+- `bbox` (BoundingBox): used by `travel_to()` to detect if a lazy-init rebuild is needed
+
+---
+
+### Key Algorithm — `avoid_perimeters_inner()`
+
+1. **Intersection detection** via `AllIntersectionsVisitor` + `EdgeGrid` — finds every crossing of the direct travel segment with boundary polygons.
+2. **Retry with expanded segment** — if no intersections found, the start/end points may already be inside the offset zone; a slightly wider segment is tried.
+3. **`extend_for_closest_lines()`** — synthesises artificial intersections at the endpoints for degenerate cases where the path enters/exits a boundary tangentially rather than crossing it.
+4. **Polygon walk** — for each entry/exit crossing pair on the same boundary, walk either forward or backward (whichever produces the shorter arc, determined by `get_shortest_direction()`), emitting SCALED_EPSILON-offset waypoints.
+5. **`simplify_travel()`** — post-process: greedily remove waypoints that don't re-introduce crossings, producing the shortest straight-line path consistent with the boundary avoidance constraint.
+
+---
+
+### Key Functions Annotated
+
+| Function | Lines | Key Notes |
+|---|---|---|
+| `inner_offset()` | ~1210–1290 | Variable per-vertex inward offset; tries 3 progressively looser `min_contour_width` values to avoid over-shrinking narrow constrictions |
+| `contour_distance()` | ~1150–1210 | Wall-thickness measurement (ElephantFootCompensation approach); feeds `inner_offset()` |
+| `get_boundary()` | ~1300–1350 | Assembles the final Polygons for m_internal from contour_distance + inner_offset output |
+| `init_boundary()` | ~1355–1370 | Runs `get_boundary()`, calls `EdgeGrid::Grid::create()`, calls `precompute_polygon_distances()` |
+| `init_layer()` | ~1375–1410 | Clears m_internal/m_external (lazy reset), computes `m_lslices_offset`, builds `m_grid_lslice` |
+| `travel_to()` | ~1413–1450 | Coordinate correction (object vs world), lazy init of m_internal or m_external, calls `avoid_perimeters()`, applies `max_travel_detour_distance` cap, sets `could_be_wipe_disabled` |
+| `avoid_perimeters()` | ~1455–1520 | Wrapper: selects m_internal vs m_external, calls `avoid_perimeters_inner()`, converts result to Polyline |
+| `avoid_perimeters_inner()` | ~700–1140 | Core routing algorithm (see above) |
+
+---
+
+### Dead Code — `#if 0` Block (lines ~1522–1921, ~400 lines)
+
+A complete alternative implementation is disabled behind `#if 0`. It contains:
+- Second `avoid_perimeters_inner()` — heuristic-based simplification (`simplify_travel_heuristics`) instead of greedy
+- Second `avoid_perimeters()` — same interface but calls the heuristic version
+- Second `travel_to()` — same interface
+- Second `init_layer()` — **eager** boundary init (builds both m_internal and m_external at layer start) vs the current **lazy** approach (build only when first travel that layer needs it)
+
+No comment explains which design was intentionally chosen or whether the block is kept for future benchmarking. Tagged `[HAZARD-78]`.
+
+---
+
+### Boundary Modes
+
+| Mode | Trigger | Boundaries Source | Purpose |
+|---|---|---|---|
+| `m_internal` | Default; `m_use_external_mp == false` | Inward-offset perimeters of **current object's** layer | Avoid stringing inside the object |
+| `m_external` | `m_use_external_mp == true` (multi-object) | Expanded holes of **all** PrintObjects at this Z | Avoid crossing neighbouring objects during inter-object travels |
+
+---
+
+### Hazards Added — Session 10
+
+| # | Hazard | Severity |
+|---|--------|----------|
+| 78 | Large `#if 0` dead-code block (~400 lines): entire alternative implementation | Medium |
+| 79 | Lazy boundary re-init triggers full `inner_offset()` + EdgeGrid rebuild on bbox miss | Medium |
+| 80 | All three EdgeGrid instances hardcoded to 1mm cell size (`// FIXME 1mm grid?`) | Low |
+
+---
+
+### Key Findings — Session 10
+
+1. **Two coordinate systems meet in `travel_to()`** — input `start`/`end` are in **world** coordinates but `m_internal` boundaries are in **object-local** coordinates. `travel_to()` applies the `m_object_instance_transformed_bounding_box` transform to bridge the gap. This transform application must stay in sync with the boundary construction transform or paths will be systematically offset.
+
+2. **`simplify_travel()` is O(N²) in waypoint count** — for each remaining waypoint it calls `avoid_perimeters_inner()` again on the partial path. For extremely complex perimeter shapes this could be slow, but in practice waypoint counts are small (rarely > 20).
+
+3. **`contour_distance()` is called once per vertex during `inner_offset()`** — it builds a local EdgeGrid per call for the wall-thickness measurement. This is the most expensive sub-operation in `init_boundary()`. For large layers with many perimeter vertices this can be a meaningful contributor to layer-start latency.
+
+4. **`precompute_polygon_distances()` must be called after every boundary rebuild** — it populates `boundaries_params` which is required by the polygon-walk step of `avoid_perimeters_inner()`. If a boundary is ever modified without calling this function, the arc-length lookups will silently use stale data.
+
+5. **`could_be_wipe_disabled`** — `travel_to()` sets this flag (via `need_wipe()`) when the travel stays entirely within layer slices. This is a minor coupling between the path planner and the wipe/retract decision subsystem; the flag is consumed by `GCode::travel_to()` to potentially suppress a retract+wipe.
+
+---
+
+### Open Questions — Session 10
+
+1. `[UNCLEAR]` `extend_for_closest_lines()` synthesises artificial intersections when start/end are inside the boundary offset zone. The exact geometric condition under which this is needed vs the expanded-segment retry is not fully documented. Edge cases at corners or concave regions may hit both code paths.
+
+2. `[UNCLEAR]` Why is `m_external` built from `expanded holes of all PrintObjects` rather than their outer perimeters? The choice of holes (vs full perimeter boundary) means the planner avoids routing through the interior of neighbouring objects but not through their perimeter walls. This seems intentional for multi-object prints where objects are adjacent but the reason is not commented.
+
+3. `[UNCLEAR]` `get_shortest_direction()` returns a direction enum (CW/CCW) based on comparing arc lengths along the polygon in each direction. For polygons with complex topology (self-intersecting after offset), it's unclear whether the arc-length heuristic always chooses the geometrically shortest non-crossing walk.
+
+---
+
+### Next Annotation Targets (Session 11+)
+
+1. `src/libslic3r/GCode/GCodeProcessor.cpp` — G-code simulation/statistics (**highest priority**, ~5000 lines)
+2. `src/libslic3r/GCode/FanMover.cpp` — fan control post-processor
+3. `src/libslic3r/GCode/AdaptivePAProcessor.cpp` — adaptive pressure advance
+4. `src/libslic3r/Arachne/` directory — variable-width perimeter internals
+5. `slice_slabs_make_lines()` back-fill annotation (within TriangleMeshSlicer.cpp)

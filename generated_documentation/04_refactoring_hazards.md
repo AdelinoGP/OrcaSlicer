@@ -1237,3 +1237,70 @@ This asymmetry means a caller passing a scaled Z value (e.g., `scale_(layer_z)`)
 | 75 | `triangulate_slice()` O(N²) vertex lookup | TriangleMeshSlicer.cpp | Medium | P2 |
 | 76 | Zero-length edges from integer rounding in `slice_facet()` | TriangleMeshSlicer.cpp | Medium | P2 |
 | 77 | Mixed scaled/unscaled Z contract at public API boundaries | TriangleMeshSlicer.cpp | High | P1 |
+
+---
+
+## Session 10 — AvoidCrossingPerimeters.cpp (Hazards 78–80)
+
+---
+
+### Hazard 78 — Dead `#if 0` Alternative Implementation (~400 lines)
+
+**File:** `src/libslic3r/GCode/AvoidCrossingPerimeters.cpp` (lines ~1522–1912)
+**Severity:** Medium
+
+A large `#if 0` block wraps an entire parallel implementation of the travel-rerouting system:
+- A second `avoid_perimeters_inner()` (simpler: no `extend_for_closest_lines` fallback)
+- `simplify_travel_heuristics()` — a more aggressive multi-segment shortcut pass not present in the active code
+- A second `avoid_perimeters()` that calls `simplify_travel_heuristics` forward then backward
+- A second `travel_to()` that uses `Geometry::liang_barsky_line_clipping` for bbox intersection
+- A second `init_layer()` that eagerly builds both `m_internal` and `m_external` at layer start (vs the current lazy approach)
+
+Neither version has any comment explaining why one was chosen over the other, or whether the disabled version was intentionally preserved for future use. If the active code is modified (e.g., to fix a routing bug), this block silently diverges further.
+
+**Mitigation:** If the dead code is not planned to be revived, delete it. If it represents a valid alternative to benchmark against, move it to a feature-flagged test path with a clear comment explaining the design tradeoff (eager vs lazy boundary init, heuristic vs greedy simplification).
+
+---
+
+### Hazard 79 — Lazy Boundary Re-Init on Every Out-of-Bounds Travel
+
+**File:** `src/libslic3r/GCode/AvoidCrossingPerimeters.cpp` (`travel_to()`, ~lines 1413–1435)
+**Severity:** Medium
+
+`travel_to()` lazily initialises `m_internal` (and `m_external`) on the first travel that needs them per layer. However, if start or end falls outside the current `bbox`, the entire boundary is cleared and rebuilt:
+
+```cpp
+} else if (!(m_internal.bbox.contains(startf) && m_internal.bbox.contains(endf))) {
+    m_internal.clear();
+    init_boundary(&m_internal, ...);
+}
+```
+
+`init_boundary()` calls `get_boundary()` → `inner_offset()` → `variable_offset_inner_ex()` (Clipper), `EdgeGrid::Grid::create()`, and `precompute_polygon_distances()`. This entire pipeline runs again for each bbox miss. On prints with frequent wide-area travel moves — or when `max_travel_detour_distance` causes a fallback that still shifts the bbox — this can trigger repeated expensive recomputations within the same layer.
+
+**Mitigation:** Size the initial bbox generously (e.g., full layer slice extents) so that out-of-bounds misses are rare. Alternatively, expand the bbox incrementally rather than rebuilding from scratch.
+
+---
+
+### Hazard 80 — Hardcoded 1mm EdgeGrid Cell Size
+
+**File:** `src/libslic3r/GCode/AvoidCrossingPerimeters.cpp` (`init_boundary()` ~line 1364, `init_layer()` ~line 1518)
+**Severity:** Low
+
+All three EdgeGrid instances (`m_internal.grid`, `m_external.grid`, `m_grid_lslice`) are built with a hardcoded cell size of `coord_t(scale_(1.))` — exactly 1mm. Each has an acknowledged `// FIXME 1mm grid?` comment.
+
+- For prints with very fine features (e.g., 0.2mm nozzle, 0.1mm perimeter spacing), 1mm cells are ≈5–10× too coarse, causing each grid cell to contain many boundary edges and making the O(k) `cell_data_range` loop proportionally more expensive.
+- For large-format prints (300×300mm+), 1mm cells may be appropriate but the absolute cell count becomes large, increasing memory use.
+- The `m_grid_lslice` grid is particularly critical: it is used in `any_expolygon_contains()` on every single travel move.
+
+**Mitigation:** Derive cell size from `perimeter_spacing` (e.g., `max(0.5 * perimeter_spacing, scale_(0.5))`) to adapt to the actual feature size. This is a low-risk change as it only affects query performance, not correctness.
+
+---
+
+## Summary Table (Hazards 78–80)
+
+| # | Hazard | File | Severity | Priority |
+|---|--------|------|----------|----------|
+| 78 | Dead `#if 0` alternative implementation (~400 lines) | AvoidCrossingPerimeters.cpp | Medium | P2 |
+| 79 | Lazy boundary re-init on every out-of-bounds travel | AvoidCrossingPerimeters.cpp | Medium | P2 |
+| 80 | Hardcoded 1mm EdgeGrid cell size | AvoidCrossingPerimeters.cpp | Low | P3 |
