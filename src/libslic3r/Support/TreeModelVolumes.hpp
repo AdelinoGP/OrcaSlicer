@@ -1,10 +1,36 @@
-// Tree supports by Thomas Rahm, losely based on Tree Supports by CuraEngine.
+// Tree supports by Thomas Rahm, loosely based on Tree Supports by CuraEngine.
 // Original source of Thomas Rahm's tree supports:
 // https://github.com/ThomasRahm/CuraEngine
 //
 // Original CuraEngine copyright:
 // Copyright (c) 2021 Ultimaker B.V.
 // CuraEngine is released under the terms of the AGPLv3 or higher.
+//
+// [INTENT] This header declares TreeModelVolumes, the central cache for all 2D
+// constraint polygons used by TreeSupport3D's organic branch routing:
+//
+//   COLLISION   — XY-expanded model outline at each layer (+ z-distance window).
+//   AVOIDANCE   — Propagated collision zones that block a branch from reaching the build plate
+//                 or a model surface. Three AvoidanceType variants; two target modes.
+//   WALL RESTRICTION — Intersection(collision[r=0, layer], collision[radius, layer-1]):
+//                 prevents branches from tunneling through printed walls.
+//   PLACEABLE   — Where a branch foot can rest on a model surface.
+//
+// [COUPLING] All public getXxx() methods are const but use const_cast internally for lazy
+//   calculation. Not const-correct in the strict sense — safe only because all mutation
+//   goes through cache insert() methods protected by a per-cache std::mutex.
+//
+// [CONCURRENCY] All RadiusLayerPolygonCache instances are guarded by mutable std::mutex.
+//   The nested tbb::parallel_for in calculateCollision / calculateWallRestrictions is safe
+//   because each task writes to disjoint (radius, layer) pairs.
+//
+// [HAZARD] m_bed_area is public (line 170) — no protection against external mutation.
+//   TreeSupport3D writes to it directly during branch clipping. If accessed concurrently,
+//   this would be a data race.
+//
+// [MEMORY] RadiusLayerPolygonCache stores Polygons by value in std::map per layer.
+//   For tall prints (1000+ layers) × many radii, combined size can reach 100s of MB.
+//   clear() and clear_all_but_object_collision() must be called at pipeline boundaries.
 
 #ifndef slic3r_TreeModelVolumes_hpp
 #define slic3r_TreeModelVolumes_hpp

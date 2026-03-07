@@ -5,6 +5,80 @@
 // Original CuraEngine copyright:
 // Copyright (c) 2021 Ultimaker B.V.
 // CuraEngine is released under the terms of the AGPLv3 or higher.
+//
+// [INTENT] TreeModelVolumes is a lazy-with-precalculation cache for three types of
+// 2D constraint polygons used by TreeSupport3D to route branch paths:
+//
+//   1. COLLISION:   The XY+Z-expanded model outline at each layer. Any branch node
+//                   whose center falls inside collision(radius, layer) would intersect
+//                   the model. Two variants: regular and "holefree" (holes filled in).
+//
+//   2. AVOIDANCE:   The region that a branch CANNOT pass through if it wants to reach
+//                   the build plate (or a model surface). Derived by propagating the
+//                   collision upward layer by layer, shrinking by max_move per step.
+//                   Three sub-variants (AvoidanceType): Slow, FastSafe (hole-free), Fast.
+//                   Two targets: to_buildplate=true, to_model=true.
+//
+//   3. WALL RESTRICTION: Intersection of current-layer collision (radius 0) with
+//                   previous-layer collision (at branch radius). Used to prevent
+//                   branches from tunneling through thin walls between layers.
+//
+//   4. PLACEABLE AREAS: Where a branch foot can rest on top of the model surface.
+//                   Only computed when support_rests_on_model is true.
+//
+// CACHING STRATEGY:
+//   All results are keyed by (radius, layer_idx) and stored in RadiusLayerPolygonCache
+//   instances (one per constraint type). RadiusLayerPolygonCache is a std::vector<std::map>
+//   protected by a single std::mutex for thread-safe lazy inserts.
+//
+//   Radii are NOT stored continuously — they are snapped to a coarse grid via
+//   ceilRadius(). The grid has two phases:
+//     - Linear: m_radius_0 to SUPPORT_TREE_EXPONENTIAL_THRESHOLD (0.5mm steps)
+//     - Exponential: × SUPPORT_TREE_EXPONENTIAL_FACTOR (1.5×) steps thereafter
+//   This means cache entries for neighboring radii may alias to the same key, and
+//   a radius lookup returns the polygon for the SMALLEST cached radius >= requested.
+//
+// PRECALCULATE vs LAZY:
+//   If precalculate() is called, all required (radius, layer) pairs are computed
+//   upfront in TBB parallel (recommended for multi-core systems).
+//   If NOT called, each getXxx() call triggers calculateXxx() on the calling thread
+//   with a performance warning. The latter is much slower on multi-core systems.
+//
+// [COUPLING] Constructor reads PrintObject::lslices, PrintConfig, TreeSupportSettings.
+//   calculateCollision() reads m_layer_outlines, m_machine_border, m_anti_overhang.
+//   calculateAvoidance() reads collision cache (via getCollision/getCollisionHolefree).
+//   All public getXxx() methods use const_cast to call calculateXxx() lazily.
+//
+// [CONCURRENCY] All cache insert() methods lock m_mutex (per RadiusLayerPolygonCache).
+//   calculateCollision/Avoidance/WallRestrictions all use tbb::parallel_for internally.
+//   The nested TBB parallelism (parallel_for inside parallel_for in calculateCollision)
+//   is intentional — TBB handles work-stealing across the nested pools.
+//
+// [HAZARD] calculateMachineBorderCollision() always returns empty Polygons (#if 1 branch).
+//   Machine borders are IGNORED — tree support legs can collide with the print bed boundary.
+//   The #else branch (offsetting by 1000mm) is disabled because it overflows int32 coords.
+//
+// [HAZARD] calculateCollision() bug at line ~472:
+//   `processing_last_mesh = outline_idx == layer_outline_indices.size()`
+//   This compares the value of outline_idx (a size_t) to layer_outline_indices.size().
+//   Since outline_idx is iterated over VALUES (not indices) of layer_outline_indices,
+//   this is never true unless one mesh index happens to equal the total mesh count.
+//   The intended check is `outline_idx == layer_outline_indices.back()`.
+//   This means placeable areas and anti_overhang are NEVER applied properly when
+//   there is more than one mesh group (currently always one group due to #if 0 in
+//   group_meshes(), so this bug is latent).
+//
+// [HAZARD] Multi-mesh group code in constructor (lines 70-92) and calculateCollision
+//   (line ~127-153) are both inside #if 0 blocks. Currently always single-mesh.
+//   If multi-mesh is ever re-enabled, the xy_distance selection logic at line ~441-448
+//   uses an approximation (m_current_min_xy_dist_delta added at request time) that
+//   introduces small inaccuracies for non-primary mesh groups.
+//
+// [MEMORY] RadiusLayerPolygonCache stores Polygons by value in std::map<coord_t, Polygons>
+//   per layer. For tall prints (1000+ layers) × many radius buckets, total memory can
+//   be tens to hundreds of MB. clear() and clear_all_but_object_collision() are provided
+//   but only called at explicit pipeline boundaries.
+
 
 #include "TreeModelVolumes.hpp"
 #include "TreeSupportCommon.hpp"
@@ -35,7 +109,12 @@ using namespace std::literals;
 // had to use a define beacuse the macro processing inside macro BOOST_LOG_TRIVIAL()
 #define error_level_not_in_cache debug
 
-//FIXME Machine border is currently ignored.
+// [INTENT] DEAD CODE — machine border is always ignored (#if 1 returns empty).
+// The #else branch would offset the build volume polygon outward by 1000mm (giving a
+// 1m safety ring) and then subtract the original bed polygon to create a border wall.
+// Disabled because 1000mm in scaled int32 coordinates overflows (max ~32mm at 1e6 scale).
+// [HAZARD] Without machine borders, tree support legs can extend beyond the physical
+// print bed. On printers with bed clips or limited print area, this can cause print failures.
 static Polygons calculateMachineBorderCollision(Polygon machine_border)
 {
     // Put a border of 1m around the print volume so that we don't collide.
@@ -154,6 +233,26 @@ TreeModelVolumes::TreeModelVolumes(
 #endif
 }
 
+// [INTENT] Upfront batch computation of all collision and avoidance polygons up to
+// max_layer. Called once at the start of tree support generation. Determines which
+// (radius, layer) pairs are actually needed by simulating the branch radius growth
+// schedule, then dispatches calculateCollision(), calculateCollisionHolefree(),
+// calculatePlaceables(), calculateAvoidance(), and calculateWallRestrictions() in
+// parallel via a tbb::task_group.
+//
+// [STATE] Sets m_precalculated = true. After this, any cache miss triggers a
+// BOOST_LOG_TRIVIAL(debug) warning and falls back to lazy calculation.
+//
+// [COUPLING] Reads m_layer_outlines[m_current_outline_idx].first for TreeSupportSettings.
+//   Reads config.getRadius(), config.recommendedMinRadius(), config.tip_layers to
+//   enumerate all radius buckets needed.
+//
+// [MEMORY] The radius_until_layer map can have O(tip_layers + log(max_layer)) entries.
+//   Each entry maps to a (radius, max_layer) pair; the Cartesian product × 3 avoidance
+//   types × 2 targets = up to 6× that count of avoidance tasks.
+//
+// [HAZARD] SVG paint-cache debugging block at lines ~256-291 is behind #if 0.
+//   Generating these SVGs for large prints would write thousands of files to disk.
 void TreeModelVolumes::precalculate(const PrintObject& print_object, const coord_t max_layer, std::function<void()> throw_on_cancel)
 {
     auto t_start = std::chrono::high_resolution_clock::now();
@@ -291,6 +390,13 @@ void TreeModelVolumes::precalculate(const PrintObject& print_object, const coord
 #endif
 }
 
+// [INTENT] Cache accessor for collision regions. Snaps orig_radius to the nearest
+// ceil-radius bucket, then looks up m_collision_cache. If not found and precalculate()
+// was already called, logs a performance warning, then falls back to lazy calculateCollision().
+// [COUPLING] Uses const_cast to call calculateCollision() from a const method.
+//   This is safe as long as no concurrent readers hold references to the same
+//   (radius, layer_idx) entry — which is guaranteed by the per-cache mutex.
+// [CONCURRENCY] Thread-safe: RadiusLayerPolygonCache::getArea() locks its mutex.
 const Polygons& TreeModelVolumes::getCollision(const coord_t orig_radius, LayerIndex layer_idx, bool min_xy_dist) const
 {
     const coord_t radius = this->ceilRadius(orig_radius, min_xy_dist);
@@ -327,6 +433,17 @@ const Polygons& TreeModelVolumes::getCollisionHolefree(coord_t radius, LayerInde
     return getCollisionHolefree(radius, layer_idx);
 }
 
+// [INTENT] Cache accessor for avoidance regions. Returns the polygon set that a branch of
+// orig_radius must avoid at layer_idx to eventually reach the build plate (to_model=false)
+// or some model surface (to_model=true).
+// Layer 0 is a special case: avoidance at layer 0 equals collision (no further path to route).
+// FastSafe type is automatically downgraded to Fast if radius >= m_increase_until_radius
+// (no holes exist at that radius by definition).
+// Falls back to lazy calculateAvoidance() if the entry is missing and m_precalculated is true.
+// [COUPLING] Uses avoidance_cache() dispatch table to select among 6 cache instances by
+// (type × to_model). The dispatch is a switch inside a helper that returns a non-const ref.
+// [CONCURRENCY] Thread-safe via RadiusLayerPolygonCache::getArea() mutex.
+// [HAZARD] const_cast<TreeModelVolumes*>(this)->calculateAvoidance() — see getCollision notes.
 const Polygons& TreeModelVolumes::getAvoidance(const coord_t orig_radius, LayerIndex layer_idx, AvoidanceType type, bool to_model, bool min_xy_dist) const
 {
     if (layer_idx == 0) // What on the layer directly above buildplate do i have to avoid to reach the buildplate ...
@@ -356,6 +473,16 @@ const Polygons& TreeModelVolumes::getAvoidance(const coord_t orig_radius, LayerI
     return getAvoidance(orig_radius, layer_idx, type, to_model, min_xy_dist);
 }
 
+// [INTENT] Cache accessor for placeable areas — where a branch foot of orig_radius can
+// actually rest on a model surface. For radius==0, delegates directly to getCollision(0,...)
+// which computes placable areas as a side-effect of calculateCollision().
+// For radius>0, calls calculatePlaceables() lazily if not found.
+// [COUPLING] Depends on placable-area side-effect in calculateCollision(radius=0).
+//   The lazy fallback path calls calculatePlaceables(radius, layer_idx) which
+//   calls getPlaceableAreas(0, layer_idx) internally — a recursive call chain.
+// [CONCURRENCY] Thread-safe via cache mutex.
+// [HAZARD] throw_on_cancel lambda is passed through the lazy calculatePlaceables()
+//   call but NOT used in the fast-path cache lookup. Cancellation checking is coarse.
 const Polygons& TreeModelVolumes::getPlaceableAreas(const coord_t orig_radius, LayerIndex layer_idx, std::function<void()> throw_on_cancel) const
 {
     const coord_t radius = ceilRadius(orig_radius);
@@ -372,6 +499,16 @@ const Polygons& TreeModelVolumes::getPlaceableAreas(const coord_t orig_radius, L
     return getPlaceableAreas(orig_radius, layer_idx, throw_on_cancel);
 }
 
+// [INTENT] Cache accessor for wall-restriction areas — the intersection of current-layer
+// collision (radius 0) with previous-layer collision (at branch radius). This region
+// represents printed walls that a branch cannot tunnel through between layers.
+// Two caches: m_wall_restrictions_cache (regular xy_dist) and m_wall_restrictions_cache_min
+// (min xy_dist). The min variant is only used when m_current_min_xy_dist_delta > 0.
+// [COUPLING] layer_idx == 0 is guarded by assert(layer_idx > 0); returns collision as fallback
+//   (safe but semantically wrong — wall restrictions don't exist below layer 0).
+// [CONCURRENCY] Thread-safe via cache mutex. const_cast for lazy calculateWallRestrictions().
+// [HAZARD] min_xy_dist is masked: `min_xy_dist &= m_current_min_xy_dist_delta > 0`.
+//   If delta is 0, the min cache is always bypassed, which is correct but subtle.
 const Polygons& TreeModelVolumes::getWallRestriction(const coord_t orig_radius, LayerIndex layer_idx, bool min_xy_dist) const
 {
     assert(layer_idx > 0);
@@ -412,7 +549,37 @@ void TreeModelVolumes::calculateCollision(const std::vector<RadiusLayerPair> &ke
     });
 }
 
-// Calculate collisions and placable areas for radius and for layer 0 to max_layer_idx inclusive.
+// [INTENT] Core collision computation for a single radius up to max_layer_idx.
+// Three-phase per mesh-group:
+//   Phase 1 — parallel offset of each layer's union(machine_border + outlines) by (radius+xy_dist).
+//   Phase 2 — parallel summation over z_distance_top/bottom_layers bands, then union with
+//             anti_overhang (support blockers) on the last mesh group.
+//   Phase 3 — (only when radius==0 and m_support_rests_on_model) compute placeable areas as
+//             diff(inflated_below_layer, current_collision+anti_overhang).
+// Stores results to m_collision_cache (and m_placeable_areas_cache for radius==0).
+//
+// [HAZARD] BUG: processing_last_mesh at line 578:
+//   `const bool processing_last_mesh = outline_idx == layer_outline_indices.size();`
+//   outline_idx is a VALUE from layer_outline_indices (a sorted permutation of mesh indices),
+//   NOT the loop counter. layer_outline_indices.size() is the count of meshes.
+//   Unless a mesh's actual index (e.g. mesh #3) equals the total number of meshes,
+//   this is NEVER true. The intended check is:
+//     `outline_idx == layer_outline_indices.back()`
+//   (i.e., are we processing the last mesh in the sorted order?)
+//   Consequence: anti_overhang is never applied, and polygon simplification / final union
+//   only happens if the condition is accidentally true. For the current single-mesh case
+//   (layer_outline_indices = {0}, size = 1), this fires correctly ONLY if mesh index == 1,
+//   which it isn't (index is 0). So for ALL normal single-mesh prints, anti_overhang is
+//   silently skipped and the final simplification does NOT run. Latent because multi-mesh
+//   grouping is disabled, but still affects the single-mesh path.
+//
+// [CONCURRENCY] Nested TBB parallel_for (outer over mesh groups, inner over layers).
+//   TBB handles work-stealing for nested task arenas. The outer for is sequential (range
+//   over mesh groups); only the inner parallel_for is dispatched to TBB threads.
+//
+// [MEMORY] collision_areas_offsetted is a stack-local LayerPolygonCache; data is a
+//   stack-local LayerPolygonCache. Both are moved into cache on function exit.
+//   Peak memory during execution = 2× the layer range × sizeof(Polygons).
 void TreeModelVolumes::calculateCollision(const coord_t radius, const LayerIndex max_layer_idx, std::function<void()> throw_on_cancel)
 {
 //    assert(radius == this->ceilRadius(radius));
@@ -579,6 +746,19 @@ void TreeModelVolumes::calculateCollision(const coord_t radius, const LayerIndex
         m_placeable_areas_cache.insert(std::move(data_placeable), radius);
 }
 
+// [INTENT] Build the holefree (no-holes) collision cache by shrinking the regular collision
+// at m_increase_until_radius down to each requested smaller radius. This ensures that
+// branches at small radii avoid holes that they would fall into if they were grown to
+// m_increase_until_radius.
+// Algorithm: collision_holefree[r] = simplified(offset(collision[m_increase_until_radius],
+//                                               5 - ceil(m_increase_until_radius - r), jtRound))
+// The "5 - increase_radius_ceil" offset is a small contraction to remove boundary noise.
+// [STATE] Reads m_collision_cache (via getCollision); writes m_collision_cache_holefree.
+// [CONCURRENCY] Outer tbb::parallel_for over layer ranges; per-layer inner loop over keys.
+// [HAZARD] increase_radius_ceil is computed as ceilRadius(m_increase_until_radius, false) - r.
+//   For very small r this offset can be large; for r ≈ m_increase_until_radius it approaches 0.
+//   If increase_radius_ceil > 5, the inner offset becomes positive (expansion, not contraction)
+//   — this is by design for small radii but may produce unexpected polygons for degenerate inputs.
 void TreeModelVolumes::calculateCollisionHolefree(const std::vector<RadiusLayerPair> &keys, std::function<void()> throw_on_cancel)
 {
     LayerIndex max_layer = 0;
@@ -611,6 +791,33 @@ void TreeModelVolumes::calculateCollisionHolefree(const std::vector<RadiusLayerP
     });
 }
 
+// [INTENT] Compute all avoidance regions for the given (radius, max_layer) keys.
+// For each key × 3 AvoidanceTypes × 2 targets (to_buildplate, to_model), creates an
+// AvoidanceTask struct. Tasks are dispatched to tbb::parallel_for, but each task's
+// inner loop (propagating avoidance bottom-up layer by layer) is INHERENTLY SERIAL.
+//
+// Avoidance propagation algorithm per task:
+//   latest_avoidance[layer] = union(collision[layer], offset(latest_avoidance[layer-1], -move_step))
+//   repeated move_steps times per layer to avoid tunneling through walls.
+//   For to_model=true: diff with placeableAreas[layer] to allow landing on model surfaces.
+//
+// [STATE] Reads m_collision_cache or m_collision_cache_holefree (depending on task type).
+//   Reads m_placeable_areas_cache. Writes avoidance_cache(type, to_model).
+//
+// [CONCURRENCY] Outer tbb::parallel_for dispatches independent tasks concurrently.
+//   Each task's inner for-loop is serial (layer dependency chain).
+//   Tasks that share the same avoidance cache call cache.insert() which locks m_mutex.
+//
+// [HAZARD] iter_idx computation for task assignment (lines 738-744) is hardcoded
+//   for 2 targets × keys.size() × 3 types = 6 * keys.size() tasks.
+//   If to_build_plate or to_model is false, the corresponding tasks are filtered
+//   by the (task.to_model ? to_model : to_build_plate) guard. This is correct but
+//   fragile — the "6×" constant embeds assumptions about AvoidanceType::Count == 3.
+//
+// [HAZARD] move_step = 1.9 × max(radius, m_current_min_xy_dist). If radius is very
+//   small and m_current_min_xy_dist is also small, move_step approaches 0 and
+//   the guard `if (move_step < EPSILON) return;` prevents division-by-zero, but
+//   that task's avoidance is silently skipped — left as empty in the cache.
 void TreeModelVolumes::calculateAvoidance(const std::vector<RadiusLayerPair> &keys, bool to_build_plate, bool to_model, std::function<void()> throw_on_cancel)
 {
     // For every RadiusLayer pair there are 3 avoidances that have to be calculated.
@@ -714,6 +921,7 @@ void TreeModelVolumes::calculateAvoidance(const std::vector<RadiusLayerPair> &ke
 }
 
 
+// [INTENT] Batch dispatch: parallel_for over keys, calling calculatePlaceables(radius, max_layer).
 void TreeModelVolumes::calculatePlaceables(const std::vector<RadiusLayerPair> &keys, std::function<void()> throw_on_cancel)
 {
     tbb::parallel_for(tbb::blocked_range<size_t>(0, keys.size()),
@@ -723,6 +931,19 @@ void TreeModelVolumes::calculatePlaceables(const std::vector<RadiusLayerPair> &k
         });
 }
 
+// [INTENT] Compute placeable areas for a specific (radius, max_required_layer) pair.
+// Placeable areas at layer L = offset(placeableAreas(radius=0, layer=L), -(radius+xy_dist)).
+// The inner shrink by (radius + xy_dist) removes thin slivers that look flat but are
+// actually the far edge of xy_distance that can't genuinely hold a branch foot.
+// Layer 0 special case: placeables = diff(machine_border, collision(radius=0, layer=0)).
+// [COUPLING] Reads m_placeable_areas_cache (via getPlaceableAreas(0, layer_idx)).
+//   This is a recursive call: calculatePlaceables(r>0) → getPlaceableAreas(0) → [from cache].
+//   The radius-0 placeables must already be in cache (set as a side-effect of calculateCollision).
+// [CONCURRENCY] tbb::parallel_for over layers. Each layer is independent.
+// [HAZARD] If m_machine_border is empty (always, per calculateMachineBorderCollision()),
+//   layer 0 placeables = diff({}, collision) = {} always empty. Branches can never start
+//   from layer 0 when using to_model=true with radius>0. Acceptable workaround since
+//   support at layer 0 is edge case.
 void TreeModelVolumes::calculatePlaceables(const coord_t radius, const LayerIndex max_required_layer, std::function<void()> throw_on_cancel)
 {
     LayerIndex start_layer = 1 + m_placeable_areas_cache.getMaxCalculatedLayer(radius);
@@ -762,6 +983,22 @@ void TreeModelVolumes::calculatePlaceables(const coord_t radius, const LayerInde
     m_placeable_areas_cache.insert(std::move(data), start_layer, radius);
 }
 
+// [INTENT] Compute wall restriction areas: regions a branch cannot pass through between
+// consecutive layers. Defined as intersection(collision(r=0, layer), collision(radius, layer-1)).
+// Conceptually: if a wall is printed at layer L (collision at r=0), and at layer L-1
+// the branch's swept area (collision at radius) overlaps that wall, the branch would
+// have moved through the wall — which is physically impossible.
+//
+// Two variants:
+//   - Regular: intersection(collision(0, layer, false), collision(radius, layer-1, true))
+//   - Min:     intersection(collision(0, layer, true),  collision(radius, layer-1, true))
+// The "true" on the second arg uses min_xy_dist (tighter fit), "false" uses the regular dist.
+//
+// [COUPLING] Reads m_collision_cache via getCollision(). Must be populated first by calculateCollision().
+// [CONCURRENCY] Outer tbb::parallel_for over keys (independent radius groups).
+//   Inner tbb::parallel_for over layers within each radius group — nested TBB.
+// [HAZARD] The inner TBB nesting means for large key sets, TBB may spawn many nested
+//   parallel_for tasks. Depends on TBB's task arena for fair work-stealing.
 void TreeModelVolumes::calculateWallRestrictions(const std::vector<RadiusLayerPair> &keys, std::function<void()> throw_on_cancel)
 {
     // Wall restrictions are mainly important when they represent actual walls that are printed, and not "just" the configured z_distance, because technically valid placement is no excuse for moving through a wall.
@@ -832,6 +1069,24 @@ void TreeModelVolumes::calculateWallRestrictions(const std::vector<RadiusLayerPa
     });
 }
 
+// [INTENT] Snap a radius upward to the nearest grid point used by the cache.
+// Two-phase grid:
+//   Phase 1 (linear): from m_radius_0 to SUPPORT_TREE_EXPONENTIAL_THRESHOLD
+//     steps of stepsize = initial_radius_delta / num_steps (approx 0.5mm).
+//   Phase 2 (exponential): multiply by SUPPORT_TREE_EXPONENTIAL_FACTOR (1.5×) each step
+//     until out >= radius.
+// Radii in m_ignorable_radii (pre-computed set of tip-range radii that will never be
+// requested) are skipped (they alias to the next grid point above them).
+//
+// [HAZARD] Aliasing: two distinct branch radii that both ceil to the same grid point
+//   will share the same cache entry. The collision polygon is LARGER than needed for
+//   the smaller radius — conservative but may prevent valid branch placements.
+//   This is intentional to bound cache size; the trade-off is reduced reachability.
+//
+// [HAZARD] The linear phase has a subtle off-by-one risk: if initial_radius_delta <=
+//   SUPPORT_TREE_COLLISION_RESOLUTION, the code falls through to `out += SUPPORT_TREE_COLLISION_RESOLUTION`
+//   and then enters the exponential loop. For most printers initial_radius_delta >> COLLISION_RESOLUTION,
+//   so this path is rarely exercised.
 coord_t TreeModelVolumes::ceilRadius(const coord_t radius) const
 {
     if (radius == 0)
