@@ -1,4 +1,24 @@
 // Orca: WipeTower2 for all non bbl printers, support all MMU device and toolchanger.
+//
+// [INTENT] This file implements the purge tower G-code generator for non-BBL printers.
+// It handles two distinct hardware classes:
+//   1. SEMM (single-extruder multi-material, e.g. Prusa MMU/AMS Lite): one nozzle, filament
+//      loaded/unloaded via a selector/bowden; requires full ramming + cooling cycle per change.
+//   2. Multi-tool-head (e.g. tool-changers): multiple nozzles; toolchange is handled by firmware
+//      ([change_filament_gcode] placeholder); ramming via multitool_ramming path.
+//
+// [STATE] Two-phase design:
+//   Phase 1 (planning): plan_toolchange() builds m_plan, plan_tower() calculates layer depths,
+//          save_on_last_wipe() steals finish_layer extrusion volume from the last wipe of each layer.
+//          generate() runs this fixed-point loop 5 times until convergence (see generate()).
+//   Phase 2 (generation): generate() iterates m_plan and calls tool_change() + finish_layer()
+//          to produce per-layer ToolChangeResult vectors consumed by GCode.cpp.
+//
+// [COUPLING] GCodeProcessor::s_IsBBLPrinter is set to false in WipeTowerWriter2's constructor —
+//   a global static side effect that affects G-code output format for all downstream processing.
+//
+// [MEMORY] WipeTowerWriter2 is a stack-allocated fluent builder per TCR. It tracks its own
+//   position/feedrate state and accumulates the gcode string. construct_tcr() moves the string out.
 #include "WipeTower2.hpp"
 
 #include <cassert>
@@ -24,6 +44,14 @@
 namespace Slic3r
 {
 
+// [INTENT] Constants governing wipe tower geometry and G-code generation.
+// flat_iron_speed: mm/min speed for ironing pass = 10 mm/s * 60 = 600 mm/min.
+// flat_iron_area: area (mm²) to iron after wipe; controls spiral ironing extent.
+// wipe_tower_wall_infill_overlap: currently 0 — no infill overlap with perimeter walls.
+// WIPE_TOWER_RESOLUTION: arc approximation chord length (mm) for polygon discretization.
+// arc_fit_size: number of segments to approximate each rounded corner arc.
+// nozzle_diameter_to_nozzle_change_width: maps nozzle diameter to purge line width during
+//   nozzle-change operations (wider nozzle → wider purge line).
 static constexpr float      flat_iron_area                 = 4.f;
 constexpr float         flat_iron_speed                = 10.f * 60.f;
 static const double     wipe_tower_wall_infill_overlap = 0.0;
@@ -1216,6 +1244,10 @@ private:
 
 
 
+// [INTENT] construct_tcr() packs the current WipeTowerWriter2 state into a ToolChangeResult value.
+// [MEMORY] writer.gcode() is std::move'd — the writer is consumed and must not be used afterward.
+// [HAZARD] tool_change_start_pos is always set to start_pos as a fallback (ORCA fix) to avoid
+//   undefined-variable travel in WipeTowerIntegration::post_process_wipe_tower_moves.
 WipeTower::ToolChangeResult WipeTower2::construct_tcr(WipeTowerWriter2& writer,
                                                      bool priming,
                                                      size_t old_tool,
@@ -1515,6 +1547,13 @@ std::vector<WipeTower::ToolChangeResult> WipeTower2::prime(
 	return results;
 }
 
+// [INTENT] tool_change() is the top-level entry point for one toolchange event at the current layer.
+// It sequences: Unload (ram + cool old filament) → Change (emit T-code placeholder) →
+//   Load (push new filament) → Wipe (purge new filament until volume target is met).
+// For multi-tool-head printers, Load and cooling steps are skipped (firmware handles them).
+// [STATE] Advances m_depth_traversed, m_num_tool_changes, m_current_tool.
+// [COUPLING] Emits [change_filament_gcode] placeholder (toolchange_Change) to be substituted
+//   by GCode.cpp's WipeTowerIntegration post-processor with the actual T-code or custom gcode.
 WipeTower::ToolChangeResult WipeTower2::tool_change(size_t tool)
 {
     size_t old_tool = m_current_tool;
@@ -1629,6 +1668,13 @@ WipeTower::ToolChangeResult WipeTower2::tool_change(size_t tool)
 }
 
 
+// [INTENT] toolchange_Unload(): ram old filament out of the melt zone (SEMM or multitool_ramming),
+// then retract into cooling tube and execute back-and-forth cooling moves.
+// [STATE] Advances writer position; leaves nozzle at end_of_ramming + y_step alignment.
+// [HAZARD] cold_ramming path (MK4MMU3): drops temp by 20°C before ramming to stiffen filament;
+//   this temperature change is sent as a blocking M109 — increases total toolchange time.
+// [HAZARD] Stamping (filament_stamping_distance != 0): pushes filament into the melt zone
+//   between cooling moves to spread blobs across the tower rather than at a single point.
 // Ram the hot material out of the melt zone, retract the filament into the cooling tubes and let it cool.
 void WipeTower2::toolchange_Unload(
 	WipeTowerWriter2 &writer,
@@ -1843,6 +1889,13 @@ void WipeTower2::toolchange_Unload(
           .flush_planner_queue();
 }
 
+// [INTENT] toolchange_Change(): emit the toolchange G-code placeholder and update writer's
+//   internal tool state. Does not emit the actual T-code — that is handled by firmware or the
+//   [change_filament_gcode] custom G-code substituted later by WipeTowerIntegration.
+// [HAZARD] After [change_filament_gcode] the printer head may be anywhere. A G1 move with
+//   never_skip_tag() forces a re-position to the known wipe-tower coordinate before any
+//   extrusion, preventing air moves from dragging material.
+// [STATE] Sets m_current_tool = new_tool; records used filament length of the old tool.
 // Change the tool, set a speed override for soluble and flex materials.
 void WipeTower2::toolchange_Change(
 	WipeTowerWriter2 &writer,
@@ -1883,6 +1936,12 @@ void WipeTower2::toolchange_Change(
 	m_current_tool = new_tool;
 }
 
+// [INTENT] toolchange_Load(): slowly push new filament from parking position (cooling tube) into
+//   the melt zone, distributing the excess material left/right to avoid concentrated blobs.
+// [STATE] Only runs for SEMM with filament_ramming enabled and non-zero retraction distances.
+//   Multi-tool-head printers skip this (firmware loads filament directly to the hot end).
+// [HAZARD] The 3-phase load (0.2× fast start → 0.7× normal → 0.1× super slow) mimics PrusaSlicer
+//   logic; the "super slow" phase allows the heat zone to fully melt loaded filament before wiping.
 void WipeTower2::toolchange_Load(
 	WipeTowerWriter2 &writer,
 	const WipeTower::box_coordinates  &cleaning_box)
@@ -1911,6 +1970,14 @@ void WipeTower2::toolchange_Load(
     }
 }
 
+// [INTENT] toolchange_Wipe(): purge new filament by extruding back-and-forth rows until
+//   the target wipe_volume is consumed. Speed ramps from 33% → 37.5% → 45.8% → 87.5% → 100%
+//   of target_speed to avoid pressure build-up on the first passes.
+// [STATE] m_left_to_right toggles each row; terminates early when x_to_wipe < WT_EPSILON.
+// [HAZARD] The speed ramp is a hardcoded multi-threshold step function — tightly coupled to
+//   expected extrusion pressure behaviour. Changes to nozzle/filament physics may require retune.
+// [INTENT] do_ironing: after the first wipe pass, a spiral ironing sub-pass flattens the layer
+//   surface to improve adhesion of subsequent layers in the tower.
 // Wipe the newly loaded filament until the end of the assigned wipe area.
 void WipeTower2::toolchange_Wipe(
 	WipeTowerWriter2 &writer,
@@ -1999,6 +2066,16 @@ void WipeTower2::toolchange_Wipe(
 
 
 
+// [INTENT] finish_layer(): extrude the perimeter wall and sparse/solid infill of the tower
+//   for the non-toolchange area of the current layer (the "empty grid" region above toolchanges).
+// [STATE] Sets m_current_layer_finished = true. Must be called exactly once per layer.
+//   Called by generate() either before or after toolchanges on the layer depending on
+//   first_toolchange_to_nonsoluble() result, then merged into the adjacent TCR via merge_tcr().
+// [INTENT] Solid infill is used when the next layer contains soluble filament (needs full support)
+//   or on the first layer with adhesion enabled. Otherwise sparse bridging infill is used.
+// [INTENT] Brim is extruded here on the first layer only, using the outermost wall polygon offset
+//   by spacing * loops_num. Actual brim width is saved to m_wipe_tower_brim_width_real.
+// [COUPLING] Wall type dispatch: wtwCone → generate_support_cone_wall(); else → generate_support_rib_wall().
 WipeTower::ToolChangeResult WipeTower2::finish_layer()
 {
 	assert(! this->layer_finished());
@@ -2208,6 +2285,15 @@ static float get_wipe_depth(float volume, float layer_height, float perimeter_wi
 	return (int(length_to_extrude / width) + 1) * perimeter_width * extra_spacing;
 }
 
+// [INTENT] plan_toolchange(): called once per toolchange event (in Z-ascending order) to build
+//   the m_plan data structure. For old_tool == new_tool (layer without real toolchange), just
+//   creates the WipeTowerInfo entry for the layer and returns early.
+// [STATE] Computes required_depth = ramming_depth + wiping_depth for this toolchange.
+//   ramming_depth: y-rows consumed by the ramming speed profile (disabled → 0).
+//   wiping_depth: rows needed to consume wipe_volume - first_wipe_line carryover volume.
+// [HAZARD] ORCA planning_spacing fix: first layer uses m_extra_flow spacing, later layers use
+//   m_extra_spacing_wipe — must stay consistent with toolchange_Wipe() or tower depth is mis-estimated.
+// [COUPLING] wipe_volume comes from WipeTower2::extract_wipe_volumes() which reads flush_volumes_matrix.
 // Appends a toolchange into m_plan and calculates neccessary depth of the corresponding box
 void WipeTower2::plan_toolchange(float z_par, float layer_height_par, unsigned int old_tool,
                                 unsigned int new_tool, float wipe_volume)
@@ -2251,6 +2337,13 @@ void WipeTower2::plan_toolchange(float z_par, float layer_height_par, unsigned i
 
 
 
+// [INTENT] plan_tower(): computes the final m_wipe_tower_depth by scanning all layers top-down
+//   and propagating maximum depths downward. A lower layer must be at least as deep as any
+//   layer above it (tower walls must be continuous), so min-depth is forced: if a lower layer
+//   is less than 2*perimeter_width shallower than an upper layer, the lower layer is widened.
+// [STATE] Sets m_wipe_tower_depth, m_wipe_tower_height, m_current_height.
+// [HAZARD] This O(n²) propagation loop visits all prior layers for each new deeper layer.
+//   Acceptable for typical print counts (<1000 layers) but could be slow for very tall prints.
 void WipeTower2::plan_tower()
 {
 	// Calculate m_wipe_tower_depth (maximum depth for all the layers) and propagate depths downwards
@@ -2276,6 +2369,14 @@ void WipeTower2::plan_tower()
 	}
 }
 
+// [INTENT] save_on_last_wipe(): reduce purge volume by stealing the finish_layer extrusion volume
+//   from the last non-soluble toolchange on each layer. This avoids double-counting the material
+//   extruded by finish_layer (perimeter + infill) against the purge budget.
+// [STATE] Mutates ToolChange::required_depth and ToolChange::wipe_volume in m_plan.
+// [HAZARD] Calls tool_change() and finish_layer() as a dry run (generating G-code that is
+//   discarded) just to measure total_extrusion_length_in_plane(). This means the writer state
+//   machine is exercised but the results are thrown away — subtle coupling to writer side effects.
+// [HAZARD] ORCA spacing consistency fix applied here too (same comment block as plan_toolchange).
 void WipeTower2::save_on_last_wipe()
 {
     for (m_layer_info=m_plan.begin();m_layer_info<m_plan.end();++m_layer_info) {
@@ -2359,6 +2460,16 @@ static WipeTower::ToolChangeResult merge_tcr(WipeTower::ToolChangeResult& first,
 }
 
 
+// [INTENT] generate(): main entry point — runs the planning/optimization loop then executes
+//   the final G-code generation pass over all layers.
+// [STATE] Planning loop: plan_tower() + save_on_last_wipe() run 5 times to converge depth
+//   estimates. The loop count is empirical (#if 1 guard allows easy disabling during debug).
+// [INTENT] After planning, iterates m_plan and for each layer calls tool_change() for each
+//   toolchange and finish_layer() for the infill region. finish_layer TCR is merged into the
+//   adjacent toolchange TCR via merge_tcr() so GCode.cpp sees a single continuous move.
+// [STATE] m_internal_rotation flips 180° each layer to alternate wipe direction.
+// [MEMORY] result is a 2D vector — outer index = layer index, inner = ToolChangeResults for
+//   that layer (one per toolchange + one for finish_layer merged in).
 // Processes vector m_plan and calls respective functions to generate G-code for the wipe tower
 // Resulting ToolChangeResults are appended into vector "result"
 void WipeTower2::generate(std::vector<std::vector<WipeTower::ToolChangeResult>> &result)

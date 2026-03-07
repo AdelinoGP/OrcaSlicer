@@ -1,4 +1,18 @@
 // Orca: WipeTower2 for all non bbl printers, support all MMU device and toolchanger
+//
+// [INTENT] WipeTower2 is the non-BBL multi-material purge tower generator. It handles SEMM
+// (single-extruder multi-material, e.g. Prusa MMU) and multi-tool-head printers. The BBL-specific
+// path uses the original WipeTower (WipeTower.cpp); this class activates for everything else.
+//
+// [STATE] Lifecycle: (1) Construct with config, (2) call plan_toolchange() for every toolchange
+// at every layer in ascending Z order, (3) call generate() once to produce ToolChangeResults.
+// The results are consumed by GCode.cpp and spliced into the per-layer G-code stream.
+//
+// [MEMORY] All per-layer toolchange data lives in m_plan (std::vector<WipeTowerInfo>).
+// WipeTowerWriter2 (inner class in .cpp) is a RAII fluent builder that accumulates the G-code
+// string for one TCR, then construct_tcr() moves it into the result — no shared mutable state.
+//
+// [CONCURRENCY] Not thread-safe. Called from the main GCode thread only; no TBB usage inside.
 
 #ifndef WipeTower2_
 #define WipeTower2_
@@ -144,9 +158,12 @@ public:
     std::vector<std::pair<float, std::vector<float>>> get_used_filament_until_layer() const { return m_used_filament_length_until_layer; }
     int get_number_of_toolchanges() const { return m_num_tool_changes; }
 
+    // [STATE] Per-extruder filament parameters, populated by set_extruder() from PrintConfig.
+    // [COUPLING] These mirror PrintConfig fields; changes to config names require mirrored updates here.
+    // [HAZARD] filament_area assumes all extruders share the same filament diameter (see filament_area() below).
     struct FilamentParameters {
         std::string 	    material = "PLA";
-        bool                is_soluble = false;
+        bool                is_soluble = false;   // [STATE] Soluble materials get solid infill on adjacent layers
         int  			    temperature = 0;
         int  			    first_layer_temperature = 0;
         int                 interface_print_temperature = 0;
@@ -154,59 +171,64 @@ public:
         float               loading_speed_start = 0.f;
         float               unloading_speed = 0.f;
         float               unloading_speed_start = 0.f;
-        float               delay = 0.f ;
+        float               delay = 0.f ;          // [INTENT] Cooling park dwell time after unloading (SEMM only)
 
 		float               filament_stamping_loading_speed = 0.f;
-		float               filament_stamping_distance = 0.f;
+		float               filament_stamping_distance = 0.f; // [INTENT] MK4MMU3 stamping: push filament into melt zone during cooling
 
-        int                 cooling_moves = 0;
+        int                 cooling_moves = 0;     // [INTENT] Number of back-and-forth cooling tube moves
         float               cooling_initial_speed = 0.f;
         float               cooling_final_speed = 0.f;
         float               ramming_line_width_multiplicator = 1.f;
         float               ramming_step_multiplicator = 1.f;
         float               max_e_speed = std::numeric_limits<float>::max();
-        std::vector<float>  ramming_speed;
+        std::vector<float>  ramming_speed; // [INTENT] Speed profile over ramming sequence, one entry per 0.25s segment
         float               nozzle_diameter;
-        float               filament_area;
-		bool			    multitool_ramming;
+        float               filament_area;  // [INTENT] Cross-section area of filament in mm², used for extrusion flow calc
+		bool			    multitool_ramming;      // [INTENT] True for multi-tool-head printers — ramming is done by the tool itself
 		float               multitool_ramming_time = 0.f;
 		float               filament_minimal_purge_on_wipe_tower = 0.f;
         float               retract_length;
         float               retract_speed;
         float               tower_interface_pre_extrusion_dist = 0.f;
         float               tower_interface_pre_extrusion_length = 0.f;
-        float               tower_ironing_area = 4.f;
+        float               tower_ironing_area = 4.f;   // [INTENT] Area to iron flat after first wipe pass
         float               tower_interface_purge_length = 0.f;
     };
 
 private:
+	// [INTENT] SHAPE_NORMAL = wipe rows grow in +Y; SHAPE_REVERSED = grow in -Y.
+	// Currently always SHAPE_NORMAL (the alternating logic is commented out in set_layer).
 	enum wipe_shape // A fill-in direction
 	{
 		SHAPE_NORMAL = 1,
 		SHAPE_REVERSED = -1
 	};
 
+    // [INTENT] Line width = nozzle_diameter * Width_To_Nozzle_Ratio.
+    // [HAZARD] This ratio is applied globally; different nozzle sizes handled via nozzle_diameter_to_nozzle_change_width map.
     const float Width_To_Nozzle_Ratio = 1.25f; // desired line width (oval) in multiples of nozzle diameter - may not be actually neccessary to adjust
     const float WT_EPSILON            = 1e-3f;
     float filament_area() const {
+        // [HAZARD] Assumes all extruders have the same filament diameter. Multi-diameter setups unsupported.
         return m_filpar[0].filament_area; // all extruders are assumed to have the same filament diameter at this point
     }
 
 
 	bool   m_semm               = true; // Are we using a single extruder multimaterial printer?
 	bool   m_enable_filament_ramming = true;
-	bool   m_is_mk4mmu3         = false;
+	bool   m_is_mk4mmu3         = false; // [INTENT] MK4+MMU3 uses cold ramming (temp drop before ramming) and stamping
     int    m_wipe_tower_filament = 0;   // 1-based config value, 0 means auto
     Vec2f  m_wipe_tower_pos; 			// Left front corner of the wipe tower in mm.
 	float  m_wipe_tower_width; 			// Width of the wipe tower.
 	float  m_wipe_tower_depth 	= 0.f; 	// Depth of the wipe tower
 	float  m_wipe_tower_height  = 0.f;
-	float  m_wipe_tower_cone_angle = 0.f;
+	float  m_wipe_tower_cone_angle = 0.f; // [INTENT] Half-angle of cone wall; 0 means flat/rib wall
     float  m_wipe_tower_brim_width      = 0.f; 	// Width of brim (mm) from config
     float  m_wipe_tower_brim_width_real = 0.f; 	// Width of brim (mm) after generation
     BoundingBoxf m_first_layer_bbx;              // Actual first-layer bounding box (incl. brim/ribs)
 	float  m_wipe_tower_rotation_angle = 0.f; // Wipe tower rotation angle in degrees (with respect to x axis)
-    float  m_internal_rotation  = 0.f;
+    float  m_internal_rotation  = 0.f; // [STATE] Flips 180° each layer to alternate wipe direction (reduce seam buildup)
 	float  m_y_shift			= 0.f;  // y shift passed to writer
 	float  m_z_pos 				= 0.f;  // Current Z position.
 	float  m_layer_height 		= 0.f; 	// Current layer height.
@@ -214,23 +236,25 @@ private:
     int    m_old_temperature    = -1;   // To keep track of what was the last temp that we set (so we don't issue the command when not neccessary)
     float  m_travel_speed       = 0.f;
 	float  m_infill_speed       = 0.f;
-    float  m_wipe_tower_max_purge_speed   = 90.f;
+    float  m_wipe_tower_max_purge_speed   = 90.f; // [STATE] mm/s cap on purge speed to avoid under-extrusion
 	float  m_perimeter_speed    = 0.f;
     float  m_first_layer_speed  = 0.f;
-    size_t m_first_layer_idx    = size_t(-1);
-    bool   m_flat_ironing       = false;
+    size_t m_first_layer_idx    = size_t(-1); // [STATE] Index into m_plan of the first "real" wipe layer
+    bool   m_flat_ironing       = false;      // [INTENT] Ironing pass after first wipe to flatten layer surface
     bool   m_enable_tower_interface_features = false;
     bool   m_enable_tower_interface_cooldown_during_tower = false;
     bool   m_prev_layer_had_interface = false;
     bool   m_current_layer_has_interface = false;
 
+	// [INTENT] Wall type selects structural wall geometry:
+	//   wtwNormal = plain rectangle, wtwRib = diagonal X-brace, wtwCone = tapered cone base
 	int m_wall_type;
-    bool   m_used_fillet                  = true;
+    bool   m_used_fillet                  = true;  // [INTENT] Round polygon corners to reduce stress concentrations
     float  m_rib_width                    = 10;
     float  m_extra_rib_length             = 0;
-    float  m_rib_length                   = 0;
+    float  m_rib_length                   = 0;     // [STATE] Computed in generate() as max diagonal of tower footprint
 
-    bool   m_enable_arc_fitting           = false;
+    bool   m_enable_arc_fitting           = false; // [INTENT] Emit G2/G3 arcs for rounded wall geometry when supported
 
 	// G-code generator parameters.
     float           m_cooling_tube_retraction   = 0.f;
@@ -291,22 +315,26 @@ private:
     // Goes through m_plan, calculates border and finish_layer extrusions and subtracts them from last wipe
     void save_on_last_wipe();
 
-    // to store information about tool changes for a given layer
+    // [INTENT] Per-layer plan entry. plan_toolchange() builds this; generate() consumes it.
+    // [STATE] depth is the maximum purge depth reserved for this layer (propagated downwards so
+    //         lower layers are always at least as deep as the deepest layer above them).
 	struct WipeTowerInfo{
+        // [INTENT] One toolchange inside a layer. required_depth = ramming_depth + wiping_depth.
 		struct ToolChange {
             size_t old_tool;
             size_t new_tool;
-			float required_depth;
-            float ramming_depth;
-            float first_wipe_line;
-            float wipe_volume;
-			float wipe_volume_total;
+			float required_depth;    // [STATE] Total y-depth reserved on the tower for this change
+            float ramming_depth;     // [STATE] y-depth consumed by ramming passes alone
+            float first_wipe_line;   // [STATE] Length of the first (partial) wipe line carried over from ramming
+            float wipe_volume;       // [STATE] Purge volume assigned after save_on_last_wipe() optimization
+			float wipe_volume_total; // [STATE] Original purge volume before optimization
             ToolChange(size_t old, size_t newtool, float depth=0.f, float ramming_depth=0.f, float fwl=0.f, float wv=0.f)
             : old_tool{old}, new_tool{newtool}, required_depth{depth}, ramming_depth{ramming_depth}, first_wipe_line{fwl}, wipe_volume{wv}, wipe_volume_total{wv} {}
 		};
 		float z;		// z position of the layer
 		float height;	// layer height
 		float depth;	// depth of the layer based on all layers above
+        // [INTENT] Sum of required_depth for all toolchanges on this layer.
 		float toolchanges_depth() const { float sum = 0.f; for (const auto &a : tool_changes) sum += a.required_depth; return sum; }
 
 		std::vector<ToolChange> tool_changes;
@@ -315,6 +343,10 @@ private:
 			: z{z_par}, height{layer_height_par}, depth{0} {}
 	};
 
+    // [STATE] m_plan is the central data structure: ordered by Z ascending, built during pre-slice
+    // phase by plan_toolchange(), then read-only during generate().
+    // [HAZARD] plan_tower() and save_on_last_wipe() both iterate m_plan and mutate depth/wipe_volume fields;
+    // generate() runs both 5 times in a fixed-point loop to converge wipe savings vs. depth changes.
 	std::vector<WipeTowerInfo> m_plan; 	// Stores information about all layers and toolchanges for the future wipe tower (filled by plan_toolchange(...))
 	std::vector<WipeTowerInfo>::iterator m_layer_info = m_plan.end();
 
