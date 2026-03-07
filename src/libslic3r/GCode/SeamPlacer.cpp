@@ -1,3 +1,25 @@
+// [INTENT] SeamPlacer.cpp — full implementation of seam placement pipeline.
+// See SeamPlacer.hpp for the high-level algorithm overview.
+//
+// Pipeline summary (executed in SeamPlacer::init()):
+//   compute_global_occlusion()         — mesh decimation + uniform sampling + TBB raycasting
+//   gather_enforcers_blockers()        — AABB trees for user-painted enforcer/blocker regions
+//   gather_seam_candidates()           — per-layer TBB: extract perimeters, compute angles, classify enforcer/blocker
+//   calculate_candidates_visibility()  — per-layer TBB: query KD-tree, weighted interpolation of sample visibility
+//   calculate_overhangs_and_layer_embedding() — per-layer TBB: overhang and hidden-point detection
+//   pick_seam_point() / pick_random_seam_point() — per-perimeter: choose best candidate
+//   align_seam_points()                — cluster seams across layers, fit B-spline, store final positions
+//
+// Then at G-code export time (single-threaded):
+//   place_seam() — look up pre-computed seam, split ExtrusionLoop at the chosen point
+//
+// [CONCURRENCY] All TBB parallel_for loops operate on disjoint layer ranges.
+//   No shared mutable state between threads during each phase.
+//   Phases are sequenced (each completes before the next begins).
+//
+// [MEMORY] GlobalModelInfo (mesh samples, AABB trees) is allocated on the stack inside init()
+//   and destroyed before align_seam_points() runs. This limits peak memory but forces two-pass design.
+
 #include "SeamPlacer.hpp"
 
 #include "Polygon.hpp"
@@ -35,10 +57,14 @@ namespace Slic3r {
 
 namespace SeamPlacerImpl {
 
+// [INTENT] Sign function returning -1, 0, or +1. Used in the negative-volume ray-counter
+// to track winding direction of hits when evaluating boolean-subtracted meshes.
 template<typename T> int sgn(T val) {
   return int(T(0) < val) - int(val < T(0));
 }
 
+// [INTENT] Gaussian-like bell curve used for distance-weighted visibility interpolation
+// and as the concave-angle component of the angle penalty function.
 // base function: ((e^(((1)/(x^(2)+1)))-1)/(e-1))
 // checkout e.g. here: https://www.geogebra.org/calculator
 float gauss(float value, float mean_x_coord, float mean_value, float falloff_speed) {
@@ -48,6 +74,13 @@ float gauss(float value, float mean_x_coord, float mean_value, float falloff_spe
   return mean_value * (std::exp(exponent) - 1.0f) / (std::exp(1.0f) - 1.0f);
 }
 
+// [INTENT] Combined angle penalty function: Gaussian (concave preference) + sigmoid (convex penalty).
+// Formula: gauss(x, 0, 1, 3) + 1/(2 + exp(-x))
+// At x=0 (flat): ~0.58 + 0.33 = ~0.92 (moderate penalty)
+// At x<0 (concave): Gaussian peaks → penalty decreases toward 0 (concave = hidden seam, good)
+// At x>0 (convex): sigmoid increases → penalty rises toward ~1.5 (convex = visible ridge, bad)
+// Reference: doc/seam_placement/corner_penalty_function.png
+// [COUPLING] angle_importance_aligned/nearest constants in SeamPlacer scale this value in SeamComparator.
 float compute_angle_penalty(float ccw_angle) {
   // This function is used:
   // ((ℯ^(((1)/(x^(2)*3+1)))-1)/(ℯ-1))*1+((1)/(2+ℯ^(-x)))
@@ -58,6 +91,10 @@ float compute_angle_penalty(float ccw_angle) {
          1.0f / (2 + std::exp(-ccw_angle));
 }
 
+// [INTENT] Orthonormal coordinate frame. Used to rotate hemisphere sample directions from
+// local surface-normal space into world space for raycasting.
+// set_from_z() builds a right-handed frame given only the normal (Z axis).
+// The X/Y tangent axes are arbitrary (Gram-Schmidt with a fallback for near-vertical normals).
 /// Coordinate frame
 class Frame {
 public:
@@ -103,6 +140,13 @@ private:
   Vec3f mX, mY, mZ;
 };
 
+// [INTENT] Three sampling functions for hemisphere/sphere ray directions.
+// sample_sphere_uniform    — full sphere (used nowhere currently, kept for reference).
+// sample_hemisphere_uniform— uniform hemisphere; used in raycast_visibility to generate the 5×5 grid.
+// sample_power_cosine_hemisphere — cosine-weighted; unused currently, possibly legacy from earlier seam variant.
+// Input: Vec2f samples in [0,1)^2 (stratified grid cells).
+// [HAZARD] sample_sphere_uniform and sample_power_cosine_hemisphere are dead code;
+//          only sample_hemisphere_uniform is called. Remove if refactoring.
 Vec3f sample_sphere_uniform(const Vec2f &samples) {
   float term1 = 2.0f * float(PI) * samples.x();
   float term2 = 2.0f * sqrt(samples.y() - samples.y() * samples.y());
@@ -125,6 +169,34 @@ Vec3f sample_power_cosine_hemisphere(const Vec2f &samples, float power) {
   return Vec3f(cos(term1) * term3, sin(term1) * term3, term2);
 }
 
+// [INTENT] Core raycasting function. Returns a visibility score in [0, 1+] for each mesh sample point.
+// Score = 1.0 (start) minus 1/25 per ray that hits the mesh (i.e., is occluded).
+// Score > 1.0 is possible for spAlignedBack mode where a front-facing bias is added.
+// A visibility of 0 = fully occluded = best for seam (not visible to user).
+// A visibility of 1 = fully exposed = worst for seam.
+//
+// [ALGORITHM]
+//   For each sample point (TBB parallel):
+//     1. Build a Frame aligned to the surface normal.
+//     2. For each of 5×5=25 stratified hemisphere directions:
+//        a. Transform ray direction to world space.
+//        b. Cast ray from sample+offset against AABB tree.
+//        c. If hit face is front-facing relative to ray → point is occluded → subtract 1/25.
+//   Result: score per sample = fraction of visible hemisphere directions.
+//
+// [CONCURRENCY] TBB parallel_for over sample indices. Each thread has its own `hits` vector to avoid allocation.
+//   The `result` vector is written at independent indices — no data races.
+//
+// [COUPLING] negative_volumes_start_index separates positive model triangles from subtracted volumes.
+//   The negative-volume logic uses a parity counter (iterating hits in reverse) to determine
+//   whether the ray origin is inside the final boolean solid. This is a simplified CSG evaluation
+//   assuming a specific ordering, with a TODO noting it is not fully general.
+//
+// [HAZARD] AABBTreeIndirect::intersect_ray_first_hit requires double-precision origin/direction.
+//   The source Vec3f values are cast to Vec3d inline — this conversion is silent but correct.
+// [HAZARD] spAlignedBack adds a Y-axis alignment bias > 1.0 to result[s_idx]. The score can exceed
+//   the [0,1] range assumed by SeamComparator. Comparator uses penalty_a < penalty_b so relative
+//   ordering is preserved, but the interpretation of the score as a probability breaks down.
 std::vector<float> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &raycasting_tree,
                                       const indexed_triangle_set &triangles,
                                       const TriangleSetSamples &samples,
@@ -226,6 +298,16 @@ std::vector<float> raycast_visibility(const AABBTreeIndirect::Tree<3, float> &ra
   return result;
 }
 
+// [INTENT] Per-vertex corner angle measurement using a sliding window.
+// For each vertex, finds the point min_arm_length away in each direction (arc distance),
+// then measures the angle between the two chord vectors.
+// min_arm_length ~ nozzle diameter ensures the window spans a meaningful arc length.
+// Result is in radians; sign conventions: CCW polygon → positive angles for convex corners.
+// [ALGORITHM] O(N) sliding window: idx_prev walks forward, idx_next walks forward,
+//   both maintaining arc-length invariants. idx_curr advances one step per outer iteration.
+// [HAZARD] If polygon.size() == 1, result[0] is set to 0 but the loop body is never entered —
+//   the while loops at lines ~245-248 would iterate infinitely on a single-point polygon
+//   if polygon.size() != 1 check were removed. This is fine as-is but fragile.
 std::vector<float> calculate_polygon_angles_at_vertices(const Polygon &polygon, const std::vector<float> &lengths,
                                                         float min_arm_length) {
   std::vector<float> result(polygon.size());
@@ -290,6 +372,22 @@ struct CoordinateFunctor {
   }
 };
 
+// [INTENT] GlobalModelInfo aggregates all mesh-level data needed for seam scoring.
+// Lifetime: stack-allocated inside SeamPlacer::init(), destroyed in the braced scope after
+// calculate_candidates_visibility() returns. This is intentional — the large raycasting
+// data (30k sample positions, normals, visibility floats, AABB tree) is freed before the
+// memory-intensive alignment phase begins.
+//
+// Key fields:
+//   mesh_samples             — 30k uniform surface samples with normals
+//   mesh_samples_visibility  — raycasted visibility score per sample
+//   mesh_samples_tree        — KD-tree for O(log N) radius searches (used in calculate_point_visibility)
+//   mesh_samples_radius      — search radius derived from Poisson density to ensure ≥4 samples in 90% of queries
+//   enforcers / blockers     — triangle meshes from user-painted seam regions
+//   enforcers_tree / blockers_tree — AABB trees for O(log N) enforcer/blocker point classification
+//
+// [COUPLING] calculate_point_visibility() is a pure function on this struct — no external state.
+// [CONCURRENCY] Read-only from all TBB worker threads after init. No locking needed.
 // structure to store global information about the model - occlusion hits, enforcers, blockers
 struct GlobalModelInfo {
   TriangleSetSamples mesh_samples;
@@ -321,6 +419,15 @@ struct GlobalModelInfo {
                                                        blockers_tree, position, radius_sqr);
   }
 
+  // [INTENT] calculate_point_visibility() transfers sample-space visibility to an arbitrary 3D point
+  // via weighted interpolation over nearby mesh samples.
+  // Weight = (radius - plane_dist) + (radius - euclidean_dist): double-penalizes distant samples.
+  // Returns 1.0 (fully visible / bad) when no nearby samples found — conservative fallback.
+  // [HAZARD] The weight can be negative if a sample is farther than mesh_samples_radius in the
+  //   plane-distance component. In that case total_weight underflows. Since points are found via
+  //   find_nearby_points(radius), euclidean distance is always ≤ radius, but plane_dist can exceed radius
+  //   for off-plane geometries. Negative weights would produce nonsense visibility — potential hazard
+  //   if mesh_samples_radius is very small relative to geometry scale.
   float calculate_point_visibility(const Vec3f &position) const {
     std::vector<size_t> points = find_nearby_points(mesh_samples_tree, position, mesh_samples_radius);
     if (points.empty()) {
@@ -402,6 +509,21 @@ struct GlobalModelInfo {
 }
 ;
 
+// [INTENT] extract_perimeter_polygons() walks the LayerRegion extrusionentity tree to collect
+// only external perimeter polygons. This handles both the simple case (loop at top level) and
+// the collection case (inner + outer + overhang grouped together).
+//
+// [ALGORITHM] For each region → each entity:
+//   - If entity is a collection: scan sub-entities; if any path has erExternalPerimeter role, take the whole loop.
+//   - If entity is not a collection: take it directly (legacy/simple path).
+//   - Fallback: if the outer collection contains no external perimeters but has geometry, take the whole entity.
+//
+// [HAZARD] The fallback (polygons.empty() after the collection walk) adds the entire ex_entity as a polygon.
+//   This was designed to handle edge cases but could incorrectly include inner perimeters if
+//   erExternalPerimeter role is not set on any path. Result would be a seam placed on an inner perimeter.
+//
+// [COUPLING] corresponding_regions_out is parallel to polygons — same index → same LayerRegion.
+//   nullptr region is inserted for the dummy single-point polygon on layers with no perimeters.
 //Extract perimeter polygons of the given layer
 Polygons extract_perimeter_polygons(const Layer *layer, std::vector<const LayerRegion*> &corresponding_regions_out) {
   Polygons polygons;
@@ -449,6 +571,26 @@ Polygons extract_perimeter_polygons(const Layer *layer, std::vector<const LayerR
   return polygons;
 }
 
+// [INTENT] process_perimeter_polygon() converts one 2D perimeter polygon into SeamCandidates
+// and appends them to result.points. It also:
+//   1. Normalises winding to CCW (and flips angle signs if was CW).
+//   2. Computes per-vertex corner angles via calculate_polygon_angles_at_vertices().
+//   3. Classifies each vertex as Enforced/Blocked/Neutral via AABB tree lookups.
+//   4. Oversamples long edges that touch enforcer regions at enforcer_oversampling_distance intervals.
+//   5. If any vertex is Enforced, finds the longest continuous enforced patch and marks its
+//      middle point (or the sharpest angle in it) as central_enforcer = true for alignment anchoring.
+//
+// [STATE] result.perimeters grows by one Perimeter per call.
+//   result.points grows by (polygon.size() + oversampled_count) entries.
+//   The new Perimeter references are stable because result.perimeters is a deque.
+//
+// [HAZARD] oversampled_points are inserted between original polygon points via a queue.
+//   Oversampled points have local_ccw_angle = 0 (not measured). The enforcer check uses
+//   the edge's bounding box distance, not per-sample per-point distance — a point 0.2mm into
+//   an enforcer zone may not be classified Enforced if it falls between samples.
+//
+// [COUPLING] global_model_info.is_enforced/is_blocked use flow_width as the query radius.
+//   The flow_width is read from region->flow(frExternalPerimeter). nullptr region → 0.0 width.
 // Insert SeamCandidates created from perimeter polygons in to the result vector.
 // Compute its type (Enfrocer,Blocker), angle, and position
 //each SeamCandidate also contains pointer to shared Perimeter structure representing the polygon
@@ -621,6 +763,24 @@ std::pair<size_t, size_t> find_previous_and_next_perimeter_point(const std::vect
   return {size_t(prev),size_t(next)};
 }
 
+// [INTENT] compute_global_occlusion() builds GlobalModelInfo from the PrintObject mesh.
+// Steps:
+//   1. Merge all MODEL_PART volumes into triangle_set; NEGATIVE_VOLUME volumes into negative_volumes_set.
+//      Both are decimated to ≤16000 triangles each to keep raycasting fast.
+//   2. Merge the two sets (negative volumes appended after positive, index boundary stored).
+//   3. Apply object transform (centered world coords) to the combined mesh.
+//   4. Sample 30k uniform surface points on the combined mesh (parallel).
+//   5. Build KD-tree over sample positions for later radius queries.
+//   6. Compute search_radius from Poisson statistics (probability 0.9 of finding ≥4 samples in area).
+//   7. Build AABB tree over combined mesh for raycasting.
+//   8. Run raycast_visibility() in parallel over all samples.
+//
+// [COUPLING] Only called for spAligned, spNearest, spAlignedBack. spRandom and spRear skip raycasting.
+// [MEMORY] triangle_set can be large before decimation. short_edge_collapse decimates in-place.
+//   After both meshes are merged, the combined set reaches up to 32000 triangles.
+// [HAZARD] its_short_edge_collpase (note typo: "collpase") is applied per-volume before merging,
+//   so the merge boundary (negative_volumes_start_index) is taken from post-decimation sizes.
+//   If decimation is uneven, the negative volume part may have far fewer or more triangles than expected.
 // Computes all global model info - transforms object, performs raycasting
 void compute_global_occlusion(GlobalModelInfo &result, const PrintObject *po,
                               std::function<void(void)> throw_if_canceled,
@@ -739,6 +899,25 @@ void gather_enforcers_blockers(GlobalModelInfo &result, const PrintObject *po) {
       << "SeamPlacer: build AABB trees for raycasting enforcers/blockers: end";
 }
 
+// [INTENT] SeamComparator encapsulates the multi-criteria seam point scoring logic.
+// Two methods:
+//   is_first_better()         — strict total order (for initial seam selection and sorting)
+//   is_first_not_much_worse() — relaxed order (for alignment: accept a nearby point that's "close enough")
+//
+// Priority hierarchy (is_first_better):
+//   1. central_enforcer (spAligned/spAlignedBack only) — highest priority, anchors alignment strings
+//   2. EnforcedBlockedSeamPoint type: Enforced > Neutral > Blocked
+//   3. Overhang avoidance: positive overhang is penalized
+//   4. Embedded points preferred (hidden inside multimaterial join, embedded_distance < -0.5mm)
+//   5. spRear: maximize Y coordinate (back of the bed)
+//   6. Weighted sum: overhang + visibility + angle_importance * compute_angle_penalty(ccw_angle) + distance_penalty
+//
+// [COUPLING] angle_importance differs by mode: 0.6 (aligned) vs 1.0 (nearest).
+//   For spNearest, distance_penalty uses a Gaussian centered at 0 to strongly prefer seam near last nozzle position.
+//
+// [HAZARD] The penalty formula mixes overhang (mm), visibility (fraction 0-1), and angle penalty (~0.5-1.5).
+//   These quantities have different units/scales. The weights are empirically tuned, not dimensionally consistent.
+//   Refactoring must preserve the exact numeric formula or recalibrate.
 struct SeamComparator {
   SeamPosition setup;
   float angle_importance;
@@ -941,6 +1120,17 @@ size_t pick_nearest_seam_point_index(const std::vector<SeamCandidate> &perimeter
   return seam_index;
 }
 
+// [INTENT] pick_random_seam_point() places the seam at a uniformly random location on the perimeter,
+// constrained to the best-quality tier (Enforced > Neutral > Blocked, overhang-free).
+// [ALGORITHM] Single-pass streaming random selection:
+//   Maintain a list of viable (point, edge_length) entries. When a strictly better point is found,
+//   discard all current viables and restart from scratch. At the end, pick a position proportional
+//   to edge lengths (area-weighted = length-weighted for 1D perimeter).
+// [STATE] The seed is derived from the first vertex position via a hash (sin×large_prime).
+//   This makes the seam position reproducible for identical geometry but uncorrelated between perimeters.
+// [HAZARD] The position is stored in perimeter.final_seam_position (not limited to a polygon vertex).
+//   finalized=true is set immediately — no alignment will move it. This breaks the seam-string
+//   alignment for spRandom mode. This is intentional (random mode skips alignment entirely).
 // picks random seam point uniformly, respecting enforcers blockers and overhang avoidance.
 void pick_random_seam_point(const std::vector<SeamCandidate> &perimeter_points, size_t start_index) {
   SeamComparator comparator { spRandom };
@@ -1229,6 +1419,37 @@ std::vector<std::pair<size_t, size_t>> SeamPlacer::find_seam_string(const PrintO
   return seam_string;
 }
 
+// [INTENT] align_seam_points() smooths the vertical seam trajectory across layers using cubic B-splines.
+// It operates on the already-chosen seam_index values set by pick_seam_point().
+//
+// [ALGORITHM]
+//   1. Gather all (layer_idx, seam_index) pairs from every perimeter of every layer.
+//   2. Sort them by SeamComparator so the best seams are processed first (greedy cluster assignment).
+//   3. For each unfinalized seam, try to grow a "seam string" — a connected chain of seams across
+//      adjacent layers within (seam_align_tolerable_dist_factor × flow_width) horizontal distance.
+//      Also try alternative starting points sampled from the string to find the longest chain.
+//   4. If string has ≥ seam_align_minimum_string_seams (6) entries, fit a cubic B-spline through
+//      the XY positions weighted by inverse angle penalty and signed path length.
+//      - Enforced points get +3.0 weight bonus and curling_influence=1.0.
+//      - Points where the string bends more than 2× the local corner angle get curling_influence=-0.8
+//        (reducing their contribution to total_length → fewer spline segments → smoother path).
+//   5. For each point in the string, interpolate between its original position and the spline-fitted
+//      position by factor t = clamp((|ccw_angle| / sharp_angle_snapping_threshold)^3, 0, 1).
+//      Sharp corners (t→1) stay at their exact position; smooth points (t→0) move to the spline.
+//   6. Store the interpolated position in Perimeter::final_seam_position and set finalized=true.
+//
+// [STATE] After this function returns, finalized perimeters will use final_seam_position in place_seam().
+//   Non-finalized perimeters (strings too short) will use seam_index directly.
+//
+// [HAZARD] global_index-- at line ~1323 re-visits the current seam after an alternative string is chosen.
+//   This is correct but subtle: the intent is to avoid skipping a seam that was displaced by a longer
+//   alternative string being aligned first. Misunderstanding this decrement would cause an infinite loop
+//   if the loop condition is changed.
+//
+// [COUPLING] Geometry::fit_cubic_bspline() is called with z-coordinates as the parameterization variable
+//   and XY positions as observations. The spline is evaluated at the z of each seam point in the string.
+//   This assumes z increases monotonically within the string — guaranteed because strings are built
+//   by adjacent-layer search and sorted by layer_idx before fitting.
 // clusters already chosen seam points into strings across multiple layers, and then
 // aligns the strings via polynomial fit
 // Does not change the positions of the SeamCandidates themselves, instead stores
@@ -1497,6 +1718,39 @@ void SeamPlacer::init(const Print &print, std::function<void(void)> throw_if_can
   }
 }
 
+// [INTENT] place_seam() is the hot path called for every ExtrusionLoop during G-code export.
+// It looks up the pre-computed seam position and calls loop.split_at() / loop.split_at_vertex()
+// to rotate the loop so it starts at the seam point.
+//
+// [ALGORITHM]
+//   1. Compute layer_index = layer->id() - raft_layers (raft layers don't have seam data).
+//   2. Find the closest pre-computed perimeter in the layer's KD-tree to this loop's points.
+//      Iterates a few loop points until two consecutive ones agree on the same closest perimeter
+//      (handles Arachne T-junctions where a single point might snap to the wrong perimeter).
+//   3. If perimeter.finalized: use final_seam_position (from B-spline alignment).
+//      If spNearest: re-compute using pick_nearest_seam_point_index() with actual last_pos.
+//      Otherwise: use perimeter.seam_index (from pick_seam_point()).
+//   4. For inner perimeters (erPerimeter role):
+//      a. Project the seam point onto the nearest edge of the loop.
+//      b. For concave angles: adjust projection toward the corner bisector + compute corrected depth.
+//      c. For convex angles: scale depth by cos(angle/2) / sqrt(2) to get perpendicular depth.
+//      d. If staggered_inner_seams is enabled: walk forward along the loop by `depth` mm
+//         so inner seam is offset from the outer seam position.
+//   5. split_at_vertex() if the seam point is already a loop vertex (within 1.5µm).
+//      Otherwise split_at() to insert a new point.
+//
+// [COUPLING] overhang (output) = unsupported_dist at the chosen seam candidate.
+//   Passed back to GCode::process_layer() to decide fan speed for overhang cooling.
+//
+// [HAZARD] The perimeter-matching loop iterates up to points_count times (all points in the loop).
+//   For very long loops, this is O(N) KD-tree queries at O(log M) each — potentially slow
+//   for complex prints with thousands of vertices per loop on each layer.
+//
+// [HAZARD] The staggered_inner_seams walk uses depth = max(path.width, depth). If depth >> loop.length(),
+//   the while loop would run indefinitely. The outer loop condition `while (depth > 0)` subtracts
+//   dist per iteration, so it terminates when depth becomes ≤ 0. However if a zero-length segment
+//   exists in the loop (a=b), dist=0 and depth never decreases → infinite loop.
+//   In practice G-code resolution removes near-zero segments at the split_at step, but not beforehand.
 void SeamPlacer::place_seam(const Layer *layer, ExtrusionLoop &loop,
                             const Point &last_pos, float& overhang) const {
   using namespace SeamPlacerImpl;
