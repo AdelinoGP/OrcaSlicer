@@ -112,21 +112,116 @@ Uses Clipper (Angus Johnson) for all 2D boolean operations (union, diff, offset,
 3. `[UNCLEAR]` How does the Arachne variable-width perimeter generator interact with the traditional `PerimeterGenerator`? Are they mutually exclusive?
 4. `[UNCLEAR]` The `ClipperZUtils` / `Clipper2ZUtils` appear to tag intersection points with Z metadata — unclear purpose, likely for seam or feature detection.
 
-### Cross-References
-- `Print.hpp` ↔ `TriangleMeshSlicer.hpp` ↔ `Layer.hpp` — core slicing chain
-- `GCode.hpp` ↔ `GCodeWriter.hpp` ↔ `GCode/ToolOrdering.hpp` ↔ `GCode/WipeTower.hpp` — G-code generation chain
-- `Fill/FillBase.hpp` ← all 13+ infill patterns — classic factory/strategy pattern
-- `Support/SupportMaterial.cpp` ↔ `Support/TreeSupport.cpp` — two independent support algorithms
+---
+
+## Session 2 — Annotation Phase (Iterations 2–3)
+
+### Files Annotated and Committed
+
+| Commit | Files | Key Findings |
+|--------|-------|-------------|
+| `eedbdf838f` | OrcaSlicer.cpp, TriangleMeshSlicer.cpp | Dual coordinate system; CLI::run() 6000-line coupling hazard; flush_and_exit macro |
+| `02b4cb7b9e` | OrcaSlicer.cpp (CLI loops) | Per-plate G-code export; headless slice loop |
+| `fd0738255e` | Print.cpp, PrintObject.cpp | Step state machine, invalidation DAG, PrintObjectStep cascade |
+| `5f58029f8f` | PrintObjectSlice.cpp | posSlice pipeline; polyhole transform; brim grouping |
+| `f071eee56b` | Format/STL.cpp, OBJ.cpp, AMF.cpp, 3mf.cpp, bbs_3mf.cpp | store_stl always returns true; AMF read-only; 3mf column-major transpose hazard |
+| `c28a2db5f8` | PerimeterGenerator.cpp, Fill/Fill.cpp | Arachne loop_number+1 off-by-one; spiral forces classic; lightning raw pointer |
+| `26474719cd` | GCode.cpp, GCodeWriter.cpp | TBB pipeline; e_per_mm double-apply; lazy_lift deferred hazard; toolchange sequence |
 
 ---
 
-## Session 1 — Task 1 (Entry Point Annotation) — In Progress
+### Key Discoveries (Session 2)
 
-Files to process next:
-- `src/OrcaSlicer.cpp` (full)
-- `src/libslic3r/TriangleMesh.cpp`
-- `src/libslic3r/TriangleMeshSlicer.cpp`
-- `src/libslic3r/Model.cpp` (selected sections)
-- `src/libslic3r/Print.cpp` / `PrintObject.cpp`
-- `src/libslic3r/PerimeterGenerator.cpp`
-- `src/libslic3r/GCode.cpp` / `GCodeWriter.cpp`
+#### PerimeterGenerator.cpp
+
+**Algorithm dispatch (LayerRegion.cpp:120):**
+- `process_classic()` — iterative Clipper polygon inset. Fixed-width perimeters. Dispatch when `spiral_vase` OR `wall_generator != Arachne`.
+- `process_arachne()` — Arachne medial-axis/straight-skeleton. Variable-width perimeters. Only when `wall_generator == Arachne` AND `!spiral_vase`.
+
+**Critical hazards discovered:**
+- `loop_number+1` passed to Arachne (1-indexed) vs `loop_number` used by Classic (0-indexed). Off-by-one produces wrong wall count, no error.
+- `precise_outer_wall` config only applied in `InnerOuter` wall sequence; silently ignored in `OuterInner` mode.
+- Zero-length Arachne extrusion skip at ~L452 in `process_arachne()`. Removing this generates degenerate G-code.
+- `split_top_surfaces()` must be called in both algorithms; a diff between the two causes top solid infill discrepancies.
+
+#### Fill/Fill.cpp
+
+**Infill pipeline:**
+- `Layer::make_fills()` entry at line ~1192.
+- `group_fills()` batches compatible surfaces to minimise filler object overhead.
+- `Fill::new_from_type()` factory in `FillBase.cpp:40` — 25+ pattern classes dispatched by `InfillPattern` enum.
+- `calculate_infill_rotation_angle()` implements an undocumented mini-metalanguage for layer-varying rotation (no tests).
+
+**Critical hazards:**
+- `FillLightning::Filler` stores raw pointer to `lightning_generator`. Fragile lifetime.
+- `dynamic_cast` used for `FillConcentricInternal`/`FillConcentric`/`FillLightning::Filler` — silent nullptr if type mismatch.
+- Surface grouping float comparison can prevent batching of geometrically identical surfaces.
+
+#### GCode.cpp (7895 lines)
+
+**Export pipeline:**
+```
+do_export() → _do_export() → process_layers() → [TBB pipeline]:
+  generator(serial) → [spiral_mode] → [pressure_equalizer] → cooling → fan_mover → [pa_processor] → output
+```
+
+**TBB pipeline notes:**
+- All filters are `serial_in_order` — not truly parallel; provides pipelining overlap only.
+- 4 hardcoded pipeline variant expressions (spiral × pressure_equalizer). Combinatorial maintenance hazard.
+- `pressure_equalizer` requires a NOP layer injected at end-of-stream (1-layer lookahead buffer).
+
+**`_extrude()` (line ~6275):**
+- e_per_mm chain: `mm3_per_mm × print_flow_ratio × filament_flow_ratio × role_ratio... / filament_flow_ratio`
+- filament_flow_ratio applied twice (once via e_per_mm3()), then divided out. Fragile but intentional.
+- Acceleration + jerk: 12-entry role-based lookup. Klipper gets combined `M204`/`M205`; others get separate commands.
+- Speed: 15+ role cases, falls through to default if role not matched.
+
+**`travel_to()` (line ~7207):**
+- `needs_retraction()` → optional `AvoidCrossingPerimeters::travel_to()` → re-evaluate retraction on new path.
+- `z` parameter defaults to `DBL_MAX` (no Z change). Accidentally passing `0.0` crashes nozzle into bed.
+
+**`retract()` (line ~7517):**
+- Wipe path split: `calculateWipeRetractionLengths()` → partial E before wipe + rest during wipe.
+- Z-lift gated by `RetractLiftEnforceType` (AllSurfaces / TopOnly / BottomOnly / TopAndBottom).
+- Hilbert Curve infill pattern special-cases suppress retraction — workaround, not general design.
+
+**`set_extruder()` (line ~7594):**
+- Multi-extruder: retract → `filament_end_gcode` → OozePrevention → T<n> → temperature → `filament_start_gcode` → prime → unretract.
+- `filament_id` (logical slot) ≠ `extruder_id` (physical hardware). Must not be confused.
+- `m_toolchange_count` incremented before retract — off-by-one on exception.
+
+**Global hazards:**
+- `travel_point_1/2/3` (line ~94) — file-scope globals for AMS cutter path. Not mutex-protected.
+- `do_export()` early return if step already done + file exists — stale file never re-generated.
+- PlaceholderParser failures are deferred until next layer boundary via `check_placeholder_parser_failed()`.
+
+#### GCodeWriter.cpp (1202 lines)
+
+**Key state:**
+- `m_pos` — Vec3d in print coords (plate offset NOT included). Offset applied at emit time.
+- `m_lifted` — applied Z-hop height. `m_to_lift` — pending deferred lift (lazy_lift).
+- `Filament::retract()` tracks retraction state — `_retract()` returns empty string if already retracted.
+
+**Critical hazards:**
+- `lazy_lift()` deferred lift never emits if travel is cancelled. `unlift()` clears without emitting if `m_lifted == 0`.
+- `use_firmware_retraction` forces `length = 1.0` to bypass zero-length skip. Mixing modes mid-print desync filament state.
+- `full_gcode_comment` is a `static bool` — shared across all GCodeWriter instances (not thread-safe for multi-plate parallel export).
+
+---
+
+### Open Questions (Remaining)
+
+1. `[UNCLEAR]` `calculate_infill_rotation_angle()` mini metalanguage grammar — no documentation, no tests. Needs dedicated analysis.
+2. `[UNCLEAR]` `ClipperZUtils` Z-metadata tagging at intersections — purpose not yet determined. Possibly for seam detection.
+3. `[UNCLEAR]` `g_max_label_object = 64` BBL firmware cap — not validated against firmware limits.
+4. `[UNCLEAR]` How does `SeamPlacer` interact with `extrude_loop()`? Seam placement pre-computes positions but integration mechanism not yet traced.
+
+---
+
+### Next Annotation Targets (Priority Order)
+
+1. `src/libslic3r/GCode/ToolOrdering.cpp` — which extruder/filament for which layer (critical for multi-material)
+2. `src/libslic3r/GCode/CoolingBuffer.cpp` — fan speed / print speed adjustment per-layer
+3. `src/libslic3r/GCode/SeamPlacer.cpp` — seam position selection algorithm
+4. `src/libslic3r/GCode/WipeTower2.cpp` — wipe tower G-code generation
+5. `src/libslic3r/Support/SupportMaterial.cpp` — support structure generation
