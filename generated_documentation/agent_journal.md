@@ -1255,3 +1255,88 @@ AdaptivePAProcessor wraps AdaptivePAInterpolator and provides the G-code post-pr
 2. `src/libslic3r/Arachne/SkeletalTrapezoidation.cpp/.hpp` — Voronoi-based medial axis + bead distribution (~2656 lines total, highest complexity)
 3. `src/libslic3r/Arachne/BeadingStrategy/` — 7 files, bead width distribution strategies (~612 lines total)
 4. `src/libslic3r/Arachne/SkeletalTrapezoidationGraph.cpp` — graph data structure for skeletal trapezoidation (~472 lines)
+
+---
+
+## Session 15 — WallToolPaths (Arachne Pipeline Entry Point)
+
+**Files processed:**
+- `src/libslic3r/Arachne/WallToolPaths.cpp` (879 lines → 1011 lines after annotation) — annotated
+- `src/libslic3r/Arachne/WallToolPaths.hpp` (144 lines → 306 lines after annotation) — annotated
+
+**Commit:** `282248fa4a` — annotate: WallToolPaths.cpp/.hpp — Arachne pipeline entry point (Session 15)
+
+**New hazards documented:** 126–140 (see 04_refactoring_hazards.md)
+
+### Module Summary — WallToolPaths
+
+WallToolPaths is the public API entry point for the Arachne variable-width perimeter system. It bridges the slicer's polygon representation (Polygons / PrintObjectConfig) and the Arachne geometry kernel (SkeletalTrapezoidation).
+
+**Pipeline (generate() method):**
+1. Outline pre-processing (9 chained steps):
+   - Triple offset (−ε, +2ε, −ε) to snap near-self-intersections
+   - simplify() — Ramer-Douglas-Peucker-style vertex removal
+   - fixSelfIntersections() — nudge + Clipper SimplifyPolygons
+   - removeDegenerateVerts() — remove backtrack vertices
+   - removeColinearEdges() — remove near-collinear vertices
+   - fixSelfIntersections() again (removeColinearEdges can create new intersections)
+   - removeDegenerateVerts() again
+   - removeSmallAreas() — remove polygons with area < (bead_width_0/2)²
+   - union_() — final Clipper union
+2. Compute BeadingStrategy via BeadingStrategyFactory
+3. Construct SkeletalTrapezoidation and call generateToolpaths()
+4. stitchToolPaths() — join open polylines into closed polygons
+5. removeSmallLines() — prune short odd (transition) lines
+6. separateOutInnerContour() — split 0-width contour paths from printable paths
+7. simplifyToolPaths() — simplify each ExtrusionLine by area deviation
+8. removeEmptyToolPaths() — final cleanup
+
+### Key Discoveries — Session 15
+
+1. **Triple offset destroys thin features before Arachne sees them:** The outline pre-processing applies `offset(-ε, +2ε, -ε)` where ε ≈ allowed_distance/2 - 1 ≈ 11500 nm. Any feature thinner than ε is silently destroyed before SkeletalTrapezoidation runs. This means the user's min_feature_size setting is irrelevant for features below this physical threshold (~11.5 microns).
+
+2. **transition_filter_dist hardcoded to 100mm:** The transition filter distance (the Voronoi skeleton length over which wall-count transitions are smoothed) is hardcoded to 100mm. For typical print sizes (100–300mm), this is a large fraction of the part. For small parts (< 50mm), virtually ALL wall-count transitions may fall within the filter range, causing them all to be suppressed. This is likely an OrcaSlicer-specific tuning change from the original CuraEngine value.
+
+3. **contour_paths dead code:** `separateOutInnerContour()` allocates a `contour_paths` vector and reserves capacity for it, but never populates it. The variable is unused and appears to be a remnant of a previous refactoring. It does not affect behavior but increases memory allocation unnecessarily.
+
+4. **removeEmptyToolPaths return semantics are inverted:** The function returns `true` when the toolpaths vector is EMPTY after removal (i.e., all paths were removed), not when there are paths remaining. This is counterintuitive and must be correctly interpreted by callers.
+
+5. **is_top_or_bottom_layer always false from make_paths_params():** The factory function hardcodes `is_top_or_bottom_layer = false`. Callers that need top/bottom layer behavior must set this flag manually after the call. If forgotten, removeSmallLines() uses the wrong (less aggressive) threshold for top/bottom layers, potentially leaving short odd lines that create surface artifacts.
+
+6. **outline stored as reference — dangling risk:** The constructor takes `const Polygons& outline` and stores it by reference. The polygon must outlive the WallToolPaths object. This is safe in current callers (outline is from a long-lived PrintObject region), but in refactored code that creates WallToolPaths lazily or asynchronously, this could become a dangling reference.
+
+7. **simplify() uses Shoelace accumulated area — int64_t overflow potential:** The polygon simplification algorithm accumulates area contributions using int64_t arithmetic. For pathological inputs (very long consecutive collinear segments), the accumulated_area_removed can theoretically overflow. At typical OrcaSlicer coordinate scales, this is safe but should be noted for a refactored integer-coordinate system.
+
+### Key Hazards — Session 15
+
+| # | Hazard | Severity |
+|---|--------|----------|
+| 126 | Triple-offset destroys features < ~11500nm before SkeletalTrapezoidation | High |
+| 127 | transition_filter_dist hardcoded 100mm — may suppress all transitions on small parts | High |
+| 128 | contour_paths allocated but never populated — dead code, wastes memory | Low |
+| 129 | removeEmptyToolPaths returns true=EMPTY (inverted semantics) | Medium |
+| 130 | is_top_or_bottom_layer always false in make_paths_params(); caller must fix | Medium |
+| 131 | outline stored as const reference — dangling risk in async/lazy contexts | High |
+| 132 | simplify() int64_t area accumulation: overflow for pathological inputs | Low |
+| 133 | removeColinearEdges introduces new self-intersections (noted in code, fixSelfIntersections run twice) | Medium |
+| 134 | generateToolpaths() produces unsorted output in edge cases — sorted assertion may fire | Medium |
+| 135 | min_feature_size from params.min_feature_size (float→coord_t): sub-1nm silently becomes 0 | Medium |
+| 136 | stitchToolPaths: bead_width_x-1 stitch_distance; if bead_width_x=0, distance=-1 (UB) | High |
+| 137 | fixSelfIntersections epsilon<1 path uses ClipperLib pftEvenOdd without nudging | Low |
+| 138 | getRegionOrder uses SparsePointGrid not SparseLineGrid; can miss constraints for simplified insets | Medium |
+| 139 | separateOutInnerContour checks only first junction of first line for w==0 classification | Medium |
+| 140 | min_nozzle_diameter governs all Arachne parameters in multi-nozzle setups | Medium |
+
+### Open Questions — Session 15
+
+1. `[UNCLEAR]` The Arachne algorithm in `SkeletalTrapezoidation` has not been annotated yet. The exact semantics of `is_odd` lines (transition lines vs fill-gap lines) are described here based on code behavior but should be verified against SkeletalTrapezoidation's output.
+
+2. `[UNCLEAR]` The `fill_outline_gaps = true` global constant (line 18 of hpp) is hardcoded to true, meaning thin-wall widening (WideningBeadingStrategy) is always enabled. Is there a user-facing setting to disable this? If not, users with very thin features that produce artifact prints cannot turn it off.
+
+3. `[UNCLEAR]` The `discretization_step_size = scaled<coord_t>(0.8)` (0.8mm) for arc discretization seems large for high-resolution models. For circular cross-sections, 0.8mm steps produce visible chord artifacts on arcs. How does this interact with the upstream mesh simplification in `prepared_outline`?
+
+### Next Annotation Targets (Session 16+)
+
+1. `src/libslic3r/Arachne/SkeletalTrapezoidation.cpp/.hpp` — Core Voronoi + medial axis algorithm (2656 lines, highest complexity)
+2. `src/libslic3r/Arachne/BeadingStrategy/` — 7 files (~612 lines, bead width strategies)
+3. `src/libslic3r/Arachne/SkeletalTrapezoidationGraph.cpp` — graph data structure (~472 lines)

@@ -1724,3 +1724,18 @@ When `only_overhangs = true`, the fan delay is only active while `current_role =
 | 123 | `std::map<double>` keyed on floating-point acceleration — equality-sensitive; rounding in caller can miss bucket | AdaptivePAInterpolator.cpp | Medium | P2 |
 | 124 | `std::round(x * 1000.0) / 1000.0` rounding near x.0005 boundaries is non-deterministic in IEEE 754 | AdaptivePAInterpolator.cpp | Low | P3 |
 | 125 | `accelerations_` vector is a redundant parallel structure to `flow_interpolators_` keys — drift risk | AdaptivePAInterpolator.hpp | Low | P3 |
+| 126 | Triple-offset in generate() destroys features < ~11500nm before SkeletalTrapezoidation | WallToolPaths.cpp | High | P1 |
+| 127 | `transition_filter_dist` hardcoded to 100mm — may suppress all wall-count transitions on small parts | WallToolPaths.cpp | High | P1 |
+| 128 | `contour_paths` vector allocated and reserved in separateOutInnerContour() but never populated — dead code | WallToolPaths.cpp | Low | P3 |
+| 129 | `removeEmptyToolPaths()` return value: true = toolpaths IS empty (inverted / non-intuitive semantics) | WallToolPaths.cpp | Medium | P2 |
+| 130 | `is_top_or_bottom_layer` hardcoded false in `make_paths_params()`; caller must manually set for top/bottom layers | WallToolPaths.cpp | Medium | P2 |
+| 131 | `outline` stored as `const Polygons&` — dangling reference if caller's polygon is a temporary or goes out of scope | WallToolPaths.hpp | High | P1 |
+| 132 | `simplify()` uses int64_t area accumulation across many removed vertices — overflow risk for pathological inputs | WallToolPaths.cpp | Low | P3 |
+| 133 | `removeColinearEdges()` can introduce new self-intersections; requires second `fixSelfIntersections()` pass | WallToolPaths.cpp | Medium | P2 |
+| 134 | `generateToolpaths()` sorted assertion may fire if post-processing reorders insets | WallToolPaths.cpp | Medium | P2 |
+| 135 | `min_feature_size` and `min_bead_width` are float→scaled coord_t; sub-1nm values silently become 0 | WallToolPaths.cpp | Medium | P2 |
+| 136 | `stitchToolPaths`: `stitch_distance = bead_width_x - 1`; if bead_width_x is 0, distance = -1 (UB in PolylineStitcher) | WallToolPaths.cpp | High | P1 |
+| 137 | `fixSelfIntersections(epsilon < 1)` uses Clipper pftEvenOdd without point-nudging step | WallToolPaths.cpp | Low | P3 |
+| 138 | `getRegionOrder()` uses SparsePointGrid not SparseLineGrid — adjacency constraints can be missed for simplified insets | WallToolPaths.cpp | Medium | P2 |
+| 139 | `separateOutInnerContour()` classifies entire inset based only on first junction of first line | WallToolPaths.cpp | Medium | P2 |
+| 140 | `make_paths_params()` uses min_nozzle_diameter for ALL Arachne parameters in multi-nozzle setups | WallToolPaths.cpp | Medium | P2 |
