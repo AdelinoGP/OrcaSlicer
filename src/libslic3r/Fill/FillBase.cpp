@@ -1,3 +1,22 @@
+// [INTENT] FillBase.cpp — Factory, shared infill utilities, and perimeter-connection engine.
+// This file owns:
+//   1. Fill::new_from_type() — the factory dispatching InfillPattern enums to concrete Fill subclasses.
+//   2. Fill::fill_surface() / fill_surface_arachne() / fill_surface_extrusion() — the public API called
+//      by PrintObject::make_fills(). fill_surface_extrusion() wraps the other two and appends the result
+//      to an ExtrusionEntityCollection, then calls _create_gap_fill().
+//   3. _create_gap_fill() — Orca's dedicated gap-fill pipeline (medial axis of unextruded areas).
+//   4. connect_infill() — perimeter-walking connector that joins open infill line ends to the boundary.
+//   5. connect_base_support() — variant of connect_infill() for support base patterns with structural
+//      arch prioritization and loop-emission.
+//   6. multiline_fill() — Orca-specific Clipper2-based offset pipeline for multi-line infill patterns.
+//
+// [COUPLING] This file #includes every Fill*.hpp — it is the central hub for all infill subclasses.
+//            All subclasses inherit from Fill (FillBase.hpp) and are instantiated only through new_from_type().
+// [CONCURRENCY] No internal parallelism. Called from TBB parallel_for in PrintObject::make_fills().
+//               All Fill instances are per-thread (stack-allocated via new_from_type); no shared state.
+// [STATE] Fill::infill_anchor and Fill::infill_anchor_max are static class members — shared across all
+//         instances and threads. They are write-once at startup (BBS overrides), then read-only.
+
 #include <stdio.h>
 #include <numeric>
 
@@ -32,92 +51,110 @@
 
 namespace Slic3r {
 
-//BBS: 0% of sparse_infill_line_width, no anchor at the start of sparse infill
+// BBS: 0% of sparse_infill_line_width, no anchor at the start of sparse infill
+//  [INTENT] infill_anchor and infill_anchor_max are static class members controlling perimeter anchor
+//  length. 400 means 400% of line width; infill_anchor_max = 20mm absolute cap.
+//  [HAZARD] These are write-once-at-startup statics. If two Print instances with different printer
+//  profiles exist simultaneously (future multi-printer UI), both share these globals — last write wins.
 float Fill::infill_anchor = 400;
-//BBS: 20mm
+// BBS: 20mm
 float Fill::infill_anchor_max = 20;
 
+// [INTENT] new_from_type() is the sole factory for all Fill subclasses. Maps InfillPattern enum →
+// concrete heap-allocated Fill object. Caller owns and must delete the returned pointer.
+// [COUPLING] Adding a new infill pattern requires: (1) add enum value to InfillPattern, (2) add case
+// here, (3) add #include for the header, (4) update ConfigOptionEnum<InfillPattern> values map.
+// [HAZARD] Returns raw owning pointer — no unique_ptr. All call sites must delete or assign to a
+// managing wrapper. Missing delete = memory leak. No null return path except the string overload.
 Fill* Fill::new_from_type(const InfillPattern type)
 {
     switch (type) {
-    case ipConcentric:          return new FillConcentric();
-    case ipHoneycomb:           return new FillHoneycomb();
-    case ipLateralHoneycomb:         return new FillLateralHoneycomb();
-    case ip3DHoneycomb:         return new Fill3DHoneycomb();
-    case ipGyroid:              return new FillGyroid();
-    case ipTpmsD:               return new FillTpmsD();//from creality print
-    case ipTpmsFK:              return new FillTpmsFK();
-    case ipRectilinear:         return new FillRectilinear();
-    case ipAlignedRectilinear:  return new FillAlignedRectilinear();
-    case ipCrossHatch:          return new FillCrossHatch();
-    case ipMonotonic:           return new FillMonotonic();
-    case ipLine:                return new FillLine();
-    case ipGrid:                return new FillGrid();
-    case ipLateralLattice:           return new FillLateralLattice();
-    case ipTriangles:           return new FillTriangles();
-    case ipStars:               return new FillStars();
-    case ipCubic:               return new FillCubic();
-    case ipQuarterCubic:        return new FillQuarterCubic();
-    case ipArchimedeanChords:   return new FillArchimedeanChords();
-    case ipHilbertCurve:        return new FillHilbertCurve();
-    case ipOctagramSpiral:      return new FillOctagramSpiral();
-    case ipAdaptiveCubic:       return new FillAdaptive::Filler();
-    case ipSupportCubic:        return new FillAdaptive::Filler();
-    case ipSupportBase:         return new FillSupportBase();  // simply line fill
-    case ipLightning:           return new FillLightning::Filler();
+    case ipConcentric: return new FillConcentric();
+    case ipHoneycomb: return new FillHoneycomb();
+    case ipLateralHoneycomb: return new FillLateralHoneycomb();
+    case ip3DHoneycomb: return new Fill3DHoneycomb();
+    case ipGyroid: return new FillGyroid();
+    case ipTpmsD: return new FillTpmsD(); // from creality print
+    case ipTpmsFK: return new FillTpmsFK();
+    case ipRectilinear: return new FillRectilinear();
+    case ipAlignedRectilinear: return new FillAlignedRectilinear();
+    case ipCrossHatch: return new FillCrossHatch();
+    case ipMonotonic: return new FillMonotonic();
+    case ipLine: return new FillLine();
+    case ipGrid: return new FillGrid();
+    case ipLateralLattice: return new FillLateralLattice();
+    case ipTriangles: return new FillTriangles();
+    case ipStars: return new FillStars();
+    case ipCubic: return new FillCubic();
+    case ipQuarterCubic: return new FillQuarterCubic();
+    case ipArchimedeanChords: return new FillArchimedeanChords();
+    case ipHilbertCurve: return new FillHilbertCurve();
+    case ipOctagramSpiral: return new FillOctagramSpiral();
+    case ipAdaptiveCubic: return new FillAdaptive::Filler();
+    case ipSupportCubic: return new FillAdaptive::Filler();
+    case ipSupportBase: return new FillSupportBase(); // simply line fill
+    case ipLightning: return new FillLightning::Filler();
     // BBS: for internal solid infill only
-    case ipConcentricInternal:  return new FillConcentricInternal();
+    case ipConcentricInternal: return new FillConcentricInternal();
     // BBS: for bottom and top surface only
     // Orca: Replace BBS implementation with Prusa implementation
-    case ipMonotonicLine:       return new FillMonotonicLines();
-    case ipZigZag:              return new FillZigZag();
-    case ipCrossZag:            return new FillCrossZag();
-    case ipLockedZag:           return new FillLockedZag();
+    case ipMonotonicLine: return new FillMonotonicLines();
+    case ipZigZag: return new FillZigZag();
+    case ipCrossZag: return new FillCrossZag();
+    case ipLockedZag: return new FillLockedZag();
     default: throw Slic3r::InvalidArgument("unknown type");
     }
 }
 
-Fill* Fill::new_from_type(const std::string &type)
+Fill* Fill::new_from_type(const std::string& type)
 {
-    const t_config_enum_values &enum_keys_map = ConfigOptionEnum<InfillPattern>::get_enum_values();
-    t_config_enum_values::const_iterator it = enum_keys_map.find(type);
+    const t_config_enum_values&          enum_keys_map = ConfigOptionEnum<InfillPattern>::get_enum_values();
+    t_config_enum_values::const_iterator it            = enum_keys_map.find(type);
     return (it == enum_keys_map.end()) ? nullptr : new_from_type(InfillPattern(it->second));
 }
 
-// Force initialization of the Fill::use_bridge_flow() internal static map in a thread safe fashion even on compilers
-// not supporting thread safe non-static data member initializers.
-static bool use_bridge_flow_initializer = Fill::use_bridge_flow(ipGrid);
-
+// [INTENT] use_bridge_flow() — queries whether a given InfillPattern uses bridge flow rate.
+// Caches results in a static vector populated once by constructing every Fill subclass.
+// [HAZARD] The static vector 'cached' is initialized lazily on first call. The global
+// use_bridge_flow_initializer forces initialization at static init time to prevent races
+// on first parallel call, but relies on static init ordering — fragile across TUs.
+// [STATE] Once populated, 'cached' is read-only. Thread-safe for reads, unsafe during initialization
+// if static init ordering is violated.
 bool Fill::use_bridge_flow(const InfillPattern type)
 {
-	static std::vector<unsigned char> cached;
-	if (cached.empty()) {
-		cached.assign(size_t(ipCount), 0);
-		for (size_t i = 0; i < cached.size(); ++ i) {
-			auto *fill = Fill::new_from_type((InfillPattern)i);
-			cached[i] = fill->use_bridge_flow();
-			delete fill;
-		}
-	}
-	return cached[type] != 0;
+    static std::vector<unsigned char> cached;
+    if (cached.empty()) {
+        cached.assign(size_t(ipCount), 0);
+        for (size_t i = 0; i < cached.size(); ++i) {
+            auto* fill = Fill::new_from_type((InfillPattern) i);
+            cached[i]  = fill->use_bridge_flow();
+            delete fill;
+        }
+    }
+    return cached[type] != 0;
 }
 
-Polylines Fill::fill_surface(const Surface *surface, const FillParams &params)
+// [INTENT] fill_surface() — thin public wrapper: offsets the surface expolygon inward by
+// (overlap - 0.5*spacing) to establish the infill boundary, then calls _fill_surface_single()
+// for each resulting fragment. Returns raw polylines (no flow applied).
+// [COUPLING] _fill_surface_single() is a pure-virtual method — each Fill subclass implements it.
+// [HAZARD] The offset can produce zero fragments (very narrow surfaces). Callers receive an empty
+// vector silently. gap fill in fill_surface_extrusion() may then still run on unextruded areas.
+Polylines Fill::fill_surface(const Surface* surface, const FillParams& params)
 {
     // Perform offset.
     Slic3r::ExPolygons expp = offset_ex(surface->expolygon, float(scale_(this->overlap - 0.5 * this->spacing)));
     // Create the infills for each of the regions.
     Polylines polylines_out;
-    for (size_t i = 0; i < expp.size(); ++ i)
-        _fill_surface_single(
-            params,
-            surface->thickness_layers,
-            _infill_direction(surface),
-            std::move(expp[i]),
-            polylines_out);
+    for (size_t i = 0; i < expp.size(); ++i)
+        _fill_surface_single(params, surface->thickness_layers, _infill_direction(surface), std::move(expp[i]), polylines_out);
     return polylines_out;
 }
 
+// [INTENT] fill_surface_arachne() — same as fill_surface() but returns ThickPolylines for
+// variable-width infill (Arachne path). Used when params.use_arachne == true.
+// [COUPLING] _fill_surface_single() override accepting ThickPolylines must be implemented by
+// subclasses supporting Arachne mode. Not all Fill subclasses implement this overload.
 ThickPolylines Fill::fill_surface_arachne(const Surface* surface, const FillParams& params)
 {
     // Perform offset.
@@ -129,33 +166,39 @@ ThickPolylines Fill::fill_surface_arachne(const Surface* surface, const FillPara
     return thick_polylines_out;
 }
 
+// [INTENT] fill_surface_extrusion() — the main entry point called by GCode / PrintObject::make_fills().
+// Wraps fill_surface() or fill_surface_arachne(), converts raw polylines to ExtrusionEntityCollection,
+// applies flow rate adjustments, sets reverse flag (for non-reversible patterns), and runs gap fill.
+// [STATE] Appends a new ExtrusionEntityCollection* to 'out'; caller owns the heap memory.
+// [COUPLING] Uses params.use_arachne, params.using_internal_flow, params.can_reverse, params.extrusion_role.
+//            Special Orca flag: calib_flowrate_topinfill_special_order forces no_sort for flow calibration.
+// [HAZARD] If both fill_surface and fill_surface_arachne throw InfillFailedException, out is unchanged
+//          and gap fill is NOT run (early return). Narrow regions may silently produce no output.
 // BBS: this method is used to fill the ExtrusionEntityCollection. It call fill_surface by default
 void Fill::fill_surface_extrusion(const Surface* surface, const FillParams& params, ExtrusionEntitiesPtr& out)
 {
-    Polylines polylines;
+    Polylines      polylines;
     ThickPolylines thick_polylines;
     try {
         if (params.use_arachne)
             thick_polylines = this->fill_surface_arachne(surface, params);
         else
             polylines = this->fill_surface(surface, params);
-    }
-    catch (InfillFailedException&) {}
+    } catch (InfillFailedException&) {}
 
     if (!polylines.empty() || !thick_polylines.empty()) {
         // calculate actual flow from spacing (which might have been adjusted by the infill
         // pattern generator)
         double flow_mm3_per_mm = params.flow.mm3_per_mm();
-        double flow_width = params.flow.width();
+        double flow_width      = params.flow.width();
         if (params.using_internal_flow) {
             // if we used the internal flow we're not doing a solid infill
             // so we can safely ignore the slight variation that might have
             // been applied to f->spacing
-        }
-        else {
-            Flow new_flow = params.flow.with_spacing(this->spacing);
+        } else {
+            Flow new_flow   = params.flow.with_spacing(this->spacing);
             flow_mm3_per_mm = new_flow.mm3_per_mm();
-            flow_width = new_flow.width();
+            flow_width      = new_flow.width();
         }
         // Save into layer.
         ExtrusionEntityCollection* eec = nullptr;
@@ -163,22 +206,20 @@ void Fill::fill_surface_extrusion(const Surface* surface, const FillParams& para
         // Only concentric fills are not sorted.
         eec->no_sort = this->no_sort();
         // ORCA: special flag for flow rate calibration
-        auto is_flow_calib = params.extrusion_role == erTopSolidInfill && this->print_object_config->has("calib_flowrate_topinfill_special_order") &&
+        auto is_flow_calib = params.extrusion_role == erTopSolidInfill &&
+                             this->print_object_config->has("calib_flowrate_topinfill_special_order") &&
                              this->print_object_config->option("calib_flowrate_topinfill_special_order")->getBool();
         if (is_flow_calib) {
             eec->no_sort = true;
         }
-        size_t idx   = eec->entities.size();
+        size_t idx = eec->entities.size();
         if (params.use_arachne) {
             Flow new_flow = params.flow.with_spacing(float(this->spacing));
             variable_width(thick_polylines, params.extrusion_role, new_flow, eec->entities);
             thick_polylines.clear();
-        }
-        else {
-            extrusion_entities_append_paths(
-                eec->entities, std::move(polylines),
-                params.extrusion_role,
-                flow_mm3_per_mm, float(flow_width), params.flow.height());
+        } else {
+            extrusion_entities_append_paths(eec->entities, std::move(polylines), params.extrusion_role, flow_mm3_per_mm, float(flow_width),
+                                            params.flow.height());
         }
         if (!params.can_reverse || is_flow_calib) {
             for (size_t i = idx; i < eec->entities.size(); i++)
@@ -190,37 +231,60 @@ void Fill::fill_surface_extrusion(const Surface* surface, const FillParams& para
     }
 }
 
+// [INTENT] _create_gap_fill() — computes the medial axis of unextruded regions within the surface
+// and appends variable-width gap-fill extrusions to 'out'. This is Orca's replacement for the
+// BBS approach; it runs after normal infill is committed, using the covered polygons to detect gaps.
+//
+// Algorithm:
+//   1. Compute unextruded_areas = no_overlap_expolygons MINUS polygons_covered_by_spacing(10).
+//   2. Compute gapfill_areas = union of unextruded_areas intersected with no_overlap_expolygons.
+//   3. Morphological filter: opening with min/2 removes noise; offset2 removes areas too large for gap fill.
+//   4. Sort gap polygons by first contour point (chain_points) to reduce travel moves.
+//   5. DP simplify (douglas_peucker at 0.1*SCALED_RESOLUTION) then medial_axis() per polygon.
+//   6. Filter out gap fill lines shorter than filter_out_gap_fill config value.
+//   7. Convert ThickPolylines to extrusions via variable_width().
+//
+// [STATE] Reads this->no_overlap_expolygons (set by Fill::fill_surface_extrusion caller chain).
+//         Appends directly to 'out' ExtrusionEntityCollection.
+// [COUPLING] Requires params.density >= 1 to run (solid infill only) and gap_fill_target != gftNowhere.
+//            For internal solid (stInternalSolid), runs only when gap_fill_target == gftEverywhere.
+// [HAZARD] polygons_covered_by_spacing(10) uses a 10-unit (10nm) tolerance — this is an integer
+//          constant, not scaled. If coord_t units change, this constant breaks silently.
+// [HAZARD] medial_axis() can generate very short spurs. The filter_out_gap_fill config parameter
+//          cuts these but a zero value (default off) passes all lengths including degenerate 1-point lines.
+// [HAZARD] is_bridge(params.extrusion_role) guard skips gap fill for bridge surfaces — correct, but
+//          if a new bridge-like role is added without updating is_bridge(), gap fill runs on bridges.
 // Orca: Dedicated function to calculate gap fill lines for the provided surface, according to the print object parameters
 // and append them to the out ExtrusionEntityCollection.
-void Fill::_create_gap_fill(const Surface* surface, const FillParams& params, ExtrusionEntityCollection* out){
-
-    //Orca: just to be safe, check against null pointer for the print object config and if NULL return.
-    if (this->print_object_config == nullptr) return;
+void Fill::_create_gap_fill(const Surface* surface, const FillParams& params, ExtrusionEntityCollection* out)
+{
+    // Orca: just to be safe, check against null pointer for the print object config and if NULL return.
+    if (this->print_object_config == nullptr)
+        return;
 
     // Orca: Enable gap fill as per the user preference. Return early if gap fill is to not be applied.
     if ((this->print_object_config->gap_fill_target.value == gftNowhere) ||
         (surface->surface_type == stInternalSolid && this->print_object_config->gap_fill_target.value != gftEverywhere))
         return;
 
-    Flow new_flow = params.flow;
+    Flow       new_flow = params.flow;
     ExPolygons unextruded_areas;
-    unextruded_areas = diff_ex(this->no_overlap_expolygons, union_ex(out->polygons_covered_by_spacing(10)));
+    unextruded_areas         = diff_ex(this->no_overlap_expolygons, union_ex(out->polygons_covered_by_spacing(10)));
     ExPolygons gapfill_areas = union_ex(unextruded_areas);
     if (!this->no_overlap_expolygons.empty())
         gapfill_areas = intersection_ex(gapfill_areas, this->no_overlap_expolygons);
 
     if (gapfill_areas.size() > 0 && params.density >= 1) {
-        double min = 0.2 * new_flow.scaled_spacing() * (1 - INSET_OVERLAP_TOLERANCE);
-        double max = 2. * new_flow.scaled_spacing();
-        ExPolygons gaps_ex = diff_ex(
-                                     opening_ex(gapfill_areas, float(min / 2.)),
+        double     min     = 0.2 * new_flow.scaled_spacing() * (1 - INSET_OVERLAP_TOLERANCE);
+        double     max     = 2. * new_flow.scaled_spacing();
+        ExPolygons gaps_ex = diff_ex(opening_ex(gapfill_areas, float(min / 2.)),
                                      offset2_ex(gapfill_areas, -float(max / 2.), float(max / 2. + ClipperSafetyOffset)));
-        //BBS: sort the gap_ex to avoid mess travel
+        // BBS: sort the gap_ex to avoid mess travel
         Points ordering_points;
         ordering_points.reserve(gaps_ex.size());
         ExPolygons gaps_ex_sorted;
         gaps_ex_sorted.reserve(gaps_ex.size());
-        for (const ExPolygon &ex : gaps_ex)
+        for (const ExPolygon& ex : gaps_ex)
             ordering_points.push_back(ex.contour.first_point());
         std::vector<Points::size_type> order2 = chain_points(ordering_points);
         for (size_t i : order2)
@@ -228,7 +292,7 @@ void Fill::_create_gap_fill(const Surface* surface, const FillParams& params, Ex
 
         ThickPolylines polylines;
         for (ExPolygon& ex : gaps_ex_sorted) {
-            //BBS: Use DP simplify to avoid duplicated points and accelerate medial-axis calculation as well.
+            // BBS: Use DP simplify to avoid duplicated points and accelerate medial-axis calculation as well.
             ex.douglas_peucker(SCALED_RESOLUTION * 0.1);
             ex.medial_axis(min, max, &polylines);
         }
@@ -236,8 +300,9 @@ void Fill::_create_gap_fill(const Surface* surface, const FillParams& params, Ex
         if (!polylines.empty() && !is_bridge(params.extrusion_role)) {
             polylines.erase(std::remove_if(polylines.begin(), polylines.end(),
                                            [&](const ThickPolyline& p) {
-                return p.length() < scale_(params.config->filter_out_gap_fill.value);
-            }), polylines.end());
+                                               return p.length() < scale_(params.config->filter_out_gap_fill.value);
+                                           }),
+                            polylines.end());
 
             ExtrusionEntityCollection gap_fill;
             variable_width(polylines, erGapFill, params.flow, gap_fill.entities);
@@ -247,6 +312,12 @@ void Fill::_create_gap_fill(const Surface* surface, const FillParams& params, Ex
     }
 }
 
+// [INTENT] _adjust_solid_spacing() — rounds up line spacing so that N lines exactly fit width without a partial gap at the edge.
+//          Result is clamped to ≤120% of the input distance. Never decreases spacing. Output replaces params.spacing in solid infill.
+// [STATE] Pure function; no side effects. Used by FillRectilinear and other scan-line fillers before rasterizing.
+// [HAZARD] When width is very narrow relative to distance, factor > 1.2 triggers the cap, widening lines by up to 20%.
+//          For extremely narrow fills (width < distance) number_of_intervals == 0 → returns original distance unchanged,
+//          producing a single-line overfill rather than an empty result.
 // Calculate a new spacing to fill width with possibly integer number of lines,
 // the first and last line being centered at the interval ends.
 // This function possibly increases the spacing, never decreases,
@@ -257,11 +328,9 @@ coord_t Fill::_adjust_solid_spacing(const coord_t width, const coord_t distance)
     assert(width >= 0);
     assert(distance > 0);
     // floor(width / distance)
-    const auto  number_of_intervals = coord_t((width - EPSILON) / distance);
-    coord_t     distance_new        = (number_of_intervals == 0) ?
-        distance :
-        coord_t((width - EPSILON) / number_of_intervals);
-    const coordf_t factor = coordf_t(distance_new) / coordf_t(distance);
+    const auto     number_of_intervals = coord_t((width - EPSILON) / distance);
+    coord_t        distance_new        = (number_of_intervals == 0) ? distance : coord_t((width - EPSILON) / number_of_intervals);
+    const coordf_t factor              = coordf_t(distance_new) / coordf_t(distance);
     assert(factor > 1. - 1e-5);
     // How much could the extrusion width be increased? By 20%.
     const coordf_t factor_max = 1.2;
@@ -270,24 +339,30 @@ coord_t Fill::_adjust_solid_spacing(const coord_t width, const coord_t distance)
     return distance_new;
 }
 
+// [INTENT] _infill_direction() — returns (angle_radians, reference_shift_point) for the fill pattern on this layer.
+//          Priority: bridge_angle > per-layer rotation > static angle. Adds π/2 because infill lines are perpendicular to the angle.
+// [STATE] Reads this->angle (set externally), this->layer_id, this->bounding_box, and surface->bridge_angle.
+//         this->fixed_angle suppresses per-layer rotation when set by certain fill types (e.g. FillAlignedRectilinear).
+// [COUPLING] _layer_angle() is a virtual method — subclasses override the rotation schedule (e.g. 90° every layer for rectilinear,
+//            120° for triangles). Default implementation in Fill rotates by angle_offset per layer.
+// [HAZARD] If FLT_MAX slips through to out_angle (angle never set), a printf warning fires and angle becomes 0 + π/2 = 90°.
+//          This is a latent bug if a Fill instance is reused without setting angle.
 // Returns orientation of the infill and the reference point of the infill pattern.
 // For a normal print, the reference point is the center of a bounding box of the STL.
-std::pair<float, Point> Fill::_infill_direction(const Surface *surface) const
+std::pair<float, Point> Fill::_infill_direction(const Surface* surface) const
 {
     // set infill angle
     float out_angle = this->angle;
 
-	if (out_angle == FLT_MAX) {
-		//FIXME Vojtech: Add a warning?
+    if (out_angle == FLT_MAX) {
+        // FIXME Vojtech: Add a warning?
         printf("Using undefined infill angle\n");
         out_angle = 0.f;
     }
 
     // Bounding box is the bounding box of a perl object Slic3r::Print::Object (c++ object Slic3r::PrintObject)
     // The bounding box is only undefined in unit tests.
-    Point out_shift = empty(this->bounding_box) ?
-    	surface->expolygon.contour.bounding_box().center() :
-        this->bounding_box.center();
+    Point out_shift = empty(this->bounding_box) ? surface->expolygon.contour.bounding_box().center() : this->bounding_box.center();
 
 #if 0
     if (empty(this->bounding_box)) {
@@ -298,8 +373,8 @@ std::pair<float, Point> Fill::_infill_direction(const Surface *surface) const
 #endif
 
     if (surface->bridge_angle >= 0) {
-	    // use bridge angle
-		//FIXME Vojtech: Add a debugf?
+        // use bridge angle
+        // FIXME Vojtech: Add a debugf?
         // Slic3r::debugf "Filling bridge with angle %d\n", rad2deg($surface->bridge_angle);
 #ifdef SLIC3R_DEBUG
         printf("Filling bridge with angle %f\n", surface->bridge_angle);
@@ -307,67 +382,104 @@ std::pair<float, Point> Fill::_infill_direction(const Surface *surface) const
         out_angle = float(surface->bridge_angle);
     } else if (this->layer_id != size_t(-1) && !fixed_angle) {
         // alternate fill direction
-        //Orca: Do not alternate direction if Fill.fixed_angle is true
+        // Orca: Do not alternate direction if Fill.fixed_angle is true
         out_angle += this->_layer_angle(this->layer_id / surface->thickness_layers);
     } else {
-//    	printf("Layer_ID undefined!\n");
+        //    	printf("Layer_ID undefined!\n");
     }
 
-    out_angle += float(M_PI/2.);
+    out_angle += float(M_PI / 2.);
     return std::pair<float, Point>(out_angle, out_shift);
 }
 
+// [INTENT] ContourIntersectionPoint — T-joint node connecting one infill line endpoint to its nearest point on a closed perimeter contour.
+//          Two ContourIntersectionPoints (indices 2i, 2i+1) represent both ends of the same infill line.
+// [STATE] Circular doubly-linked list per contour: prev_on_contour / next_on_contour link all T-joints on the same contour CCW.
+//         contour_not_taken_length_prev/next track available arc length not yet assigned to any extrusion.
+//         consumed=true means this T-joint is fully processed; prev_trimmed/next_trimmed mean the arc in that direction overlaps an infill line.
+// [MEMORY] All ContourIntersectionPoint instances are stored in BoundaryInfillGraph::map_infill_end_point_to_boundary (flat vector, stable).
+//          Pointers into this vector are safe during connect_infill() — no reallocation occurs after creation.
+// [COUPLING] consume_prev()/consume_next() mark an arc AND set consumed=true so no other code walks the same arc.
+//            trim_prev()/trim_next() only shrink the available arc length — they do not set consumed.
+//            could_take_prev()/could_take_next() check consumed AND length > SCALED_EPSILON.
+//            could_connect_prev()/could_connect_next() additionally check that the neighbour is not consumed and neither arc is trimmed.
 // A single T joint of an infill line to a closed contour or one of its holes.
-struct ContourIntersectionPoint {
+struct ContourIntersectionPoint
+{
     // Contour and point on a contour where an infill line is connected to.
-    size_t                      contour_idx;
-    size_t                      point_idx;
+    size_t contour_idx;
+    size_t point_idx;
     // Eucleidean parameter of point_idx along its contour.
-    double                      param;
+    double param;
     // Other intersection points along the same contour. If there is only a single T-joint on a contour
     // with an intersection line, then the prev_on_contour and next_on_contour remain nulls.
-    ContourIntersectionPoint*   prev_on_contour { nullptr };
-    ContourIntersectionPoint*   next_on_contour { nullptr };
+    ContourIntersectionPoint* prev_on_contour{nullptr};
+    ContourIntersectionPoint* next_on_contour{nullptr};
     // Length of the contour not yet allocated to some extrusion path going back (clockwise), or masked out by some overlapping infill line.
-    double                      contour_not_taken_length_prev { std::numeric_limits<double>::max() };
-    // Length of the contour not yet allocated to some extrusion path going forward (counter-clockwise), or masked out by some overlapping infill line.
-    double                      contour_not_taken_length_next { std::numeric_limits<double>::max() };
+    double contour_not_taken_length_prev{std::numeric_limits<double>::max()};
+    // Length of the contour not yet allocated to some extrusion path going forward (counter-clockwise), or masked out by some overlapping
+    // infill line.
+    double contour_not_taken_length_next{std::numeric_limits<double>::max()};
     // End point is consumed if an infill line connected to this T-joint was already connected left or right along the contour,
     // or if the infill line was processed, but it was not possible to connect it left or right along the contour.
-    bool                        consumed { false };
+    bool consumed{false};
     // Whether the contour was trimmed by an overlapping infill line, or whether part of this contour was connected to some infill line.
-    bool                        prev_trimmed { false };
-    bool                        next_trimmed { false };
+    bool prev_trimmed{false};
+    bool next_trimmed{false};
 
-    void                        consume_prev() { this->contour_not_taken_length_prev = 0.; this->prev_trimmed = true; this->consumed = true; }
-    void                        consume_next() { this->contour_not_taken_length_next = 0.; this->next_trimmed = true; this->consumed = true; }
+    void consume_prev()
+    {
+        this->contour_not_taken_length_prev = 0.;
+        this->prev_trimmed                  = true;
+        this->consumed                      = true;
+    }
+    void consume_next()
+    {
+        this->contour_not_taken_length_next = 0.;
+        this->next_trimmed                  = true;
+        this->consumed                      = true;
+    }
 
-    void                        trim_prev(const double new_len) {
+    void trim_prev(const double new_len)
+    {
         if (new_len < this->contour_not_taken_length_prev) {
             this->contour_not_taken_length_prev = new_len;
-            this->prev_trimmed = true;
+            this->prev_trimmed                  = true;
         }
     }
-    void                        trim_next(const double new_len) {
+    void trim_next(const double new_len)
+    {
         if (new_len < this->contour_not_taken_length_next) {
             this->contour_not_taken_length_next = new_len;
-            this->next_trimmed = true;
+            this->next_trimmed                  = true;
         }
     }
 
     // The end point of an infill line connected to this T-joint was not processed yet and a piece of the contour could be extruded going backwards.
-    bool                        could_take_prev() const throw() { return ! this->consumed && this->contour_not_taken_length_prev > SCALED_EPSILON; }
+    bool could_take_prev() const throw() { return !this->consumed && this->contour_not_taken_length_prev > SCALED_EPSILON; }
     // The end point of an infill line connected to this T-joint was not processed yet and a piece of the contour could be extruded going forward.
-    bool                        could_take_next() const throw() { return ! this->consumed && this->contour_not_taken_length_next > SCALED_EPSILON; }
+    bool could_take_next() const throw() { return !this->consumed && this->contour_not_taken_length_next > SCALED_EPSILON; }
 
     // Could extrude a complete segment from this to this->prev_on_contour.
-    bool                        could_connect_prev() const throw()
-        { return ! this->consumed && this->prev_on_contour != this && ! this->prev_on_contour->consumed && ! this->prev_trimmed && ! this->prev_on_contour->next_trimmed; }
+    bool could_connect_prev() const throw()
+    {
+        return !this->consumed && this->prev_on_contour != this && !this->prev_on_contour->consumed && !this->prev_trimmed &&
+               !this->prev_on_contour->next_trimmed;
+    }
     // Could extrude a complete segment from this to this->next_on_contour.
-    bool                        could_connect_next() const throw()
-        { return ! this->consumed && this->next_on_contour != this && ! this->next_on_contour->consumed && ! this->next_trimmed && ! this->next_on_contour->prev_trimmed; }
+    bool could_connect_next() const throw()
+    {
+        return !this->consumed && this->next_on_contour != this && !this->next_on_contour->consumed && !this->next_trimmed &&
+               !this->next_on_contour->prev_trimmed;
+    }
 };
 
+// [INTENT] closed_contour_distance_ccw / closed_contour_distance_cw — arc-length distance
+//          along a closed contour in CCW (positive param direction) or CW (reverse) direction.
+//          Handles wraparound at the contour seam by adding contour_length when d < 0.
+// [STATE] Pure; no side effects.
+// [HAZARD] If param1 or param2 are outside [0, contour_length], the assertion fires in debug;
+//          in release, the returned distance will be wrong (negative or >contour_length).
 // Distance from param1 to param2 when going counter-clockwise.
 static inline double closed_contour_distance_ccw(double param1, double param2, double contour_length)
 {
@@ -385,8 +497,12 @@ static inline double closed_contour_distance_cw(double param1, double param2, do
     return closed_contour_distance_ccw(param2, param1, contour_length);
 }
 
+// [INTENT] path_length_along_contour_ccw() — CCW arc length from cp1 to cp2 along their shared
+//          contour, using parametric arc lengths stored in the ContourIntersectionPoints.
+//          Thin wrapper around closed_contour_distance_ccw.
+// [STATE] Pure; asserts same contour_idx but no state mutation.
 // Length along the contour from cp1 to cp2 going counter-clockwise.
-double path_length_along_contour_ccw(const ContourIntersectionPoint *cp1, const ContourIntersectionPoint *cp2, double contour_length)
+double path_length_along_contour_ccw(const ContourIntersectionPoint* cp1, const ContourIntersectionPoint* cp2, double contour_length)
 {
     assert(cp1 != nullptr);
     assert(cp2 != nullptr);
@@ -395,15 +511,20 @@ double path_length_along_contour_ccw(const ContourIntersectionPoint *cp1, const 
     return closed_contour_distance_ccw(cp1->param, cp2->param, contour_length);
 }
 
+// [INTENT] path_lengths_along_contour() — returns both CCW and CW arc lengths from cp1 to cp2.
+//          Used in the disabled #if 0 connection strategy to decide which direction is shorter.
+// [STATE] Pure; no side effects.
 // Lengths along the contour from cp1 to cp2 going CCW and going CW.
-std::pair<double, double> path_lengths_along_contour(const ContourIntersectionPoint *cp1, const ContourIntersectionPoint *cp2, double contour_length)
+std::pair<double, double> path_lengths_along_contour(const ContourIntersectionPoint* cp1,
+                                                     const ContourIntersectionPoint* cp2,
+                                                     double                          contour_length)
 {
     // Zero'th param is the length of the contour.
-    double param_lo  = cp1->param;
-    double param_hi  = cp2->param;
+    double param_lo = cp1->param;
+    double param_hi = cp2->param;
     assert(param_lo >= 0. && param_lo <= contour_length);
     assert(param_hi >= 0. && param_hi <= contour_length);
-    bool  reversed  = false;
+    bool reversed = false;
     if (param_lo > param_hi) {
         std::swap(param_lo, param_hi);
         reversed = true;
@@ -414,22 +535,33 @@ std::pair<double, double> path_lengths_along_contour(const ContourIntersectionPo
     return out;
 }
 
+// [INTENT] take_cw_full/take_ccw_full — append all contour points of the (idx_start, idx_end] arc to polyline pl.
+//          CW walks backwards through the contour array; CCW walks forward. Both use modular index arithmetic.
+// [HAZARD] Precondition: pl.points.back() == contour[idx_start]. Violated at runtime only in debug builds (assert).
+//          CW version: starts at idx_start-1, decrements with wrap. CCW starts at idx_start+1, increments with wrap.
+//          Both emit the endpoint idx_end as the last point, yielding a half-open interval (idx_start, idx_end].
 // Add contour points from interval (idx_start, idx_end> to polyline.
-static inline void take_cw_full(Polyline &pl, const Points &contour, size_t idx_start, size_t idx_end)
+static inline void take_cw_full(Polyline& pl, const Points& contour, size_t idx_start, size_t idx_end)
 {
-    assert(! pl.empty() && pl.points.back() == contour[idx_start]);
+    assert(!pl.empty() && pl.points.back() == contour[idx_start]);
     size_t i = (idx_start == 0) ? contour.size() - 1 : idx_start - 1;
     while (i != idx_end) {
         pl.points.emplace_back(contour[i]);
         if (i == 0)
             i = contour.size();
-        -- i;
+        --i;
     }
     pl.points.emplace_back(contour[i]);
 }
 
+// [INTENT] take_cw_limited/take_ccw_limited — same arc traversal as the full variants but stops early at length_to_take (Euclidean distance).
+//          Returns the actual length taken. The last point is linearly interpolated if the arc is trimmed mid-segment.
+// [HAZARD] If length_to_take > arc length, terminates at idx_end and returns the actual arc length (shorter than requested).
+//          The interpolation t = (length_to_take - lprev) / (l - lprev) can produce NaN if l == lprev (zero-length segment).
+//          Zero-length segments are guarded by assert(length_to_take > SCALED_EPSILON) but not by the loop itself.
 // Add contour points from interval (idx_start, idx_end> to polyline, limited by the Eucleidean length taken.
-static inline double take_cw_limited(Polyline &pl, const Points &contour, const std::vector<double> &params, size_t idx_start, size_t idx_end, double length_to_take)
+static inline double take_cw_limited(
+    Polyline& pl, const Points& contour, const std::vector<double>& params, size_t idx_start, size_t idx_end, double length_to_take)
 {
     // If appending to an infill line, then the start point of a perimeter line shall match the end point of an infill line.
     assert(pl.empty() || pl.points.back() == contour[idx_start]);
@@ -438,13 +570,13 @@ static inline double take_cw_limited(Polyline &pl, const Points &contour, const 
     // Length of the contour.
     double length = params.back();
     // Parameter (length from contour.front()) for the first point.
-    double p0     = params[idx_start];
+    double p0 = params[idx_start];
     // Current (2nd) point of the contour.
-    size_t i      = (idx_start == 0) ? contour.size() - 1 : idx_start - 1;
+    size_t i = (idx_start == 0) ? contour.size() - 1 : idx_start - 1;
     // Previous point of the contour.
-    size_t iprev  = idx_start;
+    size_t iprev = idx_start;
     // Length of the contour curve taken for iprev.
-    double lprev  = 0.;
+    double lprev = 0.;
 
     for (;;) {
         double l = closed_contour_distance_cw(p0, params[i], length);
@@ -462,22 +594,22 @@ static inline double take_cw_limited(Polyline &pl, const Points &contour, const 
         lprev = l;
         if (i == 0)
             i = contour.size();
-        -- i;
+        --i;
     }
     assert(false);
     return 0;
 }
 
 // Add contour points from interval (idx_start, idx_end> to polyline.
-static inline void take_ccw_full(Polyline &pl, const Points &contour, size_t idx_start, size_t idx_end)
+static inline void take_ccw_full(Polyline& pl, const Points& contour, size_t idx_start, size_t idx_end)
 {
-    assert(! pl.empty() && pl.points.back() == contour[idx_start]);
+    assert(!pl.empty() && pl.points.back() == contour[idx_start]);
     size_t i = idx_start;
-    if (++ i == contour.size())
+    if (++i == contour.size())
         i = 0;
     while (i != idx_end) {
         pl.points.emplace_back(contour[i]);
-        if (++ i == contour.size())
+        if (++i == contour.size())
             i = 0;
     }
     pl.points.emplace_back(contour[i]);
@@ -485,7 +617,8 @@ static inline void take_ccw_full(Polyline &pl, const Points &contour, size_t idx
 
 // Add contour points from interval (idx_start, idx_end> to polyline, limited by the Eucleidean length taken.
 // Returns length of the contour taken.
-static inline double take_ccw_limited(Polyline &pl, const Points &contour, const std::vector<double> &params, size_t idx_start, size_t idx_end, double length_to_take)
+static inline double take_ccw_limited(
+    Polyline& pl, const Points& contour, const std::vector<double>& params, size_t idx_start, size_t idx_end, double length_to_take)
 {
     // If appending to an infill line, then the start point of a perimeter line shall match the end point of an infill line.
     assert(pl.empty() || pl.points.back() == contour[idx_start]);
@@ -494,15 +627,15 @@ static inline double take_ccw_limited(Polyline &pl, const Points &contour, const
     // Length of the contour.
     double length = params.back();
     // Parameter (length from contour.front()) for the first point.
-    double p0     = params[idx_start];
+    double p0 = params[idx_start];
     // Current (2nd) point of the contour.
-    size_t i      = idx_start;
-    if (++ i == contour.size())
+    size_t i = idx_start;
+    if (++i == contour.size())
         i = 0;
     // Previous point of the contour.
-    size_t iprev  = idx_start;
+    size_t iprev = idx_start;
     // Length of the contour curve taken at iprev.
-    double lprev  = 0;
+    double lprev = 0;
     for (;;) {
         double l = closed_contour_distance_ccw(p0, params[i], length);
         if (l >= length_to_take) {
@@ -517,45 +650,57 @@ static inline double take_ccw_limited(Polyline &pl, const Points &contour, const
             return l;
         iprev = i;
         lprev = l;
-        if (++ i == contour.size())
+        if (++i == contour.size())
             i = 0;
     }
     assert(false);
     return 0;
 }
 
+// [INTENT] take() (index variant) — splices a perimeter arc directly between two infill polylines.
+//          Appends all contour points of arc (idx_start, idx_end] (CW or CCW) to pl1, then appends all of pl2 (skip first point).
+//          Result: pl1 and pl2 are merged into one continuous polyline via the perimeter arc.
+// [INTENT] take() (ContourIntersectionPoint* variant) — same splice but additionally marks all intermediate ContourIntersectionPoints
+//          as consumed (consume_prev+consume_next), and marks the arc boundary endpoints (cp_start→consume_next, cp_end→consume_prev).
+// [COUPLING] Caller is responsible for reversing pl1 or pl2 so the correct endpoints align with contour[cp_start/cp_end->point_idx]
+//            before calling take(). No reversal is performed inside take().
 // Connect end of pl1 to the start of pl2 using the perimeter contour.
 // If clockwise, then a clockwise segment from idx_start to idx_end is taken, otherwise a counter-clockwise segment is being taken.
-static void take(Polyline &pl1, const Polyline &pl2, const Points &contour, size_t idx_start, size_t idx_end, bool clockwise)
+static void take(Polyline& pl1, const Polyline& pl2, const Points& contour, size_t idx_start, size_t idx_end, bool clockwise)
 {
 #ifndef NDEBUG
-	assert(idx_start != idx_end);
+    assert(idx_start != idx_end);
     assert(pl1.size() >= 2);
     assert(pl2.size() >= 2);
 #endif /* NDEBUG */
 
-	{
-		// Reserve memory at pl1 for the connecting contour and pl2.
-		int new_points = int(idx_end) - int(idx_start) - 1;
-		if (new_points < 0)
-			new_points += int(contour.size());
-		pl1.points.reserve(pl1.points.size() + size_t(new_points) + pl2.points.size());
-	}
+    {
+        // Reserve memory at pl1 for the connecting contour and pl2.
+        int new_points = int(idx_end) - int(idx_start) - 1;
+        if (new_points < 0)
+            new_points += int(contour.size());
+        pl1.points.reserve(pl1.points.size() + size_t(new_points) + pl2.points.size());
+    }
 
-	if (clockwise)
+    if (clockwise)
         take_cw_full(pl1, contour, idx_start, idx_end);
-	else
+    else
         take_ccw_full(pl1, contour, idx_start, idx_end);
 
     pl1.points.insert(pl1.points.end(), pl2.points.begin() + 1, pl2.points.end());
 }
 
-static void take(Polyline &pl1, const Polyline &pl2, const Points &contour, ContourIntersectionPoint *cp_start, ContourIntersectionPoint *cp_end, bool clockwise)
+static void take(Polyline&                 pl1,
+                 const Polyline&           pl2,
+                 const Points&             contour,
+                 ContourIntersectionPoint* cp_start,
+                 ContourIntersectionPoint* cp_end,
+                 bool                      clockwise)
 {
     assert(cp_start->prev_on_contour != nullptr);
     assert(cp_start->next_on_contour != nullptr);
-    assert(cp_end  ->prev_on_contour != nullptr);
-    assert(cp_end  ->next_on_contour != nullptr);
+    assert(cp_end->prev_on_contour != nullptr);
+    assert(cp_end->next_on_contour != nullptr);
     assert(cp_start != cp_end);
 
     take(pl1, pl2, contour, cp_start->point_idx, cp_end->point_idx, clockwise);
@@ -564,7 +709,7 @@ static void take(Polyline &pl1, const Polyline &pl2, const Points &contour, Cont
     if (clockwise)
         std::swap(cp_start, cp_end);
     if (cp_start->next_on_contour != cp_end)
-        for (auto *cp = cp_start->next_on_contour; cp->next_on_contour != cp_end; cp = cp->next_on_contour) {
+        for (auto* cp = cp_start->next_on_contour; cp->next_on_contour != cp_end; cp = cp->next_on_contour) {
             cp->consume_prev();
             cp->consume_next();
         }
@@ -572,27 +717,40 @@ static void take(Polyline &pl1, const Polyline &pl2, const Points &contour, Cont
     cp_end->consume_prev();
 }
 
-static void take_limited(
-    Polyline &pl1, const Points &contour, const std::vector<double> &params,
-    ContourIntersectionPoint *cp_start, ContourIntersectionPoint *cp_end, bool clockwise, double take_max_length, double line_half_width)
+// [INTENT] take_limited() — appends a partial perimeter hook to infill polyline pl1. Length is bounded by take_max_length
+//          and by the available arc length stored in cp_start->contour_not_taken_length_prev/next. Does not merge a second polyline.
+//          If the endpoint of pl1 is at the start (not back), pl1 is temporarily reversed so points are appended at the back, then re-reversed.
+// [STATE] Modifies cp_start->consumed=true immediately. Updates trim lengths on intermediate ContourIntersectionPoints as the arc walks.
+// [HAZARD] add_at_start path moves pl1.points into a temporary and rebuilds — if an exception is thrown mid-rebuild, pl1 is corrupt.
+//          The cp_start == cp_end case (both ends of the same infill line touch the same contour point) is explicitly handled:
+//          capped at contour_length - line_half_width to avoid wrapping over the starting point.
+// [COUPLING] Relies on take_cw_limited / take_ccw_limited for arc traversal with length budget.
+static void take_limited(Polyline&                  pl1,
+                         const Points&              contour,
+                         const std::vector<double>& params,
+                         ContourIntersectionPoint*  cp_start,
+                         ContourIntersectionPoint*  cp_end,
+                         bool                       clockwise,
+                         double                     take_max_length,
+                         double                     line_half_width)
 {
 #ifndef NDEBUG
     // This is a valid case, where a single infill line connect to two different contours (outer contour + hole or two holes).
-//    assert(cp_start != cp_end);
+    //    assert(cp_start != cp_end);
     assert(cp_start->prev_on_contour != nullptr);
     assert(cp_start->next_on_contour != nullptr);
-    assert(cp_end  ->prev_on_contour != nullptr);
-    assert(cp_end  ->next_on_contour != nullptr);
+    assert(cp_end->prev_on_contour != nullptr);
+    assert(cp_end->next_on_contour != nullptr);
     assert(pl1.size() >= 2);
     assert(contour.size() + 1 == params.size());
 #endif /* NDEBUG */
 
-    if (! (clockwise ? cp_start->could_take_prev() : cp_start->could_take_next()))
+    if (!(clockwise ? cp_start->could_take_prev() : cp_start->could_take_next()))
         return;
 
     assert(pl1.points.front() == contour[cp_start->point_idx] || pl1.points.back() == contour[cp_start->point_idx]);
-    bool        add_at_start = pl1.points.front() == contour[cp_start->point_idx];
-    Points      pl_tmp;
+    bool   add_at_start = pl1.points.front() == contour[cp_start->point_idx];
+    Points pl_tmp;
     if (add_at_start) {
         pl_tmp = std::move(pl1.points);
         pl1.points.clear();
@@ -607,28 +765,27 @@ static void take_limited(
         pl1.points.reserve(pl1.points.size() + pl_tmp.size() + size_t(new_points));
     }
 
-    double length = params.back();
+    double length       = params.back();
     double length_to_go = take_max_length;
-    cp_start->consumed = true;
+    cp_start->consumed  = true;
     if (cp_start == cp_end) {
         length_to_go = std::max(0., std::min(length_to_go, length - line_half_width));
         length_to_go = std::min(length_to_go, clockwise ? cp_start->contour_not_taken_length_prev : cp_start->contour_not_taken_length_next);
         cp_start->consume_prev();
         cp_start->consume_next();
         if (length_to_go > SCALED_EPSILON)
-            clockwise ?
-                take_cw_limited (pl1, contour, params, cp_start->point_idx, cp_start->point_idx, length_to_go) :
-                take_ccw_limited(pl1, contour, params, cp_start->point_idx, cp_start->point_idx, length_to_go);
+            clockwise ? take_cw_limited(pl1, contour, params, cp_start->point_idx, cp_start->point_idx, length_to_go) :
+                        take_ccw_limited(pl1, contour, params, cp_start->point_idx, cp_start->point_idx, length_to_go);
     } else if (clockwise) {
         // Going clockwise from cp_start to cp_end.
         assert(cp_start != cp_end);
-        for (ContourIntersectionPoint *cp = cp_start; cp != cp_end; cp = cp->prev_on_contour) {
+        for (ContourIntersectionPoint* cp = cp_start; cp != cp_end; cp = cp->prev_on_contour) {
             // Length of the segment from cp to cp->prev_on_contour.
-            double l = closed_contour_distance_cw(cp->param, cp->prev_on_contour->param, length);
+            double l     = closed_contour_distance_cw(cp->param, cp->prev_on_contour->param, length);
             length_to_go = std::min(length_to_go, cp->contour_not_taken_length_prev);
-            //if (cp->prev_on_contour->consumed)
-                // Don't overlap with an already extruded infill line.
-                length_to_go = std::max(0., std::min(length_to_go, l - line_half_width));
+            // if (cp->prev_on_contour->consumed)
+            //  Don't overlap with an already extruded infill line.
+            length_to_go = std::max(0., std::min(length_to_go, l - line_half_width));
             cp->consume_prev();
             if (l >= length_to_go) {
                 if (length_to_go > SCALED_EPSILON) {
@@ -644,12 +801,12 @@ static void take_limited(
         }
     } else {
         assert(cp_start != cp_end);
-        for (ContourIntersectionPoint *cp = cp_start; cp != cp_end; cp = cp->next_on_contour) {
-            double l = closed_contour_distance_ccw(cp->param, cp->next_on_contour->param, length);
+        for (ContourIntersectionPoint* cp = cp_start; cp != cp_end; cp = cp->next_on_contour) {
+            double l     = closed_contour_distance_ccw(cp->param, cp->next_on_contour->param, length);
             length_to_go = std::min(length_to_go, cp->contour_not_taken_length_next);
-            //if (cp->next_on_contour->consumed)
-                // Don't overlap with an already extruded infill line.
-                length_to_go = std::max(0., std::min(length_to_go, l - line_half_width));
+            // if (cp->next_on_contour->consumed)
+            //  Don't overlap with an already extruded infill line.
+            length_to_go = std::max(0., std::min(length_to_go, l - line_half_width));
             cp->consume_next();
             if (l >= length_to_go) {
                 if (length_to_go > SCALED_EPSILON) {
@@ -671,114 +828,136 @@ static void take_limited(
     }
 }
 
+// [INTENT] SegmentPoint — a point along a polyline described by segment index and parametric t ∈ [0,1).
+//          Used to represent the clipped start/end of an infill polyline after removing the `clip_distance`
+//          from each end. This avoids marking perimeter arcs that are anchored by the endpoint region.
+// [STATE] POD; idx_segment = SIZE_MAX means "invalid" (no clip found — polyline too short).
 // Return an index of start of a segment and a point of the clipping point at distance from the end of polyline.
-struct SegmentPoint {
-	// Segment index, defining a line <idx_segment, idx_segment + 1).
-	size_t idx_segment = std::numeric_limits<size_t>::max();
-	// Parameter of point in <0, 1) along the line <idx_segment, idx_segment + 1)
-	double t;
-	Vec2d  point;
+struct SegmentPoint
+{
+    // Segment index, defining a line <idx_segment, idx_segment + 1).
+    size_t idx_segment = std::numeric_limits<size_t>::max();
+    // Parameter of point in <0, 1) along the line <idx_segment, idx_segment + 1)
+    double t;
+    Vec2d  point;
 
-	bool valid() const { return idx_segment != std::numeric_limits<size_t>::max(); }
+    bool valid() const { return idx_segment != std::numeric_limits<size_t>::max(); }
 };
 
-static inline SegmentPoint clip_start_segment_and_point(const Points &polyline, double distance)
+// [INTENT] clip_start_segment_and_point() / clip_end_segment_and_point() — find the point on a
+//          polyline at Euclidean distance `distance` from the start (or end). Returns a SegmentPoint
+//          with the segment index and parameter t so the point can be used for clipping.
+// [STATE] Pure; returns a SegmentPoint value. Returns invalid SegmentPoint if polyline too short.
+// [HAZARD] clip_end_segment_and_point uses `int i` for reverse iteration — polylines with more than
+//          INT_MAX points (impossible in practice) would overflow the cast.
+static inline SegmentPoint clip_start_segment_and_point(const Points& polyline, double distance)
 {
-	assert(polyline.size() >= 2);
-	assert(distance > 0.);
-	// Initialized to "invalid".
-	SegmentPoint out;
-	if (polyline.size() >= 2) {
-	    Vec2d pt_prev = polyline.front().cast<double>();
-        for (size_t i = 1; i < polyline.size(); ++ i) {
-			Vec2d pt = polyline[i].cast<double>();
-			Vec2d v = pt - pt_prev;
-	        double l = v.norm();
-	        if (l > distance) {
-	        	out.idx_segment = i - 1;
-	        	out.t 			= distance / l;
-	        	out.point 		= pt_prev + out.t * v;
-	            break;
-	        }
-	        distance -= l;
-	        pt_prev = pt;
-	    }
-	}
-	return out;
+    assert(polyline.size() >= 2);
+    assert(distance > 0.);
+    // Initialized to "invalid".
+    SegmentPoint out;
+    if (polyline.size() >= 2) {
+        Vec2d pt_prev = polyline.front().cast<double>();
+        for (size_t i = 1; i < polyline.size(); ++i) {
+            Vec2d  pt = polyline[i].cast<double>();
+            Vec2d  v  = pt - pt_prev;
+            double l  = v.norm();
+            if (l > distance) {
+                out.idx_segment = i - 1;
+                out.t           = distance / l;
+                out.point       = pt_prev + out.t * v;
+                break;
+            }
+            distance -= l;
+            pt_prev = pt;
+        }
+    }
+    return out;
 }
 
-static inline SegmentPoint clip_end_segment_and_point(const Points &polyline, double distance)
+static inline SegmentPoint clip_end_segment_and_point(const Points& polyline, double distance)
 {
-	assert(polyline.size() >= 2);
-	assert(distance > 0.);
-	// Initialized to "invalid".
-	SegmentPoint out;
-	if (polyline.size() >= 2) {
-	    Vec2d pt_next = polyline.back().cast<double>();
-		for (int i = int(polyline.size()) - 2; i >= 0; -- i) {
-			Vec2d pt = polyline[i].cast<double>();
-			Vec2d v = pt - pt_next;
-	        double l = v.norm();
-	        if (l > distance) {
-	        	out.idx_segment = i;
-	        	out.t 			= distance / l;
-	        	out.point 		= pt_next + out.t * v;
-				// Store the parameter referenced to the starting point of a segment.
-				out.t			= 1. - out.t;
-	            break;
-	        }
-	        distance -= l;
-	        pt_next = pt;
-	    }
-	}
-	return out;
+    assert(polyline.size() >= 2);
+    assert(distance > 0.);
+    // Initialized to "invalid".
+    SegmentPoint out;
+    if (polyline.size() >= 2) {
+        Vec2d pt_next = polyline.back().cast<double>();
+        for (int i = int(polyline.size()) - 2; i >= 0; --i) {
+            Vec2d  pt = polyline[i].cast<double>();
+            Vec2d  v  = pt - pt_next;
+            double l  = v.norm();
+            if (l > distance) {
+                out.idx_segment = i;
+                out.t           = distance / l;
+                out.point       = pt_next + out.t * v;
+                // Store the parameter referenced to the starting point of a segment.
+                out.t = 1. - out.t;
+                break;
+            }
+            distance -= l;
+            pt_next = pt;
+        }
+    }
+    return out;
 }
 
+// [INTENT] line_rounded_thick_segment_collision() — tests whether a query line [line_a, line_b] collides with the
+//          Minkowski sum of segment [segment_a, segment_b] inflated by radius (a "stadium" / capsule shape).
+//          Returns (true, [tmin,tmax]) where tmin/tmax are Euclidean distances along the line of the overlap interval.
+// [COUPLING] Uses Geometry::ray_circle_intersections_r2_lv2_c() for rounded end-cap intersections and
+//            Geometry::liang_barsky_line_clipping_interval() for the rectangular body of the thick segment.
+// [HAZARD] Very short line (lv < SCALED_EPSILON²): special-case only tests the midpoint of the line vs the thick segment.
+//          If the line is exactly zero length, the returned interval is [0, 0] which is valid but unusable.
+//          tmin/tmax are initialized to ±DBL_MAX — if no intersections are found, tmin > tmax and intersects=false (correct).
+// [HAZARD] The #if 0 block at line ~913 is debug SVG export code. If enabled, it opens a new SVG file per call —
+//          extremely expensive in production. Never enable without guarding with INFILL_DEBUG_OUTPUT.
 // Calculate intersection of a line with a thick segment.
 // Returns Eucledian parameters of the line / thick segment overlap.
-static inline bool line_rounded_thick_segment_collision(
-    const Vec2d &line_a,    const Vec2d &line_b,
-    const Vec2d &segment_a, const Vec2d &segment_b, const double offset,
-    std::pair<double, double> &out_interval)
+static inline bool line_rounded_thick_segment_collision(const Vec2d&               line_a,
+                                                        const Vec2d&               line_b,
+                                                        const Vec2d&               segment_a,
+                                                        const Vec2d&               segment_b,
+                                                        const double               offset,
+                                                        std::pair<double, double>& out_interval)
 {
-    const Vec2d  line_v0   = line_b - line_a;
-    double       lv        = line_v0.squaredNorm();
+    const Vec2d line_v0 = line_b - line_a;
+    double      lv      = line_v0.squaredNorm();
 
     const Vec2d  segment_v = segment_b - segment_a;
     const double segment_l = segment_v.norm();
     const double offset2   = offset * offset;
 
     bool intersects = false;
-    if (lv < SCALED_EPSILON * SCALED_EPSILON)
-    {
+    if (lv < SCALED_EPSILON * SCALED_EPSILON) {
         // Very short line vector. Just test whether the center point is inside the offset line.
         Vec2d lpt = 0.5 * (line_a + line_b);
         if (segment_l > SCALED_EPSILON) {
-            intersects = line_alg::distance_to_squared(Linef{ segment_a, segment_b }, lpt) < offset2;
+            intersects = line_alg::distance_to_squared(Linef{segment_a, segment_b}, lpt) < offset2;
         } else
             intersects = (0.5 * (segment_a + segment_b) - lpt).squaredNorm() < offset2;
         if (intersects) {
-            out_interval.first = 0.;
+            out_interval.first  = 0.;
             out_interval.second = sqrt(lv);
         }
-    }
-    else
-    {
+    } else {
         // Output interval.
-        double tmin = std::numeric_limits<double>::max();
-        double tmax = -tmin;
-        auto extend_interval = [&tmin, &tmax](double atmin, double atmax) {
+        double tmin            = std::numeric_limits<double>::max();
+        double tmax            = -tmin;
+        auto   extend_interval = [&tmin, &tmax](double atmin, double atmax) {
             tmin = std::min(tmin, atmin);
             tmax = std::max(tmax, atmax);
         };
 
         // Intersections with the inflated segment end points.
-        auto ray_circle_intersection_interval_extend = [&extend_interval](const Vec2d &segment_pt, const double offset2, const Vec2d &line_pt, const Vec2d &line_vec) {
+        auto ray_circle_intersection_interval_extend = [&extend_interval](const Vec2d& segment_pt, const double offset2,
+                                                                          const Vec2d& line_pt, const Vec2d& line_vec) {
             std::pair<Vec2d, Vec2d> pts;
-            Vec2d  p0 = line_pt - segment_pt;
-            double lv2 = line_vec.squaredNorm();
-            if (Geometry::ray_circle_intersections_r2_lv2_c(offset2, line_vec.y(), - line_vec.x(), lv2, - line_vec.y() * p0.x() + line_vec.x() * p0.y(), pts)) {
-                double tmin = (pts.first  - p0).dot(line_vec) / lv2;
+            Vec2d                   p0  = line_pt - segment_pt;
+            double                  lv2 = line_vec.squaredNorm();
+            if (Geometry::ray_circle_intersections_r2_lv2_c(offset2, line_vec.y(), -line_vec.x(), lv2,
+                                                            -line_vec.y() * p0.x() + line_vec.x() * p0.y(), pts)) {
+                double tmin = (pts.first - p0).dot(line_vec) / lv2;
                 double tmax = (pts.second - p0).dot(line_vec) / lv2;
                 if (tmin > tmax)
                     std::swap(tmin, tmax);
@@ -795,22 +974,20 @@ static inline bool line_rounded_thick_segment_collision(
             ray_circle_intersection_interval_extend(segment_b, offset2, line_a, line_v0);
             // Clip the line segment transformed into a coordinate space of the segment,
             // where the segment spans (0, 0) to (segment_l, 0).
-            const Vec2d dir_x = segment_v / segment_l;
-            const Vec2d dir_y(- dir_x.y(), dir_x.x());
-            const Vec2d line_p0(line_a - segment_a);
+            const Vec2d               dir_x = segment_v / segment_l;
+            const Vec2d               dir_y(-dir_x.y(), dir_x.x());
+            const Vec2d               line_p0(line_a - segment_a);
             std::pair<double, double> interval;
-            if (Geometry::liang_barsky_line_clipping_interval(
-                    Vec2d(line_p0.dot(dir_x), line_p0.dot(dir_y)),
-                    Vec2d(line_v0.dot(dir_x), line_v0.dot(dir_y)),
-                    BoundingBoxf(Vec2d(0., - offset), Vec2d(segment_l, offset)),
-                    interval))
+            if (Geometry::liang_barsky_line_clipping_interval(Vec2d(line_p0.dot(dir_x), line_p0.dot(dir_y)),
+                                                              Vec2d(line_v0.dot(dir_x), line_v0.dot(dir_y)),
+                                                              BoundingBoxf(Vec2d(0., -offset), Vec2d(segment_l, offset)), interval))
                 extend_interval(interval.first, interval.second);
         } else
             ray_circle_intersection_interval_extend(0.5 * (segment_a + segment_b), offset, line_a, line_v0);
 
         intersects = tmin <= tmax;
         if (intersects) {
-            lv = sqrt(lv);
+            lv                  = sqrt(lv);
             out_interval.first  = tmin * lv;
             out_interval.second = tmax * lv;
         }
@@ -840,10 +1017,15 @@ static inline bool line_rounded_thick_segment_collision(
 }
 
 #ifndef NDEBUG
-static inline bool inside_interval(double low, double high, double p)
-{
-    return p >= low && p <= high;
-}
+// [INTENT] inside_interval / interval_inside_interval / cyclic_interval_inside_interval — debug-only
+//          geometric predicates for validating that contour arc parameters are consistently trimmed
+//          in the BoundaryInfillGraph. Used exclusively in #ifndef NDEBUG / assert() contexts.
+// [STATE] Pure functions; no side effects.
+// [HAZARD] cyclic_interval_inside_interval modifies both inner and outer high values by adding `length`
+//          to handle wrap-around at the contour seam. If length is 0 (degenerate contour), both bounds
+//          become equal and all intervals falsely compare as inside. Protected by assert(contour.size()>=3)
+//          upstream, but the function itself has no guard.
+static inline bool inside_interval(double low, double high, double p) { return p >= low && p <= high; }
 
 static inline bool interval_inside_interval(double outer_low, double outer_high, double inner_low, double inner_high, double epsilon)
 {
@@ -866,26 +1048,34 @@ static inline bool cyclic_interval_inside_interval(double outer_low, double oute
 }
 #endif // NDEBUG
 
+// [INTENT] export_infill_to_svg() — debug visualization: writes a .svg file showing the boundary contours,
+//          trimming state of each arc segment (trimmed=blue, untrimmed=yellow), and infill lines.
+//          Activated only when INFILL_DEBUG_OUTPUT is #defined at compile time.
+// [HAZARD] This function opens a new .svg file on every call. If called inside a tight loop (e.g., per
+//          infill line), it produces thousands of files per slice. Never enable in production builds.
+// [STATE] Uses a static iRun counter incremented at each call site to version file names.
+//          Not thread-safe if connect_infill() is ever called from multiple threads simultaneously.
+// [COUPLING] Depends on Slic3r::SVG, union_ex(), and the ContourIntersectionPoint linked-list structure.
 #ifdef INFILL_DEBUG_OUTPUT
 static void export_infill_to_svg(
     // Boundary contour, along which the perimeter extrusions will be drawn.
-    const std::vector<Points>                              &boundary,
+    const std::vector<Points>& boundary,
     // Parametrization of boundary with Euclidian length.
-    const std::vector<std::vector<double>>                 &boundary_parameters,
+    const std::vector<std::vector<double>>& boundary_parameters,
     // Intersections (T-joints) of the infill lines with the boundary.
-    std::vector<std::vector<ContourIntersectionPoint*>>    &boundary_intersections,
+    std::vector<std::vector<ContourIntersectionPoint*>>& boundary_intersections,
     // Infill lines, either completely inside the boundary, or touching the boundary.
-    const Polylines                                        &infill,
-    const coord_t                                           scaled_spacing,
-    const std::string                                      &path,
-    const Polylines                                        &overlap_lines = Polylines(),
-    const Polylines                                        &polylines = Polylines(),
-    const Points                                           &pts = Points())
+    const Polylines&   infill,
+    const coord_t      scaled_spacing,
+    const std::string& path,
+    const Polylines&   overlap_lines = Polylines(),
+    const Polylines&   polylines     = Polylines(),
+    const Points&      pts           = Points())
 {
-    Polygons    polygons;
-    std::transform(boundary.begin(), boundary.end(), std::back_inserter(polygons), [](auto &pts) { return Polygon(pts); });
+    Polygons polygons;
+    std::transform(boundary.begin(), boundary.end(), std::back_inserter(polygons), [](auto& pts) { return Polygon(pts); });
     ExPolygons  expolygons = union_ex(polygons);
-    BoundingBox bbox = get_extents(polygons);
+    BoundingBox bbox       = get_extents(polygons);
     bbox.offset(scale_(3.));
 
     ::Slic3r::SVG svg(path, bbox);
@@ -897,18 +1087,19 @@ static void export_infill_to_svg(
     const std::string color_boundary_not_trimmed = "yellow";
     const coordf_t    boundary_line_width        = scaled_spacing;
     svg.draw_outline(polygons, "red", boundary_line_width);
-    for (const std::vector<ContourIntersectionPoint*> &intersections : boundary_intersections) {
-        const size_t                 boundary_idx  = &intersections - boundary_intersections.data();
-        const Points                &contour       = boundary[boundary_idx];
-        const std::vector<double>   &contour_param = boundary_parameters[boundary_idx];
-        for (const ContourIntersectionPoint *ip : intersections) {
+    for (const std::vector<ContourIntersectionPoint*>& intersections : boundary_intersections) {
+        const size_t               boundary_idx  = &intersections - boundary_intersections.data();
+        const Points&              contour       = boundary[boundary_idx];
+        const std::vector<double>& contour_param = boundary_parameters[boundary_idx];
+        for (const ContourIntersectionPoint* ip : intersections) {
             assert(ip->next_trimmed == ip->next_on_contour->prev_trimmed);
             assert(ip->prev_trimmed == ip->prev_on_contour->next_trimmed);
             {
-                Polyline pl { contour[ip->point_idx] };
+                Polyline pl{contour[ip->point_idx]};
                 if (ip->next_trimmed) {
                     if (ip->contour_not_taken_length_next > SCALED_EPSILON) {
-                        take_ccw_limited(pl, contour, contour_param, ip->point_idx, ip->next_on_contour->point_idx, ip->contour_not_taken_length_next);
+                        take_ccw_limited(pl, contour, contour_param, ip->point_idx, ip->next_on_contour->point_idx,
+                                         ip->contour_not_taken_length_next);
                         svg.draw(pl, color_boundary_trimmed, boundary_line_width);
                     }
                 } else {
@@ -917,10 +1108,11 @@ static void export_infill_to_svg(
                 }
             }
             {
-                Polyline pl { contour[ip->point_idx] };
+                Polyline pl{contour[ip->point_idx]};
                 if (ip->prev_trimmed) {
                     if (ip->contour_not_taken_length_prev > SCALED_EPSILON) {
-                        take_cw_limited(pl, contour, contour_param, ip->point_idx, ip->prev_on_contour->point_idx, ip->contour_not_taken_length_prev);
+                        take_cw_limited(pl, contour, contour_param, ip->point_idx, ip->prev_on_contour->point_idx,
+                                        ip->contour_not_taken_length_prev);
                         svg.draw(pl, color_boundary_trimmed, boundary_line_width);
                     }
                 } else {
@@ -938,23 +1130,23 @@ static void export_infill_to_svg(
     svg.draw(infill, "brown");
     static constexpr double trim_length = scale_(0.15);
     for (Polyline polyline : infill)
-        if (! polyline.empty()) {
+        if (!polyline.empty()) {
             Vec2d a = polyline.points.front().cast<double>();
             Vec2d d = polyline.points.back().cast<double>();
             if (polyline.size() == 2) {
-                Vec2d v = d - a;
+                Vec2d  v = d - a;
                 double l = v.norm();
                 if (l > 2. * trim_length) {
                     a += v * trim_length / l;
                     d -= v * trim_length / l;
                     polyline.points.front() = a.cast<coord_t>();
-                    polyline.points.back() = d.cast<coord_t>();
+                    polyline.points.back()  = d.cast<coord_t>();
                 } else
                     polyline.points.clear();
             } else if (polyline.size() > 2) {
-                Vec2d b = polyline.points[1].cast<double>();
-                Vec2d c = polyline.points[polyline.points.size() - 2].cast<double>();
-                Vec2d v = b - a;
+                Vec2d  b = polyline.points[1].cast<double>();
+                Vec2d  c = polyline.points[polyline.points.size() - 2].cast<double>();
+                Vec2d  v = b - a;
                 double l = v.norm();
                 if (l > trim_length) {
                     a += v * trim_length / l;
@@ -977,8 +1169,14 @@ static void export_infill_to_svg(
 }
 #endif // INFILL_DEBUG_OUTPUT
 
+// [INTENT] validate_boundary_intersections() — debug assertion helper. Verifies the circular
+//          doubly-linked list of ContourIntersectionPoints is self-consistent: each node's
+//          next_trimmed == next_on_contour->prev_trimmed and vice versa. Used only in assert().
+// [STATE] Pure read; returns true if valid, false otherwise (only reached in debug builds).
+// [HAZARD] If any pointer in the linked list is null or dangling, this function will crash.
+//          The crash is acceptable in debug; production builds skip this via #ifndef NDEBUG.
 #ifndef NDEBUG
-bool validate_boundary_intersections(const std::vector<std::vector<ContourIntersectionPoint*>> &boundary_intersections)
+bool validate_boundary_intersections(const std::vector<std::vector<ContourIntersectionPoint*>>& boundary_intersections)
 {
     for (const std::vector<ContourIntersectionPoint*>& contour : boundary_intersections) {
         for (ContourIntersectionPoint* ip : contour) {
@@ -990,91 +1188,128 @@ bool validate_boundary_intersections(const std::vector<std::vector<ContourInters
 }
 #endif // NDEBUG
 
+// [INTENT] mark_boundary_segments_touching_infill() — marks boundary arcs as "consumed/trimmed" when
+//          they spatially overlap with existing infill lines. This prevents the connect_infill() connector
+//          from walking along perimeter arcs that are already covered by infill, avoiding double-printing.
+//
+//          Algorithm:
+//          1. Build an EdgeGrid from the boundary contours.
+//          2. For each infill line, clip the line by `clip_distance` at both ends (to skip the anchored
+//             endpoint region which is already correctly handled).
+//          3. For each clipped infill segment, query the EdgeGrid using a thick-segment visitor.
+//          4. For each boundary edge that the thick segment overlaps: mark the arc between the flanking
+//             ContourIntersectionPoints as trimmed and update contour_not_taken_length_prev/next.
+//
+// [STATE] Mutates boundary_intersections[*][*]->next_trimmed / prev_trimmed / contour_not_taken_length_*
+//         for every boundary arc that overlaps an infill line. These flags control which arcs
+//         connect_infill() may use for perimeter walking.
+// [COUPLING] Requires a pre-built EdgeGrid from boundary. The Visitor inner class captures
+//            boundary_intersections by reference — must not outlive the outer call.
+// [HAZARD] The Visitor's `operator()` is called by EdgeGrid during a traversal that may visit the same
+//          boundary edge multiple times (from different infill lines). trim operations are idempotent
+//          (min/max updates), so repeated visits are safe.
+// [HAZARD] clip_distance is in scaled coordinates; passing mm values directly would silently skip
+//          all clipping, leaving the full infill line as a potential trimmer (too aggressive).
 // Mark the segments of split boundary as consumed if they are very close to some of the infill line.
 void mark_boundary_segments_touching_infill(
     // Boundary contour, along which the perimeter extrusions will be drawn.
-	const std::vector<Points>                              &boundary,
+    const std::vector<Points>& boundary,
     // Parametrization of boundary with Euclidian length.
-	const std::vector<std::vector<double>>                 &boundary_parameters,
+    const std::vector<std::vector<double>>& boundary_parameters,
     // Intersections (T-joints) of the infill lines with the boundary.
-    std::vector<std::vector<ContourIntersectionPoint*>>    &boundary_intersections,
+    std::vector<std::vector<ContourIntersectionPoint*>>& boundary_intersections,
     // Bounding box around the boundary.
-	const BoundingBox 		                               &boundary_bbox,
+    const BoundingBox& boundary_bbox,
     // Infill lines, either completely inside the boundary, or touching the boundary.
-	const Polylines 		                               &infill,
+    const Polylines& infill,
     // How much of the infill ends should be ignored when marking the boundary segments?
-	const double			                                clip_distance,
+    const double clip_distance,
     // Roughly width of the infill line.
-	const double 				                            distance_colliding)
+    const double distance_colliding)
 {
     assert(boundary.size() == boundary_parameters.size());
 #ifndef NDEBUG
-    for (size_t i = 0; i < boundary.size(); ++ i)
+    for (size_t i = 0; i < boundary.size(); ++i)
         assert(boundary[i].size() + 1 == boundary_parameters[i].size());
     assert(validate_boundary_intersections(boundary_intersections));
 #endif
 
 #ifdef INFILL_DEBUG_OUTPUT
     static int iRun = 0;
-    ++ iRun;
+    ++iRun;
     int iStep = 0;
-    export_infill_to_svg(boundary, boundary_parameters, boundary_intersections, infill, distance_colliding * 2, debug_out_path("%s-%03d.svg", "FillBase-mark_boundary_segments_touching_infill-start", iRun));
+    export_infill_to_svg(boundary, boundary_parameters, boundary_intersections, infill, distance_colliding * 2,
+                         debug_out_path("%s-%03d.svg", "FillBase-mark_boundary_segments_touching_infill-start", iRun));
     Polylines perimeter_overlaps;
 #endif // INFILL_DEBUG_OUTPUT
 
-	EdgeGrid::Grid grid;
+    EdgeGrid::Grid grid;
     // Make sure that the the grid is big enough for queries against the thick segment.
-	grid.set_bbox(boundary_bbox.inflated(distance_colliding * 1.43));
-	// Inflate the bounding box by a thick line width.
-	grid.create(boundary, coord_t(std::max(clip_distance, distance_colliding) + scale_(10.)));
+    grid.set_bbox(boundary_bbox.inflated(distance_colliding * 1.43));
+    // Inflate the bounding box by a thick line width.
+    grid.create(boundary, coord_t(std::max(clip_distance, distance_colliding) + scale_(10.)));
 
     // Visitor for the EdgeGrid to trim boundary_intersections with existing infill lines.
-	struct Visitor {
-		Visitor(const EdgeGrid::Grid &grid,
-                const std::vector<Points> &boundary, const std::vector<std::vector<double>> &boundary_parameters, std::vector<std::vector<ContourIntersectionPoint*>> &boundary_intersections,
-                const double radius) :
-			grid(grid), boundary(boundary), boundary_parameters(boundary_parameters), boundary_intersections(boundary_intersections), radius(radius), trim_l_threshold(0.5 * radius) {}
+    struct Visitor
+    {
+        Visitor(const EdgeGrid::Grid&                                grid,
+                const std::vector<Points>&                           boundary,
+                const std::vector<std::vector<double>>&              boundary_parameters,
+                std::vector<std::vector<ContourIntersectionPoint*>>& boundary_intersections,
+                const double                                         radius)
+            : grid(grid)
+            , boundary(boundary)
+            , boundary_parameters(boundary_parameters)
+            , boundary_intersections(boundary_intersections)
+            , radius(radius)
+            , trim_l_threshold(0.5 * radius)
+        {}
 
         // Init with a segment of an infill line.
-		void init(const Vec2d &infill_pt1, const Vec2d &infill_pt2) {
-			this->infill_pt1 = &infill_pt1;
-			this->infill_pt2 = &infill_pt2;
+        void init(const Vec2d& infill_pt1, const Vec2d& infill_pt2)
+        {
+            this->infill_pt1 = &infill_pt1;
+            this->infill_pt2 = &infill_pt2;
             this->infill_bbox.reset();
             this->infill_bbox.merge(infill_pt1);
             this->infill_bbox.merge(infill_pt2);
             this->infill_bbox.offset(this->radius + SCALED_EPSILON);
         }
 
-		bool operator()(coord_t iy, coord_t ix) {
-			// Called with a row and colum of the grid cell, which is intersected by a line.
-			auto cell_data_range = this->grid.cell_data_range(iy, ix);
-			for (auto it_contour_and_segment = cell_data_range.first; it_contour_and_segment != cell_data_range.second; ++ it_contour_and_segment) {
-				// End points of the line segment and their vector.
-				auto segment = this->grid.segment(*it_contour_and_segment);
-                std::vector<ContourIntersectionPoint*> &intersections = boundary_intersections[it_contour_and_segment->first];
+        bool operator()(coord_t iy, coord_t ix)
+        {
+            // Called with a row and colum of the grid cell, which is intersected by a line.
+            auto cell_data_range = this->grid.cell_data_range(iy, ix);
+            for (auto it_contour_and_segment = cell_data_range.first; it_contour_and_segment != cell_data_range.second;
+                 ++it_contour_and_segment) {
+                // End points of the line segment and their vector.
+                auto                                    segment       = this->grid.segment(*it_contour_and_segment);
+                std::vector<ContourIntersectionPoint*>& intersections = boundary_intersections[it_contour_and_segment->first];
                 if (intersections.empty())
                     // There is no infil line touching this contour, thus effort will be saved to calculate overlap with other infill lines.
                     continue;
-				const Vec2d seg_pt1 = segment.first.cast<double>();
-				const Vec2d seg_pt2 = segment.second.cast<double>();
+                const Vec2d               seg_pt1 = segment.first.cast<double>();
+                const Vec2d               seg_pt2 = segment.second.cast<double>();
                 std::pair<double, double> interval;
-                BoundingBoxf bbox_seg;
+                BoundingBoxf              bbox_seg;
                 bbox_seg.merge(seg_pt1);
                 bbox_seg.merge(seg_pt2);
 #ifdef INFILL_DEBUG_OUTPUT
-                //if (this->infill_bbox.overlap(bbox_seg)) this->perimeter_overlaps.push_back({ segment.first, segment.second });
+                // if (this->infill_bbox.overlap(bbox_seg)) this->perimeter_overlaps.push_back({ segment.first, segment.second });
 #endif // INFILL_DEBUG_OUTPUT
-                if (this->infill_bbox.overlap(bbox_seg) && line_rounded_thick_segment_collision(seg_pt1, seg_pt2, *this->infill_pt1, *this->infill_pt2, this->radius, interval)) {
+                if (this->infill_bbox.overlap(bbox_seg) &&
+                    line_rounded_thick_segment_collision(seg_pt1, seg_pt2, *this->infill_pt1, *this->infill_pt2, this->radius, interval)) {
                     // The boundary segment intersects with the infill segment thickened by radius.
                     // Interval is specified in Euclidian length from seg_pt1 to seg_pt2.
                     // 1) Find the Euclidian parameters of seg_pt1 and seg_pt2 on its boundary contour.
-                    const std::vector<double> &contour_parameters = boundary_parameters[it_contour_and_segment->first];
-                    const double contour_length = contour_parameters.back();
-					const double param_seg_pt1  = contour_parameters[it_contour_and_segment->second];
-                    const double param_seg_pt2  = contour_parameters[it_contour_and_segment->second + 1];
+                    const std::vector<double>& contour_parameters = boundary_parameters[it_contour_and_segment->first];
+                    const double               contour_length     = contour_parameters.back();
+                    const double               param_seg_pt1      = contour_parameters[it_contour_and_segment->second];
+                    const double               param_seg_pt2      = contour_parameters[it_contour_and_segment->second + 1];
 #ifdef INFILL_DEBUG_OUTPUT
-                    this->perimeter_overlaps.push_back({ Point((seg_pt1 + (seg_pt2 - seg_pt1).normalized() * interval.first).cast<coord_t>()),
-                                                         Point((seg_pt1 + (seg_pt2 - seg_pt1).normalized() * interval.second).cast<coord_t>()) });
+                    this->perimeter_overlaps.push_back(
+                        {Point((seg_pt1 + (seg_pt2 - seg_pt1).normalized() * interval.first).cast<coord_t>()),
+                         Point((seg_pt1 + (seg_pt2 - seg_pt1).normalized() * interval.second).cast<coord_t>())});
 #endif // INFILL_DEBUG_OUTPUT
                     assert(interval.first >= 0.);
                     assert(interval.second >= 0.);
@@ -1089,36 +1324,43 @@ void mark_boundary_segments_touching_infill(
                         ip_low = ip_high = intersections.front();
                     } else {
                         assert(intersections.size() > 1);
-                        auto it_low  = Slic3r::lower_bound_by_predicate(intersections.begin(), intersections.end(), [param_overlap1](const ContourIntersectionPoint *l) { return l->param < param_overlap1; });
-                        auto it_high = Slic3r::lower_bound_by_predicate(intersections.begin(), intersections.end(), [param_overlap2](const ContourIntersectionPoint *l) { return l->param < param_overlap2; });
-                        ip_low  = it_low  == intersections.end() ? intersections.front() : *it_low;
-                        ip_high = it_high == intersections.end() ? intersections.front() : *it_high;
+                        auto it_low  = Slic3r::lower_bound_by_predicate(intersections.begin(), intersections.end(),
+                                                                        [param_overlap1](const ContourIntersectionPoint* l) {
+                                                                           return l->param < param_overlap1;
+                                                                       });
+                        auto it_high = Slic3r::lower_bound_by_predicate(intersections.begin(), intersections.end(),
+                                                                        [param_overlap2](const ContourIntersectionPoint* l) {
+                                                                            return l->param < param_overlap2;
+                                                                        });
+                        ip_low       = it_low == intersections.end() ? intersections.front() : *it_low;
+                        ip_high      = it_high == intersections.end() ? intersections.front() : *it_high;
                         if (ip_low->param != param_overlap1)
                             ip_low = ip_low->prev_on_contour;
                         assert(ip_low != ip_high);
                         // Verify that the interval (param_overlap1, param_overlap2) is inside the interval (ip_low->param, ip_high->param).
-                        assert(cyclic_interval_inside_interval(ip_low->param, ip_high->param, param_overlap1, param_overlap2, contour_length));
+                        assert(
+                            cyclic_interval_inside_interval(ip_low->param, ip_high->param, param_overlap1, param_overlap2, contour_length));
                     }
                     assert(validate_boundary_intersections(boundary_intersections));
                     // Mark all ContourIntersectionPoints between ip_low and ip_high as consumed.
                     if (ip_low->next_on_contour != ip_high)
-                        for (ContourIntersectionPoint *ip = ip_low->next_on_contour; ip != ip_high; ip = ip->next_on_contour) {
+                        for (ContourIntersectionPoint* ip = ip_low->next_on_contour; ip != ip_high; ip = ip->next_on_contour) {
                             ip->consume_prev();
                             ip->consume_next();
                         }
                     // Subtract the interval from the first and last segments.
                     double trim_l = closed_contour_distance_ccw(ip_low->param, param_overlap1, contour_length);
-                    //if (trim_l > trim_l_threshold)
-                        ip_low->trim_next(trim_l);
+                    // if (trim_l > trim_l_threshold)
+                    ip_low->trim_next(trim_l);
                     trim_l = closed_contour_distance_ccw(param_overlap2, ip_high->param, contour_length);
-                    //if (trim_l > trim_l_threshold)
-                        ip_high->trim_prev(trim_l);
+                    // if (trim_l > trim_l_threshold)
+                    ip_high->trim_prev(trim_l);
                     assert(ip_low->next_trimmed == ip_high->prev_trimmed);
                     assert(validate_boundary_intersections(boundary_intersections));
-                    //FIXME mark point as consumed?
-                    //FIXME verify the sequence between prev and next?
+                    // FIXME mark point as consumed?
+                    // FIXME verify the sequence between prev and next?
 #ifdef INFILL_DEBUG_OUTPUT
-					{
+                    {
 #if 0
                         static size_t iRun = 0;
 						ExPolygon expoly(Polygon(*grid.contours().front()));
@@ -1131,45 +1373,46 @@ void mark_boundary_segments_touching_infill(
 #endif
                     }
 #endif // INFILL_DEBUG_OUTPUT
-				}
-			}
-			// Continue traversing the grid along the edge.
-			return true;
-		}
+                }
+            }
+            // Continue traversing the grid along the edge.
+            return true;
+        }
 
-		const EdgeGrid::Grid 			   			        &grid;
-		const std::vector<Points> 					        &boundary;
-        const std::vector<std::vector<double>>              &boundary_parameters;
-        std::vector<std::vector<ContourIntersectionPoint*>> &boundary_intersections;
-		// Maximum distance between the boundary and the infill line allowed to consider the boundary not touching the infill line.
-		const double								         radius;
+        const EdgeGrid::Grid&                                grid;
+        const std::vector<Points>&                           boundary;
+        const std::vector<std::vector<double>>&              boundary_parameters;
+        std::vector<std::vector<ContourIntersectionPoint*>>& boundary_intersections;
+        // Maximum distance between the boundary and the infill line allowed to consider the boundary not touching the infill line.
+        const double radius;
         // Region around the contour / infill line intersection point, where the intersections are ignored.
-        const double                                         trim_l_threshold;
+        const double trim_l_threshold;
 
-		const Vec2d 								        *infill_pt1;
-		const Vec2d 								        *infill_pt2;
-        BoundingBoxf                                         infill_bbox;
+        const Vec2d* infill_pt1;
+        const Vec2d* infill_pt2;
+        BoundingBoxf infill_bbox;
 
 #ifdef INFILL_DEBUG_OUTPUT
-        Polylines                                            perimeter_overlaps;
+        Polylines perimeter_overlaps;
 #endif // INFILL_DEBUG_OUTPUT
-	} visitor(grid, boundary, boundary_parameters, boundary_intersections, distance_colliding);
+    } visitor(grid, boundary, boundary_parameters, boundary_intersections, distance_colliding);
 
-	for (const Polyline &polyline : infill) {
+    for (const Polyline& polyline : infill) {
 #ifdef INFILL_DEBUG_OUTPUT
-        ++ iStep;
+        ++iStep;
 #endif // INFILL_DEBUG_OUTPUT
-		// Clip the infill polyline by the Eucledian distance along the polyline.
-		SegmentPoint start_point = clip_start_segment_and_point(polyline.points, clip_distance);
-		SegmentPoint end_point   = clip_end_segment_and_point(polyline.points, clip_distance);
-		if (start_point.valid() && end_point.valid() &&
-			(start_point.idx_segment < end_point.idx_segment || (start_point.idx_segment == end_point.idx_segment && start_point.t < end_point.t))) {
-			// The clipped polyline is non-empty.
+       // Clip the infill polyline by the Eucledian distance along the polyline.
+        SegmentPoint start_point = clip_start_segment_and_point(polyline.points, clip_distance);
+        SegmentPoint end_point   = clip_end_segment_and_point(polyline.points, clip_distance);
+        if (start_point.valid() && end_point.valid() &&
+            (start_point.idx_segment < end_point.idx_segment ||
+             (start_point.idx_segment == end_point.idx_segment && start_point.t < end_point.t))) {
+            // The clipped polyline is non-empty.
 #ifdef INFILL_DEBUG_OUTPUT
             visitor.perimeter_overlaps.clear();
 #endif // INFILL_DEBUG_OUTPUT
-			for (size_t point_idx = start_point.idx_segment; point_idx <= end_point.idx_segment; ++ point_idx) {
-//FIXME extend the EdgeGrid to suport tracing a thick line.
+            for (size_t point_idx = start_point.idx_segment; point_idx <= end_point.idx_segment; ++point_idx) {
+// FIXME extend the EdgeGrid to suport tracing a thick line.
 #if 0
 				Point pt1, pt2;
 				Vec2d pt1d, pt2d;
@@ -1190,8 +1433,8 @@ void mark_boundary_segments_touching_infill(
 				visitor.init(pt1d, pt2d);
 				grid.visit_cells_intersecting_thick_line(pt1, pt2, distance_colliding, visitor);
 #else
-				Vec2d pt1 = (point_idx == start_point.idx_segment) ? start_point.point : polyline.points[point_idx    ].cast<double>();
-				Vec2d pt2 = (point_idx == end_point  .idx_segment) ? end_point  .point : polyline.points[point_idx + 1].cast<double>();
+                Vec2d pt1 = (point_idx == start_point.idx_segment) ? start_point.point : polyline.points[point_idx].cast<double>();
+                Vec2d pt2 = (point_idx == end_point.idx_segment) ? end_point.point : polyline.points[point_idx + 1].cast<double>();
 #if 0
 					{
 						static size_t iRun = 0;
@@ -1204,55 +1447,77 @@ void mark_boundary_segments_touching_infill(
 						svg.draw(Line(pt1.cast<coord_t>(), pt2.cast<coord_t>()), "magenta", scale_(0.1));
 					}
 #endif
-				visitor.init(pt1, pt2);
-				// Simulate tracing of a thick line. This only works reliably if distance_colliding <= grid cell size.
-				Vec2d v = (pt2 - pt1).normalized() * distance_colliding;
-				Vec2d vperp = perp(v);
-				Vec2d a = pt1 - v - vperp;
-				Vec2d b = pt2 + v - vperp;
+                visitor.init(pt1, pt2);
+                // Simulate tracing of a thick line. This only works reliably if distance_colliding <= grid cell size.
+                Vec2d v     = (pt2 - pt1).normalized() * distance_colliding;
+                Vec2d vperp = perp(v);
+                Vec2d a     = pt1 - v - vperp;
+                Vec2d b     = pt2 + v - vperp;
                 assert(grid.bbox().contains(a.cast<coord_t>()));
                 assert(grid.bbox().contains(b.cast<coord_t>()));
-				grid.visit_cells_intersecting_line(a.cast<coord_t>(), b.cast<coord_t>(), visitor);
-				a = pt1 - v + vperp;
-				b = pt2 + v + vperp;
+                grid.visit_cells_intersecting_line(a.cast<coord_t>(), b.cast<coord_t>(), visitor);
+                a = pt1 - v + vperp;
+                b = pt2 + v + vperp;
                 assert(grid.bbox().contains(a.cast<coord_t>()));
                 assert(grid.bbox().contains(b.cast<coord_t>()));
                 grid.visit_cells_intersecting_line(a.cast<coord_t>(), b.cast<coord_t>(), visitor);
 #endif
 #ifdef INFILL_DEBUG_OUTPUT
-//                export_infill_to_svg(boundary, boundary_parameters, boundary_intersections, infill, distance_colliding * 2, debug_out_path("%s-%03d-%03d-%03d.svg", "FillBase-mark_boundary_segments_touching_infill-step", iRun, iStep, int(point_idx)), { polyline });
+//                export_infill_to_svg(boundary, boundary_parameters, boundary_intersections, infill, distance_colliding * 2,
+//                debug_out_path("%s-%03d-%03d-%03d.svg", "FillBase-mark_boundary_segments_touching_infill-step", iRun, iStep,
+//                int(point_idx)), { polyline });
 #endif // INFILL_DEBUG_OUTPUT
-			}
+            }
 #ifdef INFILL_DEBUG_OUTPUT
             Polylines perimeter_overlaps;
-            export_infill_to_svg(boundary, boundary_parameters, boundary_intersections, infill, distance_colliding * 2, debug_out_path("%s-%03d-%03d.svg", "FillBase-mark_boundary_segments_touching_infill-step", iRun, iStep), visitor.perimeter_overlaps, { polyline });
+            export_infill_to_svg(boundary, boundary_parameters, boundary_intersections, infill, distance_colliding * 2,
+                                 debug_out_path("%s-%03d-%03d.svg", "FillBase-mark_boundary_segments_touching_infill-step", iRun, iStep),
+                                 visitor.perimeter_overlaps, {polyline});
             append(perimeter_overlaps, std::move(visitor.perimeter_overlaps));
             perimeter_overlaps.clear();
 #endif // INFILL_DEBUG_OUTPUT
         }
-	}
+    }
 
 #ifdef INFILL_DEBUG_OUTPUT
-    export_infill_to_svg(boundary, boundary_parameters, boundary_intersections, infill, distance_colliding * 2, debug_out_path("%s-%03d.svg", "FillBase-mark_boundary_segments_touching_infill-end", iRun), perimeter_overlaps);
+    export_infill_to_svg(boundary, boundary_parameters, boundary_intersections, infill, distance_colliding * 2,
+                         debug_out_path("%s-%03d.svg", "FillBase-mark_boundary_segments_touching_infill-end", iRun), perimeter_overlaps);
 #endif // INFILL_DEBUG_OUTPUT
     assert(validate_boundary_intersections(boundary_intersections));
 }
 
-void Fill::connect_infill(Polylines &&infill_ordered, const ExPolygon &boundary_src, Polylines &polylines_out, const double spacing, const FillParams &params)
+// [INTENT] connect_infill() (ExPolygon overload) — thin dispatcher: converts ExPolygon (outer contour +
+//          holes) into a vector of Polygon* and delegates to the main connect_infill() overload.
+//          ExPolygon's contour and all holes are eligible boundary segments for perimeter walking.
+// [COUPLING] Delegates to the vector<const Polygon*> overload which calls create_boundary_infill_graph().
+// [INTENT] connect_infill() (ExPolygon overload) — thin dispatcher: converts ExPolygon (outer contour +
+//          holes) into a vector of Polygon* and delegates to the main connect_infill() overload.
+//          ExPolygon's contour and all holes are eligible boundary segments for perimeter walking.
+// [COUPLING] Delegates to the vector<const Polygon*> overload which calls create_boundary_infill_graph().
+void Fill::connect_infill(
+    Polylines&& infill_ordered, const ExPolygon& boundary_src, Polylines& polylines_out, const double spacing, const FillParams& params)
 {
-	assert(! boundary_src.contour.points.empty());
+    assert(!boundary_src.contour.points.empty());
     auto polygons_src = reserve_vector<const Polygon*>(boundary_src.holes.size() + 1);
     polygons_src.emplace_back(&boundary_src.contour);
-    for (const Polygon &polygon : boundary_src.holes)
+    for (const Polygon& polygon : boundary_src.holes)
         polygons_src.emplace_back(&polygon);
 
     connect_infill(std::move(infill_ordered), polygons_src, get_extents(boundary_src.contour), polylines_out, spacing, params);
 }
 
-void Fill::connect_infill(Polylines &&infill_ordered, const Polygons &boundary_src, const BoundingBox &bbox, Polylines &polylines_out, const double spacing, const FillParams &params)
+// [INTENT] connect_infill() (Polygons overload) — thin dispatcher: converts a flat Polygons
+//          collection into vector<const Polygon*> and delegates to the main overload.
+// [COUPLING] Raw pointer aliasing of boundary_src elements — polygons must outlive the call.
+void Fill::connect_infill(Polylines&&        infill_ordered,
+                          const Polygons&    boundary_src,
+                          const BoundingBox& bbox,
+                          Polylines&         polylines_out,
+                          const double       spacing,
+                          const FillParams&  params)
 {
     auto polygons_src = reserve_vector<const Polygon*>(boundary_src.size());
-    for (const Polygon &polygon : boundary_src)
+    for (const Polygon& polygon : boundary_src)
         polygons_src.emplace_back(&polygon);
 
     connect_infill(std::move(infill_ordered), polygons_src, bbox, polylines_out, spacing, params);
@@ -1260,30 +1525,53 @@ void Fill::connect_infill(Polylines &&infill_ordered, const Polygons &boundary_s
 
 static constexpr auto boundary_idx_unconnected = std::numeric_limits<size_t>::max();
 
+// [INTENT] BoundaryInfillGraph — central data structure for connect_infill() / connect_base_support().
+//          Holds the modified boundary contours (with infill T-joint points inserted), their arc-length
+//          parametrizations, and the array of ContourIntersectionPoint nodes — one pair per infill line
+//          (first=start, second=end), linked into per-contour circular doubly-linked lists.
+//
+//          Helpers provide:
+//          - point() / infill_end_point()  — dereference a ContourIntersectionPoint to its coordinate
+//          - interpolate_contour_point()   — lerp along a contour segment at a given arc parameter
+//          - Direction enum + dir()/dir_prev()/dir_next() — classify arc direction (Left/Right/Up/Down)
+//          - first() / other()             — determine which endpoint of an infill line a cp belongs to
+//
+// [MEMORY] Owns `boundary` (Points vectors), `boundary_params`, and `map_infill_end_point_to_boundary`.
+//          All ContourIntersectionPoint* in the linked lists point INTO map_infill_end_point_to_boundary
+//          — they are NOT separately heap-allocated. The graph must not be moved/resized after the
+//          linked-list pointers are set up inside create_boundary_infill_graph().
+// [HAZARD] Moving or reallocating map_infill_end_point_to_boundary after linked-list construction
+//          invalidates all prev_on_contour / next_on_contour pointers → dangling pointer UB.
+// [COUPLING] Used by create_boundary_infill_graph(), mark_boundary_segments_overlapping_infill(),
+//            base_support_extend_infill_lines(), evaluate_support_arches(), connect_infill(),
+//            connect_base_support(), emit_loops_in_band().
 struct BoundaryInfillGraph
 {
-    std::vector<Points>                     boundary;
-    std::vector<std::vector<double>>        boundary_params;
-    std::vector<ContourIntersectionPoint>   map_infill_end_point_to_boundary;
+    std::vector<Points>                   boundary;
+    std::vector<std::vector<double>>      boundary_params;
+    std::vector<ContourIntersectionPoint> map_infill_end_point_to_boundary;
 
-    const Point&    point(const ContourIntersectionPoint &cp) const {
+    const Point& point(const ContourIntersectionPoint& cp) const
+    {
         assert(cp.contour_idx != size_t(-1));
         assert(cp.point_idx != size_t(-1));
         return this->boundary[cp.contour_idx][cp.point_idx];
     }
 
-    const Point&    infill_end_point(size_t infill_end_point_idx) const {
+    const Point& infill_end_point(size_t infill_end_point_idx) const
+    {
         return this->point(this->map_infill_end_point_to_boundary[infill_end_point_idx]);
     }
 
-    const Point     interpolate_contour_point(const ContourIntersectionPoint &cp, double param) {
-        const Points                &contour        = this->boundary[cp.contour_idx];
-        const std::vector<double>   &contour_params = this->boundary_params[cp.contour_idx];
+    const Point interpolate_contour_point(const ContourIntersectionPoint& cp, double param)
+    {
+        const Points&              contour        = this->boundary[cp.contour_idx];
+        const std::vector<double>& contour_params = this->boundary_params[cp.contour_idx];
         // Find the start of a contour segment with param.
         auto it = std::lower_bound(contour_params.begin(), contour_params.end(), param);
         if (*it != param) {
             assert(it != contour_params.begin());
-            -- it;
+            --it;
         }
         size_t i = it - contour_params.begin();
         if (i == contour.size())
@@ -1301,70 +1589,72 @@ struct BoundaryInfillGraph
         Taken,
     };
 
-    static Direction dir(const Point &p1, const Point &p2) {
-        return p1.x() == p2.x() ?
-            (p1.y() < p2.y() ? Up : Down) :
-            (p1.x() < p2.x() ? Right : Left);
+    static Direction dir(const Point& p1, const Point& p2)
+    {
+        return p1.x() == p2.x() ? (p1.y() < p2.y() ? Up : Down) : (p1.x() < p2.x() ? Right : Left);
     }
 
-    const Direction dir_prev(const ContourIntersectionPoint &cp) const {
+    const Direction dir_prev(const ContourIntersectionPoint& cp) const
+    {
         assert(cp.prev_on_contour);
-        return cp.could_take_prev() ?
-            dir(this->point(cp), this->point(*cp.prev_on_contour)) :
-            Taken;
+        return cp.could_take_prev() ? dir(this->point(cp), this->point(*cp.prev_on_contour)) : Taken;
     }
 
-    const Direction dir_next(const ContourIntersectionPoint &cp) const {
+    const Direction dir_next(const ContourIntersectionPoint& cp) const
+    {
         assert(cp.next_on_contour);
-        return cp.could_take_next() ?
-            dir(this->point(cp), this->point(*cp.next_on_contour)) :
-            Taken;
+        return cp.could_take_next() ? dir(this->point(cp), this->point(*cp.next_on_contour)) : Taken;
     }
 
-    bool            first(const ContourIntersectionPoint &cp) const {
-        return ((&cp - this->map_infill_end_point_to_boundary.data()) & 1) == 0;
-    }
+    bool first(const ContourIntersectionPoint& cp) const { return ((&cp - this->map_infill_end_point_to_boundary.data()) & 1) == 0; }
 
-    const ContourIntersectionPoint& other(const ContourIntersectionPoint &cp) const {
+    const ContourIntersectionPoint& other(const ContourIntersectionPoint& cp) const
+    {
         return this->map_infill_end_point_to_boundary[((&cp - this->map_infill_end_point_to_boundary.data()) ^ 1)];
     }
 
-    ContourIntersectionPoint& other(const ContourIntersectionPoint &cp) {
+    ContourIntersectionPoint& other(const ContourIntersectionPoint& cp)
+    {
         return this->map_infill_end_point_to_boundary[((&cp - this->map_infill_end_point_to_boundary.data()) ^ 1)];
     }
 
-    bool            prev_vertical(const ContourIntersectionPoint &cp) const {
-        return this->point(cp).x() == this->point(*cp.prev_on_contour).x();
-    }
+    bool prev_vertical(const ContourIntersectionPoint& cp) const { return this->point(cp).x() == this->point(*cp.prev_on_contour).x(); }
 
-    bool            next_vertical(const ContourIntersectionPoint &cp) const {
-        return this->point(cp).x() == this->point(*cp.next_on_contour).x();
-    }
-
+    bool next_vertical(const ContourIntersectionPoint& cp) const { return this->point(cp).x() == this->point(*cp.next_on_contour).x(); }
 };
 
-
-// After mark_boundary_segments_touching_infill() marks boundary segments overlapping trimmed infill lines,
-// there are possibly some very short boundary segments unmarked, but overlapping the untrimmed infill lines fully
-// Mark those short boundary segments.
+// [INTENT] mark_boundary_segments_overlapping_infill() — second-pass boundary trimmer.
+//          After mark_boundary_segments_touching_infill() handles the trimmed ends of infill lines,
+//          there can remain very short boundary arcs between two ConsortiumIntersectionPoints that
+//          fully overlap an *untrimmed* infill line without being caught by the first pass.
+//          This function walks each cp's next/prev arc and checks whether every point on the arc is
+//          within `0.5*(spacing + ε)` of the infill line; if so it marks the arc as consumed (trim to 0).
+//
+// [STATE] Mutates graph.map_infill_end_point_to_boundary[*].next_trimmed / prev_trimmed /
+//         contour_not_taken_length_* via cp.trim_next() / cp.trim_prev().
+// [COUPLING] Requires BoundaryInfillGraph fully constructed (create_boundary_infill_graph() called).
+//            Assumes each infill polyline has exactly 2 points (assert infill_polyline.size() == 2).
+// [HAZARD] The assert(infill_polyline.size() == 2) only fires in debug builds. If called with
+//          multi-segment polylines (from non-rectilinear fills), it will silently use only the
+//          first/last point of the line as the Linef, potentially leaving arcs unmarked.
 static inline void mark_boundary_segments_overlapping_infill(
-    BoundaryInfillGraph                                    &graph,
+    BoundaryInfillGraph& graph,
     // Infill lines, either completely inside the boundary, or touching the boundary.
-    const Polylines                                        &infill,
+    const Polylines& infill,
     // Spacing (width) of the infill lines.
-    const double                                            spacing)
+    const double spacing)
 {
-    for (ContourIntersectionPoint &cp : graph.map_infill_end_point_to_boundary) {
-        const Points                &contour         = graph.boundary[cp.contour_idx];
-        const std::vector<double>   &contour_params  = graph.boundary_params[cp.contour_idx];
-        const Polyline              &infill_polyline = infill[(&cp - graph.map_infill_end_point_to_boundary.data()) / 2];
-        const double                 radius          = 0.5 * (spacing + SCALED_EPSILON);
+    for (ContourIntersectionPoint& cp : graph.map_infill_end_point_to_boundary) {
+        const Points&              contour         = graph.boundary[cp.contour_idx];
+        const std::vector<double>& contour_params  = graph.boundary_params[cp.contour_idx];
+        const Polyline&            infill_polyline = infill[(&cp - graph.map_infill_end_point_to_boundary.data()) / 2];
+        const double               radius          = 0.5 * (spacing + SCALED_EPSILON);
         assert(infill_polyline.size() == 2);
-        const Linef                  infill_line { infill_polyline.points.front().cast<double>(), infill_polyline.points.back().cast<double>() };
+        const Linef infill_line{infill_polyline.points.front().cast<double>(), infill_polyline.points.back().cast<double>()};
         if (cp.could_take_next()) {
             bool inside = true;
-            for (size_t i = cp.point_idx; i != cp.next_on_contour->point_idx; ) {
-                size_t j = next_idx_modulo(i, contour);
+            for (size_t i = cp.point_idx; i != cp.next_on_contour->point_idx;) {
+                size_t      j       = next_idx_modulo(i, contour);
                 const Vec2d seg_pt2 = contour[j].cast<double>();
                 if (line_alg::distance_to_squared(infill_line, seg_pt2) < radius * radius) {
                     // The segment is completely inside.
@@ -1372,7 +1662,8 @@ static inline void mark_boundary_segments_overlapping_infill(
                     std::pair<double, double> interval;
                     line_rounded_thick_segment_collision(contour[i].cast<double>(), seg_pt2, infill_line.a, infill_line.b, radius, interval);
                     assert(interval.first == 0.);
-                    double len_out = closed_contour_distance_ccw(contour_params[cp.point_idx], contour_params[i], contour_params.back()) + interval.second;
+                    double len_out = closed_contour_distance_ccw(contour_params[cp.point_idx], contour_params[i], contour_params.back()) +
+                                     interval.second;
                     if (len_out < cp.contour_not_taken_length_next) {
                         // Leaving the infill line region before exiting cp.contour_not_taken_length_next,
                         // thus at least some of the contour is outside and we will extrude this segment.
@@ -1380,12 +1671,13 @@ static inline void mark_boundary_segments_overlapping_infill(
                         break;
                     }
                 }
-                if (closed_contour_distance_ccw(contour_params[cp.point_idx], contour_params[j], contour_params.back()) >= cp.contour_not_taken_length_next)
+                if (closed_contour_distance_ccw(contour_params[cp.point_idx], contour_params[j], contour_params.back()) >=
+                    cp.contour_not_taken_length_next)
                     break;
                 i = j;
             }
             if (inside) {
-                if (! cp.next_trimmed)
+                if (!cp.next_trimmed)
                     // The arc from cp to cp.next_on_contour was not trimmed yet, however it is completely overlapping the infill line.
                     cp.next_on_contour->trim_prev(0);
                 cp.trim_next(0);
@@ -1394,8 +1686,8 @@ static inline void mark_boundary_segments_overlapping_infill(
             cp.trim_next(0);
         if (cp.could_take_prev()) {
             bool inside = true;
-            for (size_t i = cp.point_idx; i != cp.prev_on_contour->point_idx; ) {
-                size_t j = prev_idx_modulo(i, contour);
+            for (size_t i = cp.point_idx; i != cp.prev_on_contour->point_idx;) {
+                size_t      j       = prev_idx_modulo(i, contour);
                 const Vec2d seg_pt2 = contour[j].cast<double>();
                 // Distance of the second segment line from the infill line.
                 if (line_alg::distance_to_squared(infill_line, seg_pt2) < radius * radius) {
@@ -1404,7 +1696,8 @@ static inline void mark_boundary_segments_overlapping_infill(
                     std::pair<double, double> interval;
                     line_rounded_thick_segment_collision(contour[i].cast<double>(), seg_pt2, infill_line.a, infill_line.b, radius, interval);
                     assert(interval.first == 0.);
-                    double len_out = closed_contour_distance_cw(contour_params[cp.point_idx], contour_params[i], contour_params.back()) + interval.second;
+                    double len_out = closed_contour_distance_cw(contour_params[cp.point_idx], contour_params[i], contour_params.back()) +
+                                     interval.second;
                     if (len_out < cp.contour_not_taken_length_prev) {
                         // Leaving the infill line region before exiting cp.contour_not_taken_length_next,
                         // thus at least some of the contour is outside and we will extrude this segment.
@@ -1412,12 +1705,13 @@ static inline void mark_boundary_segments_overlapping_infill(
                         break;
                     }
                 }
-                if (closed_contour_distance_cw(contour_params[cp.point_idx], contour_params[j], contour_params.back()) >= cp.contour_not_taken_length_prev)
+                if (closed_contour_distance_cw(contour_params[cp.point_idx], contour_params[j], contour_params.back()) >=
+                    cp.contour_not_taken_length_prev)
                     break;
                 i = j;
             }
             if (inside) {
-                if (! cp.prev_trimmed)
+                if (!cp.prev_trimmed)
                     // The arc from cp to cp.prev_on_contour was not trimmed yet, however it is completely overlapping the infill line.
                     cp.prev_on_contour->trim_next(0);
                 cp.trim_prev(0);
@@ -1427,12 +1721,37 @@ static inline void mark_boundary_segments_overlapping_infill(
     }
 }
 
-BoundaryInfillGraph create_boundary_infill_graph(const Polylines &infill_ordered, const std::vector<const Polygon*> &boundary_src, const BoundingBox &bbox, const double spacing)
+// [INTENT] create_boundary_infill_graph() — constructs a BoundaryInfillGraph by:
+//   1. Building an EdgeGrid from boundary_src.
+//   2. For each infill polyline endpoint, snapping it to the nearest boundary edge using
+//      EdgeGrid::Grid::closest_point_signed_distance() and sorting results CCW per contour.
+//   3. For each boundary contour, interleaving the original polygon vertices with the snapped
+//      T-joint points (inserting them into contour_dst at the correct position).
+//   4. Building the circular doubly-linked list of ContourIntersectionPoints along each contour.
+//   5. Parametrizing the resulting boundary (arc-length from contour start).
+//   6. Calling mark_boundary_segments_touching_infill() to pre-trim arcs overlapping infill ends.
+//
+// [STATE] Returns a freshly-heap-allocated BoundaryInfillGraph. All internal linked-list
+//         pointers are stable because the graph is returned by value and the vector is not
+//         resized thereafter.
+// [MEMORY] Returns by value (NRVO expected). Internal map_infill_end_point_to_boundary is
+//          reserved up-front to prevent reallocation after pointer setup.
+// [COUPLING] Calls mark_boundary_segments_touching_infill() internally. Clip / collision
+//            distances are hard-coded as 1.7× and 0.8× scaled spacing.
+// [HAZARD] The assert(cp.distance <= 3.) at line ~1686 fires only in debug. In release,
+//          if an infill endpoint is >3 scaled units from the boundary (snapping failure),
+//          it is silently assigned contour_idx = boundary_idx_unconnected, and connect_infill()
+//          skips it. This can leave dangling open polylines.
+BoundaryInfillGraph create_boundary_infill_graph(const Polylines&                   infill_ordered,
+                                                 const std::vector<const Polygon*>& boundary_src,
+                                                 const BoundingBox&                 bbox,
+                                                 const double                       spacing)
 {
     BoundaryInfillGraph out;
     out.boundary.assign(boundary_src.size(), Points());
     out.boundary_params.assign(boundary_src.size(), std::vector<double>());
-    out.map_infill_end_point_to_boundary.assign(infill_ordered.size() * 2, ContourIntersectionPoint{ boundary_idx_unconnected, boundary_idx_unconnected });
+    out.map_infill_end_point_to_boundary.assign(infill_ordered.size() * 2,
+                                                ContourIntersectionPoint{boundary_idx_unconnected, boundary_idx_unconnected});
     {
         // Project the infill_ordered end points onto boundary_src.
         std::vector<std::pair<EdgeGrid::Grid::ClosestPointResult, size_t>> intersection_points;
@@ -1441,8 +1760,8 @@ BoundaryInfillGraph create_boundary_infill_graph(const Polylines &infill_ordered
             grid.set_bbox(bbox.inflated(SCALED_EPSILON));
             grid.create(boundary_src, coord_t(scale_(10.)));
             intersection_points.reserve(infill_ordered.size() * 2);
-            for (const Polyline &pl : infill_ordered)
-                for (const Point *pt : { &pl.points.front(), &pl.points.back() }) {
+            for (const Polyline& pl : infill_ordered)
+                for (const Point* pt : {&pl.points.front(), &pl.points.back()}) {
                     EdgeGrid::Grid::ClosestPointResult cp = grid.closest_point_signed_distance(*pt, coord_t(SCALED_EPSILON));
                     if (cp.valid()) {
                         // The infill end point shall lie on the contour.
@@ -1450,57 +1769,61 @@ BoundaryInfillGraph create_boundary_infill_graph(const Polylines &infill_ordered
                         intersection_points.emplace_back(cp, (&pl - infill_ordered.data()) * 2 + (pt == &pl.points.front() ? 0 : 1));
                     }
                 }
-            std::sort(intersection_points.begin(), intersection_points.end(), [](const std::pair<EdgeGrid::Grid::ClosestPointResult, size_t> &cp1, const std::pair<EdgeGrid::Grid::ClosestPointResult, size_t> &cp2) {
-                return   cp1.first.contour_idx < cp2.first.contour_idx ||
-                        (cp1.first.contour_idx == cp2.first.contour_idx &&
-                            (cp1.first.start_point_idx < cp2.first.start_point_idx ||
-                                (cp1.first.start_point_idx == cp2.first.start_point_idx && cp1.first.t < cp2.first.t)));
-            });
+            std::sort(intersection_points.begin(), intersection_points.end(),
+                      [](const std::pair<EdgeGrid::Grid::ClosestPointResult, size_t>& cp1,
+                         const std::pair<EdgeGrid::Grid::ClosestPointResult, size_t>& cp2) {
+                          return cp1.first.contour_idx < cp2.first.contour_idx ||
+                                 (cp1.first.contour_idx == cp2.first.contour_idx &&
+                                  (cp1.first.start_point_idx < cp2.first.start_point_idx ||
+                                   (cp1.first.start_point_idx == cp2.first.start_point_idx && cp1.first.t < cp2.first.t)));
+                      });
         }
-        auto it = intersection_points.begin();
-        auto it_end = intersection_points.end();
-        std::vector<std::vector<ContourIntersectionPoint*>> boundary_intersection_points(out.boundary.size(), std::vector<ContourIntersectionPoint*>());
-        for (size_t idx_contour = 0; idx_contour < boundary_src.size(); ++ idx_contour) {
+        auto                                                it     = intersection_points.begin();
+        auto                                                it_end = intersection_points.end();
+        std::vector<std::vector<ContourIntersectionPoint*>> boundary_intersection_points(out.boundary.size(),
+                                                                                         std::vector<ContourIntersectionPoint*>());
+        for (size_t idx_contour = 0; idx_contour < boundary_src.size(); ++idx_contour) {
             // Copy contour_src to contour_dst while adding intersection points.
             // Map infill end points map_infill_end_point_to_boundary to the newly inserted boundary points of contour_dst.
             // chain the points of map_infill_end_point_to_boundary along their respective contours.
-            const Polygon &contour_src = *boundary_src[idx_contour];
-            Points        &contour_dst = out.boundary[idx_contour];
-            std::vector<ContourIntersectionPoint*> &contour_intersection_points = boundary_intersection_points[idx_contour];
-            ContourIntersectionPoint *pfirst = nullptr;
-            ContourIntersectionPoint *pprev  = nullptr;
+            const Polygon&                          contour_src                 = *boundary_src[idx_contour];
+            Points&                                 contour_dst                 = out.boundary[idx_contour];
+            std::vector<ContourIntersectionPoint*>& contour_intersection_points = boundary_intersection_points[idx_contour];
+            ContourIntersectionPoint*               pfirst                      = nullptr;
+            ContourIntersectionPoint*               pprev                       = nullptr;
             {
                 // Reserve intersection points.
                 size_t n_intersection_points = 0;
-                for (auto itx = it; itx != it_end && itx->first.contour_idx == idx_contour; ++ itx)
-                    ++ n_intersection_points;
+                for (auto itx = it; itx != it_end && itx->first.contour_idx == idx_contour; ++itx)
+                    ++n_intersection_points;
                 contour_intersection_points.reserve(n_intersection_points);
             }
-            for (size_t idx_point = 0; idx_point < contour_src.points.size(); ++ idx_point) {
-                const Point &ipt = contour_src.points[idx_point];
+            for (size_t idx_point = 0; idx_point < contour_src.points.size(); ++idx_point) {
+                const Point& ipt = contour_src.points[idx_point];
                 if (contour_dst.empty() || contour_dst.back() != ipt)
                     contour_dst.emplace_back(ipt);
-                for (; it != it_end && it->first.contour_idx == idx_contour && it->first.start_point_idx == idx_point; ++ it) {
+                for (; it != it_end && it->first.contour_idx == idx_contour && it->first.start_point_idx == idx_point; ++it) {
                     // Add these points to the destination contour.
-                    const Polyline  &infill_line = infill_ordered[it->second / 2];
-                    const Point     &pt          = (it->second & 1) ? infill_line.points.back() : infill_line.points.front();
-//#ifndef NDEBUG
-//                    {
-//                      const Vec2d pt1 = ipt.cast<double>();
-//                      const Vec2d pt2 = (idx_point + 1 == contour_src.size() ? contour_src.points.front() : contour_src.points[idx_point + 1]).cast<double>();
-//                      const Vec2d ptx = lerp(pt1, pt2, it->first.t);
-//                      assert(std::abs(ptx.x() - pt.x()) < SCALED_EPSILON);
-//                      assert(std::abs(ptx.y() - pt.y()) < SCALED_EPSILON);
-//                    }
-//#endif // NDEBUG
+                    const Polyline& infill_line = infill_ordered[it->second / 2];
+                    const Point&    pt          = (it->second & 1) ? infill_line.points.back() : infill_line.points.front();
+                    // #ifndef NDEBUG
+                    //                     {
+                    //                       const Vec2d pt1 = ipt.cast<double>();
+                    //                       const Vec2d pt2 = (idx_point + 1 == contour_src.size() ? contour_src.points.front() :
+                    //                       contour_src.points[idx_point + 1]).cast<double>(); const Vec2d ptx = lerp(pt1, pt2, it->first.t);
+                    //                       assert(std::abs(ptx.x() - pt.x()) < SCALED_EPSILON);
+                    //                       assert(std::abs(ptx.y() - pt.y()) < SCALED_EPSILON);
+                    //                     }
+                    // #endif // NDEBUG
                     size_t idx_tjoint_pt = 0;
                     if (idx_point + 1 < contour_src.size() || pt != contour_dst.front()) {
                         if (pt != contour_dst.back())
                             contour_dst.emplace_back(pt);
                         idx_tjoint_pt = contour_dst.size() - 1;
                     }
-                    out.map_infill_end_point_to_boundary[it->second] = ContourIntersectionPoint{ /* it->second, */ idx_contour, idx_tjoint_pt };
-                    ContourIntersectionPoint *pthis = &out.map_infill_end_point_to_boundary[it->second];
+                    out.map_infill_end_point_to_boundary[it->second] = ContourIntersectionPoint{/* it->second, */ idx_contour,
+                                                                                                idx_tjoint_pt};
+                    ContourIntersectionPoint* pthis                  = &out.map_infill_end_point_to_boundary[it->second];
                     if (pprev) {
                         pprev->next_on_contour = pthis;
                         pthis->prev_on_contour = pprev;
@@ -1510,25 +1833,26 @@ BoundaryInfillGraph create_boundary_infill_graph(const Polylines &infill_ordered
                     pprev = pthis;
                 }
                 if (pfirst) {
-                    pprev->next_on_contour = pfirst;
+                    pprev->next_on_contour  = pfirst;
                     pfirst->prev_on_contour = pprev;
                 }
             }
             // Parametrize the new boundary with the intersection points inserted.
-            std::vector<double> &contour_params = out.boundary_params[idx_contour];
+            std::vector<double>& contour_params = out.boundary_params[idx_contour];
             contour_params.assign(contour_dst.size() + 1, 0.);
             for (size_t i = 1; i < contour_dst.size(); ++i) {
                 contour_params[i] = contour_params[i - 1] + (contour_dst[i].cast<double>() - contour_dst[i - 1].cast<double>()).norm();
                 assert(contour_params[i] > contour_params[i - 1]);
             }
-            contour_params.back() = contour_params[contour_params.size() - 2] + (contour_dst.back().cast<double>() - contour_dst.front().cast<double>()).norm();
+            contour_params.back() = contour_params[contour_params.size() - 2] +
+                                    (contour_dst.back().cast<double>() - contour_dst.front().cast<double>()).norm();
             assert(contour_params.back() > contour_params[contour_params.size() - 2]);
             // Map parameters from contour_params to boundary_intersection_points.
-            for (ContourIntersectionPoint *ip : contour_intersection_points)
+            for (ContourIntersectionPoint* ip : contour_intersection_points)
                 ip->param = contour_params[ip->point_idx];
             // and measure distance to the previous and next intersection point.
             const double contour_length = contour_params.back();
-            for (ContourIntersectionPoint *ip : contour_intersection_points)
+            for (ContourIntersectionPoint* ip : contour_intersection_points)
                 if (ip->next_on_contour == ip) {
                     assert(ip->prev_on_contour == ip);
                     ip->contour_not_taken_length_prev = ip->contour_not_taken_length_next = contour_length;
@@ -1551,18 +1875,26 @@ BoundaryInfillGraph create_boundary_infill_graph(const Polylines &infill_ordered
         // Mark the points and segments of split out.boundary as consumed if they are very close to some of the infill line.
         {
             // @supermerill used 2. * scale_(spacing)
-            const double clip_distance      = 1.7 * scale_(spacing);
+            const double clip_distance = 1.7 * scale_(spacing);
             // Allow a bit of overlap. This value must be slightly higher than the overlap of FillAdaptive, otherwise
             // the anchors of the adaptive infill will mask the other side of the perimeter line.
             // (see connect_lines_using_hooks() in FillAdaptive.cpp)
             const double distance_colliding = 0.8 * scale_(spacing);
-            mark_boundary_segments_touching_infill(out.boundary, out.boundary_params, boundary_intersection_points, bbox, infill_ordered, clip_distance, distance_colliding);
+            mark_boundary_segments_touching_infill(out.boundary, out.boundary_params, boundary_intersection_points, bbox, infill_ordered,
+                                                   clip_distance, distance_colliding);
         }
     }
 
     return out;
 }
 
+// [INTENT] extended_object_bounding_box() — returns a bounding box large enough to contain
+//          all rotations of every layer. Achieved by symmetrizing the box (swapping x/y min/max)
+//          and scaling by sqrt(2), which is the worst-case diagonal factor.
+// [STATE] Pure; reads this->bounding_box, returns a new BoundingBox.
+// [HAZARD] Uses BoundingBox::scaled() with a floating-point factor — the result is cast to
+//          integer coord_t internally. Large objects near coord_t overflow could silently produce
+//          wrong bounds. No overflow check.
 // The extended bounding box of the whole object that covers any rotation of every layer.
 BoundingBox Fill::extended_object_bounding_box() const
 {
@@ -1575,10 +1907,41 @@ BoundingBox Fill::extended_object_bounding_box() const
     return out.scaled(sqrt(2.));
 }
 
-void Fill::connect_infill(Polylines &&infill_ordered, const std::vector<const Polygon*> &boundary_src, const BoundingBox &bbox, Polylines &polylines_out, const double spacing, const FillParams &params)
+// [INTENT] connect_infill() (main implementation, vector<const Polygon*> overload) — the core
+//          perimeter-walking connector for standard infill fills.
+//
+//          Algorithm:
+//          1. create_boundary_infill_graph() builds the BoundaryInfillGraph (snaps endpoints,
+//             builds arc-length parametrizations, pre-trims arcs overlapping infill ends).
+//          2. A union-find (`merged_with`) tracks which polylines have been chained together.
+//          3. If !params.dont_sort, collect all available arcs into `arches` sorted by arc_length.
+//          4. Greedily consume arches (shortest first) to connect adjacent infill lines.
+//             - If arc_length < anchor_length_max: splice the full arc via take().
+//             - Else if anchor_length > ε: append a limited hook via take_limited().
+//          5. For every remaining unconnected endpoint, try the shorter then longer neighbor arc.
+//             If neither neighbor connects (still open), emit a hook of length anchor_length.
+//          6. Move all non-empty merged polylines to polylines_out.
+//
+// [STATE] Mutates infill_ordered (moves polylines into the merged chain), and polylines_out.
+//         The BoundaryInfillGraph is local; ContourIntersectionPoint pointers are stable within it.
+// [MEMORY] infill_ordered is taken by rvalue reference; contents are moved into polylines_out.
+//          graph is stack-allocated (large struct — boundary/params/nodes all heap via std::vector).
+// [CONCURRENCY] Not thread-safe; called once per fill surface from PerimeterGenerator or Fill.
+// [COUPLING] Calls create_boundary_infill_graph(), take(), take_limited(). Uses BoundaryInfillGraph
+//            and ContourIntersectionPoint by reference.
+// [HAZARD] The `#if 0` block (lines ~1861-1934) is dead code: an earlier connection strategy
+//          sorted by cost that was replaced by the arch-length approach. Kept as reference.
+// [HAZARD] Orca-specific: `params.multiline > 1` skips arcs shorter than spacing×multiline
+//          (line 1962), preventing unwanted short zig-zag connections in multi-line infill mode.
+void Fill::connect_infill(Polylines&&                        infill_ordered,
+                          const std::vector<const Polygon*>& boundary_src,
+                          const BoundingBox&                 bbox,
+                          Polylines&                         polylines_out,
+                          const double                       spacing,
+                          const FillParams&                  params)
 {
-	assert(! infill_ordered.empty());
-    assert(params.anchor_length     >= 0.);
+    assert(!infill_ordered.empty());
+    assert(params.anchor_length >= 0.);
     assert(params.anchor_length_max >= 0.01f);
     assert(params.anchor_length_max >= params.anchor_length);
     const double anchor_length     = scale_(params.anchor_length);
@@ -1685,38 +2048,40 @@ void Fill::connect_infill(Polylines &&infill_ordered, const std::vector<const Po
 	}
 #endif
 
-    struct Arc {
-        ContourIntersectionPoint    *intersection;
-        double                       arc_length;
+    struct Arc
+    {
+        ContourIntersectionPoint* intersection;
+        double                    arc_length;
     };
     std::vector<Arc> arches;
     if (!params.dont_sort) {
         arches.reserve(graph.map_infill_end_point_to_boundary.size());
         for (ContourIntersectionPoint& cp : graph.map_infill_end_point_to_boundary)
             if (cp.contour_idx != boundary_idx_unconnected && cp.next_on_contour != &cp && cp.could_connect_next())
-                arches.push_back({ &cp, path_length_along_contour_ccw(&cp, cp.next_on_contour, graph.boundary_params[cp.contour_idx].back()) });
+                arches.push_back(
+                    {&cp, path_length_along_contour_ccw(&cp, cp.next_on_contour, graph.boundary_params[cp.contour_idx].back())});
         std::sort(arches.begin(), arches.end(), [](const auto& l, const auto& r) { return l.arc_length < r.arc_length; });
     }
 
-    //FIXME improve the Traveling Salesman problem with 2-opt and 3-opt local optimization.
-    for (Arc &arc : arches)
-        if (! arc.intersection->consumed && ! arc.intersection->next_on_contour->consumed) {
+    // FIXME improve the Traveling Salesman problem with 2-opt and 3-opt local optimization.
+    for (Arc& arc : arches)
+        if (!arc.intersection->consumed && !arc.intersection->next_on_contour->consumed) {
             // Indices of the polylines to be connected by a perimeter segment.
-            ContourIntersectionPoint *cp1            = arc.intersection;
-            ContourIntersectionPoint *cp2            = arc.intersection->next_on_contour;
-            size_t                    polyline_idx1  = get_and_update_merged_with(((cp1 - graph.map_infill_end_point_to_boundary.data()) / 2));
-            size_t                    polyline_idx2  = get_and_update_merged_with(((cp2 - graph.map_infill_end_point_to_boundary.data()) / 2));
-            const Points             &contour        = graph.boundary[cp1->contour_idx];
+            ContourIntersectionPoint* cp1 = arc.intersection;
+            ContourIntersectionPoint* cp2 = arc.intersection->next_on_contour;
+            size_t        polyline_idx1   = get_and_update_merged_with(((cp1 - graph.map_infill_end_point_to_boundary.data()) / 2));
+            size_t        polyline_idx2   = get_and_update_merged_with(((cp2 - graph.map_infill_end_point_to_boundary.data()) / 2));
+            const Points& contour         = graph.boundary[cp1->contour_idx];
 
             // Orca: If multiline infill is requested, skip connections that are too short.
             if (params.multiline > 1 && arc.arc_length < scale_(spacing) * params.multiline) {
                 continue;
             }
 
-            const std::vector<double> &contour_params = graph.boundary_params[cp1->contour_idx];
+            const std::vector<double>& contour_params = graph.boundary_params[cp1->contour_idx];
             if (polyline_idx1 != polyline_idx2) {
-                Polyline &polyline1 = infill_ordered[polyline_idx1];
-                Polyline &polyline2 = infill_ordered[polyline_idx2];
+                Polyline& polyline1 = infill_ordered[polyline_idx1];
+                Polyline& polyline2 = infill_ordered[polyline_idx2];
                 if (arc.arc_length < anchor_length_max) {
                     // Not closing a loop, connecting the lines.
                     assert(contour[cp1->point_idx] == polyline1.points.front() || contour[cp1->point_idx] == polyline1.points.back());
@@ -1738,44 +2103,45 @@ void Fill::connect_infill(Polylines &&infill_ordered, const std::vector<const Po
                 } else if (anchor_length > SCALED_EPSILON) {
                     // Move along the perimeter, but don't take the whole arc.
                     take_limited(polyline1, contour, contour_params, cp1, cp2, false, anchor_length, line_half_width);
-                    take_limited(polyline2, contour, contour_params, cp2, cp1, true,  anchor_length, line_half_width);
+                    take_limited(polyline2, contour, contour_params, cp2, cp1, true, anchor_length, line_half_width);
                 }
             }
         }
 
     // Connect the remaining open infill lines to the perimeter lines if possible.
-    for (ContourIntersectionPoint &contour_point : graph.map_infill_end_point_to_boundary)
-        if (! contour_point.consumed && contour_point.contour_idx != boundary_idx_unconnected) {
-            const Points              &contour        = graph.boundary[contour_point.contour_idx];
-            const std::vector<double> &contour_params = graph.boundary_params[contour_point.contour_idx];
+    for (ContourIntersectionPoint& contour_point : graph.map_infill_end_point_to_boundary)
+        if (!contour_point.consumed && contour_point.contour_idx != boundary_idx_unconnected) {
+            const Points&              contour        = graph.boundary[contour_point.contour_idx];
+            const std::vector<double>& contour_params = graph.boundary_params[contour_point.contour_idx];
 
-            double    lprev         = contour_point.could_connect_prev() ?
-                path_length_along_contour_ccw(contour_point.prev_on_contour, &contour_point, contour_params.back()) :
-                std::numeric_limits<double>::max();
-            double    lnext         = contour_point.could_connect_next() ?
-                path_length_along_contour_ccw(&contour_point, contour_point.next_on_contour, contour_params.back()) :
-                std::numeric_limits<double>::max();
-            size_t    polyline_idx  = get_and_update_merged_with(((&contour_point - graph.map_infill_end_point_to_boundary.data()) / 2));
-            Polyline &polyline      = infill_ordered[polyline_idx];
-            assert(! polyline.empty());
-            assert(contour[contour_point.point_idx] == polyline.points.front() || contour[contour_point.point_idx] == polyline.points.back());
+            double    lprev        = contour_point.could_connect_prev() ?
+                                         path_length_along_contour_ccw(contour_point.prev_on_contour, &contour_point, contour_params.back()) :
+                                         std::numeric_limits<double>::max();
+            double    lnext        = contour_point.could_connect_next() ?
+                                         path_length_along_contour_ccw(&contour_point, contour_point.next_on_contour, contour_params.back()) :
+                                         std::numeric_limits<double>::max();
+            size_t    polyline_idx = get_and_update_merged_with(((&contour_point - graph.map_infill_end_point_to_boundary.data()) / 2));
+            Polyline& polyline     = infill_ordered[polyline_idx];
+            assert(!polyline.empty());
+            assert(contour[contour_point.point_idx] == polyline.points.front() ||
+                   contour[contour_point.point_idx] == polyline.points.back());
             bool connected = false;
-            for (double l : { std::min(lprev, lnext), std::max(lprev, lnext) }) {
+            for (double l : {std::min(lprev, lnext), std::max(lprev, lnext)}) {
                 if (l == std::numeric_limits<double>::max() || l > anchor_length_max)
                     break;
                 // Take the complete contour.
-                bool      reversed      = l == lprev;
-                ContourIntersectionPoint *cp2 = reversed ? contour_point.prev_on_contour : contour_point.next_on_contour;
+                bool                      reversed = l == lprev;
+                ContourIntersectionPoint* cp2      = reversed ? contour_point.prev_on_contour : contour_point.next_on_contour;
                 // Identify which end of the polyline touches the boundary.
-                size_t    polyline_idx2 = get_and_update_merged_with(((cp2 - graph.map_infill_end_point_to_boundary.data()) / 2));
+                size_t polyline_idx2 = get_and_update_merged_with(((cp2 - graph.map_infill_end_point_to_boundary.data()) / 2));
                 if (polyline_idx == polyline_idx2)
                     // Try the other side.
                     continue;
                 // Not closing a loop.
                 if (contour[contour_point.point_idx] == polyline.points.front())
                     polyline.reverse();
-                Polyline &polyline2 = infill_ordered[polyline_idx2];
-                assert(! polyline.empty());
+                Polyline& polyline2 = infill_ordered[polyline_idx2];
+                assert(!polyline.empty());
                 assert(contour[cp2->point_idx] == polyline2.points.front() || contour[cp2->point_idx] == polyline2.points.back());
                 if (contour[cp2->point_idx] == polyline2.points.back())
                     polyline2.reverse();
@@ -1787,13 +2153,13 @@ void Fill::connect_infill(Polylines &&infill_ordered, const std::vector<const Po
                 } else {
                     // Mark the first polyline as merged with the second one.
                     merged_with[polyline_idx] = polyline_idx2;
-                    polyline2 = std::move(polyline);
+                    polyline2                 = std::move(polyline);
                     polyline.points.clear();
                 }
                 connected = true;
                 break;
             }
-            if (! connected && anchor_length > SCALED_EPSILON) {
+            if (!connected && anchor_length > SCALED_EPSILON) {
                 // Which to take? One could optimize for:
                 // 1) Shortest path
                 // 2) Hook length
@@ -1802,20 +2168,29 @@ void Fill::connect_infill(Polylines &&infill_ordered, const std::vector<const Po
                 double l = std::max(contour_point.contour_not_taken_length_prev, contour_point.contour_not_taken_length_next);
                 if (l > SCALED_EPSILON) {
                     if (contour_point.contour_not_taken_length_prev > contour_point.contour_not_taken_length_next)
-                        take_limited(polyline, contour, contour_params, &contour_point, contour_point.prev_on_contour, true, anchor_length, line_half_width);
+                        take_limited(polyline, contour, contour_params, &contour_point, contour_point.prev_on_contour, true, anchor_length,
+                                     line_half_width);
                     else
-                        take_limited(polyline, contour, contour_params, &contour_point, contour_point.next_on_contour, false, anchor_length, line_half_width);
+                        take_limited(polyline, contour, contour_params, &contour_point, contour_point.next_on_contour, false, anchor_length,
+                                     line_half_width);
                 }
             }
         }
 
-    polylines_out.reserve(polylines_out.size() + std::count_if(infill_ordered.begin(), infill_ordered.end(), [](const Polyline &pl) { return ! pl.empty(); }));
-	for (Polyline &pl : infill_ordered)
-		if (! pl.empty())
-			polylines_out.emplace_back(std::move(pl));
+    polylines_out.reserve(polylines_out.size() +
+                          std::count_if(infill_ordered.begin(), infill_ordered.end(), [](const Polyline& pl) { return !pl.empty(); }));
+    for (Polyline& pl : infill_ordered)
+        if (!pl.empty())
+            polylines_out.emplace_back(std::move(pl));
 }
 
-void Fill::chain_or_connect_infill(Polylines &&infill_ordered, const ExPolygon &boundary, Polylines &polylines_out, const double spacing, const FillParams &params)
+// [INTENT] chain_or_connect_infill() — policy selector for how infill lines are assembled.
+//          If params.dont_connect() is true: chain polylines using nearest-neighbor (no perimeter
+//          walking), otherwise call connect_infill(). Empty infill is handled gracefully.
+// [STATE] Moves infill_ordered; appends to polylines_out.
+// [COUPLING] Thin wrapper over connect_infill() and chain_polylines().
+void Fill::chain_or_connect_infill(
+    Polylines&& infill_ordered, const ExPolygon& boundary, Polylines& polylines_out, const double spacing, const FillParams& params)
 {
     if (!infill_ordered.empty()) {
         if (params.dont_connect()) {
@@ -1827,53 +2202,71 @@ void Fill::chain_or_connect_infill(Polylines &&infill_ordered, const ExPolygon &
     }
 }
 
-// Extend the infill lines along the perimeters, this is mainly useful for grid aligned support, where a perimeter line may be nearly
-// aligned with the infill lines.
-static inline void base_support_extend_infill_lines(Polylines &infill, BoundaryInfillGraph &graph, const double spacing, const FillParams &params)
+// [INTENT] base_support_extend_infill_lines() — for grid-aligned sparse support infill, extends
+//          infill line endpoints along the perimeter when the contour segment immediately next to
+//          the endpoint runs nearly vertically (same x within dist_max_x = 0.33 * line_spacing)
+//          and sufficiently far in y (dist_min_y = 0.5 * line_spacing).
+//          This closes small gaps where a perimeter segment is nearly co-linear with the infill
+//          direction, preventing thin unprinted regions between infill and perimeter.
+//
+// [STATE] Mutates graph.map_infill_end_point_to_boundary[*].point_idx and trim/not-taken lengths.
+//         Mutates infill[*] (the polyline itself) to include the arc extension at front or back.
+// [COUPLING] Requires a fully-constructed BoundaryInfillGraph. Calls take_cw_full / take_ccw_full.
+// [HAZARD] The comparison `dist_y_prev < dist_y_next ? extend_prev_idx : extend_next_idx = -1;`
+//          on line ~2172 uses ternary as lvalue — this is legal C++ but highly unusual and likely
+//          to confuse a port to another language. In Rust/Python this would need explicit if/else.
+// [UNCLEAR] The function is labeled for "grid aligned support" and references spacing/density but
+//           does not guard against non-grid fills. It is only called from connect_base_support().
+// Called by Fill::connect_base_support() as part of the sparse support infill generator.
+static inline void base_support_extend_infill_lines(Polylines&           infill,
+                                                    BoundaryInfillGraph& graph,
+                                                    const double         spacing,
+                                                    const FillParams&    params)
 {
-/*
-    // Backup the source lines.
-    Lines lines;
-    lines.reserve(linfill.size());
-    std::transform(infill.begin(), infill.end(), std::back_inserter(lines), [](const Polyline &pl) { assert(pl.size() == 2); return Line(pl.points.begin(), pl.points.end()); });
-*/
+    /*
+        // Backup the source lines.
+        Lines lines;
+        lines.reserve(linfill.size());
+        std::transform(infill.begin(), infill.end(), std::back_inserter(lines), [](const Polyline &pl) { assert(pl.size() == 2); return
+       Line(pl.points.begin(), pl.points.end()); });
+    */
 
-    const double    line_spacing    = scale_(spacing) / params.density;
+    const double line_spacing = scale_(spacing) / params.density;
     // Maximum deviation perpendicular to the infill line to allow merging as a continuation of the same infill line.
-    const auto      dist_max_x      = coord_t(line_spacing * 0.33);
+    const auto dist_max_x = coord_t(line_spacing * 0.33);
     // Minimum length of the arc away from the infill end point to allow merging as a continuation of the same infill line.
-    const auto      dist_min_y      = coord_t(line_spacing * 0.5);
+    const auto dist_min_y = coord_t(line_spacing * 0.5);
 
-    for (ContourIntersectionPoint &cp : graph.map_infill_end_point_to_boundary) {
-        const Points                &contour         = graph.boundary[cp.contour_idx];
-        const std::vector<double>   &contour_param   = graph.boundary_params[cp.contour_idx];
-        const Point                 &pt              = contour[cp.point_idx];
-        const bool                   first           = graph.first(cp);
-        int                          extend_next_idx = -1;
-        int                          extend_prev_idx = -1;
-        coord_t                      dist_y_prev;
-        coord_t                      dist_y_next;
-        double                       arc_len_prev;
-        double                       arc_len_next;
+    for (ContourIntersectionPoint& cp : graph.map_infill_end_point_to_boundary) {
+        const Points&              contour         = graph.boundary[cp.contour_idx];
+        const std::vector<double>& contour_param   = graph.boundary_params[cp.contour_idx];
+        const Point&               pt              = contour[cp.point_idx];
+        const bool                 first           = graph.first(cp);
+        int                        extend_next_idx = -1;
+        int                        extend_prev_idx = -1;
+        coord_t                    dist_y_prev;
+        coord_t                    dist_y_next;
+        double                     arc_len_prev;
+        double                     arc_len_next;
 
-        if (! graph.next_vertical(cp)){
+        if (!graph.next_vertical(cp)) {
             size_t i = cp.point_idx;
             size_t j = next_idx_modulo(i, contour);
             while (j != cp.next_on_contour->point_idx) {
-                //const Point &p1 = contour[i];
-                const Point &p2 = contour[j];
+                // const Point &p1 = contour[i];
+                const Point& p2 = contour[j];
                 if (std::abs(p2.x() - pt.x()) > dist_max_x)
                     break;
                 i = j;
                 j = next_idx_modulo(j, contour);
             }
             if (i != cp.point_idx) {
-                const Point &p2 = contour[i];
+                const Point& p2     = contour[i];
                 coord_t      dist_y = p2.y() - pt.y();
                 if (first)
-                    dist_y = - dist_y;
+                    dist_y = -dist_y;
                 if (dist_y > dist_min_y) {
-                    arc_len_next    = closed_contour_distance_ccw(contour_param[cp.point_idx], contour_param[i], contour_param.back());
+                    arc_len_next = closed_contour_distance_ccw(contour_param[cp.point_idx], contour_param[i], contour_param.back());
                     if (arc_len_next < cp.contour_not_taken_length_next) {
                         extend_next_idx = i;
                         dist_y_next     = dist_y;
@@ -1882,22 +2275,22 @@ static inline void base_support_extend_infill_lines(Polylines &infill, BoundaryI
             }
         }
 
-        if (! graph.prev_vertical(cp)) {
+        if (!graph.prev_vertical(cp)) {
             size_t i = cp.point_idx;
             size_t j = prev_idx_modulo(i, contour);
             while (j != cp.prev_on_contour->point_idx) {
-                //const Point &p1 = contour[i];
-                const Point &p2 = contour[j];
+                // const Point &p1 = contour[i];
+                const Point& p2 = contour[j];
                 if (std::abs(p2.x() - pt.x()) > dist_max_x)
                     break;
                 i = j;
                 j = prev_idx_modulo(j, contour);
             }
             if (i != cp.point_idx) {
-                const Point &p2 = contour[i];
+                const Point& p2     = contour[i];
                 coord_t      dist_y = p2.y() - pt.y();
                 if (first)
-                    dist_y = - dist_y;
+                    dist_y = -dist_y;
                 if (dist_y > dist_min_y) {
                     arc_len_prev = closed_contour_distance_ccw(contour_param[i], contour_param[cp.point_idx], contour_param.back());
                     if (arc_len_prev < cp.contour_not_taken_length_prev) {
@@ -1914,7 +2307,7 @@ static inline void base_support_extend_infill_lines(Polylines &infill, BoundaryI
 
         assert(cp.prev_trimmed == cp.prev_on_contour->next_trimmed);
         assert(cp.next_trimmed == cp.next_on_contour->prev_trimmed);
-        Polyline &infill_line = infill[(&cp - graph.map_infill_end_point_to_boundary.data()) / 2];
+        Polyline& infill_line = infill[(&cp - graph.map_infill_end_point_to_boundary.data()) / 2];
         if (extend_prev_idx >= 0) {
             if (first)
                 infill_line.reverse();
@@ -1926,7 +2319,8 @@ static inline void base_support_extend_infill_lines(Polylines &infill, BoundaryI
                 cp.contour_not_taken_length_prev -= arc_len_prev;
             else
                 cp.contour_not_taken_length_prev = cp.prev_on_contour->contour_not_taken_length_next =
-                    closed_contour_distance_ccw(contour_param[cp.prev_on_contour->point_idx], contour_param[cp.point_idx], contour_param.back());
+                    closed_contour_distance_ccw(contour_param[cp.prev_on_contour->point_idx], contour_param[cp.point_idx],
+                                                contour_param.back());
             cp.trim_next(0);
             cp.next_on_contour->prev_trimmed = true;
         } else if (extend_next_idx >= 0) {
@@ -1942,27 +2336,46 @@ static inline void base_support_extend_infill_lines(Polylines &infill, BoundaryI
                 cp.contour_not_taken_length_next -= arc_len_next;
             else
                 cp.contour_not_taken_length_next = cp.next_on_contour->contour_not_taken_length_prev =
-                    closed_contour_distance_ccw(contour_param[cp.point_idx], contour_param[cp.next_on_contour->point_idx], contour_param.back());
+                    closed_contour_distance_ccw(contour_param[cp.point_idx], contour_param[cp.next_on_contour->point_idx],
+                                                contour_param.back());
         }
     }
 }
 
+// [INTENT] emit_loops_in_band() — traces a contour arc from parameter `tbegin` to `tend` and
+//          clips it to a vertical band (left, right). Segments entering or leaving the band are
+//          interpolated at the band boundary. Used in connect_base_support() to emit the "middle"
+//          portion of a perimeter arch that is trimmed at both ends by adjacent infill lines.
+//
+//          Inner class `State` accumulates points for the in-progress polyline and finalizes it
+//          when the contour leaves the band. Multiple disjoint sub-polylines may be emitted.
+//
+// [STATE] Appends to `polylines_out`. Local State object is stack-allocated.
+// [HAZARD] Interpolation of the band crossing (`add_interpolated_point()`) assumes the segment
+//          is not vertical (division by p2->x() - p1->x()). If a contour segment is exactly
+//          vertical and its x crosses the band boundary, division by zero occurs.
+// [HAZARD] `m_polyline.points.erase(... begin() + m_polyline_end ...)` (finalize) assumes
+//          m_polyline_end < m_polyline.size(). A logic error in add_interpolated_point ordering
+//          could violate this, producing UB. Only guarded by assert in debug.
+// [UNCLEAR] The `side1` and `side2` public members on State and the conditional vertical-segment
+//           merging logic in `add_interpolated_point()` implement an implicit "don't create
+//           degenerate vertical segments" heuristic that is not documented inline.
 // Called by Fill::connect_base_support() as part of the sparse support infill generator.
 // Emit contour loops tracing the contour from tbegin to tend inside a band of (left, right).
 // The contour is supposed to enter the "forbidden" zone outside of the (left, right) band at tbegin and also at tend.
 static inline void emit_loops_in_band(
     // Vertical band, which will trim the contour between tbegin and tend.
-    coord_t                      left,
-    coord_t                      right,
+    coord_t left,
+    coord_t right,
     // Contour and its parametrization.
-    const Points                &contour,
-    const std::vector<double>   &contour_params,
+    const Points&              contour,
+    const std::vector<double>& contour_params,
     // Span of the parameters of an arch to trim with the vertical band.
-    double                       tbegin,
-    double                       tend,
+    double tbegin,
+    double tend,
     // Minimum arch length to put into polylines_out. Shorter arches are not necessary to support a dense support infill.
-    double                       min_length,
-    Polylines                   &polylines_out)
+    double     min_length,
+    Polylines& polylines_out)
 {
     assert(left < right);
     assert(contour.size() + 1 == contour_params.size());
@@ -1970,7 +2383,7 @@ static inline void emit_loops_in_band(
 #ifndef NDEBUG
     double contour_length = contour_params.back();
     assert(tbegin >= 0 && tbegin < contour_length);
-    assert(tend   >= 0 && tend   < contour_length);
+    assert(tend >= 0 && tend < contour_length);
     assert(min_length > 0);
 #endif // NDEBUG
 
@@ -1980,13 +2393,13 @@ static inline void emit_loops_in_band(
         auto it_begin = std::lower_bound(contour_params.begin(), contour_params.end(), tbegin);
         auto it_end   = std::lower_bound(contour_params.begin(), contour_params.end(), tend);
         assert(it_begin != contour_params.end());
-        assert(it_end   != contour_params.end());
+        assert(it_end != contour_params.end());
         if (*it_begin != tbegin) {
             assert(it_begin != contour_params.begin());
-            -- it_begin;
+            --it_begin;
         }
         ibegin = it_begin - contour_params.begin();
-        iend   = it_end   - contour_params.begin();
+        iend   = it_end - contour_params.begin();
     }
 
     if (ibegin == contour.size())
@@ -2000,34 +2413,28 @@ static inline void emit_loops_in_band(
     {
         double t1 = contour_params[ibegin];
         double t2 = next_value_modulo(ibegin, contour_params);
-        pbegin = lerp(contour[ibegin], next_value_modulo(ibegin, contour), (tbegin - t1) / (t2 - t1));
-        t1 = contour_params[iend];
-        t2 = prev_value_modulo(iend, contour_params);
-        pend = lerp(contour[iend], prev_value_modulo(iend, contour), (tend - t1) / (t2 - t1));
+        pbegin    = lerp(contour[ibegin], next_value_modulo(ibegin, contour), (tbegin - t1) / (t2 - t1));
+        t1        = contour_params[iend];
+        t2        = prev_value_modulo(iend, contour_params);
+        pend      = lerp(contour[iend], prev_value_modulo(iend, contour), (tend - t1) / (t2 - t1));
     }
 
     // Trace the contour from ibegin to iend.
-    enum Side {
-        Left,
-        Right,
-        Mid,
-        Unknown
-    };
+    enum Side { Left, Right, Mid, Unknown };
 
     enum InOutBand {
         Entering,
         Leaving,
     };
 
-    class State {
+    class State
+    {
     public:
-        State(coord_t left, coord_t right, double min_length, Polylines &polylines_out) :
-            m_left(left), m_right(right), m_min_length(min_length), m_polylines_out(polylines_out) {}
+        State(coord_t left, coord_t right, double min_length, Polylines& polylines_out)
+            : m_left(left), m_right(right), m_min_length(min_length), m_polylines_out(polylines_out)
+        {}
 
-        void add_inner_point(const Point* p)
-        {
-            m_polyline.points.emplace_back(*p);
-        }
+        void add_inner_point(const Point* p) { m_polyline.points.emplace_back(*p); }
 
         void add_outer_point(const Point* p)
         {
@@ -2066,9 +2473,11 @@ static inline void emit_loops_in_band(
         void finalize()
         {
             m_polyline.points.erase(m_polyline.points.begin() + m_polyline_end, m_polyline.points.end());
-            if (! m_polyline.empty()) {
-                if (! m_polylines_out.empty() && (m_polylines_out.back().points.back() - m_polyline.points.front()).cast<int64_t>().squaredNorm() < SCALED_EPSILON)
-                    m_polylines_out.back().points.insert(m_polylines_out.back().points.end(), m_polyline.points.begin() + 1, m_polyline.points.end());
+            if (!m_polyline.empty()) {
+                if (!m_polylines_out.empty() &&
+                    (m_polylines_out.back().points.back() - m_polyline.points.front()).cast<int64_t>().squaredNorm() < SCALED_EPSILON)
+                    m_polylines_out.back().points.insert(m_polylines_out.back().points.end(), m_polyline.points.begin() + 1,
+                                                         m_polyline.points.end());
                 else if (m_polyline.length() > m_min_length)
                     m_polylines_out.emplace_back(std::move(m_polyline));
                 m_polyline.clear();
@@ -2076,24 +2485,24 @@ static inline void emit_loops_in_band(
         };
 
     private:
-        coord_t      m_left;
-        coord_t      m_right;
-        double       m_min_length;
-        Polylines   &m_polylines_out;
+        coord_t    m_left;
+        coord_t    m_right;
+        double     m_min_length;
+        Polylines& m_polylines_out;
 
-        Polyline     m_polyline;
-        size_t       m_polyline_end { 0 };
-        Polyline     m_overlapping;
+        Polyline m_polyline;
+        size_t   m_polyline_end{0};
+        Polyline m_overlapping;
 
     public:
-        Side         side1 { Unknown };
-        Side         side2 { Unknown };
+        Side side1{Unknown};
+        Side side2{Unknown};
     };
 
-    State state { left, right, min_length, polylines_out };
+    State state{left, right, min_length, polylines_out};
 
-    const Point *p1 = &pbegin;
-    auto side = [left, right](const Point* p) {
+    const Point* p1   = &pbegin;
+    auto         side = [left, right](const Point* p) {
         coord_t x = p->x();
         return x < left ? Left : x > right ? Right : Mid;
     };
@@ -2101,12 +2510,12 @@ static inline void emit_loops_in_band(
     if (state.side1 == Mid)
         state.add_inner_point(p1);
 
-    for (size_t i = ibegin; i != iend; ) {
+    for (size_t i = ibegin; i != iend;) {
         size_t inext = i + 1;
         if (inext == contour.size())
             inext = 0;
-        const Point *p2 = inext == iend ? &pend : &contour[inext];
-        state.side2 = side(p2);
+        const Point* p2 = inext == iend ? &pend : &contour[inext];
+        state.side2     = side(p2);
         if (state.side1 == Mid) {
             if (state.side2 == Mid) {
                 // Inside the band.
@@ -2130,17 +2539,27 @@ static inline void emit_loops_in_band(
             state.add_outer_point(p2);
         }
         state.side1 = state.side2;
-        p1 = p2;
-        i  = inext;
+        p1          = p2;
+        i           = inext;
     }
     state.finalize();
 }
 
+// [INTENT] export_partial_infill_to_svg() — debug SVG dump for connect_base_support() state.
+//          Draws: filled boundary polygons, infill lines in blue, already-emitted lines in darkblue,
+//          ContourIntersectionPoint nodes colored red (consumed) or green (available),
+//          and remaining available arc stubs in lime (takeable) or magenta (blocked).
+// [STATE] Uses a debug file path from debug_out_path(). Static iRun counter at call site.
+// [HAZARD] Same concern as export_infill_to_svg: produces one file per call. Must never be
+//          enabled in production.
 #ifdef INFILL_DEBUG_OUTPUT
-static void export_partial_infill_to_svg(const std::string &path, const BoundaryInfillGraph &graph, const Polylines &infill, const Polylines &emitted)
+static void export_partial_infill_to_svg(const std::string&         path,
+                                         const BoundaryInfillGraph& graph,
+                                         const Polylines&           infill,
+                                         const Polylines&           emitted)
 {
     Polygons polygons;
-    for (const Points &pts : graph.boundary)
+    for (const Points& pts : graph.boundary)
         polygons.emplace_back(pts);
     BoundingBox bbox = get_extents(polygons);
     bbox.merge(get_extents(infill));
@@ -2148,38 +2567,54 @@ static void export_partial_infill_to_svg(const std::string &path, const Boundary
     svg.draw(union_ex(polygons));
     svg.draw(infill, "blue");
     svg.draw(emitted, "darkblue");
-    for (const ContourIntersectionPoint &cp : graph.map_infill_end_point_to_boundary)
+    for (const ContourIntersectionPoint& cp : graph.map_infill_end_point_to_boundary)
         svg.draw(graph.point(cp), cp.consumed ? "red" : "green", scaled(0.2));
-    for (const ContourIntersectionPoint &cp : graph.map_infill_end_point_to_boundary) {
+    for (const ContourIntersectionPoint& cp : graph.map_infill_end_point_to_boundary) {
         assert(cp.next_trimmed == cp.next_on_contour->prev_trimmed);
         assert(cp.prev_trimmed == cp.prev_on_contour->next_trimmed);
         if (cp.contour_not_taken_length_next > SCALED_EPSILON) {
-            Polyline pl { graph.point(cp) };
-            take_ccw_limited(pl, graph.boundary[cp.contour_idx], graph.boundary_params[cp.contour_idx], cp.point_idx, cp.next_on_contour->point_idx, cp.contour_not_taken_length_next);
+            Polyline pl{graph.point(cp)};
+            take_ccw_limited(pl, graph.boundary[cp.contour_idx], graph.boundary_params[cp.contour_idx], cp.point_idx,
+                             cp.next_on_contour->point_idx, cp.contour_not_taken_length_next);
             svg.draw(pl, cp.could_take_next() ? "lime" : "magenta", scaled(0.1));
         }
         if (cp.contour_not_taken_length_prev > SCALED_EPSILON) {
-            Polyline pl { graph.point(cp) };
-            take_cw_limited(pl, graph.boundary[cp.contour_idx], graph.boundary_params[cp.contour_idx], cp.point_idx, cp.prev_on_contour->point_idx, cp.contour_not_taken_length_prev);
+            Polyline pl{graph.point(cp)};
+            take_cw_limited(pl, graph.boundary[cp.contour_idx], graph.boundary_params[cp.contour_idx], cp.point_idx,
+                            cp.prev_on_contour->point_idx, cp.contour_not_taken_length_prev);
             svg.draw(pl, cp.could_take_prev() ? "lime" : "magenta", scaled(0.1));
         }
     }
 }
 #endif // INFILL_DEBUG_OUTPUT
 
+// [INTENT] SupportArcCost — POD classification of a boundary arc for connect_base_support().
+//          `self_loop`: arc connects both ends of the same infill line (a cap).
+//          `open`: arc was trimmed by an adjacent infill line (shares part of that line's region).
+//          `cost`: measure of structural utility — maximum deviation from the chord line in both
+//          Y-distance and perpendicular distance. Zero means "do not take this arc."
+// [STATE] Value type; pure data, no side effects.
 // To classify perimeter segments connecting infill lines, whether they are required for structural stability of the supports.
 struct SupportArcCost
 {
     // Connecting one end of an infill line to the other end of the same infill line.
-    bool    self_loop { false };
+    bool self_loop{false};
     // Some of the arc touches some infill line.
-    bool    open { false };
+    bool open{false};
     // How needed is this arch for support structural stability.
     // Zero means don't take. The higher number, the more likely it is to take the arc.
-    double  cost { 0 };
+    double cost{0};
 };
 
-static double evaluate_support_arch_cost(const Polyline &pl)
+// [INTENT] evaluate_support_arch_cost() — computes the SupportArcCost.cost for a given polyline arc.
+//          The cost is the maximum of: perpendicular distance from each polyline point to the chord
+//          (front→back), and Y-overshoot above/below the chord Y-range. This approximates how much
+//          the arc bulges outward, which correlates with structural utility as a support bridge.
+// [STATE] Pure; reads pl.points. No side effects.
+// [HAZARD] If pl.points has fewer than 2 points, front==back, Linef is degenerate, and
+//          line_alg::distance_to() may return garbage. Called only from evaluate_support_arches()
+//          which constructs pl from arc traversal, so pl always has ≥2 points in practice.
+static double evaluate_support_arch_cost(const Polyline& pl)
 {
     Point front = pl.points.front();
     Point back  = pl.points.back();
@@ -2191,37 +2626,52 @@ static double evaluate_support_arch_cost(const Polyline &pl)
 
     double dmax = 0;
     // Maximum distance in Y axis out of the (ymin, ymax) band and from the (front, back) line.
-    Linef line { front.cast<double>(), back.cast<double>() };
-    for (const Point &pt : pl.points)
-        dmax = std::max<double>(std::max(dmax, line_alg::distance_to(line, Vec2d(pt.cast<double>()))), std::max(pt.y() - ymax, ymin - pt.y()));
+    Linef line{front.cast<double>(), back.cast<double>()};
+    for (const Point& pt : pl.points)
+        dmax = std::max<double>(std::max(dmax, line_alg::distance_to(line, Vec2d(pt.cast<double>()))),
+                                std::max(pt.y() - ymax, ymin - pt.y()));
     return dmax;
 }
 
+// [INTENT] evaluate_support_arches() — for each ContourIntersectionPoint in the graph, traces
+//          the available prev/next arc (subject to trim length) and calls evaluate_support_arch_cost()
+//          to compute a SupportArcCost. The result is a flat array of size
+//          map_infill_end_point_to_boundary.size() × 2 (interleaved prev/next costs per cp).
+//          Used by connect_base_support() to rank arches and decide take priority.
+// [STATE] Allocates and returns a vector of SupportArcCost. Reuses a local `pl` Polyline.
+// [COUPLING] Calls take_ccw_limited / take_ccw_full / take_cw_limited / take_cw_full.
+// [HAZARD] The assert(cp.next_on_contour != &cp) guards against single-endpoint contours, but
+//          if map_infill_end_point_to_boundary is constructed incorrectly (not all loops closed),
+//          this assertion fires only in debug.
 // Costs for prev / next arch of each infill line end point.
-static inline std::vector<SupportArcCost> evaluate_support_arches(Polylines &infill, BoundaryInfillGraph &graph, const double spacing, const FillParams &params)
+static inline std::vector<SupportArcCost> evaluate_support_arches(Polylines&           infill,
+                                                                  BoundaryInfillGraph& graph,
+                                                                  const double         spacing,
+                                                                  const FillParams&    params)
 {
     std::vector<SupportArcCost> arches(graph.map_infill_end_point_to_boundary.size() * 2);
 
     Polyline pl;
-    for (ContourIntersectionPoint &cp : graph.map_infill_end_point_to_boundary) {
+    for (ContourIntersectionPoint& cp : graph.map_infill_end_point_to_boundary) {
         // Not a losed loop, such loops should already be consumed.
         assert(cp.next_on_contour != &cp);
         const size_t                    infill_line_idx = &cp - graph.map_infill_end_point_to_boundary.data();
         const bool                      first           = (infill_line_idx & 1) == 0;
-        const ContourIntersectionPoint *other_end       = first ? &cp + 1 : &cp - 1;
+        const ContourIntersectionPoint* other_end       = first ? &cp + 1 : &cp - 1;
 
-        SupportArcCost &out_prev = arches[infill_line_idx * 2];
-        SupportArcCost &out_next = *(&out_prev + 1);
-        out_prev.self_loop = cp.prev_on_contour == other_end;
-        out_prev.open      = cp.prev_trimmed;
-        out_next.self_loop = cp.next_on_contour == other_end;
-        out_next.open      = cp.next_trimmed;
+        SupportArcCost& out_prev = arches[infill_line_idx * 2];
+        SupportArcCost& out_next = *(&out_prev + 1);
+        out_prev.self_loop       = cp.prev_on_contour == other_end;
+        out_prev.open            = cp.prev_trimmed;
+        out_next.self_loop       = cp.next_on_contour == other_end;
+        out_next.open            = cp.next_trimmed;
 
         if (cp.contour_not_taken_length_next > SCALED_EPSILON) {
             pl.clear();
             pl.points.emplace_back(graph.point(cp));
             if (cp.next_trimmed)
-                take_ccw_limited(pl, graph.boundary[cp.contour_idx], graph.boundary_params[cp.contour_idx], cp.point_idx, cp.next_on_contour->point_idx, cp.contour_not_taken_length_next);
+                take_ccw_limited(pl, graph.boundary[cp.contour_idx], graph.boundary_params[cp.contour_idx], cp.point_idx,
+                                 cp.next_on_contour->point_idx, cp.contour_not_taken_length_next);
             else
                 take_ccw_full(pl, graph.boundary[cp.contour_idx], cp.point_idx, cp.next_on_contour->point_idx);
             out_next.cost = evaluate_support_arch_cost(pl);
@@ -2231,7 +2681,8 @@ static inline std::vector<SupportArcCost> evaluate_support_arches(Polylines &inf
             pl.clear();
             pl.points.emplace_back(graph.point(cp));
             if (cp.prev_trimmed)
-                take_cw_limited(pl, graph.boundary[cp.contour_idx], graph.boundary_params[cp.contour_idx], cp.point_idx, cp.prev_on_contour->point_idx, cp.contour_not_taken_length_prev);
+                take_cw_limited(pl, graph.boundary[cp.contour_idx], graph.boundary_params[cp.contour_idx], cp.point_idx,
+                                cp.prev_on_contour->point_idx, cp.contour_not_taken_length_prev);
             else
                 take_cw_full(pl, graph.boundary[cp.contour_idx], cp.point_idx, cp.prev_on_contour->point_idx);
             out_prev.cost = evaluate_support_arch_cost(pl);
@@ -2241,11 +2692,57 @@ static inline std::vector<SupportArcCost> evaluate_support_arches(Polylines &inf
     return arches;
 }
 
+// [INTENT] connect_base_support() (main implementation) — specialized connector for sparse
+//          support grid infill. Uses a more conservative, structurally-aware connection strategy
+//          than the standard connect_infill(), because support regions require structural stability
+//          (perimeter arcs act as bridges for the first supported layer).
+//
+//          Algorithm:
+//          1. create_boundary_infill_graph() — build graph with T-joint snapping and arc trimming.
+//          2. mark_boundary_segments_overlapping_infill() — second-pass trim for short arcs.
+//          3. Emit full perimeter loops for contours with zero infill intersections (degenerate case).
+//          4. Emit "excess" middle arcs (both ends trimmed, but arc departs far from infill lines).
+//             These use emit_loops_in_band() to clip arcs to the vertical infill band.
+//          5. base_support_extend_infill_lines() — extend infill endpoints along near-vertical perimeter.
+//          6. Union-find (merged_with) tracks polyline chains.
+//          7. Lambdas: take_vertical_prev() decides which side to connect when both directions
+//             are vertical. take_next() handles the actual splice/trim at each arc.
+//          8. Pass 1: Consume all vertical arches (greedy, longer first).
+//          9. evaluate_support_arches() — score all remaining arches by structural utility.
+//         10. Pass 2: Connect structurally useful arches (cost between cost_low and cost_high,
+//             with significant cost difference between prev/next). Longest first.
+//         11. Pass 3: Zig-zag: connect remaining unconnected lines in order (simple fallback).
+//         12. Pass 4: Add self-loop "caps" at infill endpoints that loop back to themselves.
+//         13. Pass 5: T-joint connections using long arches, longest first.
+//         14. Pass 6: Force-add very long arches / caps even if endpoints already consumed.
+//         15. Emit all non-empty merged polylines to polylines_out.
+//
+// [STATE] Mutates infill_ordered (moves lines into chains), appends to polylines_out.
+//         BoundaryInfillGraph is local; arches vector is local.
+// [MEMORY] graph.map_infill_end_point_to_boundary must not be resized; take_next lambda
+//          captures it by reference (raw pointer arithmetic inside).
+// [CONCURRENCY] Not thread-safe; single-threaded per fill surface.
+// [COUPLING] Calls create_boundary_infill_graph(), mark_boundary_segments_overlapping_infill(),
+//            base_support_extend_infill_lines(), evaluate_support_arches(), emit_loops_in_band(),
+//            take(), take_limited().
+// [HAZARD] `static const double cost_low/high/veryhigh` — these are static locals (effectively
+//          runtime constants, but initialized each call). They reference `line_spacing` which is
+//          computed per-call. The `static` keyword is misleading: these are re-evaluated each
+//          invocation because line_spacing differs. The `static` has no practical effect here
+//          beyond micro-optimization of the double constant, but in a multithreaded context it
+//          would cause data races (not currently a concern since this is single-threaded).
+// [HAZARD] The `#if 0` block (lines ~2779-2848) is dead code: an alternate horizontal arch
+//          pass that was disabled. Contains complex logic not exercised in production.
 // Both the poly_with_offset and polylines_out are rotated, so the infill lines are strictly vertical.
-void Fill::connect_base_support(Polylines &&infill_ordered, const std::vector<const Polygon*> &boundary_src, const BoundingBox &bbox, Polylines &polylines_out, const double spacing, const FillParams &params)
+void Fill::connect_base_support(Polylines&&                        infill_ordered,
+                                const std::vector<const Polygon*>& boundary_src,
+                                const BoundingBox&                 bbox,
+                                Polylines&                         polylines_out,
+                                const double                       spacing,
+                                const FillParams&                  params)
 {
-//    assert(! infill_ordered.empty());
-    assert(params.anchor_length     >= 0.);
+    //    assert(! infill_ordered.empty());
+    assert(params.anchor_length >= 0.);
     assert(params.anchor_length_max >= 0.01f);
     assert(params.anchor_length_max >= params.anchor_length);
 
@@ -2253,18 +2750,18 @@ void Fill::connect_base_support(Polylines &&infill_ordered, const std::vector<co
 
 #ifdef INFILL_DEBUG_OUTPUT
     static int iRun = 0;
-    ++ iRun;
+    ++iRun;
     export_partial_infill_to_svg(debug_out_path("connect_base_support-initial-%03d.svg", iRun), graph, infill_ordered, polylines_out);
 #endif // INFILL_DEBUG_OUTPUT
 
-    const double        line_half_width = 0.5 * scale_(spacing);
-    const double        line_spacing    = scale_(spacing) / params.density;
-    const double        min_arch_length = 1.3 * line_spacing;
-    const double        trim_length     = line_half_width * 0.3;
+    const double line_half_width = 0.5 * scale_(spacing);
+    const double line_spacing    = scale_(spacing) / params.density;
+    const double min_arch_length = 1.3 * line_spacing;
+    const double trim_length     = line_half_width * 0.3;
 
-// After mark_boundary_segments_touching_infill() marks boundary segments overlapping trimmed infill lines,
-// there are possibly some very short boundary segments unmarked, but overlapping the untrimmed infill lines fully.
-// Mark those short boundary segments.
+    // After mark_boundary_segments_touching_infill() marks boundary segments overlapping trimmed infill lines,
+    // there are possibly some very short boundary segments unmarked, but overlapping the untrimmed infill lines fully.
+    // Mark those short boundary segments.
     mark_boundary_segments_overlapping_infill(graph, infill_ordered, scale_(spacing));
 
 #ifdef INFILL_DEBUG_OUTPUT
@@ -2275,9 +2772,9 @@ void Fill::connect_base_support(Polylines &&infill_ordered, const std::vector<co
     // Extrude these loops as perimeters.
     {
         std::vector<size_t> num_boundary_contour_infill_points(graph.boundary.size(), 0);
-        for (ContourIntersectionPoint &cp : graph.map_infill_end_point_to_boundary)
-            ++ num_boundary_contour_infill_points[cp.contour_idx];
-        for (size_t i = 0; i < num_boundary_contour_infill_points.size(); ++ i)
+        for (ContourIntersectionPoint& cp : graph.map_infill_end_point_to_boundary)
+            ++num_boundary_contour_infill_points[cp.contour_idx];
+        for (size_t i = 0; i < num_boundary_contour_infill_points.size(); ++i)
             if (num_boundary_contour_infill_points[i] == 0 && graph.boundary_params[i].back() > trim_length + 0.5 * line_spacing) {
                 // Emit a perimeter.
                 Polyline pl(graph.boundary[i]);
@@ -2290,19 +2787,20 @@ void Fill::connect_base_support(Polylines &&infill_ordered, const std::vector<co
 
     // Before processing the boundary arches, emit those arches, which were trimmed by the infill lines at both sides, but which
     // depart from the infill line at least once after touching the infill line.
-    for (ContourIntersectionPoint &cp : graph.map_infill_end_point_to_boundary) {
+    for (ContourIntersectionPoint& cp : graph.map_infill_end_point_to_boundary) {
         if (cp.next_on_contour && cp.next_trimmed && cp.next_on_contour->prev_trimmed) {
             // The arch is leaving one infill line to end up at the same infill line or at the neighbouring one.
             // The arch is touching one of those infill lines at least once.
-            // Trace those arches and emit their parts, which are not attached to the end points and they are not overlapping with the two infill lines mentioned.
-            bool    first    = graph.first(cp);
-            coord_t left     = graph.point(cp).x();
-            coord_t right    = left;
+            // Trace those arches and emit their parts, which are not attached to the end points and they are not overlapping with the two
+            // infill lines mentioned.
+            bool    first = graph.first(cp);
+            coord_t left  = graph.point(cp).x();
+            coord_t right = left;
             if (first) {
-                left  += line_half_width;
+                left += line_half_width;
                 right += line_spacing - line_half_width;
             } else {
-                left  -= line_spacing - line_half_width;
+                left -= line_spacing - line_half_width;
                 right -= line_half_width;
             }
             double param_start    = cp.param + cp.contour_not_taken_length_next;
@@ -2314,7 +2812,8 @@ void Fill::connect_base_support(Polylines &&infill_ordered, const std::vector<co
                 param_end += contour_length;
             // Verify that the interval (param_overlap1, param_overlap2) is inside the interval (ip_low->param, ip_high->param).
             assert(cyclic_interval_inside_interval(cp.param, cp.next_on_contour->param, param_start, param_end, contour_length));
-            emit_loops_in_band(left, right, graph.boundary[cp.contour_idx], graph.boundary_params[cp.contour_idx], param_start, param_end, 0.5 * line_spacing, polylines_out);
+            emit_loops_in_band(left, right, graph.boundary[cp.contour_idx], graph.boundary_params[cp.contour_idx], param_start, param_end,
+                               0.5 * line_spacing, polylines_out);
         }
     }
 #ifdef INFILL_DEBUG_OUTPUT
@@ -2329,7 +2828,7 @@ void Fill::connect_base_support(Polylines &&infill_ordered, const std::vector<co
 
     std::vector<size_t> merged_with(infill_ordered.size());
     std::iota(merged_with.begin(), merged_with.end(), 0);
-    auto get_and_update_merged_with = [&graph, &merged_with](const ContourIntersectionPoint *cp) -> size_t {
+    auto get_and_update_merged_with = [&graph, &merged_with](const ContourIntersectionPoint* cp) -> size_t {
         size_t polyline_idx = (cp - graph.map_infill_end_point_to_boundary.data()) / 2;
         for (size_t last = polyline_idx;;) {
             size_t lower = merged_with[last];
@@ -2344,16 +2843,14 @@ void Fill::connect_base_support(Polylines &&infill_ordered, const std::vector<co
         return std::numeric_limits<size_t>::max();
     };
 
-    auto vertical = [](BoundaryInfillGraph::Direction dir) {
-        return dir == BoundaryInfillGraph::Up || dir == BoundaryInfillGraph::Down;
-    };
+    auto vertical = [](BoundaryInfillGraph::Direction dir) { return dir == BoundaryInfillGraph::Up || dir == BoundaryInfillGraph::Down; };
     // When both left / right arch connected to cp is vertical (ends up at the same vertical infill line), which one to take?
-    auto take_vertical_prev = [](const ContourIntersectionPoint &cp) {
+    auto take_vertical_prev = [](const ContourIntersectionPoint& cp) {
         return cp.prev_trimmed == cp.next_trimmed ?
-            // Both are either trimmed or not trimmed. Take the longer contour.
-            cp.contour_not_taken_length_prev > cp.contour_not_taken_length_next :
-            // One is trimmed, the other is not trimmed. Take the not trimmed.
-            ! cp.prev_trimmed && cp.next_trimmed;
+                   // Both are either trimmed or not trimmed. Take the longer contour.
+                   cp.contour_not_taken_length_prev > cp.contour_not_taken_length_next :
+                   // One is trimmed, the other is not trimmed. Take the not trimmed.
+                   !cp.prev_trimmed && cp.next_trimmed;
     };
 
     // Connect infill lines at cp and cpo_next_on_contour.
@@ -2365,27 +2862,28 @@ void Fill::connect_base_support(Polylines &&infill_ordered, const std::vector<co
     // If cp1 == next_on_contour (a single infill line is connected to a contour, this is a valid case for contours with holes),
     // then extrude the full circle.
     // Nothing is done if the arch could no more be taken (one of it end points were consumed already).
-    auto take_next = [&graph, &infill_ordered, &merged_with, get_and_update_merged_with, line_half_width, trim_length](ContourIntersectionPoint &cp, bool take_first) {
+    auto take_next = [&graph, &infill_ordered, &merged_with, get_and_update_merged_with, line_half_width,
+                      trim_length](ContourIntersectionPoint& cp, bool take_first) {
         // Indices of the polylines to be connected by a perimeter segment.
-        ContourIntersectionPoint  *cp1            = &cp;
-        ContourIntersectionPoint  *cp2            = cp.next_on_contour;
+        ContourIntersectionPoint* cp1 = &cp;
+        ContourIntersectionPoint* cp2 = cp.next_on_contour;
         assert(cp1->next_trimmed == cp2->prev_trimmed);
-        //assert(cp1->next_trimmed || cp1->consumed == cp2->consumed);
+        // assert(cp1->next_trimmed || cp1->consumed == cp2->consumed);
         if (take_first ? cp1->consumed : cp2->consumed)
             return;
         size_t                     polyline_idx1  = get_and_update_merged_with(cp1);
         size_t                     polyline_idx2  = get_and_update_merged_with(cp2);
-        Polyline                  &polyline1      = infill_ordered[polyline_idx1];
-        Polyline                  &polyline2      = infill_ordered[polyline_idx2];
-        const Points              &contour        = graph.boundary[cp1->contour_idx];
-        const std::vector<double> &contour_params = graph.boundary_params[cp1->contour_idx];
+        Polyline&                  polyline1      = infill_ordered[polyline_idx1];
+        Polyline&                  polyline2      = infill_ordered[polyline_idx2];
+        const Points&              contour        = graph.boundary[cp1->contour_idx];
+        const std::vector<double>& contour_params = graph.boundary_params[cp1->contour_idx];
         assert(cp1->consumed || contour[cp1->point_idx] == polyline1.points.front() || contour[cp1->point_idx] == polyline1.points.back());
         assert(cp2->consumed || contour[cp2->point_idx] == polyline2.points.front() || contour[cp2->point_idx] == polyline2.points.back());
         bool trimmed = take_first ? cp1->next_trimmed : cp2->prev_trimmed;
-        if (! trimmed) {
+        if (!trimmed) {
             // Trim the end if closing a loop or making a T-joint.
             trimmed = cp1 == cp2 || polyline_idx1 == polyline_idx2 || (take_first ? cp2->consumed : cp1->consumed);
-            if (! trimmed) {
+            if (!trimmed) {
                 const bool                      cp1_first = ((cp1 - graph.map_infill_end_point_to_boundary.data()) & 1) == 0;
                 const ContourIntersectionPoint* cp1_other = cp1_first ? cp1 + 1 : cp1 - 1;
                 // Self loop, connecting the end points of the same infill line.
@@ -2410,7 +2908,7 @@ void Fill::connect_base_support(Polylines &&infill_ordered, const std::vector<co
                 take_limited(polyline1, contour, contour_params, cp1, cp2, false, 1e10, line_half_width);
             else
                 take_limited(polyline2, contour, contour_params, cp2, cp1, true, 1e10, line_half_width);
-        } else if (! cp1->consumed && ! cp2->consumed) {
+        } else if (!cp1->consumed && !cp2->consumed) {
             if (contour[cp1->point_idx] == polyline1.points.front())
                 polyline1.reverse();
             if (contour[cp2->point_idx] == polyline2.points.back())
@@ -2430,25 +2928,25 @@ void Fill::connect_base_support(Polylines &&infill_ordered, const std::vector<co
 
     // Consume all vertical arches. If a vertical arch is touching a neighboring vertical infill line, thus the vertical arch is trimmed,
     // only consume the trimmed part if it is longer than min_arch_length.
-    for (ContourIntersectionPoint &cp : graph.map_infill_end_point_to_boundary) {
+    for (ContourIntersectionPoint& cp : graph.map_infill_end_point_to_boundary) {
         assert(cp.contour_idx != boundary_idx_unconnected);
         if (cp.consumed)
             continue;
-        const ContourIntersectionPoint &cp_other = graph.other(cp);
+        const ContourIntersectionPoint& cp_other = graph.other(cp);
         assert((cp.next_on_contour == &cp_other) == (cp_other.prev_on_contour == &cp));
         assert((cp.prev_on_contour == &cp_other) == (cp_other.next_on_contour == &cp));
         BoundaryInfillGraph::Direction dir_prev = graph.dir_prev(cp);
         BoundaryInfillGraph::Direction dir_next = graph.dir_next(cp);
         // Following code will also consume contours with just a single infill line attached. (cp1->next_on_contour == cp1).
         assert((cp.next_on_contour == &cp) == (cp.prev_on_contour == &cp));
-        bool can_take_prev = vertical(dir_prev) && ! cp.prev_on_contour->consumed && cp.prev_on_contour != &cp_other;
-        bool can_take_next = vertical(dir_next) && ! cp.next_on_contour->consumed && cp.next_on_contour != &cp_other;
-        if (can_take_prev && (! can_take_next || take_vertical_prev(cp))) {
-            if (! cp.prev_trimmed || cp.contour_not_taken_length_prev > min_arch_length)
+        bool can_take_prev = vertical(dir_prev) && !cp.prev_on_contour->consumed && cp.prev_on_contour != &cp_other;
+        bool can_take_next = vertical(dir_next) && !cp.next_on_contour->consumed && cp.next_on_contour != &cp_other;
+        if (can_take_prev && (!can_take_next || take_vertical_prev(cp))) {
+            if (!cp.prev_trimmed || cp.contour_not_taken_length_prev > min_arch_length)
                 // take previous
                 take_next(*cp.prev_on_contour, false);
         } else if (can_take_next) {
-            if (! cp.next_trimmed || cp.contour_not_taken_length_next > min_arch_length)
+            if (!cp.next_trimmed || cp.contour_not_taken_length_next > min_arch_length)
                 // take next
                 take_next(cp, true);
         }
@@ -2458,27 +2956,27 @@ void Fill::connect_base_support(Polylines &&infill_ordered, const std::vector<co
     export_partial_infill_to_svg(debug_out_path("connect_base_support-vertical-%03d.svg", iRun), graph, infill_ordered, polylines_out);
 #endif // INFILL_DEBUG_OUTPUT
 
-    const std::vector<SupportArcCost> arches = evaluate_support_arches(infill_ordered, graph, spacing, params);
-    static const double cost_low      = line_spacing * 1.3;
-    static const double cost_high     = line_spacing * 2.;
-    static const double cost_veryhigh = line_spacing * 3.;
+    const std::vector<SupportArcCost> arches        = evaluate_support_arches(infill_ordered, graph, spacing, params);
+    static const double               cost_low      = line_spacing * 1.3;
+    static const double               cost_high     = line_spacing * 2.;
+    static const double               cost_veryhigh = line_spacing * 3.;
 
     {
         std::vector<const SupportArcCost*> selected;
         selected.reserve(graph.map_infill_end_point_to_boundary.size());
-        for (ContourIntersectionPoint &cp : graph.map_infill_end_point_to_boundary) {
+        for (ContourIntersectionPoint& cp : graph.map_infill_end_point_to_boundary) {
             if (cp.consumed)
                 continue;
-            const SupportArcCost &cost_prev = arches[(&cp - graph.map_infill_end_point_to_boundary.data()) * 2];
-            const SupportArcCost &cost_next = *(&cost_prev + 1);
-            double                cost_min = cost_prev.cost;
-            double                cost_max = cost_next.cost;
+            const SupportArcCost& cost_prev = arches[(&cp - graph.map_infill_end_point_to_boundary.data()) * 2];
+            const SupportArcCost& cost_next = *(&cost_prev + 1);
+            double                cost_min  = cost_prev.cost;
+            double                cost_max  = cost_next.cost;
             if (cost_min > cost_max)
                 std::swap(cost_min, cost_max);
             if (cost_max < cost_low || cost_min > cost_high)
                 // Don't take any of the prev / next arches now, take zig-zag instead. It does not matter which one will be taken.
                 continue;
-            const double           cost_diff_relative = (cost_max - cost_min) / cost_max;
+            const double cost_diff_relative = (cost_max - cost_min) / cost_max;
             if (cost_diff_relative < 0.25)
                 // Don't take any of the prev / next arches now, take zig-zag instead. It does not matter which one will be taken.
                 continue;
@@ -2488,11 +2986,11 @@ void Fill::connect_base_support(Polylines &&infill_ordered, const std::vector<co
                 selected.emplace_back(&cost_next);
         }
         // Take the longest arch first.
-        std::sort(selected.begin(), selected.end(), [](const auto *l, const auto *r) { return l->cost > r->cost; });
+        std::sort(selected.begin(), selected.end(), [](const auto* l, const auto* r) { return l->cost > r->cost; });
         // And connect along the arches.
-        for (const SupportArcCost *arc : selected) {
-            ContourIntersectionPoint &cp = graph.map_infill_end_point_to_boundary[(arc - arches.data()) / 2];
-            if (! cp.consumed) {
+        for (const SupportArcCost* arc : selected) {
+            ContourIntersectionPoint& cp = graph.map_infill_end_point_to_boundary[(arc - arches.data()) / 2];
+            if (!cp.consumed) {
                 bool prev = ((arc - arches.data()) & 1) == 0;
                 if (prev)
                     take_next(*cp.prev_on_contour, false);
@@ -2578,7 +3076,7 @@ void Fill::connect_base_support(Polylines &&infill_ordered, const std::vector<co
 #endif // INFILL_DEBUG_OUTPUT
 
     // Traverse the unconnected lines in a zig-zag fashion, left to right only.
-    for (ContourIntersectionPoint &cp : graph.map_infill_end_point_to_boundary) {
+    for (ContourIntersectionPoint& cp : graph.map_infill_end_point_to_boundary) {
         assert(cp.contour_idx != boundary_idx_unconnected);
         if (cp.consumed)
             continue;
@@ -2598,14 +3096,14 @@ void Fill::connect_base_support(Polylines &&infill_ordered, const std::vector<co
 #endif // INFILL_DEBUG_OUTPUT
 
     // Add the left caps.
-    for (ContourIntersectionPoint &cp : graph.map_infill_end_point_to_boundary) {
-        const bool                      first = ((&cp - graph.map_infill_end_point_to_boundary.data()) & 1) == 0;
-        const ContourIntersectionPoint *other_end = first ? &cp + 1 : &cp - 1;
+    for (ContourIntersectionPoint& cp : graph.map_infill_end_point_to_boundary) {
+        const bool                      first     = ((&cp - graph.map_infill_end_point_to_boundary.data()) & 1) == 0;
+        const ContourIntersectionPoint* other_end = first ? &cp + 1 : &cp - 1;
         const bool                      loop_next = cp.next_on_contour == other_end;
         const bool                      loop_prev = other_end->next_on_contour == &cp;
 #ifndef NDEBUG
-        const SupportArcCost           &cost_prev = arches[(&cp - graph.map_infill_end_point_to_boundary.data()) * 2];
-        const SupportArcCost           &cost_next = *(&cost_prev + 1);
+        const SupportArcCost& cost_prev = arches[(&cp - graph.map_infill_end_point_to_boundary.data()) * 2];
+        const SupportArcCost& cost_next = *(&cost_prev + 1);
         assert(cost_prev.self_loop == loop_prev);
         assert(cost_next.self_loop == loop_next);
 #endif // NDEBUG
@@ -2622,21 +3120,23 @@ void Fill::connect_base_support(Polylines &&infill_ordered, const std::vector<co
     // Connect with T joints using long arches. Loops could be created only if a very long arc has to be added.
     {
         std::vector<const SupportArcCost*> candidates;
-        for (ContourIntersectionPoint &cp : graph.map_infill_end_point_to_boundary) {
+        for (ContourIntersectionPoint& cp : graph.map_infill_end_point_to_boundary) {
             if (cp.could_take_prev())
                 candidates.emplace_back(&arches[(&cp - graph.map_infill_end_point_to_boundary.data()) * 2]);
             if (cp.could_take_next())
                 candidates.emplace_back(&arches[(&cp - graph.map_infill_end_point_to_boundary.data()) * 2 + 1]);
         }
-        std::sort(candidates.begin(), candidates.end(), [](auto *c1, auto *c2) { return c1->cost > c2->cost; });
-        for (const SupportArcCost *candidate : candidates) {
-            ContourIntersectionPoint &cp   = graph.map_infill_end_point_to_boundary[(candidate - arches.data()) / 2];
+        std::sort(candidates.begin(), candidates.end(), [](auto* c1, auto* c2) { return c1->cost > c2->cost; });
+        for (const SupportArcCost* candidate : candidates) {
+            ContourIntersectionPoint& cp   = graph.map_infill_end_point_to_boundary[(candidate - arches.data()) / 2];
             bool                      prev = ((candidate - arches.data()) & 1) == 0;
             if (prev) {
-                if (cp.could_take_prev() && (get_and_update_merged_with(&cp) != get_and_update_merged_with(cp.prev_on_contour) || candidate->cost > cost_high))
+                if (cp.could_take_prev() &&
+                    (get_and_update_merged_with(&cp) != get_and_update_merged_with(cp.prev_on_contour) || candidate->cost > cost_high))
                     take_next(*cp.prev_on_contour, false);
             } else {
-                if (cp.could_take_next() && (get_and_update_merged_with(&cp) != get_and_update_merged_with(cp.next_on_contour) || candidate->cost > cost_high))
+                if (cp.could_take_next() &&
+                    (get_and_update_merged_with(&cp) != get_and_update_merged_with(cp.next_on_contour) || candidate->cost > cost_high))
                     take_next(cp, true);
             }
         }
@@ -2648,38 +3148,36 @@ void Fill::connect_base_support(Polylines &&infill_ordered, const std::vector<co
 
     // Add very long arches and reasonably long caps even if both of its end points were already consumed.
     const double cap_cost = 0.5 * line_spacing;
-    for (ContourIntersectionPoint &cp : graph.map_infill_end_point_to_boundary) {
-        const SupportArcCost &cost_prev = arches[(&cp - graph.map_infill_end_point_to_boundary.data()) * 2];
-        const SupportArcCost &cost_next = *(&cost_prev + 1);
+    for (ContourIntersectionPoint& cp : graph.map_infill_end_point_to_boundary) {
+        const SupportArcCost& cost_prev = arches[(&cp - graph.map_infill_end_point_to_boundary.data()) * 2];
+        const SupportArcCost& cost_next = *(&cost_prev + 1);
         if (cp.contour_not_taken_length_prev > SCALED_EPSILON &&
-            (cost_prev.self_loop ?
-                cost_prev.cost > cap_cost :
-                cost_prev.cost > cost_veryhigh)) {
+            (cost_prev.self_loop ? cost_prev.cost > cap_cost : cost_prev.cost > cost_veryhigh)) {
             assert(cp.consumed && (cp.prev_on_contour->consumed || cp.prev_trimmed));
-            Polyline pl { graph.point(cp) };
-            if (! cp.prev_trimmed) {
+            Polyline pl{graph.point(cp)};
+            if (!cp.prev_trimmed) {
                 cp.trim_prev(cp.contour_not_taken_length_prev - line_half_width);
                 cp.prev_on_contour->trim_next(0);
             }
             if (cp.contour_not_taken_length_prev > SCALED_EPSILON) {
-                take_cw_limited(pl, graph.boundary[cp.contour_idx], graph.boundary_params[cp.contour_idx], cp.point_idx, cp.prev_on_contour->point_idx, cp.contour_not_taken_length_prev);
+                take_cw_limited(pl, graph.boundary[cp.contour_idx], graph.boundary_params[cp.contour_idx], cp.point_idx,
+                                cp.prev_on_contour->point_idx, cp.contour_not_taken_length_prev);
                 cp.trim_prev(0);
                 pl.clip_start(line_half_width);
                 polylines_out.emplace_back(std::move(pl));
             }
         }
         if (cp.contour_not_taken_length_next > SCALED_EPSILON &&
-            (cost_next.self_loop ?
-                cost_next.cost > cap_cost :
-                cost_next.cost > cost_veryhigh)) {
+            (cost_next.self_loop ? cost_next.cost > cap_cost : cost_next.cost > cost_veryhigh)) {
             assert(cp.consumed && (cp.next_on_contour->consumed || cp.next_trimmed));
-            Polyline pl { graph.point(cp) };
-            if (! cp.next_trimmed) {
+            Polyline pl{graph.point(cp)};
+            if (!cp.next_trimmed) {
                 cp.trim_next(cp.contour_not_taken_length_next - line_half_width);
                 cp.next_on_contour->trim_prev(0);
             }
             if (cp.contour_not_taken_length_next > SCALED_EPSILON) {
-                take_ccw_limited(pl, graph.boundary[cp.contour_idx], graph.boundary_params[cp.contour_idx], cp.point_idx, cp.next_on_contour->point_idx, cp.contour_not_taken_length_next); // line_half_width);
+                take_ccw_limited(pl, graph.boundary[cp.contour_idx], graph.boundary_params[cp.contour_idx], cp.point_idx,
+                                 cp.next_on_contour->point_idx, cp.contour_not_taken_length_next); // line_half_width);
                 cp.trim_next(0);
                 pl.clip_start(line_half_width);
                 polylines_out.emplace_back(std::move(pl));
@@ -2691,21 +3189,53 @@ void Fill::connect_base_support(Polylines &&infill_ordered, const std::vector<co
     export_partial_infill_to_svg(debug_out_path("connect_base_support-final-%03d.svg", iRun), graph, infill_ordered, polylines_out);
 #endif // INFILL_DEBUG_OUTPUT
 
-    polylines_out.reserve(polylines_out.size() + std::count_if(infill_ordered.begin(), infill_ordered.end(), [](const Polyline &pl) { return ! pl.empty(); }));
-    for (Polyline &pl : infill_ordered)
-        if (! pl.empty())
+    polylines_out.reserve(polylines_out.size() +
+                          std::count_if(infill_ordered.begin(), infill_ordered.end(), [](const Polyline& pl) { return !pl.empty(); }));
+    for (Polyline& pl : infill_ordered)
+        if (!pl.empty())
             polylines_out.emplace_back(std::move(pl));
 }
 
-void Fill::connect_base_support(Polylines &&infill_ordered, const Polygons &boundary_src, const BoundingBox &bbox, Polylines &polylines_out, const double spacing, const FillParams &params)
+// [INTENT] connect_base_support() (Polygons overload) — thin dispatcher: converts Polygons into
+//          vector<const Polygon*> and delegates to the main connect_base_support() overload.
+// [COUPLING] Raw pointer aliasing — boundary_src must outlive the call.
+void Fill::connect_base_support(Polylines&&        infill_ordered,
+                                const Polygons&    boundary_src,
+                                const BoundingBox& bbox,
+                                Polylines&         polylines_out,
+                                const double       spacing,
+                                const FillParams&  params)
 {
     auto polygons_src = reserve_vector<const Polygon*>(boundary_src.size());
-    for (const Polygon &polygon : boundary_src)
+    for (const Polygon& polygon : boundary_src)
         polygons_src.emplace_back(&polygon);
 
     connect_base_support(std::move(infill_ordered), polygons_src, bbox, polylines_out, spacing, params);
 }
 
+// [INTENT] multiline_fill() — OrcaSlicer-specific post-processing step for "multiline" infill mode.
+//          When params.multiline > 1, the original set of infill lines is expanded into a bundle of
+//          `n_lines` parallel lines evenly spaced at `spacing`, using Clipper2's path offsetter
+//          with Round join/end types. For odd n_lines: one center line + symmetric offsets.
+//          For even n_lines: offsets at ±0.5*spacing, ±1.5*spacing, etc.
+//          This effectively replaces each single infill line with a "thick" multi-line bundle,
+//          enabling variable-width infill regions.
+//
+// [STATE] Replaces polylines in-place: polylines is cleared and replaced with all_polylines.
+// [COUPLING] Uses Clipper2Lib::ClipperOffset (Paths64). Calls Slic3rPolylines_to_Paths64() and
+//            Paths64_to_polylines() for coordinate conversion.
+// [HAZARD] Clipper2 offsets are in scaled units (scale_(t)), but `t` is in mm-space (spacing ×
+//          integer multiples). If SCALING_FACTOR ever changes, the offsets remain correct because
+//          scale_() is used, but floating-point rounding of scale_(t) for large offsets may
+//          accumulate. Miter limit 2.0 is hard-coded.
+// [HAZARD] `static_cast<int>(polylines.size())` (n_polylines): if polylines.size() > INT_MAX,
+//          this silently overflows. Not a realistic concern for slicer workloads.
+// [HAZARD] The offsetter is created once and reused for all offset distances via a single
+//          AddPaths + repeated Execute calls. This is correct Clipper2 usage (Execute may be
+//          called multiple times after a single AddPaths), but is not obviously safe to a reader.
+// [UNCLEAR] Closed polylines from Paths64_to_polylines() (detected by front==back) are closed
+//           by re-appending the front point. The rationale is not documented — presumably needed
+//           to form a closed perimeter-like loop for certain connection patterns.
 // Fill Multiline -Clipper2 version
 void multiline_fill(Polylines& polylines, const FillParams& params, float spacing)
 {
@@ -2718,12 +3248,10 @@ void multiline_fill(Polylines& polylines, const FillParams& params, float spacin
     all_polylines.reserve(n_lines * n_polylines);
 
     // Remove invalid polylines
-    polylines.erase(std::remove_if(polylines.begin(), polylines.end(),
-                              [](const Polyline& p) { return p.size() < 2; }),
-               polylines.end());
+    polylines.erase(std::remove_if(polylines.begin(), polylines.end(), [](const Polyline& p) { return p.size() < 2; }), polylines.end());
 
     if (polylines.empty())
-    return;
+        return;
     // Convert source polylines to Clipper2 paths
     Clipper2Lib::Paths64 subject_paths = Slic3rPolylines_to_Paths64(polylines);
 
@@ -2747,7 +3275,7 @@ void multiline_fill(Polylines& polylines, const FillParams& params, float spacin
             offsets.push_back(start + i * spacing);
     }
 
-    // Process each offset 
+    // Process each offset
     Clipper2Lib::ClipperOffset offsetter(miter_limit);
     offsetter.AddPaths(subject_paths, Clipper2Lib::JoinType::Round, Clipper2Lib::EndType::Round);
 
