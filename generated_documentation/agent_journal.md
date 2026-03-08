@@ -1940,3 +1940,72 @@ Lightning Infill is a tree-based algorithm producing minimal-material infill tha
 3. `src/libslic3r/Geometry/` directory — computational geometry utilities
 4. `src/libslic3r/Format/` directory — STL/OBJ/3MF/AMF parsers
 5. `src/libslic3r/SupportMaterial.cpp` — classic (non-tree) support generation
+
+---
+
+## Session 24 — Fill/FillConcentric.hpp/.cpp + Fill/FillGyroid.hpp/.cpp
+
+### Files Processed
+- `src/libslic3r/Fill/FillConcentric.hpp` — concentric infill class declaration
+- `src/libslic3r/Fill/FillConcentric.cpp` — concentric infill implementation
+- `src/libslic3r/Fill/FillGyroid.hpp` — Gyroid TPMS infill class declaration
+- `src/libslic3r/Fill/FillGyroid.cpp` — Gyroid TPMS infill implementation
+
+### Key Discoveries
+
+**FillConcentric**
+
+`FillConcentric` generates shell-like concentric loops shrinking inward by the line spacing. The implementation:
+1. Forces `fill_params.dont_adjust = true` (no spacing adjustment for integer loop count).
+2. Calls `union_ex()` on all input expolygons before the loop (defensive for multi-region inputs).
+3. Iteratively shrinks using `offset2_ex()` to avoid sharp-corner artifacts that `offset_ex()` produces.
+4. Collects all loops into `all_polylines` and calls `chain_or_connect_infill()` for travel ordering.
+
+Key omissions: no `multiline_fill()` support; `FillConcentricInternal` (for support interfaces) is a separate class with different chaining behavior.
+
+**FillGyroid**
+
+`FillGyroid` generates cross-sections of the Gyroid TPMS (triply periodic minimal surface). The implementation is the most mathematically complex infill in OrcaSlicer:
+
+- Static function `f(x, z_sin, z_cos, vertical, flip)` evaluates the 2D Gyroid curve y = f(x) at fixed Z by solving the implicit TPMS equation. Uses `asin()` without a guard against NaN from floating-point overflow past ±1 (H321).
+- `make_one_period()` adaptively samples the curve using a midpoint-subdivision loop with a triangle-area heuristic. Convergence is O(N² log N) in the worst case due to full `std::sort()` on each refinement pass (H322).
+- `make_wave()` tiles one period across the full bounding-box width, applies row offset, clamps to [0, height], and converts to scaled `coord_t`.
+- `make_gyroid_waves()` drives the full generation: computes z_sin/z_cos, chooses horizontal vs. vertical orientation, generates two period templates (odd/even), and iterates rows at π spacing. The loop body mutates `y0` (for the even row), creating an effective 2π step per iteration — looks like a double-increment but is intentional (H328).
+
+**CorrectionAngle = -45°:** rotates the pattern for diagonal alignment on Cartesian printers.
+**DensityAdjust = 2.44:** empirical factor; Gyroid surface occupies ~41% of space at "100%" density.
+**PatternTolerance = 0.2 mm:** adaptive sampling tolerance; constexpr ODR fix in .cpp (H320).
+
+### Hazard Summary (H311–H330)
+
+| Hazard | Brief | Priority |
+|--------|-------|----------|
+| H311 | `dont_adjust=true` forces no spacing adjustment; innermost loop may clip thin walls | P2 |
+| H312 | Defensive `union_ex()` on every call adds Clipper overhead even for single-expolygon input | P3 |
+| H313 | Polyline order after union non-deterministic w.r.t. original polygon ordering | P3 |
+| H314 | `offset2_ex()` can return degenerate single-point polygons (area≈0) that pass empty check | P2 |
+| H315 | Wrong-winding holes in degenerate Clipper output treated as concentric loops | P2 |
+| H316 | `multiline_fill()` never called; `params.multiline > 1` silently ignored by FillConcentric | P2 |
+| H317 | `FillConcentricInternal::fill_surface()` is a distinct code path without `chain_or_connect_infill()` | P2 |
+| H318 | `loop_clipping` applied only inside `chain_or_connect_infill()`; missing in a naive port = seam over-extrusion | P2 |
+| H319 | `use_bridge_flow()` returns false; dead comment claims it should return true | P2 |
+| H320 | `constexpr PatternTolerance` ODR fix in .cpp; redundant in C++17, required in C++14 | P3 |
+| H321 | `asin(a/r)` in `f()`: no clamp guard against NaN from FP rounding past ±1 | P1 |
+| H322 | `make_one_period()` sort-on-every-pass: O(N² log N) worst case | P3 |
+| H323 | `make_gyroid_waves()` swaps width/height for vertical orientation; callers must not assume axis | P2 |
+| H324 | (repeat of H321 with extra context) asin domain error, NaN propagates silently | P1 |
+| H325 | `make_wave()` index-based tiling into same vector being appended: correct but fragile | P2 |
+| H326 | Clamping y to [0, height] creates flat wave ends at boundary | P3 |
+| H327 | Triangle-area heuristic (not true chord-height) for adaptive sampling | P3 |
+| H328 | `y0 += M_PI` inside loop body: intentional 2π step; looks like double-increment bug | P2 |
+| H329 | 10× spacing bounding-box expansion: wasteful wave generation for low-density fills | P3 |
+| H330 | `params.multiline == 0` → division by zero in density_adjusted calculation; no guard | P2 |
+
+### Next Annotation Targets (Session 25+)
+
+1. `src/libslic3r/Fill/Fill3DHoneycomb.cpp/.hpp` — 3D honeycomb infill
+2. `src/libslic3r/Fill/FillHoneycomb.cpp/.hpp` — 2D honeycomb infill
+3. `src/libslic3r/Fill/FillPlanePath.cpp/.hpp` — Hilbert / Archimedean / Octagram spiral fills
+4. `src/libslic3r/Fill/FillLine.cpp/.hpp` — rectilinear line fill variant
+5. `src/libslic3r/Fill/FillCrossHatch.cpp/.hpp` — cross-hatch infill
+6. `src/libslic3r/Fill/Fill.cpp/.hpp` — the Fill factory dispatch
