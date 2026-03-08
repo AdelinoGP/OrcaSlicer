@@ -1820,3 +1820,123 @@ Adaptive Cubic Infill is a two-phase algorithm:
 3. `src/libslic3r/Fill/FillConcentric.cpp`
 4. `src/libslic3r/Geometry/` directory
 4. `src/libslic3r/Fill/FillLightning.cpp` — lightning infill
+
+---
+
+## Session 23 — Fill/FillLightning.cpp + Fill/Lightning/* (Lightning Infill subsystem)
+
+### Files Processed
+- `src/libslic3r/Fill/FillLightning.cpp` — ✅ fully annotated (adapter + factory layer)
+- `src/libslic3r/Fill/FillLightning.hpp` — ✅ fully annotated (Filler class, GeneratorDeleter, GeneratorPtr)
+- `src/libslic3r/Fill/Lightning/Generator.hpp` — ✅ fully annotated (top-level orchestrator)
+- `src/libslic3r/Fill/Lightning/Generator.cpp` — ✅ fully annotated (two construction paths, overhang generation, tree build)
+- `src/libslic3r/Fill/Lightning/Layer.hpp` — ✅ fully annotated (per-layer tree container + SparseNodeGrid)
+- `src/libslic3r/Fill/Lightning/Layer.cpp` — ✅ fully annotated (generateNewTrees, getBestGroundingLocation, attach, reconnectRoots, convertToLines)
+- `src/libslic3r/Fill/Lightning/TreeNode.hpp` — ✅ fully annotated (Node class, factory pattern, all member declarations)
+- `src/libslic3r/Fill/Lightning/TreeNode.cpp` — ✅ fully annotated (all member implementations, DFS algorithms)
+
+### Architecture Discoveries
+
+**Lightning Infill Algorithm Overview (Cura-derived)**
+
+Lightning Infill is a tree-based algorithm producing minimal-material infill that supports top surfaces. The algorithm name derives from the fractal-lightning appearance of the resulting patterns. Origin paper: "Ribbed Support Vaults for 3D Printing of Hollowed Objects" (Tricard, Claux, Lefebvre).
+
+**Two-Phase Construction**
+1. `generateInitialInternalOverhangs()` (top→bottom): For each layer, compute `diff(offset(infill_area, -m_wall_supporting_radius), infill_area_above)` — the area of this layer that is NOT directly supported by the layer above. These "internal overhangs" are what the trees must support.
+2. `generateTrees()` (top→bottom, then bottom→top for the tree build): For each layer, call `Layer::generateNewTrees()` to grow new branches, `Layer::reconnectRoots()` to reattach orphaned roots, and `Node::propagateToNextLayer()` to project the trees down one layer.
+
+**Tree Node Structure**
+- Each `Node` is a 2D point in the layer plane, connected to 0 or 1 parent and 0+ children.
+- Memory model: shared_ptr parent (ownership); weak_ptr child-to-parent (cycle prevention).
+- `enable_shared_from_this` enables nodes to produce `shared_ptr<this>` safely.
+- Factory-only construction via `Node::create()` (EnableMakeShared workaround).
+- Complete RAII: dropping the last shared_ptr to a root destroys the entire subtree.
+
+**Per-Layer Growth Algorithm (`Layer::generateNewTrees`)**
+1. Build `DistanceField` from `current_overhang` — samples unsupported area at grid spacing, sorted by distance-to-boundary descending.
+2. Build `SparseNodeGrid` (4 mm cells) from existing `tree_roots` (propagated from layer above).
+3. Loop: take next unsupported cell → `getBestGroundingLocation()` (TBB parallel tree-node search + O(N) boundary scan) → `attach()` → update locator.
+4. Each attached node reduces the surrounding overhang cells in the distance field.
+
+**Cross-Layer Propagation (`Node::propagateToNextLayer`)**
+- `deepCopy()` → `prune(m_prune_length)` → `straighten(m_straightening_max_distance)` → `realign(next_outlines)`
+- Pruning removes leaf endpoints that would overhang too far for the next layer.
+- Straightening nudges single-child chains toward the junction-to-junction axis.
+- Realign snaps out-of-bounds nodes to the new layer outline.
+
+**Adapter Pattern (FillLightning.hpp/cpp)**
+- `Filler` is a thin adapter: holds a raw non-owning pointer to the Generator.
+- Generator is built once per PrintObject via `build_generator()` → `GeneratorPtr`.
+- `GeneratorDeleter` enables opaque unique_ptr (PImpl-lite) to avoid incomplete-type deletion.
+- Per-layer fill call: `getTreesForLayer()` → `convertToLines()` → `multiline_fill()` → `intersection_pl()` → `chain_or_connect_infill()`.
+
+**OrcaSlicer-Specific Additions**
+- `multiline_fill()` integration: Orca's multi-line offset applied before final Clipper clip.
+- `generateTreesforSupport()`: secondary constructor for tree-support usage, different `m_supporting_radius` formula.
+- Divide-by-zero guard in Generator constructor (density clamped before division).
+
+**Namespace Comment Bug (Copy-Paste)**
+- Both `FillLightning.cpp` (line 151) and `FillLightning.hpp` (line 125) have namespace closing comments saying `FillAdaptive` instead of `FillLightning`. These are stale copy-paste errors from FillAdaptive files. The actual braces are syntactically correct. Documented as H265, H266.
+
+**Non-Determinism (rand())**
+- `Node::convertToPolylines()` uses `rand() % m_children.size()` to pick which child extends the "long" polyline at each junction. In release builds (debug helper `get_svg_filename()` never called), `rand()` uses default seed 1 — technically deterministic but machine-dependent if the debug path was ever hit. Documented as H273.
+
+### Critical Hazards Found (H264–H310)
+
+| # | Description | Priority |
+|---|-------------|----------|
+| H264 | `GeneratorDeleter` pattern: if Generator.hpp included before FillLightning.hpp, compiler may allow `unique_ptr<Generator>` without custom deleter. On MSVC/MT: heap corruption on cross-TU delete. Always use `GeneratorPtr` | P1 |
+| H265 | FillLightning.cpp line 151 namespace comment bug: says `FillAdaptive` not `FillLightning` | P3 |
+| H266 | FillLightning.hpp line 125 same namespace comment copy-paste bug | P3 |
+| H267 | `Filler::generator` raw non-owning pointer; no null-check in `_fill_surface_single()`; dangling if PrintObject destroyed mid-slice | P1 |
+| H268 | `layer_id` index not range-checked in release builds; out-of-bounds access is UB | P1 |
+| H269 | `multiline_fill()` may push lines outside expolygon; double-clip is correct but hidden | P2 |
+| H270 | Two constructors have different `m_supporting_radius` formulas; using infill formula for support (or vice versa) produces wrong branch density | P1 |
+| H271 | Partial-construction if `throw_on_cancel_callback` throws; no guard | P2 |
+| H272 | All three angle-derived parameters hardcoded at 45°; no user configuration | P2 |
+| H273 | `rand()` used for non-deterministic child selection in `convertToPolylines()` | P2 |
+| H274 | `rand_num` computed but unused in `get_svg_filename()` — dead code | P3 |
+| H275 | Negative-area polygon from Clipper offset silently accepted as "no overhang" | P2 |
+| H276 | EdgeGrid rebuilt per layer in `generateTrees()` — O(N_edges × N_layers) total cost | P3 |
+| H277 | Cancel callback called once per layer — coarse-grained cancel response | P3 |
+| H278 | `bboxs` (typo) must match `m_lightning_layers` size; no enforcement | P2 |
+| H279 | `generateTreesforSupport()` takes non-const reference vectors; caller must keep alive | P2 |
+| H280 | `DistanceField` not annotated; must preserve interior-first growth order in port | P2 |
+| H281 | SparseNodeGrid locator not updated immediately after `attach()`; brief inconsistency window | P2 |
+| H282 | Closest-boundary scan in `getBestGroundingLocation()` is O(N_vertices) with no spatial index | P2 |
+| H283 | TBB parallel_for in `getBestGroundingLocation()` has no minimum-cell-count guard | P3 |
+| H284 | Tie-breaking by lexicographic grid address — algorithmic, not quality-based | P3 |
+| H285 | `reconnectRoots()` linear scan `std::find` — O(N²) for large forests | P3 |
+| H286 | `PointHash` quality not validated; poor distribution degrades lookup to O(N) | P3 |
+| H287 | `GroundingLocation::p()` assert debug-only; release crash on default-constructed instance | P1 |
+| H288 | `Layer::tree_roots` is public — unguarded modification can leave SparseNodeGrid stale | P2 |
+| H289 | `getBestGroundingLocation()` boundary scan O(N_vertices) with EdgeGrid available but unused for this step | P2 |
+| H290 | `Layer::attach()` no capacity pre-reservation; reallocation possible | P3 |
+| H291 | `reconnectRoots()` UB if root already removed before call: `erase(end())` | P1 |
+| H292 | `convertToLines()` single Clipper call for all trees; dominates runtime for complex outlines | P3 |
+| H293 | `convertToPolylines()` polyline order non-deterministic across machines (rand seed) | P3 |
+| H294 | `getWeightedDistance()` double→coord_t truncation; silent overflow for >2.1 km | P3 |
+| H295 | Negative grid keys valid but confusing when node outside bbox | P3 |
+| H296 | `fillLocator()` does not clear locator first; stale entries accumulate if non-empty locator passed | P3 |
+| H297 | DistanceField sub-cell overhangs produce no infill; silent unsupported areas | P2 |
+| H298 | Cancel callback called once per unsupported point; I/O in callback = throughput bottleneck | P3 |
+| H299 | Null `new_root` after `attach()` returns true would skip locator insert; latent bug | P3 |
+| H300 | `locator_cell_size()` free function; inlining not guaranteed; per-call overhead in inner loop | P3 |
+| H301 | `EnableMakeShared` trick is C++-specific; port must replicate factory-only construction intent | P2 |
+| H302 | `addChild()` no cycle check in release builds | P2 |
+| H303 | Multiple recursive DFS functions; stack depth = tree depth; must be iterative for Go/Python ports | P2 |
+| H304 | `getWeightedDistance()` hardcoded valence constants; must be preserved exactly in port | P3 |
+| H305 | `reroot()` O(depth) recursive; same stack concern as H303 | P3 |
+| H306 | `closestNode()` O(N_nodes) linear scan; O(N_roots × N_nodes) in reconnectRoots | P2 |
+| H307 | All recursive DFS: Go (8 KB goroutine), Python (1000-frame limit) will overflow for trees > ~500 levels | P1 |
+| H308 | `straighten()` floating-point → coord_t rounding accumulates over many passes | P3 |
+| H309 | `removeJunctionOverlap()` swap-and-pop destroys polyline ordering | P3 |
+| H310 | `m_parent` weak_ptr: lock() returns nullptr if parent destroyed; code not always null-checking | P2 |
+
+### Next Annotation Targets (Session 24+)
+
+1. `src/libslic3r/Fill/FillConcentric.cpp` — concentric infill algorithm
+2. `src/libslic3r/Fill/FillGyroid.cpp` — gyroid/honeycomb infill
+3. `src/libslic3r/Geometry/` directory — computational geometry utilities
+4. `src/libslic3r/Format/` directory — STL/OBJ/3MF/AMF parsers
+5. `src/libslic3r/SupportMaterial.cpp` — classic (non-tree) support generation
