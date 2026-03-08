@@ -2224,3 +2224,62 @@ qhull "quite often" returns non-manifold output. The manifold assertion was comm
 5. `src/libslic3r/Flow.cpp`
 
 **Next hazard number to assign: H422**
+
+---
+
+## Session 28 — ClipperUtils.hpp
+
+### Files Processed
+- `src/libslic3r/ClipperUtils.hpp` — fully annotated (H422–H439)
+
+### Key Discoveries
+
+**PathsProvider iterator family** — The file defines 8 adapter types (EmptyPathsProvider, SinglePathProvider, PolygonsProvider, PolylinesProvider, MultiPointsProvider, ExPolygonProvider, ExPolygonsProvider, SurfacesProvider, SurfacesPtrProvider) that allow the same templated Clipper wrappers to accept any geometry container. This zero-cost abstraction pattern is important to replicate in any port — the alternative (overloaded functions) would require exponential combinations.
+
+**`_foreach_node<ON>` silent bug (H435)** — The `e_ordering::ON` specialization of the `foreach_node` template was intended to iterate nodes in spatial order, but the implementation calls `order_nodes()` and stores the result, then iterates the *original* unordered `nodes` instead of the ordered result. This means `traverse_pt_noholes()` (the only caller using `ON`) never produces ordered output. The bug is present in all sessions and has been in the codebase since Arachne integration.
+
+**ClipperSafetyOffset placement (H423)** — The 10nm safety offset is applied only to the clip polygon in difference/intersection operations, not the subject. This is by design (to avoid modifying the subject geometry) but can leave 10nm slivers when subject and clip share a boundary segment.
+
+### Hazards Assigned
+H422–H439 (see 04_refactoring_hazards.md)
+
+### Commits
+- `2c3ef4b66f` — annotate ClipperUtils.hpp (H422–H439)
+
+---
+
+## Session 29 — ClipperUtils.cpp
+
+### Files Processed
+- `src/libslic3r/ClipperUtils.cpp` — fully annotated (H440–H457), 1420 original lines
+
+### Key Discoveries
+
+**shrink_paths bounding-box sentinel trick (H446, H447)** — For negative offsets that may split contours, the code adds a large outer rectangle as an additional subject, then runs a pftNegative union, then removes the outermost polygon. This is a clever workaround for Clipper's lack of a native "shrink and extract holes" operation. The sentinel margin is only 10nm — fragile if Clipper ever outputs paths outside GetBounds().
+
+**clipper_do_polytree double-pass workaround (H450)** — All ExPolygon-output boolean operations run Clipper twice: once to Paths (fast, handles overlapping edges), once to PolyTree (for hierarchy). This is the fractal pyramid fix for GitHub issue #117.
+
+**_clipper_pl_recombine O(N²) (H451–H453)** — After clipping polygons as open paths, fragments are reconnected by nested endpoint-equality loops. For large polyline sets this is quadratic. Each `erase()` is additionally O(N). A spatial hash on endpoints would reduce this to O(N log N).
+
+**variable_offset_inner/outer delta size mismatch (H456)** — The `deltas` parameter must have exactly `expoly.holes.size() + 1` entries. This is only asserted in Debug. In Release, mismatched deltas cause silent out-of-bounds access.
+
+**variable_offset_outer copy-paste comment error (H457)** — Says "non positive" but asserts >= 0. The code is correct; the comment is wrong. A porter reading only the comment would invert the check.
+
+### Hazards Assigned
+H440–H457 (see 04_refactoring_hazards.md)
+
+### Commits
+- `dc15558b0a` — annotate ClipperUtils.cpp (H440–H457)
+
+### Next Annotation Targets (Session 30+)
+
+**Immediately next:**
+1. `src/libslic3r/Model.hpp` — core object hierarchy (ModelObject, ModelVolume, ModelInstance, Model)
+2. `src/libslic3r/Model.cpp` — implementation of above
+
+**Medium priority:**
+3. `src/libslic3r/Geometry.cpp` + `Geometry/` directory
+4. `src/libslic3r/EdgeGrid.cpp`
+5. `src/libslic3r/Flow.cpp`
+
+**Next hazard number to assign: H458**
