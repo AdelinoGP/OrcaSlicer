@@ -2409,3 +2409,43 @@ H528–H538 (see 04_refactoring_hazards.md)
 4. `src/libslic3r/MultiMaterialSegmentation.cpp` — LOWER priority
 
 **Next hazard number to assign: H539**
+
+---
+
+## Session 35 — EdgeGrid.cpp Annotation
+
+### Files Processed
+- `src/libslic3r/EdgeGrid.cpp` — full annotation pass; H539–H547 assigned
+- `generated_documentation/04_refactoring_hazards.md` — appended H539–H547 entries
+- `generated_documentation/agent_journal.md` — added session 35 entry
+
+### Key Discoveries
+- **H539**: `Contour` stores raw `const Point*` pointers — lifetime not managed by Grid; caller must keep source polygons alive (critical for ports with different ownership models)
+- **H540**: Bresenham accumulator uses `int64_t` products of `coord_t` values; no guard for extreme coordinate ranges
+- **H541**: `calculate_sdf()` signum flood-fill produces all-positive SDF for open polyline inputs; only closed contours provide seeds
+- **H542**: `signed_distance_bilinear()` extrapolates unboundedly outside grid bbox — no clamping or special return value
+- **H543**: `det == 0` assert for collinear adjacent segments is Debug-only; Release silently returns wrong sign for degenerate vertices
+- **H544**: `contours_simplified()` uses `goto end_of_poly` — same pattern as H528 (Geometry.cpp arrange())
+- **H545**: `intersecting_edges()` has a dead ternary branch (`jfirst` flag computed but both arms emit same pair); `sort_remove_duplicates()` therefore redundant
+- **H546**: `Grid::inside()` is permanently in `#if 0` with `//FIXME finish this!` and zero-init variables — intentionally unfinished; do not port
+- **H547**: Distance field stored as `float`; precision loss above ~16 mm at nanometre `coord_t` resolution — relevant for large print beds
+
+### Architecture Notes
+- The Grid is a pure spatial index with no ownership of contour data — this is a clean separation but creates an implicit lifetime contract
+- Two-pass Bresenham rasterisation is algorithmically sound but the cell size heuristic in the free-function `intersecting_edges()` (average edge length) is fragile for mixed-scale inputs
+- `signed_distance()` is a two-tier fallback: edge search → bilinear SDF fallback. The transition boundary depends on `search_radius` and may produce non-smooth distance values at the boundary
+
+### Hazards Assigned
+H539–H547 (see 04_refactoring_hazards.md)
+
+### Commits
+- `bd042a632e` — annotate EdgeGrid.cpp spatial grid and SDF implementation
+
+### Next Annotation Targets (Session 36+)
+
+**Immediately next:**
+1. `src/libslic3r/Flow.cpp` — MEDIUM priority, H548 onward
+2. `src/libslic3r/ShortestPath.cpp` — LOWER priority
+3. `src/libslic3r/MultiMaterialSegmentation.cpp` — LOWER priority
+
+**Next hazard number to assign: H548**
