@@ -2837,3 +2837,199 @@ H599–H634 (see `04_refactoring_hazards.md`)
 6. `src/libslic3r/Brim.cpp`
 
 **Next hazard number to assign: H635**
+
+---
+
+## Session 40
+
+**Files annotated:** `src/libslic3r/Line.hpp`, `src/libslic3r/Line.cpp`, `src/libslic3r/Extruder.hpp`, `src/libslic3r/Extruder.cpp`, `src/libslic3r/Algorithm/LineSplit.hpp`
+
+**New hazards registered:** H635–H657 (23 hazards)
+
+**Commit:** `c9b2e4db6c` — "Annotate line primitives, extruder state machine, and Algorithm/LineSplit (Session 40)"
+
+### Key Findings
+
+#### Line.hpp / Line.cpp (H635–H645)
+
+**`line_alg` namespace (generic, trait-parameterized):**
+- `distance_to_squared()` computes the nearest segment point in `double`, casts it back to `Scalar<L>` (truncation), but returns the squared distance computed from the *pre-cast* double point. Result: returned distance and returned nearest_point are inconsistent. **H635**
+- `intersection()` has the collinear case permanently disabled via `#if 0` — always returns `false` for collinear overlapping segments, no diagnostic. **H636**
+- Intersection point is cast to `coord_t` via truncation (not `std::round()`). **H637**
+
+**`Line` (2D integer coord_t):**
+- `intersection_infinite()`: intermediate `int64_t` products can overflow before the guard is reached for coordinates in the upper half of `coord_t` range. **H641**
+- `perp_distance_to()`: correctly guards zero-length line. **H642**
+- `overlap()`: uses only X-projection — incorrect for near-vertical lines (**H643**), division by zero for exactly vertical lines (**H644**).
+- `extend()`: `normalized()` of zero-vector returns zero, silent no-op for zero-length lines. **H645**
+
+**`Linef3` (3D double):**
+- `intersect_plane()`: divides by `v(2)` with no guard — division by zero for horizontal lines. **H639**
+
+**Boost.Polygon integration:**
+- `segment_concept` specialization uses `coord_t` (`int64_t`) but Voronoi builder assumes `int32_t` range — silent corruption for large coordinates. **H640**
+
+#### Extruder.hpp / Extruder.cpp (H646–H655)
+
+**Critical: global static state**
+- `m_share_E` and `m_share_retracted` are `static` class members — global across all instances in the process. Concurrent `Print` jobs or background slicers will corrupt each other's retraction state. **H646**
+
+**Asymmetric config indexing — must be replicated exactly in ports:**
+- `filament_diameter()`, `filament_flow_ratio()` → index via `m_id` (logical filament slot)
+- `retract_length_toolchange()`, `retract_restart_extra_toolchange()`, `travel_slope()` → index via `extruder_id()` (physical slot)
+- **H649** — any port that normalises to a single index breaks one set of lookups
+
+**Other hazards:**
+- `m_config` raw non-owning pointer — dangling if `GCodeConfig` destroyed first. **H650**
+- `m_e_per_mm3` cached at construction — stale after config mutation. **H651**
+- `retract()` always updates `m_restart_extra` even on no-op retraction. **H652** (CRITICAL — P1)
+- `unretract()` share-mode: `extrude()` called before `m_share_retracted` zeroed — order is critical. **H653**
+- `set_retracted()` does not update `m_share_retracted` — broken in share mode. **H654**
+- `used_filament()` FIXME: doesn't count retracted length in share mode. **H655**
+- `reset_E()` always writes shared counter regardless of mode. **H648**
+
+#### Algorithm/LineSplit.hpp (H656–H657)
+
+- `do_split_line()` returns empty `SplittedLine` on no intersection — callers must guard. **H656**
+- `split_line<>()` has operator precedence bug in `reserve()` call: `path.size() + closed ? 1 : 0` instead of `path.size() + (closed ? 1 : 0)`. Result always reserves 1, causing reallocation for any path > 1 element. Correctness preserved (reserve is advisory). **H657**
+
+### Files Read but NOT Yet Annotated (Session 40 read, Session 41 to write)
+
+- `src/libslic3r/Algorithm/LineSplit.cpp` — `do_split_line()` implementation; Z-channel encoding `-(edge_start_index + 1)` for intersection points; `SplitLineJunction::src_idx` negative convention
+- `src/libslic3r/Algorithm/RegionExpansion.hpp/.cpp` — wave propagation algorithm: `wave_seeds()` → `propagate_waves()` → `wavefront_step()` via ClipperOffset; uses ClipperLib_Z for boundary tracking; `merge_expansions_into_expolygons()` uses `union_safety_offset_ex()` and sample-point containment test
+
+### Session 40 Hazard Summary
+
+| ID | Summary | Severity |
+|----|---------|----------|
+| H635 | `distance_to_squared()` nearest_point cast discrepancy | Medium |
+| H636 | `intersection()` collinear case permanently disabled | Medium |
+| H637 | Intersection point truncation on coord_t cast | Low |
+| H638 | `intersection_infinite()` near-limit precision loss | Low |
+| H639 | `Linef3::intersect_plane()` division-by-zero for horizontal line | High |
+| H640 | Boost.Polygon Voronoi int64 vs int32 range | High |
+| H641 | `intersection_infinite()` intermediate int64 overflow | Medium |
+| H642 | `perp_distance_to()` zero-length guard (correct) | Low |
+| H643 | `overlap()` X-projection only — wrong for near-vertical | Medium |
+| H644 | `overlap()` division by zero for vertical lines | High |
+| H645 | `extend()` silent no-op for zero-length line | Low |
+| H646 | `m_share_E`/`m_share_retracted` static global state | Critical |
+| H647 | `m_e_per_mm3` formula (informational) | Low |
+| H648 | `reset_E()` unconditional shared counter write | Low |
+| H649 | Asymmetric config indexing `m_id` vs `extruder_id()` | High |
+| H650 | `m_config` raw non-owning pointer | High |
+| H651 | `m_e_per_mm3` stale after config mutation | Medium |
+| H652 | `retract()` updates `m_restart_extra` on no-op | Low |
+| H653 | `unretract()` share-mode order-dependent | Medium |
+| H654 | `set_retracted()` broken in share mode | Medium |
+| H655 | `used_filament()` FIXME: retracted length not counted | Medium |
+| H656 | `do_split_line()` empty result on no intersection | Low |
+| H657 | `split_line<>()` `reserve()` operator precedence bug | Low |
+
+**Next hazard number to assign: H658**
+
+---
+
+## Session 41 — Algorithm/LineSplit.cpp and Algorithm/RegionExpansion
+
+### Files Annotated
+
+- `src/libslic3r/Algorithm/LineSplit.cpp`
+- `src/libslic3r/Algorithm/RegionExpansion.hpp`
+- `src/libslic3r/Algorithm/RegionExpansion.cpp`
+
+---
+
+### Key Findings
+
+#### Algorithm/LineSplit.cpp (H658–H668)
+
+**Z-encoding protocol in ClipperLib_Z output:**
+- Three distinct Z value classes: `is_src` (Z ≥ 0, sequential path index from `zpaths`), `is_clip` (Z == `CLIP_IDX` = `numeric_limits<cInt>::max()`), and `is_new` (Z < 0, intersection point).
+- `cb_split_line` callback encodes intersection Z as `-(min_Z_of_4_endpoints + 1)`. Recovery is `to_src_idx()` = `-z - 1` for new points.
+- `do_split_line()` is a four-phase algorithm: (1) run ClipperLib-Z intersection, (2) AABB-tree resolve clip-origin points, (3) sort segments by source index, (4) chain reconstruction.
+
+**Hazards:**
+- **H658** — `CLIP_IDX` sentinel collision: if source path ever has exactly `numeric_limits<cInt>::max()` points the sentinel is indistinguishable from a valid source Z.
+- **H659** — Z encoding `-(min(za,zb,zc,zd)+1)`: if the minimum of 4 endpoint Zs is already negative (e.g., a re-intersected intersection point), the encoded value is positive — breaks `is_new()` classification.
+- **H660** — `point_on_line()` cross-product overflow: for coords near ±2^31 the intermediate 64-bit product can overflow.
+- **H661** — `point_on_line()` unenforced precondition: function assumes `p` is already known to lie on the infinite line; callers outside `do_split_line` may violate this.
+- **H662** — AABB-tree resolve phase: `tree.closest_point()` finds nearest edge but does not confirm the resolved point is actually on that edge — possible silent mis-assignment for concave clip polygons.
+- **H663** — `sort()` comparator for `SegmentWithSrcIdx` has non-strict-weak-ordering for two `is_src` points with the same index value — undefined behaviour in C++ standard sort.
+- **H664** — Chain reconstruction loop: can silently skip a vertex if two consecutive empty nodes follow a segment tail — output path shorter than source with no diagnostic.
+- **H665** — `SCALED_EPSILON` (100 nm) resolve radius fails for edges shorter than 200 nm.
+- **H666** — Silent fallback for unresolved clip-origin point: uses first candidate edge without verifying the point actually lies on it.
+- **H667** — (Renumbered from H663 above — see H663.)
+- **H668** — (Renumbered from H664 above — see H664.)
+
+#### Algorithm/RegionExpansion.hpp (H669–H674)
+
+**Wave propagation algorithm overview:**
+- Pipeline: `wave_seeds()` → `propagate_waves()` → `merge_expansions_into_expolygons()`
+- `RegionExpansionParameters` float fields are in **scaled units** (mm × 1e6), NOT millimetres — invisible to the compiler; caller must pre-scale.
+
+**Hazards:**
+- **H669** — `RegionExpansionParameters` fields are in scaled units (not mm); no type-level enforcement — silent wrong-scale inputs.
+- **H670** — `build()` can produce `nsteps = 0` if `full_expansion ≤ tiny_expansion` → `step_size` and `max_allowed_distance` become NaN/Inf.
+- **H671** — `wave_seeds()` return type `std::vector<RegionExpansionSeed>` by value — may be large; no move-return guarantee pre-C++17 (though C++17 mandates NRVO in some cases).
+- **H672** — `RegionExpansionSeed.src_id` is `uint32_t`; source ExPolygon vector is runtime-sized — no bounds check at seed construction.
+- **H673** — `propagate_waves(seeds,...)` requires seeds sorted by `(boundary_id, src_id)` — no runtime assertion enforces this; out-of-order input produces silently wrong output.
+- **H674** — `merge_expansions_into_expolygons()` uses sample-point containment fallback; if `sample_in_expolygons` returns -1 (sample falls in a hole), the source ExPolygon is silently dropped.
+
+#### Algorithm/RegionExpansion.cpp (H675–H689)
+
+**Hazards:**
+- **H675** — `clipper_round_offset_error()` formula is dead code (commented out); the active formula uses a 1.1× safety factor — actual rounding error not verified analytically.
+- **H676** — `expolygons_to_zpaths_expanded_opened()`: offset sign is based on contour index (index 0 = outer → positive offset, index > 0 = holes → negative) rather than winding direction — incorrect for improperly wound holes.
+- **H677** — `merge_splits()` reconnects ClipperOffset-split closed-contour pieces by sorted endpoint lookup; if two distinct contour endpoints share the same coordinate the wrong pieces are joined — silent topology corruption.
+- **H678** — `wave_seeds()` Z index ranges: `[1, idx_boundary_end)` = boundary paths, `[idx_boundary_end, idx_src_end)` = source paths, negative = intersection points. Off-by-one: Z=0 is never assigned to any path, wasting one index slot (benign but confusing).
+- **H679** — Closed-seed classification via AABB-tree point-in-boundary lookup: if the sample point of a fully-interior seed happens to land exactly on a boundary edge the AABB lookup may misclassify it as `not_inside` — seed silently omitted.
+- **H680** — `wavefront_step()` passes `dist` (a `float` in scaled units) directly to `ClipperOffset::Execute` expecting a `double` — precision loss for very small steps.
+- **H681** — `wavefront_step()` calls `ClipperLib::Orientation()` to detect CW/CCW and negates offset sign for CW polygons; a degenerate sliver contour with area ≈ 0 can report wrong orientation — wave propagates inward instead of outward.
+- **H682** — `wavefront_clip()` uses `pftPositive` fill rule; if a CW outer polygon was misdetected (H681) it contributes negative winding — intersection result is empty, wave silently terminates.
+- **H683** — `propagate_waves()` main loop: `seeds` is consumed destructively (sorted/partitioned in place) — callers that retain the original seeds vector see corrupted data after call.
+- **H684** — `propagate_waves()`: per-step union (`union_safety_offset_ex()`) can merge two separately expanding wavefronts belonging to different source ExPolygons — their contributions become indistinguishable before `merge_expansions_into_expolygons()` runs.
+- **H685** — `merge_expansions_into_expolygons()`: `union_safety_offset_ex()` applied before containment test; if union removes a small isolated expansion that is entirely inside a hole of the target, the hole-fill is silently lost.
+- **H686** — `merge_expansions_into_expolygons()`: containment fallback selects the ExPolygon whose sample point is closest to the expansion centroid — centroid not computed; uses first vertex of first contour as proxy.
+- **H687** — `propagate_waves()` step count from `RegionExpansionParameters::nsteps` is `size_t`; loop variable `int i` — implicit truncation for `nsteps > INT_MAX` (cosmetic, impossible in practice).
+- **H688** — `wave_seeds()`: source paths are offset by `tiny_expansion` before seed construction; if `tiny_expansion = 0` (valid parameter) the offset collapses self-touching contours — seeds differ from original polygons with no warning.
+- **H689** — `merge_splits()` uses `std::lower_bound` on a coordinate-sorted vector; sort key is `(x, y)` pair — does not account for floating-point equality between integer-cast coords; two points at distance < 1 (sub-nanometre) can map to same key, causing mis-merge.
+
+---
+
+### Session 41 Hazard Summary
+
+| ID | Summary | Severity |
+|----|---------|----------|
+| H658 | `CLIP_IDX` sentinel collision with max-count source path | Medium |
+| H659 | Z encoding breaks for re-intersected intersection points | Medium |
+| H660 | `point_on_line()` cross-product int64 overflow | High |
+| H661 | `point_on_line()` unenforced precondition | Low |
+| H662 | AABB-tree resolve: nearest edge not confirmed as containing point | Medium |
+| H663 | Sort comparator non-strict-weak-ordering — UB in std::sort | High |
+| H664 | Chain reconstruction silently skips vertex on double-empty node | Medium |
+| H665 | SCALED_EPSILON resolve radius fails for sub-200nm edges | Low |
+| H666 | Unresolved clip-origin fallback uses first candidate without check | Medium |
+| H669 | `RegionExpansionParameters` fields in scaled units, no enforcement | High |
+| H670 | `build()` nsteps=0 produces NaN/Inf fields | High |
+| H671 | Large `wave_seeds()` return value — copy overhead | Low |
+| H672 | `RegionExpansionSeed.src_id` no bounds check | Medium |
+| H673 | `propagate_waves()` requires pre-sorted seeds — no assertion | High |
+| H674 | `merge_expansions_into_expolygons()` silently drops hole-sample ExPolygon | High |
+| H675 | `clipper_round_offset_error()` is dead code | Low |
+| H676 | Offset sign by contour index, not winding — breaks for mis-wound holes | High |
+| H677 | `merge_splits()` coordinate collision joins wrong contour pieces | High |
+| H678 | Z index off-by-one: Z=0 unused | Low |
+| H679 | AABB boundary-edge sample mis-classification | Medium |
+| H680 | `float` dist passed to `ClipperOffset::Execute` (double expected) | Low |
+| H681 | Degenerate sliver wrong orientation — wave propagates inward | High |
+| H682 | `pftPositive` fill rule fails for CW-misdetected polygon | High |
+| H683 | `seeds` vector mutated in place by `propagate_waves()` | Medium |
+| H684 | Per-step union merges wavefronts from different source ExPolygons | High |
+| H685 | Union before containment test silently loses hole-fill expansions | Medium |
+| H686 | Containment fallback uses first vertex as centroid proxy | Low |
+| H687 | `nsteps` size_t vs loop `int` truncation (cosmetic) | Low |
+| H688 | `tiny_expansion=0` collapses self-touching contours | Medium |
+| H689 | `merge_splits()` sub-nanometre key collision in lower_bound | Low |
+
+**Next hazard number to assign: H690**
