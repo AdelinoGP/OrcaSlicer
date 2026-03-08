@@ -1673,3 +1673,78 @@ Hazards 176–204 added to `04_refactoring_hazards.md`. Notable P0/P1 items:
 ### Next Annotation Targets (Session 21+)
 
 1. `src/libslic3r/Fill/FillBase.cpp` — 2782 lines, factory + gap fill pipeline (highest priority)
+
+---
+
+## Session 21 — Fill/FillBase.cpp (infill connection engine, 3310 lines)
+
+### Files Processed
+- `src/libslic3r/Fill/FillBase.cpp` (lines 1–3310, full file)
+
+### Key Discoveries
+
+**Factory and statics:**
+- `Fill::new_from_type()` returns a raw owning pointer; no `unique_ptr`. All call sites must delete or use a managing wrapper.
+- `Fill::infill_anchor` / `infill_anchor_max` are static class members — if two `Print` instances with different profiles exist simultaneously, the last write wins.
+- `use_bridge_flow_initializer` forces static initialization of the `cached` vector to prevent first-call data races, but relies on translation-unit static init ordering — fragile.
+
+**Gap fill pipeline:**
+- `fill_surface_extrusion()` (line 178): if both `fill_surface` and `fill_surface_arachne` throw `InfillFailedException`, `out` is unchanged and gap fill is skipped — narrow regions silently produce no output.
+- `polygons_covered_by_spacing(10)` uses a hardcoded `10` (10 nm) integer tolerance in `make_fill_extrusion()` — not scaled with `SCALING_FACTOR`.
+- `medial_axis()` can generate very short spurs; `filter_out_gap_fill` config parameter is `0` by default, passing all degenerate 1-point lines.
+
+**Spacing math:**
+- `align_to_grid()` in `adjust_solid_spacing()` (line ~318): when `number_of_intervals == 0`, returns original distance unchanged instead of empty, producing a single-line overfill.
+- `FLT_MAX` slip-through in `_fill_angle()` (line ~348): if no angle is ever set, a `printf` warning fires and the angle becomes `0 + π/2 = 90°`.
+
+**Contour walking helpers:**
+- `clip_end_segment_and_point` uses `int i` for reverse iteration — polylines with > INT_MAX points would overflow; not realistic but documents the implicit assumption.
+- `add_at_start` path (line 724) moves `pl1.points` into a temporary and rebuilds — an exception mid-rebuild leaves `pl1` corrupt; only avoided in practice because `move` itself is noexcept.
+
+**`BoundaryInfillGraph` — linked-list stability:**
+- `map_infill_end_point_to_boundary` (vector of `ContourIntersectionPoint`) **must not be resized** after linked-list construction; all graph pointers point into it. Reallocation = dangling pointer UB (H237 — P1).
+- `create_boundary_infill_graph()` silently produces `boundary_idx_unconnected` nodes when endpoint snapping fails (distance > 3 scaled units); no release warning (H238 — P2).
+- `assert(infill_polyline.size() == 2)` in `take()` fires only in debug; multi-segment polylines silently use only first and last point (H239 — P2).
+
+**`connect_infill()` — arc connection strategy:**
+- `extended_object_bounding_box()` scales by `sqrt(2)` with float-to-coord_t cast; large objects near coord_t overflow produce a truncated bounding box (H240 — P2).
+- `#if 0` dead code block (lines ~1861–1934): earlier cost-sorted connection strategy, kept as reference.
+- `params.multiline > 1` skips arcs shorter than `spacing×multiline` — Orca-specific guard (H241 — P3).
+
+**`base_support_extend_infill_lines()` — ternary-as-lvalue:**
+- `dist_y_prev < dist_y_next ? extend_prev_idx : extend_next_idx = -1;` (line ~2172) — ternary used as lvalue. Legal C++ but will not compile in Rust/Python without rewrite to `if/else` (H242 — P2).
+
+**`emit_loops_in_band()` — division by zero:**
+- `add_interpolated_point()` divides by `p2->x() - p1->x()` — exactly vertical contour segments produce division by zero (H243 — P1).
+- `m_polyline.points.erase(begin() + m_polyline_end)` in finalize: index overflow UB if logic error in ordering; only guarded by debug assert (H244 — P2).
+
+**`connect_base_support()` — misleading static:**
+- `static const double cost_low/high/veryhigh` (line 2728): these are re-initialized each call because `line_spacing` differs per call. The `static` keyword is misleading; in a multithreaded context it would cause data races (H245 — P2).
+- `#if 0` dead code block (lines ~2779–2848): alternate horizontal arch pass, kept as reference.
+
+**`multiline_fill()` — Clipper2 offsetter reuse:**
+- `static_cast<int>(polylines.size())` (line 3231): overflows for > INT_MAX polylines; not realistic but undocumented (H246 — P3).
+- Clipper2 `Execute` called multiple times after single `AddPaths` — correct Clipper2 usage but not obviously safe to a reader (H247 — P3).
+
+### Critical Hazards Found (H237–H247)
+
+| # | Description | Priority |
+|---|-------------|----------|
+| H237 | `BoundaryInfillGraph::map_infill_end_point_to_boundary` must not be moved/resized after linked-list pointers are set; reallocation produces dangling pointer UB with no compile-time enforcement | P1 |
+| H238 | `create_boundary_infill_graph()` silently emits `boundary_idx_unconnected` nodes when infill endpoint snapping fails (distance > 3 scaled units); no release-build warning | P2 |
+| H239 | `assert(infill_polyline.size() == 2)` in `take()` fires only in debug; multi-segment polylines from non-rectilinear fills silently use only first and last points, corrupting the arc walk | P2 |
+| H240 | `extended_object_bounding_box()` scales by `sqrt(2)` with float→coord_t cast; near coord_t overflow, silently truncates the bounding box producing incorrect connection distance limits | P2 |
+| H241 | `params.multiline > 1` skips arcs shorter than `spacing×multiline` — Orca-specific guard undocumented; ported code must preserve or the arc quality degrades on multiline infill | P3 |
+| H242 | `dist_y_prev < dist_y_next ? extend_prev_idx : extend_next_idx = -1;` — ternary-as-lvalue idiom (legal C++17); must be rewritten as `if/else` in any port to Rust, Python, or Go | P2 |
+| H243 | `emit_loops_in_band()`: `add_interpolated_point()` divides by `p2->x() - p1->x()` — exactly vertical contour segment crossing a band boundary produces integer division by zero | P1 |
+| H244 | `emit_loops_in_band()` finalize: `m_polyline.points.erase(begin() + m_polyline_end)` — if ordering logic sets `m_polyline_end >= m_polyline.size()`, UB; only debug assert guard | P2 |
+| H245 | `connect_base_support()`: `static const double cost_low/high/veryhigh` depend on per-call `line_spacing`; `static` has no practical effect now but would cause data races if ever parallelized | P2 |
+| H246 | `multiline_fill()`: `static_cast<int>(polylines.size())` silently overflows for > INT_MAX polylines; not realistic but not documented | P3 |
+| H247 | `multiline_fill()`: Clipper2 `Execute` called multiple times after a single `AddPaths` — correct Clipper2 usage but not obviously safe to a port; requires a comment or refactor to be clear | P3 |
+
+### Next Annotation Targets (Session 22+)
+
+1. Update `04_refactoring_hazards.md` with H237–H247
+2. `src/libslic3r/Fill/FillBase.hpp` — base class, `FillParams` struct
+3. `src/libslic3r/Fill/FillAdaptive.cpp` — adaptive cubic infill
+4. `src/libslic3r/Fill/FillLightning.cpp` — lightning infill
