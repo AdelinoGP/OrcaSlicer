@@ -1555,3 +1555,40 @@ Hazards 176–204 added to `04_refactoring_hazards.md`. Notable P0/P1 items:
 
 1. `src/libslic3r/GCode/GCodeProcessor.hpp` — header for the G-code processing pass (~500+ lines)
 2. `src/libslic3r/GCode/GCodeProcessor.cpp` — the 8000-line G-code processor
+
+---
+
+## Session 19 — GCodeProcessor.hpp (G-code analysis engine header)
+
+### Files Processed
+
+| File | Status |
+|------|--------|
+| `src/libslic3r/GCode/GCodeProcessor.hpp` | Full annotation complete |
+| `generated_documentation/04_refactoring_hazards.md` | Hazards 214–227 added |
+| `generated_documentation/agent_journal.md` | This entry |
+
+### Key Discoveries
+
+**Role of this file:** `GCodeProcessor.hpp` declares the data structures and interface for the G-code post-processing and analysis pass. It is the second major pipeline stage after `GCode.cpp` generates the G-code text, and it runs in two modes:
+1. **Stand-alone file mode** (`process_file()`): reads a G-code file from disk, used by the G-code viewer.
+2. **Pipelined/streaming mode** (`initialize()` → `process_buffer()*` → `finalize()`): processes G-code as it is being generated, used by the slicer for time estimation without a second file read.
+
+**GCodeProcessorResult — the central output:** A flat array of `MoveVertex` records (~80 bytes each) with one entry per G1/G2/G3 move plus synthetic entries for tool-changes, color-changes, and pauses. The viewer indexes into this array randomly for viewport picking and color-coding. Peak RSS can reach several hundred MB for complex prints.
+
+**Tag-driven semantic reconstruction:** GCodeProcessor reconstructs ALL print semantics (layer, role, extruder, seam, wipe, etc.) from comment tags embedded in the G-code by `GCode.cpp`. Two tag sets exist (`Reserved_Tags[]` for BBL printers, `Reserved_Tags_compatible[]` for others), selected by the global `s_IsBBLPrinter` static. The `ETags` enum values are direct array indices into these vectors — ordering is critical (H222).
+
+**Dual TimeMachine simulation:** Two `TimeMachine` instances run simultaneously (Normal, Stealth modes), each simulating a 64-entry firmware motion planner queue with trapezoidal velocity profiles and backward-pass junction smoothing. Time is accumulated as `double` to avoid float precision loss from summing many small increments.
+
+**CommandProcessor trie:** G/M code handlers are registered into a character trie at construction time. `process_command()` dispatches in O(command_length) rather than O(number_of_commands). The `early_quit` flag enables single-letter prefixes (T tool-change) to fire without consuming the rest of the command string.
+
+**Critical bugs found (H215, H220, H221, H222, H226):**
+- **H215** (P1): `PrintEstimatedStatistics::reset()` iterates by value — `modes[]` NOT actually cleared.
+- **H220** (P1): `result_mutex` is `mutable`/`const` but viewer reads without locking — data race on viewer thread.
+- **H221** (P1): Copy-assignment operator silently omits ~9 fields including `backtrace_enabled`, `nozzle_hrc`, `z_offset`.
+- **H222** (P1): ETags enum values are raw array indices — reordering without updating both tag arrays corrupts all G-code tag analysis.
+- **H226** (P1): `m_print` is a raw non-owning pointer — use-after-free risk on cancellation.
+
+### Next Annotation Targets (Session 20+)
+
+1. `src/libslic3r/GCode/GCodeProcessor.cpp` — the 8000-line G-code processor implementation
