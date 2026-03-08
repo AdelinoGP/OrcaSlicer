@@ -2371,3 +2371,41 @@ H479–H527 (see 04_refactoring_hazards.md)
 5. `src/libslic3r/MultiMaterialSegmentation.cpp` — LOWER priority
 
 **Next hazard number to assign: H528**
+
+---
+
+## Session 34 — Geometry.cpp Annotation + Documentation Catch-Up
+
+### Files Processed
+- `src/libslic3r/Geometry.cpp` — full annotation pass; H528–H538 assigned
+- `generated_documentation/04_refactoring_hazards.md` — appended H528–H538 entries
+- `generated_documentation/agent_journal.md` — added session 34 entry
+
+### Key Discoveries
+- **H528**: `arrange()` has a dead `#if 0` block with a cleaner first implementation; the active `#else` branch uses a `goto ENDSORT` label inside nested loops — unusual pre-C++11 binary-insert pattern
+- **H529**: `extract_euler_angles()` uses `Eigen::eulerAngles(2,1,0)` with documented gimbal-lock near Y≈±90°; not round-trip stable; port must use quaternions instead
+- **H530**: `transform3d_from_string()` calls `::atof()` which is locale-dependent; European locales silently truncate decimal values — all string-loaded transforms corrupted on non-C locales
+- **H531**: `volume_to_bed_transformation()` case 2 divide-by-zero when source and target bounding boxes are identical or degenerate (flat object); produces NaN scale silently
+- **H532**: `mat_around_a_point_rotate()` calls `.inverse()` without an invertibility check; zero-scale transforms produce NaN propagation
+- **H533**: `set_mirror()` silently normalises non-{-1,0,1} values to ±1 without warning
+- **H534**: `reset_rotation()` / `reset_scaling_factor()` construct a full Jacobi SVD per call — called from UI drag handlers, potential per-tick overhead
+- **H535**: `project_point_to_segment()` asserts `t ∈ [-1e-6, 1+1e-6]` but does NOT clamp; Release builds extrapolate beyond segment endpoints
+- **H536**: `set_scaling_factor()` zero-scale assertion is Debug-only; Release builds silently accept singular transforms
+- **H537**: `TransformationSVD` mirror pre-multiply by `diag(-1,1,1)` encodes the mirror convention; must be replicated exactly in any port
+- **H538**: `generate_transform()` calls `normalized()` on direction vectors without zero-length guard; zero-vector input produces a zero-row transform matrix silently
+
+### Hazards Assigned
+H528–H538 (see 04_refactoring_hazards.md)
+
+### Commits
+- `aee28b4bf4` — annotate Geometry.cpp transform/rotation utilities
+
+### Next Annotation Targets (Session 35+)
+
+**Immediately next:**
+1. `src/libslic3r/EdgeGrid.cpp` — MEDIUM priority, H539 onward
+2. `src/libslic3r/Flow.cpp` — MEDIUM priority
+3. `src/libslic3r/ShortestPath.cpp` — LOWER priority
+4. `src/libslic3r/MultiMaterialSegmentation.cpp` — LOWER priority
+
+**Next hazard number to assign: H539**
