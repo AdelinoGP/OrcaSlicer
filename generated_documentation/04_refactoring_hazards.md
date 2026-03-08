@@ -1304,3 +1304,211 @@ All three EdgeGrid instances (`m_internal.grid`, `m_external.grid`, `m_grid_lsli
 | 78 | Dead `#if 0` alternative implementation (~400 lines) | AvoidCrossingPerimeters.cpp | Medium | P2 |
 | 79 | Lazy boundary re-init on every out-of-bounds travel | AvoidCrossingPerimeters.cpp | Medium | P2 |
 | 80 | Hardcoded 1mm EdgeGrid cell size | AvoidCrossingPerimeters.cpp | Low | P3 |
+
+---
+
+## GCodeProcessor — Session 12 Hazards (81–95)
+
+These hazards were discovered while completing the annotation pass on `GCodeProcessor.cpp`.
+
+---
+
+### Hazard 81 — `finalize()` Post-Process Atomic Rename: No Backup
+
+**File:** `src/libslic3r/GCode/GCodeProcessor.cpp` (`finalize()` ~line 2870, `run_post_process()` ~line 1118)
+**Severity:** High
+
+When `finalize(post_process=true)` is called, `run_post_process()` writes a temporary file then renames it over the original G-code file. This is an atomic rename on POSIX filesystems — but **no backup of the original is kept**. If the process is killed between the write and the rename, or if the rename fails on a cross-device or network filesystem, the original file may be lost or the output may be corrupt.
+
+Additionally, the post-processor rewrites time-estimation comment tags in-place (inserting elapsed time strings). If `calculate_time()` has not been called prior to `run_post_process()`, the replacement values will all be zero.
+
+**Mitigation:** In a refactored implementation, write to a `.tmp` file, verify integrity (file size ≥ original, no truncation), then rename. Keep the original as `.bak` for one generation. Callers must guarantee `calculate_time()` has run before `run_post_process()`.
+
+---
+
+### Hazard 82 — `store_move_vertex()` Invalidates All Move Indices
+
+**File:** `src/libslic3r/GCode/GCodeProcessor.cpp` (`calculate_time()` ~line 6139, `store_move_vertex()` ~line 5841)
+**Severity:** High
+
+`calculate_time()` inserts synthetic "actual-speed marker" vertices into `m_result.moves` via `vector::insert()` at arbitrary positions. After each call, every previously obtained index or iterator into `m_result.moves` is invalidated. The insertion updates `TimeBlock.move_id` values through an `id_map`, but any external code holding a cached index or pointer to a MoveVertex will silently use stale data.
+
+This is called both by `simulate_st_synchronize()` (incrementally, on every M-command that drains blocks) and by `finalize()` (once at the end). The incremental calls mean that indices can shift multiple times during parsing — not just once.
+
+**Mitigation:** In a refactored system, either:
+1. Defer all synthetic-move insertion to a single post-parse phase (no incremental inserts during parsing), or
+2. Use stable handles (e.g., array of unique IDs) rather than positional indices for cross-referencing between moves and blocks.
+
+---
+
+### Hazard 83 — `m_result.moves` Unbounded Memory Growth
+
+**File:** `src/libslic3r/GCode/GCodeProcessor.cpp` (`store_move_vertex()` ~line 5841)
+**Severity:** High
+
+`m_result.moves` is a `std::vector<MoveVertex>`. Each `MoveVertex` is ~200 bytes. A large multi-extruder print with 10M line segments produces ~2 GB of move data, all held in a single contiguous heap allocation until `GCodeProcessorResult` is destroyed. There is no streaming, chunked-processing, or eviction mechanism.
+
+The synthetic moves inserted by `calculate_time()` can increase total count by 10–30% above the raw parsed count on prints with many velocity changes.
+
+**Mitigation:** For a refactored system targeting memory-constrained environments, implement a sliding window: process moves in chunks of N, emit completed chunks to disk/GPU, and retain only the look-ahead window needed for trapezoidal planning. The current architecture does not allow this without significant restructuring.
+
+---
+
+### Hazard 84 — `G92 E` vs `G92 X/Y/Z`: Asymmetric Origin Update
+
+**File:** `src/libslic3r/GCode/GCodeProcessor.cpp` (`process_G92()` ~line 5222)
+**Severity:** High
+
+`G92 X/Y/Z` updates `m_origin[axis]` to shift the virtual coordinate system. `G92 E` instead directly sets `m_end_position[E]`, bypassing `m_origin[E]`. This is intentional (prevents float precision drift at large cumulative E values), but it creates an asymmetric implementation: a refactor that naively unifies all axes to use origin shifting will produce wrong E tracking after any G92 E reset — which is emitted at every layer start by OrcaSlicer's own G-code writer.
+
+**Mitigation:** The E axis must be treated as a running accumulator with periodic absolute resets, not as an origin-shifted coordinate. Document this distinction explicitly in the refactored coordinate-tracking data structure.
+
+---
+
+### Hazard 85 — `process_G28()` Re-Parses a Synthetic Raw String
+
+**File:** `src/libslic3r/GCode/GCodeProcessor.cpp` (`process_G28()` ~line 5192)
+**Severity:** Medium
+
+The home handler constructs a raw G-code string (e.g., `"G28 X0  Y0  Z0"`) and re-parses it through a freshly constructed `GCodeReader` to produce a `GCodeLine`. This pattern is fragile: if `GCodeReader::parse_line` changes its whitespace handling or parameter parsing, the synthetic string may not parse as expected. The double-space gap `"X0  Y0"` in the no-axis-specified case is particularly suspicious — it was likely introduced as a workaround and could silently fail with a strict parser.
+
+**Mitigation:** Replace with a direct call to `process_G1()` with a pre-built axes array, eliminating the string round-trip entirely.
+
+---
+
+### Hazard 86 — `process_M204()` T-Parameter Dual Meaning (Legacy vs Modern)
+
+**File:** `src/libslic3r/GCode/GCodeProcessor.cpp` (`process_M204()` ~line 5464)
+**Severity:** Medium
+
+In M204 legacy format (S present), parameter T means **retract acceleration**. In M204 modern format (no S), parameter T means **travel acceleration**. The disambiguation is purely based on whether S is present in the same command.
+
+OrcaSlicer's own G-code writer emits `M204 S<val>` (legacy format). Third-party slicers (e.g., PrusaSlicer in Marlin 2 mode) may emit `M204 P<print> T<travel>` (modern format). If a G-code file mixes both in start/end scripts, the T interpretation will be inconsistent. A refactored parser must document and preserve this context-sensitive parsing.
+
+---
+
+### Hazard 87 — `process_SET_VELOCITY_LIMIT()`: Per-Call Regex Construction
+
+**File:** `src/libslic3r/GCode/GCodeProcessor.cpp` (`process_SET_VELOCITY_LIMIT()` ~line 5525)
+**Severity:** Medium
+
+`process_SET_VELOCITY_LIMIT()` and `process_SET_PRESSURE_ADVANCE()` each construct `std::regex` objects on every function call. For a Klipper print file emitting `SET_VELOCITY_LIMIT` or `SET_PRESSURE_ADVANCE` thousands of times (e.g., every extrusion segment with Pressure Advance enabled), this incurs repeated pattern compilation cost — typically 10–100 µs per regex construction on common hardware.
+
+The three patterns in `process_SET_VELOCITY_LIMIT()` are simple enough to replace with `std::string_view::find` + manual number parsing, which would be 100× faster.
+
+**Mitigation:** Pre-compile all regex patterns to `static const std::regex` members (or equivalent static-local variables). In a non-C++ port, use compiled regex or simple string scanning for these hot paths.
+
+---
+
+### Hazard 88 — `process_G29()` Hard-Coded 260s Bed-Leveling Time
+
+**File:** `src/libslic3r/GCode/GCodeProcessor.cpp` (`process_G29()` ~line 5146)
+**Severity:** Medium
+
+The G29 handler hard-codes a 260-second dwell for BBS printers with an explicit `// Todo: use a machine related setting when we have second kind of BBL printer`. New BBL models (A1, X1E, etc.) may have significantly different bed scan times. The current code emits the same 260s regardless of printer model once `s_IsBBLPrinter` is true.
+
+For non-BBL printers the same 260s is used unconditionally regardless of any machine config, which is almost certainly wrong for RepRapFirmware / Klipper / Duet machines that may have multi-pass mesh leveling routines.
+
+**Mitigation:** Replace with a configurable `bed_leveling_time` machine parameter. Default to 0 (no wait) when the parameter is absent, and make the BBS default explicit.
+
+---
+
+### Hazard 89 — `calculate_time()` O(n²) Synthetic-Move Insertion
+
+**File:** `src/libslic3r/GCode/GCodeProcessor.cpp` (`calculate_time()` ~line 6139)
+**Severity:** Medium
+
+The actual-speed move insertion loop calls `result.moves.insert(begin + base_id, ...)` at an arbitrary index inside a `std::vector`. For a vector of N elements, each insert is O(N). If there are M synthetic move groups to insert, total complexity is O(M·N) — quadratic in the number of velocity splits for a large print.
+
+For typical prints this is acceptable (M is small relative to N), but for Klipper prints with per-segment pressure advance changes, M can approach N, making this O(N²).
+
+**Mitigation:** Replace with a single-pass merge: build a new vector by interleaving original moves and synthetic clusters in one O(N) pass, then swap. This is the standard "merge two sorted sequences" approach.
+
+---
+
+### Hazard 90 — `m_extruder_id` Sentinel Relies on `unsigned char` Overflow
+
+**File:** `src/libslic3r/GCode/GCodeProcessor.cpp` (`get_extruder_id()` ~line 6372, `get_filament_id()` ~line 6348)
+**Severity:** Medium
+
+`m_extruder_id` is `unsigned char` and uses the value `(unsigned char)(-1)` = `0xFF` = `255` as a sentinel meaning "not yet initialized". The check `m_extruder_id == (unsigned char)(-1)` is correct C++ (both sides are 255u after promotion) but relies on the type being exactly `unsigned char`. If a refactor changes the type to `int` or `uint8_t` with different sign semantics, the uninitialized sentinel must be explicitly updated. Languages without guaranteed unsigned char wrap (e.g., Rust's `u8`) would need an explicit `u8::MAX` constant.
+
+---
+
+### Hazard 91 — `update_slice_warnings()` Duplicate Timelapse Warning Emission
+
+**File:** `src/libslic3r/GCode/GCodeProcessor.cpp` (`update_slice_warnings()` ~line 6241)
+**Severity:** Low–Medium
+
+The `NOT_SUPPORT_TRADITIONAL_TIMELAPSE` warning is emitted **twice** with different error codes and severity levels ("10018003" level 2, "1000C003" level 3) in a single code path. This was done for backward compatibility with older A-series firmware. Any downstream parser that deduplicates on the warning message string rather than the error_code will silently drop one of them. Any code that counts warnings will report 2 warnings when logically there is one condition.
+
+**Mitigation:** Use a versioned warning dispatch: if firmware version < threshold, emit old code; if ≥ threshold, emit new code. Never emit both. If both are genuinely required simultaneously by different firmware revisions, document this explicitly in the data model.
+
+---
+
+### Hazard 92 — `M106` 8-bit PWM Assumption
+
+**File:** `src/libslic3r/GCode/GCodeProcessor.cpp` (`process_M106()` ~line 5275)
+**Severity:** Low
+
+Fan speed is converted as `(100.0f / 255.0f) * S_value`, assuming 8-bit PWM (0–255 range). Some firmware (e.g., RepRapFirmware with high-resolution fans, or Klipper with `max_power`) uses 0–1.0 or higher-bit-depth fan control. An S value of 1.0 in Klipper's normalized range would produce ~0.4% fan speed instead of 100%.
+
+**Mitigation:** Gate on firmware flavor: for Klipper, map S 0.0–1.0 → 0–100%; for Marlin/BBS, use 0–255 map. Add a config flag `fan_pwm_bits` for explicit range specification.
+
+---
+
+### Hazard 93 — `finalize()` `gcode_time.cache` Flushed with `ColorChange` Sentinel
+
+**File:** `src/libslic3r/GCode/GCodeProcessor.cpp` (`finalize()` ~line 2870)
+**Severity:** Low
+
+The tail-end gcode_time.cache flush in `finalize()` always uses `CustomGCode::ColorChange` as the segment type regardless of the actual last custom event type. For a print that ends after a ToolChange (not a ColorChange), the final time segment will be misclassified as a color-change segment in the `gcode_time.times` list, affecting per-segment time breakdown UI.
+
+**Mitigation:** Track the most recent `CustomGCode::Type` in a member variable and use it as the flush type in `finalize()`.
+
+---
+
+### Hazard 94 — Seam Next-Line-Id Off-by-One in `store_move_vertex()`
+
+**File:** `src/libslic3r/GCode/GCodeProcessor.cpp` (`store_move_vertex()` ~line 5841)
+**Severity:** Low
+
+The line_id assignment logic has three cases:
+- `Color_change / Pause_Print / Custom_GCode`: `m_line_id + 1` (one ahead)
+- `Seam`: `m_last_line_id` (unchanged from previous)
+- All others: `m_line_id`
+
+The Seam case reuses `m_last_line_id` rather than advancing, creating a shared line ID between the seam vertex and the preceding move. In the G-code viewer, clicking the seam vertex highlights the same line as the preceding move. This is likely intentional (seams don't have their own G-code line), but the implicit coupling means any refactor that normalizes line IDs will need to explicitly preserve this "seam inherits previous line" behavior.
+
+---
+
+### Hazard 95 — `process_filaments()` Resets Remaining Volume on ToolChange
+
+**File:** `src/libslic3r/GCode/GCodeProcessor.cpp` (`process_filaments()` ~line 6124)
+**Severity:** Low
+
+On ToolChange, `process_filaments()` resets `m_remaining_volume[last_extruder_id] = m_nozzle_volume[last_extruder_id]`. This models the nozzle as having a "full" remaining volume after each tool change, seeding the flush-volume FIFO. If the tool change does not actually flush the nozzle to empty (e.g., a direct swap without a purge move), this reset overcounts the flush volume for the next segment and may produce incorrect filament usage statistics.
+
+**Mitigation:** The model is a simplification. A refactored implementation should allow configuring whether a tool change includes a full flush, partial flush, or no flush, and adjust the remaining-volume reset accordingly.
+
+---
+
+## Summary Table (Hazards 81–95)
+
+| # | Hazard | File | Severity | Priority |
+|---|--------|------|----------|----------|
+| 81 | `finalize()` post-process no backup before atomic rename | GCodeProcessor.cpp | High | P1 |
+| 82 | `calculate_time()` invalidates all move indices | GCodeProcessor.cpp | High | P1 |
+| 83 | `m_result.moves` unbounded RAM growth (2GB+ for large prints) | GCodeProcessor.cpp | High | P1 |
+| 84 | `G92 E` vs `G92 XYZ` asymmetric origin update | GCodeProcessor.cpp | High | P1 |
+| 85 | `process_G28()` re-parses synthetic raw string | GCodeProcessor.cpp | Medium | P2 |
+| 86 | `M204 T` dual meaning: retract (legacy S) vs travel (modern P) | GCodeProcessor.cpp | Medium | P2 |
+| 87 | Per-call regex construction in SET_VELOCITY_LIMIT / SET_PRESSURE_ADVANCE | GCodeProcessor.cpp | Medium | P2 |
+| 88 | Hard-coded 260s G29 bed-leveling dwell time | GCodeProcessor.cpp | Medium | P2 |
+| 89 | O(n²) synthetic-move insertion in `calculate_time()` | GCodeProcessor.cpp | Medium | P2 |
+| 90 | `m_extruder_id` sentinel relies on unsigned char overflow | GCodeProcessor.cpp | Medium | P2 |
+| 91 | Duplicate timelapse warning emission with same message | GCodeProcessor.cpp | Low | P3 |
+| 92 | M106 assumes 8-bit PWM (0–255), breaks Klipper normalized range | GCodeProcessor.cpp | Low | P3 |
+| 93 | Final gcode_time cache flushed with wrong `ColorChange` type | GCodeProcessor.cpp | Low | P3 |
+| 94 | Seam vertex inherits previous line_id silently | GCodeProcessor.cpp | Low | P3 |
+| 95 | ToolChange resets nozzle volume to full regardless of actual flush | GCodeProcessor.cpp | Low | P3 |

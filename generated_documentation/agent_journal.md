@@ -1032,3 +1032,72 @@ No comment explains which design was intentionally chosen or whether the block i
 3. `src/libslic3r/GCode/AdaptivePAProcessor.cpp` — adaptive pressure advance
 4. `src/libslic3r/Arachne/` directory — variable-width perimeter internals
 5. `slice_slabs_make_lines()` back-fill annotation (within TriangleMeshSlicer.cpp)
+
+---
+
+## Session 12 — GCodeProcessor.cpp Final Annotation Pass + Hazards 81–95
+
+**Date:** 2026-03-07
+**Branch:** `agent/analysis`
+**Files modified:** `GCodeProcessor.cpp`, `04_refactoring_hazards.md`, `agent_journal.md`
+
+### Work Completed
+
+This session completed the annotation pass on `GCodeProcessor.cpp` (6379 lines, the largest single source file in the GCode pipeline). All remaining un-annotated top-level functions now have structured `[INTENT]`, `[STATE]`, `[HAZARD]`, `[COUPLING]`, and/or `[MEMORY]` comment blocks.
+
+**Functions annotated in this session:**
+
+| Function | Lines | Key findings |
+|----------|-------|-------------|
+| `finalize()` | ~2870 | 8-step ordering matters; post-process rename is irreversible |
+| `store_move_vertex()` | ~5841 | Plate-offset + z_offset applied here; move indices invalidated by later calculate_time() |
+| `process_G4()` | ~5135 | S+P additive dwell; both must be summed |
+| `process_G29()` | ~5146 | 260s hard-coded BBS magic constant |
+| `process_G10/G11()` | ~5159 | Firmware retract → G1 translation; retract_restart_extra asymmetry |
+| `process_G28()` | ~5192 | Synthetic raw-string re-parsing hazard |
+| `process_G92()` | ~5222 | E axis uses direct position reset, not origin shift |
+| `process_M104/M109()` | ~5265 | Temperature tracking for vitrification warning |
+| `process_M106/M107()` | ~5275 | 8-bit PWM assumption; BBS P1 handling |
+| `process_M900/M572/SET_PRESSURE_ADVANCE()` | ~5290 | Per-call regex construction hazard |
+| `process_M201()` | ~5409 | Acceleration array update; flavor-based unit conversion |
+| `process_M203()` | ~5433 | Feedrate units: mm/s vs mm/min by flavor |
+| `process_M204()` | ~5464 | T-param dual meaning: retract (legacy S) vs travel (modern) |
+| `process_M205()` | ~5492 | Jerk limits; XY shared via X param; junction deviation J |
+| `process_SET_VELOCITY_LIMIT()` | ~5525 | 3 regex per call; SCV maps only to XY jerk |
+| `process_custom_gcode_time()` | ~6105 | simulate_st_synchronize; zero-duration segment skip |
+| `calculate_time()` | ~6139 | O(n²) vector insertion; Normal-only actual-speed collection |
+| `update_slice_warnings()` | ~6241 | Timelapse warning dual-emit; bit-field decoding |
+| `extract_absolute_position_on_axis()` | ~6224 | Volumetric E path commented out |
+| `get_filament_id / get_extruder_id` | ~6348 | 0xFF sentinel via unsigned char; force_initialize default |
+
+### New Hazards Documented (81–95)
+
+15 new hazards written to `04_refactoring_hazards.md`, covering:
+- **P1 (Critical):** finalize() no-backup rename, calculate_time() index invalidation, 2GB+ move vector, G92 E asymmetry
+- **P2 (High):** G28 synthetic re-parse, M204 T dual meaning, per-call regex, G29 hard-coded dwell, O(n²) insertion, unsigned char sentinel
+- **P3 (Low):** duplicate timelapse warning, M106 PWM assumption, wrong flush type at finalize, seam line-id inheritance, ToolChange volume reset
+
+### Architecture Insights
+
+1. **GCodeProcessor is a two-phase pipeline:** Phase 1 (parsing) runs line-by-line building `m_result.moves` with placeholder time fields. Phase 2 (calculate_time) retroactively fills time fields and may insert additional vertices. Any refactoring must preserve this two-phase structure or risk index corruption.
+
+2. **simulate_st_synchronize is an incremental checkpoint:** Called at every M-command that could affect timing (M104, M106, G4, G29, etc.), it drains the pending TimeBlock queue. This means time estimation is not deferred to finalize() — it runs incrementally throughout parsing. A refactored system that batches all time computation to the end would need to handle the intermediate state differently.
+
+3. **The coordinate state machine has five active variables:** `m_start_position`, `m_end_position`, `m_origin`, `m_global_positioning_type`, `m_e_local_positioning_type`. All five must be correctly initialized and maintained across every G/M command handler or position tracking breaks silently.
+
+4. **Fan speed, temperature, and pressure advance are snapshot values:** They are captured at the moment of each G1 move and stored per-vertex. There is no interpolation between the last-known value and the next command; abrupt changes at command boundaries are the intended model.
+
+### Open Questions — Session 12
+
+1. `[UNCLEAR]` `process_G29()` calls `simulate_st_synchronize(value_s)` with 260s for non-BBS printers — but `simulate_st_synchronize` calls `calculate_time()` which processes accumulated blocks. If G29 appears before any motion blocks in the file, will this produce a spurious 260s at t=0 in the time breakdown? The interaction with zero-block edge cases is not tested.
+
+2. `[UNCLEAR]` `store_move_vertex()` applies `m_extruder_offsets[filament_id]` to the position. For single-extruder printers this offset is zero. For multi-extruder, it represents nozzle geometry compensation. However, `m_extruder_offsets` is populated from `machine_extruder_offset` config — if this config is absent (e.g., in viewer-only mode), the offset defaults to zero, which may be wrong for some multi-extruder hardware setups.
+
+3. `[UNCLEAR]` The `M221` extrude-factor override is stored in `machine.extrude_factor_override_percentage` but it's not clear where this value is consumed in the time estimation. The TimeMachine trapezoidal planner uses `m_feedrate` directly — does M221 ever modify m_feedrate before block creation, or is it only a post-hoc scale factor?
+
+### Next Annotation Targets (Session 13+)
+
+1. `src/libslic3r/GCode/FanMover.cpp` — fan speed lookahead post-processor
+2. `src/libslic3r/GCode/AdaptivePAProcessor.cpp` + `AdaptivePAInterpolator.cpp` — adaptive pressure advance
+3. `src/libslic3r/Arachne/` directory — variable-width perimeters (WallToolPaths, etc.)
+4. `src/libslic3r/GCode/GCodeProcessor.hpp` — annotate header (structs, enums, member variables)
