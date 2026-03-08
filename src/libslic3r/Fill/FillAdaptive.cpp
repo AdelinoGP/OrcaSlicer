@@ -1,3 +1,22 @@
+// [INTENT] FillAdaptive.cpp — implements the Adaptive Cubic Infill pattern, originally inspired by
+//          Cura's SubDivCube. The algorithm:
+//            1. Builds an octree over the 3-D mesh (build_octree / insert_triangle), subdividing
+//               only cells that contain a surface triangle. Cell size doubles per level.
+//            2. At slicing time, each FillContext traverses the octree and generates wall lines
+//               for the three infill directions (+60°, 0°, -60°) via generate_infill_lines_recursive().
+//            3. Lines are collected, trimmed to the ExPolygon via intersection_pl(), and T-joint
+//               hooks are added via connect_lines_using_hooks() for anchorage.
+//            4. Polylines are chained via chain_or_connect_infill().
+//
+// [COUPLING] Depends on FillBase.hpp (Fill base class), ClipperUtils, admesh (indexed_triangle_set),
+//            Boost.Geometry R*-tree (bgi::rtree), Boost object_pool (Octree node allocator).
+// [MEMORY]   Octree nodes are allocated from boost::object_pool<Cube> — no individual new/delete.
+//            The pool is destroyed atomically when the Octree is deleted via OctreeDeleter.
+//            OctreePtr is a std::unique_ptr<Octree, OctreeDeleter> managed by PrintObject.
+// [CONCURRENCY] FillContext is stack-allocated per-call of _fill_surface_single(). Each TBB task
+//               owns its own FillContext and Filler instance. No shared mutable state between tasks.
+//               build_octree() is called once per object, before any TBB fill tasks begin.
+
 #include "../ClipperUtils.hpp"
 #include "../ExPolygon.hpp"
 #include "../Surface.hpp"
@@ -17,18 +36,30 @@
 #include <numeric>
 
 // Boost pool: Don't use mutexes to synchronize memory allocation.
+// [HAZARD] BOOST_POOL_NO_MT disables pool mutex — pool is NOT thread-safe. This is safe here because
+//          each Octree is built on a single thread and never written to concurrently. Any future change
+//          that calls pool.construct() from multiple threads will cause a data race.
 #define BOOST_POOL_NO_MT
 #include <boost/pool/object_pool.hpp>
 
+// [COUPLING] Boost.Geometry R*-tree (bgi::rstar<16,4>) is used for nearest-line lookups in
+//            connect_lines_using_hooks(). The tree stores (rtree_segment_t, size_t) pairs where
+//            size_t is the index into the `lines` vector. Invalidating that vector invalidates the tree.
 #include <boost/geometry.hpp>
 #include <boost/geometry/geometries/point.hpp>
 #include <boost/geometry/geometries/segment.hpp>
 #include <boost/geometry/index/rtree.hpp>
 
+namespace Slic3r { namespace FillAdaptive {
 
-namespace Slic3r {
-namespace FillAdaptive {
-
+// [INTENT] triangle_AABB_intersects — separating-axis (SAT) test between a triangle (a,b,c) and an
+//          axis-aligned bounding box. Returns true if they overlap. Used by insert_triangle() to
+//          decide whether to subdivide a child octree cell. Template parameter Vector is either Vec3d
+//          or Vec3f depending on call site.
+// [COUPLING] Called exclusively from Octree::insert_triangle() during octree construction.
+// [HAZARD] Float precision: child bboxes are expanded by ±EPSILON before calling this test to
+//          avoid missing triangles that lie exactly on a cell wall. The test itself uses
+//          Scalar arithmetic; if called with Vec3d the multiplications are double-precision.
 // Derived from https://github.com/juj/MathGeoLib/blob/master/src/Geometry/Triangle.cpp
 // The AABB-Triangle test implementation is based on the pseudo-code in
 // Christer Ericson's Real-Time Collision Detection, pp. 169-172. It is
@@ -37,24 +68,23 @@ namespace FillAdaptive {
 // Original MathGeoLib benchmark:
 //    Best: 17.282 nsecs / 46.496 ticks, Avg: 17.804 nsecs, Worst: 18.434 nsecs
 //
-//FIXME Vojtech: The MathGeoLib contains a vectorized implementation.
-template<typename Vector> 
-bool triangle_AABB_intersects(const Vector &a, const Vector &b, const Vector &c, const BoundingBoxBase<Vector> &aabb)
+// FIXME Vojtech: The MathGeoLib contains a vectorized implementation.
+template<typename Vector>
+bool triangle_AABB_intersects(const Vector& a, const Vector& b, const Vector& c, const BoundingBoxBase<Vector>& aabb)
 {
     using Scalar = typename Vector::Scalar;
 
     Vector tMin = a.cwiseMin(b.cwiseMin(c));
     Vector tMax = a.cwiseMax(b.cwiseMax(c));
 
-    if (tMin.x() >= aabb.max.x() || tMax.x() <= aabb.min.x()
-        || tMin.y() >= aabb.max.y() || tMax.y() <= aabb.min.y()
-        || tMin.z() >= aabb.max.z() || tMax.z() <= aabb.min.z())
+    if (tMin.x() >= aabb.max.x() || tMax.x() <= aabb.min.x() || tMin.y() >= aabb.max.y() || tMax.y() <= aabb.min.y() ||
+        tMin.z() >= aabb.max.z() || tMax.z() <= aabb.min.z())
         return false;
 
     Vector center = (aabb.min + aabb.max) * 0.5f;
-    Vector h = aabb.max - center;
+    Vector h      = aabb.max - center;
 
-    const Vector t[3] { b-a, c-a, c-b };
+    const Vector t[3]{b - a, c - a, c - b};
 
     Vector ac = a - center;
 
@@ -64,7 +94,7 @@ bool triangle_AABB_intersects(const Vector &a, const Vector &b, const Vector &c,
     if (abs(s) >= r)
         return false;
 
-    const Vector at[3] = { t[0].cwiseAbs(), t[1].cwiseAbs(), t[2].cwiseAbs() };
+    const Vector at[3] = {t[0].cwiseAbs(), t[1].cwiseAbs(), t[2].cwiseAbs()};
 
     Vector bc = b - center;
     Vector cc = c - center;
@@ -88,7 +118,7 @@ bool triangle_AABB_intersects(const Vector &a, const Vector &b, const Vector &c,
     Scalar d1 = t[0].y() * ac.z() - t[0].z() * ac.y();
     Scalar d2 = t[0].y() * cc.z() - t[0].z() * cc.y();
     Scalar tc = (d1 + d2) * 0.5f;
-    r = std::abs(h.y() * at[0].z() + h.z() * at[0].y());
+    r         = std::abs(h.y() * at[0].z() + h.z() * at[0].y());
     if (r + std::abs(tc - d1) < std::abs(tc))
         return false;
 
@@ -96,7 +126,7 @@ bool triangle_AABB_intersects(const Vector &a, const Vector &b, const Vector &c,
     d1 = t[1].y() * ac.z() - t[1].z() * ac.y();
     d2 = t[1].y() * bc.z() - t[1].z() * bc.y();
     tc = (d1 + d2) * 0.5f;
-    r = std::abs(h.y() * at[1].z() + h.z() * at[1].y());
+    r  = std::abs(h.y() * at[1].z() + h.z() * at[1].y());
     if (r + std::abs(tc - d1) < std::abs(tc))
         return false;
 
@@ -104,7 +134,7 @@ bool triangle_AABB_intersects(const Vector &a, const Vector &b, const Vector &c,
     d1 = t[2].y() * ac.z() - t[2].z() * ac.y();
     d2 = t[2].y() * bc.z() - t[2].z() * bc.y();
     tc = (d1 + d2) * 0.5f;
-    r = std::abs(h.y() * at[2].z() + h.z() * at[2].y());
+    r  = std::abs(h.y() * at[2].z() + h.z() * at[2].y());
     if (r + std::abs(tc - d1) < std::abs(tc))
         return false;
 
@@ -112,7 +142,7 @@ bool triangle_AABB_intersects(const Vector &a, const Vector &b, const Vector &c,
     d1 = t[0].z() * ac.x() - t[0].x() * ac.z();
     d2 = t[0].z() * cc.x() - t[0].x() * cc.z();
     tc = (d1 + d2) * 0.5f;
-    r = std::abs(h.x() * at[0].z() + h.z() * at[0].x());
+    r  = std::abs(h.x() * at[0].z() + h.z() * at[0].x());
     if (r + std::abs(tc - d1) < std::abs(tc))
         return false;
 
@@ -120,7 +150,7 @@ bool triangle_AABB_intersects(const Vector &a, const Vector &b, const Vector &c,
     d1 = t[1].z() * ac.x() - t[1].x() * ac.z();
     d2 = t[1].z() * bc.x() - t[1].x() * bc.z();
     tc = (d1 + d2) * 0.5f;
-    r = std::abs(h.x() * at[1].z() + h.z() * at[1].x());
+    r  = std::abs(h.x() * at[1].z() + h.z() * at[1].x());
     if (r + std::abs(tc - d1) < std::abs(tc))
         return false;
 
@@ -128,7 +158,7 @@ bool triangle_AABB_intersects(const Vector &a, const Vector &b, const Vector &c,
     d1 = t[2].z() * ac.x() - t[2].x() * ac.z();
     d2 = t[2].z() * bc.x() - t[2].x() * bc.z();
     tc = (d1 + d2) * 0.5f;
-    r = std::abs(h.x() * at[2].z() + h.z() * at[2].x());
+    r  = std::abs(h.x() * at[2].z() + h.z() * at[2].x());
     if (r + std::abs(tc - d1) < std::abs(tc))
         return false;
 
@@ -136,7 +166,7 @@ bool triangle_AABB_intersects(const Vector &a, const Vector &b, const Vector &c,
     d1 = t[0].x() * ac.y() - t[0].y() * ac.x();
     d2 = t[0].x() * cc.y() - t[0].y() * cc.x();
     tc = (d1 + d2) * 0.5f;
-    r = std::abs(h.y() * at[0].x() + h.x() * at[0].y());
+    r  = std::abs(h.y() * at[0].x() + h.x() * at[0].y());
     if (r + std::abs(tc - d1) < std::abs(tc))
         return false;
 
@@ -144,7 +174,7 @@ bool triangle_AABB_intersects(const Vector &a, const Vector &b, const Vector &c,
     d1 = t[1].x() * ac.y() - t[1].y() * ac.x();
     d2 = t[1].x() * bc.y() - t[1].y() * bc.x();
     tc = (d1 + d2) * 0.5f;
-    r = std::abs(h.y() * at[1].x() + h.x() * at[1].y());
+    r  = std::abs(h.y() * at[1].x() + h.x() * at[1].y());
     if (r + std::abs(tc - d1) < std::abs(tc))
         return false;
 
@@ -152,7 +182,7 @@ bool triangle_AABB_intersects(const Vector &a, const Vector &b, const Vector &c,
     d1 = t[2].x() * ac.y() - t[2].y() * ac.x();
     d2 = t[2].x() * bc.y() - t[2].y() * bc.x();
     tc = (d1 + d2) * 0.5f;
-    r = std::abs(h.y() * at[2].x() + h.x() * at[2].y());
+    r  = std::abs(h.y() * at[2].x() + h.x() * at[2].y());
     if (r + std::abs(tc - d1) < std::abs(tc))
         return false;
 
@@ -221,129 +251,174 @@ bool triangle_AABB_intersects(const Vector &a, const Vector &b, const Vector &c,
 //        return out;
 //    }
 
+// [INTENT] child_centers — unit-vector offsets for the 8 children of an octree cube.
+//          Each component is ±1, enumerating all 8 octants. At depth d, the actual displacement
+//          is child_centers[i] * (cubes_properties[d].edge_length / 4.0).
+//          Ordering matches child_traversal_order below.
+// [STATE]  Compile-time constant — never mutated.
 // Ordering of children cubes.
-static const std::array<Vec3d, 8> child_centers {
-    Vec3d(-1, -1, -1), Vec3d( 1, -1, -1), Vec3d(-1,  1, -1), Vec3d( 1,  1, -1),
-    Vec3d(-1, -1,  1), Vec3d( 1, -1,  1), Vec3d(-1,  1,  1), Vec3d( 1,  1,  1)
-};
+static const std::array<Vec3d, 8> child_centers{Vec3d(-1, -1, -1), Vec3d(1, -1, -1), Vec3d(-1, 1, -1), Vec3d(1, 1, -1),
+                                                Vec3d(-1, -1, 1),  Vec3d(1, -1, 1),  Vec3d(-1, 1, 1),  Vec3d(1, 1, 1)};
 
+// [INTENT] child_traversal_order — for each of the 3 infill line directions (0°, +120°, -120°),
+//          defines the order in which 8 children must be visited so that the wall-line samples
+//          are encountered in strictly monotonic order along the infill direction. This allows
+//          the FillContext::temp_lines array to merge adjacent cell contributions in O(1)
+//          without sorting. The three rows correspond to direction_angles[0..2].
+// [STATE]  Compile-time constant — never mutated.
+// [HAZARD] The indices must be consistent with child_centers[] and direction_angles[]; if any
+//          are changed, verify_traversal_order() assertions will fire in debug builds.
 // Traversal order of octree children cells for three infill directions,
 // so that a single line will be discretized in a strictly monotonic order.
-static constexpr std::array<std::array<int, 8>, 3> child_traversal_order {
-    std::array<int, 8>{ 2, 3, 0, 1, 6, 7, 4, 5 },
-    std::array<int, 8>{ 4, 0, 6, 2, 5, 1, 7, 3 },
-    std::array<int, 8>{ 1, 5, 0, 4, 3, 7, 2, 6 },
+static constexpr std::array<std::array<int, 8>, 3> child_traversal_order{
+    std::array<int, 8>{2, 3, 0, 1, 6, 7, 4, 5},
+    std::array<int, 8>{4, 0, 6, 2, 5, 1, 7, 3},
+    std::array<int, 8>{1, 5, 0, 4, 3, 7, 2, 6},
 };
 
+// [INTENT] Cube — a single node in the adaptive infill octree. Stores the 3-D world-space center
+//          of the cube and up to 8 child pointers (null = not subdivided in that octant).
+// [MEMORY] Cubes are never individually new'd/deleted. They are allocated from Octree::pool
+//          (boost::object_pool<Cube>) and released atomically when the pool is destroyed.
+//          All Cube* pointers are pool-owned; do NOT free them manually.
+// [STATE]  `center` is initially in octree-rotated coordinates, then transformed to world-space
+//          by transform_center() after the octree is fully built.
+// [HAZARD] In NDEBUG builds, center_octree is stripped away; the debug-only verification
+//          in verify_traversal_order() relies on it being present.
 struct Cube
 {
     Vec3d center;
 #ifndef NDEBUG
     Vec3d center_octree;
-#endif // NDEBUG
-    std::array<Cube*, 8> children {}; // initialized to nullptrs
-    Cube(const Vec3d &center) : center(center) {}
+#endif                               // NDEBUG
+    std::array<Cube*, 8> children{}; // initialized to nullptrs
+    Cube(const Vec3d& center) : center(center) {}
 };
 
+// [INTENT] CubeProperties — cached per-depth geometric parameters for the rotated cube. Pre-computing
+//          these avoids repeated sqrt/mul inside the hot DDA traversal loop.
+//          Formulas (for a cube with edge e, rotated to stand on its corner):
+//            height           = e * sqrt(3)   (extent along the diagonal axis)
+//            diagonal_length  = e * sqrt(2)   (face diagonal, used for line endpoint calc)
+//            line_z_distance  = e / sqrt(3)   (half-height of the wall plane's Z extent)
+//            line_xy_distance = e / sqrt(6)   (XY offset of the wall line from the cell center)
+// [STATE]  Read-only after creation in make_cubes_properties().
 struct CubeProperties
 {
-    double edge_length;     // Lenght of edge of a cube
-    double height;          // Height of rotated cube (standing on the corner)
-    double diagonal_length; // Length of diagonal of a cube a face
-    double line_z_distance; // Defines maximal distance from a center of a cube on Z axis on which lines will be created
-    double line_xy_distance;// Defines maximal distance from a center of a cube on X and Y axis on which lines will be created
+    double edge_length;      // Lenght of edge of a cube
+    double height;           // Height of rotated cube (standing on the corner)
+    double diagonal_length;  // Length of diagonal of a cube a face
+    double line_z_distance;  // Defines maximal distance from a center of a cube on Z axis on which lines will be created
+    double line_xy_distance; // Defines maximal distance from a center of a cube on X and Y axis on which lines will be created
 };
 
+// [INTENT] Octree — the top-level adaptive infill data structure. Owns the memory pool for all
+//          Cube nodes. One Octree is created per PrintObject (see build_octree()) and shared
+//          read-only by all fill tasks operating on that object's layers.
+// [MEMORY] pool (boost::object_pool<Cube>) owns all nodes. When the Octree is deleted via
+//          OctreeDeleter, the pool destructor frees all Cubes at once. OctreePtr is a
+//          std::unique_ptr<Octree, OctreeDeleter> stored on PrintObject.
+// [CONCURRENCY] After build_octree() returns, the Octree is immutable. Multiple TBB fill tasks
+//               read it concurrently without locks. No writes occur during fill generation.
+// [STATE]  origin is transformed to world coordinates by build_octree() after construction.
+//          cubes_properties is indexed by octree depth (0 = finest/leaf).
 struct Octree
 {
     // Octree will allocate its Cubes from the pool. The pool only supports deletion of the complete pool,
     // perfect for building up our octree.
     boost::object_pool<Cube>    pool;
-    Cube*                       root_cube { nullptr };
+    Cube*                       root_cube{nullptr};
     Vec3d                       origin;
     std::vector<CubeProperties> cubes_properties;
 
-    Octree(const Vec3d &origin, const std::vector<CubeProperties> &cubes_properties)
-        : root_cube(pool.construct(origin)), origin(origin), cubes_properties(cubes_properties) {}
+    Octree(const Vec3d& origin, const std::vector<CubeProperties>& cubes_properties)
+        : root_cube(pool.construct(origin)), origin(origin), cubes_properties(cubes_properties)
+    {}
 
-    void insert_triangle(const Vec3d &a, const Vec3d &b, const Vec3d &c, Cube *current_cube, const BoundingBoxf3 &current_bbox, int depth);
+    void insert_triangle(const Vec3d& a, const Vec3d& b, const Vec3d& c, Cube* current_cube, const BoundingBoxf3& current_bbox, int depth);
 };
 
-void OctreeDeleter::operator()(Octree *p) {
-    delete p;
-}
+// [INTENT] OctreeDeleter::operator() — custom deleter for OctreePtr (std::unique_ptr<Octree, OctreeDeleter>).
+//          Destroying the Octree also destroys pool, which atomically frees all Cube nodes.
+void OctreeDeleter::operator()(Octree* p) { delete p; }
 
-std::pair<double, double> adaptive_fill_line_spacing(const PrintObject &print_object)
+// [INTENT] adaptive_fill_line_spacing — computes the global octree cell line-spacing for both
+//          icAdaptiveCubic and icSupportCubic patterns by averaging density and extrusion width
+//          across all printing regions that use those patterns.
+//          Formula: line_spacing = (avg_extrusion_width / (avg_density/100 * 1/3)) * n_multiline
+//          The 1/3 factor accounts for 3 crossing infill directions each contributing equally.
+// [STATE]  Read-only: reads PrintObject config and layer region fill_surfaces. No mutations.
+// [HAZARD] Averaging regions: if multiple regions have wildly different densities or widths,
+//          the resulting single octree cell size is a compromise that may not suit any individual
+//          region perfectly. This is an architectural simplification inherited from PrusaSlicer.
+// [HAZARD] n_multiline reads only printing_region(0).config() — ignores per-region multiline
+//          settings if regions differ. Any port must replicate or fix this.
+// [COUPLING] Reads PrintObject::printing_region(), PrintObject::layers(), Flow::auto_extrusion_width().
+std::pair<double, double> adaptive_fill_line_spacing(const PrintObject& print_object)
 {
     // Output, spacing for icAdaptiveCubic and icSupportCubic
-    double  adaptive_line_spacing = 0.;
-    double  support_line_spacing = 0.;
+    double adaptive_line_spacing = 0.;
+    double support_line_spacing  = 0.;
 
-    enum class Tristate {
-        Yes,
-        No,
-        Maybe
-    };
-    struct RegionFillData {
-        Tristate        has_adaptive_infill;
-        Tristate        has_support_infill;
-        double          density;
-        double          extrusion_width;
+    enum class Tristate { Yes, No, Maybe };
+    struct RegionFillData
+    {
+        Tristate has_adaptive_infill;
+        Tristate has_support_infill;
+        double   density;
+        double   extrusion_width;
     };
     std::vector<RegionFillData> region_fill_data;
     region_fill_data.reserve(print_object.num_printing_regions());
     bool                       build_octree                   = false;
-    const std::vector<double> &nozzle_diameters               = print_object.print()->config().nozzle_diameter.values;
+    const std::vector<double>& nozzle_diameters               = print_object.print()->config().nozzle_diameter.values;
     double                     max_nozzle_diameter            = *std::max_element(nozzle_diameters.begin(), nozzle_diameters.end());
     double                     default_infill_extrusion_width = Flow::auto_extrusion_width(FlowRole::frInfill, float(max_nozzle_diameter));
-    for (size_t region_id = 0; region_id < print_object.num_printing_regions(); ++ region_id) {
-        const PrintRegionConfig &config                 = print_object.printing_region(region_id).config();
-        bool                     nonempty               = config.sparse_infill_density > 0;
-        bool                     has_adaptive_infill    = nonempty && config.sparse_infill_pattern == ipAdaptiveCubic;
-        bool                     has_support_infill     = nonempty && config.sparse_infill_pattern == ipSupportCubic;
+    for (size_t region_id = 0; region_id < print_object.num_printing_regions(); ++region_id) {
+        const PrintRegionConfig& config                   = print_object.printing_region(region_id).config();
+        bool                     nonempty                 = config.sparse_infill_density > 0;
+        bool                     has_adaptive_infill      = nonempty && config.sparse_infill_pattern == ipAdaptiveCubic;
+        bool                     has_support_infill       = nonempty && config.sparse_infill_pattern == ipSupportCubic;
         double                   sparse_infill_line_width = config.sparse_infill_line_width.get_abs_value(max_nozzle_diameter);
-        region_fill_data.push_back(RegionFillData({
-            has_adaptive_infill ? Tristate::Maybe : Tristate::No,
-            has_support_infill ? Tristate::Maybe : Tristate::No,
-            config.sparse_infill_density,
-            sparse_infill_line_width != 0. ? sparse_infill_line_width : default_infill_extrusion_width
-        }));
+        region_fill_data.push_back(RegionFillData(
+            {has_adaptive_infill ? Tristate::Maybe : Tristate::No, has_support_infill ? Tristate::Maybe : Tristate::No,
+             config.sparse_infill_density, sparse_infill_line_width != 0. ? sparse_infill_line_width : default_infill_extrusion_width}));
         build_octree |= has_adaptive_infill || has_support_infill;
     }
 
     if (build_octree) {
         // Compute the average of above parameters over all layers
-        for (const Layer *layer : print_object.layers())
-            for (size_t region_id = 0; region_id < layer->regions().size(); ++ region_id) {
-                RegionFillData &rd = region_fill_data[region_id];
-                if (rd.has_adaptive_infill == Tristate::Maybe && ! layer->regions()[region_id]->fill_surfaces.empty())
+        for (const Layer* layer : print_object.layers())
+            for (size_t region_id = 0; region_id < layer->regions().size(); ++region_id) {
+                RegionFillData& rd = region_fill_data[region_id];
+                if (rd.has_adaptive_infill == Tristate::Maybe && !layer->regions()[region_id]->fill_surfaces.empty())
                     rd.has_adaptive_infill = Tristate::Yes;
-                if (rd.has_support_infill == Tristate::Maybe && ! layer->regions()[region_id]->fill_surfaces.empty())
+                if (rd.has_support_infill == Tristate::Maybe && !layer->regions()[region_id]->fill_surfaces.empty())
                     rd.has_support_infill = Tristate::Yes;
             }
 
-        double  adaptive_fill_density           = 0.;
-        double  adaptive_infill_extrusion_width = 0.;
-        int     adaptive_cnt                    = 0;
-        double  support_fill_density            = 0.;
-        double  support_infill_extrusion_width  = 0.;
-        int     support_cnt                     = 0;
+        double adaptive_fill_density           = 0.;
+        double adaptive_infill_extrusion_width = 0.;
+        int    adaptive_cnt                    = 0;
+        double support_fill_density            = 0.;
+        double support_infill_extrusion_width  = 0.;
+        int    support_cnt                     = 0;
 
-        for (const RegionFillData &rd : region_fill_data) {
+        for (const RegionFillData& rd : region_fill_data) {
             if (rd.has_adaptive_infill == Tristate::Yes) {
-                adaptive_fill_density           += rd.density;
+                adaptive_fill_density += rd.density;
                 adaptive_infill_extrusion_width += rd.extrusion_width;
-                ++ adaptive_cnt;
+                ++adaptive_cnt;
             } else if (rd.has_support_infill == Tristate::Yes) {
-                support_fill_density           += rd.density;
+                support_fill_density += rd.density;
                 support_infill_extrusion_width += rd.extrusion_width;
-                ++ support_cnt;
+                ++support_cnt;
             }
         }
 
         auto to_line_spacing = [](int cnt, double density, double extrusion_width) {
             if (cnt) {
-                density         /= double(cnt);
+                density /= double(cnt);
                 extrusion_width /= double(cnt);
                 return extrusion_width / ((density / 100.0f) * 0.333333333f);
             } else
@@ -357,23 +432,34 @@ std::pair<double, double> adaptive_fill_line_spacing(const PrintObject &print_ob
     return std::make_pair(adaptive_line_spacing, support_line_spacing);
 }
 
+// [INTENT] FillContext — per-direction DDA traversal state for one call of _fill_surface_single().
+//          One FillContext is created for each of the 3 infill directions (0°, +120°, -120°).
+//          It accumulates infill wall-line segments from the octree DDA traversal into
+//          temp_lines (in-progress spanning lines) and output_lines (completed lines).
+// [MEMORY] Stack-allocated in _fill_surface_single(). temp_lines and output_lines are heap
+//          vectors managed by the FillContext lifetime; no external ownership.
+// [CONCURRENCY] Each TBB task that processes a surface calls _fill_surface_single(), which
+//               creates its own std::array<FillContext,3> locally on the stack. No sharing
+//               between tasks; no synchronization needed.
+// [STATE]  direction_angles[] is a compile-time constant; cos_a/sin_a are derived from it
+//          at construction time. traversal_order is a pointer to child_traversal_order[] row.
+// [HAZARD] temp_lines has fixed size (1 << octree.cubes_properties.size()) - 1. This is the
+//          number of nodes in a full binary tree of that depth. If cubes_properties ever grows
+//          unboundedly (e.g. very large mesh), temp_lines could be large. In practice, max
+//          depth is ~10 (mesh bbox ~1000 mm, cell ~2 mm), so size ~1023 — acceptable.
 // Context used by generate_infill_lines() when recursively traversing an octree in a DDA fashion
 // (Digital Differential Analyzer).
 struct FillContext
 {
     // The angles have to agree with child_traversal_order.
-    static constexpr double direction_angles[3] {
-        0.,
-        (2.0 * M_PI) / 3.0,
-        -(2.0 * M_PI) / 3.0
-    };
+    static constexpr double direction_angles[3]{0., (2.0 * M_PI) / 3.0, -(2.0 * M_PI) / 3.0};
 
-    FillContext(const Octree &octree, double z_position, int direction_idx) :
-        cubes_properties(octree.cubes_properties),
-        z_position(z_position),
-        traversal_order(child_traversal_order[direction_idx]),
-        cos_a(cos(direction_angles[direction_idx])),
-        sin_a(sin(direction_angles[direction_idx]))
+    FillContext(const Octree& octree, double z_position, int direction_idx)
+        : cubes_properties(octree.cubes_properties)
+        , z_position(z_position)
+        , traversal_order(child_traversal_order[direction_idx])
+        , cos_a(cos(direction_angles[direction_idx]))
+        , sin_a(sin(direction_angles[direction_idx]))
     {
         static constexpr auto unused = std::numeric_limits<coord_t>::max();
         temp_lines.assign((1 << octree.cubes_properties.size()) - 1, Line(Point(unused, unused), Point(unused, unused)));
@@ -382,56 +468,64 @@ struct FillContext
     // Rotate the point, uses the same convention as Point::rotate().
     Vec2d rotate(const Vec2d& v) { return Vec2d(this->cos_a * v.x() - this->sin_a * v.y(), this->sin_a * v.x() + this->cos_a * v.y()); }
 
-    const std::vector<CubeProperties>  &cubes_properties;
+    const std::vector<CubeProperties>& cubes_properties;
     // Top of the current layer.
-    const double                        z_position;
+    const double z_position;
     // Order of traversal for this line direction.
-    const std::array<int, 8>            traversal_order;
+    const std::array<int, 8> traversal_order;
     // Rotation of the generated line for this line direction.
-    const double                        cos_a;
-    const double                        sin_a;
+    const double cos_a;
+    const double sin_a;
 
     // Linearized tree spanning a single Octree wall, used to connect lines spanning
     // neighboring Octree cells. Unused lines have the Line::a::x set to infinity.
-    std::vector<Line>                   temp_lines;
+    std::vector<Line> temp_lines;
     // Final output
-    std::vector<Line>                   output_lines;
+    std::vector<Line> output_lines;
 };
 
-static constexpr double octree_rot[3] = { 5.0 * M_PI / 4.0, Geometry::deg2rad(215.264), M_PI / 6.0 };
+// [INTENT] octree_rot — Euler angles (ZYX intrinsic, in radians) that rotate world-space
+//          coordinates into the octree's canonical frame where the cube axes align with the
+//          three 60°-spaced infill directions. The octree is built in this rotated frame so
+//          that the infill walls are axis-aligned, then the finished tree is rotated back to
+//          world space by transform_to_world() for efficient slicing.
+// [STATE]  Compile-time constant — never mutated.
+static constexpr double octree_rot[3] = {5.0 * M_PI / 4.0, Geometry::deg2rad(215.264), M_PI / 6.0};
 
+// [INTENT] transform_to_world — quaternion that maps octree-space coordinates to world-space.
+//          Applied to all Cube::center values after the octree is fully built to avoid repeating
+//          the rotation during per-layer infill generation.
+// [COUPLING] Inverse of transform_to_octree(). Must be kept consistent.
 Eigen::Quaterniond transform_to_world()
 {
-    return Eigen::AngleAxisd(octree_rot[2], Vec3d::UnitZ()) * Eigen::AngleAxisd(octree_rot[1], Vec3d::UnitY()) * Eigen::AngleAxisd(octree_rot[0], Vec3d::UnitX());
+    return Eigen::AngleAxisd(octree_rot[2], Vec3d::UnitZ()) * Eigen::AngleAxisd(octree_rot[1], Vec3d::UnitY()) *
+           Eigen::AngleAxisd(octree_rot[0], Vec3d::UnitX());
 }
 
+// [INTENT] transform_to_octree — quaternion that maps world-space coordinates into octree-space.
+//          Used when inserting mesh triangles (in world-space) into the octree during build_octree().
+// [COUPLING] Inverse of transform_to_world(). Must be kept consistent.
 Eigen::Quaterniond transform_to_octree()
 {
-    return Eigen::AngleAxisd(- octree_rot[0], Vec3d::UnitX()) * Eigen::AngleAxisd(- octree_rot[1], Vec3d::UnitY()) * Eigen::AngleAxisd(- octree_rot[2], Vec3d::UnitZ());
+    return Eigen::AngleAxisd(-octree_rot[0], Vec3d::UnitX()) * Eigen::AngleAxisd(-octree_rot[1], Vec3d::UnitY()) *
+           Eigen::AngleAxisd(-octree_rot[2], Vec3d::UnitZ());
 }
 
 #ifndef NDEBUG
 // Verify that the traversal order of the octree children matches the line direction,
 // therefore the infill line may get extended with O(1) time & space complexity.
-static bool verify_traversal_order(
-    FillContext  &context,
-    const Cube   *cube,
-    int           depth,
-    const Vec2d  &line_from,
-    const Vec2d  &line_to)
+static bool verify_traversal_order(FillContext& context, const Cube* cube, int depth, const Vec2d& line_from, const Vec2d& line_to)
 {
     std::array<Vec3d, 8> c;
-    Eigen::Quaterniond to_world = transform_to_world();
+    Eigen::Quaterniond   to_world = transform_to_world();
     for (int i = 0; i < 8; ++i) {
-        int j = context.traversal_order[i];
+        int   j    = context.traversal_order[i];
         Vec3d cntr = to_world * (cube->center_octree + (child_centers[j] * (context.cubes_properties[depth].edge_length / 4.)));
         assert(!cube->children[j] || cube->children[j]->center.isApprox(cntr));
         c[i] = cntr;
     }
-    std::array<Vec3d, 10> dirs = {
-        c[1] - c[0], c[2] - c[0], c[3] - c[1], c[3] - c[2], c[3] - c[0],
-        c[5] - c[4], c[6] - c[4], c[7] - c[5], c[7] - c[6], c[7] - c[4]
-    };
+    std::array<Vec3d, 10> dirs = {c[1] - c[0], c[2] - c[0], c[3] - c[1], c[3] - c[2], c[3] - c[0],
+                                  c[5] - c[4], c[6] - c[4], c[7] - c[5], c[7] - c[6], c[7] - c[4]};
     assert(std::abs(dirs[4].z()) < 0.005);
     assert(std::abs(dirs[9].z()) < 0.005);
     assert(dirs[0].isApprox(dirs[3]));
@@ -447,18 +541,36 @@ static bool verify_traversal_order(
 }
 #endif // NDEBUG
 
-static void generate_infill_lines_recursive(
-    FillContext     &context,
-    const Cube      *cube,
-    // Address of this wall in the octree,  used to address context.temp_lines.
-    int              address,
-    int              depth)
+// [INTENT] generate_infill_lines_recursive — DDA (Digital Differential Analyzer) octree traversal
+//          that samples wall-lines at the current layer Z from all octree cells.
+//          For each Cube at `depth` that spans the current z_position:
+//            - If close enough to the cell's equatorial wall plane, compute the line endpoints
+//              using the analytic formula for an octree wall cross-section, rotate by cos_a/sin_a,
+//              and either extend the running context.temp_lines[address] segment or flush it to
+//              context.output_lines if a gap > 1000 scaled units is detected.
+//            - Recurse into children using context.traversal_order for monotonic ordering.
+// [STATE]  Mutates context.temp_lines and context.output_lines. `address` encodes the node
+//          position as a 1-indexed binary-tree address: left child = address*2+1,
+//          right child = address*2+2 (after ++address when i==4).
+// [HAZARD] Gap threshold > 1000 (not SCALED_EPSILON=100) is intentional but undocumented magic.
+//          The comment says SCALED_EPSILON is not enough; the 1000 unit (~0.001 mm) gap
+//          prevents spurious line extensions across non-adjacent cells.
+// [HAZARD] Recursion depth equals octree depth (~10 max). Not a stack-depth concern in practice.
+//          If depth is ever pathologically large, stack overflow is possible in theory.
+// [COUPLING] Depends on FillContext (direction, traversal_order, temp_lines, output_lines),
+//            CubeProperties (height, line_z_distance, diagonal_length, line_xy_distance),
+//            and the octree Cube* tree structure.
+static void generate_infill_lines_recursive(FillContext& context,
+                                            const Cube*  cube,
+                                            // Address of this wall in the octree,  used to address context.temp_lines.
+                                            int address,
+                                            int depth)
 {
     assert(cube != nullptr);
 
-    const std::vector<CubeProperties> &cubes_properties = context.cubes_properties;
-    const double z_diff     = context.z_position - cube->center.z();
-    const double z_diff_abs = std::abs(z_diff);
+    const std::vector<CubeProperties>& cubes_properties = context.cubes_properties;
+    const double                       z_diff           = context.z_position - cube->center.z();
+    const double                       z_diff_abs       = std::abs(z_diff);
 
     if (z_diff_abs > cubes_properties[depth].height / 2.)
         return;
@@ -466,21 +578,20 @@ static void generate_infill_lines_recursive(
     if (z_diff_abs < cubes_properties[depth].line_z_distance) {
         // Discretize a single wall splitting the cube into two.
         const double zdist = cubes_properties[depth].line_z_distance;
-        Vec2d from(
-            0.5 * cubes_properties[depth].diagonal_length * (zdist - z_diff_abs) / zdist,
-            cubes_properties[depth].line_xy_distance - (zdist + z_diff) / sqrt(2.));
-        Vec2d to(-from.x(), from.y());
+        Vec2d        from(0.5 * cubes_properties[depth].diagonal_length * (zdist - z_diff_abs) / zdist,
+                          cubes_properties[depth].line_xy_distance - (zdist + z_diff) / sqrt(2.));
+        Vec2d        to(-from.x(), from.y());
         from = context.rotate(from);
         to   = context.rotate(to);
         // Relative to cube center
         const Vec2d offset(cube->center.x(), cube->center.y());
         from += offset;
-        to   += offset;
+        to += offset;
         // Verify that the traversal order of the octree children matches the line direction,
         // therefore the infill line may get extended with O(1) time & space complexity.
         assert(verify_traversal_order(context, cube, depth, from, to));
         // Either extend an existing line or start a new one.
-        Line &last_line = context.temp_lines[address];
+        Line& last_line = context.temp_lines[address];
         Line  new_line(Point::new_scale(from), Point::new_scale(to));
         if (last_line.a.x() == std::numeric_limits<coord_t>::max()) {
             last_line.a = new_line.a;
@@ -493,15 +604,15 @@ static void generate_infill_lines_recursive(
 
     // left child index
     address = address * 2 + 1;
-    -- depth;
+    --depth;
     size_t i = 0;
     for (const int child_idx : context.traversal_order) {
-        const Cube *child = cube->children[child_idx];
+        const Cube* child = cube->children[child_idx];
         if (child != nullptr)
             generate_infill_lines_recursive(context, child, address, depth);
-        if (++ i == 4)
+        if (++i == 4)
             // right child index
-            ++ address;
+            ++address;
     }
 }
 
@@ -510,7 +621,10 @@ static void generate_infill_lines_recursive(
 #endif
 
 #ifdef ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
-static void export_infill_lines_to_svg(const ExPolygon &expoly, const Polylines &polylines, const std::string &path, const Points &pts = Points())
+static void export_infill_lines_to_svg(const ExPolygon&   expoly,
+                                       const Polylines&   polylines,
+                                       const std::string& path,
+                                       const Points&      pts = Points())
 {
     BoundingBox bbox = get_extents(expoly);
     bbox.offset(scale_(3.));
@@ -521,23 +635,23 @@ static void export_infill_lines_to_svg(const ExPolygon &expoly, const Polylines 
     svg.draw(polylines, "red");
     static constexpr double trim_length = scale_(0.4);
     for (Polyline polyline : polylines)
-        if (! polyline.empty()) {
+        if (!polyline.empty()) {
             Vec2d a = polyline.points.front().cast<double>();
             Vec2d d = polyline.points.back().cast<double>();
             if (polyline.size() == 2) {
-                Vec2d v = d - a;
+                Vec2d  v = d - a;
                 double l = v.norm();
                 if (l > 2. * trim_length) {
                     a += v * trim_length / l;
                     d -= v * trim_length / l;
                     polyline.points.front() = a.cast<coord_t>();
-                    polyline.points.back() = d.cast<coord_t>();
+                    polyline.points.back()  = d.cast<coord_t>();
                 } else
                     polyline.points.clear();
             } else if (polyline.size() > 2) {
-                Vec2d b = polyline.points[1].cast<double>();
-                Vec2d c = polyline.points[polyline.points.size() - 2].cast<double>();
-                Vec2d v = b - a;
+                Vec2d  b = polyline.points[1].cast<double>();
+                Vec2d  c = polyline.points[polyline.points.size() - 2].cast<double>();
+                Vec2d  v = b - a;
                 double l = v.norm();
                 if (l > trim_length) {
                     a += v * trim_length / l;
@@ -557,66 +671,101 @@ static void export_infill_lines_to_svg(const ExPolygon &expoly, const Polylines 
 }
 #endif /* ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT */
 
+// [INTENT] Intersection — describes a T-joint where one infill polyline's endpoint lies against
+//          the interior of another infill line. Used by connect_lines_using_hooks() to build
+//          T-joint hooks that anchor the shorter polyline to the crossing line.
+//          Fields:
+//            closest_line  — the host line being T-joined against (pointer into lines_src)
+//            intersect_line — the segment of the polyline arriving at this T (pointer into lines_src)
+//            intersect_pl   — the full polyline whose endpoint is the T-joint (pointer into lines)
+//            intersect_point — the T-joint point (end of intersect_pl)
+//            front          — true if intersect_point is the front of intersect_pl
+//            left           — side of the T relative to closest_line (used for hook direction)
+//            used           — set to true once the hook has been generated for this intersection
+// [MEMORY] Raw pointers into three parallel arrays (lines, lines_src, intersections). All arrays
+//          must remain stable (no reallocation) during the hook-connection loop.
+//          [HAZARD] If lines, lines_src, or intersections vectors are reallocated, all pointers
+//          become dangling. connect_lines_using_hooks() must not push_back to these vectors
+//          while iterating.
+// [COUPLING] Tightly coupled to connect_lines_using_hooks(), add_hook(), get_nearest_intersection().
 // Representing a T-joint (in general case) between two infill lines
-// (between one end point of intersect_pl/intersect_line and 
+// (between one end point of intersect_pl/intersect_line and
 struct Intersection
 {
     // Closest line to intersect_point.
-    const Line  *closest_line;
+    const Line* closest_line;
 
     // The line for which is computed closest line from intersect_point to closest_line
-    const Line  *intersect_line;
+    const Line* intersect_line;
     // Pointer to the polyline from which is computed closest_line
-    Polyline    *intersect_pl;
+    Polyline* intersect_pl;
     // Point for which is computed closest line (closest_line)
-    Point        intersect_point;
+    Point intersect_point;
     // Indicate if intersect_point is the first or the last point of intersect_pl
-    bool         front;
+    bool front;
     // Signum of intersect_line_dir.cross(closest_line.dir()):
-    bool         left;
+    bool left;
 
     // Indication if this intersection has been proceed
-    bool         used = false;
+    bool used = false;
 
-    bool         fresh() const throw() { return ! used && ! intersect_pl->empty(); }
+    bool fresh() const throw() { return !used && !intersect_pl->empty(); }
 
-    Intersection(const Line &closest_line, const Line &intersect_line, Polyline *intersect_pl, const Point &intersect_point, bool front) :
-        closest_line(&closest_line), intersect_line(&intersect_line), intersect_pl(intersect_pl), intersect_point(intersect_point), front(front)
+    Intersection(const Line& closest_line, const Line& intersect_line, Polyline* intersect_pl, const Point& intersect_point, bool front)
+        : closest_line(&closest_line)
+        , intersect_line(&intersect_line)
+        , intersect_pl(intersect_pl)
+        , intersect_point(intersect_point)
+        , front(front)
     {
         // Calculate side of this intersection line of the closest line.
         Vec2d v1((this->closest_line->b - this->closest_line->a).cast<double>());
         Vec2d v2(this->intersect_line_dir());
 #ifndef NDEBUG
         {
-            Vec2d v1n = v1.normalized();
-            Vec2d v2n = v2.normalized();
-            double c = cross2(v1n, v2n);
+            Vec2d  v1n = v1.normalized();
+            Vec2d  v2n = v2.normalized();
+            double c   = cross2(v1n, v2n);
             assert(std::abs(c) > sin(M_PI / 12.));
         }
 #endif // NDEBUG
         this->left = cross2(v1, v2) > 0.;
     }
 
-    std::optional<Line> other_hook() const {
+    std::optional<Line> other_hook() const
+    {
         std::optional<Line> out;
-        const Points &pts = intersect_pl->points;
+        const Points&       pts = intersect_pl->points;
         if (pts.size() >= 3)
             out = this->front ? Line(pts[1], pts[2]) : Line(pts[pts.size() - 2], pts[pts.size() - 3]);
         return out;
     }
 
-    bool      other_hook_intersects(const Line &l, Point &pt) {
+    bool other_hook_intersects(const Line& l, Point& pt)
+    {
         std::optional<Line> h = other_hook();
         return h && h->intersection(l, &pt);
     }
-    bool      other_hook_intersects(const Line &l) { Point pt; return this->other_hook_intersects(l, pt); }
+    bool other_hook_intersects(const Line& l)
+    {
+        Point pt;
+        return this->other_hook_intersects(l, pt);
+    }
 
     // Direction to intersect_point.
-    Vec2d     intersect_line_dir() const throw() {
-        return (this->intersect_point == intersect_line->a ? intersect_line->b - intersect_line->a : intersect_line->a - intersect_line->b).cast<double>();
+    Vec2d intersect_line_dir() const throw()
+    {
+        return (this->intersect_point == intersect_line->a ? intersect_line->b - intersect_line->a : intersect_line->a - intersect_line->b)
+            .cast<double>();
     }
 };
 
+// [INTENT] get_nearest_intersection — given an index into a sorted list of T-joint intersections
+//          that all lie on the same closest_line, returns the closest fresh (unprocessed) neighbor.
+//          Prefers the neighbor closer along the projection axis; if both neighbors are fresh,
+//          picks whichever is closer; if only one is fresh, picks that one.
+// [HAZARD] Relies on intersect_line being sorted by projection distance before calling. If the
+//          sort order is wrong, the selected neighbor will be incorrect, producing malformed hooks.
 static inline Intersection* get_nearest_intersection(std::vector<std::pair<Intersection*, double>>& intersect_line, const size_t first_idx)
 {
     assert(intersect_line.size() >= 2);
@@ -627,21 +776,28 @@ static inline Intersection* get_nearest_intersection(std::vector<std::pair<Inter
         take_next = false;
     else {
         // Has both prev and next.
-        const std::pair<Intersection*, double> &ithis = intersect_line[first_idx];
-        const std::pair<Intersection*, double> &iprev = intersect_line[first_idx - 1];
-        const std::pair<Intersection*, double> &inext = intersect_line[first_idx + 1];
-        take_next = iprev.first->fresh() && inext.first->fresh() ?
-            inext.second - ithis.second < ithis.second - iprev.second :
-            inext.first->fresh();
+        const std::pair<Intersection*, double>& ithis = intersect_line[first_idx];
+        const std::pair<Intersection*, double>& iprev = intersect_line[first_idx - 1];
+        const std::pair<Intersection*, double>& inext = intersect_line[first_idx + 1];
+        take_next = iprev.first->fresh() && inext.first->fresh() ? inext.second - ithis.second < ithis.second - iprev.second :
+                                                                   inext.first->fresh();
     }
     return intersect_line[take_next ? first_idx + 1 : first_idx - 1].first;
 }
 
-// Create a line representing the anchor aka hook extrusion based on line_to_offset 
+// [INTENT] create_offset_line — translates `offset_line` perpendicularly away from the T-joint's
+//          closest_line by scaled_offset, in the direction determined by intersection.left.
+//          The line is also extended by scaled_offset * 1.16 (= 1/cos(PI/6)) to guarantee
+//          that intersection tests with adjacent infill lines will always find a collision.
+// [HAZARD] The magic factor 1.16 ≈ 2/sqrt(3) accounts for the 60° infill angle. If infill
+//          angles change, this factor needs recalculation.
+// Create a line representing the anchor aka hook extrusion based on line_to_offset
 // translated in the direction of the intersection line (intersection.intersect_line).
-static Line create_offset_line(Line offset_line, const Intersection &intersection, const double scaled_offset)
+static Line create_offset_line(Line offset_line, const Intersection& intersection, const double scaled_offset)
 {
-    offset_line.translate((perp(intersection.closest_line->vector().cast<double>().normalized()) * (intersection.left ? scaled_offset : - scaled_offset)).cast<coord_t>());
+    offset_line.translate(
+        (perp(intersection.closest_line->vector().cast<double>().normalized()) * (intersection.left ? scaled_offset : -scaled_offset))
+            .cast<coord_t>());
     // Extend the line by a small value to guarantee a collision with adjacent lines
     offset_line.extend(coord_t(scaled_offset * 1.16)); // / cos(PI/6)
     return offset_line;
@@ -651,26 +807,51 @@ namespace bg  = boost::geometry;
 namespace bgm = boost::geometry::model;
 namespace bgi = boost::geometry::index;
 
+// [INTENT] rtree type aliases — Boost.Geometry R*-tree storing (segment, polyline_index) pairs.
+//          Used in connect_lines_using_hooks() for fast nearest-segment lookup and intersection
+//          queries during T-joint hook generation.
+//          rtree_t uses rstar<16,4>: max 16 entries per node, min 4 (32% fill factor).
+// [HAZARD] float coordinates are required because bgi::intersects overflows for coord_t (int32)
+//          values at slicer scale (coord_t ~10^6 units). Precision loss at float resolution
+//          (~7 decimal digits) is acceptable for mm-scale hook geometry but not for sub-micron work.
+// [COUPLING] rtree stores size_t indices into the `lines` vector. If `lines` is reallocated,
+//            the indices remain valid but the Polyline* pointers stored in Intersection structs
+//            would be dangling. The two representations must be kept in sync.
 // float is needed because for coord_t bgi::intersects throws "bad numeric conversion: positive overflow"
 using rtree_point_t   = bgm::point<float, 2, boost::geometry::cs::cartesian>;
 using rtree_segment_t = bgm::segment<rtree_point_t>;
 using rtree_t         = bgi::rtree<std::pair<rtree_segment_t, size_t>, bgi::rstar<16, 4>>;
 
-static inline rtree_point_t mk_rtree_point(const Point &pt) {
-    return rtree_point_t(float(pt.x()), float(pt.y()));
-}
-static inline rtree_segment_t mk_rtree_seg(const Point &a, const Point &b) {
-    return { mk_rtree_point(a), mk_rtree_point(b) };
-}
-static inline rtree_segment_t mk_rtree_seg(const Line &l) {
-    return mk_rtree_seg(l.a, l.b);
-}
+static inline rtree_point_t   mk_rtree_point(const Point& pt) { return rtree_point_t(float(pt.x()), float(pt.y())); }
+static inline rtree_segment_t mk_rtree_seg(const Point& a, const Point& b) { return {mk_rtree_point(a), mk_rtree_point(b)}; }
+static inline rtree_segment_t mk_rtree_seg(const Line& l) { return mk_rtree_seg(l.a, l.b); }
 
+// [INTENT] add_hook — for a given T-joint (intersection), computes and appends a hook segment
+//          to the front or back of intersection.intersect_pl. The hook extends along the
+//          closest_line direction for up to hook_length, trimmed short if it would collide with
+//          another infill line or the boundary. Both forward and backward directions are tried;
+//          the longer result wins.
+//          Algorithm:
+//            1. Find hook_start = intersection of intersect_line with the offset closest_line.
+//            2. Extend forward along closest_line by (hook_length + trim_padding), query rtree.
+//            3. If forward is too short (< hook_length - SCALED_EPSILON), try backward.
+//            4. Prepend or append (hook_end, hook_start) to the polyline at the correct end.
+// [MEMORY] Modifies intersection.intersect_pl->points in place (emplace at front or back).
+//          No heap allocation beyond the vector growth.
+// [HAZARD] filter_itself lambda captures lines_src.data() and uses pointer arithmetic
+//          (intersection.intersect_line - lines_src.data()) to identify the current line's
+//          rtree entry for exclusion. If lines_src is resized, lines_src.data() changes and
+//          the subtraction yields UB.
+// [COUPLING] Requires the rtree to contain both infill lines (indices 0..lines.size()-1) and
+//            boundary segments (indices lines.size()..poly_idx-1) as inserted by
+//            connect_lines_using_hooks before the hook loop.
 // Create a hook based on hook_line and append it to the begin or end of the polyline in the intersection
-static void add_hook(
-    const Intersection &intersection, const double scaled_offset, 
-    const coordf_t hook_length, double scaled_trim_distance, 
-    const rtree_t &rtree, const Lines &lines_src)
+static void add_hook(const Intersection& intersection,
+                     const double        scaled_offset,
+                     const coordf_t      hook_length,
+                     double              scaled_trim_distance,
+                     const rtree_t&      rtree,
+                     const Lines&        lines_src)
 {
     if (hook_length < SCALED_EPSILON)
         // Ignore open hooks.
@@ -680,11 +861,11 @@ static void add_hook(
     {
         const Vec2d  v  = (intersection.closest_line->b - intersection.closest_line->a).cast<double>();
         const Vec2d  va = (intersection.intersect_point - intersection.closest_line->a).cast<double>();
-        const double l2 = v.squaredNorm();  // avoid a sqrt
+        const double l2 = v.squaredNorm(); // avoid a sqrt
         assert(l2 > 0.);
-        const double t  = va.dot(v) / l2;
+        const double t = va.dot(v) / l2;
         assert(t > 0. && t < 1.);
-        const double          d  = (t * v - va).norm();
+        const double d = (t * v - va).norm();
         assert(d < 1000.);
     }
 #endif // NDEBUG
@@ -692,20 +873,22 @@ static void add_hook(
     // Trim the hook start by the infill line it will connect to.
     Point hook_start;
 
-    [[maybe_unused]] bool intersection_found = intersection.intersect_line->intersection(
-        create_offset_line(*intersection.closest_line, intersection, scaled_offset),
-        &hook_start);
+    [[maybe_unused]] bool intersection_found = intersection.intersect_line->intersection(create_offset_line(*intersection.closest_line,
+                                                                                                            intersection, scaled_offset),
+                                                                                         &hook_start);
     assert(intersection_found);
 
     std::optional<Line> other_hook = intersection.other_hook();
 
-    Vec2d   hook_vector_norm = intersection.closest_line->vector().cast<double>().normalized();
+    Vec2d hook_vector_norm = intersection.closest_line->vector().cast<double>().normalized();
     // hook_vector is extended by the thickness of the infill line, so that a collision is found against
     // the infill centerline to be later trimmed by the thickened line.
-    Vector  hook_vector      = ((hook_length + 1.16 * scaled_trim_distance) * hook_vector_norm).cast<coord_t>();
-    Line    hook_forward(hook_start, hook_start + hook_vector);
+    Vector hook_vector = ((hook_length + 1.16 * scaled_trim_distance) * hook_vector_norm).cast<coord_t>();
+    Line   hook_forward(hook_start, hook_start + hook_vector);
 
-    auto filter_itself = [&intersection, &lines_src](const auto &item) { return item.second != (long unsigned int)(intersection.intersect_line - lines_src.data()); };
+    auto filter_itself = [&intersection, &lines_src](const auto& item) {
+        return item.second != (long unsigned int) (intersection.intersect_line - lines_src.data());
+    };
 
     std::vector<std::pair<rtree_segment_t, size_t>> hook_intersections;
     rtree.query(bgi::intersects(mk_rtree_seg(hook_forward)) && bgi::satisfies(filter_itself), std::back_inserter(hook_intersections));
@@ -715,12 +898,12 @@ static void add_hook(
     // Find closest intersection of a line segment starting with pt pointing in dir
     // with any of the hook_intersections, returns Euclidian distance.
     // dir is normalized.
-    auto max_hook_length = [hook_length, scaled_trim_distance, &lines_src](
-        const Vec2d &pt, const Vec2d &dir,
-        const std::vector<std::pair<rtree_segment_t, size_t>> &hook_intersections,
-        bool self_intersection, const std::optional<Line> &self_intersection_line, const Point &self_intersection_point) {
+    auto max_hook_length = [hook_length, scaled_trim_distance,
+                            &lines_src](const Vec2d& pt, const Vec2d& dir,
+                                        const std::vector<std::pair<rtree_segment_t, size_t>>& hook_intersections, bool self_intersection,
+                                        const std::optional<Line>& self_intersection_line, const Point& self_intersection_point) {
         // No hook is longer than hook_length, there shouldn't be any intersection closer than that.
-        auto max_length = hook_length;
+        auto max_length        = hook_length;
         auto update_max_length = [&max_length](double d) {
             if (d < max_length)
                 max_length = d;
@@ -730,8 +913,8 @@ static void add_hook(
             return scaled_trim_distance * std::abs(cross2(dir, dir2.normalized()));
         };
 
-        for (const auto &hook_intersection : hook_intersections) {
-            const rtree_segment_t &segment = hook_intersection.first;
+        for (const auto& hook_intersection : hook_intersections) {
+            const rtree_segment_t& segment = hook_intersection.first;
             // Segment start and end points, segment vector.
             Vec2d pt2(bg::get<0, 0>(segment), bg::get<0, 1>(segment));
             Vec2d dir2 = Vec2d(bg::get<1, 0>(segment), bg::get<1, 1>(segment)) - pt2;
@@ -745,29 +928,33 @@ static void add_hook(
             update_max_length(t);
         }
         if (self_intersection) {
-            double t = (self_intersection_point.cast<double>() - pt).dot(dir) - shift_from_thick_line((*self_intersection_line).vector().cast<double>());
+            double t = (self_intersection_point.cast<double>() - pt).dot(dir) -
+                       shift_from_thick_line((*self_intersection_line).vector().cast<double>());
             max_length = std::min(max_length, t);
         }
         return std::max(0., max_length);
     };
 
     Vec2d  hook_startf              = hook_start.cast<double>();
-    double hook_forward_max_length  = max_hook_length(hook_startf, hook_vector_norm, hook_intersections, self_intersection, other_hook, self_intersection_point);
+    double hook_forward_max_length  = max_hook_length(hook_startf, hook_vector_norm, hook_intersections, self_intersection, other_hook,
+                                                      self_intersection_point);
     double hook_backward_max_length = 0.;
     if (hook_forward_max_length < hook_length - SCALED_EPSILON) {
         // Try the other side.
         hook_intersections.clear();
         Line hook_backward(hook_start, hook_start - hook_vector);
         rtree.query(bgi::intersects(mk_rtree_seg(hook_backward)) && bgi::satisfies(filter_itself), std::back_inserter(hook_intersections));
-        self_intersection = other_hook && other_hook->intersection(hook_backward, &self_intersection_point);
-        hook_backward_max_length = max_hook_length(hook_startf, - hook_vector_norm, hook_intersections, self_intersection, other_hook, self_intersection_point);
+        self_intersection        = other_hook && other_hook->intersection(hook_backward, &self_intersection_point);
+        hook_backward_max_length = max_hook_length(hook_startf, -hook_vector_norm, hook_intersections, self_intersection, other_hook,
+                                                   self_intersection_point);
     }
 
     // Take the longer hook.
-    Vec2d hook_dir = (hook_forward_max_length > hook_backward_max_length ? hook_forward_max_length : - hook_backward_max_length) * hook_vector_norm;
+    Vec2d hook_dir = (hook_forward_max_length > hook_backward_max_length ? hook_forward_max_length : -hook_backward_max_length) *
+                     hook_vector_norm;
     Point hook_end = hook_start + hook_dir.cast<coord_t>();
 
-    Points &pl = intersection.intersect_pl->points;
+    Points& pl = intersection.intersect_pl->points;
     if (intersection.front) {
         pl.front() = hook_start;
         pl.emplace(pl.begin(), hook_end);
@@ -778,11 +965,11 @@ static void add_hook(
 }
 
 #ifndef NDEBUG
-bool validate_intersection_t_joint(const Intersection &intersection)
+bool validate_intersection_t_joint(const Intersection& intersection)
 {
-    const Vec2d  v = (intersection.closest_line->b - intersection.closest_line->a).cast<double>();
+    const Vec2d  v  = (intersection.closest_line->b - intersection.closest_line->a).cast<double>();
     const Vec2d  va = (intersection.intersect_point - intersection.closest_line->a).cast<double>();
-    const double l2 = v.squaredNorm();  // avoid a sqrt
+    const double l2 = v.squaredNorm(); // avoid a sqrt
     assert(l2 > 0.);
     const double t = va.dot(v);
     assert(t > SCALED_EPSILON && t < l2 - SCALED_EPSILON);
@@ -790,7 +977,7 @@ bool validate_intersection_t_joint(const Intersection &intersection)
     assert(d < 1000.);
     return true;
 }
-bool validate_intersections(const std::vector<Intersection> &intersections)
+bool validate_intersections(const std::vector<Intersection>& intersections)
 {
     for (const Intersection& intersection : intersections)
         assert(validate_intersection_t_joint(intersection));
@@ -798,15 +985,38 @@ bool validate_intersections(const std::vector<Intersection> &intersections)
 }
 #endif // NDEBUG
 
-static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &boundary, const double spacing, const coordf_t hook_length, const coordf_t hook_length_max)
+// [INTENT] connect_lines_using_hooks — the main T-joint anchoring pass.
+//          Given a set of infill polylines (post-clipping), this function:
+//            1. Inserts all infill lines into an R*-tree for fast lookup.
+//            2. Merges close collinear segments split by the boundary (gap < r2_close=1200² units).
+//            3. Detects T-joints (one polyline endpoint projects onto the interior of another line).
+//            4. For each T-joint, decides whether to: drop (too short), trim (medium), or anchor (long).
+//            5. For anchoring: either connects two facing T-joints with a bridge segment, or
+//               calls add_hook() to add a single hook to one polyline's end.
+//            6. Merges endpoint-touching polylines using a union-find (merged_with[]).
+//          Returns the modified polylines with hooks/bridges added, empty slots removed.
+// [MEMORY] Takes `lines` by move (Polylines&&). Modifies polyline endpoints and points in-place.
+//          intersections vector stores Intersection objects with raw pointers into lines/lines_src.
+//          [HAZARD] Neither lines, lines_src, nor intersections may be reallocated after their
+//          final push_back — raw pointers become dangling on reallocation.
+// [CONCURRENCY] Called single-threaded from _fill_surface_single(). No shared state.
+// [COUPLING] Depends on add_hook(), create_offset_line(), get_nearest_intersection(),
+//            Boost.Geometry rtree, ExPolygon boundary for boundary-collision checks.
+// [HAZARD] update_merged_polyline_idx: iterative path-compression union-find without rank
+//          balancing. O(depth) per call, can degrade to O(N) for adversarial merge orders.
+//          For typical infill line counts (~100s), this is not a performance concern.
+// [STATE]  poly_idx tracks the rtree index counter across both infill lines and boundary segments.
+//          Boundary segments are inserted after infill lines; their indices are > lines.size()-1.
+static Polylines connect_lines_using_hooks(
+    Polylines&& lines, const ExPolygon& boundary, const double spacing, const coordf_t hook_length, const coordf_t hook_length_max)
 {
     rtree_t rtree;
     size_t  poly_idx = 0;
 
     // 19% overlap, slightly lower than the allowed overlap in Fill::connect_infill()
-    const float scaled_offset           = float(scale_(spacing) * 0.81);
+    const float scaled_offset = float(scale_(spacing) * 0.81);
     // 25% overlap
-    const float scaled_trim_distance    = float(scale_(spacing) * 0.5 * 0.75);
+    const float scaled_trim_distance = float(scale_(spacing) * 0.5 * 0.75);
 
     // Keeping the vector of closest points outside the loop, so the vector does not need to be reallocated.
     std::vector<std::pair<rtree_segment_t, size_t>> closest;
@@ -816,24 +1026,28 @@ static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &b
         // Insert infill lines into rtree, merge close collinear segments split by the infill boundary,
         // collect lines_touching_at_endpoints.
         double r2_close = Slic3r::sqr(1200.);
-        for (Polyline &poly : lines) {
+        for (Polyline& poly : lines) {
             assert(poly.points.size() == 2);
             if (&poly != lines.data()) {
-                // Join collinear segments separated by a tiny gap. These gaps were likely created by clipping the infill lines with a concave dent in an infill boundary.
-                auto collinear_segment = [&rtree, &closest, &lines, &lines_touching_at_endpoints, r2_close](const Point& pt, const Point& pt_other, const Polyline* polyline) -> std::pair<Polyline*, bool> {
+                // Join collinear segments separated by a tiny gap. These gaps were likely created by clipping the infill lines with a
+                // concave dent in an infill boundary.
+                auto collinear_segment = [&rtree, &closest, &lines, &lines_touching_at_endpoints,
+                                          r2_close](const Point& pt, const Point& pt_other,
+                                                    const Polyline* polyline) -> std::pair<Polyline*, bool> {
                     closest.clear();
                     rtree.query(bgi::nearest(mk_rtree_point(pt), 1), std::back_inserter(closest));
-                    const Polyline *other = &lines[closest.front().second];
-                    double dist2_front = (other->points.front() - pt).cast<double>().squaredNorm();
-                    double dist2_back  = (other->points.back() - pt).cast<double>().squaredNorm();
-                    double dist2_min   = std::min(dist2_front, dist2_back);
+                    const Polyline* other       = &lines[closest.front().second];
+                    double          dist2_front = (other->points.front() - pt).cast<double>().squaredNorm();
+                    double          dist2_back  = (other->points.back() - pt).cast<double>().squaredNorm();
+                    double          dist2_min   = std::min(dist2_front, dist2_back);
                     if (dist2_min < r2_close) {
                         // Don't connect the segments in an opposite direction.
-                        double dist2_min_other = std::min((other->points.front() - pt_other).cast<double>().squaredNorm(), (other->points.back() - pt_other).cast<double>().squaredNorm());
+                        double dist2_min_other = std::min((other->points.front() - pt_other).cast<double>().squaredNorm(),
+                                                          (other->points.back() - pt_other).cast<double>().squaredNorm());
                         if (dist2_min_other > dist2_min) {
                             // End points of the two lines are very close, they should have been merged together if they are collinear.
-                            Vec2d v1 = (pt_other - pt).cast<double>();
-                            Vec2d v2 = (other->points.back() - other->points.front()).cast<double>();
+                            Vec2d v1  = (pt_other - pt).cast<double>();
+                            Vec2d v2  = (other->points.back() - other->points.front()).cast<double>();
                             Vec2d v1n = v1.normalized();
                             Vec2d v2n = v2.normalized();
                             // The vectors must not be collinear.
@@ -851,17 +1065,17 @@ static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &b
                     }
                     return std::make_pair(static_cast<Polyline*>(nullptr), false);
                 };
-                auto collinear_front = collinear_segment(poly.points.front(), poly.points.back(),  &poly);
-                auto collinear_back  = collinear_segment(poly.points.back(),  poly.points.front(), &poly);
-                assert(! collinear_front.first || ! collinear_back.first || collinear_front.first != collinear_back.first);
+                auto collinear_front = collinear_segment(poly.points.front(), poly.points.back(), &poly);
+                auto collinear_back  = collinear_segment(poly.points.back(), poly.points.front(), &poly);
+                assert(!collinear_front.first || !collinear_back.first || collinear_front.first != collinear_back.first);
                 if (collinear_front.first) {
-                    Polyline &other = *collinear_front.first;
+                    Polyline& other = *collinear_front.first;
                     assert(&other != &poly);
                     poly.points.front() = collinear_front.second ? other.points.back() : other.points.front();
                     other.points.clear();
                 }
                 if (collinear_back.first) {
-                    Polyline &other = *collinear_back.first;
+                    Polyline& other = *collinear_back.first;
                     assert(&other != &poly);
                     poly.points.back() = collinear_back.second ? other.points.back() : other.points.front();
                     other.points.clear();
@@ -874,8 +1088,9 @@ static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &b
     // Convert input polylines to lines_src after the colinear segments were merged.
     Lines lines_src;
     lines_src.reserve(lines.size());
-    std::transform(lines.begin(), lines.end(), std::back_inserter(lines_src), [](const Polyline &pl) { 
-        return pl.empty() ? Line(Point(0, 0), Point(0, 0)) : Line(pl.points.front(), pl.points.back()); });
+    std::transform(lines.begin(), lines.end(), std::back_inserter(lines_src), [](const Polyline& pl) {
+        return pl.empty() ? Line(Point(0, 0), Point(0, 0)) : Line(pl.points.front(), pl.points.back());
+    });
 
     sort_remove_duplicates(lines_touching_at_endpoints);
 
@@ -889,25 +1104,25 @@ static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &b
         const double line_len_threshold_anchor_both_sides  = line_len_threshold_drop_both_sides + scaled_offset;
         const double line_len_threshold_drop_single_side   = scaled_offset * (1. / cos(PI / 6.) + 1.5) + SCALED_EPSILON;
         const double line_len_threshold_anchor_single_side = line_len_threshold_drop_single_side + scaled_offset;
-        for (size_t line_idx = 0; line_idx < lines.size(); ++ line_idx) {
-            Polyline    &line        = lines[line_idx];
+        for (size_t line_idx = 0; line_idx < lines.size(); ++line_idx) {
+            Polyline& line = lines[line_idx];
             if (line.points.empty())
                 continue;
 
-            Point &front_point = line.points.front();
-            Point &back_point  = line.points.back();
+            Point& front_point = line.points.front();
+            Point& back_point  = line.points.back();
 
             // Find the nearest line from the start point of the line.
             std::optional<size_t> tjoint_front, tjoint_back;
             {
-                auto has_tjoint = [&closest, line_idx, &rtree, &lines, &lines_src](const Point &pt) {
-                    auto filter_t_joint = [line_idx, &lines_src, pt](const auto &item) { 
+                auto has_tjoint = [&closest, line_idx, &rtree, &lines, &lines_src](const Point& pt) {
+                    auto filter_t_joint = [line_idx, &lines_src, pt](const auto& item) {
                         if (item.second != line_idx) {
                             // Verify that the point projects onto the line.
-                            const Line  &line = lines_src[item.second];
-                            const Vec2d  v  = (line.b - line.a).cast<double>();
-                            const Vec2d  va = (pt - line.a).cast<double>();
-                            const double l2 = v.squaredNorm();  // avoid a sqrt
+                            const Line&  line = lines_src[item.second];
+                            const Vec2d  v    = (line.b - line.a).cast<double>();
+                            const Vec2d  va   = (pt - line.a).cast<double>();
+                            const double l2   = v.squaredNorm(); // avoid a sqrt
                             if (l2 > 0.) {
                                 const double t = va.dot(v);
                                 return t > SCALED_EPSILON && t < l2 - SCALED_EPSILON;
@@ -918,20 +1133,21 @@ static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &b
                     closest.clear();
                     rtree.query(bgi::nearest(mk_rtree_point(pt), 1) && bgi::satisfies(filter_t_joint), std::back_inserter(closest));
                     std::optional<size_t> out;
-                    if (! closest.empty()) {
-                        const Polyline &pl = lines[closest.front().second];
+                    if (!closest.empty()) {
+                        const Polyline& pl = lines[closest.front().second];
                         if (pl.points.empty()) {
                             // The closest infill line was already dropped as it was too short.
                             // Such an infill line should not make a T-joint anyways.
-    #if 0 // #ifndef NDEBUG
+#if 0  // #ifndef NDEBUG
                             const auto &seg = closest.front().first;
                             struct Linef { Vec2d a; Vec2d b; };
                             Linef l { { bg::get<0, 0>(seg), bg::get<0, 1>(seg) }, { bg::get<1, 0>(seg), bg::get<1, 1>(seg) } };
                             assert(line_alg::distance_to_squared(l, Vec2d(pt.cast<double>())) > 1000 * 1000);
-    #endif // NDEBUG
-                        } else if (pl.size() >= 2 && 
-                            //FIXME Hoping that pl is really a line, trimmed by a polygon using ClipperUtils. Sometimes Clipper leaves some additional collinear points on the polyline, let's hope it is all right.
-                            Line{ pl.front(), pl.back() }.distance_to_squared(pt) <= 1000 * 1000)
+#endif // NDEBUG
+                        } else if (pl.size() >= 2 &&
+                                   // FIXME Hoping that pl is really a line, trimmed by a polygon using ClipperUtils. Sometimes Clipper
+                                   // leaves some additional collinear points on the polyline, let's hope it is all right.
+                                   Line{pl.front(), pl.back()}.distance_to_squared(pt) <= 1000 * 1000)
                             out = closest.front().second;
                     }
                     return out;
@@ -940,11 +1156,12 @@ static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &b
                 auto filter_end_point_connections = [&lines_touching_at_endpoints, &lines, &line](std::optional<size_t> in) {
                     std::optional<size_t> out;
                     if (in) {
-                        const Polyline *lo = &line;
-                        const Polyline *hi = &lines[*in];
+                        const Polyline* lo = &line;
+                        const Polyline* hi = &lines[*in];
                         if (lo > hi)
                             std::swap(lo, hi);
-                        if (! std::binary_search(lines_touching_at_endpoints.begin(), lines_touching_at_endpoints.end(), std::make_pair(lo, hi)))
+                        if (!std::binary_search(lines_touching_at_endpoints.begin(), lines_touching_at_endpoints.end(),
+                                                std::make_pair(lo, hi)))
                             // Not an end-point connection, it is a valid T-joint.
                             out = in;
                     }
@@ -956,16 +1173,16 @@ static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &b
 
             int num_tjoints = int(tjoint_front.has_value()) + int(tjoint_back.has_value());
             if (num_tjoints > 0) {
-                double line_len   = line.length();
-                bool   drop       = false;
-                bool   anchor     = false;
+                double line_len = line.length();
+                bool   drop     = false;
+                bool   anchor   = false;
                 if (num_tjoints == 1) {
                     // Connected to perimeters on a single side only, connected to another infill line on the other side.
                     drop   = line_len < line_len_threshold_drop_single_side;
                     anchor = line_len > line_len_threshold_anchor_single_side;
                 } else {
                     // Not connected to perimeters at all, connected to two infill lines.
-                    assert(num_tjoints == 2);                    
+                    assert(num_tjoints == 2);
                     drop   = line_len < line_len_threshold_drop_both_sides;
                     anchor = line_len > line_len_threshold_anchor_both_sides;
                 }
@@ -982,51 +1199,50 @@ static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &b
                     }
                     if (tjoint_back) {
                         // T-joint of line's back point with the 'closest' line.
-                        intersections.emplace_back(lines_src[*tjoint_back],  lines_src[line_idx], &line, back_point,  false);
+                        intersections.emplace_back(lines_src[*tjoint_back], lines_src[line_idx], &line, back_point, false);
                         assert(validate_intersection_t_joint(intersections.back()));
                     }
                 } else {
                     if (tjoint_front)
                         // T joint at the front at a 60 degree angle, the line is very short.
                         // Trim the front side.
-                        front_point += ((scaled_trim_distance * 1.155) * (back_point - front_point).cast<double>().normalized()).cast<coord_t>();
+                        front_point += ((scaled_trim_distance * 1.155) * (back_point - front_point).cast<double>().normalized())
+                                           .cast<coord_t>();
                     if (tjoint_back)
                         // T joint at the front at a 60 degree angle, the line is very short.
                         // Trim the front side.
-                        back_point  += ((scaled_trim_distance * 1.155) * (front_point - back_point).cast<double>().normalized()).cast<coord_t>();
+                        back_point += ((scaled_trim_distance * 1.155) * (front_point - back_point).cast<double>().normalized())
+                                          .cast<coord_t>();
                 }
             }
         }
         // Remove those intersections, that point to a dropped line.
-        for (auto it = intersections.begin(); it != intersections.end(); ) {
-            assert(! lines[it->intersect_line - lines_src.data()].points.empty());
+        for (auto it = intersections.begin(); it != intersections.end();) {
+            assert(!lines[it->intersect_line - lines_src.data()].points.empty());
             if (lines[it->closest_line - lines_src.data()].points.empty()) {
                 *it = intersections.back();
                 intersections.pop_back();
             } else
-                ++ it;
+                ++it;
         }
     }
     assert(validate_intersections(intersections));
 
 #ifdef ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
-    static int iRun = 0;
-    int iStep = 0;
+    static int iRun  = 0;
+    int        iStep = 0;
     {
         Points pts;
-        for (const Intersection &i : intersections)
+        for (const Intersection& i : intersections)
             pts.emplace_back(i.intersect_point);
         export_infill_lines_to_svg(boundary, lines, debug_out_path("FillAdaptive-Tjoints-%d.svg", iRun++), pts);
     }
 #endif /* ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT */
 
     // Sort lexicographically by closest_line_idx and left/right orientation.
-    std::sort(intersections.begin(), intersections.end(),
-      [](const Intersection &i1, const Intersection &i2) {
-            return (i1.closest_line == i2.closest_line) ?
-                int(i1.left) < int(i2.left) :
-                i1.closest_line < i2.closest_line;
-        });
+    std::sort(intersections.begin(), intersections.end(), [](const Intersection& i1, const Intersection& i2) {
+        return (i1.closest_line == i2.closest_line) ? int(i1.left) < int(i2.left) : i1.closest_line < i2.closest_line;
+    });
 
     std::vector<size_t> merged_with(lines.size());
     std::iota(merged_with.begin(), merged_with.end(), 0);
@@ -1034,13 +1250,13 @@ static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &b
     // Appends the boundary polygon with all holes to rtree for detection to check whether hooks are not crossing the boundary
     {
         Point prev = boundary.contour.points.back();
-        for (const Point &point : boundary.contour.points) {
+        for (const Point& point : boundary.contour.points) {
             rtree.insert(std::make_pair(mk_rtree_seg(prev, point), poly_idx++));
             prev = point;
         }
-        for (const Polygon &polygon : boundary.holes) {
+        for (const Polygon& polygon : boundary.holes) {
             Point prev = polygon.points.back();
-            for (const Point &point : polygon.points) {
+            for (const Point& point : polygon.points) {
                 rtree.insert(std::make_pair(mk_rtree_seg(prev, point), poly_idx++));
                 prev = point;
             }
@@ -1062,9 +1278,10 @@ static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &b
     };
     auto update_merged_polyline = [&lines, update_merged_polyline_idx](Intersection& intersection) {
         // Update the polyline index to index which is merged
-        size_t intersect_pl_idx = update_merged_polyline_idx(intersection.intersect_pl - lines.data());
+        size_t intersect_pl_idx   = update_merged_polyline_idx(intersection.intersect_pl - lines.data());
         intersection.intersect_pl = &lines[intersect_pl_idx];
-        // After polylines are merged, it is necessary to update "forward" based on if intersect_point is the first or the last point of intersect_pl.
+        // After polylines are merged, it is necessary to update "forward" based on if intersect_point is the first or the last point of
+        // intersect_pl.
         if (intersection.fresh()) {
             assert(intersection.intersect_pl->points.front() == intersection.intersect_point ||
                    intersection.intersect_pl->points.back() == intersection.intersect_point);
@@ -1073,24 +1290,24 @@ static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &b
     };
 
     // Merge polylines touching at their ends. This should be a very rare case, but it happens surprisingly often.
-    for (auto it = lines_touching_at_endpoints.rbegin(); it != lines_touching_at_endpoints.rend(); ++ it) {
-        Polyline *pl1 = const_cast<Polyline*>(it->first);
-        Polyline *pl2 = const_cast<Polyline*>(it->second);
+    for (auto it = lines_touching_at_endpoints.rbegin(); it != lines_touching_at_endpoints.rend(); ++it) {
+        Polyline* pl1 = const_cast<Polyline*>(it->first);
+        Polyline* pl2 = const_cast<Polyline*>(it->second);
         assert(pl1 < pl2);
         // pl1 was visited for the 1st time.
         // pl2 may have alread been merged with another polyline, even with this one.
         pl2 = &lines[update_merged_polyline_idx(pl2 - lines.data())];
         assert(pl1 <= pl2);
         // Avoid closing a loop, ignore dropped infill lines.
-        if (pl1 != pl2 && ! pl1->points.empty() && ! pl2->points.empty()) {
+        if (pl1 != pl2 && !pl1->points.empty() && !pl2->points.empty()) {
             // Merge the polylines.
             assert(pl1 < pl2);
             assert(pl1->points.size() >= 2);
             assert(pl2->points.size() >= 2);
-            double d11 = (pl1->points.front() - pl2->points.front()).cast<double>().squaredNorm();
-            double d12 = (pl1->points.front() - pl2->points.back()) .cast<double>().squaredNorm();
-            double d21 = (pl1->points.back()  - pl2->points.front()).cast<double>().squaredNorm();
-            double d22 = (pl1->points.back()  - pl2->points.back()) .cast<double>().squaredNorm();
+            double d11   = (pl1->points.front() - pl2->points.front()).cast<double>().squaredNorm();
+            double d12   = (pl1->points.front() - pl2->points.back()).cast<double>().squaredNorm();
+            double d21   = (pl1->points.back() - pl2->points.front()).cast<double>().squaredNorm();
+            double d22   = (pl1->points.back() - pl2->points.back()).cast<double>().squaredNorm();
             double d1min = std::min(d11, d12);
             double d2min = std::min(d21, d22);
             if (d1min < d2min) {
@@ -1110,44 +1327,46 @@ static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &b
     std::vector<std::pair<Intersection*, double>> intersect_line;
     for (size_t min_idx = 0; min_idx < intersections.size();) {
         intersect_line.clear();
-        // All the nearest points (T-joints) ending at the same line are projected onto this line. Because of it, it can easily find the nearest point.
+        // All the nearest points (T-joints) ending at the same line are projected onto this line. Because of it, it can easily find the
+        // nearest point.
         {
             const Vec2d line_dir = intersections[min_idx].closest_line->vector().cast<double>();
-            size_t max_idx = min_idx;
-            for (; max_idx < intersections.size() && 
-                    intersections[min_idx].closest_line == intersections[max_idx].closest_line &&
-                    intersections[min_idx].left         == intersections[max_idx].left;
-                    ++ max_idx)
+            size_t      max_idx  = min_idx;
+            for (; max_idx < intersections.size() && intersections[min_idx].closest_line == intersections[max_idx].closest_line &&
+                   intersections[min_idx].left == intersections[max_idx].left;
+                 ++max_idx)
                 intersect_line.emplace_back(&intersections[max_idx], line_dir.dot(intersections[max_idx].intersect_point.cast<double>()));
             min_idx = max_idx;
             assert(intersect_line.size() > 0);
             // Sort the intersections along line_dir.
-            std::sort(intersect_line.begin(), intersect_line.end(), [](const auto &i1, const auto &i2) { return i1.second < i2.second; });
+            std::sort(intersect_line.begin(), intersect_line.end(), [](const auto& i1, const auto& i2) { return i1.second < i2.second; });
         }
 
         if (intersect_line.size() == 1) {
             // Simple case: The current intersection is the only one touching its adjacent line.
-            Intersection &first_i = *intersect_line.front().first;
+            Intersection& first_i = *intersect_line.front().first;
             update_merged_polyline(first_i);
             if (first_i.fresh()) {
                 // Try to connect left or right. If not enough space for hook_length, take the longer side.
 #ifdef ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
-                export_infill_lines_to_svg(boundary, lines, debug_out_path("FillAdaptive-add_hook0-pre-%d-%d.svg", iRun, iStep), { first_i.intersect_point });
+                export_infill_lines_to_svg(boundary, lines, debug_out_path("FillAdaptive-add_hook0-pre-%d-%d.svg", iRun, iStep),
+                                           {first_i.intersect_point});
 #endif // ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
                 add_hook(first_i, scaled_offset, hook_length, scaled_trim_distance, rtree, lines_src);
 #ifdef ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
-                export_infill_lines_to_svg(boundary, lines, debug_out_path("FillAdaptive-add_hook0-pre-%d-%d.svg", iRun, iStep), { first_i.intersect_point });
-                ++ iStep;
+                export_infill_lines_to_svg(boundary, lines, debug_out_path("FillAdaptive-add_hook0-pre-%d-%d.svg", iRun, iStep),
+                                           {first_i.intersect_point});
+                ++iStep;
 #endif // ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
                 first_i.used = true;
             }
             continue;
         }
 
-        for (size_t first_idx = 0; first_idx < intersect_line.size(); ++ first_idx) {
-            Intersection &first_i = *intersect_line[first_idx].first;
+        for (size_t first_idx = 0; first_idx < intersect_line.size(); ++first_idx) {
+            Intersection& first_i = *intersect_line[first_idx].first;
             update_merged_polyline(first_i);
-            if (! first_i.fresh())
+            if (!first_i.fresh())
                 // The intersection has been processed, or the polyline has been merged to another polyline.
                 continue;
 
@@ -1156,7 +1375,7 @@ static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &b
                 update_merged_polyline(*intersect_line[first_idx - 1].first);
             if (first_idx + 1 < intersect_line.size())
                 update_merged_polyline(*intersect_line[first_idx + 1].first);
-            Intersection &nearest_i = *get_nearest_intersection(intersect_line, first_idx);
+            Intersection& nearest_i = *get_nearest_intersection(intersect_line, first_idx);
             assert(first_i.closest_line == nearest_i.closest_line);
             assert(first_i.intersect_line != nearest_i.intersect_line);
             assert(first_i.intersect_line != first_i.closest_line);
@@ -1166,27 +1385,32 @@ static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &b
             // Check if both intersections lie on the offset_line and simultaneously get their points of intersecting.
             // These points are used as start and end of the hook
             Point first_i_point, nearest_i_point;
-            bool could_connect = false;
+            bool  could_connect = false;
             if (nearest_i.fresh()) {
                 could_connect = first_i.intersect_line->intersection(offset_line, &first_i_point) &&
                                 nearest_i.intersect_line->intersection(offset_line, &nearest_i_point);
                 assert(could_connect);
             }
-            Points &first_points  = first_i.intersect_pl->points;
-            Points &second_points = nearest_i.intersect_pl->points;
+            Points& first_points  = first_i.intersect_pl->points;
+            Points& second_points = nearest_i.intersect_pl->points;
             could_connect &= (nearest_i_point - first_i_point).cast<double>().squaredNorm() <= Slic3r::sqr(hook_length_max);
             if (could_connect) {
                 // Both intersections are so close that their polylines can be connected.
                 // Verify that no other infill line intersects this anchor line.
                 closest.clear();
-                rtree.query(
-                    bgi::intersects(mk_rtree_seg(first_i_point, nearest_i_point)) &&
-                    bgi::satisfies([&first_i, &nearest_i, &lines_src](const auto &item) 
-                        { return item.second != (long unsigned int)(first_i.intersect_line - lines_src.data())
-                              && item.second != (long unsigned int)(nearest_i.intersect_line - lines_src.data()); }),
-                    std::back_inserter(closest));
+                rtree.query(bgi::intersects(mk_rtree_seg(first_i_point, nearest_i_point)) &&
+                                bgi::satisfies([&first_i, &nearest_i, &lines_src](const auto& item) {
+                                    return item.second != (long unsigned int) (first_i.intersect_line - lines_src.data()) &&
+                                           item.second != (long unsigned int) (nearest_i.intersect_line - lines_src.data());
+                                }),
+                            std::back_inserter(closest));
                 could_connect = closest.empty();
 #if 0
+                // [INTENT][DEAD CODE] Self-intersection avoidance: if the bridge segment between two
+                //                     T-joint intersections would cross either polyline's existing hook,
+                //                     reject the connection and fall back to individual hooks. Disabled
+                //                     because the trim-after-connection approach was deemed sufficient.
+                //                     Left here for reference if re-enabling proves necessary.
                 // Avoid self intersections. Maybe it is better to trim the self intersection after the connection?
                 if (could_connect && first_i.intersect_pl != nearest_i.intersect_pl) {
                     Line l(first_i_point, nearest_i_point);
@@ -1197,24 +1421,27 @@ static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &b
             bool connected = false;
             if (could_connect) {
 #ifdef ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
-                export_infill_lines_to_svg(boundary, lines, debug_out_path("FillAdaptive-connecting-pre-%d-%d.svg", iRun, iStep), { first_i.intersect_point, nearest_i.intersect_point });
+                export_infill_lines_to_svg(boundary, lines, debug_out_path("FillAdaptive-connecting-pre-%d-%d.svg", iRun, iStep),
+                                           {first_i.intersect_point, nearest_i.intersect_point});
 #endif // ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
-                // No other infill line intersects this anchor line. Extrude it as a whole.
+       // No other infill line intersects this anchor line. Extrude it as a whole.
                 if (first_i.intersect_pl == nearest_i.intersect_pl) {
                     // Both intersections are on the same polyline, that means a loop is being closed.
                     assert(first_i.front != nearest_i.front);
-                    if (! first_i.front)
+                    if (!first_i.front)
                         std::swap(first_i_point, nearest_i_point);
                     first_points.front() = first_i_point;
                     first_points.back()  = nearest_i_point;
-                    //FIXME trim the end of a closed loop a bit?
+                    // FIXME trim the end of a closed loop a bit?
                     first_points.emplace(first_points.begin(), nearest_i_point);
                 } else {
                     // Both intersections are on different polylines
-                    Line  l(first_i_point, nearest_i_point);
-                    l.translate((perp(first_i.closest_line->vector().cast<double>().normalized()) * (first_i.left ? scaled_trim_distance : - scaled_trim_distance)).cast<coord_t>());
+                    Line l(first_i_point, nearest_i_point);
+                    l.translate((perp(first_i.closest_line->vector().cast<double>().normalized()) *
+                                 (first_i.left ? scaled_trim_distance : -scaled_trim_distance))
+                                    .cast<coord_t>());
                     Point pt_start, pt_end;
-                    bool  trim_start = first_i  .intersect_pl->points.size() == 3 && first_i  .other_hook_intersects(l, pt_start);
+                    bool  trim_start = first_i.intersect_pl->points.size() == 3 && first_i.other_hook_intersects(l, pt_start);
                     bool  trim_end   = nearest_i.intersect_pl->points.size() == 3 && nearest_i.other_hook_intersects(l, pt_end);
                     first_points.reserve(first_points.size() + second_points.size());
                     if (first_i.front)
@@ -1240,67 +1467,73 @@ static Polylines connect_lines_using_hooks(Polylines &&lines, const ExPolygon &b
                     }
                 }
                 nearest_i.used = true;
-                connected = true;
+                connected      = true;
 #ifdef ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
-                export_infill_lines_to_svg(boundary, lines, debug_out_path("FillAdaptive-connecting-post-%d-%d.svg", iRun, iStep), { first_i.intersect_point, nearest_i.intersect_point });
+                export_infill_lines_to_svg(boundary, lines, debug_out_path("FillAdaptive-connecting-post-%d-%d.svg", iRun, iStep),
+                                           {first_i.intersect_point, nearest_i.intersect_point});
 #endif // ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
             }
-            if (! connected) {
+            if (!connected) {
                 // Try to connect left or right. If not enough space for hook_length, take the longer side.
 #ifdef ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
-                export_infill_lines_to_svg(boundary, lines, debug_out_path("FillAdaptive-add_hook-pre-%d-%d.svg", iRun, iStep), { first_i.intersect_point });
+                export_infill_lines_to_svg(boundary, lines, debug_out_path("FillAdaptive-add_hook-pre-%d-%d.svg", iRun, iStep),
+                                           {first_i.intersect_point});
 #endif // ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
                 add_hook(first_i, scaled_offset, hook_length, scaled_trim_distance, rtree, lines_src);
 #ifdef ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
-                export_infill_lines_to_svg(boundary, lines, debug_out_path("FillAdaptive-add_hook-post-%d-%d.svg", iRun, iStep), { first_i.intersect_point });
+                export_infill_lines_to_svg(boundary, lines, debug_out_path("FillAdaptive-add_hook-post-%d-%d.svg", iRun, iStep),
+                                           {first_i.intersect_point});
 #endif // ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
             }
 #ifdef ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
-            ++ iStep;
+            ++iStep;
 #endif // ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
             first_i.used = true;
         }
     }
 
     Polylines polylines_out;
-    polylines_out.reserve(polylines_out.size() + std::count_if(lines.begin(), lines.end(), [](const Polyline &pl) { return !pl.empty(); }));
-    for (Polyline &pl : lines)
-        if (!pl.empty()) polylines_out.emplace_back(std::move(pl));
+    polylines_out.reserve(polylines_out.size() + std::count_if(lines.begin(), lines.end(), [](const Polyline& pl) { return !pl.empty(); }));
+    for (Polyline& pl : lines)
+        if (!pl.empty())
+            polylines_out.emplace_back(std::move(pl));
     return polylines_out;
 }
 
 #ifndef NDEBUG
-bool has_no_collinear_lines(const Polylines &polylines)
+bool has_no_collinear_lines(const Polylines& polylines)
 {
     // Create line end point lookup.
-    struct LineEnd {
-        LineEnd(const Polyline *line, bool start) : line(line), start(start) {}
-        const Polyline *line;
+    struct LineEnd
+    {
+        LineEnd(const Polyline* line, bool start) : line(line), start(start) {}
+        const Polyline* line;
         // Is it the start or end point?
-        bool            start;
-        const Point&    point() const { return start ? line->points.front() : line->points.back(); }
-        const Point&    other_point() const { return start ? line->points.back() : line->points.front(); }
-        LineEnd         other_end() const { return LineEnd(line, !start); }
-        Vec2d           vec() const { return Vec2d((this->other_point() - this->point()).cast<double>()); }
-        bool operator==(const LineEnd &rhs) const { return this->line == rhs.line && this->start == rhs.start; }
+        bool         start;
+        const Point& point() const { return start ? line->points.front() : line->points.back(); }
+        const Point& other_point() const { return start ? line->points.back() : line->points.front(); }
+        LineEnd      other_end() const { return LineEnd(line, !start); }
+        Vec2d        vec() const { return Vec2d((this->other_point() - this->point()).cast<double>()); }
+        bool         operator==(const LineEnd& rhs) const { return this->line == rhs.line && this->start == rhs.start; }
     };
-    struct LineEndAccessor {
-        const Point* operator()(const LineEnd &pt) const { return &pt.point(); }
+    struct LineEndAccessor
+    {
+        const Point* operator()(const LineEnd& pt) const { return &pt.point(); }
     };
     typedef ClosestPointInRadiusLookup<LineEnd, LineEndAccessor> ClosestPointLookupType;
-    ClosestPointLookupType closest_end_point_lookup(coord_t(1001. * sqrt(2.)));
+    ClosestPointLookupType                                       closest_end_point_lookup(coord_t(1001. * sqrt(2.)));
     for (const Polyline& pl : polylines) {
-//        assert(pl.points.size() == 2);
+        //        assert(pl.points.size() == 2);
         auto line_start = LineEnd(&pl, true);
         auto line_end   = LineEnd(&pl, false);
 
-        auto assert_not_collinear = [&closest_end_point_lookup](const LineEnd &line_start) {
+        auto assert_not_collinear = [&closest_end_point_lookup](const LineEnd& line_start) {
             std::vector<std::pair<const LineEnd*, double>> hits = closest_end_point_lookup.find_all(line_start.point());
-            for (const std::pair<const LineEnd*, double> &hit : hits)
+            for (const std::pair<const LineEnd*, double>& hit : hits)
                 if ((line_start.point() - hit.first->point()).cwiseAbs().maxCoeff() <= 1000) {
                     // End points of the two lines are very close, they should have been merged together if they are collinear.
-                    Vec2d v1 = line_start.vec();
-                    Vec2d v2 = hit.first->vec();
+                    Vec2d v1  = line_start.vec();
+                    Vec2d v2  = hit.first->vec();
                     Vec2d v1n = v1.normalized();
                     Vec2d v2n = v2.normalized();
                     // The vectors must not be collinear.
@@ -1318,31 +1551,50 @@ bool has_no_collinear_lines(const Polylines &polylines)
 }
 #endif
 
-void Filler::_fill_surface_single(
-    const FillParams              &params,
-    unsigned int                   thickness_layers,
-    const std::pair<float, Point> &direction,
-    ExPolygon                      expolygon,
-    Polylines                     &polylines_out)
+// [INTENT] Filler::_fill_surface_single — top-level adaptive cubic infill for one ExPolygon layer.
+//          Pipeline:
+//            1. Creates 3 FillContext objects (one per infill direction 0°, +120°, -120°).
+//            2. Calls generate_infill_lines_recursive() on each context to DDA-traverse the octree.
+//            3. Flushes any in-progress temp_lines segments to the line set.
+//            4. Converts lines to Polylines, applies multiline_fill() offset if n_multiline > 1.
+//            5. Clips all polylines to the ExPolygon via intersection_pl().
+//            6. For single-line mode (multiline==1): trims collinear intermediate points,
+//               calls connect_lines_using_hooks() for T-joint anchoring, then chain_or_connect_infill().
+//            7. For multiline mode: skips hooks, calls chain_or_connect_infill() directly.
+// [STATE]  Reads adapt_fill_octree (shared immutable), this->z, this->spacing, params.
+//          Writes to polylines_out (output parameter).
+// [COUPLING] Depends on adapt_fill_octree (set by PrintObject before TBB fill tasks run).
+//            If adapt_fill_octree is null, asserts in debug builds.
+// [CONCURRENCY] Multiple TBB tasks may call _fill_surface_single() concurrently for different
+//               surfaces/layers. Each call has its own FillContext stack variables. No shared
+//               mutable state — safe for concurrent execution.
+// [MEMORY] all_polylines and all_polylines_with_hooks are local. No long-lived allocations.
+void Filler::_fill_surface_single(const FillParams&              params,
+                                  unsigned int                   thickness_layers,
+                                  const std::pair<float, Point>& direction,
+                                  ExPolygon                      expolygon,
+                                  Polylines&                     polylines_out)
 {
-    assert (this->adapt_fill_octree);
+    assert(this->adapt_fill_octree);
 
     Polylines all_polylines;
     {
         // 3 contexts for three directions of infill lines
-        std::array<FillContext, 3> contexts { 
-            FillContext { *adapt_fill_octree, this->z, 0 },
-            FillContext { *adapt_fill_octree, this->z, 1 },
-            FillContext { *adapt_fill_octree, this->z, 2 }
-        };
+        std::array<FillContext, 3> contexts{FillContext{*adapt_fill_octree, this->z, 0}, FillContext{*adapt_fill_octree, this->z, 1},
+                                            FillContext{*adapt_fill_octree, this->z, 2}};
         // Generate the infill lines along the octree cells, merge touching lines of the same direction.
         size_t num_lines = 0;
-        for (auto &context : contexts) {
+        for (auto& context : contexts) {
             generate_infill_lines_recursive(context, adapt_fill_octree->root_cube, 0, int(adapt_fill_octree->cubes_properties.size()) - 1);
             num_lines += context.output_lines.size() + context.temp_lines.size();
         }
 
 #if 0
+        // [INTENT][DEAD CODE] Old approach: collect lines per direction, convert to Polylines,
+        //                     clip each direction separately with to_polygons(expolygon).
+        //                     Replaced by the #else branch which collects all directions first,
+        //                     then clips once using the ExPolygon directly (avoids polygon conversion
+        //                     overhead and produces fewer small fragments).
         // Collect the lines, trim them by the expolygon.
         all_polylines.reserve(num_lines);
         auto boundary = to_polygons(expolygon);
@@ -1356,20 +1608,20 @@ void Filler::_fill_surface_single(
             // Crop all polylines
             append(all_polylines, intersection_pl(std::move(lines), boundary));
         }
-//        assert(has_no_collinear_lines(all_polylines));        
+//        assert(has_no_collinear_lines(all_polylines));
 #else
         // Collect the lines.
         std::vector<Line> lines;
         lines.reserve(num_lines);
-        for (auto &context : contexts) {
+        for (auto& context : contexts) {
             append(lines, context.output_lines);
-            for (const Line &line : context.temp_lines)
+            for (const Line& line : context.temp_lines)
                 if (line.a.x() != std::numeric_limits<coord_t>::max())
                     lines.emplace_back(line);
         }
         // Convert lines to polylines.
         all_polylines.reserve(lines.size());
-        std::transform(lines.begin(), lines.end(), std::back_inserter(all_polylines), [](const Line& l) { return Polyline{ l.a, l.b }; });
+        std::transform(lines.begin(), lines.end(), std::back_inserter(all_polylines), [](const Line& l) { return Polyline{l.a, l.b}; });
 
         // Apply multiline offset if needed
         multiline_fill(all_polylines, params, spacing);
@@ -1398,7 +1650,10 @@ void Filler::_fill_surface_single(
         const auto hook_length     = coordf_t(std::min<float>(std::numeric_limits<coord_t>::max(), scale_(params.anchor_length)));
         const auto hook_length_max = coordf_t(std::min<float>(std::numeric_limits<coord_t>::max(), scale_(params.anchor_length_max)));
 
-    Polylines all_polylines_with_hooks = all_polylines.size() > 1 ? connect_lines_using_hooks(std::move(all_polylines), expolygon, this->spacing, hook_length, hook_length_max) : std::move(all_polylines);
+        Polylines all_polylines_with_hooks = all_polylines.size() > 1 ?
+                                                 connect_lines_using_hooks(std::move(all_polylines), expolygon, this->spacing, hook_length,
+                                                                           hook_length_max) :
+                                                 std::move(all_polylines);
 
 #ifdef ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
         {
@@ -1408,7 +1663,7 @@ void Filler::_fill_surface_single(
 #endif /* ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT */
 
         chain_or_connect_infill(std::move(all_polylines_with_hooks), expolygon, polylines_out, this->spacing, params);
-    } else { 
+    } else {
         // if multiline  is > 1 infill is ready to connect
         chain_or_connect_infill(std::move(all_polylines), expolygon, polylines_out, this->spacing, params);
     }
@@ -1416,33 +1671,45 @@ void Filler::_fill_surface_single(
 #ifdef ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT
     {
         static int iRun = 0;
-        export_infill_lines_to_svg(expolygon, polylines_out, debug_out_path("FillAdaptive-final-%d.svg", iRun ++));
+        export_infill_lines_to_svg(expolygon, polylines_out, debug_out_path("FillAdaptive-final-%d.svg", iRun++));
     }
 #endif /* ADAPTIVE_CUBIC_INFILL_DEBUG_OUTPUT */
 }
 
-//static double bbox_max_radius(const BoundingBoxf3 &bbox, const Vec3d &center)
+// static double bbox_max_radius(const BoundingBoxf3 &bbox, const Vec3d &center)
 //{
-//    const auto p = (bbox.min - center);
-//    const auto s = bbox.size();
-//    double r2max = 0.;
-//    for (int i = 0; i < 8; ++ i)
-//        r2max = std::max(r2max, (p + Vec3d(s.x() * double(i & 1), s.y() * double(i & 2), s.z() * double(i & 4))).squaredNorm());
-//    return sqrt(r2max);
-//}
+//     const auto p = (bbox.min - center);
+//     const auto s = bbox.size();
+//     double r2max = 0.;
+//     for (int i = 0; i < 8; ++ i)
+//         r2max = std::max(r2max, (p + Vec3d(s.x() * double(i & 1), s.y() * double(i & 2), s.z() * double(i & 4))).squaredNorm());
+//     return sqrt(r2max);
+// }
 
+// [INTENT] make_cubes_properties — computes the CubeProperties table for all octree levels, from
+//          the finest level (edge_length = line_spacing * 2) doubling each level until
+//          edge_length > max_cube_edge_length (the mesh bounding-box diagonal).
+//          All geometric parameters (height, diagonal_length, etc.) are derived analytically
+//          from the edge length using sqrt(2) and sqrt(3) factors for a cube on its corner.
+// [STATE]  Pure function — returns a new vector. No global state.
+// [HAZARD] Orca guard: if only 1 level would be produced (very low density where line_spacing is
+//          close to the mesh size), a second level is force-added. Without this, build_octree()
+//          skips all triangle insertion (depth==1 → depth--→0 → loop body not entered), producing
+//          an empty octree and disconnected infill lines. This guard fixes the low-density bug.
+// [UNCLEAR] The "+ EPSILON" on max_cube_edge_length is to avoid floating-point boundary issues
+//           where the loop exit condition would be missed by rounding. The exact EPSILON is
+//           Slic3r::EPSILON (1e-6), which seems sufficient but is not formally proven.
 static std::vector<CubeProperties> make_cubes_properties(double max_cube_edge_length, double line_spacing)
 {
     max_cube_edge_length += EPSILON;
 
     std::vector<CubeProperties> cubes_properties;
-    for (double edge_length = line_spacing * 2.;; edge_length *= 2.)
-    {
+    for (double edge_length = line_spacing * 2.;; edge_length *= 2.) {
         CubeProperties props{};
-        props.edge_length = edge_length;
-        props.height = edge_length * sqrt(3);
-        props.diagonal_length = edge_length * sqrt(2);
-        props.line_z_distance = edge_length / sqrt(3);
+        props.edge_length      = edge_length;
+        props.height           = edge_length * sqrt(3);
+        props.diagonal_length  = edge_length * sqrt(2);
+        props.line_z_distance  = edge_length / sqrt(3);
         props.line_xy_distance = edge_length / sqrt(6);
         cubes_properties.emplace_back(props);
         if (edge_length > max_cube_edge_length)
@@ -1452,7 +1719,7 @@ static std::vector<CubeProperties> make_cubes_properties(double max_cube_edge_le
     // Fixes scenario where adaptive fill is disconnected from walls on low densities
     if (cubes_properties.size() == 1) {
         CubeProperties p = cubes_properties.back();
-        p.edge_length      *= 2.0;
+        p.edge_length *= 2.0;
         p.height           = p.edge_length * sqrt(3);
         p.diagonal_length  = p.edge_length * sqrt(2);
         p.line_z_distance  = p.edge_length / sqrt(3);
@@ -1462,35 +1729,74 @@ static std::vector<CubeProperties> make_cubes_properties(double max_cube_edge_le
     return cubes_properties;
 }
 
-static inline bool is_overhang_triangle(const Vec3d &a, const Vec3d &b, const Vec3d &c, const Vec3d &up)
+// [INTENT] is_overhang_triangle — returns true if the triangle (a,b,c) has a normal whose
+//          component along `up` exceeds cos(45°) = 0.707, i.e. the triangle faces more than
+//          45° downward. Used in support_overhangs_only mode to restrict the adaptive octree
+//          to only subdivide near overhanging surfaces (avoiding unnecessary densification).
+// [HAZARD] The threshold 0.707 is a hardcoded cosine of 45°. If the overhang angle threshold
+//          setting (currently not user-exposed for adaptive infill) is ever made configurable,
+//          this constant needs to be parameterized.
+// [UNCLEAR] The normal vector `n` is NOT normalized before the dot product with `up`. The
+//           inequality n.dot(up) > 0.707 * n.norm() is equivalent to cos(angle(n,up)) > 0.707,
+//           which is correct. But comparing with n.norm() (not n.squaredNorm()) means one sqrt
+//           per triangle — a minor performance note.
+static inline bool is_overhang_triangle(const Vec3d& a, const Vec3d& b, const Vec3d& c, const Vec3d& up)
 {
     // Calculate triangle normal.
     Vec3d n = (b - a).cross(c - b);
     return n.dot(up) > 0.707 * n.norm();
 }
 
-static void transform_center(Cube *current_cube, const Eigen::Matrix3d &rot)
+// [INTENT] transform_center — recursively applies a rotation matrix `rot` to the center of
+//          every Cube node in the subtree rooted at current_cube. Called once by build_octree()
+//          after the full octree is constructed in octree-space, to convert all centers to
+//          world-space (avoiding the rotation per-layer in generate_infill_lines_recursive).
+//          In debug builds, center_octree is set to the pre-rotation center for verification.
+// [STATE]  Mutates Cube::center for every node in the subtree. Single-threaded call.
+// [HAZARD] Recursive over octree depth (up to ~10). No stack concern for typical objects.
+static void transform_center(Cube* current_cube, const Eigen::Matrix3d& rot)
 {
 #ifndef NDEBUG
     current_cube->center_octree = current_cube->center;
 #endif // NDEBUG
     current_cube->center = rot * current_cube->center;
-    for (auto *child : current_cube->children)
+    for (auto* child : current_cube->children)
         if (child)
             transform_center(child, rot);
 }
 
+// [INTENT] build_octree — entry point for the adaptive infill octree construction.
+//          Steps:
+//            1. Compute mesh bounding box and octree center (BoundingBox3Base<Vec3f>).
+//            2. Build CubeProperties table via make_cubes_properties() for the mesh size.
+//            3. Allocate Octree with the root cube at the bounding box center.
+//            4. For each mesh triangle (and each overhang_triangle): transform_to_octree()
+//               direction is implicit — triangles are in world-space, but insert_triangle()
+//               compares against axis-aligned child bboxes in octree space. Actually: the
+//               triangle vertices are passed as-is (world-space) because transform_to_world()
+//               was applied to the mesh before calling build_octree(). [UNCLEAR: verify this]
+//            5. In support_overhangs_only mode: only insert triangles passing is_overhang_triangle().
+//            6. After all triangles inserted, transform all Cube::center values to world-space
+//               via transform_center().
+// [STATE]  Creates a new Octree on the heap; ownership transferred to caller via OctreePtr
+//          (unique_ptr with OctreeDeleter). Called once per PrintObject before TBB fill tasks.
+// [CONCURRENCY] Single-threaded. Must complete before any concurrent fill task reads the octree.
+// [MEMORY] Octree and its Cube pool are owned by the returned OctreePtr. Caller (PrintObject)
+//          stores the OctreePtr; it is destroyed when the PrintObject is destroyed or re-sliced.
+// [COUPLING] Takes indexed_triangle_set from admesh; overhang_triangles from PrintObjectSlice.
+//            line_spacing comes from adaptive_fill_line_spacing(). support_overhangs_only flag
+//            from PrintObject config (sparse_infill_pattern == ipSupportCubic).
 OctreePtr build_octree(
     // Mesh is rotated to the coordinate system of the octree.
-    const indexed_triangle_set  &triangle_mesh,
+    const indexed_triangle_set& triangle_mesh,
     // Overhang triangles extracted from fill surfaces with stInternalBridge type,
     // rotated to the coordinate system of the octree.
-    const std::vector<Vec3d>    &overhang_triangles, 
-    coordf_t                     line_spacing,
-    bool                         support_overhangs_only)
+    const std::vector<Vec3d>& overhang_triangles,
+    coordf_t                  line_spacing,
+    bool                      support_overhangs_only)
 {
     assert(line_spacing > 0);
-    assert(! std::isnan(line_spacing));
+    assert(!std::isnan(line_spacing));
 
     BoundingBox3Base<Vec3f>     bbox(triangle_mesh.vertices);
     Vec3d                       cube_center      = bbox.center().cast<double>();
@@ -1498,23 +1804,21 @@ OctreePtr build_octree(
     auto                        octree           = OctreePtr(new Octree(cube_center, cubes_properties));
 
     if (cubes_properties.size() > 1) {
-        Octree *octree_ptr = octree.get();
-        double edge_length_half = 0.5 * cubes_properties.back().edge_length;
-        Vec3d  diag_half(edge_length_half, edge_length_half, edge_length_half);
-        int    max_depth = int(cubes_properties.size()) - 1;
-        auto process_triangle = [octree_ptr, max_depth, diag_half](const Vec3d &a, const Vec3d &b, const Vec3d &c) {
-            octree_ptr->insert_triangle(
-                a, b, c,
-                octree_ptr->root_cube,
-                BoundingBoxf3(octree_ptr->root_cube->center - diag_half, octree_ptr->root_cube->center + diag_half),
-                max_depth);
+        Octree* octree_ptr       = octree.get();
+        double  edge_length_half = 0.5 * cubes_properties.back().edge_length;
+        Vec3d   diag_half(edge_length_half, edge_length_half, edge_length_half);
+        int     max_depth        = int(cubes_properties.size()) - 1;
+        auto    process_triangle = [octree_ptr, max_depth, diag_half](const Vec3d& a, const Vec3d& b, const Vec3d& c) {
+            octree_ptr->insert_triangle(a, b, c, octree_ptr->root_cube,
+                                           BoundingBoxf3(octree_ptr->root_cube->center - diag_half, octree_ptr->root_cube->center + diag_half),
+                                           max_depth);
         };
         auto up_vector = support_overhangs_only ? Vec3d(transform_to_octree() * Vec3d(0., 0., 1.)) : Vec3d();
-        for (auto &tri : triangle_mesh.indices) {
+        for (auto& tri : triangle_mesh.indices) {
             Vec3d a = triangle_mesh.vertices[tri[0]].cast<double>();
             Vec3d b = triangle_mesh.vertices[tri[1]].cast<double>();
             Vec3d c = triangle_mesh.vertices[tri[2]].cast<double>();
-            if (! support_overhangs_only || is_overhang_triangle(a, b, c, up_vector))
+            if (!support_overhangs_only || is_overhang_triangle(a, b, c, up_vector))
                 process_triangle(a, b, c);
         }
         for (size_t i = 0; i < overhang_triangles.size(); i += 3)
@@ -1530,7 +1834,22 @@ OctreePtr build_octree(
     return octree;
 }
 
-void Octree::insert_triangle(const Vec3d &a, const Vec3d &b, const Vec3d &c, Cube *current_cube, const BoundingBoxf3 &current_bbox, int depth)
+// [INTENT] Octree::insert_triangle — recursive triangle-AABB intersection test driving
+//          octree subdivision. For each of 8 child cells of current_cube:
+//            1. Computes the child's AABB (expanded by ±EPSILON to avoid missing edge-touching triangles).
+//            2. Tests AABB-triangle intersection via triangle_AABB_intersects().
+//            3. If intersecting, allocates a child Cube from pool if not yet existing.
+//            4. Recurses to depth 0 (leaf) to subdivide all the way to the finest cell size.
+//          The recursion terminates when depth reaches 0 (leaf level, no further subdivision).
+// [MEMORY] New Cube nodes are allocated via this->pool.construct(child_center).
+//          Pool memory is not freed until the Octree is destroyed (see OctreeDeleter).
+// [HAZARD] EPSILON expansion of child bboxes ensures triangles touching a cell boundary are
+//          included in both adjacent cells. This intentional overlap prevents missed triangles
+//          at the cost of slight octree over-densification near surfaces.
+// [HAZARD] The depth == 0 check means depth is decremented BEFORE the loop. If called with
+//          depth == 0 directly (not > 0 as asserted), undefined behavior from accessing
+//          cubes_properties[-1]. The assert(depth > 0) guards against this at call sites.
+void Octree::insert_triangle(const Vec3d& a, const Vec3d& b, const Vec3d& c, Cube* current_cube, const BoundingBoxf3& current_bbox, int depth)
 {
     assert(current_cube);
     assert(depth > 0);
@@ -1540,12 +1859,12 @@ void Octree::insert_triangle(const Vec3d &a, const Vec3d &b, const Vec3d &c, Cub
     // Squared radius of a sphere around the child cube.
     // const double r2_cube = Slic3r::sqr(0.5 * this->cubes_properties[depth].height + EPSILON);
 
-    for (size_t i = 0; i < 8; ++ i) {
-        const Vec3d &child_center_dir = child_centers[i];
+    for (size_t i = 0; i < 8; ++i) {
+        const Vec3d& child_center_dir = child_centers[i];
         // Calculate a slightly expanded bounding box of a child cube to cope with triangles touching a cube wall and other numeric errors.
         // We will rather densify the octree a bit more than necessary instead of missing a triangle.
         BoundingBoxf3 bbox;
-        for (int k = 0; k < 3; ++ k) {
+        for (int k = 0; k < 3; ++k) {
             if (child_center_dir[k] == -1.) {
                 bbox.min[k] = current_bbox.min[k];
                 bbox.max[k] = current_cube->center[k] + EPSILON;
@@ -1555,10 +1874,10 @@ void Octree::insert_triangle(const Vec3d &a, const Vec3d &b, const Vec3d &c, Cub
             }
         }
         Vec3d child_center = current_cube->center + (child_center_dir * (this->cubes_properties[depth].edge_length / 2.));
-        //if (dist2_to_triangle(a, b, c, child_center) < r2_cube) {
-        // dist2_to_triangle and r2_cube are commented out too.
+        // if (dist2_to_triangle(a, b, c, child_center) < r2_cube) {
+        //  dist2_to_triangle and r2_cube are commented out too.
         if (triangle_AABB_intersects(a, b, c, bbox)) {
-            if (! current_cube->children[i])
+            if (!current_cube->children[i])
                 current_cube->children[i] = this->pool.construct(child_center);
             if (depth > 0)
                 this->insert_triangle(a, b, c, current_cube->children[i], bbox, depth);
@@ -1566,5 +1885,4 @@ void Octree::insert_triangle(const Vec3d &a, const Vec3d &b, const Vec3d &c, Cub
     }
 }
 
-} // namespace FillAdaptive
-} // namespace Slic3r
+}} // namespace Slic3r::FillAdaptive
