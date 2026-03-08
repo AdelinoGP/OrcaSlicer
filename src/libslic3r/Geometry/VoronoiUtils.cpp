@@ -1,3 +1,14 @@
+// [INTENT] Implementation of VoronoiUtils static helpers used by Arachne / SkeletalTrapezoidation.
+//   Provides: VD vertex integer conversion, parabola discretization, cell range computation,
+//   and source geometry recovery.
+//
+// [COUPLING] Heavy SFINAE template machinery: every public method that takes SegmentIterator
+//   requires an explicit instantiation here. See explicit instantiation block below.
+// [HAZARD] H586: The explicit instantiation list covers exactly 5 iterator types. Adding a
+//   new consumer that passes a different iterator type produces a cryptic linker error
+//   (undefined reference to VoronoiUtils::get_source_segment<NewIt>) with no compile error.
+// [MEMORY] All functions return by value (no heap allocation beyond returned vectors/Points).
+// [CONCURRENCY] No shared mutable state; all functions are effectively pure.
 #include <boost/log/trivial.hpp>
 #include <libslic3r/Arachne/utils/PolygonsSegmentIndex.hpp>
 #include <libslic3r/MultiMaterialSegmentation.hpp>
@@ -20,31 +31,53 @@ using LinesIt                     = Lines::iterator;
 using ColoredLinesIt              = ColoredLines::iterator;
 using ColoredLinesConstIt         = ColoredLines::const_iterator;
 
+// [INTENT] Force the compiler to emit code for all five iterator types used in the codebase.
+//   Without these, templates are only instantiated when the definition is visible at call sites —
+//   but the definitions live here in the .cpp, so callers in other TUs would get linker errors.
+// [HAZARD] H586: New SegmentIterator types not listed here cause linker failures.
 // Explicit template instantiation.
-template LinesIt::reference VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type &, LinesIt, LinesIt);
-template VD::SegmentIt::reference VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type &, VD::SegmentIt, VD::SegmentIt);
-template ColoredLinesIt::reference VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type &, ColoredLinesIt, ColoredLinesIt);
-template ColoredLinesConstIt::reference VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type &, ColoredLinesConstIt, ColoredLinesConstIt);
-template PolygonsSegmentIndexConstIt::reference VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
-template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &, LinesIt, LinesIt);
-template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &, VD::SegmentIt, VD::SegmentIt);
-template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &, ColoredLinesIt, ColoredLinesIt);
-template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &, ColoredLinesConstIt, ColoredLinesConstIt);
-template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
-template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(const VoronoiDiagram::cell_type &, LinesIt, LinesIt);
-template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(const VoronoiDiagram::cell_type &, VD::SegmentIt, VD::SegmentIt);
-template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(const VoronoiDiagram::cell_type &, ColoredLinesConstIt, ColoredLinesConstIt);
-template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(const VoronoiDiagram::cell_type &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
-template PointCellRange<Point> VoronoiUtils::compute_point_cell_range(const VoronoiDiagram::cell_type &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
-template Points VoronoiUtils::discretize_parabola(const Point &, const Arachne::PolygonsSegmentIndex &, const Point &, const Point &, coord_t, float);
-template Arachne::PolygonsPointIndex VoronoiUtils::get_source_point_index(const VoronoiDiagram::cell_type &, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
+template LinesIt::reference             VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type&, LinesIt, LinesIt);
+template VD::SegmentIt::reference       VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type&, VD::SegmentIt, VD::SegmentIt);
+template ColoredLinesIt::reference      VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type&, ColoredLinesIt, ColoredLinesIt);
+template ColoredLinesConstIt::reference VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type&,
+                                                                         ColoredLinesConstIt,
+                                                                         ColoredLinesConstIt);
+template PolygonsSegmentIndexConstIt::reference VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type&,
+                                                                                 PolygonsSegmentIndexConstIt,
+                                                                                 PolygonsSegmentIndexConstIt);
+template Point                                  VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type&, LinesIt, LinesIt);
+template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type&, VD::SegmentIt, VD::SegmentIt);
+template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type&, ColoredLinesIt, ColoredLinesIt);
+template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type&, ColoredLinesConstIt, ColoredLinesConstIt);
+template Point VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type&, PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt);
+template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(const VoronoiDiagram::cell_type&, LinesIt, LinesIt);
+template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(const VoronoiDiagram::cell_type&, VD::SegmentIt, VD::SegmentIt);
+template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(const VoronoiDiagram::cell_type&,
+                                                                          ColoredLinesConstIt,
+                                                                          ColoredLinesConstIt);
+template SegmentCellRange<Point> VoronoiUtils::compute_segment_cell_range(const VoronoiDiagram::cell_type&,
+                                                                          PolygonsSegmentIndexConstIt,
+                                                                          PolygonsSegmentIndexConstIt);
+template PointCellRange<Point>   VoronoiUtils::compute_point_cell_range(const VoronoiDiagram::cell_type&,
+                                                                        PolygonsSegmentIndexConstIt,
+                                                                        PolygonsSegmentIndexConstIt);
+template Points                  VoronoiUtils::discretize_parabola(
+    const Point&, const Arachne::PolygonsSegmentIndex&, const Point&, const Point&, coord_t, float);
+template Arachne::PolygonsPointIndex VoronoiUtils::get_source_point_index(const VoronoiDiagram::cell_type&,
+                                                                          PolygonsSegmentIndexConstIt,
+                                                                          PolygonsSegmentIndexConstIt);
 
+// [INTENT] Return a reference to the source segment that generated the given VD cell.
+//   Validates that the cell is a segment cell and that source_index is in range.
+// [HAZARD] Throws Slic3r::InvalidArgument / OutOfRange; callers should only call on segment cells.
 template<typename SegmentIterator>
 typename boost::polygon::enable_if<
     typename boost::polygon::gtl_if<typename boost::polygon::is_segment_concept<
         typename boost::polygon::geometry_concept<typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
     typename std::iterator_traits<SegmentIterator>::reference>::type
-VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type &cell, const SegmentIterator segment_begin, const SegmentIterator segment_end)
+VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type& cell,
+                                 const SegmentIterator            segment_begin,
+                                 const SegmentIterator            segment_end)
 {
     if (!cell.contains_segment())
         throw Slic3r::InvalidArgument("Voronoi cell doesn't contain a source segment!");
@@ -55,12 +88,15 @@ VoronoiUtils::get_source_segment(const VoronoiDiagram::cell_type &cell, const Se
     return *(segment_begin + cell.source_index());
 }
 
+// [INTENT] Return the input point (segment start or end) that generated a point-site VD cell.
+//   Dispatches on source_category (SEGMENT_START_POINT → LOW endpoint, SEGMENT_END_POINT → HIGH).
+// [HAZARD] Throws RuntimeError if source_category is SINGLE_POINT (not expected in segment-only VDs).
 template<typename SegmentIterator>
 typename boost::polygon::enable_if<
     typename boost::polygon::gtl_if<typename boost::polygon::is_segment_concept<
         typename boost::polygon::geometry_concept<typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
     typename boost::polygon::segment_point_type<typename std::iterator_traits<SegmentIterator>::value_type>::type>::type
-VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &cell, const SegmentIterator segment_begin, const SegmentIterator segment_end)
+VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type& cell, const SegmentIterator segment_begin, const SegmentIterator segment_end)
 {
     using Segment = typename std::iterator_traits<SegmentIterator>::value_type;
 
@@ -76,18 +112,23 @@ VoronoiUtils::get_source_point(const VoronoiDiagram::cell_type &cell, const Segm
         const SegmentIterator segment_it = segment_begin + cell.source_index();
         return boost::polygon::segment_traits<Segment>::get(*segment_it, boost::polygon::HIGH);
     } else if (cell.source_category() == boost::polygon::SOURCE_CATEGORY_SINGLE_POINT) {
-        throw Slic3r::RuntimeError("Voronoi diagram is always constructed using segments, so cell.source_category() shouldn't be SOURCE_CATEGORY_SINGLE_POINT!");
+        throw Slic3r::RuntimeError(
+            "Voronoi diagram is always constructed using segments, so cell.source_category() shouldn't be SOURCE_CATEGORY_SINGLE_POINT!");
     } else {
         throw Slic3r::InvalidArgument("Function get_source_point() should only be called on point cells!");
     }
 }
 
+// [INTENT] Return an Arachne PolygonsPointIndex identifying which polygon vertex generated
+//   the point-site VD cell. Delegates to the segment iterator's .next() for END_POINT cells
+//   to obtain the next vertex index in the polygon ring.
+// [COUPLING] Requires SegmentIterator::value_type to be PolygonsSegmentIndex (provides .next()).
 template<typename SegmentIterator>
 typename boost::polygon::enable_if<
     typename boost::polygon::gtl_if<typename boost::polygon::is_segment_concept<
         typename boost::polygon::geometry_concept<typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
     Arachne::PolygonsPointIndex>::type
-VoronoiUtils::get_source_point_index(const VD::cell_type &cell, const SegmentIterator segment_begin, const SegmentIterator segment_end)
+VoronoiUtils::get_source_point_index(const VD::cell_type& cell, const SegmentIterator segment_begin, const SegmentIterator segment_end)
 {
     if (!cell.contains_point())
         throw Slic3r::InvalidArgument("Voronoi cell doesn't contain a source point!");
@@ -101,17 +142,33 @@ VoronoiUtils::get_source_point_index(const VD::cell_type &cell, const SegmentIte
         const SegmentIterator segment_it = segment_begin + cell.source_index();
         return (*segment_it).next();
     } else if (cell.source_category() == boost::polygon::SOURCE_CATEGORY_SINGLE_POINT) {
-        throw Slic3r::RuntimeError("Voronoi diagram is always constructed using segments, so cell.source_category() shouldn't be SOURCE_CATEGORY_SINGLE_POINT!");
+        throw Slic3r::RuntimeError(
+            "Voronoi diagram is always constructed using segments, so cell.source_category() shouldn't be SOURCE_CATEGORY_SINGLE_POINT!");
     } else {
         throw Slic3r::InvalidArgument("Function get_source_point_index() should only be called on point cells!");
     }
 }
 
+// [INTENT] Discretize the parabolic VD arc defined by focus=source_point and
+//   directrix=source_segment, producing a Points polyline from 'start' to 'end'.
+//   Step count is derived from approximate_step_size measured along the directrix.
+//   Inserts special "marking" points at ±(transitioning_angle/2) boundaries for the
+//   Arachne bead-width transition strategy: marking_start, apex, marking_end.
+//
+// [STATE] Stateless; input coordinates are coord_t (int64 scaled) matching Slic3r conventions.
+// [HAZARD] H593: if add_marking_start && add_marking_end && !add_apex a warning is logged but
+//   callers do not check for this degraded output. The polyline will be missing the apex point.
+// [COUPLING] Uses perp() helper and Point::rotated(cos,sin) from libslic3r geometry utils.
 template<typename Segment>
 typename boost::polygon::enable_if<typename boost::polygon::gtl_if<typename boost::polygon::is_segment_concept<
-    typename boost::polygon::geometry_concept<Segment>::type>::type>::type,
-    Points>::type
-VoronoiUtils::discretize_parabola(const Point &source_point, const Segment &source_segment, const Point &start, const Point &end, const coord_t approximate_step_size, float transitioning_angle)
+                                       typename boost::polygon::geometry_concept<Segment>::type>::type>::type,
+                                   Points>::type
+VoronoiUtils::discretize_parabola(const Point&   source_point,
+                                  const Segment& source_segment,
+                                  const Point&   start,
+                                  const Point&   end,
+                                  const coord_t  approximate_step_size,
+                                  float          transitioning_angle)
 {
     Points discretized;
     // x is distance of point projected on the segment ab
@@ -203,19 +260,26 @@ VoronoiUtils::discretize_parabola(const Point &source_point, const Segment &sour
     return discretized;
 }
 
+// [INTENT] Find edge_begin and edge_end pointers that bracket the interior half-edges of a
+//   trapezoid VD cell (segment site). Iterates the cell's incident edge ring looking for
+//   v0 == to_i64 (→ edge_begin) and v1 == from_i64 (→ edge_end). Infinite edges are skipped.
+//
+// [HAZARD] H591: do-while uses comma operator `while (edge = edge->next(), ...)` so `continue`
+//   for infinite edges still advances the loop pointer — correct but fragile to refactor.
+// [COUPLING] Depends on SegmentIterator providing from()/to() on the segment type.
 template<typename SegmentIterator>
 typename boost::polygon::enable_if<
     typename boost::polygon::gtl_if<typename boost::polygon::is_segment_concept<
         typename boost::polygon::geometry_concept<typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
     Geometry::SegmentCellRange<
         typename boost::polygon::segment_point_type<typename std::iterator_traits<SegmentIterator>::value_type>::type>>::type
-VoronoiUtils::compute_segment_cell_range(const VD::cell_type &cell, const SegmentIterator segment_begin, const SegmentIterator segment_end)
+VoronoiUtils::compute_segment_cell_range(const VD::cell_type& cell, const SegmentIterator segment_begin, const SegmentIterator segment_end)
 {
     using Segment          = typename std::iterator_traits<SegmentIterator>::value_type;
     using Point            = typename boost::polygon::segment_point_type<Segment>::type;
     using SegmentCellRange = SegmentCellRange<Point>;
 
-    const Segment &source_segment = Geometry::VoronoiUtils::get_source_segment(cell, segment_begin, segment_end);
+    const Segment& source_segment = Geometry::VoronoiUtils::get_source_segment(cell, segment_begin, segment_end);
     const Point    from           = boost::polygon::segment_traits<Segment>::get(source_segment, boost::polygon::LOW);
     const Point    to             = boost::polygon::segment_traits<Segment>::get(source_segment, boost::polygon::HIGH);
     const Vec2i64  from_i64       = from.template cast<int64_t>();
@@ -228,7 +292,7 @@ VoronoiUtils::compute_segment_cell_range(const VD::cell_type &cell, const Segmen
     bool                 seen_possible_start             = false;
     bool                 after_start                     = false;
     bool                 ending_edge_is_set_before_start = false;
-    const VD::edge_type *edge                            = cell.incident_edge();
+    const VD::edge_type* edge                            = cell.incident_edge();
     do {
         if (edge->is_infinite())
             continue;
@@ -253,13 +317,22 @@ VoronoiUtils::compute_segment_cell_range(const VD::cell_type &cell, const Segmen
     return cell_range;
 }
 
+// [INTENT] Find edge_begin and edge_end pointers for a triangular (point-site) VD cell.
+//   First checks whether the cell is geometrically inside the input polygon using
+//   is_point_inside_polygon_corner(). If outside, returns an invalid (default) PointCellRange.
+//   Otherwise, locates the single edge whose vertex1 == source_point_i64 and sets
+//   edge_begin = that_edge->next(), edge_end = that_edge.
+//
+// [STATE] Read-only on VD; returns a new PointCellRange.
+// [COUPLING] Requires SegmentIterator to be PolygonsSegmentIndexConstIt (get_source_point_index
+//   and is_point_inside_polygon_corner both use PolygonsPointIndex).
+// [HAZARD] Collinear edges in the input polygon are not supported (asserted away).
 template<typename SegmentIterator>
 typename boost::polygon::enable_if<
     typename boost::polygon::gtl_if<typename boost::polygon::is_segment_concept<
         typename boost::polygon::geometry_concept<typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
-    Geometry::PointCellRange<
-        typename boost::polygon::segment_point_type<typename std::iterator_traits<SegmentIterator>::value_type>::type>>::type
-VoronoiUtils::compute_point_cell_range(const VD::cell_type &cell, const SegmentIterator segment_begin, const SegmentIterator segment_end)
+    Geometry::PointCellRange<typename boost::polygon::segment_point_type<typename std::iterator_traits<SegmentIterator>::value_type>::type>>::type
+VoronoiUtils::compute_point_cell_range(const VD::cell_type& cell, const SegmentIterator segment_begin, const SegmentIterator segment_end)
 {
     using Segment        = typename std::iterator_traits<SegmentIterator>::value_type;
     using Point          = typename boost::polygon::segment_point_type<Segment>::type;
@@ -271,7 +344,7 @@ VoronoiUtils::compute_point_cell_range(const VD::cell_type &cell, const SegmentI
     // We want to ignore (by returning PointCellRange without assigned edge_begin and edge_end) cells outside the input polygon.
     PointCellRange cell_range(source_point);
 
-    const VD::edge_type *edge = cell.incident_edge();
+    const VD::edge_type* edge = cell.incident_edge();
     if (edge->is_infinite() || !is_in_range<CoordType>(*edge)) {
         // Ignore infinite edges, because they only occur outside the polygon.
         // Also ignore edges with endpoints that don't fit into CoordType, because such edges are definitely outside the polygon.
@@ -284,14 +357,15 @@ VoronoiUtils::compute_point_cell_range(const VD::cell_type &cell, const SegmentI
     const Point                       edge_query_point = (edge_v0 == source_point) ? edge_v1 : edge_v0;
 
     // Check if the edge has another endpoint inside the corner of the polygon.
-    if (!Geometry::is_point_inside_polygon_corner(source_point_idx.prev().p(), source_point_idx.p(), source_point_idx.next().p(), edge_query_point)) {
+    if (!Geometry::is_point_inside_polygon_corner(source_point_idx.prev().p(), source_point_idx.p(), source_point_idx.next().p(),
+                                                  edge_query_point)) {
         // If the endpoint isn't inside the corner of the polygon, it means that
         // the whole cell isn't inside the polygons, and we will ignore such cells.
         return cell_range;
     }
 
     const Vec2i64 source_point_i64 = source_point.template cast<int64_t>();
-    edge = cell.incident_edge();
+    edge                           = cell.incident_edge();
     do {
         assert(edge->is_finite());
 
@@ -302,20 +376,25 @@ VoronoiUtils::compute_point_cell_range(const VD::cell_type &cell, const SegmentI
             // FIXME @hejllukas: With Arachne, we don't support polygons with collinear edges,
             //                   because with collinear edges we have to handle secondary edges.
             //                   Such edges goes through the endpoints of the input segments.
-            assert((Geometry::VoronoiUtils::to_point(edge->vertex0()) == source_point_i64 || edge->is_primary()) && "Point cells must end in the point! They cannot cross the point with an edge, because collinear edges are not allowed in the input.");
+            assert((Geometry::VoronoiUtils::to_point(edge->vertex0()) == source_point_i64 || edge->is_primary()) &&
+                   "Point cells must end in the point! They cannot cross the point with an edge, because collinear edges are not allowed "
+                   "in the input.");
         }
     } while (edge = edge->next(), edge != cell.incident_edge());
 
     return cell_range;
 }
 
-Vec2i64 VoronoiUtils::to_point(const VD::vertex_type *vertex)
+// [INTENT] Convert VD vertex pointer to Vec2i64 integer coordinates via std::llround.
+// [HAZARD] H592: asserts that coordinates are finite and in int64 range; in release builds
+//   overflow is UB. Callers should use is_in_range<int64_t>() first.
+Vec2i64 VoronoiUtils::to_point(const VD::vertex_type* vertex)
 {
     assert(vertex != nullptr);
     return VoronoiUtils::to_point(*vertex);
 }
 
-Vec2i64 VoronoiUtils::to_point(const VD::vertex_type &vertex)
+Vec2i64 VoronoiUtils::to_point(const VD::vertex_type& vertex)
 {
     const double x = vertex.x(), y = vertex.y();
 
@@ -325,12 +404,14 @@ Vec2i64 VoronoiUtils::to_point(const VD::vertex_type &vertex)
     return {std::llround(x), std::llround(y)};
 }
 
-bool VoronoiUtils::is_finite(const VD::vertex_type &vertex)
-{
-    return std::isfinite(vertex.x()) && std::isfinite(vertex.y());
-}
+// [INTENT] Null check for VD vertex coordinates (not infinity/NaN). Use before to_point().
+bool VoronoiUtils::is_finite(const VD::vertex_type& vertex) { return std::isfinite(vertex.x()) && std::isfinite(vertex.y()); }
 
-VD::vertex_type VoronoiUtils::make_rotated_vertex(VD::vertex_type &vertex, const double angle)
+// [INTENT] Return a new VD::vertex_type with coordinates rotated by 'angle' radians around
+//   the origin. incident_edge() and color() are copied from the source vertex.
+//   The result is NOT inserted into the VD graph — it is only used as a temporary for debug
+//   SVG rendering (VoronoiVisualUtils.hpp).
+VD::vertex_type VoronoiUtils::make_rotated_vertex(VD::vertex_type& vertex, const double angle)
 {
     const double cos_a = std::cos(angle);
     const double sin_a = std::sin(angle);

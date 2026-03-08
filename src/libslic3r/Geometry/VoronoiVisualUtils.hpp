@@ -1,3 +1,25 @@
+// [INTENT] Debug/visualization utilities for the Boost.Polygon Voronoi diagram.
+// Two independent sections:
+//   1. boost::polygon::voronoi_visual_utils<CT>  (inside namespace boost::polygon)
+//      — parabola discretization via iterative midpoint subdivision; adapted
+//      verbatim from the Boost.Polygon library example code by Andrii Sydorchuk.
+//   2. Slic3r::Voronoi::Internal helpers + dump_voronoi_to_svg()
+//      — color_exterior() flood-fill, clip/sample edge helpers, and the main
+//      SVG dumper for human-readable VD inspection.
+//
+// [COUPLING] Depends on Slic3r::Geometry::VoronoiDiagram, VoronoiOffset
+// (for vertex_category()), Slic3r::SVG, Slic3r::BoundingBox,
+// Slic3r::Line/Point/Polygon types.  This file is header-only and is
+// included from Voronoi*.cpp translation units that need SVG output.
+//
+// [CONCURRENCY] dump_voronoi_to_svg() is NOT thread-safe due to SVG file I/O.
+// All other helpers are pure functions safe to call from multiple threads
+// on distinct VD objects.
+//
+// [HAZARD H580] The boost::polygon::voronoi_visual_utils class is an embedded
+// copy of boost/polygon/voronoi_graphic_utils.hpp. If the vendored Boost
+// version ships the same class, both definitions will be visible to the
+// linker as template instantiations — potential ODR violation if CT differs.
 #ifndef slic3r_VoronoiVisualUtils_hpp_
 #define slic3r_VoronoiVisualUtils_hpp_
 
@@ -19,175 +41,162 @@ namespace boost { namespace polygon {
 // Distributed under the Boost Software License, Version 1.0.
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          http://www.boost.org/LICENSE_1_0.txt)
-template <typename CT>
-class voronoi_visual_utils {
- public:
-  // Discretize parabolic Voronoi edge.
-  // Parabolic Voronoi edges are always formed by one point and one segment
-  // from the initial input set.
-  //
-  // Args:
-  //   point: input point.
-  //   segment: input segment.
-  //   max_dist: maximum discretization distance.
-  //   discretization: point discretization of the given Voronoi edge.
-  //
-  // Template arguments:
-  //   InCT: coordinate type of the input geometries (usually integer).
-  //   Point: point type, should model point concept.
-  //   Segment: segment type, should model segment concept.
-  //
-  // Important:
-  //   discretization should contain both edge endpoints initially.
-  template <class InCT1, class InCT2,
-            template<class> class Point,
-            template<class> class Segment>
-  static
-  typename enable_if<
-    typename gtl_and<
-      typename gtl_if<
-        typename is_point_concept<
-          typename geometry_concept< Point<InCT1> >::type
-        >::type
-      >::type,
-      typename gtl_if<
-        typename is_segment_concept<
-          typename geometry_concept< Segment<InCT2> >::type
-        >::type
-      >::type
-    >::type,
-    void
-  >::type discretize(
-      const Point<InCT1>& point,
-      const Segment<InCT2>& segment,
-      const CT max_dist,
-      std::vector< Point<CT> >* discretization) {
-    // Apply the linear transformation to move start point of the segment to
-    // the point with coordinates (0, 0) and the direction of the segment to
-    // coincide the positive direction of the x-axis.
-    CT segm_vec_x = cast(x(high(segment))) - cast(x(low(segment)));
-    CT segm_vec_y = cast(y(high(segment))) - cast(y(low(segment)));
-    CT sqr_segment_length = segm_vec_x * segm_vec_x + segm_vec_y * segm_vec_y;
 
-    // Compute x-coordinates of the endpoints of the edge
-    // in the transformed space.
-    CT projection_start = sqr_segment_length *
-        get_point_projection((*discretization)[0], segment);
-    CT projection_end = sqr_segment_length *
-        get_point_projection((*discretization)[1], segment);
-    assert(projection_start != projection_end);
+// [INTENT] Template class providing a single static method discretize() that
+// converts a parabolic Voronoi edge (defined by a point site and a segment
+// site) into a polyline with a bounded maximum deviation from the true arc.
+// The algorithm works in a transformed coordinate system aligned with the
+// segment directrix, eliminating the need to handle arbitrary orientations.
+//
+// CT: coordinate type for the output polyline (usually double).
+// The input geometry uses InCT (usually coord_t / int64_t).
+template<typename CT> class voronoi_visual_utils
+{
+public:
+    // Discretize parabolic Voronoi edge.
+    // Parabolic Voronoi edges are always formed by one point and one segment
+    // from the initial input set.
+    //
+    // Args:
+    //   point: input point.
+    //   segment: input segment.
+    //   max_dist: maximum discretization distance.
+    //   discretization: point discretization of the given Voronoi edge.
+    //
+    // Template arguments:
+    //   InCT: coordinate type of the input geometries (usually integer).
+    //   Point: point type, should model point concept.
+    //   Segment: segment type, should model segment concept.
+    //
+    // Important:
+    //   discretization should contain both edge endpoints initially.
+    //
+    // [INTENT] Iterative (stack-based) subdivision of the parabola. The loop
+    // pushes the midpoint of each sub-arc onto the stack when the chord-height
+    // deviation exceeds max_dist, and pops when it is within tolerance.  This
+    // avoids worst-case recursion depth and emits points in order.
+    //
+    // [MEMORY] Writes to the discretization vector in-place; the last element
+    // is saved before the loop and restored afterward so the caller's endpoint
+    // is never lost.
+    //
+    // [HAZARD] assert(projection_start != projection_end) — if the two endpoints
+    // project to the same position on the directrix axis, the algorithm will
+    // produce NaN or infinite coordinates silently in release builds.
+    template<class InCT1, class InCT2, template<class> class Point, template<class> class Segment>
+    static typename enable_if<
+        typename gtl_and<typename gtl_if<typename is_point_concept<typename geometry_concept<Point<InCT1>>::type>::type>::type,
+                         typename gtl_if<typename is_segment_concept<typename geometry_concept<Segment<InCT2>>::type>::type>::type>::type,
+        void>::type
+    discretize(const Point<InCT1>& point, const Segment<InCT2>& segment, const CT max_dist, std::vector<Point<CT>>* discretization)
+    {
+        // Apply the linear transformation to move start point of the segment to
+        // the point with coordinates (0, 0) and the direction of the segment to
+        // coincide the positive direction of the x-axis.
+        CT segm_vec_x         = cast(x(high(segment))) - cast(x(low(segment)));
+        CT segm_vec_y         = cast(y(high(segment))) - cast(y(low(segment)));
+        CT sqr_segment_length = segm_vec_x * segm_vec_x + segm_vec_y * segm_vec_y;
 
-    // Compute parabola parameters in the transformed space.
-    // Parabola has next representation:
-    // f(x) = ((x-rot_x)^2 + rot_y^2) / (2.0*rot_y).
-    CT point_vec_x = cast(x(point)) - cast(x(low(segment)));
-    CT point_vec_y = cast(y(point)) - cast(y(low(segment)));
-    CT rot_x = segm_vec_x * point_vec_x + segm_vec_y * point_vec_y;
-    CT rot_y = segm_vec_x * point_vec_y - segm_vec_y * point_vec_x;
+        // Compute x-coordinates of the endpoints of the edge
+        // in the transformed space.
+        CT projection_start = sqr_segment_length * get_point_projection((*discretization)[0], segment);
+        CT projection_end   = sqr_segment_length * get_point_projection((*discretization)[1], segment);
+        assert(projection_start != projection_end);
 
-    // Save the last point.
-    Point<CT> last_point = (*discretization)[1];
-    discretization->pop_back();
+        // Compute parabola parameters in the transformed space.
+        // Parabola has next representation:
+        // f(x) = ((x-rot_x)^2 + rot_y^2) / (2.0*rot_y).
+        CT point_vec_x = cast(x(point)) - cast(x(low(segment)));
+        CT point_vec_y = cast(y(point)) - cast(y(low(segment)));
+        CT rot_x       = segm_vec_x * point_vec_x + segm_vec_y * point_vec_y;
+        CT rot_y       = segm_vec_x * point_vec_y - segm_vec_y * point_vec_x;
 
-    // Use stack to avoid recursion.
-    std::stack<CT> point_stack;
-    point_stack.push(projection_end);
-    CT cur_x = projection_start;
-    CT cur_y = parabola_y(cur_x, rot_x, rot_y);
+        // Save the last point.
+        Point<CT> last_point = (*discretization)[1];
+        discretization->pop_back();
 
-    // Adjust max_dist parameter in the transformed space.
-    const CT max_dist_transformed = max_dist * max_dist * sqr_segment_length;
-    while (!point_stack.empty()) {
-      CT new_x = point_stack.top();
-      CT new_y = parabola_y(new_x, rot_x, rot_y);
+        // Use stack to avoid recursion.
+        std::stack<CT> point_stack;
+        point_stack.push(projection_end);
+        CT cur_x = projection_start;
+        CT cur_y = parabola_y(cur_x, rot_x, rot_y);
 
-      // Compute coordinates of the point of the parabola that is
-      // furthest from the current line segment.
-      CT mid_x = (new_y - cur_y) / (new_x - cur_x) * rot_y + rot_x;
-      CT mid_y = parabola_y(mid_x, rot_x, rot_y);
-      assert(mid_x != cur_x || mid_y != cur_y);
-      assert(mid_x != new_x || mid_y != new_y);
+        // Adjust max_dist parameter in the transformed space.
+        const CT max_dist_transformed = max_dist * max_dist * sqr_segment_length;
+        while (!point_stack.empty()) {
+            CT new_x = point_stack.top();
+            CT new_y = parabola_y(new_x, rot_x, rot_y);
 
-      // Compute maximum distance between the given parabolic arc
-      // and line segment that discretize it.
-      CT dist = (new_y - cur_y) * (mid_x - cur_x) -
-          (new_x - cur_x) * (mid_y - cur_y);
-      CT div = (new_y - cur_y) * (new_y - cur_y) + (new_x - cur_x) * (new_x - cur_x);
-      assert(div != 0);
-      dist = dist * dist / div;
-      if (dist <= max_dist_transformed) {
-        // Distance between parabola and line segment is less than max_dist.
-        point_stack.pop();
-        CT inter_x = (segm_vec_x * new_x - segm_vec_y * new_y) /
-            sqr_segment_length + cast(x(low(segment)));
-        CT inter_y = (segm_vec_x * new_y + segm_vec_y * new_x) /
-            sqr_segment_length + cast(y(low(segment)));
-        discretization->push_back(Point<CT>(inter_x, inter_y));
-        cur_x = new_x;
-        cur_y = new_y;
-      } else {
-        point_stack.push(mid_x);
-      }
+            // Compute coordinates of the point of the parabola that is
+            // furthest from the current line segment.
+            CT mid_x = (new_y - cur_y) / (new_x - cur_x) * rot_y + rot_x;
+            CT mid_y = parabola_y(mid_x, rot_x, rot_y);
+            assert(mid_x != cur_x || mid_y != cur_y);
+            assert(mid_x != new_x || mid_y != new_y);
+
+            // Compute maximum distance between the given parabolic arc
+            // and line segment that discretize it.
+            CT dist = (new_y - cur_y) * (mid_x - cur_x) - (new_x - cur_x) * (mid_y - cur_y);
+            CT div  = (new_y - cur_y) * (new_y - cur_y) + (new_x - cur_x) * (new_x - cur_x);
+            assert(div != 0);
+            dist = dist * dist / div;
+            if (dist <= max_dist_transformed) {
+                // Distance between parabola and line segment is less than max_dist.
+                point_stack.pop();
+                CT inter_x = (segm_vec_x * new_x - segm_vec_y * new_y) / sqr_segment_length + cast(x(low(segment)));
+                CT inter_y = (segm_vec_x * new_y + segm_vec_y * new_x) / sqr_segment_length + cast(y(low(segment)));
+                discretization->push_back(Point<CT>(inter_x, inter_y));
+                cur_x = new_x;
+                cur_y = new_y;
+            } else {
+                point_stack.push(mid_x);
+            }
+        }
+
+        // Update last point.
+        discretization->back() = last_point;
     }
 
-    // Update last point.
-    discretization->back() = last_point;
-  }
+private:
+    // [INTENT] Evaluate parabola y(x) = ((x-a)^2 + b^2) / (2b) in the
+    // transformed coordinate system where the directrix is the X-axis.
+    // Compute y(x) = ((x - a) * (x - a) + b * b) / (2 * b).
+    static CT parabola_y(CT x, CT a, CT b) { return ((x - a) * (x - a) + b * b) / (b + b); }
 
- private:
-  // Compute y(x) = ((x - a) * (x - a) + b * b) / (2 * b).
-  static CT parabola_y(CT x, CT a, CT b) {
-    return ((x - a) * (x - a) + b * b) / (b + b);
-  }
+    // Get normalized length of the distance between:
+    //   1) point projection onto the segment
+    //   2) start point of the segment
+    // Return this length divided by the segment length. This is made to avoid
+    // sqrt computation during transformation from the initial space to the
+    // transformed one and vice versa. The assumption is made that projection of
+    // the point lies between the start-point and endpoint of the segment.
+    //
+    // [INTENT] Returns dot(segment_vec, point_vec) / |segment|^2, i.e. the
+    // normalized (0..1) projection parameter of the point onto the segment.
+    template<class InCT, template<class> class Point, template<class> class Segment>
+    static typename enable_if<
+        typename gtl_and<typename gtl_if<typename is_point_concept<typename geometry_concept<Point<int>>::type>::type>::type,
+                         typename gtl_if<typename is_segment_concept<typename geometry_concept<Segment<long>>::type>::type>::type>::type,
+        CT>::type
+    get_point_projection(const Point<CT>& point, const Segment<InCT>& segment)
+    {
+        CT segment_vec_x      = cast(x(high(segment))) - cast(x(low(segment)));
+        CT segment_vec_y      = cast(y(high(segment))) - cast(y(low(segment)));
+        CT point_vec_x        = x(point) - cast(x(low(segment)));
+        CT point_vec_y        = y(point) - cast(y(low(segment)));
+        CT sqr_segment_length = segment_vec_x * segment_vec_x + segment_vec_y * segment_vec_y;
+        CT vec_dot            = segment_vec_x * point_vec_x + segment_vec_y * point_vec_y;
+        return vec_dot / sqr_segment_length;
+    }
 
-  // Get normalized length of the distance between:
-  //   1) point projection onto the segment
-  //   2) start point of the segment
-  // Return this length divided by the segment length. This is made to avoid
-  // sqrt computation during transformation from the initial space to the
-  // transformed one and vice versa. The assumption is made that projection of
-  // the point lies between the start-point and endpoint of the segment.
-  template <class InCT,
-            template<class> class Point,
-            template<class> class Segment>
-  static
-  typename enable_if<
-    typename gtl_and<
-      typename gtl_if<
-        typename is_point_concept<
-          typename geometry_concept< Point<int> >::type
-        >::type
-      >::type,
-      typename gtl_if<
-        typename is_segment_concept<
-          typename geometry_concept< Segment<long> >::type
-        >::type
-      >::type
-    >::type,
-    CT
-  >::type get_point_projection(
-      const Point<CT>& point, const Segment<InCT>& segment) {
-    CT segment_vec_x = cast(x(high(segment))) - cast(x(low(segment)));
-    CT segment_vec_y = cast(y(high(segment))) - cast(y(low(segment)));
-    CT point_vec_x = x(point) - cast(x(low(segment)));
-    CT point_vec_y = y(point) - cast(y(low(segment)));
-    CT sqr_segment_length =
-        segment_vec_x * segment_vec_x + segment_vec_y * segment_vec_y;
-    CT vec_dot = segment_vec_x * point_vec_x + segment_vec_y * point_vec_y;
-    return vec_dot / sqr_segment_length;
-  }
-
-  template <typename InCT>
-  static CT cast(const InCT& value) {
-    return static_cast<CT>(value);
-  }
+    // [INTENT] Safe cast helper: converts input coordinate type InCT to output
+    // CT (usually double) for all arithmetic done in the transformed space.
+    template<typename InCT> static CT cast(const InCT& value) { return static_cast<CT>(value); }
 };
 
-} } // namespace boost::polygon
+}} // namespace boost::polygon
 
-
-namespace Slic3r
-{
+namespace Slic3r {
 
 // The following code for the visualization of the boost Voronoi diagram is based on:
 //
@@ -198,114 +207,182 @@ namespace Slic3r
 //          http://www.boost.org/LICENSE_1_0.txt)
 namespace Voronoi { namespace Internal {
 
-    using VD = Geometry::VoronoiDiagram;
-    typedef double coordinate_type;
-    typedef boost::polygon::point_data<coordinate_type> point_type;
-    typedef boost::polygon::segment_data<coordinate_type> segment_type;
-    typedef boost::polygon::rectangle_data<coordinate_type> rect_type;
-    typedef VD::cell_type cell_type;
-    typedef VD::cell_type::source_index_type source_index_type;
-    typedef VD::cell_type::source_category_type source_category_type;
-    typedef VD::edge_type edge_type;
-    typedef VD::cell_container_type cell_container_type;
-    typedef VD::cell_container_type vertex_container_type;
-    typedef VD::edge_container_type edge_container_type;
-    typedef VD::const_cell_iterator const_cell_iterator;
-    typedef VD::const_vertex_iterator const_vertex_iterator;
-    typedef VD::const_edge_iterator const_edge_iterator;
+// [INTENT] Type aliases for the Voronoi visualization helpers below.
+// All use double coordinates (coordinate_type) since this code is for
+// debug output only; precision loss from coord_t → double is acceptable.
+using VD = Geometry::VoronoiDiagram;
+typedef double                                          coordinate_type;
+typedef boost::polygon::point_data<coordinate_type>     point_type;
+typedef boost::polygon::segment_data<coordinate_type>   segment_type;
+typedef boost::polygon::rectangle_data<coordinate_type> rect_type;
+typedef VD::cell_type                                   cell_type;
+typedef VD::cell_type::source_index_type                source_index_type;
+typedef VD::cell_type::source_category_type             source_category_type;
+typedef VD::edge_type                                   edge_type;
+typedef VD::cell_container_type                         cell_container_type;
+typedef VD::cell_container_type                         vertex_container_type;
+typedef VD::edge_container_type                         edge_container_type;
+typedef VD::const_cell_iterator                         const_cell_iterator;
+typedef VD::const_vertex_iterator                       const_vertex_iterator;
+typedef VD::const_edge_iterator                         const_edge_iterator;
 
-    static const std::size_t EXTERNAL_COLOR = 1;
+// [INTENT] Color value used to mark edges and vertices that are
+// "exterior" (connected to infinity).  Stored in the VD color field,
+// which is a mutable 32-bit integer on both edges and vertices.
+static const std::size_t EXTERNAL_COLOR = 1;
 
-    inline void color_exterior(const VD::edge_type* edge)
-    {
-        if (edge->color() == EXTERNAL_COLOR)
-            return;
-        edge->color(EXTERNAL_COLOR);
-        edge->twin()->color(EXTERNAL_COLOR);
-        const VD::vertex_type* v = edge->vertex1();
-        if (v == NULL || !edge->is_primary())
-            return;
-        v->color(EXTERNAL_COLOR);
-        const VD::edge_type* e = v->incident_edge();
-        do {
-            color_exterior(e);
-            e = e->rot_next();
-        } while (e != v->incident_edge());
-    }
-
-    inline point_type retrieve_point(const Points &points, const std::vector<segment_type> &segments, const cell_type& cell)
-    {
-        assert(cell.source_category() == boost::polygon::SOURCE_CATEGORY_SEGMENT_START_POINT || cell.source_category() == boost::polygon::SOURCE_CATEGORY_SEGMENT_END_POINT ||
-               cell.source_category() == boost::polygon::SOURCE_CATEGORY_SINGLE_POINT);
-        return cell.source_category() == boost::polygon::SOURCE_CATEGORY_SINGLE_POINT ?
-                    Voronoi::Internal::point_type(double(points[cell.source_index()].x()), double(points[cell.source_index()].y())) :
-                    (cell.source_category() == boost::polygon::SOURCE_CATEGORY_SEGMENT_START_POINT) ?
-                        low(segments[cell.source_index()]) : high(segments[cell.source_index()]);
-    }
-
-    inline void clip_infinite_edge(const Points &points, const std::vector<segment_type> &segments, const edge_type& edge, coordinate_type bbox_max_size, std::vector<point_type>* clipped_edge)
-    {
-        assert(edge.is_infinite());
-        assert((edge.vertex0() == nullptr) != (edge.vertex1() == nullptr));
-
-        const cell_type& cell1 = *edge.cell();
-        const cell_type& cell2 = *edge.twin()->cell();
-        // Infinite edges could not be created by two segment sites.
-        assert(cell1.contains_point() || cell2.contains_point());
-        if (! cell1.contains_point() && ! cell2.contains_point()) {
-            printf("Error! clip_infinite_edge - infinite edge separates two segment cells\n");
-            return;
-        }
-        point_type direction;
-        if (cell1.contains_point() && cell2.contains_point()) {
-            assert(! edge.is_secondary());
-            point_type p1 = retrieve_point(points, segments, cell1);
-            point_type p2 = retrieve_point(points, segments, cell2);
-            if (edge.vertex0() == nullptr)
-                std::swap(p1, p2);
-            direction.x(p1.y() - p2.y());
-            direction.y(p2.x() - p1.x());
-        } else {
-            assert(edge.is_secondary());
-            segment_type segment = cell1.contains_segment() ? segments[cell1.source_index()] : segments[cell2.source_index()];
-            direction.x(high(segment).y() - low(segment).y());
-            direction.y(low(segment).x() - high(segment).x());
-        }
-        coordinate_type koef = bbox_max_size / (std::max)(fabs(direction.x()), fabs(direction.y()));
-        if (edge.vertex0() == nullptr) {
-            clipped_edge->push_back(point_type(edge.vertex1()->x() + direction.x() * koef, edge.vertex1()->y() + direction.y() * koef));
-            clipped_edge->push_back(point_type(edge.vertex1()->x(), edge.vertex1()->y()));
-        } else {
-            clipped_edge->push_back(point_type(edge.vertex0()->x(), edge.vertex0()->y()));
-            clipped_edge->push_back(point_type(edge.vertex0()->x() + direction.x() * koef, edge.vertex0()->y() + direction.y() * koef));
-        }
-    }
-
-    inline void sample_curved_edge(const Points &points, const std::vector<segment_type> &segments, const edge_type& edge, std::vector<point_type> &sampled_edge, coordinate_type max_dist)
-    {
-        point_type point = edge.cell()->contains_point() ?
-            retrieve_point(points, segments, *edge.cell()) :
-            retrieve_point(points, segments, *edge.twin()->cell());
-        segment_type segment = edge.cell()->contains_point() ?
-            segments[edge.twin()->cell()->source_index()] :
-            segments[edge.cell()->source_index()];
-        ::boost::polygon::voronoi_visual_utils<coordinate_type>::discretize(point, segment, max_dist, &sampled_edge);
-    }
-
-} /* namespace Internal */ } // namespace Voronoi
-
-BoundingBox get_extents(const Lines &lines);
-
-static inline void dump_voronoi_to_svg(
-    const char          *path,
-    const Geometry::VoronoiDiagram &vd,
-    const Points        &points,
-    const Lines         &lines,
-    const Polygons      &offset_curves = Polygons(),
-    const Lines         &helper_lines = Lines(),
-    double               scale = 0)
+// [INTENT] Recursive flood-fill that marks all edges and vertices
+// reachable from an infinite edge as EXTERNAL_COLOR.  Only primary edges
+// propagate the flood (secondary edges that share a cell with infinite
+// edges are excluded by the is_primary() check on vertex edges).
+//
+// [HAZARD H595] This function is recursive.  For a large Voronoi diagram
+// with many infinite edges, the call stack depth equals the number of
+// reachable primary edges, which can be O(n) in the number of input
+// segments.  This risks stack overflow for large inputs.  Should be
+// rewritten with an explicit stack.
+//
+// [STATE] Mutates the VD color field.  Not idempotent if called with
+// EXTERNAL_COLOR already set (early-return guard prevents double traversal).
+inline void color_exterior(const VD::edge_type* edge)
 {
-    const bool          internalEdgesOnly           = false;
+    if (edge->color() == EXTERNAL_COLOR)
+        return;
+    edge->color(EXTERNAL_COLOR);
+    edge->twin()->color(EXTERNAL_COLOR);
+    const VD::vertex_type* v = edge->vertex1();
+    if (v == NULL || !edge->is_primary())
+        return;
+    v->color(EXTERNAL_COLOR);
+    const VD::edge_type* e = v->incident_edge();
+    do {
+        color_exterior(e);
+        e = e->rot_next();
+    } while (e != v->incident_edge());
+}
+
+// [INTENT] Look up the point site associated with a cell.  A cell can be
+// generated by a single point or by an endpoint of a segment; the category
+// discriminates between the two cases.  Returns the relevant point_type
+// (double coordinates).
+//
+// [COUPLING] Reads points[] and segments[] arrays indexed by
+// cell.source_index(); caller must ensure these arrays match the VD input.
+inline point_type retrieve_point(const Points& points, const std::vector<segment_type>& segments, const cell_type& cell)
+{
+    assert(cell.source_category() == boost::polygon::SOURCE_CATEGORY_SEGMENT_START_POINT ||
+           cell.source_category() == boost::polygon::SOURCE_CATEGORY_SEGMENT_END_POINT ||
+           cell.source_category() == boost::polygon::SOURCE_CATEGORY_SINGLE_POINT);
+    return cell.source_category() == boost::polygon::SOURCE_CATEGORY_SINGLE_POINT ?
+               Voronoi::Internal::point_type(double(points[cell.source_index()].x()), double(points[cell.source_index()].y())) :
+           (cell.source_category() == boost::polygon::SOURCE_CATEGORY_SEGMENT_START_POINT) ? low(segments[cell.source_index()]) :
+                                                                                             high(segments[cell.source_index()]);
+}
+
+// [INTENT] Extend an infinite (half-line) VD edge to a finite clipped
+// segment for SVG rendering.  The direction of the infinite ray is derived
+// from the two cell sites:
+//   • point–point cell: perpendicular to the line joining the two points.
+//   • point–segment cell (secondary edge): parallel to the segment.
+// The clipped endpoint is offset by bbox_max_size in the ray direction
+// so it extends well beyond the viewport; the SVG renderer clips it.
+//
+// [COUPLING] Only valid for edges where exactly one vertex is nullptr
+// (half-infinite).  Asserts this precondition.
+inline void clip_infinite_edge(const Points&                    points,
+                               const std::vector<segment_type>& segments,
+                               const edge_type&                 edge,
+                               coordinate_type                  bbox_max_size,
+                               std::vector<point_type>*         clipped_edge)
+{
+    assert(edge.is_infinite());
+    assert((edge.vertex0() == nullptr) != (edge.vertex1() == nullptr));
+
+    const cell_type& cell1 = *edge.cell();
+    const cell_type& cell2 = *edge.twin()->cell();
+    // Infinite edges could not be created by two segment sites.
+    assert(cell1.contains_point() || cell2.contains_point());
+    if (!cell1.contains_point() && !cell2.contains_point()) {
+        printf("Error! clip_infinite_edge - infinite edge separates two segment cells\n");
+        return;
+    }
+    point_type direction;
+    if (cell1.contains_point() && cell2.contains_point()) {
+        assert(!edge.is_secondary());
+        point_type p1 = retrieve_point(points, segments, cell1);
+        point_type p2 = retrieve_point(points, segments, cell2);
+        if (edge.vertex0() == nullptr)
+            std::swap(p1, p2);
+        direction.x(p1.y() - p2.y());
+        direction.y(p2.x() - p1.x());
+    } else {
+        assert(edge.is_secondary());
+        segment_type segment = cell1.contains_segment() ? segments[cell1.source_index()] : segments[cell2.source_index()];
+        direction.x(high(segment).y() - low(segment).y());
+        direction.y(low(segment).x() - high(segment).x());
+    }
+    coordinate_type koef = bbox_max_size / (std::max) (fabs(direction.x()), fabs(direction.y()));
+    if (edge.vertex0() == nullptr) {
+        clipped_edge->push_back(point_type(edge.vertex1()->x() + direction.x() * koef, edge.vertex1()->y() + direction.y() * koef));
+        clipped_edge->push_back(point_type(edge.vertex1()->x(), edge.vertex1()->y()));
+    } else {
+        clipped_edge->push_back(point_type(edge.vertex0()->x(), edge.vertex0()->y()));
+        clipped_edge->push_back(point_type(edge.vertex0()->x() + direction.x() * koef, edge.vertex0()->y() + direction.y() * koef));
+    }
+}
+
+// [INTENT] Populate sampled_edge with discretized points along a curved
+// (parabolic) VD edge by delegating to voronoi_visual_utils<double>::discretize().
+// sampled_edge must already contain the two finite endpoints of the edge
+// before calling; discretize() inserts intermediate points between them.
+//
+// [COUPLING] Determines which of the two adjacent cells is the point site
+// and which is the segment site, then passes both to discretize().
+inline void sample_curved_edge(const Points&                    points,
+                               const std::vector<segment_type>& segments,
+                               const edge_type&                 edge,
+                               std::vector<point_type>&         sampled_edge,
+                               coordinate_type                  max_dist)
+{
+    point_type   point   = edge.cell()->contains_point() ? retrieve_point(points, segments, *edge.cell()) :
+                                                           retrieve_point(points, segments, *edge.twin()->cell());
+    segment_type segment = edge.cell()->contains_point() ? segments[edge.twin()->cell()->source_index()] :
+                                                           segments[edge.cell()->source_index()];
+    ::boost::polygon::voronoi_visual_utils<coordinate_type>::discretize(point, segment, max_dist, &sampled_edge);
+}
+
+}} // namespace Voronoi::Internal
+
+// [INTENT] Forward declaration — get_extents() for Lines is defined in SVG.cpp
+// or similar; needed by dump_voronoi_to_svg() to compute the bounding box.
+BoundingBox get_extents(const Lines& lines);
+
+// [INTENT] Render the full Voronoi diagram to an SVG file for debugging.
+// Draws:
+//   • Input polygon vertices and edges (light sea green)
+//   • VD vertices color-coded by category: OnContour (black), Outside (red), Inside (blue)
+//   • VD edges: primary (black), secondary (green), parabolic arcs (red)
+//   • Optional offset curves (magenta) and helper lines (orange)
+//
+// [COUPLING] Calls color_exterior() to mark infinite-reachable edges when
+// internalEdgesOnly is true (currently hardcoded false).  Uses
+// Slic3r::Geometry::Voronoi::vertex_category() from VoronoiOffset.hpp.
+//
+// [STATE] SVG file I/O is not thread-safe; must be called from a single thread
+// when writing the same path.
+//
+// [HAZARD] Coordinate conversion from double VD coordinates to coord_t (int32)
+// is guarded by sign checks (in_range lambda) but not range checks — if VD
+// vertex coordinates exceed INT32_MAX, the cast silently wraps.
+static inline void dump_voronoi_to_svg(const char*                     path,
+                                       const Geometry::VoronoiDiagram& vd,
+                                       const Points&                   points,
+                                       const Lines&                    lines,
+                                       const Polygons&                 offset_curves = Polygons(),
+                                       const Lines&                    helper_lines  = Lines(),
+                                       double                          scale         = 0)
+{
+    const bool internalEdgesOnly = false;
 
     BoundingBox bbox;
     bbox.merge(get_extents(points));
@@ -313,40 +390,39 @@ static inline void dump_voronoi_to_svg(
     bbox.merge(get_extents(offset_curves));
     bbox.merge(get_extents(helper_lines));
     for (boost::polygon::voronoi_diagram<double>::const_vertex_iterator it = vd.vertices().begin(); it != vd.vertices().end(); ++it)
-        if (! internalEdgesOnly || it->color() != Voronoi::Internal::EXTERNAL_COLOR)
+        if (!internalEdgesOnly || it->color() != Voronoi::Internal::EXTERNAL_COLOR)
             bbox.merge(Point(it->x(), it->y()));
     bbox.min -= (0.01 * bbox.size().cast<double>()).cast<coord_t>();
     bbox.max += (0.01 * bbox.size().cast<double>()).cast<coord_t>();
 
     if (scale == 0)
         scale =
-//                0.1
-                0.01
-                * std::min(bbox.size().x(), bbox.size().y());
+            //                0.1
+            0.01 * std::min(bbox.size().x(), bbox.size().y());
     else
         scale *= SCALING_FACTOR;
 
-    const std::string   inputSegmentPointColor      = "lightseagreen";
-    const coord_t       inputSegmentPointRadius     = std::max<coord_t>(1, coord_t(0.09 * scale));
-    const std::string   inputSegmentColor           = "lightseagreen";
-    const coord_t       inputSegmentLineWidth       = coord_t(0.03 * scale);
+    const std::string inputSegmentPointColor  = "lightseagreen";
+    const coord_t     inputSegmentPointRadius = std::max<coord_t>(1, coord_t(0.09 * scale));
+    const std::string inputSegmentColor       = "lightseagreen";
+    const coord_t     inputSegmentLineWidth   = coord_t(0.03 * scale);
 
-    const std::string   voronoiPointColor           = "black";
-    const std::string   voronoiPointColorOutside    = "red";
-    const std::string   voronoiPointColorInside     = "blue";
-    const coord_t       voronoiPointRadius          = std::max<coord_t>(1, coord_t(0.06 * scale));
-    const std::string   voronoiLineColorPrimary     = "black";
-    const std::string   voronoiLineColorSecondary   = "green";
-    const std::string   voronoiArcColor             = "red";
-    const coord_t       voronoiLineWidth            = coord_t(0.02 * scale);
+    const std::string voronoiPointColor         = "black";
+    const std::string voronoiPointColorOutside  = "red";
+    const std::string voronoiPointColorInside   = "blue";
+    const coord_t     voronoiPointRadius        = std::max<coord_t>(1, coord_t(0.06 * scale));
+    const std::string voronoiLineColorPrimary   = "black";
+    const std::string voronoiLineColorSecondary = "green";
+    const std::string voronoiArcColor           = "red";
+    const coord_t     voronoiLineWidth          = coord_t(0.02 * scale);
 
-    const std::string   offsetCurveColor            = "magenta";
-    const coord_t       offsetCurveLineWidth        = coord_t(0.02 * scale);
+    const std::string offsetCurveColor     = "magenta";
+    const coord_t     offsetCurveLineWidth = coord_t(0.02 * scale);
 
-    const std::string   helperLineColor             = "orange";
-    const coord_t       helperLineWidth             = coord_t(0.04 * scale);
+    const std::string helperLineColor = "orange";
+    const coord_t     helperLineWidth = coord_t(0.04 * scale);
 
-    const bool          primaryEdgesOnly            = false;
+    const bool primaryEdgesOnly = false;
 
     ::Slic3r::SVG svg(path, bbox);
 
@@ -358,10 +434,9 @@ static inline void dump_voronoi_to_svg(
 
     // Make a copy of the input segments with the double type.
     std::vector<Voronoi::Internal::segment_type> segments;
-    for (Lines::const_iterator it = lines.begin(); it != lines.end(); ++ it)
-        segments.push_back(Voronoi::Internal::segment_type(
-            Voronoi::Internal::point_type(double(it->a(0)), double(it->a(1))),
-            Voronoi::Internal::point_type(double(it->b(0)), double(it->b(1)))));
+    for (Lines::const_iterator it = lines.begin(); it != lines.end(); ++it)
+        segments.push_back(Voronoi::Internal::segment_type(Voronoi::Internal::point_type(double(it->a(0)), double(it->a(1))),
+                                                           Voronoi::Internal::point_type(double(it->b(0)), double(it->b(1)))));
 
     // Color exterior edges.
     if (internalEdgesOnly) {
@@ -377,20 +452,24 @@ static inline void dump_voronoi_to_svg(
     }
     // Draw the input polygon.
     for (Lines::const_iterator it = lines.begin(); it != lines.end(); ++it)
-        svg.draw(Line(Point(coord_t(it->a(0)), coord_t(it->a(1))), Point(coord_t(it->b(0)), coord_t(it->b(1)))), inputSegmentColor, inputSegmentLineWidth);
+        svg.draw(Line(Point(coord_t(it->a(0)), coord_t(it->a(1))), Point(coord_t(it->b(0)), coord_t(it->b(1)))), inputSegmentColor,
+                 inputSegmentLineWidth);
 
 #if 1
     // Draw voronoi vertices.
     for (boost::polygon::voronoi_diagram<double>::const_vertex_iterator it = vd.vertices().begin(); it != vd.vertices().end(); ++it)
-        if (! internalEdgesOnly || it->color() != Voronoi::Internal::EXTERNAL_COLOR) {
-            const std::string *color = nullptr;
+        if (!internalEdgesOnly || it->color() != Voronoi::Internal::EXTERNAL_COLOR) {
+            const std::string* color = nullptr;
             switch (Voronoi::vertex_category(*it)) {
-            case Voronoi::VertexCategory::OnContour:    color = &voronoiPointColor;         break;
-            case Voronoi::VertexCategory::Outside:      color = &voronoiPointColorOutside;  break;
-            case Voronoi::VertexCategory::Inside:       color = &voronoiPointColorInside;   break;
+            case Voronoi::VertexCategory::OnContour: color = &voronoiPointColor; break;
+            case Voronoi::VertexCategory::Outside: color = &voronoiPointColorOutside; break;
+            case Voronoi::VertexCategory::Inside: color = &voronoiPointColorInside; break;
             default: color = &voronoiPointColor; // assert(false);
             }
             Point pt(coord_t(it->x()), coord_t(it->y()));
+            // [INTENT] Guard against coord_t overflow: if the double coordinate
+            // has sign disagreement with its cast result, the cast wrapped around
+            // INT32_MAX — skip drawing this vertex.
             if (it->x() * pt.x() >= 0. && it->y() * pt.y() >= 0.)
                 // Conversion to coord_t is valid.
                 svg.draw(Point(coord_t(it->x()), coord_t(it->y())), *color, voronoiPointRadius);
@@ -402,10 +481,10 @@ static inline void dump_voronoi_to_svg(
         if (internalEdgesOnly && (it->color() == Voronoi::Internal::EXTERNAL_COLOR))
             continue;
         std::vector<Voronoi::Internal::point_type> samples;
-        std::string color = voronoiLineColorPrimary;
+        std::string                                color = voronoiLineColorPrimary;
         if (!it->is_finite()) {
             Voronoi::Internal::clip_infinite_edge(points, segments, *it, bbox_dim_max, &samples);
-            if (! it->is_primary())
+            if (!it->is_primary())
                 color = voronoiLineColorSecondary;
         } else {
             // Store both points of the segment into samples. sample_curved_edge will split the initial line
@@ -415,30 +494,31 @@ static inline void dump_voronoi_to_svg(
             if (it->is_curved()) {
                 Voronoi::Internal::sample_curved_edge(points, segments, *it, samples, discretization_step);
                 color = voronoiArcColor;
-            } else if (! it->is_primary())
+            } else if (!it->is_primary())
                 color = voronoiLineColorSecondary;
         }
-        for (std::size_t i = 0; i + 1 < samples.size(); ++ i) {
+        for (std::size_t i = 0; i + 1 < samples.size(); ++i) {
             Vec2d a(samples[i].x(), samples[i].y());
-            Vec2d b(samples[i+1].x(), samples[i+1].y());
+            Vec2d b(samples[i + 1].x(), samples[i + 1].y());
             // Convert to coord_t.
             Point ia = a.cast<coord_t>();
             Point ib = b.cast<coord_t>();
             // Is the conversion possible? Do the resulting points fit into int32_t?
-            auto  in_range = [](const Point &ip, const Vec2d &p) { return p.x() * ip.x() >= 0. && p.y() * ip.y() >= 0.; };
-            bool  a_in_range = in_range(ia, a);
-            bool  b_in_range = in_range(ib, b);
-            if (! a_in_range || ! b_in_range) {
-                if (! a_in_range && ! b_in_range)
+            // [INTENT] Sign-consistency check: if cast wrapped, the sign will flip.
+            auto in_range   = [](const Point& ip, const Vec2d& p) { return p.x() * ip.x() >= 0. && p.y() * ip.y() >= 0.; };
+            bool a_in_range = in_range(ia, a);
+            bool b_in_range = in_range(ib, b);
+            if (!a_in_range || !b_in_range) {
+                if (!a_in_range && !b_in_range)
                     // None fits, ignore.
                     continue;
                 // One fit, the other does not. Try to clip.
                 Vec2d v = b - a;
                 v.normalize();
                 v *= bbox.size().cast<double>().norm();
-                auto p = a_in_range ? Vec2d(a + v) : Vec2d(b - v);
+                auto  p  = a_in_range ? Vec2d(a + v) : Vec2d(b - v);
                 Point ip = p.cast<coord_t>();
-                if (! in_range(ip, p))
+                if (!in_range(ip, p))
                     continue;
                 (a_in_range ? ib : ia) = ip;
             }

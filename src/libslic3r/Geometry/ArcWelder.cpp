@@ -21,12 +21,16 @@
 // GNU Affero General Public License for more details.
 //
 //
-// You can contact the author at the following email address: 
+// You can contact the author at the following email address:
 // FormerLurker@pm.me
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// [INTENT] ArcWelder.cpp is intentionally empty: all logic lives in ArcWelder.hpp as templates.
+// This translation unit exists solely to hold the license attribution and provide a build target.
+// [COUPLING] If non-template helpers are ever added, they belong here.
 
 #include "ArcWelder.hpp"
 
 namespace Slic3r { namespace Geometry { namespace ArcWelder {
 
-} } } // namespace Slic3r::Geometry::ArcWelder
+}}} // namespace Slic3r::Geometry::ArcWelder

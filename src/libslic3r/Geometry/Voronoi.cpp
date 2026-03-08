@@ -1,3 +1,10 @@
+// [INTENT] VoronoiDiagram implementation: explicit template instantiations, VD construction with
+//   repair loop, deep-copy to local storage, and the three detect_known_issues helpers.
+// [COUPLING] Three segment iterator types are explicitly instantiated here (LinesIt,
+//   ColoredLinesConstIt, PolygonsSegmentIndexConstIt). Any new segment iterator type used
+//   with construct_voronoi must be added here or the linker will fail.
+// [CONCURRENCY] Each call is self-contained; multiple threads can each call construct_voronoi
+//   on their own VoronoiDiagram instance without contention.
 #include "Voronoi.hpp"
 
 #include <boost/log/trivial.hpp>
@@ -11,11 +18,18 @@
 
 namespace Slic3r::Geometry {
 
+// [INTENT] Type aliases for the three explicit instantiation contexts:
+//   - LinesIt: Arachne wall-toolpath callers pass Lines (integer-coord segments).
+//   - ColoredLinesConstIt: MultiMaterialSegmentation passes ColoredLines (lines with material tag).
+//   - PolygonsSegmentIndexConstIt: Arachne SkeletalTrapezoidation passes polygon segment indices.
 using PolygonsSegmentIndexConstIt = std::vector<Arachne::PolygonsSegmentIndex>::const_iterator;
 using LinesIt                     = Lines::iterator;
 using ColoredLinesConstIt         = ColoredLines::const_iterator;
 
-// Explicit template instantiation.
+// [INTENT] Explicit template instantiation forces the compiler to emit object code for these
+//   three specialisations in this TU only. Template body is NOT in the header — it's here.
+// [HAZARD] H586 (Low): If a new segment iterator type is needed, it must be added here; the
+//   linker error will be cryptic (undefined reference to a deeply nested template function).
 template void VoronoiDiagram::construct_voronoi(LinesIt, LinesIt, bool);
 template void VoronoiDiagram::construct_voronoi(ColoredLinesConstIt, ColoredLinesConstIt, bool);
 template void VoronoiDiagram::construct_voronoi(PolygonsSegmentIndexConstIt, PolygonsSegmentIndexConstIt, bool);
@@ -24,56 +38,34 @@ template<typename SegmentIterator>
 typename boost::polygon::enable_if<
     typename boost::polygon::gtl_if<typename boost::polygon::is_segment_concept<
         typename boost::polygon::geometry_concept<typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
-    void>::type
-VoronoiDiagram::construct_voronoi(const SegmentIterator segment_begin, const SegmentIterator segment_end, const bool try_to_repair_if_needed) {
-    boost::polygon::construct_voronoi(segment_begin, segment_end, &m_voronoi_diagram);
-    if (try_to_repair_if_needed) {
-        if (m_issue_type = detect_known_issues(*this, segment_begin, segment_end); m_issue_type != IssueType::NO_ISSUE_DETECTED) {
-            if (m_issue_type == IssueType::MISSING_VORONOI_VERTEX) {
-                BOOST_LOG_TRIVIAL(warning) << "Detected missing Voronoi vertex, input polygons will be rotated back and forth.";
-            } else if (m_issue_type == IssueType::NON_PLANAR_VORONOI_DIAGRAM) {
-                BOOST_LOG_TRIVIAL(warning) << "Detected non-planar Voronoi diagram, input polygons will be rotated back and forth.";
-            } else if (m_issue_type == IssueType::VORONOI_EDGE_INTERSECTING_INPUT_SEGMENT) {
-                BOOST_LOG_TRIVIAL(warning) << "Detected Voronoi edge intersecting input segment, input polygons will be rotated back and forth.";
-            } else if (m_issue_type == IssueType::FINITE_EDGE_WITH_NON_FINITE_VERTEX) {
-                BOOST_LOG_TRIVIAL(warning) << "Detected finite Voronoi vertex with non finite vertex, input polygons will be rotated back and forth.";
-            } else if (m_issue_type == IssueType::PARABOLIC_VORONOI_EDGE_WITHOUT_FOCUS_POINT) {
-                BOOST_LOG_TRIVIAL(warning) << "Detected parabolic Voronoi edges without focus point, input polygons will be rotated back and forth.";
-            } else {
-                BOOST_LOG_TRIVIAL(error) << "Detected unknown Voronoi diagram issue, input polygons will be rotated back and forth.";
-            }
-
-            if (m_issue_type = try_to_repair_degenerated_voronoi_diagram(segment_begin, segment_end); m_issue_type != IssueType::NO_ISSUE_DETECTED) {
-                if (m_issue_type == IssueType::MISSING_VORONOI_VERTEX) {
-                    BOOST_LOG_TRIVIAL(error) << "Detected missing Voronoi vertex even after the rotation of input.";
-                } else if (m_issue_type == IssueType::NON_PLANAR_VORONOI_DIAGRAM) {
-                    BOOST_LOG_TRIVIAL(error) << "Detected non-planar Voronoi diagram even after the rotation of input.";
-                } else if (m_issue_type == IssueType::VORONOI_EDGE_INTERSECTING_INPUT_SEGMENT) {
-                    BOOST_LOG_TRIVIAL(error) << "Detected Voronoi edge intersecting input segment even after the rotation of input.";
-                } else if (m_issue_type == IssueType::FINITE_EDGE_WITH_NON_FINITE_VERTEX) {
-                    BOOST_LOG_TRIVIAL(error) << "Detected finite Voronoi vertex with non finite vertex even after the rotation of input.";
-                } else if (m_issue_type == IssueType::PARABOLIC_VORONOI_EDGE_WITHOUT_FOCUS_POINT) {
-                    BOOST_LOG_TRIVIAL(error) << "Detected parabolic Voronoi edges without focus point even after the rotation of input.";
-                } else {
-                    BOOST_LOG_TRIVIAL(error) << "Detected unknown Voronoi diagram issue even after the rotation of input.";
-                }
-
-                m_state = State::REPAIR_UNSUCCESSFUL;
-            } else {
-                m_state = State::REPAIR_SUCCESSFUL;
-            }
-        } else {
-            m_state      = State::REPAIR_NOT_NEEDED;
-            m_issue_type = IssueType::NO_ISSUE_DETECTED;
-        }
-    } else {
-        m_state      = State::UNKNOWN;
-        m_issue_type = IssueType::UNKNOWN;
+    VoronoiDiagram::IssueType>::type
+VoronoiDiagram::detect_known_issues(const VoronoiDiagram& voronoi_diagram,
+                                    const SegmentIterator segment_begin,
+                                    const SegmentIterator segment_end)
+{
+    // [INTENT] Public static validity check. Runs three sub-checks in priority order:
+    //   1. Edge scan (O(E)): finite edges with nullptr/infinite vertices, parabolic edges without focus.
+    //   2. Cell scan (O(C*E)): missing VD vertex at segment endpoint, VD edge crossing input segment.
+    //   3. CGAL planarity angle check (O(E log E)): detects non-planar VD via angular ordering.
+    // [COUPLING] Calls VoronoiUtilsCgal::is_voronoi_diagram_planar_angle — CGAL dependency here.
+    if (const IssueType edge_issue_type = detect_known_voronoi_edge_issues(voronoi_diagram);
+        edge_issue_type != IssueType::NO_ISSUE_DETECTED) {
+        return edge_issue_type;
+    } else if (const IssueType cell_issue_type = detect_known_voronoi_cell_issues(voronoi_diagram, segment_begin, segment_end);
+               cell_issue_type != IssueType::NO_ISSUE_DETECTED) {
+        return cell_issue_type;
+    } else if (!VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(voronoi_diagram, segment_begin, segment_end)) {
+        // Detection of non-planar Voronoi diagram detects at least GH issues #8474, #8514 and #8446.
+        return IssueType::NON_PLANAR_VORONOI_DIAGRAM;
     }
+
+    return IssueType::NO_ISSUE_DETECTED;
 }
 
 void VoronoiDiagram::clear()
 {
+    // [INTENT] Reset the diagram to empty state. If m_is_modified the local copies are cleared;
+    //   otherwise the Boost VD is cleared. Resets state/issue_type to UNKNOWN.
     if (m_is_modified) {
         m_vertices.clear();
         m_edges.clear();
@@ -87,21 +79,27 @@ void VoronoiDiagram::clear()
     m_issue_type = IssueType::UNKNOWN;
 }
 
-void VoronoiDiagram::copy_to_local(voronoi_diagram_type &voronoi_diagram) {
+void VoronoiDiagram::copy_to_local(voronoi_diagram_type& voronoi_diagram)
+{
+    // [INTENT] Deep-copy the Boost VD into local vectors so vertices can be mutated (rotated back)
+    //   without touching Boost's immutable internal containers.
+    // [MEMORY] After this call m_voronoi_diagram is cleared (memory released) and m_is_modified=true.
+    //   Peak memory usage is approximately 2x during the copy before the clear.
+    // [HAZARD] H585: pointer arithmetic `ptr - container.data()` assumes contiguous storage.
     m_edges.clear();
     m_cells.clear();
     m_vertices.clear();
 
     // Copy Voronoi edges.
     m_edges.reserve(voronoi_diagram.num_edges());
-    for (const edge_type &edge : voronoi_diagram.edges()) {
+    for (const edge_type& edge : voronoi_diagram.edges()) {
         m_edges.emplace_back(edge.is_linear(), edge.is_primary());
         m_edges.back().color(edge.color());
     }
 
     // Copy Voronoi cells.
     m_cells.reserve(voronoi_diagram.num_cells());
-    for (const cell_type &cell : voronoi_diagram.cells()) {
+    for (const cell_type& cell : voronoi_diagram.cells()) {
         m_cells.emplace_back(cell.source_index(), cell.source_category());
         m_cells.back().color(cell.color());
 
@@ -113,7 +111,7 @@ void VoronoiDiagram::copy_to_local(voronoi_diagram_type &voronoi_diagram) {
 
     // Copy Voronoi vertices.
     m_vertices.reserve(voronoi_diagram.num_vertices());
-    for (const vertex_type &vertex : voronoi_diagram.vertices()) {
+    for (const vertex_type& vertex : voronoi_diagram.vertices()) {
         m_vertices.emplace_back(vertex.x(), vertex.y());
         m_vertices.back().color(vertex.color());
 
@@ -124,9 +122,9 @@ void VoronoiDiagram::copy_to_local(voronoi_diagram_type &voronoi_diagram) {
     }
 
     // Assign all pointers for each Voronoi edge.
-    for (const edge_type &old_edge : voronoi_diagram.edges()) {
+    for (const edge_type& old_edge : voronoi_diagram.edges()) {
         size_t     edge_idx = &old_edge - voronoi_diagram.edges().data();
-        edge_type &new_edge = m_edges[edge_idx];
+        edge_type& new_edge = m_edges[edge_idx];
 
         if (old_edge.cell()) {
             size_t cell_idx = old_edge.cell() - voronoi_diagram.cells().data();
@@ -162,19 +160,63 @@ template<typename SegmentIterator>
 typename boost::polygon::enable_if<
     typename boost::polygon::gtl_if<typename boost::polygon::is_segment_concept<
         typename boost::polygon::geometry_concept<typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
-    VoronoiDiagram::IssueType>::type
-VoronoiDiagram::detect_known_issues(const VoronoiDiagram &voronoi_diagram, SegmentIterator segment_begin, SegmentIterator segment_end)
+    void>::type
+VoronoiDiagram::construct_voronoi(const SegmentIterator segment_begin, const SegmentIterator segment_end, const bool try_to_repair_if_needed)
 {
-    if (const IssueType edge_issue_type = detect_known_voronoi_edge_issues(voronoi_diagram); edge_issue_type != IssueType::NO_ISSUE_DETECTED) {
-        return edge_issue_type;
-    } else if (const IssueType cell_issue_type = detect_known_voronoi_cell_issues(voronoi_diagram, segment_begin, segment_end); cell_issue_type != IssueType::NO_ISSUE_DETECTED) {
-        return cell_issue_type;
-    } else if (!VoronoiUtilsCgal::is_voronoi_diagram_planar_angle(voronoi_diagram, segment_begin, segment_end)) {
-        // Detection of non-planar Voronoi diagram detects at least GH issues #8474, #8514 and #8446.
-        return IssueType::NON_PLANAR_VORONOI_DIAGRAM;
-    }
+    // [INTENT] Build the Boost VD, then detect known issues and attempt repair if requested.
+    // [STATE] After this call: m_state ∈ {REPAIR_NOT_NEEDED, REPAIR_SUCCESSFUL, REPAIR_UNSUCCESSFUL, UNKNOWN}.
+    //   m_issue_type holds the last issue found (NO_ISSUE_DETECTED on success).
+    boost::polygon::construct_voronoi(segment_begin, segment_end, &m_voronoi_diagram);
+    if (try_to_repair_if_needed) {
+        // [INTENT] Assignment-in-condition: detect first, store result in m_issue_type simultaneously.
+        if (m_issue_type = detect_known_issues(*this, segment_begin, segment_end); m_issue_type != IssueType::NO_ISSUE_DETECTED) {
+            if (m_issue_type == IssueType::MISSING_VORONOI_VERTEX) {
+                BOOST_LOG_TRIVIAL(warning) << "Detected missing Voronoi vertex, input polygons will be rotated back and forth.";
+            } else if (m_issue_type == IssueType::NON_PLANAR_VORONOI_DIAGRAM) {
+                BOOST_LOG_TRIVIAL(warning) << "Detected non-planar Voronoi diagram, input polygons will be rotated back and forth.";
+            } else if (m_issue_type == IssueType::VORONOI_EDGE_INTERSECTING_INPUT_SEGMENT) {
+                BOOST_LOG_TRIVIAL(warning)
+                    << "Detected Voronoi edge intersecting input segment, input polygons will be rotated back and forth.";
+            } else if (m_issue_type == IssueType::FINITE_EDGE_WITH_NON_FINITE_VERTEX) {
+                BOOST_LOG_TRIVIAL(warning)
+                    << "Detected finite Voronoi vertex with non finite vertex, input polygons will be rotated back and forth.";
+            } else if (m_issue_type == IssueType::PARABOLIC_VORONOI_EDGE_WITHOUT_FOCUS_POINT) {
+                BOOST_LOG_TRIVIAL(warning)
+                    << "Detected parabolic Voronoi edges without focus point, input polygons will be rotated back and forth.";
+            } else {
+                BOOST_LOG_TRIVIAL(error) << "Detected unknown Voronoi diagram issue, input polygons will be rotated back and forth.";
+            }
 
-    return IssueType::NO_ISSUE_DETECTED;
+            // [INTENT] Attempt repair by rotation (up to 4 angles). If any angle succeeds,
+            //   m_is_modified becomes true and accessors serve the local copies.
+            if (m_issue_type = try_to_repair_degenerated_voronoi_diagram(segment_begin, segment_end);
+                m_issue_type != IssueType::NO_ISSUE_DETECTED) {
+                if (m_issue_type == IssueType::MISSING_VORONOI_VERTEX) {
+                    BOOST_LOG_TRIVIAL(error) << "Detected missing Voronoi vertex even after the rotation of input.";
+                } else if (m_issue_type == IssueType::NON_PLANAR_VORONOI_DIAGRAM) {
+                    BOOST_LOG_TRIVIAL(error) << "Detected non-planar Voronoi diagram even after the rotation of input.";
+                } else if (m_issue_type == IssueType::VORONOI_EDGE_INTERSECTING_INPUT_SEGMENT) {
+                    BOOST_LOG_TRIVIAL(error) << "Detected Voronoi edge intersecting input segment even after the rotation of input.";
+                } else if (m_issue_type == IssueType::FINITE_EDGE_WITH_NON_FINITE_VERTEX) {
+                    BOOST_LOG_TRIVIAL(error) << "Detected finite Voronoi vertex with non finite vertex even after the rotation of input.";
+                } else if (m_issue_type == IssueType::PARABOLIC_VORONOI_EDGE_WITHOUT_FOCUS_POINT) {
+                    BOOST_LOG_TRIVIAL(error) << "Detected parabolic Voronoi edges without focus point even after the rotation of input.";
+                } else {
+                    BOOST_LOG_TRIVIAL(error) << "Detected unknown Voronoi diagram issue even after the rotation of input.";
+                }
+
+                m_state = State::REPAIR_UNSUCCESSFUL;
+            } else {
+                m_state = State::REPAIR_SUCCESSFUL;
+            }
+        } else {
+            m_state      = State::REPAIR_NOT_NEEDED;
+            m_issue_type = IssueType::NO_ISSUE_DETECTED;
+        }
+    } else {
+        m_state      = State::UNKNOWN;
+        m_issue_type = IssueType::UNKNOWN;
+    }
 }
 
 template<typename SegmentIterator>
@@ -182,10 +224,14 @@ typename boost::polygon::enable_if<
     typename boost::polygon::gtl_if<typename boost::polygon::is_segment_concept<
         typename boost::polygon::geometry_concept<typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
     VoronoiDiagram::IssueType>::type
-VoronoiDiagram::detect_known_voronoi_cell_issues(const VoronoiDiagram &voronoi_diagram,
+VoronoiDiagram::detect_known_voronoi_cell_issues(const VoronoiDiagram& voronoi_diagram,
                                                  const SegmentIterator segment_begin,
                                                  const SegmentIterator segment_end)
 {
+    // [INTENT] Scans all segment-source cells for two issues:
+    //   A) Invalid cell range (missing VD vertex at segment endpoint → GH #8846).
+    //   B) VD vertex on the wrong side of the source segment (cross product < 0 → GH #8446, #8474, #8514).
+    // [COUPLING] Calls VoronoiUtils::compute_segment_cell_range and VoronoiUtils::get_source_segment.
     using Segment          = typename std::iterator_traits<SegmentIterator>::value_type;
     using Point            = typename boost::polygon::segment_point_type<Segment>::type;
     using SegmentCellRange = SegmentCellRange<Point>;
@@ -194,22 +240,26 @@ VoronoiDiagram::detect_known_voronoi_cell_issues(const VoronoiDiagram &voronoi_d
         if (cell.is_degenerate() || !cell.contains_segment())
             continue; // Skip degenerated cell that has no spoon. Also, skip a cell that doesn't contain a segment.
 
-        if (const SegmentCellRange cell_range = VoronoiUtils::compute_segment_cell_range(cell, segment_begin, segment_end); cell_range.is_valid()) {
+        if (const SegmentCellRange cell_range = VoronoiUtils::compute_segment_cell_range(cell, segment_begin, segment_end);
+            cell_range.is_valid()) {
             // Detection if Voronoi edge is intersecting input segment.
             // It detects this type of issue at least in GH issues #8446, #8474 and #8514.
 
-            const Segment &source_segment      = Geometry::VoronoiUtils::get_source_segment(cell, segment_begin, segment_end);
-            const Vec2d    source_segment_from = boost::polygon::segment_traits<Segment>::get(source_segment, boost::polygon::LOW).template cast<double>();
-            const Vec2d    source_segment_to   = boost::polygon::segment_traits<Segment>::get(source_segment, boost::polygon::HIGH).template cast<double>();
-            const Vec2d    source_segment_vec  = source_segment_to - source_segment_from;
+            const Segment& source_segment      = Geometry::VoronoiUtils::get_source_segment(cell, segment_begin, segment_end);
+            const Vec2d    source_segment_from = boost::polygon::segment_traits<Segment>::get(source_segment, boost::polygon::LOW)
+                                                  .template cast<double>();
+            const Vec2d source_segment_to = boost::polygon::segment_traits<Segment>::get(source_segment, boost::polygon::HIGH)
+                                                .template cast<double>();
+            const Vec2d source_segment_vec = source_segment_to - source_segment_from;
 
             // All Voronoi vertices must be on the left side of the source segment, otherwise the Voronoi diagram is invalid.
-            for (const VD::edge_type *edge = cell_range.edge_begin; edge != cell_range.edge_end; edge = edge->next()) {
+            for (const VD::edge_type* edge = cell_range.edge_begin; edge != cell_range.edge_end; edge = edge->next()) {
                 if (edge->is_infinite()) {
                     // When there is a missing Voronoi vertex, we may encounter an infinite Voronoi edge.
                     // This happens, for example, in GH issue #8846.
                     return IssueType::MISSING_VORONOI_VERTEX;
-                } else if (const Vec2d edge_v1(edge->vertex1()->x(), edge->vertex1()->y()); Slic3r::cross2(source_segment_vec, edge_v1 - source_segment_from) < 0) {
+                } else if (const Vec2d edge_v1(edge->vertex1()->x(), edge->vertex1()->y());
+                           Slic3r::cross2(source_segment_vec, edge_v1 - source_segment_from) < 0) {
                     return IssueType::VORONOI_EDGE_INTERSECTING_INPUT_SEGMENT;
                 }
             }
@@ -224,12 +274,17 @@ VoronoiDiagram::detect_known_voronoi_cell_issues(const VoronoiDiagram &voronoi_d
     return IssueType::NO_ISSUE_DETECTED;
 }
 
-VoronoiDiagram::IssueType VoronoiDiagram::detect_known_voronoi_edge_issues(const VoronoiDiagram &voronoi_diagram)
+VoronoiDiagram::IssueType VoronoiDiagram::detect_known_voronoi_edge_issues(const VoronoiDiagram& voronoi_diagram)
 {
-    for (const voronoi_diagram_type::edge_type &edge : voronoi_diagram.edges()) {
+    // [INTENT] Fast O(E) scan for two edge-level pathologies:
+    //   A) Finite edge with null or infinite vertex (should never happen in a valid VD).
+    //   B) Curved (parabolic) edge where neither adjacent cell has a point source — impossible
+    //      geometrically but occurs due to Boost VD precision bugs.
+    for (const voronoi_diagram_type::edge_type& edge : voronoi_diagram.edges()) {
         if (edge.is_finite()) {
             assert(edge.vertex0() != nullptr && edge.vertex1() != nullptr);
-            if (edge.vertex0() == nullptr || edge.vertex1() == nullptr || !VoronoiUtils::is_finite(*edge.vertex0()) || !VoronoiUtils::is_finite(*edge.vertex1()))
+            if (edge.vertex0() == nullptr || edge.vertex1() == nullptr || !VoronoiUtils::is_finite(*edge.vertex0()) ||
+                !VoronoiUtils::is_finite(*edge.vertex1()))
                 return IssueType::FINITE_EDGE_WITH_NON_FINITE_VERTEX;
 
             if (edge.is_curved() && !edge.cell()->contains_point() && !edge.twin()->cell()->contains_point())
@@ -247,6 +302,9 @@ typename boost::polygon::enable_if<
     VoronoiDiagram::IssueType>::type
 VoronoiDiagram::try_to_repair_degenerated_voronoi_diagram(const SegmentIterator segment_begin, const SegmentIterator segment_end)
 {
+    // [INTENT] Try repair angles in empirically chosen order {PI/6, PI/5, PI/7, PI/11}.
+    //   These are the irrational-ratio angles least likely to recreate the degenerate configuration.
+    //   Returns NO_ISSUE_DETECTED on first success; returns last failure IssueType if all fail.
     IssueType issue_type = m_issue_type;
 
     const std::vector<double> fix_angles = {PI / 6, PI / 5, PI / 7, PI / 11};
@@ -260,8 +318,12 @@ VoronoiDiagram::try_to_repair_degenerated_voronoi_diagram(const SegmentIterator 
     return issue_type;
 }
 
-inline VD::vertex_type::color_type encode_input_segment_endpoint(const VD::cell_type::source_index_type cell_source_index, const boost::polygon::direction_1d dir)
+inline VD::vertex_type::color_type encode_input_segment_endpoint(const VD::cell_type::source_index_type cell_source_index,
+                                                                 const boost::polygon::direction_1d     dir)
 {
+    // [INTENT] Pack segment index and LOW/HIGH endpoint direction into a single color integer.
+    //   Encoding: color = (source_index + 1) << 1 | direction_bit.
+    //   +1 offset ensures color != 0 so vertices can be distinguished from unmarked ones (color==0).
     return (cell_source_index + 1) << 1 | (dir.to_int() ? 1 : 0);
 }
 
@@ -270,8 +332,14 @@ inline typename boost::polygon::enable_if<
     typename boost::polygon::gtl_if<typename boost::polygon::is_segment_concept<
         typename boost::polygon::geometry_concept<typename std::iterator_traits<SegmentIterator>::value_type>::type>::type>::type,
     typename boost::polygon::segment_point_type<typename std::iterator_traits<SegmentIterator>::value_type>::type>::type
-decode_input_segment_endpoint(const VD::vertex_type::color_type color, const SegmentIterator segment_begin, const SegmentIterator segment_end)
+decode_input_segment_endpoint(const VD::vertex_type::color_type color,
+                              const SegmentIterator             segment_begin,
+                              const SegmentIterator             segment_end)
 {
+    // [INTENT] Inverse of encode_input_segment_endpoint: extract segment index and endpoint direction
+    //   from the packed color field, then return the original Point coordinate.
+    // [HAZARD] H587 (Low): color==0 is the "unmarked" sentinel. If called with color==0 the
+    //   segment_idx underflows to SIZE_MAX. Caller must guard (color != 0) before calling.
     using SegmentType = typename std::iterator_traits<SegmentIterator>::value_type;
     using PointType   = typename boost::polygon::segment_traits<SegmentType>::point_type;
 
@@ -291,6 +359,17 @@ VoronoiDiagram::try_to_repair_degenerated_voronoi_diagram_by_rotation(const Segm
                                                                       const SegmentIterator segment_end,
                                                                       const double          fix_angle)
 {
+    // [INTENT] Single-angle repair:
+    //   1. Rotate all input segments by fix_angle (floating-point rotation of integer-coord points).
+    //   2. Build fresh VD on rotated segments.
+    //   3. Deep-copy to local storage (copy_to_local), detect issues on rotated VD.
+    //   4. Mark endpoint-coincident vertices using encode color trick.
+    //   5. Rotate all other vertices back by -fix_angle.
+    //   6. Snap endpoint vertices to original integer coordinates (avoiding float drift).
+    //   7. Clear all color markings (algorithms expect color == 0 on all vertices after this).
+    // [HAZARD] FIXME @hejllukas: source point mapping is not implemented — only segment source
+    //   endpoints are snapped back; isolated point sources keep rotated coordinates.
+    // [HAZARD] H585: copy_to_local uses contiguous-pointer arithmetic.
     using SegmentType = typename std::iterator_traits<SegmentIterator>::value_type;
     using PointType   = typename boost::polygon::segment_traits<SegmentType>::point_type;
 
@@ -317,7 +396,9 @@ VoronoiDiagram::try_to_repair_degenerated_voronoi_diagram_by_rotation(const Segm
             continue;
 
         if (cell.contains_segment()) {
-            if (const SegmentCellRange cell_range = VoronoiUtils::compute_segment_cell_range(cell, segments_rotated.begin(), segments_rotated.end()); cell_range.is_valid()) {
+            if (const SegmentCellRange cell_range = VoronoiUtils::compute_segment_cell_range(cell, segments_rotated.begin(),
+                                                                                             segments_rotated.end());
+                cell_range.is_valid()) {
                 if (cell_range.edge_end->vertex1()->color() == 0) {
                     // Vertex 1 of edge_end points to the starting endpoint of the input segment (from() or line.a).
                     VD::vertex_type::color_type color = encode_input_segment_endpoint(cell.source_index(), boost::polygon::LOW);
@@ -340,7 +421,7 @@ VoronoiDiagram::try_to_repair_degenerated_voronoi_diagram_by_rotation(const Segm
 
     // Rotate all Voronoi vertices back.
     // When a Voronoi vertex can be mapped to the input segment endpoint, then we don't need to do rotation back.
-    for (vertex_type &vertex : m_vertices) {
+    for (vertex_type& vertex : m_vertices) {
         if (vertex.color() == 0) {
             // This vertex isn't mapped to any vertex, so we rotate it back.
             vertex = VoronoiUtils::make_rotated_vertex(vertex, -fix_angle);
@@ -355,7 +436,7 @@ VoronoiDiagram::try_to_repair_degenerated_voronoi_diagram_by_rotation(const Segm
     }
 
     // We have to clear all marked vertices because some algorithms expect that all vertices have a color equal to 0.
-    for (vertex_type &vertex : m_vertices)
+    for (vertex_type& vertex : m_vertices)
         vertex.color(0);
 
     return issue_type;

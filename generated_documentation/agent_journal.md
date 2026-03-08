@@ -2572,3 +2572,151 @@ H561–H570 (see 04_refactoring_hazards.md)
 11. `src/libslic3r/Geometry/Curves.hpp`
 
 **Next hazard number to assign: H571**
+
+---
+
+## Session 38 — Geometry/ Sub-Module Annotation (ArcWelder, Circle, ConvexHull, MedialAxis, Voronoi*, Bicubic, Curves)
+
+### Files Processed
+- `src/libslic3r/Geometry/ArcWelder.hpp` — full read + annotation pass
+- `src/libslic3r/Geometry/ArcWelder.cpp` — full read + annotation pass
+- `src/libslic3r/Geometry/Circle.hpp` — full read + annotation pass
+- `src/libslic3r/Geometry/Circle.cpp` — full read + annotation pass; H571–H576 assigned
+- `src/libslic3r/Geometry/ConvexHull.hpp` — full read + annotation pass
+- `src/libslic3r/Geometry/ConvexHull.cpp` — full read + annotation pass; H577–H579 assigned
+- `src/libslic3r/Geometry/MedialAxis.hpp` — full read + annotation pass
+- `src/libslic3r/Geometry/MedialAxis.cpp` — full read + annotation pass; H581–H582 assigned
+- `src/libslic3r/Geometry/Voronoi.hpp` — full read + annotation pass; H583–H584 assigned
+- `src/libslic3r/Geometry/Voronoi.cpp` — full read + annotation pass
+- `src/libslic3r/Geometry/VoronoiOffset.hpp` — full read + annotation pass
+- `src/libslic3r/Geometry/VoronoiOffset.cpp` — full read + annotation pass; H588–H591 assigned
+- `src/libslic3r/Geometry/VoronoiUtils.hpp` — full read + annotation pass
+- `src/libslic3r/Geometry/VoronoiUtils.cpp` — full read + annotation pass; H585–H587, H592–H593 assigned
+- `src/libslic3r/Geometry/VoronoiUtilsCgal.hpp` — full read + annotation pass
+- `src/libslic3r/Geometry/VoronoiUtilsCgal.cpp` — full read + annotation pass; H594 assigned
+- `src/libslic3r/Geometry/VoronoiVisualUtils.hpp` — full read + annotation pass; H580, H595 assigned
+- `src/libslic3r/Geometry/Bicubic.hpp` — full read + annotation pass; H596 assigned
+- `src/libslic3r/Geometry/Curves.hpp` — full read + annotation pass; H597–H598 assigned
+- `generated_documentation/04_refactoring_hazards.md` — appended H571–H598
+
+### Key Discoveries
+
+**ArcWelder.hpp / ArcWelder.cpp — Architecture**
+- `ArcWelder` converts linear G-code move sequences into arc (`G2`/`G3`) equivalents using a tolerance-driven fitting loop.
+- Core state machine: `PathSegmentProjected` accumulates candidate arc spans; span committed when the next point exceeds the fit tolerance or a direction reversal is detected.
+- Key parameters: `resolution` (mm, minimum arc chord), `tolerance` (mm, maximum deviation from ideal arc), `max_angle` (maximum arc sweep per segment).
+- The fitter runs a binary search over candidate endpoint indices to find the largest span that stays within tolerance — O(n log n) in practice.
+- `[CONCURRENCY]`: the welder is a single-object stateful pass; all callers are responsible for serialising access.
+
+**Circle.hpp / Circle.cpp — Architecture**
+- Provides: `circle_ransac()`, `circle_center_taubin_newton()`, `welzl()` (minimax enclosing circle), `ray_circle_intersections()`, `arc_center()`, `circle_center()`.
+- All three fitting algorithms coexist for different call sites: RANSAC for noisy point clouds, Taubin-Newton for smooth datasets, Welzl for hard geometric containment.
+- Coordinate representation: all internal calculations in `double` mm; results returned as `Circled` (center `Vec2d`, radius `double`).
+- H571: `ray_circle_intersections()` refers to non-existent `_r2_lv2_c2` suffix — latent linker error.
+- H572: RANSAC seed is deterministic on GCC Linux (random_device returns 0).
+
+**ConvexHull.hpp / ConvexHull.cpp — Architecture**
+- Wraps CGAL and Clipper convex hull APIs with OrcaSlicer polygon types.
+- `convex_hull(Points)` → Andrew's monotone chain; `convex_hull(Pointf3s)` → projects to XY silently (H578).
+- `decompose_convex_polygon_top_bottom()` splits a convex polygon into upper/lower chains for paired-segment algorithms.
+- H577: the function name `convex_hulll` contains a triple-l typo that is the only exported symbol.
+
+**MedialAxis.hpp / MedialAxis.cpp — Architecture**
+- `MedialAxis` class: wraps a Voronoi diagram to produce the skeleton (medial axis) of an `ExPolygon`.
+- Pipeline: (1) build Voronoi from scaled polygon outline + holes; (2) filter edges by distance-to-contour tolerance; (3) `validate_edge()` — merge near-collinear edges; (4) `build()` — walk graph, produce `ThickPolyline` output with variable thickness stored as paired doubles.
+- `ThickPolylines` output: each `ThickPolyline` carries per-point left/right half-widths for variable-width extrusion.
+- The `repair()` morphological closing step (H581) modifies polygon topology to fill gaps in the skeleton.
+
+**Voronoi.hpp / Voronoi.cpp — Architecture**
+- `VoronoiDiagram` wraps `boost::polygon::voronoi_diagram<double>` and adds a `State` enum and `IssueType` enum for validity bookkeeping.
+- `is_valid()` returns `true` for `State::UNKNOWN` (H583) — default before any validation run.
+- Validation helpers in `VoronoiUtils` / `VoronoiUtilsCgal` update the state; this file only stores it.
+
+**VoronoiOffset.hpp / VoronoiOffset.cpp — Architecture**
+- `VoronoiOffset::offset()` computes inward/outward polygon offsets using the Voronoi diagram of the polygon boundary.
+- Uses Voronoi cell ranges (`compute_segment_cell_range()`) to assign per-edge offset distances.
+- `annotate_inside_outside()` classifies VD edges as inside/outside the polygon using cross-product sign.
+- 4-argument convenience overload uses `const_cast` to mutate the VD's color fields (H588).
+- H589: open (non-closed) offset loops silently discarded.
+
+**VoronoiUtils.hpp / VoronoiUtils.cpp — Architecture**
+- Provides utility functions for Voronoi diagram processing: `to_point()`, `copy_to_local()`, `decode_input_segment_endpoint()`, `discretize_parabola()`, validity checks (`is_voronoi_diagram_planar_angle`, `is_voronoi_diagram_planar_intersection`).
+- `copy_to_local()` assumes contiguous vertex storage via pointer subtraction (H585).
+- H587: `decode_input_segment_endpoint()` with `color == 0` underflows to `SIZE_MAX` — latent OOB crash.
+- `discretize_parabola()`: falls back to straight-line approximation on degenerate parabola but callers do not check (H593).
+- Explicit template instantiations required for each new iterator type (H586).
+
+**VoronoiUtilsCgal.hpp / VoronoiUtilsCgal.cpp — Architecture**
+- CGAL-backed planarity checker for Voronoi diagrams.
+- `is_voronoi_diagram_planar_intersection()`: segment sweep-line using CGAL's `do_curves_intersect` — parabolic edges excluded (H594).
+- `is_voronoi_diagram_planar_angle()`: angle-based planarity test; template instantiations in the .cpp.
+
+**VoronoiVisualUtils.hpp — Architecture**
+- Contains an embedded `boost::polygon::voronoi_visual_utils<CT>` specialisation for debug rendering.
+- `color_exterior()` is recursive — O(n) call depth, stack-overflow risk for large VDs (H595).
+- H580: potential ODR violation if the vendored Boost version ships an identical template.
+
+**Bicubic.hpp — Architecture**
+- Template header implementing bicubic surface interpolation.
+- `BicubicCoefficients::interpolate()`: evaluates a 4×4 control-point bicubic patch.
+- `BicubicInternal::clamp()` duplicates `std::clamp` (H596).
+
+**Curves.hpp — Architecture**
+- Template header: `fit_curve()` (weighted polynomial curve fitting via Eigen QR) and `fit_polynomial()`.
+- Uses Eigen `fullPivHouseholderQr()` — O(n²m); no size guard (H597).
+- H598: `assert(weights[index] > 0)` — debug-only; in release, zero weights collapse rows silently and negative weights corrupt the QR solve with NaN output.
+
+### Key Hazards Assigned
+| ID | Description | Severity |
+|----|-------------|----------|
+| H571 | `ray_circle_intersections()` non-existent `_r2_lv2_c2` suffix — latent linker error | High |
+| H572 | RANSAC `std::mt19937` deterministic on GCC Linux (random_device = 0) | Medium |
+| H573 | `arc_center()` wrong result for antipodal endpoints | Low |
+| H574 | `circle_center()` silently returns midpoint for collinear 3-point input | Low |
+| H575 | `welzl()` O(n!) worst-case without randomised permutation | Low |
+| H576 | `circle_center_taubin_newton()` returns NaN on non-convergence; callers don't check | Low |
+| H577 | `convex_hulll` triple-l typo — only exported name | Low |
+| H578 | `convex_hull(Pointf3s)` silently ignores Z | Low |
+| H579 | `decompose_convex_polygon_top_bottom()` returns empty chains on degenerate input | Low |
+| H580 | `VoronoiVisualUtils.hpp` embedded Boost template — potential ODR violation | Medium |
+| H581 | `MedialAxis::repair()` morphological closing changes polygon topology | Medium |
+| H582 | `validate_edge()` hardcodes PI/8 collinear threshold with no calibration | Low |
+| H583 | `VoronoiDiagram::is_valid()` returns true for UNKNOWN state | Medium |
+| H584 | `IssueType::UNKNOWN` overloads "not yet checked" and "unknown error" | Low |
+| H585 | `copy_to_local()` assumes contiguous VD vertex storage via pointer subtraction | Low |
+| H586 | Explicit template instantiation list — new iterator type requires manual addition | Low |
+| H587 | `decode_input_segment_endpoint()` color==0 underflows to SIZE_MAX → OOB read | High |
+| H588 | `offset()` 4-arg overload uses `const_cast` to mutate const VD | Medium |
+| H589 | Open offset loops silently discarded | Low |
+| H590 | `annotate_inside_outside()` assert side==0 — release silently misclassifies boundary | Low |
+| H591 | `compute_segment_cell_range()` infinite-edge `continue` fragile to restructuring | Low |
+| H592 | `to_point()` `llround` overflow for large VD coordinates | Low |
+| H593 | `discretize_parabola()` degraded output warning not checked by callers | Low |
+| H594 | `is_voronoi_diagram_planar_intersection()` excludes parabolic edges | Low |
+| H595 | `color_exterior()` recursive — O(n) stack depth, overflow risk | Medium |
+| H596 | `BicubicInternal::clamp()` duplicates `std::clamp` | Low |
+| H597 | `fit_curve()` O(n²m) Eigen solve — no size guard | Low |
+| H598 | `fit_curve()` assert weights > 0 — debug-only; release NaN corruption | Low |
+
+### Architecture Notes
+- The `Geometry/` sub-module is a heterogeneous collection of self-contained geometry algorithms sharing only the coordinate type (`Point`, `coord_t`, `Vec2d`).
+- All Voronoi-based algorithms (`MedialAxis`, `VoronoiOffset`, `MultiMaterialSegmentation`) share the same coordinate-scaling hazard at the `to_point()` / `from_point()` boundary — any port must handle the `double` VD ↔ `coord_t` conversion consistently.
+- The ArcWelder is a pure post-processing pass; it has no semantic knowledge of the toolpath content, only geometry. A port can treat it as a black-box algorithm operating on `(x, y)` sequences.
+- The Bicubic and Curves headers are used for bed-leveling mesh interpolation and pressure-advance calibration curve fitting, respectively — both are isolated from the main slicing pipeline.
+
+### Hazards Assigned
+H571–H598 (see 04_refactoring_hazards.md)
+
+### Next Annotation Targets (Session 39+)
+
+**Remaining `src/libslic3r/` top-level files not yet annotated (priority order):**
+1. `src/libslic3r/Algorithm/` — sub-directory (point-inside-polygon, connected-components, etc.)
+2. `src/libslic3r/AABBMesh.hpp/.cpp`
+3. `src/libslic3r/Brim.cpp`
+4. `src/libslic3r/ExPolygon.cpp/.hpp` (core polygon type)
+5. `src/libslic3r/Polygon.cpp/.hpp` / `Polyline.cpp/.hpp`
+6. `src/libslic3r/Line.cpp/.hpp` / `Point.cpp/.hpp`
+7. `src/libslic3r/Extruder.cpp/.hpp`
+8. `src/libslic3r/PrintConfig.cpp/.hpp`
+
+**Next hazard number to assign: H599**
