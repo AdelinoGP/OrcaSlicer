@@ -3316,3 +3316,101 @@ Brim.cpp is substantially extended from the PrusaSlicer baseline:
 **Commit:** `annotate: Brim.cpp/.hpp (H749-H760)`
 
 **Next hazard number to assign: H761**
+
+---
+
+## Session 47 — ArcFitter.cpp + ArcFitter.hpp
+
+### Files Processed
+- `src/libslic3r/ArcFitter.cpp` (full, 220 lines)
+- `src/libslic3r/ArcFitter.hpp` (full)
+- `src/libslic3r/Circle.hpp` (read for ArcSegment context; not annotated)
+
+### Key Discoveries
+
+**Greedy sliding-window arc fitting algorithm**
+`do_arc_fitting()` uses a greedy sliding-window approach: a front cursor advances as long as all points in `[front_index, i]` lie within `tolerance` of a single circle (tested by `try_create_arc()`). When the circle test fails, the last successful arc is committed and the window resets. Adjacent runs of 2 points that could not form an arc become `Linear_move` entries, merged by extending `end_point_index` rather than appending new entries. This is O(n) amortised.
+
+**In-place mutation of points vector (H761)**
+`do_arc_fitting_and_simplify()` takes `points` by non-const reference and modifies the vector in place — points that were merged into arcs are removed, compacting the array. This is the core hazard: any caller that holds references, iterators, or index offsets into `points` before the call will have dangling/stale state after it returns.
+
+**Prefix-sum index remapping (H762)**
+After arc fitting, indices in `PathFittingData` entries refer to the *original* point array. After compaction the mapping from original indices to new positions is computed via a prefix-sum over a `reduce_count` array. This requires segments to be strictly ascending and non-overlapping in index space. Any future change to the arc-fitting window strategy that produces overlapping index ranges would silently corrupt remapping.
+
+**Size < 3 edge case (H763)**
+`do_arc_fitting()` guards `points.size() < 3` with an early return that emits a single `Linear_move` spanning `[0, size-1]`. For `size == 0`, `points[size-1]` is `points[-1]` — undefined behaviour in release builds. Callers must guarantee `size >= 1`.
+
+**ArcSegment reverse direction hazard**
+`ArcSegment::reverse()` mutates `arc_data.direction` — no comment warns callers that reversing the segment also requires reversing the associated index range in `PathFittingData`. The `.hpp` annotation flags this with `[HAZARD]`.
+
+### Hazards Identified (H761–H763)
+
+| ID | Summary | Severity |
+|----|---------|----------|
+| H761 | `do_arc_fitting_and_simplify` mutates caller's `points` vector in-place | High |
+| H762 | Prefix-sum index remapping assumes non-overlapping ascending segments | High |
+| H763 | `do_arc_fitting` size<3 guard: size==0 → UB accessing `points[-1]` | Medium |
+
+**Commit:** `annotate: ArcFitter.cpp/.hpp (H761-H763)`
+
+**Next hazard number to assign: H764**
+
+---
+
+## Session 48 — ElephantFootCompensation.cpp/.hpp + PrintConfig.cpp (partial)
+
+### Files Processed
+- `src/libslic3r/ElephantFootCompensation.cpp` (full, 817 lines)
+- `src/libslic3r/ElephantFootCompensation.hpp` (full)
+- `src/libslic3r/PrintConfig.cpp` (lines 1–80 annotated; lines 81–10836 remain)
+
+### Key Discoveries
+
+**ElephantFootCompensation 6-step pipeline**
+The active code path (`elephant_foot_compensation()`) follows six steps:
+1. **Simplify** — Douglas-Peucker simplification of the first-layer outline
+2. **Resample** — uniform resampling at 0.5 mm spacing (`resample_by_length()`)
+3. **contour_distance2** — nearest-point EdgeGrid lookup to compute per-sample wall thickness
+4. **Delta conversion** — converts thickness to per-sample shrink delta
+5. **Banded Laplacian smooth** — smooths the delta field over a neighbourhood of width `band`
+6. **variable_offset_inner_ex** — applies per-sample variable-width inward offset to produce final ExPolygon
+
+**Legacy contour_distance() vs active contour_distance2()**
+`contour_distance()` uses a fan of 29 SDF rays from each contour point — correct but slow. `contour_distance2()` replaces it with a cheaper EdgeGrid nearest-point query that also avoids false positives at concavities. The old function is kept for reference comparison; both carry the ≤2-point silent empty-output edge case (H765, H767).
+
+**Negative compensation expands outline (H764)**
+The public API accepts `compensation` as a plain `double`. Positive values shrink (intended). Negative values silently expand — no clamping or assertion in the public-facing header.
+
+**Magic constant 0.48 in fan angle (H766)**
+`contour_distance()` computes the fan half-angle from the cross product of adjacent edge directions using `0.48` — empirically tuned, not documented in any external reference.
+
+**band parameter in scaled units (H768)**
+The Laplacian smooth `band` parameter is in `coord_t` scaled units (×1e6 mm). The `compensation` value is internally scaled, but `band` is derived from a separately scaled expression. A port in unscaled mm must explicitly convert.
+
+**variable_offset_inner_ex fallback (H769)**
+If the final offset step returns ≠1 ExPolygon, `elephant_foot_compensation()` silently returns the original unmodified input. No log in production; only a debug SVG when `TESTS_EXPORT_SVGS` is defined.
+
+**PrintConfig.cpp structure (partial annotation)**
+- File-level block comment injected (lines 1–30) ✅
+- Anonymous namespace helpers `SplitStringAndRemoveDuplicateElement` and `ReplaceString` annotated (lines 49–80) ✅
+- Enum map tables, utility functions, `init_*` bodies, and end utilities remain unannotated
+
+**Key insight for PrintConfig.cpp: L() vs _()**
+`L(s)` is an extraction marker only (evaluates to `s` at runtime — it is NOT a translator). `_(s)` is the runtime i18n translator. Confusing them would silently skip translation or produce build errors. This distinction must be preserved in any port (H771).
+
+### Hazards Identified (H764–H769)
+
+| ID | Summary | Severity |
+|----|---------|----------|
+| H764 | Negative `compensation` silently expands outline instead of shrinking | Medium |
+| H765 | `contour_distance()` returns empty for ≤2-point contours (legacy, but same in active path) | Low |
+| H766 | Fan angle magic constant 0.48 — empirically tuned, undocumented | Low |
+| H767 | `contour_distance2()` returns empty for ≤2-point contours — active code path | Medium |
+| H768 | `band` parameter must be in scaled coord_t units; passing mm gives 1e6× wrong neighbourhood | High |
+| H769 | `variable_offset_inner_ex` ≠1 result → silent fallback to original input in production | Medium |
+
+**Note:** H770 and H771 will be assigned during PrintConfig.cpp full annotation.
+
+**Commit:** `annotate: ArcFitter, ElephantFootCompensation, PrintConfig partial (Session 48)`
+
+**Next hazard number to assign: H772**
