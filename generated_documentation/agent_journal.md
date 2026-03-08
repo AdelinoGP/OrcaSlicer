@@ -3107,3 +3107,43 @@ H599–H634 (see `04_refactoring_hazards.md`)
 | H707 | Cereal unknown ordinal: assert DEBUG-only; release UB | High |
 
 **Next hazard number to assign: H708**
+
+---
+
+## Session 43 — AABBTreeIndirect.hpp and AABBTreeLines.hpp
+
+### Files Annotated
+- `src/libslic3r/AABBTreeIndirect.hpp` — 1,080 lines after annotation (fully annotated)
+- `src/libslic3r/AABBTreeLines.hpp` — 415 lines after annotation (fully annotated)
+
+### Key Insights
+
+**AABBTreeIndirect.hpp** implements a static, balanced AABB tree stored as an implicit binary heap (children at 2*i+1, 2*i+2). The same `Tree<NDims, CoordType>` template covers 2D and 3D, float and double, lines and triangles. Four query modes are provided:
+1. **Closest-primitive** (`squared_distance_to_indexed_primitives_recursive`) — branch-and-bound with pruning; degrades to O(N) when query point is inside many nested bounding boxes (H715).
+2. **First-hit ray** (`intersect_ray_recursive_first_hit`) — unordered left/right traversal (H719), correct but not front-to-back optimal.
+3. **All-hits ray** (`intersect_ray_recursive_all_hits`) — exhaustive, sorts by t after traversal.
+4. **All-within-radius** (`indexed_primitives_within_distance_squared_recurisve`) — typo in function name (H720).
+
+The `traverse()` function with `Intersecting<Box>` / `Within<Box>` predicates provides a generic policy-based traversal interface for custom queries.
+
+**AABBTreeLines.hpp** builds on AABBTreeIndirect for 2D line-segment operations. `LinesDistancer<LineType>` is the user-facing API wrapping the tree. The most critical hazards are the dual-ray point-in-polygon test (H717) which can return 0 (indeterminate) for degenerate geometry, and the signed-distance computation (H718) which silently returns 0 when outside() is indeterminate.
+
+### Hazards Identified (H708–H720)
+
+| ID | Summary | Severity |
+|----|---------|----------|
+| H708 | Tree is static — no incremental update, stale queries after mutation | High |
+| H709 | `build()` / `build_modify_input()` consume/destroy the input vector | Medium |
+| H710 | `build_recursive()` requires pre-allocated node array; direct calls can OOB | Medium |
+| H711 | `BoundingBoxWrapper::centroid()` operator-precedence bug shifts centroid | Low |
+| H712 | `ray_box_intersect_invdir()` mutates local box copy — confusing but safe | Low |
+| H713 | SSE optimisation absent in ray-box test — known performance gap | Low |
+| H714 | `closest_point_to_triangle()` missing degenerate-edge guards for AC/BC | Medium |
+| H715 | Branch-and-bound degrades to O(N) when query point inside many nested boxes | Medium |
+| H716 | `build_aabb_tree_over_indexed_triangle_set()` eps defaults to 0 — ray misses | Medium |
+| H717 | `point_outside_closed_contours()` returns 0 (indeterminate) for degenerate geometry | High |
+| H718 | Signed-distance returns 0 when `outside()` is indeterminate (H717) | High |
+| H719 | First-hit ray traversal is unordered (left before right always) | Low |
+| H720 | Typo in function name `..._recurisve` propagates to all call sites | Low |
+
+**Next hazard number to assign: H721**
