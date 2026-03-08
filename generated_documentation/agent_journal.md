@@ -2507,3 +2507,68 @@ H548–H560 (see 04_refactoring_hazards.md)
 7. `src/libslic3r/Geometry/` directory
 
 **Next hazard number to assign: H561**
+
+---
+
+## Session 37 — MultiMaterialSegmentation.cpp Annotation
+
+### Files Processed
+- `src/libslic3r/MultiMaterialSegmentation.cpp` (2229 lines) — full read + annotation pass; H561–H570 assigned
+- `generated_documentation/04_refactoring_hazards.md` — appended H561–H570 entries
+- `generated_documentation/agent_journal.md` — added session 37 entry
+
+### Key Discoveries
+
+**MultiMaterialSegmentation.cpp — Architecture**
+- Two public entry points: `multi_material_segmentation_by_painting()` (N extruders, top/bottom enabled) and `fuzzy_skin_segmentation_by_painting()` (2 states, no top/bottom).
+- Both delegate to `segmentation_by_painting()` — the shared 7-phase pipeline:
+  1. Parallel slice preprocessing (union, remove small holes, simplify).
+  2. Serial EdgeGrid construction per layer.
+  3. Nested parallel triangle projection → `PaintedLine` records per layer (64-mutex scheme).
+  4. Parallel per-layer: post-process → colorize contours → build Voronoi graph → extract color segments.
+  5. Optional `cut_segmented_layers()` for max-width / interlocking depth constraints.
+  6. Optional `segmentation_top_and_bottom_layers()` for top/bottom shell propagation.
+  7. `merge_segmented_layers()` — combine sides + top/bottom into final per-extruder ExPolygon output.
+
+**MMU_Graph**
+- Directed arc graph: `BORDER` arcs from input polygon edges (one directed arc per edge); `NON_BORDER` arcs from Voronoi diagram (two directed arcs per VD edge).
+- `all_border_points` divides node index space: 0..all_border_points-1 = contour nodes; all_border_points.. = Voronoi interior nodes.
+- `vertex.color()` field is repurposed across three distinct phases — this is the most severe porting hazard in the file (H561).
+
+**Key Hazards**
+- **H561** (High, P1): `vertex.color()` phase-overloading — VD annotation enum values (1, 2) before construction, node indices after. Any reader without phase awareness misinterprets the value.
+- **H562** (High, P1): `extract_colored_segments()` repair path uses `-1` cast to `size_t` (→ SIZE_MAX) as a sentinel arc index. Safe today; fragile under refactoring.
+- **H563** (Low, P3): `PaintedLineVisitor` AND-logic distance pre-filter is over-conservative; real filter is the collinearity check.
+- **H564** (High, P1): `segmentation_top_and_bottom_layers()` interleave trick (`layer_idx_offset = (group_idx & 1) * num_layers`) is fragile if TBB changes blocking granularity.
+- **H565** (High, P1): `layer_color_stat()` lambda hardcodes `nozzle_diameter.get_at(0)` for all colors — wrong for multi-extruder setups with different nozzle diameters.
+- **H566** (Low, P3): `append_edge()` O(degree) deduplication — no upper bound asserted.
+- **H567** (Medium, P2): `build_graph()` pointer-arithmetic indexing of `force_edge_adding[]` — empty polygon entries corrupt graph indices.
+- **H568** (High, P1): `merge_segmented_layers()` inverted index layouts: `top_and_bottom_layers[extruder][layer]` vs `segmented_regions_merged[layer][extruder-1]`.
+- **H569** (Medium, P2): `static int iRun` in debug block — unprotected global; unsafe if segmentation ever parallelized across print objects.
+- **H570** (Low, P3): `fuzzy_skin_segmentation_by_painting()` uses uniform `layer_height` for all regions — imprecise for variable-layer-height prints.
+
+### Architecture Notes
+- The Voronoi + graph traversal approach is a complex but robust alternative to naive polygon clipping for segmenting multi-color contours. Any port must replicate the full `MMU_Graph` construction pipeline (7 phases) exactly.
+- The 64-mutex hash for `painted_lines` is an efficient low-contention pattern. In Go/Rust, a `sync.RWMutex` array or per-layer `Mutex<Vec<PaintedLine>>` would be the direct equivalent.
+- `extract_colored_segments()` leftmost-arc walk is equivalent to a planar graph face enumeration. In a port, this can be expressed as a standard planar graph traversal with `used_edges` tracking.
+- `merge_segmented_layers()` applies `offset2_ex()` (morphological open/close) to remove dimples — this requires a Clipper equivalent in any target language.
+
+### Hazards Assigned
+H561–H570 (see 04_refactoring_hazards.md)
+
+### Next Annotation Targets (Session 38+)
+
+**Immediately next:**
+1. `src/libslic3r/Geometry/ArcWelder.cpp/.hpp`
+2. `src/libslic3r/Geometry/Circle.cpp/.hpp`
+3. `src/libslic3r/Geometry/ConvexHull.cpp/.hpp`
+4. `src/libslic3r/Geometry/MedialAxis.cpp/.hpp`
+5. `src/libslic3r/Geometry/Voronoi.cpp/.hpp`
+6. `src/libslic3r/Geometry/VoronoiOffset.cpp/.hpp`
+7. `src/libslic3r/Geometry/VoronoiUtils.cpp/.hpp`
+8. `src/libslic3r/Geometry/VoronoiUtilsCgal.cpp/.hpp`
+9. `src/libslic3r/Geometry/VoronoiVisualUtils.hpp`
+10. `src/libslic3r/Geometry/Bicubic.hpp`
+11. `src/libslic3r/Geometry/Curves.hpp`
+
+**Next hazard number to assign: H571**
