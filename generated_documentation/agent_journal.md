@@ -1747,4 +1747,76 @@ Hazards 176–204 added to `04_refactoring_hazards.md`. Notable P0/P1 items:
 1. Update `04_refactoring_hazards.md` with H237–H247
 2. `src/libslic3r/Fill/FillBase.hpp` — base class, `FillParams` struct
 3. `src/libslic3r/Fill/FillAdaptive.cpp` — adaptive cubic infill
+
+---
+
+## Session 22 — Fill/FillAdaptive.cpp (adaptive cubic infill)
+
+### Files Processed
+- `src/libslic3r/Fill/FillBase.hpp` — ✅ committed `ed780e47b3` (annotated session start)
+- `src/libslic3r/Fill/FillAdaptive.cpp` — ✅ committed `8c2c401236` (full annotation this session)
+
+### Architecture Discoveries
+
+**Overall Pipeline (build_octree → _fill_surface_single)**
+
+Adaptive Cubic Infill is a two-phase algorithm:
+1. **Build phase** (once per PrintObject): `build_octree()` → `Octree::insert_triangle()` subdivides an octree over the mesh surface. Cells containing surface triangles are subdivided recursively. Uses `triangle_AABB_intersects()` (Ericson SAT test) per child cell. After construction, all `Cube::center` values are transformed to world space by `transform_center()`.
+2. **Slice phase** (per layer/ExPolygon): `_fill_surface_single()` creates 3 `FillContext` objects (one per direction 0°, +120°, -120°), calls `generate_infill_lines_recursive()` DDA-traversal on each, clips resulting lines to the ExPolygon via `intersection_pl()`, then connects T-joints via `connect_lines_using_hooks()`, and chains via `chain_or_connect_infill()`.
+
+**Octree Memory Model**
+- All `Cube` nodes are allocated from `boost::object_pool<Cube>` — no individual `new`/`delete`
+- `BOOST_POOL_NO_MT` disables pool mutex — pool is single-threaded only
+- Pool is destroyed atomically when the `Octree` is deleted via `OctreeDeleter`
+- `OctreePtr = std::unique_ptr<Octree, OctreeDeleter>` held by `PrintObject`
+- After `build_octree()` returns, the octree is immutable — multiple TBB fill tasks read it concurrently without any locking
+
+**FillContext and DDA traversal**
+- `FillContext::temp_lines` is a spanning array of size `(1 << depth) - 1` (full binary tree)
+- Indexed by binary tree address (`address*2+1` for left child, `+2` for right)
+- This allows O(1) line extension across adjacent octree cells without sorting
+- `child_traversal_order` ensures monotonic traversal per direction — essential for the O(1) merge trick
+- Gap threshold `> 1000` (not `SCALED_EPSILON = 100`) prevents spurious extensions across non-adjacent cells
+
+**connect_lines_using_hooks() — T-joint anchoring**
+- Builds a Boost.Geometry `bgi::rstar<16,4>` R*-tree with `float` coordinates (coord_t overflows `bgi::intersects`)
+- Three passes: (1) merge close collinear segments, (2) detect T-joints, (3) add hooks or bridge
+- `merged_with[]` is a union-find array for tracking polyline merges — iterative path-compression, no rank
+- `Intersection` struct carries raw pointers into `lines` (Polyline*) and `lines_src` (Line*) — these vectors must not reallocate during the hook loop
+- Boundary polygon segments are inserted into the rtree after infill lines to prevent hooks crossing the boundary
+
+**Orca-specific additions**
+- `make_cubes_properties()`: if only 1 level would be produced (low density), a second level is force-added to ensure octree subdivision actually occurs — fixes disconnected infill at low densities
+- `n_multiline`: reads `printing_region(0).config().fill_multiline` and scales line spacing; `_fill_surface_single()` skips hooks for multiline > 1
+- Dead `#if 0` block in `_fill_surface_single()` (old per-direction clipping approach) replaced by single `intersection_pl()` call on all directions combined
+
+**Coordinate system**
+- Octree is built in octree-rotated space (`transform_to_octree()`) so walls are axis-aligned
+- After construction, `transform_center()` rotates all `Cube::center` to world space
+- `octree_rot[3]` = {5π/4, 215.264°, π/6} — fixed Euler angles (ZYX) for the cube-on-corner orientation
+
+### Critical Hazards Found (H251–H263)
+
+| # | Description | Priority |
+|---|-------------|----------|
+| H251 | `BOOST_POOL_NO_MT` disables pool mutex — `boost::object_pool<Cube>` is NOT thread-safe for concurrent `construct()` calls. Safe now (single-threaded build), but any future parallelization of `insert_triangle()` would cause a data race with no compile-time warning | P2 |
+| H252 | `Intersection*` pointers stored in `intersections` vector point into `lines` (Polyline*) and `lines_src` (Line*). Neither `lines` nor `lines_src` may be resized/reallocated after these pointers are taken. The invariant is upheld by construction order but has no compile-time enforcement (no `const &` or freeze mechanism) | P1 |
+| H253 | `generate_infill_lines_recursive()`: gap threshold `> 1000` scaled units is a magic constant. Not `SCALED_EPSILON` (= 100); intentional but undocumented. A port that uses SCALED_EPSILON will produce incorrect line merging | P2 |
+| H254 | `adaptive_fill_line_spacing()`: averages density and extrusion width across all regions with adaptive fill. Multiple regions with wildly different settings produce a single octree cell size that may suit none of them. Architectural simplification from PrusaSlicer | P3 |
+| H255 | `adaptive_fill_line_spacing()`: reads `n_multiline` from `printing_region(0)` only — ignores per-region multiline settings. If regions have different multiline counts, the octree cell spacing will be wrong for all but region 0 | P2 |
+| H256 | `update_merged_polyline_idx()` is iterative path-compression union-find without rank balancing. O(depth) per call; for adversarial merge orders (e.g., always merging longer chain onto shorter), degrades to O(N) per lookup, O(N²) total for N merges | P3 |
+| H257 | `rtree_t` uses `float` coordinates. For slicer-scale coordinates (~10⁶ units), precision loss is ~0.1 units (~0.0001 mm). Hook endpoints computed from float rtree queries may be off by up to 0.1 scaled unit. Not user-visible but worth noting for a port using integer geometry | P3 |
+| H258 | `create_offset_line()` extends lines by factor 1.16 ≈ 1/cos(π/6). This hardcoded factor is specific to 60° infill intersection angles. If infill angles are changed (e.g., for square-cubic hybrid), the factor must be recomputed | P2 |
+| H259 | `is_overhang_triangle()`: threshold `n.dot(up) > 0.707 * n.norm()` uses `n.norm()` (square root per triangle). Could use `n.squaredNorm()` and `0.707² × n.squaredNorm()` to avoid sqrt at no loss of precision | P3 |
+| H260 | `build_octree()`: if `cubes_properties.size() <= 1` (make_cubes_properties Orca guard forces size >= 2, but before that guard was added), the `if (cubes_properties.size() > 1)` block is entirely skipped — no triangles are inserted, octree has only a root cube, and all layers get empty infill. The guard is the fix, but the root cause (line_spacing > mesh_size) can still occur for tiny meshes | P2 |
+| H261 | `Octree::insert_triangle()`: `--depth` occurs before the loop. If called with `depth == 0` (should never happen per `assert(depth > 0)`), `cubes_properties[depth-1]` = `cubes_properties[-1]` → UB. The assert protects only in debug builds | P1 |
+| H262 | `connect_lines_using_hooks()` `filter_itself` lambda: `(intersection.intersect_line - lines_src.data())` relies on pointer subtraction into `lines_src`. If `lines_src` is ever `std::deque` or similar non-contiguous container, this is UB. Currently `std::vector` so contiguous; must remain so | P2 |
+| H263 | Dead `#if 0` block in `connect_lines_using_hooks()` (self-intersection avoidance for bridge connections, lines ~1219–1225). Was disabled because trimming-after-connection was deemed sufficient. If re-enabled without the matching trim logic, bridges may self-intersect | P3 |
+
+### Next Annotation Targets (Session 23+)
+
+1. `src/libslic3r/Fill/FillAdaptive.hpp` (80 lines, quick)
+2. `src/libslic3r/Fill/FillLightning.cpp` (Lightning infill — Cura-derived)
+3. `src/libslic3r/Fill/FillConcentric.cpp`
+4. `src/libslic3r/Geometry/` directory
 4. `src/libslic3r/Fill/FillLightning.cpp` — lightning infill
