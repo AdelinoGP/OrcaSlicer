@@ -2283,3 +2283,91 @@ H440–H457 (see 04_refactoring_hazards.md)
 5. `src/libslic3r/Flow.cpp`
 
 **Next hazard number to assign: H458**
+
+---
+
+## Session 30 — Model.hpp
+
+### Files Processed
+- `src/libslic3r/Model.hpp` — fully annotated (H458–H478)
+
+### Key Discoveries
+
+**Five bounding-box caches (H464)** — `ModelObject` maintains five separate bbox caches (`m_bounding_box_approx`, `m_bounding_box_exact`, `m_raw_bounding_box`, `m_raw_mesh_bounding_box`, `m_min_max_z`), each with its own boolean validity flag. All five must be invalidated together via `invalidate_bounding_box()`. Missing calls silently return stale data. `translate()` (in Model.cpp) was later found to update only two of the five — a concrete instance of this hazard.
+
+**Static global mutable state without locks (H459)** — `Model::extruderParamsMap` and `Model::printSpeedMap` are static class members shared across all Model instances. They are written by the UI thread and read by background slicing threads with no mutex. This is an immediate data-race hazard for any threaded port.
+
+**origin_translation accumulation (H465)** — `center_around_origin()` accumulates `origin_translation` additively with no reset. Combined with `translate()` partially updating caches (H504 in Model.cpp), this creates a multi-hazard cluster affecting G-code coordinate correctness.
+
+**Undo/Redo filesystem I/O (H467, H472)** — BBS-specific additions cause `save_object_mesh()` (blocking filesystem write) to be called on every Undo/Redo operation that touches volume IDs or mesh data. This is absent from upstream PrusaSlicer and is a performance and reliability concern.
+
+**Non-serialized fields (H478)** — Large portions of `Model` state (`plates_custom_gcodes`, `design_info`, `backup_path`, `calib_pa_pattern`, etc.) are excluded from cereal archives. After undo/redo, these retain pre-undo values silently.
+
+### Hazards Assigned
+H458–H478 (see 04_refactoring_hazards.md)
+
+### Commits
+- `809174de66` — annotate Model.hpp (H458–H478)
+
+---
+
+## Sessions 31–32 — Model.cpp (Part 1 and Part 2)
+
+### Files Processed
+- `src/libslic3r/Model.cpp` — fully annotated (H479–H527), ~4200 lines
+
+### Key Discoveries
+
+**calib_pa_pattern double-copy bug (H481)** — `assign_copy(const Model&)` copies `calib_pa_pattern` twice in two sequential identical `if` blocks. The first `make_unique` allocation is discarded immediately. Dead allocation — result is correct but wastes one construction/destruction cycle.
+
+**Backup-system TOCTOU races (H487, H491, H493, H494)** — The BBS backup subsystem (`object_backup_id_map`, `get_backup_path()`, `get_object_backup_id()`) has multiple non-atomic read-modify-write sequences that race under concurrent access. `localtime()` is also not thread-safe (H493).
+
+**`get_object_backup_id` const-overload UB (H492)** — The const overload dereferences `find(...)` unconditionally. If the object has no backup ID entry, this dereferences `end()` — undefined behaviour with no assertion in Release builds.
+
+**translate() partial cache update (H504)** — `ModelObject::translate()` fast-path updates only `m_bounding_box_approx` and `m_bounding_box_exact`; `raw_bounding_box`, `m_min_max_z`, and `convex_hull_2d` caches are left stale. This is the concrete manifestation of the H464 cluster identified in Model.hpp.
+
+**center_around_origin() accumulation hazard (H502)** — Confirmed in implementation: `origin_translation += shift` with no reset guard. Calling `rotate()` (which calls `center_around_origin()`) multiple times in a loop compounds the drift.
+
+**const_cast shared_ptr mutation (H508, H515)** — `scale_mesh_after_creation()`, `scale_geometry_after_creation()`, and `center_geometry_after_creation()` all use `const_cast<TriangleMesh*>(m_mesh.get())->...` to mutate mesh data through a shared_ptr. The invariant "mesh not shared" is enforced only by convention — no runtime check.
+
+**FacetsAnnotation not re-indexed after mesh mutation (H510, H518)** — Both `bake_xy_rotation_into_meshes()` and `transform_this_mesh()` mutate mesh vertex/index data without re-indexing `FacetsAnnotation` triangle IDs. Painted face regions become silently invalid after these operations.
+
+**get_extruders() thread-unsafe mutable cache (H514)** — A `const` method that mutates `mmuseg_extruders` / `mmuseg_ts` (both `mutable`). Two threads calling this simultaneously race on the cache update.
+
+**CEREAL_REGISTER_TYPE disabled (H527)** — The entire `CEREAL_REGISTER_TYPE` block for the Model hierarchy is inside `#if 0`. Polymorphic cereal serialization of the Model hierarchy is non-functional. Any port that uses cereal polymorphism must re-enable this block.
+
+**setExtruderParams() double-insert (H519)** — For `i==0`, inserts at key `0` AND key `1`. For `i==1`, key `1` is overwritten by extruder-1 data. Key `0` thus always holds extruder-0 parameters regardless of extruder count. Undocumented `[UNCLEAR]` intent.
+
+**get_auto_brim_width() dead code (H523)** — Function body starts with `return 0.;` on line 1, making all subsequent thermal/adhesion logic permanently unreachable.
+
+**3MF FacetsAnnotation bitstream — no version tag (H524)** — The hex encoding format has no version field. Any change to the encoding silently corrupts all previously exported `.3mf` files with painted faces.
+
+### Hazards Assigned
+H479–H527 (see 04_refactoring_hazards.md)
+
+### Commits
+- `4fcb546a5b` — annotate Model.cpp complete (Model.cpp)
+
+---
+
+## Session 33 — Documentation Catch-Up
+
+### Files Processed
+- `generated_documentation/04_refactoring_hazards.md` — appended H458–H527 entries (Sessions 30–32)
+- `generated_documentation/agent_journal.md` — added sessions 30–33 entries
+
+### Key Discoveries
+- Documentation was lagging by ~70 hazard entries (H458–H527 annotated in code but not recorded in the hazard table)
+- The journal was missing three full sessions of findings
+- Both files now brought fully current before proceeding to Geometry.cpp
+
+### Next Annotation Targets (Session 34+)
+
+**Immediately next:**
+1. `src/libslic3r/Geometry.cpp` — HIGH priority, H528 onward
+2. `src/libslic3r/EdgeGrid.cpp` — MEDIUM priority
+3. `src/libslic3r/Flow.cpp` — MEDIUM priority
+4. `src/libslic3r/ShortestPath.cpp` — LOWER priority
+5. `src/libslic3r/MultiMaterialSegmentation.cpp` — LOWER priority
+
+**Next hazard number to assign: H528**
