@@ -1165,3 +1165,93 @@ This session completed the annotation pass on `GCodeProcessor.cpp` (6379 lines, 
 1. `src/libslic3r/GCode/AdaptivePAProcessor.cpp` + `AdaptivePAInterpolator.cpp` — adaptive pressure advance
 2. `src/libslic3r/Arachne/` directory — variable-width perimeters (WallToolPaths, etc.)
 3. `src/libslic3r/GCode/GCodeProcessor.hpp` — annotate header (structs, enums, member variables)
+
+---
+
+## Session 14 — AdaptivePAProcessor + AdaptivePAInterpolator (Adaptive Pressure Advance)
+
+**Files processed:**
+- `src/libslic3r/GCode/AdaptivePAProcessor.cpp` (~530 lines) — annotated
+- `src/libslic3r/GCode/AdaptivePAProcessor.hpp` (~120 lines) — annotated
+- `src/libslic3r/GCode/AdaptivePAInterpolator.cpp` (205 lines) — annotated
+- `src/libslic3r/GCode/AdaptivePAInterpolator.hpp` (54 lines) — annotated
+
+**Commit:** `c29745e78c` — annotate: AdaptivePAProcessor + AdaptivePAInterpolator full annotation pass (Session 14)
+
+**New hazards documented:** 111–125 (see 04_refactoring_hazards.md)
+
+### Module Summary — AdaptivePAInterpolator
+
+AdaptivePAInterpolator implements a 2D calibration model:
+`PA = f(flow_rate_mm3s, acceleration_mm_s2)`
+
+The model structure is a "2D grid" of 1D PCHIP interpolators:
+- Outer axis: acceleration values (from calibration CSV)
+- Inner axis per acceleration: flow_rate → PA value
+
+Evaluation uses a "slice-then-interpolate" strategy:
+1. For each stored acceleration, interpolate PA at the query flow_rate
+2. Build a 1D array of (acceleration → PA_at_flow)
+3. Run a second PCHIP over this array to get final PA
+
+**Key design note:** Both the flow axis and the accel axis use `PchipInterpolatorHelper` as the 1D interpolation primitive. The flow-axis helpers are pre-built at parse time; the accel-axis helper is rebuilt on EVERY `operator()` call.
+
+### Module Summary — AdaptivePAProcessor
+
+AdaptivePAProcessor wraps AdaptivePAInterpolator and provides the G-code post-processing entry point. It:
+- Parses incoming G-code lines to detect extrusion moves
+- Tracks current feedrate (`m_current_feedrate`, `m_next_feedrate`) and extrusion type
+- Estimates volumetric flow rate from E-delta and feedrate
+- Looks up PA from the calibration model
+- Injects `SET_PRESSURE_ADVANCE PA=<value>` (Klipper) or `M900 K<value>` (Marlin) G-code
+
+**Processing model:** Line-by-line regex matching against raw G-code string. The lookahead scan (`process_layer()`) scans forward in the stream to find the next non-zero feedrate, creating potential O(n²) behaviour for streams with many consecutive zero-feedrate commands.
+
+### Key Discoveries — Session 14
+
+1. **`accel_value` type truncation:** `m_current_acceleration` is `unsigned int` but is populated via `std::stod()` then cast. Any fractional acceleration (e.g., from a `M204 S500.5` command) is silently truncated. The PA model uses `double` internally, so the truncated integer is passed to the 2D interpolator which may produce a slightly wrong result at fractional-acceleration boundaries.
+
+2. **`m_next_feedrate` state reset on every outer loop iteration:** In `process_layer()`, `m_next_feedrate = 0.0` is reset at the start of each outer `for` loop iteration before the lookahead scan. This is correct for the "find next feedrate" pattern, but if a future refactor moves the reset or adds `continue` statements before it, the last valid feedrate will be carried forward, causing the PA model to use a stale feedrate for flow calculation.
+
+3. **CSV silent discard on any exception:** `parseAndSetData()` uses a blanket `catch(const std::exception&)` that sets `m_isInitialised = false` and returns `-1`, discarding ALL valid data parsed before the exception. A header row in the CSV (common in exported calibration files) will trigger `std::stod` to throw, silently invalidating the entire model.
+
+4. **Bridge extrusion PA override is a hard replacement:** When the parser detects a bridge extrusion move (from the `;TYPE:Bridge infill` G-code comment), the PA value is overridden with a hard-coded `0.0` (or a configured bridge PA value). This is a non-blending override — the smooth interpolated PA is discarded entirely. If the bridge PA configuration is missing, it defaults to `0.0`, which may or may not be correct for the material.
+
+5. **`operator()` rebuilds interpolator every call:** `AdaptivePAInterpolator::operator()` constructs a new `PchipInterpolatorHelper` for the acceleration axis on every call. For typical calibration data (2–5 acceleration values), the PCHIP initialization is O(N) — fast enough in practice. But in a high-throughput G-code stream (thousands of moves), this is a repeated allocation that could be eliminated by caching the acceleration-axis model keyed on flow_rate, or by redesigning the model as a true 2D surface.
+
+6. **Return value `-1.0` sentinel:** Both `AdaptivePAInterpolator::operator()` and `PchipInterpolatorHelper::interpolate()` return `-1.0` to signal failure. This is a C-style error sentinel in a `double`-returning function. A refactored implementation should use `std::optional<double>` to make failure explicit and type-safe.
+
+### Key Hazards — Session 14
+
+| # | Hazard | Severity |
+|---|--------|----------|
+| 111 | CSV silent discard on any parse exception | Critical |
+| 112 | CSV column order undocumented; wrong order poisons model silently | High |
+| 113 | `accel_value` unsigned int truncates fractional acceleration values | High |
+| 114 | `m_next_feedrate = 0` reset fragile; moved/skipped reset causes stale feedrate | Medium |
+| 115 | `operator()` reconstructs PchipInterpolatorHelper on every call | Medium |
+| 116 | Return value -1.0 sentinel for failure — not type-safe | Medium |
+| 117 | Bridge PA override is hard-replacement, not blend | Medium |
+| 118 | Partially-parsed CSV line (2/3 fields) contributes flowRate=0 or accel=0 entry | High |
+| 119 | Lookahead scan in process_layer() is O(n²) for zero-feedrate streams | Medium |
+| 120 | Single-acceleration model returns flow-interpolated PA directly (skips accel interp) | Low |
+| 121 | `m_isInitialised` has no mutex; concurrent read during reparse would race | Low |
+| 122 | PCHIP requires sorted inputs; acc_to_flow_pa map sorts by key but inner pairs unsorted | High |
+| 123 | `std::map<double>` keying on floating-point; equality-sensitive for calibration data | Medium |
+| 124 | `std::round(x * 1000.0) / 1000.0` rounding near x.0005 boundaries is non-deterministic | Low |
+| 125 | `accelerations_` vector is a redundant parallel structure to `flow_interpolators_` keys | Low |
+
+### Open Questions — Session 14
+
+1. `[UNCLEAR]` The PCHIP implementation in `PchipInterpolatorHelper` has not been annotated yet. The hazard at #122 assumes it requires sorted input — this needs verification. If `PchipInterpolatorHelper` sorts internally, hazard #122 is not a real issue.
+
+2. `[UNCLEAR]` `AdaptivePAProcessor` reads `PrintConfig::adaptive_pressure_advance_model` as a CSV string. It is not clear whether this string is validated upstream (e.g., in the UI layer) or whether arbitrary user input can reach `parseAndSetData()` directly.
+
+3. `[UNCLEAR]` The `SET_PRESSURE_ADVANCE` command injection happens at the G-code post-processing stage (after full G-code generation). This means the injected PA commands are invisible to GCodeProcessor's pressure-advance estimation — there may be a redundant PA command path when both static PA and adaptive PA are configured simultaneously.
+
+### Next Annotation Targets (Session 15+)
+
+1. `src/libslic3r/Arachne/WallToolPaths.cpp/.hpp` — Arachne variable-width perimeter entry point (~1023 lines total)
+2. `src/libslic3r/Arachne/SkeletalTrapezoidation.cpp/.hpp` — Voronoi-based medial axis + bead distribution (~2656 lines total, highest complexity)
+3. `src/libslic3r/Arachne/BeadingStrategy/` — 7 files, bead width distribution strategies (~612 lines total)
+4. `src/libslic3r/Arachne/SkeletalTrapezoidationGraph.cpp` — graph data structure for skeletal trapezoidation (~472 lines)

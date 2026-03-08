@@ -1709,3 +1709,18 @@ When `only_overhangs = true`, the fan delay is only active while `current_role =
 | 108 | `parse_number()` copies string_view; should use from_chars | FanMover.cpp | Low | P3 |
 | 109 | `rfind(pattern, 0)` idiom confusing; should be `starts_with` | FanMover.cpp | Low | P3 |
 | 110 | `only_overhangs` role detection relies on `;TYPE:` comment contract | FanMover.cpp | Medium | P2 |
+| 111 | CSV silent discard on any parse exception — no partial recovery | AdaptivePAInterpolator.cpp | Critical | P1 |
+| 112 | CSV column order (PA, flow, accel) undocumented; wrong order poisons model silently | AdaptivePAInterpolator.cpp | High | P1 |
+| 113 | `accel_value` is `unsigned int`; populated via `std::stod()` — silent truncation of fractional values | AdaptivePAProcessor.cpp | High | P1 |
+| 114 | `m_next_feedrate = 0` reset in outer loop is fragile; any added `continue` carries stale feedrate | AdaptivePAProcessor.cpp | Medium | P2 |
+| 115 | `operator()` reconstructs `PchipInterpolatorHelper` (accel axis) on every call — repeated allocation | AdaptivePAInterpolator.cpp | Medium | P2 |
+| 116 | Return value `-1.0` sentinel for failure — not type-safe; should be `std::optional<double>` | AdaptivePAInterpolator.cpp | Medium | P2 |
+| 117 | Bridge PA override is hard-replacement (`0.0`), not a blend with interpolated value | AdaptivePAProcessor.cpp | Medium | P2 |
+| 118 | Partially-parsed CSV line (1 or 2 of 3 fields read) contributes flowRate=0 or accel=0 entry | AdaptivePAInterpolator.cpp | High | P1 |
+| 119 | Lookahead scan in `process_layer()` is O(n²) for streams with many zero-feedrate lines | AdaptivePAProcessor.cpp | Medium | P2 |
+| 120 | Single-acceleration model skips accel interpolation and returns flow-only result — undocumented shortcut | AdaptivePAInterpolator.cpp | Low | P3 |
+| 121 | `m_isInitialised` has no mutex; concurrent read during reparse would data-race | AdaptivePAInterpolator.hpp | Low | P3 |
+| 122 | PCHIP requires sorted inputs; inner (flow_rate, PA) pairs per acceleration group are unsorted | AdaptivePAInterpolator.cpp | High | P1 |
+| 123 | `std::map<double>` keyed on floating-point acceleration — equality-sensitive; rounding in caller can miss bucket | AdaptivePAInterpolator.cpp | Medium | P2 |
+| 124 | `std::round(x * 1000.0) / 1000.0` rounding near x.0005 boundaries is non-deterministic in IEEE 754 | AdaptivePAInterpolator.cpp | Low | P3 |
+| 125 | `accelerations_` vector is a redundant parallel structure to `flow_interpolators_` keys — drift risk | AdaptivePAInterpolator.hpp | Low | P3 |
