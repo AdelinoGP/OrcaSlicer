@@ -2720,3 +2720,120 @@ H571–H598 (see 04_refactoring_hazards.md)
 8. `src/libslic3r/PrintConfig.cpp/.hpp`
 
 **Next hazard number to assign: H599**
+
+---
+
+## Session 39 — Core Primitive Types: Point, BoundingBox, Polygon, Polyline, ExPolygon
+
+### Files Annotated
+
+| File | Status |
+|------|--------|
+| `src/libslic3r/Point.hpp` | ✅ Fully annotated |
+| `src/libslic3r/Point.cpp` | ✅ Fully annotated |
+| `src/libslic3r/BoundingBox.hpp` | ✅ Fully annotated |
+| `src/libslic3r/BoundingBox.cpp` | ✅ Fully annotated |
+| `src/libslic3r/Polygon.hpp` | ✅ Fully annotated |
+| `src/libslic3r/Polygon.cpp` | ✅ Fully annotated |
+| `src/libslic3r/Polyline.hpp` | ✅ Fully annotated |
+| `src/libslic3r/Polyline.cpp` | ✅ Fully annotated |
+| `src/libslic3r/ExPolygon.hpp` | ✅ Fully annotated |
+| `src/libslic3r/ExPolygon.cpp` | ✅ Fully annotated |
+
+### Key Discoveries
+
+**Point / Coordinate System (Point.hpp, Point.cpp)**
+- `Point` extends `Vec2crd` (Eigen `Matrix<coord_t, 2, 1, DontAlign>`). All coordinates are scaled integers (× 1e6 from mm).
+- `Points` uses `tbb::scalable_allocator` — ABI incompatible with `std::allocator` (H601).
+- `ClosestPointInRadiusLookup`: grid-hash spatial index; searches only 4 cells (2×2 neighborhood) — approximate, not exhaustive in radius (H604).
+- `int128::orient()` / `int128::cross()` — exact orientation predicates using 128-bit integer arithmetic for robustness.
+- `scaled()`/`unscaled()` templates: `unscaled()` multiplies (not divides) because `SCALING_FACTOR` = 1e-6 (the reciprocal). Redefining as 1e6 silently inverts all conversions.
+- `Vec2crd ↔ Vec2d` implicit-cast paths exist; converting without `unscaled()`/`scaled()` silently drops the 1e6 factor (H605).
+- `rotate(cos_a, sin_a)` snaps via `round()`; repeated rotations accumulate rounding error (H608).
+
+**BoundingBox (BoundingBox.hpp, BoundingBox.cpp)**
+- Template `BoundingBoxBase<PointType>` — three concrete types: `BoundingBox` (scaled int), `BoundingBoxf` (float), `BoundingBoxf3` (3D double). The `defined` flag distinguishes "not yet constructed" from "empty".
+- `BoundingBox3Base` iterator constructor throws `InvalidArgument` on empty input; all other constructors silently return undefined bbox — asymmetric (H603).
+- `BoundingBoxf3::transformed()` transforms all 8 box corners — correct for non-axis-aligned transforms.
+- `BoundingBox3Base::polygon(is_scaled)`: `is_scaled=true` means coords ARE already scaled integers and output divides by SCALING_FACTOR — confusing semantics.
+
+**Polygon (Polygon.hpp, Polygon.cpp)**
+- Extends `MultiPoint`. Winding convention: `contour` = CCW, `holes` = CW (enforced by callers and `is_valid()`, NOT by class construction).
+- `area()` uses shoelace via `cross2`. Returns negative for CW polygons — callers must `abs()` for unsigned area (H600).
+- `is_counter_clockwise()` delegates to `ClipperLib::Orientation()` — crosses the `coord_t`↔Clipper boundary pervasively.
+- `Polygons/PolygonPtrs/ConstPolygonPtrs` use `PointsAllocator<T>` (TBB) — not std::vector-compatible in ABI (H601).
+- `simplify()` requires CCW input — CW contours (holes) are silently reoriented by Clipper.
+- `centroid()` divides by `3*area_sum` — if area==0 (degenerate polygon), UB (NaN/inf → `coord_t` cast). No guard.
+- `densify()` uses `vector::insert()` in a loop — O(n²) for polygons with many long edges.
+
+**Polyline (Polyline.hpp, Polyline.cpp)**
+- `Polyline` carries a `fitting_result` vector (`std::vector<PathFittingData>`) parallel to `points`. Each `PathFittingData` covers a span with `path_type` (Linear/Arc_cw/Arc_ccw) and `arc_data` (ArcSegment). This vector MUST stay synchronized with `points` across ALL mutations (H599).
+- `ThickPolyline` extends `Polyline` with `width` vector (size = `(points.size()-1)*2`) and `endpoints` pair. `reverse()` must also reverse `width` and swap endpoint flags — correctly implemented.
+- `remove_same_neighbor(Polyline)` uses `std::unique` on points but does NOT update `fitting_result` — H599 violation risk.
+- `polylines_merge()` template operates on raw PointsType — loses arc metadata for `Polyline` objects.
+
+**ExPolygon (ExPolygon.hpp, ExPolygon.cpp)**
+- Layout: `contour` (Polygon, CCW) + `holes` (Polygons, CW). Winding convention enforced only by `is_valid()`, never on construction (H610).
+- `area()` uses double-negation `a -= -hole.area()` — correct (CW holes have negative shoelace area) but confusing (H602).
+- `overlaps()` is NOT commutative: vertical-boundary touches are overlapping; horizontal-boundary touches are NOT — Clipper open-boundary asymmetry (H616).
+- `contains(Polyline)` uses `diff_pl()` — Clipper-based, subject to open-boundary conventions (H614/H629).
+- `to_expolygons(Polygons)` does NOT run `union_ex()` — result may have overlapping contours with no hole nesting (H624).
+- Boost.Polygon traits expose contour only via `polygon_traits`; holes only via `polygon_with_holes_traits` (H609).
+- `to_linesf()` shared `prev_pd` state in lambda — stale state bug if ring < 2 points (H621).
+- `medial_axis()`: 4-phase algorithm (build → extend endpoints → remove short → greedy reconnect). Width invariant assert after reconnection (H632).
+- `keep_largest_contour_only()`: null crash if all contours CW (H627).
+
+### Hazards Assigned
+
+H599–H634 (see `04_refactoring_hazards.md`)
+
+| Hazard | Description | Severity |
+|--------|-------------|----------|
+| H599 | `Polyline::fitting_result` parallel vector must stay in sync with `points` | High |
+| H600 | `Polygon::area()` returns negative for CW polygons | Medium |
+| H601 | `Points` uses `tbb::scalable_allocator` — ABI incompatible | Medium |
+| H602 | `ExPolygon::area()` double-negation — correct but confusing | Medium |
+| H603 | `BoundingBox3Base` iterator constructor throws; others silently undefined | Low |
+| H604 | `ClosestPointInRadiusLookup` searches only 4 cells — approximate | High |
+| H605 | `Vec2crd ↔ Vec2d` implicit casts lose 1e6 scale factor | High |
+| H606 | `Point(double,double)` rounds via `std::round()` | Low |
+| H607 | `Point::new_scale()` truncates — overflow for coords > ~2147 m | Low |
+| H608 | `rotate(cos,sin)` snaps via `round()` — cumulative rounding | Low |
+| H609 | Boost.Polygon `polygon_traits<ExPolygon>` ignores holes | High |
+| H610 | ExPolygon winding convention not enforced on construction | High |
+| H611 | `ExPolygon::scale()` per-vertex rounding accumulation | Low |
+| H612 | `ExPolygon::translate(double)` truncates, not rounds | Low |
+| H613 | D-P simplification of ExPolygon rings is independent — topology not guaranteed | Medium |
+| H614 | `contains(Polyline)` Clipper open-boundary convention | Low |
+| H615 | `contains(Point)` inverts `border_result` for holes | Low |
+| H616 | `overlaps()` non-commutative (horizontal vs vertical boundary) | Medium |
+| H617 | `simplify_p()` may return empty result on degenerate input | Low |
+| H618 | `medial_axis()` endpoint extension uses contour only, not holes | Low |
+| H619 | `medial_axis()` greedy reconnection — random pairs when >2 meet | Low |
+| H620 | `to_lines()` closing edge outside inner loop — easy to miss in ports | Low |
+| H621 | `to_linesf()` shared `prev_pd` state — stale on short ring | Medium |
+| H622 | `to_polylines(&&)` move-then-read-front ordering is critical | Low |
+| H623 | `to_polygon_ptrs()` returns raw pointers — no lifetime guarantee | Medium |
+| H624 | `to_expolygons(Polygons)` does not restore hole nesting | High |
+| H625 | `get_extents(ExPolygon)` contour-only — undefined for empty contour | Low |
+| H626 | `has_duplicate_points()` global check — false positives for shared vertices | Low |
+| H627 | `keep_largest_contour_only()` null crash if all contours are CW | High |
+| H628 | `remove_small_and_small_holes()` area rounding near threshold | Low |
+| H629 | `contains(Polyline)` Clipper horizontal-edge false negative | Low |
+| H630 | `overlaps()` fallback: front point in hole of `other` → wrong true | Low |
+| H631 | `projection_onto()` signed int loop index vs `size_t` | Low |
+| H632 | `medial_axis()` ThickPolyline width invariant in reconnection | Medium |
+| H633 | `expolygons_match()` hole-order-sensitive — no sort performed | Low |
+| H634 | `remove_same_neighbor()` degenerate holes not erased | Low |
+
+### Next Annotation Targets (Session 40+)
+
+**Remaining `src/libslic3r/` top-level files not yet annotated (priority order):**
+1. `src/libslic3r/Line.hpp/.cpp` — Line, Linef, Lines, Linesf
+2. `src/libslic3r/Extruder.hpp/.cpp`
+3. `src/libslic3r/PrintConfig.hpp/.cpp`
+4. `src/libslic3r/Algorithm/` — sub-directory (point-inside-polygon, connected-components, etc.)
+5. `src/libslic3r/AABBMesh.hpp/.cpp`
+6. `src/libslic3r/Brim.cpp`
+
+**Next hazard number to assign: H635**
