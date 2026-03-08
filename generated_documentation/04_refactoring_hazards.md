@@ -1512,3 +1512,200 @@ On ToolChange, `process_filaments()` resets `m_remaining_volume[last_extruder_id
 | 93 | Final gcode_time cache flushed with wrong `ColorChange` type | GCodeProcessor.cpp | Low | P3 |
 | 94 | Seam vertex inherits previous line_id silently | GCodeProcessor.cpp | Low | P3 |
 | 95 | ToolChange resets nozzle volume to full regardless of actual flush | GCodeProcessor.cpp | Low | P3 |
+
+---
+
+## FanMover Post-Processor Hazards (Hazards 96–110)
+
+### Hazard 96 — `change_axis_value()`: Silent Corruption on Missing Axis
+
+**File:** `src/libslic3r/GCode/FanMover.cpp` (`change_axis_value()` line 71)
+**Severity:** Critical
+
+When the target axis letter is not present in the line string, `line.find(match)` returns `std::string::npos` (= SIZE_MAX on 64-bit). Adding 2 wraps around to 1 (`pos = 1`). `line.replace(1, end - 1, ss.str())` then silently overwrites the second character onward of the string with the numeric value, corrupting the G-code line without any assertion, exception, or log message. Callers in `_put_in_middle_G1` / `_print_in_middle_G1` only call `change_axis_value` when `item->dx != 0` etc., so the axis should always be present — but this guarantee is not enforced by any runtime check.
+
+**Mitigation:** Add a `assert(pos != std::string::npos + 2)` check or use a boolean return value to signal failure. In a refactored implementation, parse the G-code into a structured AST before mutation; never do string-replace on raw G-code.
+
+---
+
+### Hazard 97 — `change_axis_value()`: Catastrophic `end` Computation When No Trailing Space/Semicolon
+
+**File:** `src/libslic3r/GCode/FanMover.cpp` (`change_axis_value()` line 81)
+**Severity:** High
+
+`end = std::min(line.find(' ', pos+1), line.find(';', pos+1))`. If neither a space nor semicolon follows the numeric value (e.g. the axis is the last token on the line), both finds return `npos` and `std::min(npos, npos) = npos`. Then `line.replace(pos, npos - pos, ss.str())` replaces from `pos` to end-of-string with the new value — coincidentally correct for the last token! However if only one of the two finds returns npos and the other returns a valid position, `std::min` picks the valid position, which is also correct. The dangerous case is if `pos` itself is npos+2 (Hazard 96), in which case `npos - pos` = `npos - (npos+2)` = SIZE_MAX - 1 — an enormous replace length causing heap corruption.
+
+**Mitigation:** Same as Hazard 96 — structured AST approach eliminates this entire class of bug.
+
+---
+
+### Hazard 98 — `get_axis_value()`: Leading-Space Assumption Breaks on Line-Start Axes
+
+**File:** `src/libslic3r/GCode/FanMover.cpp` (`get_axis_value()` line 48)
+**Severity:** Medium
+
+The search pattern is `" X"` (space + letter). If the axis value is the very first character of the string (no leading space), `find()` returns npos and `NAN` is returned, silently ignoring the parameter. In normal OrcaSlicer G-code output all axis letters follow the command word with a space (e.g. `G1 X10 Y20`), so this is unlikely — but firmware-generated G-code that OrcaSlicer reads back (e.g. M503 responses) may not follow this convention.
+
+**Mitigation:** Also search for the pattern at position 0 (start of string) or use a proper G-code token parser.
+
+---
+
+### Hazard 99 — Time Estimation Ignores Acceleration; Causes Early Fan Arrival
+
+**File:** `src/libslic3r/GCode/FanMover.cpp` (`_process_gcode_line()` line 296)
+**Severity:** Medium
+
+Move time is computed as `time = dist / m_current_speed` using the last-seen F feedrate. This ignores acceleration, deceleration, and junction deviation. For short moves (jerk-limited), actual time is significantly longer than computed. The buffer drains based on this underestimated time, causing fan commands to arrive a few milliseconds early. For most prints the error is acceptable (< 100ms), but at high speeds with frequent direction changes (e.g. infill) the error compounds.
+
+**Mitigation:** A correct implementation would use the same trapezoidal motion profile as GCodeProcessor (with `m_time_processor`), or at minimum a simplified junction-velocity model. Accept the known ±100ms error as a design trade-off and document it.
+
+---
+
+### Hazard 100 — `m_buffer_time_size` Float Drift Corrected Only Per-Chunk, Not Per-Line
+
+**File:** `src/libslic3r/GCode/FanMover.cpp` (`process_gcode()` lines 27-28)
+**Severity:** Medium
+
+`m_buffer_time_size` is the running sum of all `BufferData::time` values. It is incremented/decremented by `put_in_buffer`/`remove_from_buffer`. Due to floating-point rounding, after thousands of additions and subtractions the sum drifts. The drift is corrected by recomputing from scratch at the start of each `process_gcode()` call. However within a single call, the assertion `abs(m_buffer_time_size - sum) < 0.01` at line 510 fires in debug builds if drift exceeds 10ms **within** a single chunk. For very long G-code chunks (e.g. flush=true on an end-of-print call) this threshold may be hit, causing debug-build assertion failures.
+
+**Mitigation:** Use `double` (not `float`) for `BufferData::time` and `m_buffer_time_size`. Alternatively, recompute from scratch after every N operations rather than once per chunk.
+
+---
+
+### Hazard 101 — `regex_fan_speed` Dead Member Wastes Resources
+
+**File:** `src/libslic3r/GCode/FanMover.hpp` (line 33)
+**Severity:** Low
+
+The `const std::regex regex_fan_speed("S[0-9]+")` member is constructed in the initializer list (compiling the regex at FanMover construction time) but is never referenced in `FanMover.cpp`. The actual fan speed parsing is done by `get_fan_speed()` + `get_axis_value()`. This wastes ~40 bytes of memory per instance and regex compilation time (usually < 1ms but nonzero). In a multi-threaded context where multiple FanMover instances are constructed, this multiplies.
+
+**Mitigation:** Remove `regex_fan_speed` from the class. A future cleanup PR should verify no other translation units reference it.
+
+---
+
+### Hazard 102 — `with_D_option` Dead Configuration Parameter
+
+**File:** `src/libslic3r/GCode/FanMover.hpp` (line 35) and `FanMover.cpp`
+**Severity:** Low
+
+`with_D_option` is accepted as a constructor parameter and stored as a `const bool` member, but it is never read anywhere in `FanMover.cpp`. The `D` parameter may have been planned for Duet/RepRap firmware-style M106 (where D sets a ramp duration) but was never implemented. Any caller passing `with_D_option=true` gets no different behaviour from `with_D_option=false`.
+
+**Mitigation:** Either implement the intended D-option behaviour or remove the parameter from the public API and all call sites. The dead parameter creates false expectations for maintainers.
+
+---
+
+### Hazard 103 — `BufferData` Constructor: Dead `line.pop_back()` Does Not Affect `raw`
+
+**File:** `src/libslic3r/GCode/FanMover.hpp` (`BufferData` constructor, line 24)
+**Severity:** Low
+
+The constructor initializer list copies `line` into `raw` first, then the constructor body does `if(!line.empty() && line.back() == '\n') line.pop_back()`. The pop operates on the local parameter `line`, NOT on the already-initialized `raw`. So `raw` always retains the trailing `\n` if the caller passed one. When `raw` is written to output, callers unconditionally append `"\n"` — producing double newlines for lines that had a trailing newline. In practice, `GCodeReader::GCodeLine::raw()` does not include a trailing newline, so this bug is dormant but would activate if the calling convention changes.
+
+**Mitigation:** Move the pop-back before the member initialization, or operate on `raw` directly in the body.
+
+---
+
+### Hazard 104 — `is_kickstart` Constructor Parameter Is `float` but Member Is `bool`
+
+**File:** `src/libslic3r/GCode/FanMover.hpp` (`BufferData` constructor, line 24)
+**Severity:** Low
+
+The constructor signature is `BufferData(std::string line, float time, int16_t fan_speed, float is_kickstart)` but the member is `bool is_kickstart`. This type mismatch compiles silently (float→bool implicit conversion). Any nonzero float (including 0.001f) sets `is_kickstart = true`, which is coincidentally correct for all current callers passing `true`/`false` (which become 1.0/0.0). A future caller accidentally passing a fractional value would silently get `is_kickstart = true`.
+
+**Mitigation:** Change the constructor parameter type to `bool`.
+
+---
+
+### Hazard 105 — Fan Speed Normalisation: Integer Truncation `100 * S / 255`
+
+**File:** `src/libslic3r/GCode/FanMover.cpp` (`_process_gcode_line()` line 306)
+**Severity:** Low
+
+`fan_speed = 100 * fan_speed / 255` uses integer arithmetic. S127 → 49 (not 50), S1 → 0 (rounds to zero, treated as fan-off). Any firmware that produces S values < 3 will have their fan speed silently zeroed, which could suppress a valid low-speed fan command. The normalisation is stored in `m_back_buffer_fan_speed` and `m_front_buffer_fan_speed`, so the 10% kickstart threshold (`fan_speed - 10`) is in these truncated units, not in raw 0–255 units.
+
+**Mitigation:** Use `(100 * fan_speed + 127) / 255` for round-to-nearest, or store raw 0–255 values and compare thresholds in that space. Any refactoring must preserve the exact rounding to avoid changing kickstart trigger conditions.
+
+---
+
+### Hazard 106 — Kickstart Duration Scales Linearly With Speed Delta; Sub-Millisecond at Low Deltas
+
+**File:** `src/libslic3r/GCode/FanMover.cpp` (`_process_gcode_line()` line 336)
+**Severity:** Low
+
+`kickstart_duration = kickstart * (fan_speed - m_front_buffer_fan_speed) / 100.f`. For a 1% speed increase, the kickstart is `kickstart / 100` seconds — at a typical kickstart of 0.1s, this is 1ms. A 1ms M106 S255 pulse is below the firmware's PWM update rate and will have no physical effect. The threshold check at line 387 (`fan_speed - m_back_buffer_fan_speed > 10`) partially mitigates this for the non-delay path, but the delay path (lines 325-354) has no such guard and will emit a sub-millisecond kickstart pulse for any positive delta.
+
+**Mitigation:** Add a minimum kickstart duration threshold (e.g. 50ms) below which kickstart is suppressed.
+
+---
+
+### Hazard 107 — `_process_T()`: Malformed Tool Command Resets to Extruder 0
+
+**File:** `src/libslic3r/GCode/FanMover.cpp` (`_process_T()` line 265)
+**Severity:** Low
+
+If `parse_number()` fails (e.g. `T!` or `Txx`) and the firmware is not RepRap, `m_currrent_extruder` is reset to 0 as a fallback. This means a corrupt or non-standard tool command silently selects extruder 0, potentially causing FanMover to use the wrong fan command format for subsequent lines on a multi-extruder printer.
+
+**Mitigation:** Leave `m_currrent_extruder` unchanged on parse failure and log a warning. Since `with_D_option` / multi-extruder fan is not yet implemented anyway, this is a dormant bug.
+
+---
+
+### Hazard 108 — `parse_number()` Uses Costly `std::string` Copy from `string_view`
+
+**File:** `src/libslic3r/GCode/FanMover.cpp` (`parse_number()` line 233)
+**Severity:** Low
+
+Explicitly documented in the source as "Legacy conversion, which is costly due to having to make a copy of the string before conversion." Constructs a full `std::string` from a `string_view` every call. For a print with millions of tool-change commands this is measurable, though tool changes are rare. The C++17 `std::from_chars` alternative would be zero-allocation and faster.
+
+**Mitigation:** Replace `std::string str{sv}; std::stoi(str, &read)` with `std::from_chars(sv.data(), sv.data() + sv.size(), out)`.
+
+---
+
+### Hazard 109 — Custom G-code Detection Uses `rfind` Not `find` for Substring Check
+
+**File:** `src/libslic3r/GCode/FanMover.cpp` (`_process_gcode_line()` line 424)
+**Severity:** Low
+
+```cpp
+if (line.raw().rfind("; custom gcode", 0) != std::string::npos)
+```
+`rfind(pattern, 0)` returns `npos` unless the string **starts with** the pattern (position 0). This is semantically equivalent to `starts_with`. However, the code uses `!= std::string::npos` as the condition, which is correct for this usage — if rfind at pos 0 finds the pattern, it returns 0 (not npos). The variable naming is potentially confusing (`rfind` reads as "search backward" to most readers), but the logic is correct. The nested check `rfind("; custom gcode end", 0)` must match first and takes priority, so "custom gcode end" correctly disables the flag.
+
+**Mitigation:** Replace with `line.raw().starts_with("; custom gcode")` (C++20) for clarity. No functional change needed.
+
+---
+
+### Hazard 110 — `only_overhangs` Role Detection Depends on `;TYPE:` Comment Contract
+
+**File:** `src/libslic3r/GCode/FanMover.cpp` (`_process_gcode_line()` line 418)
+**Severity:** Medium
+
+When `only_overhangs = true`, the fan delay is only active while `current_role == erOverhangPerimeter`. Role is tracked via `;TYPE:<role>` comments injected by the G-code generator. If:
+- The generator stops emitting `;TYPE:` comments (e.g. when spaghetti detection is disabled)
+- The role string changes (e.g. a refactor renames `"Overhang perimeter"`)
+- The comment is emitted after the first extrusion line rather than before
+
+...then `current_role` will be stale and the fan delay will either always fire or never fire. There is no compile-time or runtime check that the comment contract is maintained.
+
+**Mitigation:** Define the role comment string as a named constant shared between the G-code generator and FanMover. Add a regression test that checks FanMover correctly fires only on overhang sections.
+
+---
+
+## Summary Table (Hazards 96–110)
+
+| # | Hazard | File | Severity | Priority |
+|---|--------|------|----------|----------|
+| 96 | `change_axis_value()` wraps npos+2, silently corrupts line | FanMover.cpp | Critical | P1 |
+| 97 | `change_axis_value()` catastrophic replace if no trailing space/semicolon | FanMover.cpp | High | P1 |
+| 98 | `get_axis_value()` misses axis at position 0 (no leading space) | FanMover.cpp | Medium | P2 |
+| 99 | Time estimation ignores acceleration; fan arrives slightly early | FanMover.cpp | Medium | P2 |
+| 100 | `m_buffer_time_size` float drift only corrected per-chunk | FanMover.cpp | Medium | P2 |
+| 101 | `regex_fan_speed` dead member compiled but never used | FanMover.hpp | Low | P3 |
+| 102 | `with_D_option` stored but never read; dead API | FanMover.hpp | Low | P3 |
+| 103 | `BufferData` constructor `pop_back` operates on copy, not `raw` | FanMover.hpp | Low | P3 |
+| 104 | `is_kickstart` constructor parameter is `float` but member is `bool` | FanMover.hpp | Low | P3 |
+| 105 | Fan speed truncation `100*S/255` zeroes S < 3; shifts thresholds | FanMover.cpp | Low | P3 |
+| 106 | Kickstart duration sub-millisecond for small speed deltas | FanMover.cpp | Low | P3 |
+| 107 | Malformed `Tnn` resets extruder to 0 silently | FanMover.cpp | Low | P3 |
+| 108 | `parse_number()` copies string_view; should use from_chars | FanMover.cpp | Low | P3 |
+| 109 | `rfind(pattern, 0)` idiom confusing; should be `starts_with` | FanMover.cpp | Low | P3 |
+| 110 | `only_overhangs` role detection relies on `;TYPE:` comment contract | FanMover.cpp | Medium | P2 |

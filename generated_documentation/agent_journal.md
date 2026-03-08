@@ -1101,3 +1101,67 @@ This session completed the annotation pass on `GCodeProcessor.cpp` (6379 lines, 
 2. `src/libslic3r/GCode/AdaptivePAProcessor.cpp` + `AdaptivePAInterpolator.cpp` — adaptive pressure advance
 3. `src/libslic3r/Arachne/` directory — variable-width perimeters (WallToolPaths, etc.)
 4. `src/libslic3r/GCode/GCodeProcessor.hpp` — annotate header (structs, enums, member variables)
+
+---
+
+## Session 13 — FanMover Annotation Pass
+
+### Files Processed
+- `src/libslic3r/GCode/FanMover.cpp` (514 lines) — fully annotated
+- `src/libslic3r/GCode/FanMover.hpp` (97 lines) — fully annotated
+- `generated_documentation/04_refactoring_hazards.md` — hazards 96–110 added
+
+### Work Performed
+
+**FanMover.cpp — full annotation pass:**
+- File header: [INTENT], [STATE], [MEMORY], [CONCURRENCY], [COUPLING], [HAZARD] tags
+- `process_gcode()`: annotated the per-chunk entry point, including the O(n) rounding-drift recompute and the returned-reference invalidation hazard
+- `is_end_of_word()`: annotated as a token-boundary helper
+- `get_axis_value()`: documented the leading-space assumption hazard and strtod manual offset arithmetic
+- `change_axis_value()`: annotated the critical npos+2 wrap hazard and the end-of-string replace hazard
+- `get_fan_speed()`: documented the -1 sentinel overloading and the per-firmware fan command semantics (Bambu P1/P0 logic, MakerWare, etc.)
+- `_put_in_middle_G1()`: documented the G1-split algorithm, proportional dx/dy/dz/de scaling, the 10%-boundary snap logic, and the relative-E vs absolute-E asymmetry
+- `_print_in_middle_G1()`: documented the flush-to-output variant, noted the inverted boundary thresholds vs the buffer version, and the stale `de` hazard
+- `_remove_slow_fan()`: documented the forward-scan slow-fan purge, its interaction with motion-line time budgeting, and the intentional reach-limit behaviour
+- `_set_fan()`: documented the multi-extruder TODO (dead code path for extruder-specific fan)
+- `parse_number()`: documented the costly string copy and the blanket exception catch
+- `_process_T()`: documented the extruder-0 fallback hazard and the firmware-specific special command handling
+- `_process_gcode_line()`: full annotation of the main state machine — fan increase/decrease branches, kickstart insertion, custom-gcode bypass, only_overhangs role gating, buffer drain loop, kickstart countdown, and the debug assertion
+
+**FanMover.hpp — full annotation pass:**
+- File header: module-level [INTENT], [STATE], [MEMORY], [COUPLING]
+- `BufferData`: documented all fields, the dead `pop_back()` bug, the `float is_kickstart` type mismatch
+- `FanMover` class: documented dead `regex_fan_speed`, dead `with_D_option`, initial-speed hazard for `m_current_speed`, front/back speed tracking desync hazard, kickstart sentinel
+- `put_in_buffer()` / `remove_from_buffer()`: documented the missed `std::move` optimization
+- Constructor: documented the `nb_seconds_delay` clamping and the dead `with_D_option` parameter
+
+**Hazards 96–110 written to `04_refactoring_hazards.md`:**
+- 2 P1 critical: `change_axis_value` npos+2 wrap, catastrophic replace without trailing delimiter
+- 3 P2 medium: `get_axis_value` leading-space assumption, time estimation ignores acceleration, float drift correction frequency, `;TYPE:` comment contract dependency
+- 10 P3 low: dead regex member, dead with_D_option, dead pop_back, float/bool mismatch, fan speed truncation, sub-ms kickstart, T-command extruder reset, parse_number copy, rfind idiom, custom-gcode starts_with clarity
+
+### Key Discoveries — Session 13
+
+1. **FanMover operates on raw string text:** Unlike GCodeProcessor which builds a structured `MoveVertex` representation, FanMover performs all operations by string search and replace on raw G-code lines. This means every buffer split operation rewrites axis values in-place using `change_axis_value()`, which has silent-corruption failure modes (Hazards 96–97). A refactored implementation must parse G-code into a structured AST first.
+
+2. **Two fan speed trackers with asymmetric semantics:** `m_back_buffer_fan_speed` tracks the newest speed (just parsed), while `m_front_buffer_fan_speed` tracks the oldest speed (most recently emitted to output). Fan command suppression in the drain loop uses `front_speed` for dedup. Both must be kept in sync or commands will be silently dropped. Any refactoring that merges them into a single "current speed" variable will break the deduplication logic.
+
+3. **Kickstart has two code paths for delay vs no-delay mode:** When `nb_seconds_delay > 0` (delay mode), the kickstart pulse is injected into the buffer's historical past using `_put_in_middle_G1`. When `nb_seconds_delay == 0` (no delay), the kickstart pulse is tracked via `m_current_kickstart` and inserted via the time-countdown mechanism in the normal buffer drain. These two paths have subtle differences in when they check the 10% threshold and how they handle concurrent kickstarts being superseded.
+
+4. **Buffer is ordered oldest-first (front = output side):** The naming "front" = oldest = output end and "back" = newest = input end is consistent throughout, but is the opposite of what "front" implies in a queue. The `m_buffer.begin()` iterator is the OLDEST entry (about to be emitted), and `m_buffer.end()-1` is the NEWEST (just inserted). Refactoring to a ring buffer or deque must preserve this orientation.
+
+5. **`_print_in_middle_G1` vs `_put_in_middle_G1` threshold inversion:** When splitting a move to inject a fan command, `_put_in_middle_G1` (buffer version) puts the command BEFORE if `t < 10%` and AFTER if `t > 90%`. `_print_in_middle_G1` (output version) does the opposite: prints the G-code line FIRST if `t < 10%`, fan command FIRST if `t > 90%`. This is not a bug but reflects the semantic difference: the buffer version is "where in future time should this go?", while the print version is "which should I output first?".
+
+### Open Questions — Session 13
+
+1. `[UNCLEAR]` In `_process_gcode_line()` line 488, the drain condition is `m_buffer_time_size - m_buffer.front().time > nb_seconds_delay - EPSILON`. What is EPSILON defined as? If it's the standard `libslic3r.h` EPSILON (1e-4), this creates a 0.1ms tolerance on the drain trigger, which is negligible. But if EPSILON is larger, the drain may fire 10ms+ early, defeating the delay purpose.
+
+2. `[UNCLEAR]` `m_currrent_extruder` (note: typo "currrent") is tracked but only used in the commented-out `_set_fan()` path. Once multi-extruder fan support is implemented, the extruder tracking will suddenly matter. The `_process_T()` fallback to extruder 0 on parse failure will be a latent bug in multi-extruder setups.
+
+3. `[UNCLEAR]` When `need_flush = true` (fan speed decrease path), ALL buffered lines are flushed unconditionally at line 488. This means a slowdown command always arrives on-time (correct), but it also drains any buffered fan speed-up commands that were already placed in the buffer for the upcoming overhang. This could cause the fan to turn off and then immediately need to spin back up for the next overhang — a suboptimal but correct behaviour.
+
+### Next Annotation Targets (Session 14+)
+
+1. `src/libslic3r/GCode/AdaptivePAProcessor.cpp` + `AdaptivePAInterpolator.cpp` — adaptive pressure advance
+2. `src/libslic3r/Arachne/` directory — variable-width perimeters (WallToolPaths, etc.)
+3. `src/libslic3r/GCode/GCodeProcessor.hpp` — annotate header (structs, enums, member variables)
