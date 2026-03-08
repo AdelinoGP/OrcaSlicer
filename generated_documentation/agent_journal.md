@@ -2009,3 +2009,132 @@ Key omissions: no `multiline_fill()` support; `FillConcentricInternal` (for supp
 4. `src/libslic3r/Fill/FillLine.cpp/.hpp` — rectilinear line fill variant
 5. `src/libslic3r/Fill/FillCrossHatch.cpp/.hpp` — cross-hatch infill
 6. `src/libslic3r/Fill/Fill.cpp/.hpp` — the Fill factory dispatch
+
+---
+
+## Session 26 — Layer Lifecycle & External Surface Expansion
+
+**Date:** 2026-03-08
+**Branch:** agent/analysis
+**Iteration:** 2 of 10
+**Hazard range this session:** H352–H391
+
+### Files Annotated
+
+#### `BridgeDetector.hpp` (H331–H334)
+- Bridge detection interface: `angle` is only valid after `detect_angle()` returns true.
+- Coverage polygon and unsupported edges are separate outputs that must be requested explicitly.
+- `detect_angle()` stores the *opposite* of the span direction (π offset).
+
+#### `BridgeDetector.cpp` (H335–H349)
+- `detect_angle()` sweeps candidate angles from the bridge span's PCA direction.
+- Convex hull anchor detection: `coverage_query_points` uses convex hull of anchors, not full polygon.
+- `unsupported_edges()` computes edges by diff of bridge outline against inflated anchor polygons.
+
+#### `Layer.hpp` / `Layer.cpp` (H350–H362)
+- `LayerRegion*` raw pointers in `m_regions` — manual delete in destructor (H352).
+- `make_slices()` chain_points heuristic: non-deterministic multi-island ordering (H353).
+- `backup_untyped_slices()` / `restore_untyped_slices()` dual-state pipeline (H354).
+- `merged()` subtracter volumes must match coordinate system exactly (H355).
+- `is_perimeter_compatible()` serialization string comparison — locale-sensitive (H356).
+- `make_perimeters()` fill_no_overlap_expolygons assignment gap (H357).
+- `SupportLayer::AreaGroup` raw `ExPolygon*` dangling pointer risk (H360).
+- `lslices_ex` race during parallel pipeline (H361).
+- `lower_layer` / `upper_layer` raw back-pointers — use-after-free risk (H362).
+
+#### `LayerRegion.cpp` (H363–H391) — fully annotated this session
+**Key discoveries:**
+
+**Bridge pipeline (active `#if 1` path):**
+- `fill_surfaces_extract_expolygons()`: thickness last-wins for multi-thickness surfaces (H366).
+- `get_grouped_bridges()`: union-find path compression single-level only (H367); O(n²) intersection (H375); `bridge_expansion_begin` stays at `end()` for unsupported bridges (H374).
+- `detect_bridge_directions()`: zone linear scan O(zones × anchors) (H376); empty anchor → angle = PI (H377).
+- `merge_bridges()`: root-only angle for merged group (H378); `nullopt` dereference UB in Release (H379).
+- `expand_expolygons()`: boundary_id offset race if zone expolygons mutated (H380).
+- `expand_bridges_detect_orientations()`: early-return leaves zones unclipped (H381); double-move risk (H382).
+- `expand_merge_surfaces()`: `bridge_angle=-1` sentinel (H383); closing_radius wall erasure (H384).
+- `process_external_surfaces()` (active): expansion_zones ordering invariant (H368); closing_radius magic constants (H369); `pop_back()` ordering dependency (H370).
+
+**Fill surface classification:**
+- `prepare_fill_surfaces()`: `PrintObject::infill_only_where_needed` static constant (BBS, H371); idempotency contract (H372).
+- `elephant_foot_compensation_step()`: no minimum width guard for opening radius (H373).
+
+**Path simplification:**
+- `simplify_entity_collection()`: runtime dynamic_cast dispatch (H386); unknown type throws at runtime (H387).
+- `simplify_path/multi_path/loop()`: PrintConfig copy-per-call (H388); D-P in spiral mode removes wall detail (H389).
+
+**SVG debug helpers:**
+- Static `idx_map` is not thread-safe (H385).
+
+**Legacy `#else` `process_external_surfaces()`:**
+- BBS nozzle_dmr_avg bridge margin coupling (H390).
+- Non-idempotent: fill_boundaries destructively consumed (H391).
+
+### Commits This Session
+
+1. `annotate: bridge-angle detection, coverage, unsupported edges (BridgeDetector.hpp/.cpp)` — H331–H349
+2. `annotate: layer slices, region ownership, layer adjacency hazards (Layer.hpp)` — H350–H351
+3. `annotate: layer lifecycle, perimeter grouping, slice backup/restore (Layer.cpp)` — H352–H362
+4. `annotate: bridge grouping, expansion pipeline, path simplification (LayerRegion.cpp)` — H363–H391
+5. `docs: add H352-H391 to refactoring hazards (Layer.cpp, LayerRegion.cpp)`
+
+### Hazard Summary (H352–H391)
+
+| Hazard | Brief | Priority |
+|--------|-------|----------|
+| H352 | `~Layer()` manual raw pointer delete | P1 |
+| H353 | `chain_points()` non-deterministic slice ordering | P2 |
+| H354 | backup/restore dual-state slice model | P2 |
+| H355 | `merged()` coordinate system mismatch risk | P1 |
+| H356 | `is_perimeter_compatible()` locale-sensitive string comparison | P2 |
+| H357 | fill_no_overlap_expolygons assignment gap in make_perimeters | P2 |
+| H358 | simplify() PrintConfig copy per entity | P3 |
+| H359 | void_area() timing before fill_regions populated | P2 |
+| H360 | SupportLayer AreaGroup raw ExPolygon* | P1 |
+| H361 | lslices_ex race in parallel pipeline | P1 |
+| H362 | lower_layer/upper_layer use-after-free risk | P1 |
+| H363 | bridging_flow extruder underflow sentinel | P2 |
+| H364 | spiral_mode check doesn't count raft layers | P2 |
+| H365 | get_region() bounds violation at region count mismatch | P1 |
+| H366 | fill_surfaces_extract_expolygons thickness last-wins | P2 |
+| H367 | group_id() single-level path compression | P3 |
+| H368 | expansion_zones ordering invariant — reorder = wrong geometry | P1 |
+| H369 | closing_radius magic constants | P2 |
+| H370 | expansion_zones.pop_back() ordering dependency | P1 |
+| H371 | PrintObject::infill_only_where_needed static constant | P2 |
+| H372 | prepare_fill_surfaces idempotency contract | P2 |
+| H373 | elephant_foot opening: no minimum width guard | P2 |
+| H374 | bridge_expansion_begin stays end() for unsupported bridges | P2 |
+| H375 | get_grouped_bridges O(n²) intersection | P3 |
+| H376 | detect_bridge_directions zone linear scan | P3 |
+| H377 | empty anchor → bridge angle = PI | P2 |
+| H378 | merge_bridges root-only angle for group | P2 |
+| H379 | merge_bridges nullopt dereference UB in Release | P1 |
+| H380 | expand_expolygons boundary_id offset fragile | P3 |
+| H381 | expand_bridges early-return leaves zones unclipped | P3 |
+| H382 | double-move risk on bridge_expolygons | P3 |
+| H383 | bridge_angle=-1 sentinel collides with valid angle | P3 |
+| H384 | closing_radius can erase narrow fill regions | P2 |
+| H385 | SVG debug static map not thread-safe | P3 |
+| H386 | dynamic_cast dispatch on entity collection | P3 |
+| H387 | unknown entity type throws at runtime | P2 |
+| H388 | PrintConfig copy-per-call in simplify_* | P3 |
+| H389 | Douglas-Peucker in spiral mode removes wall detail | P3 |
+| H390 | legacy BBS nozzle_dmr_avg bridge margin | P2 |
+| H391 | legacy fill_boundaries non-idempotent destruction | P1 |
+
+### Next Annotation Targets (Session 27+)
+
+**High priority (core data structures, used everywhere):**
+1. `src/libslic3r/TriangleMesh.cpp/.hpp` — mesh storage, repair, Boolean ops, AABBTree
+2. `src/libslic3r/ClipperUtils.cpp` — all Clipper2 wrappers, safety offsets, winding conventions
+3. `src/libslic3r/Model.cpp/.hpp` — model/object/volume/instance data hierarchy
+
+**Medium priority (geometry primitives):**
+4. `src/libslic3r/Geometry.cpp` + `Geometry/` directory
+5. `src/libslic3r/EdgeGrid.cpp` — grid-accelerated collision/seam/support queries
+6. `src/libslic3r/Flow.cpp` — flow calculation foundation
+
+**Lower priority (travel and multi-material):**
+7. `src/libslic3r/ShortestPath.cpp` — TSP travel optimizer
+8. `src/libslic3r/MultiMaterialSegmentation.cpp` — MMU region boundary detection
