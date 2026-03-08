@@ -113,6 +113,14 @@ size_t get_extruder_index(const GCodeConfig& config, unsigned int filament_id)
     return 0;
 }
 
+// [INTENT] Build a reverse-lookup vector (integer value → string name) from a
+// forward map (string name → integer value). Used exclusively by
+// CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS to populate `s_keys_names_*` tables.
+// [STATE] The returned vector is sized to max(value)+1 and indexed directly by
+// enum integer. Gaps (unused ordinals) produce empty-string entries.
+// [COUPLING] Called at static initialisation time for every registered enum type.
+// Any enum whose integer values are non-contiguous or negative will produce a
+// large sparse vector or trigger UB on vector::operator[] with a negative index.
 static t_config_enum_names enum_names_from_keys_map(const t_config_enum_values& enum_keys_map)
 {
     t_config_enum_names names;
@@ -126,11 +134,35 @@ static t_config_enum_names enum_names_from_keys_map(const t_config_enum_values& 
     return names;
 }
 
+// [INTENT] Macro that wires up the three static pieces needed for each enum
+// config option type NAME:
+//   1. s_keys_names_NAME — vector<string> for integer → name lookup (built once at init)
+//   2. ConfigOptionEnum<NAME>::get_enum_values() — returns the name→int map
+//   3. ConfigOptionEnum<NAME>::get_enum_names()  — returns the int→name vector
+// [COUPLING] Each invocation produces a static local variable that is
+// initialised before main() via the C++ static initialisation order. The macro
+// must appear after its matching `s_keys_map_NAME` definition in this file.
+// [HAZARD] If two enums share the same integer ordinal and a config option
+// serialises by ordinal, the wrong enum label may be emitted. Each NAME must
+// have unique ordinals within its own map; uniqueness across different enums is
+// not required but is a common source of confusion during config schema changes.
 #define CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(NAME) \
     static t_config_enum_names             s_keys_names_##NAME = enum_names_from_keys_map(s_keys_map_##NAME); \
     template<> const t_config_enum_values& ConfigOptionEnum<NAME>::get_enum_values() { return s_keys_map_##NAME; } \
     template<> const t_config_enum_names&  ConfigOptionEnum<NAME>::get_enum_names() { return s_keys_names_##NAME; }
 
+// ---------------------------------------------------------------------------
+// Enum serialisation maps — one per enum config type.
+// Each `s_keys_map_NAME` is a static t_config_enum_values (std::map<string,int>)
+// mapping the serialised string key to its integer enum value.
+// [STATE] All maps are file-scoped statics; they are constructed once at
+// program startup and never modified at runtime.
+// [COUPLING] The string keys must match:
+//   (a) the values used in .ini / 3MF / AMF preset files on disk, and
+//   (b) the labels shown in the UI (where the UI reads them back via
+//       ConfigOptionEnum<NAME>::get_enum_names()).
+// Changing or removing a key is a breaking preset-file format change.
+// ---------------------------------------------------------------------------
 static t_config_enum_values s_keys_map_PrinterTechnology{{"FFF", ptFFF}, {"SLA", ptSLA}};
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(PrinterTechnology)
 
@@ -227,6 +259,13 @@ static t_config_enum_values s_keys_map_IroningType{{"no ironing", int(IroningTyp
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(IroningType)
 
 // BBS
+// [HAZARD] H770 — The `WallInfillOrder` map contains a duplicate string key:
+// "inner-outer-inner wall/infill" appears twice (mapped to both
+// InnerOuterInnerInfill = 2 and a second entry also = InnerOuterInnerInfill = 5).
+// std::map silently keeps the first inserted value for duplicate keys. The
+// InfillInnerOuter and InfillOuterInner variants (values 3 and 4) are accessible
+// by value but the second "inner-outer-inner wall/infill" entry is silently
+// dropped. Any port must deduplicate this map to avoid silent mismatches.
 static t_config_enum_values s_keys_map_WallInfillOrder{{"inner wall/outer wall/infill", int(WallInfillOrder::InnerOuterInfill)},
                                                        {"outer wall/inner wall/infill", int(WallInfillOrder::OuterInnerInfill)},
                                                        {"inner-outer-inner wall/infill", int(WallInfillOrder::InnerOuterInnerInfill)},
@@ -362,6 +401,11 @@ static const t_config_enum_values s_keys_map_BrimType = {
 };
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(BrimType)
 
+// [HAZARD] H771 — TimelapseType uses numeric strings "0" and "1" as keys instead
+// of descriptive names. This means old project files must contain the literal
+// characters "0" or "1" in the timelapse_type field to be parsed correctly.
+// Any migration that renames these keys to "traditional"/"smooth" is a silent
+// preset-file format break for all existing saves.
 // using 0,1 to compatible with old files
 static const t_config_enum_values s_keys_map_TimelapseType = {{"0", tlTraditional}, {"1", tlSmooth}};
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(TimelapseType)
@@ -459,6 +503,16 @@ static const t_config_enum_values s_keys_map_FilamentMapMode = {{"Auto For Flush
                                                                 {"Manual", fmmManual}};
 CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS(FilamentMapMode)
 
+// [INTENT] Build a human-readable variant string from (ExtruderType, NozzleVolumeType)
+// by concatenating their serialised names with a space: e.g. "Direct Drive Standard".
+// Used to select a printer variant profile when loading from a profile server.
+// [STATE] Returns an empty string if either argument is out of range (logs an error).
+// [COUPLING] Depends on s_keys_names_ExtruderType and s_keys_names_NozzleVolumeType
+// being populated before first call (guaranteed by static initialisation above).
+// [HAZARD] H772 — The range checks compare against `etMaxExtruderType` and
+// `nvtMaxNozzleVolumeType` sentinel values. If a new enum variant is added without
+// updating these sentinels, the check will silently pass for invalid values and
+// index into s_keys_names_* out-of-bounds (UB in release builds).
 // BBS
 std::string get_extruder_variant_string(ExtruderType extruder_type, NozzleVolumeType nozzle_volume_type)
 {
@@ -489,6 +543,14 @@ std::string get_nozzle_volume_type_string(NozzleVolumeType nozzle_volume_type)
     return s_keys_names_NozzleVolumeType[nozzle_volume_type];
 }
 
+// [INTENT] Deserialise a per-extruder AMS (Automatic Material System) count
+// string from the format "amsId#count|amsId#count|..." per extruder.
+// Returns a vector of maps: extruder_index → map<amsId, slotCount>.
+// [STATE] Pure function — no external state read or written.
+// [HAZARD] H773 — `stoi(numbers[0])` and `stoi(numbers[1])` throw std::invalid_argument
+// or std::out_of_range on malformed input (non-numeric ams_info segments). There is
+// no try/catch — a corrupt config string propagates an exception up to the caller.
+// The assert(numbers.size() == 2) fires only in DEBUG builds.
 std::vector<std::map<int, int>> get_extruder_ams_count(const std::vector<std::string>& strs)
 {
     std::vector<std::map<int, int>> extruder_ams_counts;
@@ -511,6 +573,12 @@ std::vector<std::map<int, int>> get_extruder_ams_count(const std::vector<std::st
     return extruder_ams_counts;
 }
 
+// [INTENT] Serialise the per-extruder AMS count structure back to the
+// "amsId#count|amsId#count|..." string format used in config files.
+// Inverse of get_extruder_ams_count().
+// [STATE] Pure function — no external state read or written.
+// [COUPLING] The delimiter characters '#' and '|' are hardcoded and must
+// match the splitting logic in get_extruder_ams_count().
 std::vector<std::string> save_extruder_ams_count_to_string(const std::vector<std::map<int, int>>& extruder_ams_count)
 {
     std::vector<std::string> extruder_ams_count_str;
@@ -528,6 +596,15 @@ std::vector<std::string> save_extruder_ams_count_to_string(const std::vector<std
     return extruder_ams_count_str;
 }
 
+// [INTENT] Walk all registered config options and assign `printer_technology`
+// to any that still carry ptUnknown. Called after each init_*_params() block
+// in the PrintConfigDef constructor to stamp technology affiliation on all
+// newly added options.
+// [STATE] Mutates the t_optiondef_map in place (called on `this->options`).
+// [COUPLING] Must be called in the correct order in PrintConfigDef() constructor:
+//   init_common_params → assign(ptAny) → init_fff_params → assign(ptFFF) →
+//   init_sla_params → assign(ptSLA). Calling out of order stamps options with
+//   the wrong technology tag, silently hiding them from the wrong printer type.
 static void assign_printer_technology_to_unknown(t_optiondef_map& options, PrinterTechnology printer_technology)
 {
     for (std::pair<const t_config_option_key, ConfigOptionDef>& kvp : options)
@@ -535,6 +612,18 @@ static void assign_printer_technology_to_unknown(t_optiondef_map& options, Print
             kvp.second.printer_technology = printer_technology;
 }
 
+// [INTENT] PrintConfigDef constructor: the singleton that owns the full option
+// schema for all FFF and SLA print config options. Runs all three init_* methods
+// to register every option, then stamps printer_technology on each.
+// [STATE] This is a singleton (PrintConfigDef is constructed once via
+// `print_config_def` at global scope in PrintConfig.cpp). All subsequent
+// DynamicPrintConfig / StaticPrintConfig lookups reference this shared def.
+// [COUPLING] init_extruder_option_keys() is called between init_fff_params()
+// and assign_printer_technology_to_unknown(ptFFF) — it collects the list of
+// extruder-indexed option names for multi-extruder handling. Order matters.
+// [CONCURRENCY] The constructor runs at static initialisation time (before
+// main()). If any static initialiser in another TU depends on PrintConfigDef
+// being available, initialisation-order fiasco applies.
 PrintConfigDef::PrintConfigDef()
 {
     this->init_common_params();
@@ -546,6 +635,20 @@ PrintConfigDef::PrintConfigDef()
     assign_printer_technology_to_unknown(this->options, ptSLA);
 }
 
+// [INTENT] Register all config option definitions shared between FFF and SLA
+// printer technologies (e.g., printer_technology, printable_area, bed shape).
+// Each `this->add(key, type)` call returns a ConfigOptionDef* which is then
+// populated with label, tooltip, mode, enum_keys_map, and default_value.
+// [STATE] Purely additive: appends to this->options (the t_optiondef_map).
+// [COUPLING] All options registered here will be stamped ptAny by the
+// subsequent assign_printer_technology_to_unknown(ptAny) call in the
+// constructor. Options that should belong exclusively to FFF or SLA must
+// be registered in init_fff_params() or init_sla_params() instead.
+// [HAZARD] H774 — L() is used throughout as a translation extraction marker
+// only — it evaluates to a plain string at runtime. _(s) is the runtime
+// i18n function. Using L() where _() is intended would silently produce
+// untranslated UI labels; using _() at static init time in a default_value
+// would translate too early before the locale is loaded.
 void PrintConfigDef::init_common_params()
 {
     ConfigOptionDef* def;
@@ -760,6 +863,20 @@ void PrintConfigDef::init_common_params()
     }
 }
 
+// [INTENT] Register all FFF-specific config option definitions (~6000 lines).
+// Covers: print quality (layer height, walls, infill, seam, bridging, ironing,
+// fuzzy skin, scarf seam, elephant foot, overhangs), G-code output (flavor,
+// thumbnails, timelapse, pressure advance, cooling, wipe tower), multi-material
+// (filament map, flush volumes), support structures, and per-extruder settings.
+// [STATE] Purely additive; each this->add() call registers a new option.
+// Options registered here are later stamped ptFFF by assign_printer_technology.
+// [COUPLING] Perimeter generator type ("classic" vs "arachne") is registered
+// here and determines which PerimeterGenerator path runs in Print::process().
+// [HAZARD] H775 — init_fff_params() is ~6000 lines and registers hundreds of
+// options with hardcoded default values. Any default value change here is a
+// silent behaviour change for all newly created profiles. Old saved profiles
+// that do not carry an explicit value will inherit the new default on next load,
+// potentially changing print quality without user awareness.
 void PrintConfigDef::init_fff_params()
 {
     ConfigOptionDef* def;
@@ -6818,6 +6935,16 @@ void PrintConfigDef::init_fff_params()
     def->set_default_value(new ConfigOptionBool(true));
 }
 
+// [INTENT] Populate m_extruder_option_keys with the list of per-extruder option
+// keys (options that have one value per nozzle, stored as vectors indexed by
+// extruder number). Used by DynamicPrintConfig to identify extruder-indexed
+// option vectors during config normalisation and multi-extruder resolution.
+// [STATE] Mutates this->m_extruder_option_keys (a std::vector<std::string>).
+// [COUPLING] Must be called after init_fff_params() so all extruder options
+// are already registered. The key list here must stay in sync with the actual
+// coFloats/coBools/coStrings options registered in init_fff_params(); a key
+// listed here that has no registered option def is silently ignored at lookup
+// time but wastes a vector slot per normalisation pass.
 void PrintConfigDef::init_extruder_option_keys()
 {
     // ConfigOptionFloats, ConfigOptionPercents, ConfigOptionBools, ConfigOptionStrings
@@ -6869,6 +6996,16 @@ void PrintConfigDef::init_extruder_option_keys()
     assert(std::is_sorted(m_extruder_retract_keys.begin(), m_extruder_retract_keys.end()));
 }
 
+// [INTENT] Same as init_extruder_option_keys() but for per-filament option
+// keys — options that carry one value per loaded filament/material (e.g.,
+// filament_diameter, nozzle temperatures, cooling speeds, retraction). These
+// are indexed by filament slot, not extruder hardware.
+// [STATE] Mutates this->m_filament_option_keys.
+// [COUPLING] Must be called after init_fff_params(). Filament options and
+// extruder options partially overlap (e.g., retraction_length, z_hop) — the
+// same key may appear in both m_extruder_option_keys and m_filament_option_keys.
+// Overlap is intentional: the AMS multi-material system maps filaments to
+// extruders dynamically at print time.
 void PrintConfigDef::init_filament_option_keys()
 {
     m_filament_option_keys = {
@@ -6917,6 +7054,13 @@ void PrintConfigDef::init_filament_option_keys()
     assert(std::is_sorted(m_filament_retract_keys.begin(), m_filament_retract_keys.end()));
 }
 
+// [INTENT] Register all SLA (resin printer) config option definitions.
+// Covers: display geometry, exposure times, lift/drop speeds, support
+// pillars/pads, hollowing, and SLA material parameters.
+// [STATE] Purely additive; options are stamped ptSLA by the constructor.
+// [COUPLING] SLA options are never merged with FFF options at runtime;
+// FullPrintConfig only merges FFF-side base classes. SLA configs use a
+// separate SLAPrint / SLAPrintConfig hierarchy.
 void PrintConfigDef::init_sla_params()
 {
     ConfigOptionDef* def;
@@ -7554,6 +7698,17 @@ void PrintConfigDef::init_sla_params()
     def->set_default_value(new ConfigOptionEnum<SLAMaterialSpeed>(slamsFast));
 }
 
+// [INTENT] Translate a renamed or removed config option key (from old preset files)
+// to its current equivalent. Called during DynamicPrintConfig::load() for each
+// option key read from disk that does not match a current option definition.
+// [STATE] Mutates opt_key and/or value in place; both are passed by reference.
+// [COUPLING] The mapping here is a forward-compatibility contract: once a key
+// is listed, it must remain listed forever to correctly load older preset files.
+// Removing an entry silently drops the value from old presets on next load.
+// [HAZARD] H776 — The function body is a large chain of if/else-if comparisons
+// (~244 lines). There is no unit test coverage for the majority of individual
+// renames. A mistake in any mapping silently uses the old-key fallback (option
+// not found → ignored), losing that setting when opening an old project file.
 void PrintConfigDef::handle_legacy(t_config_option_key& opt_key, std::string& value)
 {
     // BBS: handle legacy options
@@ -7961,6 +8116,14 @@ DynamicPrintConfig* DynamicPrintConfig::new_from_defaults_keys(const std::vector
     return out;
 }
 
+// [INTENT] Compute the minimum required spacing between objects on the print bed.
+// For SLA: fixed 6 mm minimum. For FFF: max(6, extruder_clearance_radius) when
+// printing by-object (sequential), else 6 mm.
+// [STATE] Pure query. No state modified.
+// [HAZARD] H779 — The `duplicate_distance = 6.` constant is commented as "BBS:
+// duplicate_distance seems to be useless" but is still used as the floor of the
+// minimum distance. Changing this value would alter object spacing for all FFF
+// printers without changing the config option name.
 double min_object_distance(const ConfigBase& cfg)
 {
     const ConfigOptionEnum<PrinterTechnology>* opt_printer_technology = cfg.option<ConfigOptionEnum<PrinterTechnology>>(
@@ -7988,6 +8151,19 @@ double min_object_distance(const ConfigBase& cfg)
     return ret;
 }
 
+// [INTENT] Normalise an FFF DynamicPrintConfig after loading or before slicing.
+// Resolves legacy "extruder" key, copies sparse_infill_filament to
+// solid_infill_filament if not set, propagates filament_type and temperature
+// arrays to the correct length, and fills in per-filament defaults.
+// `used_filaments` controls how many filament slots are normalised.
+// [STATE] Mutates `this` in place.
+// [HAZARD] H780 — normalize_fdm() erases the "extruder" key and propagates it
+// to sparse_infill_filament and wall_filament. If a user project file sets
+// "extruder" but not individual filament keys, and normalize_fdm() is called
+// multiple times (e.g., once per config merge), the second call sees no
+// "extruder" key and leaves the individual filament keys unchanged. This is
+// correct for repeated normalisation, but any code path that calls normalize_fdm()
+// on a config that has already had "extruder" removed silently no-ops the propagation.
 void DynamicPrintConfig::normalize_fdm(int used_filaments)
 {
     if (this->has("extruder")) {
@@ -10793,6 +10969,15 @@ static Points to_points(const std::vector<Vec2d>& dpts)
     return pts;
 }
 
+// [INTENT] Compute the shared printable area across all extruder printable areas
+// by iteratively intersecting their polygons. Returns the polygon intersection
+// representing the region reachable by all extruders simultaneously (used for
+// multi-extruder print-in-place and purge tower positioning).
+// [HAZARD] H777 — If any individual extruder_poly produces an empty intersection
+// (extruder printable areas are non-overlapping), `result_polygon[0]` is an
+// out-of-bounds access (result_polygon is empty). No bounds check is performed.
+// On a printer where one extruder's reach does not overlap another's, this UB
+// is triggered silently in release builds.
 Polygon get_shared_poly(const std::vector<Pointfs>& extruder_polys)
 {
     Polygon result;
@@ -10809,6 +10994,14 @@ Polygon get_shared_poly(const std::vector<Pointfs>& extruder_polys)
     }
     return result;
 }
+// [INTENT] Return the printable bed shape as a vector of scaled integer Points.
+// When use_share=true, returns the intersection of all extruder printable areas
+// (shared reachable zone). When use_share=false, returns the full printer bed.
+// Three overloads: DynamicPrintConfig (runtime lookup), PrintConfig (static), SLAPrinterConfig.
+// [STATE] Pure query — no state modified.
+// [COUPLING] Callers that layout objects (ArrangeJob, PrintObject) rely on this
+// polygon for collision and placement. Incorrect polygon (e.g., from bad extruder
+// overlap with H777) silently places objects outside printable bounds.
 Points get_bed_shape(const DynamicPrintConfig& config, bool use_share)
 {
     const ConfigOptionPoints* bed_shape_opt = config.opt<ConfigOptionPoints>("printable_area");
@@ -10852,6 +11045,14 @@ Points get_bed_shape(const PrintConfig& cfg, bool use_share)
 
 Points get_bed_shape(const SLAPrinterConfig& cfg) { return to_points(make_counter_clockwise(cfg.printable_area.values)); }
 
+// [INTENT] Convert bed_exclude_area config points to a scaled-integer Polygon
+// representing the region that should not be used for printing (e.g., the area
+// where Bambu X1 printers cut filament during filament change).
+// [STATE] Pure query.
+// [HAZARD] H778 — If bed_exclude_area has 0 or 1 points, the returned polygon
+// is degenerate (zero or one vertex). Clipper's diff() with a 1-point polygon
+// is undefined behaviour. Callers that pass this result to polygon operations
+// must guard against degenerate input.
 Polygons get_bed_excluded_area(const PrintConfig& cfg)
 {
     const Pointfs exclude_area_points = cfg.bed_exclude_area.values;

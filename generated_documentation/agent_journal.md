@@ -3414,3 +3414,77 @@ If the final offset step returns ≠1 ExPolygon, `elephant_foot_compensation()` 
 **Commit:** `annotate: ArcFitter, ElephantFootCompensation, PrintConfig partial (Session 48)`
 
 **Next hazard number to assign: H772**
+
+---
+
+## Session 49 — PrintConfig.cpp Full Annotation
+
+### Files Processed
+- `src/libslic3r/PrintConfig.cpp` (~11,051 lines) — full annotation pass
+
+### Key Discoveries
+
+**PrintConfig.cpp is the largest single source file at ~11,051 lines.** It encodes the entire configuration schema for OrcaSlicer: all option keys, enum string maps, default values, legacy migration logic, and helper utilities.
+
+**`L()` vs `_()` distinction (H774)**
+`L(s)` is a GNU gettext extraction marker that expands to `s` at runtime — it does NOT translate. `_(s)` is the actual runtime i18n function. Using `_()` inside `set_default_value()` during static init would translate before the locale is loaded. Confusing the two silently leaves UI strings untranslated.
+
+**`PrintConfigDef` singleton construction order is mandatory**
+`init_common_params()` → `assign(ptAny)` → `init_fff_params()` → `init_extruder_option_keys()` → `assign(ptFFF)` → `init_sla_params()` → `assign(ptSLA)`. Later stages depend on options registered in earlier stages. The constructor is called once at static init via `s_def` global.
+
+**Enum map duplicate key (H770)**
+`s_keys_map_WallInfillOrder` contains a duplicate string key — `std::map` silently drops the second insertion. Two values are inaccessible by name lookup.
+
+**`handle_legacy()` untested (H776)**
+A ~244-line if/else chain that renames old config keys to current ones. No unit test coverage. Any mapping error silently drops the setting for old project files.
+
+**`get_shared_poly()` OOB on empty intersection (H777)**
+If any two extruder printable areas do not overlap, `result_polygon[0]` is an out-of-bounds access.
+
+**`get_extruder_ams_count()` uncaught `stoi` (H773)**
+Malformed `ams_info` string causes `std::invalid_argument` or `std::out_of_range` to propagate uncaught.
+
+**`normalize_fdm()` not idempotent (H780)**
+Erases `"extruder"` key on first call; subsequent calls silently skip propagation.
+
+### Sections Annotated in PrintConfig.cpp
+- `enum_names_from_keys_map()` + `CONFIG_OPTION_ENUM_DEFINE_STATIC_MAPS` macro block (lines ~116–133)
+- Enum map section header block (lines ~134–200)
+- `s_keys_map_WallInfillOrder` — H770
+- `s_keys_map_TimelapseType` — H771
+- `get_extruder_variant_string()` — H772
+- `get_extruder_ams_count()` — H773
+- `save_extruder_ams_count_to_string()`
+- `assign_printer_technology_to_unknown()`
+- `PrintConfigDef::PrintConfigDef()` constructor
+- `init_common_params()` — H774
+- `init_fff_params()` — H775
+- `init_extruder_option_keys()`
+- `init_filament_option_keys()`
+- `init_sla_params()`
+- `handle_legacy()` — H776
+- `get_shared_poly()` — H777
+- `get_bed_shape()` overloads
+- `get_bed_excluded_area()` — H778
+- `min_object_distance()` — H779
+- `normalize_fdm()` — H780
+
+### Hazards Identified (H770–H780)
+
+| ID | Summary | Severity |
+|----|---------|----------|
+| H770 | `s_keys_map_WallInfillOrder` duplicate key — second entry silently dropped | Low |
+| H771 | `TimelapseType` uses numeric `"0"`/`"1"` keys for preset compat — renaming breaks all saved files | Medium |
+| H772 | `get_extruder_variant_string()` sentinel not updated → OOB on new enum value | Medium |
+| H773 | `get_extruder_ams_count()` uncaught `stoi` exception on malformed input | High |
+| H774 | `L()` vs `_()` distinction: `L()` is extraction marker only, NOT runtime translator | High |
+| H775 | `init_fff_params()` default value change silently alters all new profiles | Medium |
+| H776 | `handle_legacy()` ~244-line chain, no unit tests, silent drop on mismatch | High |
+| H777 | `get_shared_poly()` OOB access when extruder areas have no intersection | High |
+| H778 | `get_bed_excluded_area()` returns degenerate polygon for 0/1 config points | Medium |
+| H779 | `min_object_distance()` hardcoded 6 mm floor — global implicit minimum | Low |
+| H780 | `normalize_fdm()` erases `"extruder"` key; not idempotent on repeated calls | Medium |
+
+**Commit:** `annotate: PrintConfig.cpp full annotation (H770-H780) (Session 49)`
+
+**Next hazard number to assign: H781**
