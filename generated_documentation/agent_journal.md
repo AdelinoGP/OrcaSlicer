@@ -2138,3 +2138,89 @@ Key omissions: no `multiline_fill()` support; `FillConcentricInternal` (for supp
 **Lower priority (travel and multi-material):**
 7. `src/libslic3r/ShortestPath.cpp` — TSP travel optimizer
 8. `src/libslic3r/MultiMaterialSegmentation.cpp` — MMU region boundary detection
+
+---
+
+## Session 27 — TriangleMesh.hpp + TriangleMesh.cpp (mesh storage, repair, primitives)
+
+**Files annotated:**
+- `src/libslic3r/TriangleMesh.hpp` — 664 lines → annotated (H392–H411)
+- `src/libslic3r/TriangleMesh.cpp` — 1156 lines → annotated (H412–H421)
+
+**Commits this session:**
+- `f80dc95e21` — annotate TriangleMesh.hpp (H392–H411)
+- `977a27f703` — annotate TriangleMesh.cpp (H412–H421)
+
+### Key Discoveries
+
+**`TriangleMeshStats` binary serialization hazard (H394) — CRITICAL**
+The stats struct is serialised via `cereal loadBinary`/`saveBinary`. Any field addition/removal/reorder silently corrupts all saved project files. There is no version field in the struct. This must be addressed before any refactor that touches the stats layout.
+
+**`volume = -1.f` sentinel collision (H393) — HIGH**
+Volume is initialised to -1 as a "not computed" marker. Genuinely inside-out meshes with small negative volume get clamped to -1, causing recomputation loops. A port should use `std::optional<float>` to distinguish "not computed" from "computed negative value."
+
+**`its` is `public` — stale cache root cause (H396) — HIGH**
+All stale-cache hazards in `TriangleMesh` trace back to the public `its` field (`indexed_triangle_set`). Any code path can mutate geometry without the owner knowing. The mesh's volume, bounding box, and AABB tree all become incorrect silently. Making `its` private and requiring mutation through invalidating accessors would resolve this entire class of hazards.
+
+**`stl_fill_holes` disabled — open meshes pass through (H414) — HIGH**
+The 3D hole-filling pass is `#if 0` disabled. Open meshes are intentionally passed to the slicer which closes them in 2D at the layer level. This means `TriangleMeshStats::holes_fixed` is always 0, and any quality check using this counter is non-functional.
+
+**`its_make_snap()` infinite loop risk (H409) — HIGH**
+The groove convergence loop `while (!is_approx(groove_r, actual_r))` has no iteration limit. NaN propagation from degenerate geometry would produce infinite iteration.
+
+**Thread-safety of `volume()` (H397) — HIGH**
+`volume()` lazy-initialises through a `mutable` struct member without a mutex. Two threads simultaneously reading volume on a fresh mesh will both see -1 and both attempt recomputation — a data race on the mutable field.
+
+**qhull non-manifold convex hull (H401) — MEDIUM**
+qhull "quite often" returns non-manifold output. The manifold assertion was commented out in the source. A port using a different convex hull library must add its own manifold verification.
+
+**Negative scale doesn't flip winding (H415) — MEDIUM**
+`TriangleMesh::scale(negative)` mirrors vertices but leaves triangle winding unchanged. The mesh displays with inverted normals and the slicer treats all faces as back-facing.
+
+### Complete Hazard Summary (H392–H421)
+
+| Hazard | Brief | Priority |
+|--------|-------|----------|
+| H392 | holes_fixed always 0 due to stl_fill_holes disabled | P2 |
+| H393 | volume=-1 sentinel collides with negative-volume meshes | P1 |
+| H394 | TriangleMeshStats raw binary serialisation — no version field | P1 |
+| H395 | merged mesh volume double-counts overlapping sub-volumes | P2 |
+| H396 | public `its` allows geometry mutation without cache invalidation | P1 |
+| H397 | volume() lazy init without mutex — data race | P1 |
+| H398 | mirror() negates -1 sentinel to +1 | P2 |
+| H399 | transform() shear path uses approximate bounding box volume | P2 |
+| H400 | horizontal_projection() O(F × log F) Clipper calls | P3 |
+| H401 | qhull non-manifold output on convex_hull_3d() | P2 |
+| H402 | VertexFaceIndex stale after mesh mutation | P1 |
+| H403 | its_face_edge_ids face_mask: open-edge sentinel = self | P2 |
+| H404 | its_face_edge_ids same-orientation fallback — non-manifold topology | P2 |
+| H405 | its_face_edge_ids parallel sort non-deterministic order | P3 |
+| H406 | its_merge_vertices() can create T-junction non-manifold | P2 |
+| H407 | its_triangle_vertex_the_same() index-only comparison | P3 |
+| H408 | its_volume() inaccurate on open meshes | P1 |
+| H409 | its_make_snap() infinite loop on NaN groove_r | P1 |
+| H410 | its_make_snap() groove_plane modified as side-effect | P2 |
+| H411 | STL big-endian byte-swap POSIX-only macro | P3 |
+| H412 | fill_initial_stats() double face-neighbor computation | P3 |
+| H413 | repair tolerance scale-dependent: mm vs inch diverge | P2 |
+| H414 | stl_fill_holes #if 0 — open meshes pass to slicer | P1 |
+| H415 | scale(negative) mirrors vertices but not winding | P2 |
+| H416 | transformed_bounding_box() double→float precision loss | P3 |
+| H417 | slice() hardcoded 0.0004f tolerance — not adaptive | P2 |
+| H418 | its_face_edge_ids face-neighbor: incorrect orientation FIXME | P2 |
+| H419 | its_compactify_vertices() no bounds check on corrupted mesh | P2 |
+| H420 | its_make_sphere() UV sphere polar elongation | P3 |
+| H421 | its_make_snap() add_sub_mesh: no int32 overflow check | P3 |
+
+### Next Annotation Targets (Session 28+)
+
+**Immediately next:**
+1. `src/libslic3r/ClipperUtils.cpp` — all Clipper2 wrappers, used by virtually every module
+2. `src/libslic3r/Model.cpp/.hpp` — model/object/volume/instance hierarchy
+
+**Medium priority:**
+3. `src/libslic3r/Geometry.cpp` + `Geometry/` directory
+4. `src/libslic3r/EdgeGrid.cpp`
+5. `src/libslic3r/Flow.cpp`
+
+**Next hazard number to assign: H422**
