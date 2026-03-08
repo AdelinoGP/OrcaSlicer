@@ -1591,4 +1591,85 @@ Hazards 176–204 added to `04_refactoring_hazards.md`. Notable P0/P1 items:
 
 ### Next Annotation Targets (Session 20+)
 
-1. `src/libslic3r/GCode/GCodeProcessor.cpp` — the 8000-line G-code processor implementation
+1. `src/libslic3r/Fill/FillRectilinear.cpp` — 4000+ line scan-line infill engine
+
+---
+
+## Session 20 — Fill/FillRectilinear.cpp (scan-line infill engine)
+
+### Files Processed
+
+| File | Status |
+|------|--------|
+| `src/libslic3r/Fill/FillRectilinear.cpp` | Full annotation complete (65 tags) |
+| `generated_documentation/04_refactoring_hazards.md` | Hazards 228–236 added |
+| `generated_documentation/agent_journal.md` | This entry |
+
+### Key Discoveries
+
+**Role of this file:** `FillRectilinear.cpp` (~4050 lines) is the core infill generation engine for the entire rectilinear family of patterns: Rectilinear, ZigZag, Monotonic, MonotonicLines, Grid, Triangles, Stars, Cubic, Cross, 3DHoneycomb, Gyroid (sample points), and the Orca-specific FillLockedZag dual-density pattern. It is also the source of anchor points for Lightning infill via `sample_grid_pattern()`.
+
+**Three major path-generation modes:**
+1. **Greedy graph traversal** (`traverse_graph_generate_polylines`): walks the scan-line intersection graph left-to-right, using a shortest-distance heuristic to extend polylines. Used for Rectilinear, ZigZag, Grid, Triangles etc.
+2. **Monotonic ACO** (`generate_montonous_regions` → `connect_monotonic_regions` → `chain_monotonic_regions` → `polylines_from_paths`): partitions infill lines into monotonic regions then uses Ant Colony Optimization (25 rounds × 10 ants) to sequence them for minimal travel distance. The `monotonic_3_opt()` improvement step inside the ACO loop is a **STUB** — its body is entirely comments; the call is a no-op.
+3. **Multiline/trapezoidal** (`fill_surface_by_multilines`, `fill_surface_trapezoidal`): generates multi-pass sweeps (Grid = 2 sweeps, Triangles = 3) or explicit trapezoid geometry for Orca-specific patterns.
+
+**`SegmentIntersection` — core data structure:**
+- Stores y-coordinates as a rational `pos_p / pos_q` (int64 / uint32) to avoid floating-point errors in sort comparisons.
+- `operator<` uses a 96-bit integer comparison trick — splits the 64-bit×32-bit product into two 64-bit products — to compare rationals exactly without overflow.
+- `pos_q == 0` is UB (division by zero in `pos()`); asserted in `operator<` but not defensively checked elsewhere.
+- Intersection types: `OUTER_LOW`, `OUTER_HIGH`, `INNER_LOW`, `INNER_HIGH` — one per polygon contour-crossing.
+
+**`ExPolygonWithOffset` — dual-shell input:**
+- Holds the source expolygon plus two Clipper-offset levels: `outer` (perimeter join boundary) and `inner` (actual infill boundary).
+- The dual-offset is critical for the perimeter-walk connector: infill lines that end near a perimeter are linked by walking the `outer` shell, allowing the head to stay on plastic rather than travel through air.
+- If `remove_sticks()` / `remove_small()` strip too many contours, `n_contours_inner == 0` and the engine silently produces no infill for that region.
+
+**`slice_region_by_vertical_lines()` — scan-line engine:**
+- Casts N vertical lines (spacing determined by `FillParams::line_spacing`) through the offset polygons.
+- Intersections are classified and sorted per vertical line; linkage directions (up/down, inner/outer) are inferred from crossing order.
+- Under `INFILL_DEBUG_OUTPUT` mode, a validation block uses `try/catch(InfillFailedException)` for graceful degradation — not used in production builds.
+- `INFILL_OVERLAP_OVER_SPACING = 0.45` is a hardcoded magic constant controlling how far infill lines extend past the inner boundary to ensure overlap with perimeters; changing it alters dimensional accuracy.
+
+**`connect_segment_intersections_by_contours()` — graph edge builder:**
+- Links adjacent intersection pairs via perimeter-walk arcs (Valid) or marks them TooLong or Invalid.
+- The inner search loop is `O(n)` per intersection point (O(N²) total for complex surfaces). A FIXME comment acknowledges this.
+- All `Invalid` symmetry fixups are applied at the end of each vline pass to ensure bidirectional consistency.
+
+**`MonotonicRegion` / `AntPathMatrix` / `chain_monotonic_regions()` — ACO sequencing:**
+- A `MonotonicRegion` is a maximal band of scan lines traversable without direction reversal.
+- `AntPathMatrix` is a dense 2D matrix of `(n_regions × 2)²` `AntPath` entries; O(4·N²) memory — a comment suggests sparse representation but it is not implemented.
+- ACO: 25 rounds × 10 ants; pheromone evaporation + diversification each round.
+- `monotonic_3_opt()` is an **empty stub** (body is all comments). The ACO loop calls it but it performs no work. This is the most critical undocumented fact in the file.
+
+**Typo:** `generate_montonous_regions` / `montonous_region_path_length` — "montonous" should be "monotonous" throughout. **Do not fix** — renaming would break external callers.
+
+**`FillLockedZag` — Orca-specific dual-density infill:**
+- Not present in PrusaSlicer. Implements skin+skeleton infill where a sparse skeleton is overlaid with a dense skin in selected regions.
+- `lock_param` struct carries `skeleton_density_params` and `skin_density_params` maps; populated by PrintObject from per-region config.
+- Output is `multi_width_polyline`: a `vector<pair<Polylines, Flow>>` where each sub-vector carries its own Flow object for independent extrusion width calculation.
+- The `overlap_threshold` offset for the overlap region can cause skeleton+skin double-printing with over-extrusion if the threshold is set too high.
+
+**Dead code:** `FillMonotonicLineWGapFill` class (lines 3692–3885) is entirely commented out. It was the predecessor to the current `FillMonotonicLines` + FillBase gap-fill approach. Still present in the file, slowing reader comprehension.
+
+**`sample_grid_pattern()` — Lightning infill anchor points:**
+- Reuses `slice_region_by_vertical_lines()` with zero offsets to generate a regular grid of candidate anchor points.
+- Lightning infill (`FillLightning`) depends on the exact inter-point spacing guarantee from this function.
+
+### Critical Hazards Found (H228–H236)
+
+| # | Description | Priority |
+|---|-------------|----------|
+| H228 | `connect_segment_intersections_by_contours()` inner search O(N) per point → O(N²) total for complex surfaces | P2 |
+| H229 | `monotonic_3_opt()` is a no-op stub — ACO does not perform 3-opt improvement; final paths are locally suboptimal | P1 |
+| H230 | `AntPathMatrix` allocates O(4·N²) AntPath entries — dense even for sparse region graphs; can reach hundreds of MB for very complex surfaces | P2 |
+| H231 | `INFILL_OVERLAP_OVER_SPACING = 0.45` is a hardcoded magic constant; undocumented; changing it breaks dimensional accuracy silently | P3 |
+| H232 | `FillLockedZag` overlap region uses `intersection_ex` + `offset_ex` with `overlap_threshold` — threshold too high causes skeleton+skin double-print over-extrusion | P2 |
+| H233 | Dead code block `FillMonotonicLineWGapFill` (lines 3692–3885) still present; confuses readers and may cause merge conflicts | P3 |
+| H234 | `fill_surface_by_multilines()` divides `params.density` by `sweep_params.size()` — caller must ensure density is pre-multiplied or pattern density will be wrong | P2 |
+| H235 | `fill_surface_trapezoidal()` period computation casts float to int coords — potential rounding at high zoom / large print coordinates | P3 |
+| H236 | `pos_q == 0` in `SegmentIntersection` is UB (zero-denominator rational); asserted in debug builds only; malformed input can reach this silently in release | P1 |
+
+### Next Annotation Targets (Session 21+)
+
+1. `src/libslic3r/Fill/FillBase.cpp` — 2782 lines, factory + gap fill pipeline (highest priority)
