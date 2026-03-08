@@ -2449,3 +2449,61 @@ H539–H547 (see 04_refactoring_hazards.md)
 3. `src/libslic3r/MultiMaterialSegmentation.cpp` — LOWER priority
 
 **Next hazard number to assign: H548**
+
+---
+
+## Session 36 — Flow.hpp/.cpp and ShortestPath.hpp/.cpp Annotation
+
+### Files Processed
+- `src/libslic3r/Flow.hpp` — full annotation pass
+- `src/libslic3r/Flow.cpp` — full annotation pass; H548–H552 assigned
+- `src/libslic3r/ShortestPath.hpp` — full annotation pass
+- `src/libslic3r/ShortestPath.cpp` — full annotation pass; H553–H560 assigned
+- `generated_documentation/04_refactoring_hazards.md` — appended H548–H560 entries
+- `generated_documentation/agent_journal.md` — added session 36 entry
+
+### Key Discoveries
+
+**Flow.hpp / Flow.cpp**
+- `Flow` is a pure value type: `float m_width`, `m_height`, `m_spacing`, `m_nozzle_diameter`, `bool m_bridge`. Immutable after construction. All factory methods throw `FlowErrorNegativeSpacing` on invalid geometry.
+- `rounded_rectangle_extrusion_spacing()` uses a cosine-arc formula to compute the lateral advance per bead accounting for the semicircular ends; throws if result ≤ 0.
+- **H548**: `support_material_flow()` uses `support_filament - 1` as array index without a `support_filament == 0` guard — wraps to `SIZE_MAX` → OOB read (UB).
+- **H549**: `Flow::operator==` ignores `m_spacing` — equality check is weaker than structural equivalence.
+- **H550**: `Flow::with_cross_section()` increasing-flow branch uses old area to compute new width — arithmetic error for any flow increase.
+- **H551**: `BRIDGE_EXTRA_SPACING = 0.05` is raw mm, not scaled — implicit unit boundary.
+- **H552**: Dead `#if 0` block for first-layer width fallback in `new_from_config_width()`.
+
+**ShortestPath.hpp / ShortestPath.cpp**
+- Three TSP tiers: (V0) naive nearest-neighbour O(n²), (V1) multi-fragment greedy + union-find, (V2) V1 + chain flipping.
+- 2-opt post-improvement: `improve_ordering_by_two_exchanges_with_segment_flipping`, max 100 iterations (H558).
+- **H553**: `chain_and_reorder_extrusion_entities` unconditional `static_cast<ExtrusionEntityCollection*>` — UB for non-collection items.
+- **H554**: `static const double point_distance_epsilon2` inside function body — ODR risk.
+- **H555**: `reorder_extrusion_paths` declaration/definition parameter mismatch (value vs non-const reference).
+- **H556**: V2 iteration guard — `num_segments * 16` cap causes silent empty output if reached.
+- **H557**: `chain_expolygons` centroid-based ordering — non-deterministic for equal centroids.
+- **H558**: Hard-coded 100-iteration cap with no convergence warning.
+- **H559**: Five dead `#if 0` blocks preserved as algorithm history (1-opt, 3-opt v1, 4-opt Eigen variants) — do NOT delete.
+- **H560**: `do_crossover` `default:` asserts `(i >> 6) == 2` — Debug-only; Release silently produces wrong permutation if ever triggered.
+
+### Architecture Notes
+- `Flow` is safe to treat as a value type in any target language; factories map cleanly to static constructors.
+- The `flow_spacing == 0` case (bridge) bypasses rounded-rectangle geometry and must be special-cased in ports.
+- `ShortestPath` TSP algorithms rely on mutable arrays of endpoint pairs with in-place direction flipping. This pattern maps poorly to functional/immutable languages; careful translation required.
+- The union-find in V1/V2 is a standard path-compressed variant. Standard library implementations (e.g. `DisjointSet` in Go or Python `networkx`) can replace it directly.
+- All dead `#if 0` TSP variants should be preserved as reference documentation — they represent a multi-year search for a better algorithm that was never completed.
+
+### Hazards Assigned
+H548–H560 (see 04_refactoring_hazards.md)
+
+### Next Annotation Targets (Session 37+)
+
+**Immediately next:**
+1. `src/libslic3r/Fill/Fill3DHoneycomb.cpp` — remaining fill pattern
+2. `src/libslic3r/Fill/FillHoneycomb.cpp`
+3. `src/libslic3r/Fill/FillPlanePath.cpp`
+4. `src/libslic3r/Fill/FillLine.cpp`
+5. `src/libslic3r/Fill/FillCrossHatch.cpp`
+6. `src/libslic3r/MultiMaterialSegmentation.cpp`
+7. `src/libslic3r/Geometry/` directory
+
+**Next hazard number to assign: H561**
