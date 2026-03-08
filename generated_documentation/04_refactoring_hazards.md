@@ -1739,3 +1739,45 @@ When `only_overhangs = true`, the fan delay is only active while `current_role =
 | 138 | `getRegionOrder()` uses SparsePointGrid not SparseLineGrid — adjacency constraints can be missed for simplified insets | WallToolPaths.cpp | Medium | P2 |
 | 139 | `separateOutInnerContour()` classifies entire inset based only on first junction of first line | WallToolPaths.cpp | Medium | P2 |
 | 140 | `make_paths_params()` uses min_nozzle_diameter for ALL Arachne parameters in multi-nozzle setups | WallToolPaths.cpp | Medium | P2 |
+
+---
+
+## Session 16 Hazards: SkeletalTrapezoidation.cpp (Hazards 141–175)
+
+| # | Hazard | File | Severity | Priority |
+|---|--------|------|----------|----------|
+| 141 | `filterCentral()` overload has tautological always-false condition: `edge.to->isLocalMaximum() && !edge.to->isLocalMaximum()` — recursive filter body is dead code; inherited bug from CuraEngine | SkeletalTrapezoidation.cpp | High | P1 |
+| 142 | `dissolveNearbyTransitions()` recursion depth unbounded; up to ~500 levels (100mm / 0.2mm) — stack overflow on complex, fine-grained meshes | SkeletalTrapezoidation.cpp | High | P1 |
+| 143 | `transition_filter_dist` = 100mm hardcoded in WallToolPaths::generate() — dissolves nearly all transitions on small/complex parts | WallToolPaths.cpp / SkeletalTrapezoidation.cpp | High | P1 |
+| 144 | `filterNoncentralRegions()` max_dist hardcoded to 0.4mm — not scaled by nozzle size; may over-filter for large nozzles | SkeletalTrapezoidation.cpp | Medium | P2 |
+| 145 | `beading_strategy` stored as `const BeadingStrategy&` — dangling reference if caller destroys strategy before SkeletalTrapezoidation | SkeletalTrapezoidation.hpp | Critical | P0 |
+| 146 | `p_generated_toolpaths` is a raw non-owning pointer set in `generateToolpaths()` — null-deref if accessed before `generateToolpaths()` or after caller destroys the vector | SkeletalTrapezoidation.hpp | Critical | P0 |
+| 147 | `SKELETAL_TRAPEZOIDATION_BEAD_SEARCH_MAX` = 1000 cap in `getNearestBeading()` — silent fallback to fresh beading beyond this creates zero-width gap in toolpaths | SkeletalTrapezoidation.cpp | High | P1 |
+| 148 | `vd_edge_to_he_edge` / `vd_node_to_he_node` maps persist as class members but become stale after `constructFromPolygons()` completes — accidental use post-construction causes corrupt lookup | SkeletalTrapezoidation.cpp | Medium | P2 |
+| 149 | `emplace_back()` vs `emplace_front()` inconsistency in list ordering between `separatePointyQuadEndNodes()` and `makeNode()` — safe due to std::list stability but semantically surprising | SkeletalTrapezoidation.cpp | Low | P3 |
+| 150 | `generateTransitionEnd()`: mixed float × int64_t in `transition_mid_position * int64_t(transition_length)` — result narrowed to coord_t; potential truncation for large transition lengths | SkeletalTrapezoidation.cpp | Medium | P2 |
+| 151 | `generateTransitionEnd()`: `(end_pos - ab_size) / (start_pos - end_pos)` — division by zero if start_pos == end_pos (zero-length transition) | SkeletalTrapezoidation.cpp | High | P1 |
+| 152 | `isGoingDown()` source comment explicitly acknowledges "logic is not fully thought through" and doesn't account for transition mids on intermediate edges | SkeletalTrapezoidation.cpp | Medium | P2 |
+| 153 | `normal()` static helper: returns `Point(len, 0)` when input vector is near-zero (< 1 unit) — degenerate +X fallback; causes misplaced transition nodes on ultra-short edges | SkeletalTrapezoidation.cpp | Medium | P2 |
+| 154 | `applyTransitions()`: `snap_dist()` threshold silently discards transition-end nodes too close to existing topology — transitions near corners are silently dropped | SkeletalTrapezoidation.cpp | Medium | P2 |
+| 155 | `generateExtraRibs()`: iterates `graph.edges` while `insertNode()` modifies graph.edges — relies on std::list iterator stability; newly added edges are visited but harmlessly skipped | SkeletalTrapezoidation.cpp | Low | P3 |
+| 156 | `generateSegments()` / `propagateBeadingsDownward()`: `beading_propagation_transition_dist` is a class-level constant; not user-configurable | SkeletalTrapezoidation.hpp | Low | P3 |
+| 157 | `propagateBeadingsDownward(edge_t*)`: `merged_beading.total_thickness == distance_to_boundary * 2` assertion can fail due to floating-point drift in `interpolate()` | SkeletalTrapezoidation.cpp | Medium | P2 |
+| 158 | `interpolate(left, ratio, right, switching_radius)`: re-interpolation with `new_ratio + 0.1` overshoot — clamped by min(1.0, ...) but creates non-linear jump in bead widths | SkeletalTrapezoidation.cpp | Medium | P2 |
+| 159 | `interpolate()` two-argument overload: beads from the LARGER Beading beyond the shared indices are left at their original values — discontinuous width at blend boundary | SkeletalTrapezoidation.cpp | Medium | P2 |
+| 160 | `generateJunctions()`: integer rounding in junction position: `ab * int64_t(bead_R - start_R) / int64_t(end_R - start_R)` — protected by early-continue but edge case for flat edges | SkeletalTrapezoidation.cpp | Low | P3 |
+| 161 | `generateJunctions()`: "snap to start node" at 0.005 mm can make multiple junctions coincide on short edges — zero-length downstream segments | SkeletalTrapezoidation.cpp | Medium | P2 |
+| 162 | `getOrCreateBeading()`: `bead_count == -1` degenerate case — nearest beading fallback can return a beading computed for a different R value, creating width mismatch | SkeletalTrapezoidation.cpp | High | P1 |
+| 163 | `getNearestBeading()`: local `priority_queue<DistEdge>` can grow to O(graph_edges) for sparse skeletons — unbounded memory on pathological inputs | SkeletalTrapezoidation.cpp | Medium | P2 |
+| 164 | `addToolpathSegment()`: reverse-continue path for CCW-wound even walls logs error but continues — incorrect polygon winding order persists in output | SkeletalTrapezoidation.cpp | High | P1 |
+| 165 | `connectJunctions()`: do-while with comma-operator relies on `getNextUnconnected()` never returning null in valid DCEL — malformed DCEL causes null-deref | SkeletalTrapezoidation.cpp | Critical | P0 |
+| 166 | `connectJunctions()`: mismatched from/to junction sizes (diff > 1) are logged but not corrected — broken extrusion paths in output | SkeletalTrapezoidation.cpp | High | P1 |
+| 167 | `connectJunctions()`: `from_junctions` / `to_junctions` copied by value per quad — O(beads × quads) allocation overhead for high bead-count parts | SkeletalTrapezoidation.cpp | Medium | P2 |
+| 168 | `generateLocalMaximaSingleBeads()`: hexagon dot uses float sin/cos — accumulated rounding on scaled integer coordinates | SkeletalTrapezoidation.cpp | Low | P3 |
+| 169 | `generateLocalMaximaSingleBeads()`: writes open ExrusionLine directly to generated_toolpaths bypassing addToolpathSegment() — inconsistent line ownership / closure semantics | SkeletalTrapezoidation.cpp | Low | P3 |
+| 170 | `getQuadMaxRedgeTo()`: fallback `ret = ret->prev` uses 0.005 mm epsilon — workaround for float near-equality at flat quad tops; may misidentify peak on legitimate near-flat edges | SkeletalTrapezoidation.cpp | Medium | P2 |
+| 171 | `propagateBeadingsUpward()` uses `is_upward_propagated_only = true` flag to indicate unresolved beadings — no assertion that this flag is cleared before generateJunctions; could produce phantom beadings | SkeletalTrapezoidation.cpp | Medium | P2 |
+| 172 | `generateSegments()` beading sort: two flat edges with equal `dist_to_go_up` values use `optional::value_or(max)` — std::numeric_limits<coord_t>::max() in subtraction can overflow | SkeletalTrapezoidation.cpp | Medium | P2 |
+| 173 | `discretize()`: `max_angle` and `discretization_step_size` both used as thresholds but have no joint validation — inconsistent precision on large-radius Voronoi arcs | SkeletalTrapezoidation.cpp | Low | P3 |
+| 174 | `constructFromPolygons()`: Voronoi diagram built from integer coords but `discretize()` uses float sin/cos — mixed-precision coordinate system throughout the pipeline | SkeletalTrapezoidation.cpp | Medium | P2 |
+| 175 | `generateTransitionMids()` uses `coord_t` for `lower_bead_count` (semantically a count, not a length) — misleading type; in refactor use a distinct integral type | SkeletalTrapezoidation.cpp | Low | P3 |

@@ -1340,3 +1340,75 @@ WallToolPaths is the public API entry point for the Arachne variable-width perim
 1. `src/libslic3r/Arachne/SkeletalTrapezoidation.cpp/.hpp` — Core Voronoi + medial axis algorithm (2656 lines, highest complexity)
 2. `src/libslic3r/Arachne/BeadingStrategy/` — 7 files (~612 lines, bead width strategies)
 3. `src/libslic3r/Arachne/SkeletalTrapezoidationGraph.cpp` — graph data structure (~472 lines)
+
+---
+
+## Session 16 — SkeletalTrapezoidation.cpp Full Annotation
+
+**Date:** 2026-03-07
+**Files processed:** `src/libslic3r/Arachne/SkeletalTrapezoidation.cpp` (2098 → 2415 lines after annotation)
+
+### Summary
+
+Completed annotation of all remaining functions in `SkeletalTrapezoidation.cpp`. This file implements the core Kuipers et al. 2020 medial-axis algorithm that converts a polygon outline into variable-width walls (Arachne). The annotation pass covered every function from `generateAllTransitionEnds()` through `generateLocalMaximaSingleBeads()`.
+
+### Functions Annotated This Session
+
+| Function | Tags Applied | Key Finding |
+|----------|-------------|-------------|
+| `generateAllTransitionEnds()` | INTENT, STATE, COUPLING | Driver loop; spawns two TransitionEnds per TransitionMiddle |
+| `generateTransitionEnds()` | INTENT, STATE, COUPLING, HAZARD | Mixed float×int64_t arithmetic; asymmetric half-lengths |
+| `generateTransitionEnd()` | INTENT, STATE, COUPLING, HAZARD, UNCLEAR | Recursive; div-by-zero if start_pos==end_pos; complex return semantics |
+| `isGoingDown()` | INTENT, STATE, HAZARD, COUPLING | Source-acknowledged incomplete logic; doesn't handle transition mids on intermediate edges |
+| `normal()` (static) | INTENT, HAZARD | Degenerate +X fallback for near-zero input vectors |
+| `applyTransitions()` | INTENT, STATE, HAZARD, COUPLING | Materialises transition ends; snap_dist silently drops near-corner transitions |
+| `isEndOfCentral()` | INTENT | Predicate for dead-end central skeleton detection |
+| `generateExtraRibs()` | INTENT, STATE, COUPLING, HAZARD | Safe std::list iteration while modifying; relies on iterator stability |
+| `generateSegments()` | INTENT, STATE, MEMORY, CONCURRENCY | Orchestration of full toolpath generation pipeline (6 sub-steps) |
+| `getQuadMaxRedgeTo()` | INTENT, HAZARD, COUPLING | 0.005mm epsilon workaround for flat quad peak detection |
+| `propagateBeadingsUpward()` | INTENT, STATE, COUPLING | Reverse-order traversal; sets is_upward_propagated_only flag |
+| `propagateBeadingsDownward()` (dispatcher) | INTENT | Routes equidistant edges to single-edge overload |
+| `propagateBeadingsDownward()` (single-edge) | INTENT, STATE, HAZARD, COUPLING | Blend window via beading_propagation_transition_dist; assertion drift risk |
+| `interpolate()` (4-arg) | INTENT, STATE, HAZARD, UNCLEAR | +0.1 bias overshoot; unresolved TODO for locations past the middle |
+| `interpolate()` (3-arg) | INTENT, HAZARD | Zero-width markers preserved; extra beads from larger Beading left unblended |
+| `generateJunctions()` | INTENT, STATE, COUPLING, HAZARD | Underflowing junction_idx loop; snap-to-start epsilon risks coincident junctions |
+| `getOrCreateBeading()` | INTENT, HAZARD, MEMORY | bead_count==-1 degenerate fallback; width mismatch risk |
+| `getNearestBeading()` | INTENT, STATE, HAZARD | BFS capped at 1000; unbounded priority_queue memory |
+| `addToolpathSegment()` | INTENT, STATE, HAZARD, COUPLING | Reverse-continue CCW winding error logged but not corrected |
+| `connectJunctions()` | INTENT, STATE, MEMORY, COUPLING, HAZARD | Comma-operator null-deref risk; mismatched junction counts not corrected; per-quad copy overhead |
+| `generateLocalMaximaSingleBeads()` | INTENT, STATE, HAZARD, COUPLING | Float sin/cos on scaled ints; bypasses addToolpathSegment() |
+
+### Key Discoveries
+
+1. **filterCentral() dead code (Hazard 141):** The public entry point has `isLocalMaximum() && !isLocalMaximum()` — always-false — so the recursive filter is never called. This is a latent bug inherited from CuraEngine.
+
+2. **Transition system complexity:** The transition pipeline is a 5-stage process: `generateTransitionMids()` → `filterTransitionMids()` → `dissolveNearbyTransitions()` → `generateAllTransitionEnds()` → `applyTransitions()`. Each stage mutates edge-data through shared_ptr handles. Any refactor must preserve this ordering and the shared ownership model.
+
+3. **Beading propagation is bidirectional:** Upward propagation (tips→base) fills in nodes with no bead_count. Downward propagation (base→tips) then blends competing beadings using distance-weighted interpolation. The blend window is controlled by `beading_propagation_transition_dist` (hardcoded class constant).
+
+4. **interpolate() has acknowledged TODOs:** Two TODO comments in the 4-arg interpolate indicate the algorithm doesn't correctly handle toolpath locations past the wall midpoint. This is a known limitation producing sub-optimal blends for high bead-count transitions.
+
+5. **connectJunctions() do-while null risk (Hazard 165):** The loop termination relies on `getNextUnconnected()` returning the polygon domain start correctly. A malformed DCEL would cause an infinite loop or null-deref.
+
+6. **addToolpathSegment() CCW error (Hazard 164):** The reverse-continue path (extending a line in reverse) logs an error for even walls because it reverses CW winding to CCW. The error is logged but execution continues, producing incorrectly-wound even walls.
+
+### New Hazards Documented
+
+Hazards 141–175 added to `04_refactoring_hazards.md`. Notable P0/Critical items:
+- **H145**: `beading_strategy` const-ref — dangling reference risk
+- **H146**: `p_generated_toolpaths` raw non-owning pointer — null-deref risk
+- **H165**: `connectJunctions()` null-deref on malformed DCEL
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `src/libslic3r/Arachne/SkeletalTrapezoidation.cpp` | All remaining functions annotated (2098 → 2415 lines) |
+| `generated_documentation/04_refactoring_hazards.md` | Hazards 141–175 added |
+| `generated_documentation/agent_journal.md` | Session 16 entry added |
+
+### Next Annotation Targets (Session 17+)
+
+1. `src/libslic3r/Arachne/BeadingStrategy/` — 7 files (~612 lines): BeadingStrategy.hpp, DistributedBeadingStrategy.cpp, LimitedBeadingStrategy.cpp, OuterWallInsetBeadingStrategy.cpp, RedistributeBeadingStrategy.cpp, WideningBeadingStrategy.cpp, BeadingStrategyFactory.cpp
+2. `src/libslic3r/Arachne/SkeletalTrapezoidationGraph.cpp` — DCEL graph operations (~472 lines)
+3. `src/libslic3r/GCode/GCodeProcessor.hpp` — header for the 8000-line GCodeProcessor
