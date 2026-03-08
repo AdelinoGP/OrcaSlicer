@@ -3488,3 +3488,70 @@ Erases `"extruder"` key on first call; subsequent calls silently skip propagatio
 **Commit:** `annotate: PrintConfig.cpp full annotation (H770-H780) (Session 49)`
 
 **Next hazard number to assign: H781**
+
+---
+
+## Session 50 — Arrange.cpp + Arrange.hpp Annotation
+
+### Files Processed
+- `src/libslic3r/Arrange.hpp` (219 lines) — fully annotated
+- `src/libslic3r/Arrange.cpp` (1,155 lines) — fully annotated
+
+### Key Discoveries
+
+**Architecture: NFP bin-packing with custom multi-objective scoring**
+OrcaSlicer uses libnest2d (vendored, NFP-based) as the packing backend.  The `AutoArranger<TBin>` class wraps it with a custom objective function that blends:
+- Geometric density (pile bounding box area / bin area)
+- Corner-distance score (distance from bin corner or center)
+- Neighbour alignment score (R*-tree query for same-area items)
+- Material compatibility penalties (filament type, bed/print temperature)
+- Sequential-print height and clearance penalties (rod/lid clearance constraints)
+
+**Bed shape dispatch (call_with_bed)**
+A raw Points vector is classified at runtime into one of four bin types:
+- BoundingBox if poly_area/bbox_area > 99.9% (rectangle test)
+- CircleBed if all vertices within 10*SCALED_EPSILON of avg radius
+- Polygon otherwise
+- InfiniteBed for 0 or 1 input points
+
+**Pre-arrange call order is mandatory**
+The four update functions must be called in this order:
+1. `update_arrange_params()` — computes bed_shrink from skirt/clearance
+2. `update_selected_items_inflation()` — per-item inflation from brim/clearance
+3. `update_unselected_items_inflation()` — inflates fixed items
+4. `update_selected_items_axis_align()` — optional PCA rotation
+5. `get_shrink_bedpts()` — returns shrunken bed polygon
+
+All four mutate ArrangeParams or ArrangePolygon state. No assertion enforces order.
+
+**ArrangePolygon.allowed_rotations is dead**
+The field exists in the struct but is silently ignored — only `params.allow_rotations` controls whether rotations are tried, using a fixed {0°, 45°, 90°, 135°} set from `fill_config()`.
+
+**process_arrangeable winding contract**
+libnest2d requires clockwise winding. `process_arrangeable()` reverses CCW polygons. Upgrade to Clipper2 (which inverts winding) would silently break all item placement.
+
+**objfunc weight constants are empirical**
+Score blending weights (0.8/0.2, 0.5/0.5, 0.2/0.8, alignment_weight) are hardcoded and not documented with design rationale.  Any port must reproduce these exactly or re-tune.
+
+### Hazards Identified (H781–H794)
+
+| ID | Summary | Severity |
+|----|---------|----------|
+| H781 | `update_arrange_params()` not idempotent — calling twice doubles bed shrink | Medium |
+| H782 | Inflation clamp in `update_selected_items_inflation()` uses magic constant 5 | Low |
+| H783 | Tree-support plate: all items inflated to max branch radius, not per-item brim | Low |
+| H784 | `update_unselected_items_inflation()` depends on call-order after `update_arrange_params()` | Medium |
+| H785 | Axis-align threshold 0.66 undocumented — may inconsistently rotate near-equal-moment objects | Low |
+| H786 | `get_shrink_bedpts()` SGN() gives wrong direction for concave bed vertices | Medium |
+| H787 | `fill_config()` misleading comment: TOP_RIGHT branch says "center" | Low |
+| H788 | Alignment scoring disabled for objects of unique area — score stays at 1.0 (worst) | Medium |
+| H789 | `objfunc()` height_score partial-count division when loop breaks early | Low |
+| H790 | `_arrange()` zeroes min_obj_distance assuming pre-inflated items — no enforcement | Medium |
+| H791 | Dead `md` variable in `_arrange()` — `sl::offset` call is commented out | Low |
+| H792 | `process_arrangeable()` winding reversal fragile to Clipper2 upgrade | Medium |
+| H793 | `call_with_bed()` 0.1% rectangle coercion loses chamfer/irregularity constraint | Low |
+| H794 | fixeditems deflated twice (-2*EPSILON each) in arrange<BedT> + fill_config | Low |
+
+**Commit:** `annotate: Arrange.cpp + Arrange.hpp (H781-H794) (Session 50)`
+
+**Next hazard number to assign: H795**
