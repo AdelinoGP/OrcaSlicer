@@ -3209,3 +3209,110 @@ ExtrusionEntity (ABC)
 | H737 | `chained_path_from()` partial-clone exception path leaks already-cloned objects | Medium |
 
 **Next hazard number to assign: H738**
+
+---
+
+## Session 45 — AABBMesh.cpp + AABBMesh.hpp
+
+### Files Processed
+- `src/libslic3r/AABBMesh.cpp` (full, 401 lines)
+- `src/libslic3r/AABBMesh.hpp` (full)
+
+### Key Discoveries
+
+**Pimpl pattern for AABB encapsulation**
+`AABBMesh` uses the pimpl idiom with an inner `AABBImpl` class to hide the `AABBTreeIndirect::Tree3f` from the header. The `AABBImpl` is heap-allocated via a `unique_ptr<AABBImpl>` (destructor defined in .cpp so the incomplete type is resolved correctly).
+
+**Non-owning raw pointer to mesh**
+`m_tm` is a raw `const indexed_triangle_set*` — the mesh data is never owned by `AABBMesh`. Both constructors (from `indexed_triangle_set` and from `TriangleMesh`) store only a pointer. The copy constructor/assignment copy this pointer shallowly — both objects share the same mesh data with no reference counting (H738, H740).
+
+**Ray query pipeline**
+- `query_ray_hit()` — first-hit only; uses `igl::Hit` (float t); normalised-dir assert is DEBUG-only (H742). Float→double widening of `t` silently loses precision for large meshes (H747).
+- `query_ray_hits()` — all-hits; sorts by `t`, deduplicates by exact float equality (`a.t == b.t`) — near-duplicate grazing-edge hits survive (H743).
+- `normal_by_face_id()` — calls Eigen `.normalized()` on the cross-product; degenerate triangles produce NaN propagation (H746).
+
+**Dead code: `SLIC3R_HOLE_RAYCASTER`**
+`filter_hits()` merges object hits with hole cylinder intersections using a two-pointer sweep. Post-increment past `.back()` in the loop produces a dangling past-the-end pointer (H748). The feature was never shipped.
+
+**Adaptive epsilon**
+`AABBImpl::init()` optionally scales the Möller–Trumbore epsilon as `1e-6 * l²` (average edge length squared) to adapt to mesh scale. The adaptation is one-sided: very large meshes with the default epsilon miss near-surface rays; very small meshes with calculated epsilon over-eagerly fire (H739).
+
+### Hazards Identified (H738–H748)
+
+| ID | Summary | Severity |
+|----|---------|----------|
+| H738 | `m_tm` raw pointer — mesh lifetime must exceed `AABBMesh` lifetime | High |
+| H739 | Epsilon scaling: large meshes with default 1e-6 miss near-surface rays | Medium |
+| H740 | Copy constructor/assignment shallow-copies `m_tm` — shared dangling pointer risk | High |
+| H741 | `hit_result::is_inside()` uses raw dot product on un-normalized dir | Medium |
+| H742 | `query_ray_hit()` normalised-dir assert is DEBUG-only | Medium |
+| H743 | All-hits dedup uses exact float equality — near-duplicate grazing hits survive | Medium |
+| H744 | Eigen 1×3 row-vector vs Vec3d column-vector layout in `squared_distance()` | Low |
+| H745 | `vertices(idx)` / `indices(idx)` no bounds check — UB in release | Medium |
+| H746 | `normal_by_face_id()` returns NaN for degenerate (zero-area) triangles | High |
+| H747 | `igl::Hit::t` is `float`; widened to `double` — precision loss at large scale | Medium |
+| H748 | Dead-code `filter_hits()` post-increments past `.back()` — dangling pointer UB | High |
+
+**Commit:** `annotate: AABBMesh.cpp/.hpp (H738-H748)`
+
+---
+
+## Session 46 — Brim.cpp + Brim.hpp
+
+### Files Processed
+- `src/libslic3r/Brim.cpp` (full, 1127 lines)
+- `src/libslic3r/Brim.hpp`
+
+### Key Discoveries
+
+**OrcaSlicer extensions over PrusaSlicer brim**
+Brim.cpp is substantially extended from the PrusaSlicer baseline:
+1. **Per-extruder brim ordering** — brim areas keyed by `ObjectID` + extruder index
+2. **Auto-brim width** (`configBrimWidthByVolumeGroups`) — uses second moment of area (`compSecondMoment`), object height, and per-filament adhesion coefficient to compute a structurally-motivated brim width
+3. **Painted brim ears** — user-placed anchor discs stored as `BrimPoints` in model metadata; positions snapped to the post-EFC outline
+4. **Auto brim ears** — convex/concave vertex detection (ported from SuperSlicer's `detect_brim_points`)
+5. **EFC outline snapping** — `use_brim_efc_outline()` and `get_print_object_bottom_layer_expolygons()` snap brim placement to the post-ElephantFootCompensation boundary
+6. **Printable-area clipping** — per-extruder reachable zone intersection prevents brim outside build plate
+7. **Wipe-tower exclusion** — a no-brim exclusion zone around the wipe tower
+
+**Second moment of area algorithm (H752)**
+`compSecondMoment(Polygon, Vec2d&)` uses the shoelace-based moment formula. Polygon coordinates are scaled integers (×1e6), so the result is in `(scaled_units)^4`. Callers must multiply by `SCALING_FACTOR^4` to get mm⁴. Missing this conversion silently produces wildly wrong auto-brim widths.
+
+**Auto-brim heuristic magic numbers (H753, H754)**
+`configBrimWidthByVolumeGroups` divides by `Ixx + Iyy` to compute a "tipping risk" metric. Division by near-zero (degenerate polygon) is not guarded (H753). The denominator includes the constant 1920, which is empirically tuned and not documented (H754).
+
+**Iterative brim loop generation (H757, H758)**
+`make_brim_by_linesType_in_object` uses a `while (true)` loop that terminates only when `islands_ex` empties. If ClipperOffset can never shrink `islands_ex` to empty (e.g., degenerate geometry with zero-area offset), this loops forever. The 1.3/−0.3 offset split ratio is an undocumented heuristic magic number.
+
+**Plate offset applied after connect_brim_lines (H759)**
+`make_brim()` calls `connect_brim_lines()` before applying the plate offset translation. This is correct but easy to break if the call order is swapped — brim connectivity would be computed in the wrong coordinate space.
+
+**const_cast on print object (H760)**
+`make_brim()` uses `const_cast<PrintObject*>(print.get_object(i))` to write `firstLayerObjectBrimBoundingBox`. This casts away const on a `const Print&` parameter — a design smell indicating that brim results are stored back into the object rather than returned through a cleaner output channel.
+
+**Undocumented `make_brim_auto` declaration**
+`Brim.hpp` declares `make_brim_auto` but no definition exists in `Brim.cpp` — possibly a dead/removed feature (flagged as [UNCLEAR] in this entry).
+
+### Hazards Identified (H749–H760)
+
+| ID | Summary | Severity |
+|----|---------|----------|
+| H749 | Per-instance diff against global accumulator — earlier instances steal brim area from later ones | Medium |
+| H750 | `getadhesionCoeff()` last-match-wins — multi-material objects use wrong adhesion coefficient | Medium |
+| H751 | Dead commented-out code block after `return adhesionCoeff` — confuses readers | Low |
+| H752 | `compSecondMoment()` returns result in (scaled units)^4 — callers must apply SCALING_FACTOR^4 | High |
+| H753 | `height_to_area` divides by Ixx/Iyy — no guard for near-zero denominator (degenerate polygon) | High |
+| H754 | Constant 1920 in `height_to_area` is empirically tuned and undocumented | Low |
+| H755 | Connectivity filter uses 2×flow_spacing offset threshold — may merge separate objects' brims | Low |
+| H756 | Support brim path has large commented-out blocks — design intent unclear | Low |
+| H757 | `make_brim_by_linesType_in_object` `while(true)` — infinite loop on degenerate geometry | High |
+| H758 | 1.3/−0.3 offset split ratio is an undocumented heuristic | Low |
+| H759 | Plate offset applied after `connect_brim_lines` — brittle call-order dependency | Medium |
+| H760 | `const_cast<PrintObject*>` in `make_brim()` — casts away const to write brim bbox | Medium |
+
+**Unclear items logged:**
+- `make_brim_auto` is declared in `Brim.hpp` but NOT defined in `Brim.cpp` — possibly a removed/dead feature.
+
+**Commit:** `annotate: Brim.cpp/.hpp (H749-H760)`
+
+**Next hazard number to assign: H761**
