@@ -1412,3 +1412,100 @@ Hazards 141–175 added to `04_refactoring_hazards.md`. Notable P0/Critical item
 1. `src/libslic3r/Arachne/BeadingStrategy/` — 7 files (~612 lines): BeadingStrategy.hpp, DistributedBeadingStrategy.cpp, LimitedBeadingStrategy.cpp, OuterWallInsetBeadingStrategy.cpp, RedistributeBeadingStrategy.cpp, WideningBeadingStrategy.cpp, BeadingStrategyFactory.cpp
 2. `src/libslic3r/Arachne/SkeletalTrapezoidationGraph.cpp` — DCEL graph operations (~472 lines)
 3. `src/libslic3r/GCode/GCodeProcessor.hpp` — header for the 8000-line GCodeProcessor
+
+---
+
+## Session 17 — BeadingStrategy Module Complete Annotation
+
+**Date:** 2026-03-08
+**Branch:** `agent/analysis`
+**Focus:** Complete annotation of all 10 BeadingStrategy source files (5 hpp + 5 cpp pairs) plus BeadingStrategyFactory.
+
+### Objective
+
+Finish Session 17 which was partially started: `BeadingStrategy.hpp` had a partial annotation (file header + Beading struct + compute() done, remaining virtual methods not done). Annotated all remaining files in the BeadingStrategy module and appended Session 17 hazards (176–204) to `04_refactoring_hazards.md`.
+
+### Files Annotated
+
+| File | Lines | Tags Applied | Status |
+|------|-------|-------------|--------|
+| `BeadingStrategy.hpp` | 210 | INTENT, STATE, COUPLING, MEMORY, HAZARD | Completed (was partial) |
+| `BeadingStrategy.cpp` | 107 | INTENT, STATE, HAZARD, COUPLING | Complete |
+| `DistributedBeadingStrategy.hpp` | 70 | INTENT, STATE, COUPLING, HAZARD, CONCURRENCY | Complete |
+| `DistributedBeadingStrategy.cpp` | 143 | INTENT, STATE, HAZARD, CONCURRENCY | Complete |
+| `LimitedBeadingStrategy.hpp` | 103 | INTENT, STATE, MEMORY, COUPLING, HAZARD | Complete |
+| `LimitedBeadingStrategy.cpp` | 175 | INTENT, STATE, MEMORY, COUPLING, HAZARD | Complete |
+| `RedistributeBeadingStrategy.hpp` | 116 | INTENT, STATE, MEMORY, COUPLING, HAZARD | Complete |
+| `RedistributeBeadingStrategy.cpp` | 148 | INTENT, STATE, COUPLING, HAZARD | Complete |
+| `WideningBeadingStrategy.hpp` | 111 | INTENT, STATE, MEMORY, COUPLING, HAZARD | Complete |
+| `WideningBeadingStrategy.cpp` | 130 | INTENT, STATE, COUPLING, HAZARD | Complete |
+| `OuterWallInsetBeadingStrategy.hpp` | 78 | INTENT, STATE, MEMORY, COUPLING, HAZARD | Complete |
+| `OuterWallInsetBeadingStrategy.cpp` | 97 | INTENT, STATE, COUPLING, HAZARD | Complete |
+| `BeadingStrategyFactory.hpp` | 65 | INTENT, COUPLING, HAZARD | Complete |
+| `BeadingStrategyFactory.cpp` | 98 | INTENT, COUPLING, HAZARD | Complete |
+
+### Architectural Insight: Decorator Stack Construction
+
+The factory always assembles the stack in a fixed order:
+
+```
+DistributedBeadingStrategy              (base)
+└── RedistributeBeadingStrategy         (outer/inner isolation)
+    └── [WideningBeadingStrategy]       (optional: print_thin_walls)
+        └── [OuterWallInsetBeadingStrategy] (optional: offset != 0)
+            └── LimitedBeadingStrategy  (always outermost; inserts 0-width sentinels)
+```
+
+**Critical constraint:** `LimitedBeadingStrategy` MUST be outermost because it inserts 0-width sentinel beads that other decorators must not modify.
+
+### Key Discoveries
+
+1. **DistributedBeadingStrategy Gaussian falloff:** Weight function is `w(i) = max(0, 1 - one_over_r² * (i - middle)²)`. For `r=1`, falls back to uniform (1/1²). For `r=2`, `one_over_r² = 1/1² = 1.0` — full Gaussian collapse. Only `r >= 3` gives meaningful distribution.
+
+2. **LimitedBeadingStrategy 0-width sentinel:** When `bead_count > max_bead_count`, two 0-width beads are inserted symmetrically at the innermost wall boundary. These are consumed by infill/skin alignment code in SkeletalTrapezoidation. Any refactor that removes LimitedBeadingStrategy must provide an alternative boundary signal.
+
+3. **RedistributeBeadingStrategy degenerate cases:** For `bead_count <= 2`, the strategy degenerates to purely symmetric outer walls, ignoring the parent strategy entirely. The inner-wall parent is only invoked when `inner_bead_count > 0 && inner_thickness > 0`.
+
+4. **WideningBeadingStrategy getNonlinearThicknesses() unconditional:** `min_output_width` is always prepended for ALL `lower_bead_count` values. In practice only count==0 matters for thin-wall support ribs, but the implementation is not gated on count.
+
+5. **OuterWallInsetBeadingStrategy name typo:** `name = "OuterWallOfsetBeadingStrategy"` (missing 'f'). Both ctor and `toString()` carry this upstream bug. Do NOT rename during annotation or refactoring without updating all string consumers.
+
+6. **BeadingStrategyFactory max_bead_count <= 2 special case:** When `max_bead_count <= 2`, `optimal_width = preferred_bead_width_OUTER` (not inner). This prevents DistributedBeadingStrategy from using the inner-wall width as its base for single/double-wall parts where no inner walls will be generated.
+
+7. **Orca extension in factory:** Negative `outer_wall_offset` (outward shift) is supported. The guard is `!= 0` (not `> 0`). This diverges from upstream CuraEngine which only supported positive (inward) offsets.
+
+### New Hazards Documented
+
+Hazards 176–204 added to `04_refactoring_hazards.md`. Notable P0/P1 items:
+- **H176**: `getTransitionAnchorPos()` div-by-zero if `optimal_width == 0`
+- **H182**: Negative `to_be_divided` in DistributedBeadingStrategy can produce negative bead widths
+- **H184**: LimitedBeadingStrategy overflow case (bead_count >> max) is debug-only guarded
+- **H186**: `getOptimalThickness()` returns 1 m sentinel — propagates silently in release
+- **H199**: Factory max_bead_count <= 2 special case MUST be preserved
+- **H200**: Decorator stack order is fixed; refactor must preserve Distributed→Redistribute→[Widening]→[OuterWallInset]→Limited
+
+### Files Changed This Session
+
+| File | Change |
+|------|--------|
+| `src/libslic3r/Arachne/BeadingStrategy/BeadingStrategy.hpp` | Virtual method + protected field annotations completed |
+| `src/libslic3r/Arachne/BeadingStrategy/BeadingStrategy.cpp` | File header + all method annotations added |
+| `src/libslic3r/Arachne/BeadingStrategy/DistributedBeadingStrategy.hpp` | Full annotation |
+| `src/libslic3r/Arachne/BeadingStrategy/DistributedBeadingStrategy.cpp` | Full annotation |
+| `src/libslic3r/Arachne/BeadingStrategy/LimitedBeadingStrategy.hpp` | Full annotation |
+| `src/libslic3r/Arachne/BeadingStrategy/LimitedBeadingStrategy.cpp` | Full annotation |
+| `src/libslic3r/Arachne/BeadingStrategy/RedistributeBeadingStrategy.hpp` | Full annotation |
+| `src/libslic3r/Arachne/BeadingStrategy/RedistributeBeadingStrategy.cpp` | Full annotation |
+| `src/libslic3r/Arachne/BeadingStrategy/WideningBeadingStrategy.hpp` | Full annotation |
+| `src/libslic3r/Arachne/BeadingStrategy/WideningBeadingStrategy.cpp` | Full annotation |
+| `src/libslic3r/Arachne/BeadingStrategy/OuterWallInsetBeadingStrategy.hpp` | Full annotation |
+| `src/libslic3r/Arachne/BeadingStrategy/OuterWallInsetBeadingStrategy.cpp` | Full annotation |
+| `src/libslic3r/Arachne/BeadingStrategy/BeadingStrategyFactory.hpp` | Full annotation |
+| `src/libslic3r/Arachne/BeadingStrategy/BeadingStrategyFactory.cpp` | Full annotation |
+| `generated_documentation/04_refactoring_hazards.md` | Hazards 176–204 added (Session 17 section) |
+| `generated_documentation/agent_journal.md` | Session 17 entry added |
+
+### Next Annotation Targets (Session 18+)
+
+1. `src/libslic3r/Arachne/SkeletalTrapezoidationGraph.cpp` (~472 lines) — DCEL graph operations
+2. `src/libslic3r/GCode/GCodeProcessor.hpp` — header for the 8000-line GCodeProcessor
