@@ -1509,3 +1509,49 @@ Hazards 176–204 added to `04_refactoring_hazards.md`. Notable P0/P1 items:
 
 1. `src/libslic3r/Arachne/SkeletalTrapezoidationGraph.cpp` (~472 lines) — DCEL graph operations
 2. `src/libslic3r/GCode/GCodeProcessor.hpp` — header for the 8000-line GCodeProcessor
+
+---
+
+## Session 18 — SkeletalTrapezoidationGraph.cpp (graph mutation layer)
+
+### Files Processed
+
+| File | Status |
+|------|--------|
+| `src/libslic3r/Arachne/SkeletalTrapezoidationGraph.cpp` | Full annotation complete |
+| `src/libslic3r/Arachne/SkeletalTrapezoidationGraph.hpp` | Read for context (not modified — header is clean) |
+| `src/libslic3r/Arachne/SkeletalTrapezoidationEdge.hpp` | Read for context |
+| `src/libslic3r/Arachne/SkeletalTrapezoidationJoint.hpp` | Read for context |
+| `generated_documentation/04_refactoring_hazards.md` | Hazards 205–213 added |
+| `generated_documentation/agent_journal.md` | This entry |
+
+### Key Discoveries
+
+**Role of this file:** `SkeletalTrapezoidationGraph.cpp` is the *mutable DCEL layer* of the Arachne pipeline. It provides the data structure (doubly-connected edge list built on top of `HalfEdgeGraph<>`) and the three mutation operations that `SkeletalTrapezoidation.cpp` calls at different stages of pipeline construction:
+
+1. **`collapseSmallEdges(snap_dist=5 nm)`** — post-Voronoi cleanup: removes degenerate quads where nodes are closer than `snap_dist`. Two collapse patterns: top-collapse (mid-edge short) and side-collapse (both side edges short).
+2. **`insertNode(edge, mid, bead_count)`** — inserts a skeleton node at a bead-count transition, splitting the original edge and its twin into two fragments each, linked by perpendicular rib pairs.
+3. **`makeRib(prev_edge, start, end)`** — attaches a simple perpendicular rib to the polygon boundary when processing a polygon vertex that falls on a Voronoi edge.
+
+**gMAT uphill traversal:** `STHalfEdge::canGoUp()`, `isUpward()`, `distToGoUp()` implement the "uphill" partial order on the medial-axis graph. The key complexity is *equidistant edges* — when `from->distance_to_boundary == to->distance_to_boundary`, all three functions recurse through the outgoing fan. This is safe for valid gMATs but has **no cycle guard (H205)**.
+
+**distance_to_boundary sentinel:** Nodes have `distance_to_boundary = -1` at construction (from `SkeletalTrapezoidationJoint` default ctor). Both `makeRib()` and `insertRib()` explicitly set this to the computed perpendicular distance (skeleton side) or 0 (boundary side). Code that reads `distance_to_boundary` before one of these functions runs will see the -1 sentinel and silently compute wrong bead counts.
+
+**transition_ratio = 0 invariant:** Both `insertRib()` and `insertNode()` set `mid_node->data.transition_ratio = 0` explicitly. This is a contract with `SkeletalTrapezoidation::generateJunctions()`: transition END nodes have zero fractional remainder, meaning a whole number of beads fits at both ends of each transition span.
+
+**Topology invariant — prev==nullptr marks chain heads:** `collapseSmallEdges()` uses `edge.prev == nullptr` to identify chain heads (the start of a "quad"). This invariant must be preserved across all graph mutations. `insertRib()` sets `inward_edge->prev = nullptr` and `outward_edge->next = nullptr` correctly to preserve it for the new rib edges.
+
+**insertRib() leaves twin=nullptr (H213):** The function deliberately leaves `first->twin` and `second->twin` as nullptr on exit — they can only be set AFTER the corresponding call on the twin edge returns. `insertNode()` calls `insertRib()` twice and patches twins afterward. This is a fragile two-step protocol that must be preserved exactly.
+
+### Critical Hazards (Session 18)
+
+- **H205** (P1): Infinite recursion on equidistant-edge cycles in `canGoUp()` / `distToGoUp()` — no cycle guard
+- **H209** (P1): `collapseSmallEdges()` dangling-pointer corruption when a node has >1000 outgoing edges — pre-existing upstream bug
+- **H213** (P1): `insertRib()` exits with null twin pointers — only safe because `insertNode()` patches them immediately; any standalone call is a crash
+- **H212** (P2): `insertRib()` assert(dist > 0) — zero-length ribs in release when mid_node is exactly on source segment
+- **H210** (P2): One-sided thin quads survive `collapseSmallEdges()` and may generate zero-width beads downstream
+
+### Next Annotation Targets (Session 19+)
+
+1. `src/libslic3r/GCode/GCodeProcessor.hpp` — header for the G-code processing pass (~500+ lines)
+2. `src/libslic3r/GCode/GCodeProcessor.cpp` — the 8000-line G-code processor
