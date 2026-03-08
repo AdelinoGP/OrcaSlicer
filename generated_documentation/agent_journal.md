@@ -3147,3 +3147,65 @@ The `traverse()` function with `Intersecting<Box>` / `Within<Box>` predicates pr
 | H720 | Typo in function name `..._recurisve` propagates to all call sites | Low |
 
 **Next hazard number to assign: H721**
+
+---
+
+## Session 44 — ExtrusionEntity.hpp/.cpp and ExtrusionEntityCollection.hpp/.cpp
+
+### Files Annotated
+- `src/libslic3r/ExtrusionEntity.hpp` — fully annotated (~614 lines after injection)
+- `src/libslic3r/ExtrusionEntity.cpp` — fully annotated (~324 lines after injection)
+- `src/libslic3r/ExtrusionEntityCollection.hpp` — fully annotated (~176 lines after injection)
+- `src/libslic3r/ExtrusionEntityCollection.cpp` — fully annotated (174 lines after injection)
+
+All four files committed in one commit: `5a76199864`
+(`annotate: ExtrusionEntity.hpp/.cpp and ExtrusionEntityCollection.hpp/.cpp (H721-H737)`)
+
+### Key Insights
+
+**Toolpath ownership model** — `ExtrusionEntityCollection::entities` is a `std::vector<ExtrusionEntity*>` where the collection owns every pointer. `clear()` manually `delete`s each element; `operator=` calls `clear()` then re-clones. Every `append()` call clones its argument. `filter_by_extrusion_role()` deliberately returns a *shallow view* (no ownership transfer) — callers must not call `clear()` on the source while holding filtered results.
+
+**Polymorphic hierarchy**
+```
+ExtrusionEntity (ABC)
+  ├─ ExtrusionPath
+  │    ├─ ExtrusionPathSloped
+  │    └─ ExtrusionPathOriented
+  ├─ ExtrusionMultiPath
+  ├─ ExtrusionLoop
+  │    └─ ExtrusionLoopSloped
+  └─ ExtrusionEntityCollection
+```
+`ExtrusionRole` is a `uint8_t` enum (20 values; `erMixed` for collections). `ExtrusionLoopRole` is an implicit bitmask with no `operator|` defined — callers cast to/from `uint8_t` manually.
+
+**Notable implementation patterns**
+- `ExtrusionLoopSloped` constructor uses a recursive lambda `handle_line` that bisects segments to enforce `slope_max_segment_length` — the seam-entry Z-hop ramp feature (H731).
+- `extrusion_entities_append_paths_with_wipe()` groups paths within `3×width` into `ExtrusionMultiPath` with no-extrusion wipe connector segments — Bambu/Orca-specific wipe optimization (H726/H728).
+- `chained_path_from()` always clones filtered entities then delegates to `chain_and_reorder_extrusion_entities()` (ShortestPath.hpp) for greedy nearest-neighbour O(n²) ordering.
+- `flatten()` uses a local struct with `recursive_do()` — respects `no_sort` flag when `preserve_ordering=true`.
+
+**Bug documented**: `clip_front()` for `erPerimeter` overrides `clip_dist` inside the `while (distance > 0)` loop with a value derived from `ext_perimeter_overlap * crossection`. If `ext_perimeter_overlap` is near-zero, `clip_dist → 0` while `distance` stays positive — near-infinite loop (H727). The dynamic role-check on the first path makes this conditional on loop rotation state (H733).
+
+### Hazards Identified (H721–H737)
+
+| ID | Summary | Severity |
+|----|---------|----------|
+| H721 | `ExtrusionLoopRole` is an implicit bitmask with no `operator\|` — explicit casts required | Medium |
+| H722 | `elrDefault=0` cannot be tested with `& elrDefault` — must compare `== elrDefault` | Low |
+| H723 | Default `ExtrusionPath` has `mm3_per_mm=-1` — `total_volume()` returns negative | Medium |
+| H724 | `polyline` is public mutable — no caching risk in C++, but caution for ports | Low |
+| H725 | `SlopedParams` stale after clip — slope geometry inconsistent with clipped path | Medium |
+| H726 | `3×width` wipe-grouping threshold hardcoded — can merge unrelated perimeter loops | Low |
+| H727 | `clip_front()` `erPerimeter` branch near-zero `clip_dist` near-infinite loop | High |
+| H728 | `ExtrusionMultiPath` wipe connectors alias freed memory on shallow copy | High |
+| H729 | `polygons_covered_by_spacing`: spacing==width returns width polygon (correct but confusing) | Low |
+| H730 | `split_at_vertex()` purely geometric — no seam quality check | Low |
+| H731 | `ExtrusionLoopSloped` recursive lambda depth unbounded in theory | Low |
+| H732 | `clip_slope()` ramp positions depend on loop rotation state — stale after split_at | Medium |
+| H733 | `clip_front()` role taken from first path dynamically — inconsistent with H727 | Medium |
+| H734 | `role_to_string()`/`string_to_role()` not updated for new roles → "Unknown" silent corruption | Medium |
+| H735 | `filter_by_extrusion_role()` returns shallow aliased ptr view — dangling if source destroyed | High |
+| H736 | `filter_by_extrusion_role_in_place()` erases without deleting — leaks on owned vectors | High |
+| H737 | `chained_path_from()` partial-clone exception path leaks already-cloned objects | Medium |
+
+**Next hazard number to assign: H738**
