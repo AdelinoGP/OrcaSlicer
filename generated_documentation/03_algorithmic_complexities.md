@@ -650,3 +650,72 @@ For a typical island with 8 walls and 20 extrusion segments this is manageable. 
 | `reorderPerimetersByProximity()` | O(D × N² × pts) | D = inset depth |
 | `process_classic()` full island | O(wall_loops × v log v) | Clipper offset chain |
 | `process_arachne()` full island | O(v log v) + O(D×N²) | Arachne + ordering |
+
+---
+
+## Section 9 — PrintObject.cpp Algorithmic Complexities
+
+**Files:** [`PrintObject.cpp`](../src/libslic3r/PrintObject.cpp)
+
+### project_triangles_to_slabs()
+
+Parallel projection of painted triangle meshes to per-layer 2D polygon slabs:
+
+- **Input:** T triangles, L layers
+- **Phase 1 (parallel):** For each triangle, binary-search the layer array for the first and last intersecting layer — O(log L) per triangle. Then interpolate slab-boundary intersection points — O(layers_spanned) per triangle.
+  - Total Phase 1: O(T × (log L + avg_layers_spanned)) — parallelised with TBB blocked_range
+- **Phase 2 (serial):** Merge triangle projections into per-layer output — O(T × avg_layers_spanned) = O(T × L) worst case (all triangles span all layers)
+- **Typical case:** avg_layers_spanned << L, so Phase 2 is O(T)
+- LightPolygon pre-reserves 5 points (triangle–slab intersection is at most a pentagon) to minimise heap allocations inside the parallel kernel
+
+### discover_vertical_shells()
+
+Shell-promotion algorithm: promotes stInternal fill surfaces to stInternalSolid within a shell width above/below each top/bottom surface:
+
+- Per-region, per-layer nested loop: O(R × L) outer iterations
+- For each layer with solid surfaces: collect top/bottom polygons, project to neighboring N layers
+- Each projection: Clipper offset + intersection — O(v log v) where v = polygon vertex count
+- **Total:** O(R × L × N × v log v) where N = top_shell_layers or bottom_shell_layers
+- Serial — cross-layer dependencies prevent TBB parallelisation
+
+### discover_horizontal_shells()
+
+Scatters solid shell coverage across neighboring layers:
+
+- Per-region, per-layer serial sweep: O(R × L × 3) for top/bottom/bridge surface types
+- For each shell type at each layer, propagates to N neighboring layers:
+  - Clipper intersections per layer: O(v log v)
+- **Total:** O(R × L × N × v log v) — effectively the same as discover_vertical_shells
+- Uses `goto EXTERNAL` for early loop exit — O(1) skip cost
+
+### combine_infill()
+
+N-layer infill combination (infill every N layers feature):
+
+- Computes combine[] assignment array: O(L) linear pass
+- For each combined group (at most L/N groups):
+  - Multi-layer intersection of ExPolygons: O(N × v log v)
+  - Clearance offset + diff for each of N layers: O(N × v log v)
+- **Total:** O(L × v log v) — linear in layer count, Clipper-dominated
+
+### invalidate_state_by_config_options()
+
+Hand-maintained config-key → slicing-step mapping:
+
+- **Complexity:** O(k × S) where k = number of changed config keys, S = number of steps to check
+- In practice the switch is O(k) with O(1) per key (linear table lookup by string hash)
+- No algorithmic concern — pure dispatch table
+
+### Complexity Summary (PrintObject.cpp)
+
+| Operation | Complexity | Parallelism | Notes |
+|-----------|------------|-------------|-------|
+| `project_triangles_to_slabs()` | O(T × log L) | TBB parallel | T = triangles, L = layers |
+| `discover_vertical_shells()` | O(R × L × N × v log v) | Serial | N = shell layers |
+| `discover_horizontal_shells()` | O(R × L × N × v log v) | Serial | N = shell layers |
+| `combine_infill()` | O(L × v log v) | Serial | Per-region |
+| `bridge_over_infill()` | O(L × v log v) | Serial | Clipper per layer |
+| `clip_fill_surfaces()` | O(L × v log v) | Serial | Top-down pass |
+| `detect_surfaces_type()` | O(L × R × v log v) | TBB parallel | Per-layer parallel |
+| `process_external_surfaces()` | O(L × R × v log v) | TBB parallel | Per-layer parallel |
+

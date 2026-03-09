@@ -5289,3 +5289,116 @@ The `all_surfaces` vector is passed by reference and mutated in-place (erase + p
 4. Continue updating all five documentation files after each major file
 
 **Next hazard number to assign: H1087**
+
+---
+
+## Session 75
+
+### Overview
+
+Completed full annotation of `src/libslic3r/PrintObject.cpp` — all ~50+ functions now carry structured tags. This was the primary slicing orchestration file (4,767 lines after annotation). Thirteen new hazards were assigned (H1087–H1099).
+
+### Files Modified
+
+- `src/libslic3r/PrintObject.cpp` (4,767 lines after annotation; previously ~4,630 with partial session-75 additions)
+
+### Continuation Context
+
+Session 75 spanned multiple iterations. Session 74 had already annotated PerimeterGenerator.cpp completely. The PrintObject.cpp upper/middle sections (H1087–H1095) were annotated in prior iterations of this session. This iteration completed the remaining lower half (~16 functions).
+
+### Functions Annotated This Session
+
+| Function | Lines (approx) | Key Notes |
+|----------|----------------|-----------|
+| `PrintObject()` constructor | ~102 | Multi-phase init; instance shift encoding |
+| `set_instances()` | ~156 | Triggers invalidation when instances change |
+| `all_regions()` | ~186 | Region view across object |
+| `create_polyholes()` | ~202 | Polyhole geometry synthesis |
+| `_transform_hole_to_polyholes()` | ~238 | Phase aliasing risk (H1087) |
+| `detect_extruder_geometric_unprintables()` | ~380 | First-instance-only transform (H1088) |
+| `prepare_infill()` | ~644 | Multi-step infill preparation dispatch |
+| `infill()` | ~797 | Parallel infill generation |
+| `ironing()` | ~833 | Ironing pass dispatch |
+| `clear_overhangs_for_lift()` | ~856 | Clears lift overhang cache |
+| `detect_overhangs_for_lift()` | ~870 | Parallel per-layer overhang bbox |
+| `generate_support_material()` | ~911 | Support DAG step with caching |
+| `estimate_curled_extrusions()` | ~970 | Curl estimation; unclear return |
+| `simplify_extrusion_path()` | ~996 | Parallel Visvalingam simplification |
+| `prepare_adaptive_infill_data()` | ~1051 | Parallel adaptive infill octree |
+| `prepare_lightning_infill_data()` | ~1101 | Lightning infill tree build |
+| `clear_layers()` / `add_layer()` | ~1121 | Layer ownership management |
+| `get_support_layer_at_printz()` | ~1145 | Support layer binary search |
+| `clear_support_layers()` | ~1163 | Support layer deallocation |
+| `alloc_tree_support_preview_cache()` | ~1182 | Preview cache allocation |
+| `add_tree_support_layer()` / `add_support_layer()` / `insert_support_layer()` | ~1198 | Support layer insertion |
+| `invalidate_state_by_config_options()` | ~1224 | Large hand-maintained config→step map (H1089) |
+| `invalidate_all_steps()` | ~1497 | Full step invalidation |
+| `detect_surfaces_type()` | ~1509 | Interim Orca type stInternalAfterExternalBridge (H1090) |
+| `process_external_surfaces()` | ~1892 | External surface expansion |
+| `discover_vertical_shells()` | ~1984 | Vertical shell promotion; offset2 wall deletion (H1091) |
+| `bridge_over_infill()` | ~2467 | Bridge classification; lightning move hazard (H1092/H1093) |
+| `clip_fill_surfaces()` | ~3752 | Top-down infill void clipping |
+| `discover_horizontal_shells()` | ~3844 | Horizontal shell promotion; goto EXTERNAL (H1094) |
+| `combine_infill()` | ~4066 | N-layer infill combination; thickness dual-use (H1095) |
+| `clamp_exturder_to_default()` | ~3501 | Extruder index sanitisation |
+| `object_config_from_model_object()` | ~3508 | Per-object config resolution |
+| `apply_to_print_region_config()` | ~3528 | Config layer merge helper |
+| `region_config_from_model_volume()` | ~3553 | Per-volume config resolution |
+| `generate_support_preview()` | ~3596 | Timing wrapper; dead POProfiler (UNCLEAR) |
+| `update_slicing_parameters()` | ~3610 | Lazy slicing params init |
+| `slicing_parameters()` (static) | ~3620 | One-shot slicing params for UI |
+| `object_extruders()` | ~3662 | 0-based extruder index collection |
+| `update_layer_height_profile()` | ~3683 | Layer height profile validation/regen; ASAN workaround (H1096) |
+| `get_certain_layers()` | ~3717 | Layer range collection + bbox |
+| `get_instances_shift_without_plate_offset()` | ~3734 | Per-instance 2D shift |
+| `_generate_support_material()` | ~4198 | Support type dispatch |
+| `remove_bridges_from_contacts<T>()` | ~4214 | Bridge contact subtraction; typeid dispatch (H1097) |
+| `is_support_necessary()` | ~4351 | Support necessity heuristic; expensive side-effect (H1098) |
+| `project_triangles_to_slabs()` | ~4367 | Parallel triangle→layer projection |
+| `project_and_append_custom_facets()` | ~4552 | Per-volume painted facets dispatch |
+| `get_layer_at_printz()` overloads | ~4583+ | Binary search layer lookup |
+| `get_first_layer_bellow_printz()` | ~4606 | Below-z layer lookup |
+| `get_layer_idx_get_printz()` | ~4613 | Index-returning lookup |
+| `get_layer_at_bottomz()` | ~4621 | Linear scan by bottom_z (H1099) |
+
+### Key Architectural Discoveries
+
+**PrintObject as Slicing Orchestrator**
+`PrintObject` is the central orchestration object for all per-object slicing steps. The step DAG is encoded in `invalidate_state_by_config_options()` (a 270-line hand-maintained switch) and executed via the `PrintObjectStep` enum. The object caches sliced results across interactive re-slices; steps are invalidated individually when config options change.
+
+**Config Resolution Hierarchy**
+The full config resolution chain for a region is:
+  `print default → object config → volume config → material config → layer-range override`
+This is implemented across `object_config_from_model_object()`, `apply_to_print_region_config()`, and `region_config_from_model_volume()`. The static `slicing_parameters()` overload must replicate this chain independently for the UI's layer-height editor, creating a sync hazard with `Print::apply()`.
+
+**Support Dispatch**
+`_generate_support_material()` is a thin gateway that selects between `TreeSupport` and `PrintObjectSupportMaterial` based on `support_type` config. Both subsystems consume the same `m_slicing_params` and write to the same support layer vector.
+
+**Painted Facets Projection**
+Seam and support enforcer/blocker painting is projected from 3D triangle meshes to 2D layer polygons via two different algorithms: `project_triangles_to_slabs()` (parallel, slab-based for seam) vs `slice_mesh_slabs()` (mesh-slicing for enforcers/blockers). The two paths produce the same output format (per-layer Polygons) but use different geometric algorithms.
+
+### Hazard Summary (Session 75)
+
+| ID | Priority | Description |
+|----|----------|-------------|
+| H1087 | P2/Medium | `_transform_hole_to_polyholes` raw-pointer phase aliasing risk |
+| H1088 | P2/Medium | `detect_extruder_geometric_unprintables` uses only first instance shift |
+| H1089 | P1/High | `invalidate_state_by_config_options` hand-maintained map — silent stale output on new keys |
+| H1090 | P2/Medium | `detect_surfaces_type` stInternalAfterExternalBridge interim type; unchecked if reclassification removed |
+| H1091 | P2/Medium | `discover_vertical_shells` offset2() can silently delete thin walls |
+| H1092 | P1/High | `bridge_over_infill` lightning infill std::move exception leaves fill_surfaces empty |
+| H1093 | P2/Medium | `bridge_over_infill` CandidateSurface holds raw pointer into fill_surfaces — dangling on realloc |
+| H1094 | P2/Medium | `discover_horizontal_shells` uses `goto EXTERNAL` label — must be ported explicitly |
+| H1095 | P2/Medium | `combine_infill` Surface::thickness dual-use encoding |
+| H1096 | P2/Medium | `update_layer_height_profile` ASAN workaround hides ownership/aliasing issue |
+| H1097 | P2/Medium | `remove_bridges_from_contacts` typeid() runtime dispatch — fragile for new specialisations |
+| H1098 | P2/Medium | `is_support_necessary` expensive full slice+overhang cycle; destroys support layers as side-effect |
+| H1099 | P3/Low | `get_layer_at_bottomz` linear O(n) scan where O(log n) binary search is possible |
+
+### Next Steps
+
+1. Begin `src/libslic3r/Print.cpp` annotation (5010+ lines, only 3 tags so far)
+2. Then continue with remaining large core files
+3. Continue updating all five documentation files after each major file
+
+**Next hazard number to assign: H1100**
