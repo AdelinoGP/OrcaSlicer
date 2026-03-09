@@ -5607,3 +5607,68 @@ All of the following (after this journal update):
 
 ---
 
+## Session 80 — PresetBundle.cpp Full Structured-Tag Pass (H1108–H1117)
+
+### Objective
+Complete the annotation of `src/libslic3r/PresetBundle.cpp` (4612 lines / ~4900 lines post-annotation) and document all hazards discovered.
+
+### File Read Summary
+- Lines 1–3560 partially read in prior context
+- Lines 3761–4612 read in this session: `load_vendor_configs_from_json()` complete, `update_multi_material_filament_presets()`, `update_compatible()` (with four local `PreferedProfileMatch` scorer classes), `export_current_configs()`, `set_filament_preset()`, `set_default_suppressed()`, `has_errors()`
+
+### Key Discoveries
+
+**`load_vendor_configs_from_json()` architecture**
+Three-phase load: (1) parse root JSON → VendorProfile; (2) load each sub-file via `parse_subfile` lambda into `configs` map (inheritance resolution) then into PresetCollection; (3) persist `m_config_maps` / `m_filament_id_maps` for the Orca filament library bundle only (for cross-bundle inheritance). The `parse_subfile` lambda captures `current_vendor_profile` by pointer — safe only because `this->vendors` is not modified after the pointer is taken.
+
+**`filament_preset_convert` static map**
+BBL-specific Bambu H2D filament rename migration table baked as a static global in the slicer core. See H1114.
+
+**`update_compatible()` local scorer classes**
+Four local structs define the authoritative preset-selection scoring heuristic. Alias match = INT_MAX > name match = 1, ×10 multiplier for layer height / filament type match, +1 bonus for is_visible. This scoring is the only copy in the codebase. See H1117.
+
+**`update_multi_material_filament_presets()` matrix resizing**
+Resizes the flush matrix when slot count changes. The `#if 0` BBS block disables nozzle-diameter-based preset validity check. See H1116.
+
+### Annotations Written
+
+All of the following function-level blocks added to `PresetBundle.cpp`:
+- File-level header block: `[INTENT]`, `[STATE]`, `[COUPLING]`, `[CONCURRENCY]`, `[MEMORY]`, `[HAZARD]`
+- `construct_full_config()`: `[INTENT]`, `[STATE]`, `[COUPLING]`, `[CONCURRENCY]`
+- `get_required_hrc_by_filament_type()`: `[INTENT]`, `[STATE]`, `[HAZARD H1109]`, `[COUPLING]`
+- `update_system_preset_setting_ids()`: `[INTENT]`, `[HAZARD H1110]`, `[COUPLING]`
+- `update_selections()`: `[INTENT]`, `[STATE]`, `[HAZARD H1111]`
+- `load_selections()`: `[INTENT]`, `[STATE]`, `[HAZARD H1111]`, `[COUPLING]`
+- `sync_ams_list()`: `[INTENT]`, `[STATE]`, `[HAZARD H1112]`, `[HAZARD H1113]`, `[COUPLING]`
+- `full_fff_config()`: `[INTENT]`, `[STATE]`, `[HAZARD H1108]`, `[CONCURRENCY]`
+- `load_vendor_configs_from_json()`: `[INTENT]`, `[STATE]`, `[COUPLING]`, `[HAZARD H1114]`, `[HAZARD H1115]`, `[MEMORY]`
+- `filament_preset_convert` static map: `[INTENT]`, `[HAZARD H1114]`
+- `update_multi_material_filament_presets()`: `[INTENT]`, `[STATE]`, `[HAZARD H1116]`, `[COUPLING]`
+- `update_compatible()`: `[INTENT]`, `[STATE]`, `[COUPLING]`, `[HAZARD H1117]`
+
+### Hazards (Session 80)
+
+| ID | Priority | Description |
+|----|----------|-------------|
+| H1108 | P1/High | `construct_full_config()` and `full_fff_config()` share ~80% duplicated multi-filament merge logic. Changes must be mirrored manually in both. |
+| H1109 | P1/High | `get_required_hrc_by_filament_type()` static map lazy-init no-mutex data race — same pattern as H1102. |
+| H1110 | P2/Medium | `update_system_preset_setting_ids()` — three `if` branches all check `PRESET_IOT_PRINTER_TYPE` (copy-paste bug). Filament and print type branches are dead code. |
+| H1111 | P2/Medium | `load_selections()` and `update_selections()` contain nearly-identical per-project config serialization blocks. No shared helper. |
+| H1112 | P2/Medium | `sync_ams_list()` — three modes in one 400-line function via two bool flags. High cyclomatic complexity. |
+| H1113 | P2/Medium | `sync_ams_list()` uses magic bitmask `0x10000` to encode left/right extruder. No named constant. |
+| H1114 | P3/Low | `filament_preset_convert` static global — BBL H2D filament rename migration baked into slicer core. |
+| H1115 | P3/Low | `load_config_file_config()` `#if 0` dead block for original `num_extruders` calculation. |
+| H1116 | P2/Medium | `update_multi_material_filament_presets()` `#if 0` disables per-slot preset validity check. |
+| H1117 | P2/Medium | `update_compatible()` local scorer structs — authoritative preset-selection scoring buried in function body, must be replicated exactly. |
+
+### Next Hazard Number
+H1118
+
+### Files Committed (this session)
+- `src/libslic3r/PresetBundle.cpp`
+- `generated_documentation/agent_journal.md`
+- `generated_documentation/04_refactoring_hazards.md`
+
+---
+
+
