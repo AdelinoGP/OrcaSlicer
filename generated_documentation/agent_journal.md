@@ -3918,3 +3918,67 @@ Uses `emplace_hint` with the iterator returned by a failed `find()` call to hint
 The Config subsystem is the backbone of all OrcaSlicer parameter management.  Its CRTP template hierarchy, runtime polymorphism, nullable sentinels, and implicit conversions are all refactoring traps that require careful handling in any target language.  All 6 new hazards (H821–H826) have been registered in `04_refactoring_hazards.md`.
 
 **Next hazard number to assign: H827**
+
+---
+
+## Session 57 — Preset Subsystem: Preset.hpp + Preset.cpp
+
+### Files Processed
+- `src/libslic3r/Preset.hpp` — 1160 lines, fully annotated
+- `src/libslic3r/Preset.cpp` — 4459 lines (post-annotation), fully annotated
+
+### Commit
+`6ed7fbaf2d` — `annotate: Preset.hpp + Preset.cpp — preset collection and vendor profile management`
+
+### Architecture Discoveries
+
+**Preset type hierarchy:**
+`Preset::Type` enum has 8 values: TYPE_INVALID, TYPE_PRINT, TYPE_FILAMENT, TYPE_PRINTER, TYPE_PHYSICAL_PRINTER, TYPE_PLATE, TYPE_MODEL, and TYPE_COUNT.  The first three (PRINT, FILAMENT, PRINTER) are the main managed collection types.  PHYSICAL_PRINTER, PLATE, and MODEL are special-purpose non-collection types used by UI and project-file code respectively.
+
+**PresetCollection storage layout:**
+Uses `std::deque<Preset>` intentionally (not `vector`) to guarantee pointer stability across insertions; pointer invalidation would be catastrophic because many parts of the codebase hold raw `const Preset*` pointers into the collection.  Indices `[0..m_num_default_presets-1]` are always reserved for default presets.  `begin()/end()` skip defaults via `m_presets.begin() + m_num_default_presets`; `lbegin()` provides access to all including defaults.
+
+**m_edited_preset pattern:**
+`PresetCollection::m_edited_preset` is a copy of the currently selected preset that accumulates live UI edits.  It is the canonical "working copy" model.  `get_edited_preset()` returns a mutable reference to it.  This pattern is critical to understand: the UI always modifies `m_edited_preset`, not the selected preset directly.
+
+**Inheritance system:**
+`Preset::inherits()` returns/sets the `"inherits"` config key.  The `const` overload calls `config.option<ConfigOptionString>("inherits", true)` which inserts the key if missing — the const overload has a mutating side effect via `const_cast`.  `get_preset_base()` recursively walks the chain to find the ultimate root; no cycle detection exists (H828).
+
+**Diff-save pattern:**
+`Preset::save(parent_config)` writes only keys that differ from `parent_config` when the parent is provided.  This is the inheritance compression mechanism keeping user files small.  `get_preset_differed_for_save()` builds a transient `Preset*` with the same reduced config for cloud upload — caller owns and must delete this heap allocation.
+
+**deep_diff() function:**
+File-scope inline (not a method).  Expands vector options element-by-element using `#N` suffix notation (`nozzle_diameter#0`, `nozzle_diameter#1`, etc.) for per-extruder dirty detection.  Special-cases `printable_area`, `compatible_printers`, `thumbnails` (with semantic comparison via `GCodeThumbnails::make_and_check_thumbnail_list`), and ignores `default_filament_profile` entirely.
+
+**load_presets() silent deletion:**
+On any JSON parse failure, both the `.json` and `.info` sidecar are deleted from disk.  Users who hand-edit presets and introduce syntax errors will lose their files silently.
+
+**load_user_preset() return value inversion:**
+Returns `false` for both "already up to date" AND "was updated from cloud/disk".  Only returns `true` for "newly inserted".  Callers that check the return for "did anything change?" will get the wrong answer for the update case.  (H832)
+
+**VendorProfile::from_ini(tree, …):**
+Parses legacy PrusaSlicer-style `.ini` bundle format (not BBS JSON).  Iterates `[printer_model:*]` sections; technology is inferred from the model ID prefix ("SL" → SLA) if no explicit `technology` field is set.  BBL-specific family inference from `pre_family_model_map` applies when `vendor.name == "BBL"`.  The `#if 0`-guarded SLA filter block inside the loop is permanently dead code.
+
+**PhysicalPrinterCollection:**
+Binary-search (O(log N)) for case-sensitive lookup; O(N) linear scan for case-insensitive — silent performance degradation.  `load_printers_from_presets()` is entirely inside `#if 0` (H833).
+
+**PresetUtils namespace:**
+`system_printer_bed_model/bed_texture/hotend_model` use two-tier path resolution: `data_dir()` first, `resources_dir()` fallback.  All three silently return empty string (or generic fallback for hotend) if `preset.vendor == nullptr`.
+
+### Hazards Assigned
+
+| ID | Description |
+|----|-------------|
+| H827 | `PRESET_PROFILES_TEMOLATE_DIR` macro in Preset.hpp:37 has a typo ("TEMOLATE" vs "TEMPLATE") that has propagated into filesystem path construction wherever this constant is used; renaming it would be an API-breaking change |
+| H828 | `get_preset_base()` is recursive with no cycle detection — a circular `inherits` chain (A→B→A) will overflow the stack; the system does not validate the inherits graph on load, so circular chains are possible via hand-edited JSON |
+| H829 | `load_user_preset()` acquires `m_mutex` via manual `lock()` and releases via manual `unlock()` — no RAII guard.  If any exception is thrown inside the locked section, the mutex is not released and the collection becomes permanently deadlocked |
+| H830 | `PresetCollection::get_selected_preset()` contains the guard `if ((m_idx_selected < 0) || ...)` — `m_idx_selected` is `size_t`, so `< 0` is always false.  The intended crash guard for negative index is a no-op; the real guard is the `>= m_presets.size()` check on the same line |
+| H831 | `PhysicalPrinter::has_print_host_information(const DynamicPrintConfig&)` unconditionally returns `false` — completely dead, no host info is ever filtered; any caller that depends on this for security or UI decisions is silently misled |
+| H832 | `PresetCollection::load_user_preset()` return value semantics are inverted: returns `false` for both "already up to date" AND "was updated", only returns `true` for "newly inserted" — callers checking "did anything change?" receive the wrong answer for the update case |
+| H833 | `PhysicalPrinterCollection::load_printers_from_presets()` entire body is wrapped in `#if 0` — permanently disabled legacy migration for physical printers; users who had Print-Host info in old preset configs silently lose it on upgrade |
+
+### Summary
+
+The Preset subsystem is the central configuration management layer between the UI and the slicing engine.  Its deque-based storage, inheritance/diff-save system, cloud-sync metadata, and project-embedded preset merging are all refactoring-critical patterns.  7 new hazards (H827–H833) have been registered.  The most dangerous are H828 (unbounded recursion), H829 (mutex not released on exception), and H831 (dead security filter).
+
+**Next hazard number to assign: H834**
