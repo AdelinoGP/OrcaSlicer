@@ -4211,5 +4211,49 @@ Session 60 covered the two core support infrastructure files. SupportCommon.cpp 
 
 Session 61 completed annotation of `SupportSpotsGenerator.cpp`. The most significant architectural finding is the massive permanently-disabled stability analysis block (H867): the intended full workflow (curl estimation → support point placement via torque model → issue ranking) is only half-functional. `estimate_malformations()` runs, but the placement algorithm (`check_stability` / `full_search`) and issue aggregator (`gather_issues`) are never called. This means the shipped binary generates curl annotations but does not use them to place additional support points or surface printability warnings. A refactoring translator must decide whether to port or delete the ~1100 lines of dead algorithm.
 
-**Next hazard number to assign: H875**
+---
+
+### Session 61 (continued) — SupportSpotsGenerator.hpp + SupportParameters.hpp
+
+#### Files Annotated
+
+- `src/libslic3r/Support/SupportSpotsGenerator.hpp` — fully annotated
+- `src/libslic3r/Support/SupportParameters.hpp` — fully annotated
+
+#### Key Findings
+
+**SupportSpotsGenerator.hpp:**
+- Include guard uses old module name `SRC_LIBSLIC3R_SUPPORTABLEISSUESSEARCH_HPP_` — mismatch with current filename (H875).
+- `Params` struct: ~20+ fields, most `const` after construction. `filament_density` and `material_yield_strength` are `const double` but initialised from `float` literals (`1.25e-3f`, `33.0f * 1e6f`) — float rounding before widening to double loses precision (H876).
+- `Params::get_bed_adhesion_yield_strength()`: misleading indentation after the early-return `if (raft_layers_count > 0)` block — `double yield_strength = 0.02` visually appears inside an else-branch but is structurally in the enclosing function scope (H877).
+- `filament_density` comment: "common filaments are very lightweight, so precise number is not that important." — PLA-only value (1.25e-3 g/mm³); 3–8× wrong for metal-fill / ceramic composites with no override knob (H878).
+- Public declarations for `SupportPointCause` enum, `SupportPoint` struct, `PartialObject` struct — all typed for the dead stability algorithm; nothing in live code produces `SupportPoint` values at runtime.
+- `estimate_malformations()` and `estimate_supports_malformations()` declared here; these are the only two live exported functions.
+
+**SupportParameters.hpp:**
+- Header-only config aggregate (~279 lines). No `.cpp` counterpart; entire implementation is inline in the constructor.
+- Constructor resolves support style: `smsDefault` dispatches to `smsTreeOrganic` (tree supports) or `smsGrid` (classic supports) — this default-resolution policy is applied here, not in UI or config validation, making it invisible to callers that read `support_style` after construction.
+- `nozzle_diameter.get_at(object_config.support_interface_filament - 1)`: if `support_interface_filament == 0` (use active extruder), unsigned subtraction underflows to `SIZE_MAX`, silently clamped to index 0 by `get_at()` — wrong nozzle diameter returned (H879).
+- `differnt_support_interface_filament` local variable — typo ("differnt" vs "different") (H880).
+- `support_layer_height_min` declared as `coordf_t` (unscaled mm) but initialised with `scaled<coord_t>(0.01)` — returns ~10000 scaled integer units. Subsequent `std::min(support_layer_height_min, ...)` compares a large integer against small unscaled double values (~0.2). The filter is permanently non-functional due to this unit-system confusion (H881).
+- `tree_branch_diameter_double_wall_area_scaled` default in member initialiser list has a double semicolon `;;` — syntactically valid but a cosmetic defect indicating copy-paste error.
+- Most fields computed once and declared `const` after construction — safe to map to immutable record in the target language.
+
+#### Hazards Assigned
+
+| ID | Description |
+|----|-------------|
+| H875 | `SupportSpotsGenerator.hpp` include guard references old module name "SupportableIssuesSearch" — doesn't match current filename |
+| H876 | `Params::filament_density` / `material_yield_strength`: `const double` initialised from `float` literals — precision loss before widening |
+| H877 | `Params::get_bed_adhesion_yield_strength()`: misleading indentation makes `yield_strength` declaration look like it's inside an else-branch |
+| H878 | `filament_density` hardcoded to PLA density (1.25e-3 g/mm³); 3–8× wrong for high-density filaments; comment discourages correction |
+| H879 | `SupportParameters` ctor: `support_interface_filament - 1` unsigned underflow when value is 0 → `SIZE_MAX` clamped to index 0 by `get_at()` — wrong nozzle diameter |
+| H880 | `differnt_support_interface_filament` local variable typo (missing 'e') |
+| H881 | `support_layer_height_min` init with `scaled<coord_t>(0.01)` (~10000 integer units) compared against unscaled `layer->height` (~0.2 double) — unit confusion makes filter permanently non-functional |
+
+#### Summary
+
+Session 61 extended into SupportSpotsGenerator.hpp and SupportParameters.hpp. The header files revealed three critical correctness hazards: the SupportSpotsGenerator.hpp `Params` struct passes the struct by value into inner-loop functions (H871, already noted in .cpp), misleading indentation in `get_bed_adhesion_yield_strength()` (H877), and most seriously, the SupportParameters.hpp unit-system confusion for `support_layer_height_min` (H881) and the unsigned underflow for `support_interface_filament == 0` (H879). Both H879 and H881 are silent correctness bugs in the shipped binary: one returns the wrong extruder's nozzle diameter when using the active extruder for interface support, and the other means the minimum support layer height filter does nothing. SupportParameters.hpp is the only remaining header-only source file without a .cpp counterpart — it is a pure constructor-initialised aggregate, safe to map to an immutable builder record in the target language with no behavioural changes required beyond replicating the constructor logic.
+
+**Next hazard number to assign: H882**
 
