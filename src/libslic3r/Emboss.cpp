@@ -305,6 +305,8 @@ fontinfo_opt load_font_info(const unsigned char* data, unsigned int index)
     return font_info;
 }
 
+// [INTENT] Degenerate polygon filter: removes any polygon with fewer than 3 points.
+// Called after heal steps to ensure Clipper receives only valid inputs.
 void remove_bad(Polygons& polygons)
 {
     polygons.erase(std::remove_if(polygons.begin(), polygons.end(), [](const Polygon& p) { return p.size() < 3; }), polygons.end());
@@ -320,6 +322,13 @@ void remove_bad(ExPolygons& expolygons)
 }
 } // end namespace
 
+// [INTENT] divide_segments_for_close_point — Given ExPolygons and a proximity threshold,
+// finds polygon points lying near (but not on) another polygon's line segment and inserts
+// new vertices at those positions. This prevents Clipper from producing self-intersections
+// when two nearly-coincident contours are unioned during glyph healing.
+// [MEMORY] Builds a full AABBTree over all line segments of all ExPolygons; temp allocation
+// O(N_edges) per call. divs vector may be large for complex multi-glyph shapes.
+// [COUPLING] Uses AABBTreeLines, ExPolygonsIndices, Linef (double-precision lines).
 bool Emboss::divide_segments_for_close_point(ExPolygons& expolygons, double distance)
 {
     if (expolygons.empty())
@@ -429,6 +438,15 @@ bool Emboss::divide_segments_for_close_point(ExPolygons& expolygons, double dist
     return true;
 }
 
+// [INTENT] heal_polygons — Two-phase glyph outline repair:
+//   Phase 1: Clipper SimplifyPolygons (eliminates self-intersections via fill-type union) +
+//            CleanPolygons (removes near-duplicate points within 1.415 px ~= sqrt(2) px).
+//   Phase 2: Inject 3x3 rectangles at duplicate-point locations, re-union, then call
+//            heal_expolygons() for remaining duplicates/intersections.
+// [HAZARD H1027 cross-ref] If heal_expolygons() exhausts max_iteration, failing ExPolygons
+// are silently replaced by a bounding-rect hollow — see heal_dupl_inter() at line ~635.
+// [COUPLING] Clipper v1 (SimplifyPolygons, CleanPolygons), union_ex, heal_expolygons.
+// [STATE] No persistent state; pts_3x3 is a file-scope const array.
 HealedExPolygons Emboss::heal_polygons(const Polygons& shape, bool is_non_zero, unsigned int max_iteration)
 {
     const double             clean_distance = 1.415; // little grater than sqrt(2)
@@ -706,6 +724,16 @@ void remove_small_islands(ExPolygons& expolygons, double minimal_area)
 }
 #endif // REMOVE_SMALL_ISLANDS
 
+// [INTENT] get_glyph() (inner) — Rasterizes a single Unicode codepoint to Slic3r ExPolygons.
+// Steps: stbtt_GetGlyphShape → stbtt_FlattenCurves → convert to Slic3r Points (glyph scale)
+//        → wind-order reversal → heal_polygons() to fix stb_truetype self-intersections.
+// [MEMORY] stbtt_GetGlyphShape returns a malloc-allocated stbtt_vertex array, freed via ScopeGuard.
+//          stbtt_FlattenCurves similarly returns malloc-allocated stbtt__point + contour_lengths,
+//          both freed via ScopeGuard. No heap leak unless an exception escapes between sg1 and sg2
+//          construction (impossible since ScopeGuard constructors don't throw).
+// [HAZARD H1032 cross-ref] C-heap mixed with C++ scope lifetime — see H1032 comment below.
+// [HAZARD H1026 cross-ref] SHAPE_SCALE coordinate system — output Points are in glyph-scale, NOT print-scale.
+// [COUPLING] stb_truetype C API, ScopeGuard (Utils.hpp), Emboss::heal_polygons.
 std::optional<Glyph> get_glyph(const stbtt_fontinfo& font_info, int unicode_letter, float flatness)
 {
     int glyph_index = stbtt_FindGlyphIndex(&font_info, unicode_letter);
@@ -781,6 +809,16 @@ std::optional<Glyph> get_glyph(const stbtt_fontinfo& font_info, int unicode_lett
     return glyph;
 }
 
+// [INTENT] Cache-aware glyph resolver. Checks the per-font Glyphs cache first, then
+// loads font info on demand, delegates to the stbtt get_glyph() overload to build the
+// 2D outline, applies char_gap / boldness / skew post-processing, then stores in cache.
+// [STATE] font_info_opt is lazy-initialised on first miss and reused across loop iterations
+// in letter2shapes(). The cache (Glyphs&) is keyed by Unicode codepoint (int).
+// [MEMORY] H1032: stbtt vertices are allocated via C malloc inside the inner get_glyph().
+// ScopeGuard frees them before this function returns (via the inner call's RAII guards).
+// The resulting Glyph is moved into the cache map and a pointer to the stored copy returned.
+// [COUPLING] Depends on SHAPE_SCALE (glyph coordinate system, see H1026), FontProp
+// (boldness/skew/char_gap), and offset_ex / union_ex from ClipperUtils for boldness inflation.
 const Glyph* get_glyph(int unicode, const FontFile& font, const FontProp& font_prop, Glyphs& cache, fontinfo_opt& font_info_opt)
 {
     // [HAZARD H1029 P3/Low] RESOLUTION is a hardcoded magic constant (0.0125 mm).
@@ -1368,6 +1406,16 @@ namespace {
 void align_shape(ExPolygonsWithIds& shapes, const std::wstring& text, const FontProp& prop, const FontFile& font);
 } // namespace
 
+// [INTENT] Convert wide-char text string to per-character ExPolygons in glyph-scale
+// coordinates (SHAPE_SCALE units). Each character maps to one ExPolygonsWithId entry
+// whose .id is the Unicode codepoint and .expoly are the 2D outline polygons.
+// After layout (cursor-advance per glyph), calls align_shape() to apply H/V alignment.
+// [STATE] cursor is a mutable Point that accumulates advance widths and newline offsets;
+// font_info_cache is lazy-initialised inside get_glyph() and reused across letters.
+// [CONCURRENCY] was_canceled is polled every CANCEL_CHECK (10) iterations (see H1030).
+// [COUPLING] Result is consumed by union_with_delta() in text2shapes() and by the
+// text-on-curve path (sample_slice/calculate_angles). Shapes are in SHAPE_SCALE units —
+// callers must apply get_text_shape_scale() before placing in world coordinates.
 ExPolygonsWithIds Emboss::text2vshapes(FontFileWithCache&           font_with_cache,
                                        const std::wstring&          text,
                                        const FontProp&              font_prop,
@@ -1553,6 +1601,17 @@ void add_quad(uint32_t i1, uint32_t i2, indexed_triangle_set& result, uint32_t c
     result.indices.emplace_back(i1_, i1, i2_);
 };
 
+// [INTENT] Triangulate 2D glyph shapes (ExPolygons) and extrude them between two
+// surfaces defined by IProjection::create_front_back(), producing a closed
+// indexed_triangle_set with front cap, back cap, and quad-stitched sides.
+// Used when all 2D points are geometrically unique (no duplicates).
+// [STATE] Stateless — all data is local. Points used twice: once for front vertices,
+// once (with count_point offset) for back vertices.
+// [MEMORY] Allocates 2*count_point vertices and ~2*shape_triangles + 2*perimeter quads indices.
+// [COUPLING] Calls Triangulation::triangulate() (ClipperUtils), projection.create_front_back()
+// (Emboss::IProjection), add_quad() local helper.
+// [HAZARD H1026 note] Points are in SHAPE_SCALE coordinates. projection converts them to world
+// mm. Mismatch between coordinate systems here will silently produce 1000x wrong mesh scale.
 indexed_triangle_set polygons2model_unique(const ExPolygons& shape2d, const IProjection& projection, const Points& points)
 {
     // CW order of triangle indices
@@ -1604,6 +1663,15 @@ indexed_triangle_set polygons2model_unique(const ExPolygons& shape2d, const IPro
     return result;
 }
 
+// [INTENT] Same as polygons2model_unique but handles coincident 2D points from distinct
+// polygon vertices that round to the same integer in SHAPE_SCALE coordinates.
+// Triangulation::create_changes() maps all duplicate points to one canonical index,
+// then polygons2model_duplicit merges those indices so duplicate vertices share one
+// 3D vertex in the resulting mesh, avoiding zero-area triangles on the side walls.
+// [HAZARD P2/Medium] When two contour vertices are deduplicated, the side quad between
+// them is skipped (prev == index check). If many vertices collapse (very small font at
+// low resolution), entire wall segments can be omitted, producing non-manifold output.
+// Downstream CGAL corefinement may fail silently on such meshes.
 indexed_triangle_set polygons2model_duplicit(const ExPolygons&  shape2d,
                                              const IProjection& projection,
                                              const Points&      points,
@@ -1736,6 +1804,16 @@ std::optional<float> Emboss::calc_up(const Transform3d& tr, double up_limit)
     return res;
 }
 
+// [INTENT] Build a Transform3d that places a text emboss coordinate frame onto a 3D surface
+// point. The text's Z-axis (emboss direction) is aligned to `normal`, and the text's Y-axis
+// (up) is aligned to suggest_up(normal) which avoids gimbal lock near the vertical.
+// Translation to `position` is applied first, then view rotation, then up rotation.
+// [STATE] Pure computation — no shared state. Returns a fully composed Transform3d.
+// [HAZARD P2/Medium] When normal == -Vec3d::UnitZ() (text placed on downward face),
+// a special-case π rotation around UnitY is used. This is the only degenerate-axis guard.
+// For normals very close to -Z but not exactly equal, the generic acos path is taken and
+// axis_view may be near-zero, producing a degenerate AngleAxisd. No guard exists for that
+// near-degenerate case — axis_view.normalize() on a near-zero vector yields NaN/Inf.
 Transform3d Emboss::create_transformation_onto_surface(const Vec3d& position, const Vec3d& normal, double up_limit)
 {
     // is normalized ?
@@ -1928,6 +2006,19 @@ std::vector<double> Emboss::calculate_angles(int32_t distance, const PolygonPoin
     return result;
 }
 
+// [INTENT] Given a text-on-curve slice (a polygon segment + start PolygonPoint),
+// maps each character bounding box to a PolygonPoint along the slice polygon.
+// Characters to the right of centre are walked forward (point_in_distance),
+// characters to the left are walked backward (point_in_reverse_distance).
+// [STATE] All state local. `cursor` and `shapes_x_cursor` track position along the polygon.
+// `first_right_index` splits the character array at the shape midline.
+// [MEMORY] Allocates one PolygonPoint per bounding box — O(N) where N = chars in line.
+// [HAZARD P2/Medium] `is_reverse` flag meaning is inverted between the two halves:
+// right side uses is_reverse=true (calls point_in_distance) and left uses is_reverse=false
+// (calls point_in_reverse_distance). The inversion is intentional but confusing — a refactor
+// should use an enum or rename to avoid reading `is_reverse=true` → forward walk.
+// [HAZARD P3/Low] No guard against slice.polygon being empty or degenerate.
+// point_in_distance silently returns without updating cursor for polygon sizes < 2.
 PolygonPoints Emboss::sample_slice(const TextLine& slice, const BoundingBoxes& bbs, double scale)
 {
     // find BB in center of line
@@ -2013,6 +2104,15 @@ int32_t get_align_x_offset(FontProp::HorizontalAlign align, const BoundingBox& s
     return 0;
 }
 
+// [INTENT] Post-process per-character ExPolygons to apply horizontal (left/center/right)
+// and vertical (top/center/bottom) alignment. Called at the end of text2vshapes().
+// Vertical offset is computed once for all lines. Horizontal offset is computed per line
+// (resetting at each '\n' character) to center/right-justify each line independently.
+// [STATE] Mutates shapes in place — translates every ExPolygon by the computed offset.
+// [COUPLING] Reads FontProp::align (pair<HorizontalAlign,VerticalAlign>), font metrics via
+// get_align_y_offset / get_align_x_offset, and the text wstring to detect line breaks.
+// [HAZARD P3/Low] assert(shapes.size() == text.length()) — if a caller passes mismatched
+// shapes/text (e.g. after filtering or truncating), the loop will silently misalign glyphs.
 void align_shape(ExPolygonsWithIds& shapes, const std::wstring& text, const FontProp& prop, const FontFile& font)
 {
     // Shapes have to match letters in text

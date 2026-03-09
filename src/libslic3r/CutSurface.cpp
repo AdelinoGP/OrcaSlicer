@@ -541,6 +541,27 @@ void store(const Emboss::IProjection& projection, const Point& point_to_project,
 #include <filesystem>
 #endif // DEBUG_OUTPUT_DIR
 
+// [INTENT] cut_surface() — Main public entry point for projecting 2D glyph ExPolygons
+// onto a set of 3D model meshes and producing a SurfaceCut (trimesh + contours).
+// Pipeline:
+//   1. Compute shapes bounding box for AOI filtering
+//   2. For each model: skip back-facing/out-of-AOI triangles, build CGAL mesh twice
+//      (cgal_models for cutting, cgal_neg_models with flipped normals for differencing)
+//   3. Convert shapes to CGAL extruded shape mesh (cgal_shape)
+//   4. For each cgal model: corefine with shape, flood-fill, extract CutAOIs
+//   5. diff_models: subtract overlapping model volumes from patches
+//   6. calc_distances + choose_best_distance: pick best patch per outline point
+//   7. select_patches: mark which patches to use (handles partial coverage)
+//   8. merge_patches: combine selected patches into final SurfaceCut
+// [STATE] All state is call-local. cgal_models, cgal_neg_models, cgal_shape, model_cuts,
+// patches, distances are all stack-lifetime. Thread-safe — no global state.
+// [MEMORY] Highest peak: for N models, holds 2*N CutMesh objects simultaneously.
+// Each CutMesh can be many MB. All are destroyed on return.
+// [COUPLING] Depends on: priv:: namespace helpers, ExPolygonsIndices (s2i), TBB parallel_for
+// (inside set_skip_for_out_of_aoi), CGAL corefine (inside cut_from_model).
+// [HAZARD H1040 P2/Medium] set_skip_for_out_of_aoi uses only 2D XY bounding box; Z not checked.
+// Triangles far outside the projection depth range but within XY bounds are not skipped.
+// This makes the CGAL mesh unnecessarily large and can cause extra corefine intersections.
 SurfaceCut Slic3r::cut_surface(const ExPolygons&                        shapes,
                                const std::vector<indexed_triangle_set>& models,
                                const Emboss::IProjection&               projection,
@@ -637,6 +658,19 @@ SurfaceCut Slic3r::cut_surface(const ExPolygons&                        shapes,
     return result;
 }
 
+// [INTENT] cut2model() — Converts a SurfaceCut (surface patch with contour loops) into
+// a closed indexed_triangle_set suitable for mesh boolean operations (emboss/deboss).
+// Takes the front-face triangles from the cut, projects each vertex backward through
+// IProject3d::project() to get the back face, then zig-zags triangles between front and
+// back contour loops to form closed side walls.
+// [STATE] Pure conversion — stateless.
+// [MEMORY] Allocates exactly 2*|vertices| vertices and 2*|indices| + 2*sum(contour.size())
+// triangle indices. Pre-reserved via count_vertices / count_indices.
+// [HAZARD P2/Medium] Winding order for back-face triangles is swapped (Y and Z indices
+// exchanged, line 677) to produce correct outward normals. If the projection inverts
+// orientation, the swap produces inward normals on the back face, yielding an inside-out
+// mesh that CGAL boolean will invert. No orientation validation is performed.
+// [COUPLING] Depends on IProject3d::project() (Emboss), its_merge() (TriangleMesh).
 indexed_triangle_set Slic3r::cut2model(const SurfaceCut& cut, const Emboss::IProject3d& projection)
 {
     assert(!cut.empty());
@@ -1464,6 +1498,20 @@ priv::CutAOIs priv::cut_from_model(
     return create_cut_area_of_interests(cgal_model, shapes, face_type_map);
 }
 
+// [INTENT] flood_fill_inner — Propagates FaceType::inside classification to all
+// face-connected not_constrained triangles that are adjacent to at least one `inside`
+// face. Uses an iterative DFS (vector-based stack) to avoid recursion overflow on
+// large meshes. Called after CGAL corefine marks constrained-edge faces as inside/outside.
+// [STATE] face_type_map is mutated in place. process vector is reused (cleared via pop_back).
+// [MEMORY] O(N) stack depth in worst case where N = number of connected not_constrained faces.
+// guess_size=128 is a hint to avoid early realloc but has no semantic significance.
+// [HAZARD P2/Medium] If any not_constrained face has more than one inside neighbor in
+// different disconnected inside regions, flood-fill may merge them incorrectly.
+// The outer loop iterates over all faces, so once a region is flooded (inside_processed),
+// it will not be re-entered. However a not_constrained face touching two separate inside
+// regions is resolved by whichever is encountered first in face iteration order (CGAL
+// internal ordering — no defined spatial ordering). This can mis-classify faces on thin
+// bridges between two text glyphs when they nearly touch.
 void priv::flood_fill_inner(const CutMesh& mesh, FaceTypeMap& face_type_map)
 {
     std::vector<FI> process;
@@ -3047,6 +3095,21 @@ void priv::collect_open_edges(SurfacePatches& patches)
     }
 }
 
+// [INTENT] diff_models() — Subtract overlapping model volumes from each CutAOI patch.
+// For each cut patch, clips against all other model meshes to remove the hidden portions.
+// Uses CGAL clip (not corefine) to do boolean subtraction. When a clip fails to fully
+// remove the patch (due to partial overlap), divide_patch() splits the remainder into
+// connected components. Patches entirely inside another model are discarded (full_inside).
+// [STATE] Mutates cut_models by adding/removing vertex_reduction_map property.
+// models (neg) are also modified by CGAL clip internally.
+// [MEMORY] aoi_patches queue grows per AOI (cleared between iterations). Each SurfacePatch
+// holds a full CutMesh copy. Peak memory = all patches simultaneously + N CGAL trees.
+// [HAZARD P2/Medium] CGAL trees (Trees) are built lazily on demand (line 3105-3110) and
+// stored in a local vector indexed by model_index. If model_index2 >= trees.size() in a
+// future modification, this silently accesses uninitialised memory. Currently safe because
+// trees.resize(models.size()) (line 3063) matches the loop bounds.
+// [COUPLING] Depends on: create_surface_patch, clip_cut, divide_patch, collect_open_edges,
+// is_patch_inside_of_model, ModelCut2index, CGAL::AABB_tree.
 priv::SurfacePatches priv::diff_models(VCutAOIs&            cuts,
                                        /*const*/ CutMeshes& cut_models,
                                        /*const*/ CutMeshes& models,
@@ -3234,6 +3297,24 @@ bool priv::is_over_whole_expoly(const CutAOI& cutAOI, const ExPolygon& shape, co
     return true;
 }
 
+// [INTENT] select_patches() — Given best_distances (one ProjectionDistance per outline
+// contour point) and the candidate patches, returns a bool mask indicating which patches
+// should appear in the final SurfaceCut.
+// Algorithm:
+//   1. Groups patches by their source ExPolygon (shape_id).
+//   2. For shapes where a single patch covers the whole ExPolygon (is_over_whole_expoly),
+//      marks it used directly.
+//   3. For shapes covered by multiple patches or partially covered, back-projects all
+//      candidate patches to 2D, computes the unfilled area (rest), then finds patches
+//      that overlap `rest`, ranked by proximity to the depth center of used patches.
+// [STATE] All local. Returns std::vector<bool> mask parallel to `patches`.
+// [HAZARD P2/Medium] extend_delta = 1% of shape bounding box average size is used to
+// extend back-projected patch polygons before union. This prevents slivers from appearing
+// as unfilled, but if two adjacent shape ExPolygons are less than 1% apart, select_patches
+// may incorrectly pull in a patch from a neighboring glyph to fill the gap.
+// [HAZARD P3/Low] sort(used_shape_patches) for lower_bound search — O(k log k) per shape.
+// For dense multi-glyph text, this runs once per glyph per frame update — acceptable but
+// a hash set would be more efficient.
 std::vector<bool> priv::select_patches(const ProjectionDistances& best_distances,
                                        const SurfacePatches&      patches,
                                        const ExPolygons&          shapes,
@@ -3628,6 +3709,15 @@ void priv::append(SurfaceCut& sc, SurfaceCut&& sc_add)
     its_merge(sc, std::move(sc_add));
 }
 
+// [INTENT] merge_patches() — Iterates over all patches, converts each selected one
+// (mask[index]==true) to a SurfaceCut via patch2cut(), then appends them all into a
+// single SurfaceCut using append() which merges vertices/indices and adjusts contour
+// index offsets. This is the final aggregation step before returning from cut_surface().
+// [STATE] Mutates patches indirectly (patch2cut adds a convert_map property to mesh,
+// then removes it). The mask is read-only.
+// [MEMORY] result accumulates all selected patches. For N patches with K vertices each:
+// O(N*K) vertices and O(N*K) indices in the output SurfaceCut.
+// [COUPLING] Depends on patch2cut (CGAL property maps), append (its_merge / index offset).
 SurfaceCut priv::merge_patches(SurfacePatches& patches, const std::vector<bool>& mask)
 {
     SurfaceCut result;

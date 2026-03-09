@@ -4996,3 +4996,105 @@ Notable patterns in MeshBoolean:
 3. Session 73: `MultiPoint.cpp/.hpp`, `GCodeSender.cpp/.hpp`, `calib.cpp/.hpp`, `PerimeterGenerator.hpp`
 
 **Next hazard number to assign: H1022**
+
+---
+
+## Session 72 — Emboss.cpp + CutSurface.cpp + Shape/TextShape (H1022–H1049)
+
+**Branch:** `agent/analysis`
+**Files annotated:** `src/libslic3r/Emboss.hpp`, `src/libslic3r/Emboss.cpp`, `src/libslic3r/CutSurface.hpp`, `src/libslic3r/CutSurface.cpp`, `src/libslic3r/Shape/TextShape.hpp`, `src/libslic3r/Shape/TextShape.cpp`
+
+### Emboss Module (H1022–H1033)
+
+`Emboss.hpp` (532 lines) — Defines the glyph rendering and text-to-3D pipeline header.
+Key hazards:
+
+- **H1022 P1/High** (`FontFile::operator==`): uses `==` instead of `!=` for `descent`/`linegap` fields — inverted equality logic, likely a copy-paste bug.
+- **H1023 P2/Medium** (`FontFileWithCache::cache`): threading contract (main vs job threads) not enforced by the type system — raw pointer, no synchronisation primitive in the type.
+- **H1024 P2/Medium** (`UNION_DELTA = 50.0f`): magic constant controlling glyph union expansion with approximate semantics; no link to printer resolution.
+- **H1025 P2/Medium** (`ProjectTransform::project()`): ignores `m_tr` — inconsistent with `create_front_back()` which does apply it.
+- **H1026 P0/Critical**: **THIRD COORDINATE SYSTEM** — glyph-scale coords (1 unit = 0.001 mm, i.e. `SHAPE_SCALE = 0.001`) distinct from print-scale (1e-6 mm) and raw mm. Mixing silently produces 1000x wrong geometry.
+
+`Emboss.cpp` (2251 lines) — Full glyph rasterisation, font enumeration, text layout, 3D projection.
+
+- **H1027 P1/High** (`heal_dupl_inter()` fallback): unhealable ExPolygons replaced with bounding-rect hollow — corrupts glyph geometry silently in Release.
+- **H1028 P2/Medium** (`get_font_list()`): `get_font_list_by_enumeration()` and `get_font_list_by_folder()` are dead code on Windows — never called.
+- **H1029 P3/Low** (`RESOLUTION = 0.0125f`): hardcoded curve flatness — TODO to derive from printer config is unresolved.
+- **H1030 P3/Low** (cancellation in `text2vshapes`): checked every 10 chars only.
+- **H1031 P3/Low** (`EnumFamCallBack`): dead code after early `return true`; itself unreachable.
+- **H1032 P2/Medium** (C-heap vs C++ ScopeGuard): stbtt vertices freed via `free()`, ScopeGuard wraps raw C functions — safe but needs custom deleter in any refactor.
+- **H1033 P2/Medium** (`#ifdef REMOVE_SPIKES`): permanently dead ~150-line block — macro never defined.
+
+New annotations added this session:
+- `get_glyph()` cache-aware version: `[INTENT]`, `[STATE]`, `[MEMORY]`, `[COUPLING]` block
+- `text2vshapes()`: `[INTENT]`, `[STATE]`, `[CONCURRENCY]`, `[COUPLING]` block
+- `polygons2model_unique()`: `[INTENT]`, `[STATE]`, `[MEMORY]`, `[COUPLING]`, `[HAZARD H1026 note]`
+- `polygons2model_duplicit()`: `[INTENT]` + new hazard (deduplication silently drops side-wall quads → non-manifold at small font sizes)
+- `create_transformation_onto_surface()`: `[INTENT]`, `[STATE]`, near-degenerate axis hazard
+- `sample_slice()`: `[INTENT]`, `[STATE]`, `[MEMORY]`, inverted `is_reverse` flag hazard
+- `align_shape()`: `[INTENT]`, `[STATE]`, `[COUPLING]`, precondition assert hazard
+
+### CutSurface Module (H1039–H1049)
+
+`CutSurface.hpp` (106 lines):
+- **H1039 P2/Medium** (`its_cut_AoI()`): only 2D XY bounding-box filtration — no Z check.
+
+`CutSurface.cpp` (4119 lines):
+- **H1040 P2/Medium** (`set_skip_for_out_of_aoi`): Z axis not filtered — oversized CGAL meshes.
+- **H1041 P2/Medium** (`IntersectingElement::attr` bitfield): arithmetic add/subtract instead of bitwise ops — fragile if called out of order.
+- **H1048 P2/Medium** (`assert(!exist_duplicit_vertex())`): debug-only — Release silently passes duplicates to CGAL corefine.
+- **H1049 P3/Low** (`#define DEBUG_OUTPUT_DIR` commented out): ~150 lines of dead debug helpers.
+
+New body annotations added this session:
+- `flood_fill_inner()`: `[INTENT]`, `[STATE]`, `[MEMORY]`, ambiguous face classification at glyph adjacency hazard
+- `cut_surface()`: `[INTENT]` (full pipeline description), `[STATE]`, `[MEMORY]`, `[COUPLING]`, `[HAZARD H1040 note]`
+- `cut2model()`: `[INTENT]`, `[STATE]`, `[MEMORY]`, winding-order inversion hazard
+- `diff_models()`: `[INTENT]`, `[STATE]`, `[MEMORY]`, lazy AABB tree indexing hazard
+- `select_patches()`: `[INTENT]`, extend_delta cross-glyph bleed hazard, sort efficiency note
+- `merge_patches()`: `[INTENT]`, `[STATE]`, `[MEMORY]`, `[COUPLING]`
+
+### Shape/TextShape Module (H1034–H1038)
+
+`Shape/TextShape.hpp` (54 lines):
+- **H1034 P1/High** (`g_occt_fonts_maps` static global): written by main thread, read by job threads — no synchronisation.
+
+`Shape/TextShape.cpp` (352 lines):
+- **H1035 P1/High** (memory leak): `BRepPrimAPI_MakePrism` allocated with `new` in `Prism()`, never deleted.
+- **H1036 P2/Medium**: two-copy tessellation path OCCT → stl_file → TriangleMesh.
+- **H1037 P2/Medium**: `fonts_suffix` exclusion list `SearchFromEnd()` can hide legitimately named fonts; "ExtraBold" listed twice.
+- **H1038 P2/Medium**: typo map key "HarmoneyOS Sans SC" (extra 'e') vs display "HarmonyOS Sans SC".
+
+### Hazard Summary (Session 72)
+
+| ID | Priority | Description |
+|----|----------|-------------|
+| H1022 | P1/High | `FontFile::operator==` — inverted equality (descent/linegap) |
+| H1023 | P2/Medium | `FontFileWithCache::cache` threading contract unenforced |
+| H1024 | P2/Medium | `UNION_DELTA = 50.0f` magic constant |
+| H1025 | P2/Medium | `ProjectTransform::project()` ignores `m_tr` |
+| H1026 | P0/Critical | THIRD coordinate system (SHAPE_SCALE=0.001) — silent 1000x scale error |
+| H1027 | P1/High | `heal_dupl_inter()` fallback: bounding-rect hollow replaces bad glyph |
+| H1028 | P2/Medium | Dead font-enum code paths on Windows |
+| H1029 | P3/Low | `RESOLUTION = 0.0125f` unresolved TODO |
+| H1030 | P3/Low | Cancellation polled every 10 chars only |
+| H1031 | P3/Low | `EnumFamCallBack` unreachable dead code |
+| H1032 | P2/Medium | C-heap/ScopeGuard mixing for stbtt vertices |
+| H1033 | P2/Medium | `#ifdef REMOVE_SPIKES` — permanently dead ~150-line block |
+| H1034 | P1/High | `g_occt_fonts_maps` global: no sync between main+job threads |
+| H1035 | P1/High | Memory leak: `BRepPrimAPI_MakePrism` `new`, never deleted |
+| H1036 | P2/Medium | Two-copy tessellation OCCT→stl_file→TriangleMesh |
+| H1037 | P2/Medium | `fonts_suffix` SearchFromEnd may hide valid fonts; "ExtraBold" duplicate |
+| H1038 | P2/Medium | Typo "HarmoneyOS" key vs "HarmonyOS" display name |
+| H1039 | P2/Medium | `its_cut_AoI()`: only 2D XY AOI filter, no Z |
+| H1040 | P2/Medium | `set_skip_for_out_of_aoi`: no Z range filter → oversized CGAL meshes |
+| H1041 | P2/Medium | `IntersectingElement::attr`: arithmetic bitfield ops, fragile ordering |
+| H1042–H1047 | — | (reserved / assigned inline in source, see CutSurface.cpp body annotations) |
+| H1048 | P2/Medium | `assert(!exist_duplicit_vertex())` debug-only — Release passes dupes to CGAL |
+| H1049 | P3/Low | `#define DEBUG_OUTPUT_DIR` commented out — ~150 dead debug helpers |
+
+### Next Steps
+
+1. Commit Session 72
+2. Session 73: `MultiPoint.hpp/.cpp`, `GCodeSender.hpp/.cpp`, `calib.hpp/.cpp`, `PerimeterGenerator.hpp`
+
+**Next hazard number to assign: H1050**
