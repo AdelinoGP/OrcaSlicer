@@ -3982,3 +3982,86 @@ Binary-search (O(log N)) for case-sensitive lookup; O(N) linear scan for case-in
 The Preset subsystem is the central configuration management layer between the UI and the slicing engine.  Its deque-based storage, inheritance/diff-save system, cloud-sync metadata, and project-embedded preset merging are all refactoring-critical patterns.  7 new hazards (H827–H833) have been registered.  The most dangerous are H828 (unbounded recursion), H829 (mutex not released on exception), and H831 (dead security filter).
 
 **Next hazard number to assign: H834**
+
+---
+
+## Session 58 — GCode Subsystem: GCodeReader, ConflictChecker, PostProcessor, SpiralVase, ToolOrderUtils
+
+### Files Annotated
+
+| File | Status |
+|------|--------|
+| `src/libslic3r/GCodeReader.cpp` | Fully annotated |
+| `src/libslic3r/GCodeReader.hpp` | Fully annotated (minor additions) |
+| `src/libslic3r/GCode/ConflictChecker.hpp` | Fully annotated |
+| `src/libslic3r/GCode/ConflictChecker.cpp` | Fully annotated |
+| `src/libslic3r/GCode/PostProcessor.hpp` | Fully annotated |
+| `src/libslic3r/GCode/PostProcessor.cpp` | Fully annotated |
+| `src/libslic3r/GCode/SpiralVase.hpp` | Fully annotated |
+| `src/libslic3r/GCode/SpiralVase.cpp` | Fully annotated |
+| `src/libslic3r/GCode/ToolOrderUtils.hpp` | Fully annotated |
+| `src/libslic3r/GCode/ToolOrderUtils.cpp` | Fully annotated |
+
+### Key Discoveries
+
+**GCodeReader:**
+- `update_coordinates()` handles G0/G1 (linear) and G2/G3 (arc) moves, updating `m_position` from parsed axis tokens.  Arc moves store endpoint only — no arc-length integration (H834).
+- `parse_file_raw_internal()` uses a raw byte loop with a `line_end` callback; line count is based on `\n` only (H835).
+- `GCodeLine::has_value(char, float&)` uses `strtod` which is locale-dependent (H836).
+- `GCodeLine::set()` finds axis by searching `' '+axis` — first-token failure (H837) and last-token truncation (H838).
+
+**ConflictChecker:**
+- DDA-style rasterization via `line_rasterization()` converts extrusion paths to pixel-grid `RasterizationLine`s stored in `LinesBucketQueue`.
+- Parallel intersection check via TBB `parallel_for`; `bool find` flag set without atomics = data race (H839).
+- `line_rasterization()` `default:` branch calls `assert(0)` with no return — UB in release builds plus OOM risk (H840).
+- `getExtrusionPathsFromEntity()` dispatches via `dynamic_cast` per entity — O(N) RTTI per conflict pass (H841).
+- `SUPPORT_THRESHOLD = 100` mm — nearly disables support conflict detection (H842).
+
+**PostProcessor:**
+- Platform split: Win32 uses `CreateProcessW` + `WaitForSingleObject(INFINITE)` (H844); POSIX uses `boost::process::shell` via `$SHELL -c` (H845).
+- `gcode_add_line_number()` slurps entire file into `std::string` — OOM for large prints (H843).
+- Win32 environment capture uses manual env block iteration — fragile against malformed variables (H846).
+
+**SpiralVase:**
+- Two-pass design: Pass 1 (via inner `GCodeReader`) records Z/E state; Pass 2 rewrites Z continuously from the stored layer-by-layer spiral ramp.
+- `m_previous_layer` is `new GCodeReader()` / `delete m_previous_layer` — no RAII, exception leak (H847).
+- Pass 1 captures `GCodeReader` by value per lambda invocation — O(1000) copies for 1000-layer print (H848).
+- `transition_out` ramp uses delta-E which is incorrect for absolute-E G-code (H849).
+
+**ToolOrderUtils:**
+- Implements 4 multi-extruder ordering strategies: MCMF (min-cost max-flow), TSP bitmask DP, greedy nearest-neighbour, brute-force permutation `forcast`.
+- TSP bitmask DP at N=20: ~84–168 MB allocation (H850).
+- Brute-force `forcast` gated by runtime `if (n <= 5)` magic constant (H851).
+- `MCMFSolver::add_edge()` uses XOR index trick (idx^1) for reverse edges — pairing assumption invisible to callers (H852).
+- `get_distance()` has dead code after `return 0` in `l_nodes[i]==-1` branch (H853).
+
+### Hazards Assigned
+
+| ID | Description |
+|----|-------------|
+| H834 | Arc moves (G2/G3) update `m_position` with endpoint only — no arc-length integration |
+| H835 | Bare CR line endings not counted in `line_end` callback — incorrect line index |
+| H836 | `GCodeLine::has_value(char, float&)` uses locale-dependent `strtod` |
+| H837 | `GCodeLine::set()` finds axis via `' '+axis` — first-token (no leading space) silently not updated |
+| H838 | `GCodeLine::set()` last-token value-end search stops at `' '` — npos → silent string truncation |
+| H839 | `bool find` in ConflictChecker parallel lambda is non-atomic — C++ data race |
+| H840 | `line_rasterization()` `default:` branch calls `assert(0)` with no `return` — UB in release + OOM risk |
+| H841 | `getExtrusionPathsFromEntity()` uses `dynamic_cast` O(N) per entity — perf bottleneck in parallel loop |
+| H842 | `SUPPORT_THRESHOLD = 100` mm — nearly disables support conflict detection |
+| H843 | `gcode_add_line_number()` loads entire G-code file into RAM — OOM for large prints |
+| H844 | Win32 `WaitForSingleObject(INFINITE)` — no timeout for hanging post-process script |
+| H845 | POSIX `$SHELL` may not support `-c` convention — no `/bin/sh` fallback |
+| H846 | Win32 env capture ordering dependency — fragile against malformed environment variables |
+| H847 | `SpiralVase::m_previous_layer` is raw `new`/`delete` — leaks on exception |
+| H848 | SpiralVase Pass 1 copies `GCodeReader` by value per layer — O(N) copy cost |
+| H849 | SpiralVase `transition_out` uses delta-E — incorrect for absolute-E G-code |
+| H850 | TSP bitmask DP at N=20: ~84–168 MB RAM for cache matrix |
+| H851 | Brute-force `forcast` gated at N≤5 by magic constant in runtime code |
+| H852 | XOR trick for reverse edges (`edges[idx^1]`) assumes strict paired `add_edge` calls |
+| H853 | `get_distance()` dead code after `return 0` in `l_nodes[i]==-1` branch |
+
+### Summary
+
+Session 58 covered 10 source files spanning the lower-level G-code read/write pipeline (GCodeReader), the conflict detection subsystem (ConflictChecker), the post-processing script launcher (PostProcessor), the spiral vase Z-ramp rewriter (SpiralVase), and the multi-extruder tool ordering optimizer (ToolOrderUtils). 20 new hazards (H834–H853) were catalogued, including two Critical/High data races (H839), two OOM risks (H843, H850), and one high-severity incorrect G-code output bug (H849). The next hazard number to assign is **H854**.
+
+**Next hazard number to assign: H854**
