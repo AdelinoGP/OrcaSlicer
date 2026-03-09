@@ -1,3 +1,54 @@
+// [INTENT] Generates interlocking beam microstructure between adjacent mesh
+// regions printed in different materials.  The structure alternates horizontal
+// beams 90° between even and odd layer groups, mechanically interlocking the
+// two materials at their interface.
+//
+// Algorithm overview:
+//   1. Build a voxel grid over the print object with cell_size = 2*beam_width XY,
+//      2*beam_layer_count Z.
+//   2. Mark voxels that contain boundary cells of each material (shell voxels).
+//   3. Intersect the two sets to find cells containing both materials.
+//   4. Optionally remove cells near air (air_filtering) to keep structure hidden.
+//   5. For thin strips: expand one material's area into the other's thin strip
+//      so that microstructure can adhere (handleThinAreas).
+//   6. Generate beam polygons (generateMicrostructure) and apply to layer slices
+//      (applyMicrostructureToOutlines).
+//
+// Origin: CuraEngine (Ultimaker B.V.), ported into OrcaSlicer.  AGPLv3+.
+//
+// [CONCURRENCY] The public static entry point `generate_interlocking_structure`
+// iterates over region pairs sequentially.  Each `InterlockingGenerator` instance
+// modifies layer slices in-place via `PrintObject::get_layer` — not thread-safe
+// if called for overlapping region pairs concurrently.
+//
+// [COUPLING] Tightly coupled to PrintObject, LayerRegion, and VoxelUtils.
+// Changes to PrintObject layer access patterns will require updates here.
+//
+// [MEMORY] Per-call allocations:
+//   - Two unordered_sets of GridPoint3 (one per mesh) — bounded by voxel count.
+//   - One vector<ExPolygons> per layer (computeUnionedVolumeRegions).
+//   - generateMicrostructure: small fixed-size (2x2 ExPolygons).
+//   - applyMicrostructureToOutlines: two vectors of ExPolygons per interlocking
+//     layer — can be large for tall prints with many layers.
+//
+// [HAZARD H994 P2] `GridPoint3` hash (in InterlockingGenerator.cpp, std::hash
+// specialization) uses int multiplication with a fixed prime and casts to
+// `int` before converting to `size_t`.  For large coordinate values the
+// intermediate `result * prime` overflows `int` — signed integer overflow is
+// UB in C++.  The hash produces poor distribution for large coord values and
+// may cause subtle performance degradation or collisions.
+//
+// [HAZARD H995 P2] `cell_size.z()` is set to `2 * beam_layer_count` where
+// `beam_layer_count` is a `coord_t` (int32_t) derived from config.  For the
+// interlocking Z dimension this is a layer *count*, not a physical distance in
+// nm.  The voxel Z coordinate is used as a raw layer index throughout — this
+// conflates the layer-count space with the coord_t world space and is a
+// refactoring hazard.
+//
+// [HAZARD H996 P3] `ignored_gap_` is `const coord_t` with value 100u (100 nm).
+// The `u` suffix casts to unsigned before assigning to signed coord_t — benign
+// for this value but the mismatch is a style hazard.
+
 // Copyright (c) 2022 Ultimaker B.V.
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
@@ -89,7 +140,7 @@ private:
         , air_dilation(air_dilation)
         , air_filtering(air_filtering)
     {}
-    
+
     /*! Given two polygons, return the parts that border on air, and grow 'perpendicular' up to 'detect' distance.
      *
      * \param a The first polygon.
@@ -147,7 +198,8 @@ private:
      */
     void applyMicrostructureToOutlines(const std::unordered_set<GridPoint3>& cells, const std::vector<ExPolygons>& layer_regions) const;
 
-    static const coord_t ignored_gap_ = 100u; //!< Distance between models to be considered next to each other so that an interlocking structure will be generated there
+    static const coord_t ignored_gap_ =
+        100u; //!< Distance between models to be considered next to each other so that an interlocking structure will be generated there
 
     PrintObject&  print_object;
     const size_t  region_a_index;

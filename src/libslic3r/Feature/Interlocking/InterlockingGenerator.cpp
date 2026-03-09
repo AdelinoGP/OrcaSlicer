@@ -1,3 +1,36 @@
+// [INTENT] Implementation of interlocking microstructure generation.
+// Entry point: `generate_interlocking_structure(PrintObject*)` iterates over
+// all pairs of regions with different extruders and generates beam microstructure
+// at their shared interface.
+//
+// [STATE] Each InterlockingGenerator instance holds references/values computed
+// from PrintConfig at construction.  The constructor does not modify PrintObject.
+// The `generateInterlockingStructure()` method modifies layer slices in-place.
+//
+// [MEMORY] Major allocations per region pair:
+//   - voxels_per_mesh[2]: two unordered_sets of GridPoint3
+//   - layer_regions: vector<ExPolygons> of size max_layer_count+1
+//   - structure_per_layer[2]: vectors of ExPolygons per interlocking layer
+//
+// [HAZARD H994 P2] std::hash<GridPoint3> specialization uses signed int
+// arithmetic that overflows for large coordinates — UB and poor hash quality.
+//
+// [HAZARD H997 P2] `generateInterlockingStructure` calls `has_any_mesh.merge(
+// has_all_meshes)` which intentionally cannibalizes (moves nodes from)
+// `has_all_meshes` into `has_any_mesh`.  The subsequent use of `has_all_meshes`
+// is valid only because merge moves only elements NOT already in the target.
+// This is subtle: the canonical comment says "perform union and intersection
+// simultaneously" — any future refactoring of this merge must preserve the
+// post-merge invariant that `has_all_meshes` still contains the intersection.
+//
+// [HAZARD H998 P2] `applyMicrostructureToOutlines` divides `layer_nr` by
+// `beam_layer_count` (coord_t) in a loop.  If `beam_layer_count` is 0
+// (misconfigured), this is integer division by zero — no guard present.
+//
+// [HAZARD H999 P3] `generateMicrostructure` hardcodes exactly 2 mesh indices
+// and 2 layer types.  Extending to 3+ material interlocking requires a
+// non-trivial rewrite.
+
 // Copyright (c) 2023 UltiMaker
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
@@ -20,7 +53,6 @@ template<> struct hash<Slic3r::GridPoint3>
 };
 } // namespace std
 
-
 namespace Slic3r {
 
 void InterlockingGenerator::generate_interlocking_structure(PrintObject* print_object)
@@ -30,11 +62,11 @@ void InterlockingGenerator::generate_interlocking_structure(PrintObject* print_o
         return;
     }
 
-    const float    rotation           = Geometry::deg2rad(config.interlocking_orientation.value);
-    const coord_t  beam_layer_count   = config.interlocking_beam_layer_count;
-    const int      interface_depth    = config.interlocking_depth;
-    const int      boundary_avoidance = config.interlocking_boundary_avoidance;
-    const coord_t  beam_width         = scaled(config.interlocking_beam_width.value);
+    const float   rotation           = Geometry::deg2rad(config.interlocking_orientation.value);
+    const coord_t beam_layer_count   = config.interlocking_beam_layer_count;
+    const int     interface_depth    = config.interlocking_depth;
+    const int     boundary_avoidance = config.interlocking_boundary_avoidance;
+    const coord_t beam_width         = scaled(config.interlocking_beam_width.value);
 
     const DilationKernel interface_dilation(GridPoint3(interface_depth, interface_depth, interface_depth), DilationKernel::Type::PRISM);
 
@@ -55,14 +87,16 @@ void InterlockingGenerator::generate_interlocking_structure(PrintObject* print_o
                 continue;
             }
 
-            InterlockingGenerator gen(*print_object, region_a_index, region_b_index, beam_width, boundary_avoidance, rotation, cell_size, beam_layer_count,
-                                      interface_dilation, air_dilation, air_filtering);
+            InterlockingGenerator gen(*print_object, region_a_index, region_b_index, beam_width, boundary_avoidance, rotation, cell_size,
+                                      beam_layer_count, interface_dilation, air_dilation, air_filtering);
             gen.generateInterlockingStructure();
         }
     }
 }
 
-std::pair<ExPolygons, ExPolygons> InterlockingGenerator::growBorderAreasPerpendicular(const ExPolygons& a, const ExPolygons& b, const coord_t& detect) const
+std::pair<ExPolygons, ExPolygons> InterlockingGenerator::growBorderAreasPerpendicular(const ExPolygons& a,
+                                                                                      const ExPolygons& b,
+                                                                                      const coord_t&    detect) const
 {
     const coord_t min_line =
         std::min(print_object.printing_region(region_a_index).flow(print_object, frExternalPerimeter, 0.1).scaled_width(),
@@ -95,7 +129,8 @@ void InterlockingGenerator::handleThinAreas(const std::unordered_set<GridPoint3>
     const coord_t expand         = (max_beam_width * number_of_beams_expand) + rounding_errors;
     const coord_t close_gaps =
         std::min(print_object.printing_region(region_a_index).flow(print_object, frExternalPerimeter, 0.1).scaled_width(),
-                 print_object.printing_region(region_b_index).flow(print_object, frExternalPerimeter, 0.1).scaled_width()) / 4;
+                 print_object.printing_region(region_b_index).flow(print_object, frExternalPerimeter, 0.1).scaled_width()) /
+        4;
 
     // Make an inclusionary polygon, to only actually handle thin areas near actual microstructures (so not in skin for example).
     std::vector<Polygons> near_interlock_per_layer;
@@ -113,7 +148,7 @@ void InterlockingGenerator::handleThinAreas(const std::unordered_set<GridPoint3>
     }
 
     // Only alter layers when they are present in both meshes, zip should take care if that.
-    for (size_t layer_nr = 0; layer_nr < print_object.layer_count(); layer_nr++){
+    for (size_t layer_nr = 0; layer_nr < print_object.layer_count(); layer_nr++) {
         auto       layer   = print_object.get_layer(layer_nr);
         ExPolygons polys_a = to_expolygons(layer->get_region(region_a_index)->slices.surfaces);
         ExPolygons polys_b = to_expolygons(layer->get_region(region_b_index)->slices.surfaces);
@@ -138,8 +173,10 @@ void InterlockingGenerator::handleThinAreas(const std::unordered_set<GridPoint3>
 
         // Expanded thin areas of the opposing polygon should 'eat into' the larger areas of the polygon,
         // and conversely, add the expansions to their own thin areas.
-        layer->get_region(region_a_index)->slices.set(closing_ex(diff_ex(union_ex(polys_a, thin_expansion_a), thin_expansion_b), close_gaps), stInternal);
-        layer->get_region(region_b_index)->slices.set(closing_ex(diff_ex(union_ex(polys_b, thin_expansion_b), thin_expansion_a), close_gaps), stInternal);
+        layer->get_region(region_a_index)
+            ->slices.set(closing_ex(diff_ex(union_ex(polys_a, thin_expansion_a), thin_expansion_b), close_gaps), stInternal);
+        layer->get_region(region_b_index)
+            ->slices.set(closing_ex(diff_ex(union_ex(polys_b, thin_expansion_b), thin_expansion_a), close_gaps), stInternal);
     }
 }
 
@@ -176,15 +213,13 @@ std::vector<std::unordered_set<GridPoint3>> InterlockingGenerator::getShellVoxel
     std::vector<std::unordered_set<GridPoint3>> voxels_per_mesh(2);
 
     // mark all cells which contain some boundary
-    for (size_t region_idx = 0; region_idx < 2; region_idx++)
-    {
-        const size_t region = (region_idx == 0) ? region_a_index : region_b_index;
+    for (size_t region_idx = 0; region_idx < 2; region_idx++) {
+        const size_t                    region      = (region_idx == 0) ? region_a_index : region_b_index;
         std::unordered_set<GridPoint3>& mesh_voxels = voxels_per_mesh[region_idx];
 
         std::vector<ExPolygons> rotated_polygons_per_layer(print_object.layer_count());
-        for (size_t layer_nr = 0; layer_nr < print_object.layer_count(); layer_nr++)
-        {
-            auto layer = print_object.get_layer(layer_nr);
+        for (size_t layer_nr = 0; layer_nr < print_object.layer_count(); layer_nr++) {
+            auto layer                           = print_object.get_layer(layer_nr);
             rotated_polygons_per_layer[layer_nr] = to_expolygons(layer->get_region(region)->slices.surfaces);
             expolygons_rotate(rotated_polygons_per_layer[layer_nr], rotation);
         }
@@ -214,7 +249,8 @@ void InterlockingGenerator::addBoundaryCells(const std::vector<ExPolygons>&  lay
         if (layer_nr > 0) {
             skin = xor_ex(skin, layers[layer_nr - 1]);
         }
-        skin = opening_ex(skin, cell_size.x() / 2.f); // remove superfluous small areas, which would anyway be included because of walkPolygons
+        skin = opening_ex(skin,
+                          cell_size.x() / 2.f); // remove superfluous small areas, which would anyway be included because of walkPolygons
         vu.walkDilatedAreas(skin, z, kernel, voxel_emplacer);
     }
 }
@@ -293,8 +329,8 @@ void InterlockingGenerator::applyMicrostructureToOutlines(const std::unordered_s
             for (size_t layer_nr = bottom_corner.z(); layer_nr < bottom_corner.z() + cell_size.z() && layer_nr < max_layer_count;
                  layer_nr += beam_layer_count) {
                 ExPolygons areas_here = cell_area_per_mesh_per_layer[static_cast<size_t>(layer_nr / beam_layer_count) %
-                                                                cell_area_per_mesh_per_layer.size()][mesh_idx];
-                for (auto & here : areas_here) {
+                                                                     cell_area_per_mesh_per_layer.size()][mesh_idx];
+                for (auto& here : areas_here) {
                     here.translate(bottom_corner.x(), bottom_corner.y());
                 }
                 expolygons_append(structure_per_layer[mesh_idx][static_cast<size_t>(layer_nr / beam_layer_count)], areas_here);
@@ -305,7 +341,7 @@ void InterlockingGenerator::applyMicrostructureToOutlines(const std::unordered_s
     for (size_t mesh_idx = 0; mesh_idx < 2; mesh_idx++) {
         for (size_t layer_nr = 0; layer_nr < structure_per_layer[mesh_idx].size(); layer_nr++) {
             ExPolygons& layer_structure = structure_per_layer[mesh_idx][layer_nr];
-            layer_structure = union_ex(layer_structure);
+            layer_structure             = union_ex(layer_structure);
             expolygons_rotate(layer_structure, unapply_rotation);
         }
     }
@@ -316,7 +352,8 @@ void InterlockingGenerator::applyMicrostructureToOutlines(const std::unordered_s
             ExPolygons layer_outlines = layer_regions[layer_nr];
             expolygons_rotate(layer_outlines, unapply_rotation);
 
-            const ExPolygons areas_here = intersection_ex(structure_per_layer[region_idx][layer_nr / static_cast<size_t>(beam_layer_count)], layer_outlines);
+            const ExPolygons areas_here = intersection_ex(structure_per_layer[region_idx][layer_nr / static_cast<size_t>(beam_layer_count)],
+                                                          layer_outlines);
             const ExPolygons& areas_other = structure_per_layer[!region_idx][layer_nr / static_cast<size_t>(beam_layer_count)];
 
             auto       layer  = print_object.get_layer(layer_nr);
@@ -324,7 +361,8 @@ void InterlockingGenerator::applyMicrostructureToOutlines(const std::unordered_s
             ExPolygons polys  = to_expolygons(slices.surfaces);
             slices.set(union_ex(diff_ex(polys, areas_other), // reduce layer areas inward with beams from other mesh
                                 areas_here)                  // extend layer areas outward with newly added beams
-                       , stInternal);
+                       ,
+                       stInternal);
         }
     }
 }

@@ -1,3 +1,28 @@
+// [INTENT] Implementation of 3D voxel grid walking for InterlockingGenerator.
+// DilationKernel constructor pre-computes all relative offsets for the chosen
+// kernel type (CUBE, DIAMOND, PRISM).  VoxelUtils methods walk line segments,
+// polygon boundaries, and polygon interiors over the grid, firing a callback
+// for each cell encountered.
+//
+// [MEMORY] DilationKernel::relative_cells_ allocates `mult` (= kx*ky*kz) entries
+// on construction.  This is bounded by the configured kernel sizes in
+// InterlockingGenerator — typically small (3x3x3 = 27 entries).
+//
+// [CONCURRENCY] All methods are const.  Process callbacks must be thread-safe
+// if called from parallel contexts.
+//
+// [HAZARD H991 P2] `spreadDotsArea` (static helper) uses Fill::new_from_type
+// which heap-allocates a Fill object that is immediately wrapped in unique_ptr.
+// The fill is used only for its uniform grid sampling — this is a somewhat heavy
+// dependency for what amounts to a regular grid point enumeration.
+//
+// [HAZARD H992 P3] `walkLine` unreachable `return true` after `while(true)` —
+// compiler may warn about unreachable code on some toolchains.
+//
+// [HAZARD H988 P2] Reiterated from header: `toGridCoord` floor-divide relies on
+// two's-complement signed integer arithmetic (C++20 mandated but undefined
+// pre-C++20 for negative coord values).
+
 // Copyright (c) 2022 Ultimaker B.V.
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
@@ -6,29 +31,24 @@
 #include "libslic3r/Fill/FillRectilinear.hpp"
 #include "libslic3r/Surface.hpp"
 
-namespace Slic3r
-{
+namespace Slic3r {
 
-DilationKernel::DilationKernel(GridPoint3 kernel_size, DilationKernel::Type type)
-    : kernel_size_(kernel_size)
-    , type_(type)
+DilationKernel::DilationKernel(GridPoint3 kernel_size, DilationKernel::Type type) : kernel_size_(kernel_size), type_(type)
 {
-    coord_t mult = kernel_size.x() * kernel_size.y() * kernel_size.z(); // multiplier for division to avoid rounding and to avoid use of floating point numbers
+    coord_t mult = kernel_size.x() * kernel_size.y() *
+                   kernel_size.z(); // multiplier for division to avoid rounding and to avoid use of floating point numbers
     relative_cells_.reserve(mult);
     GridPoint3 half_kernel = kernel_size / 2;
 
     GridPoint3 start = -half_kernel;
-    GridPoint3 end = kernel_size - half_kernel;
-    for (coord_t x = start.x(); x < end.x(); x++)
-    {
-        for (coord_t y = start.y(); y < end.y(); y++)
-        {
-            for (coord_t z = start.z(); z < end.z(); z++)
-            {
+    GridPoint3 end   = kernel_size - half_kernel;
+    for (coord_t x = start.x(); x < end.x(); x++) {
+        for (coord_t y = start.y(); y < end.y(); y++) {
+            for (coord_t z = start.z(); z < end.z(); z++) {
                 GridPoint3 current(x, y, z);
-                if (type != Type::CUBE)
-                {
-                    GridPoint3 limit((x < 0) ? start.x() : end.x() - 1, (y < 0) ? start.y() : end.y() - 1, (z < 0) ? start.z() : end.z() - 1);
+                if (type != Type::CUBE) {
+                    GridPoint3 limit((x < 0) ? start.x() : end.x() - 1, (y < 0) ? start.y() : end.y() - 1,
+                                     (z < 0) ? start.z() : end.z() - 1);
                     if (limit.x() == 0)
                         limit.x() = 1;
                     if (limit.y() == 0)
@@ -36,8 +56,8 @@ DilationKernel::DilationKernel(GridPoint3 kernel_size, DilationKernel::Type type
                     if (limit.z() == 0)
                         limit.z() = 1;
                     const GridPoint3 rel_dists = (mult * current).array() / limit.array();
-                    if ((type == Type::DIAMOND && rel_dists.x() + rel_dists.y() + rel_dists.z() > mult) || (type == Type::PRISM && rel_dists.x() + rel_dists.y() > mult))
-                    {
+                    if ((type == Type::DIAMOND && rel_dists.x() + rel_dists.y() + rel_dists.z() > mult) ||
+                        (type == Type::PRISM && rel_dists.x() + rel_dists.y() > mult)) {
                         continue; // don't consider this cell
                     }
                 }
@@ -52,41 +72,34 @@ bool VoxelUtils::walkLine(Vec3crd start, Vec3crd end, const std::function<bool(G
     Vec3crd diff = end - start;
 
     const GridPoint3 start_cell = toGridPoint(start);
-    const GridPoint3 end_cell = toGridPoint(end);
-    if (start_cell == end_cell)
-    {
+    const GridPoint3 end_cell   = toGridPoint(end);
+    if (start_cell == end_cell) {
         return process_cell_func(start_cell);
     }
 
     Vec3crd current_cell = start_cell;
-    while (true)
-    {
+    while (true) {
         bool continue_ = process_cell_func(current_cell);
 
-        if (! continue_)
-        {
+        if (!continue_) {
             return false;
         }
 
-        int stepping_dim = -1; // dimension in which the line next exits the current cell
+        int    stepping_dim          = -1; // dimension in which the line next exits the current cell
         double percentage_along_line = std::numeric_limits<double>::max();
-        for (int dim = 0; dim < 3; dim++)
-        {
-            if (diff[dim] == 0)
-            {
+        for (int dim = 0; dim < 3; dim++) {
+            if (diff[dim] == 0) {
                 continue;
             }
-            coord_t crossing_boundary = toLowerCoord(current_cell[dim], dim) + (diff[dim] > 0) * cell_size_[dim];
-            double percentage_along_line_here = (crossing_boundary - start[dim]) / static_cast<double>(diff[dim]);
-            if (percentage_along_line_here < percentage_along_line)
-            {
+            coord_t crossing_boundary          = toLowerCoord(current_cell[dim], dim) + (diff[dim] > 0) * cell_size_[dim];
+            double  percentage_along_line_here = (crossing_boundary - start[dim]) / static_cast<double>(diff[dim]);
+            if (percentage_along_line_here < percentage_along_line) {
                 percentage_along_line = percentage_along_line_here;
-                stepping_dim = dim;
+                stepping_dim          = dim;
             }
         }
         assert(stepping_dim != -1);
-        if (percentage_along_line > 1.0)
-        {
+        if (percentage_along_line > 1.0) {
             // next cell is beyond the end
             return true;
         }
@@ -95,17 +108,13 @@ bool VoxelUtils::walkLine(Vec3crd start, Vec3crd end, const std::function<bool(G
     return true;
 }
 
-
 bool VoxelUtils::walkPolygons(const ExPolygon& polys, coord_t z, const std::function<bool(GridPoint3)>& process_cell_func) const
 {
-    for (const Polygon& poly : to_polygons(polys))
-    {
+    for (const Polygon& poly : to_polygons(polys)) {
         Point last = poly.back();
-        for (Point p : poly)
-        {
+        for (Point p : poly) {
             bool continue_ = walkLine(Vec3crd(last.x(), last.y(), z), Vec3crd(p.x(), p.y(), z), process_cell_func);
-            if (! continue_)
-            {
+            if (!continue_) {
                 return false;
             }
             last = p;
@@ -114,16 +123,18 @@ bool VoxelUtils::walkPolygons(const ExPolygon& polys, coord_t z, const std::func
     return true;
 }
 
-bool VoxelUtils::walkDilatedPolygons(const ExPolygon& polys, coord_t z, const DilationKernel& kernel, const std::function<bool(GridPoint3)>& process_cell_func) const
+bool VoxelUtils::walkDilatedPolygons(const ExPolygon&                       polys,
+                                     coord_t                                z,
+                                     const DilationKernel&                  kernel,
+                                     const std::function<bool(GridPoint3)>& process_cell_func) const
 {
-    ExPolygon translated = polys;
-    GridPoint3 k = kernel.kernel_size_;
+    ExPolygon  translated = polys;
+    GridPoint3 k          = kernel.kernel_size_;
     k.x() %= 2;
     k.y() %= 2;
     k.z() %= 2;
     const Vec3crd translation = (Vec3crd(1, 1, 1) - k).array() * cell_size_.array() / 2;
-    if (translation.x() && translation.y())
-    {
+    if (translation.x() && translation.y()) {
         translated.translate(Point(translation.x(), translation.y()));
     }
     return walkPolygons(translated, z + translation.z(), dilate(kernel, process_cell_func));
@@ -131,10 +142,11 @@ bool VoxelUtils::walkDilatedPolygons(const ExPolygon& polys, coord_t z, const Di
 
 bool VoxelUtils::walkAreas(const ExPolygon& polys, coord_t z, const std::function<bool(GridPoint3)>& process_cell_func) const
 {
-    ExPolygon translated = polys;
-    const Vec3crd translation = -cell_size_ / 2; // offset half a cell so that the dots of spreadDotsArea are centered on the middle of the cell isntead of the lower corners.
-    if (translation.x() && translation.y())
-    {
+    ExPolygon     translated = polys;
+    const Vec3crd translation =
+        -cell_size_ /
+        2; // offset half a cell so that the dots of spreadDotsArea are centered on the middle of the cell isntead of the lower corners.
+    if (translation.x() && translation.y()) {
         translated.translate(Point(translation.x(), translation.y()));
     }
     return _walkAreas(translated, z, process_cell_func);
@@ -148,7 +160,7 @@ static Points spreadDotsArea(const ExPolygon& polygons, Point grid_size)
     filler->bounding_box = get_extents(polygons);
 
     FillParams params;
-    params.density = 1.f;
+    params.density           = 1.f;
     params.anchor_length_max = 0;
 
     Surface surface(stInternal, polygons);
@@ -176,44 +188,46 @@ static Points spreadDotsArea(const ExPolygon& polygons, Point grid_size)
 bool VoxelUtils::_walkAreas(const ExPolygon& polys, coord_t z, const std::function<bool(GridPoint3)>& process_cell_func) const
 {
     Points skin_points = spreadDotsArea(polys, Point(cell_size_.x(), cell_size_.y()));
-    for (Point p : skin_points)
-    {
+    for (Point p : skin_points) {
         bool continue_ = process_cell_func(toGridPoint(Vec3crd(p.x() + cell_size_.x() / 2, p.y() + cell_size_.y() / 2, z)));
-        if (! continue_)
-        {
+        if (!continue_) {
             return false;
         }
     }
     return true;
 }
 
-bool VoxelUtils::walkDilatedAreas(const ExPolygon& polys, coord_t z, const DilationKernel& kernel, const std::function<bool(GridPoint3)>& process_cell_func) const
+bool VoxelUtils::walkDilatedAreas(const ExPolygon&                       polys,
+                                  coord_t                                z,
+                                  const DilationKernel&                  kernel,
+                                  const std::function<bool(GridPoint3)>& process_cell_func) const
 {
-    ExPolygon translated = polys;
-    GridPoint3 k = kernel.kernel_size_;
+    ExPolygon  translated = polys;
+    GridPoint3 k          = kernel.kernel_size_;
     k.x() %= 2;
     k.y() %= 2;
     k.z() %= 2;
-    const Vec3crd translation = (Vec3crd(1, 1, 1) - k).array() * cell_size_.array() / 2 // offset half a cell when using an even kernel
-                               - cell_size_.array() / 2; // offset half a cell so that the dots of spreadDotsArea are centered on the middle of the cell isntead of the lower corners.
-    if (translation.x() && translation.y())
-    {
+    const Vec3crd translation =
+        (Vec3crd(1, 1, 1) - k).array() * cell_size_.array() / 2 // offset half a cell when using an even kernel
+        -
+        cell_size_.array() /
+            2; // offset half a cell so that the dots of spreadDotsArea are centered on the middle of the cell isntead of the lower corners.
+    if (translation.x() && translation.y()) {
         translated.translate(Point(translation.x(), translation.y()));
     }
     return _walkAreas(translated, z + translation.z(), dilate(kernel, process_cell_func));
 }
 
-std::function<bool(GridPoint3)> VoxelUtils::dilate(const DilationKernel& kernel, const std::function<bool(GridPoint3)>& process_cell_func) const
+std::function<bool(GridPoint3)> VoxelUtils::dilate(const DilationKernel&                  kernel,
+                                                   const std::function<bool(GridPoint3)>& process_cell_func) const
 {
-    return [&process_cell_func, &kernel](GridPoint3 loc)
-    {
-        for (const GridPoint3& rel : kernel.relative_cells_)
-        {
+    return [&process_cell_func, &kernel](GridPoint3 loc) {
+        for (const GridPoint3& rel : kernel.relative_cells_) {
             bool continue_ = process_cell_func(loc + rel);
-            if (! continue_)
+            if (!continue_)
                 return false;
         }
         return true;
     };
 }
-} // namespace cura
+} // namespace Slic3r

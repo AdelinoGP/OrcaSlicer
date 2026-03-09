@@ -1,3 +1,40 @@
+// [INTENT] Voxel grid utilities for the InterlockingGenerator feature.
+// Provides a 3D voxel grid abstraction over Slic3r's coord_t coordinate space.
+// Key operations: walking line segments, polygon boundaries, and filled polygon
+// areas to identify which voxel cells they intersect.  Also provides dilation
+// (morphological expansion) of cell sets via configurable kernels.
+//
+// Origin: CuraEngine (Ultimaker B.V.), ported into OrcaSlicer.  AGPLv3+.
+//
+// [STATE] VoxelUtils is effectively stateless except for `cell_size_` (set at
+// construction, never mutated).  All walk methods take a callback — callers
+// accumulate state.
+//
+// [MEMORY] `DilationKernel::relative_cells_` is computed and stored in the
+// constructor (O(kernel_x * kernel_y * kernel_z) entries).  For large kernels
+// this can be significant.
+//
+// [CONCURRENCY] All walk methods are const and re-entrant provided the
+// `process_cell_func` callback itself is thread-safe.
+//
+// [COUPLING] Depends on Slic3r Polygon/ExPolygon types and the Fill subsystem
+// (Fill::new_from_type(ipAlignedRectilinear) used in spreadDotsArea).
+//
+// [HAZARD H986 P2] `walkLine` inner `while(true)` loop has no explicit
+// iteration limit.  A degenerate cell_size_ of 0 in any dimension would cause
+// integer division by zero in `toGridCoord` and an infinite loop in `walkLine`.
+// The only guard is the `assert(dim < 3)` which fires only in debug builds.
+//
+// [HAZARD H987 P3] `walkPolygons` docstring warns that voxels may be processed
+// multiple times (at polygon vertex corners).  Callers using non-idempotent
+// process_cell_func will silently double-count corner cells.
+//
+// [HAZARD H988 P2] `toGridCoord` formula `coord / cell_size - (coord < 0)` is a
+// manual floor-divide.  For negative coordinates this subtracts 1 from the
+// truncated result, which is correct for two's-complement signed integers but
+// relies on implementation-defined behaviour for non-two's-complement targets
+// (pre-C++20 technically UB; C++20 mandates two's complement).
+
 // Copyright (c) 2022 Ultimaker B.V.
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
@@ -9,14 +46,25 @@
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/ExPolygon.hpp"
 
-namespace Slic3r
-{
+namespace Slic3r {
 
+// [INTENT] 3D grid coordinate type — aliases Vec3crd (int32_t triplet).
+// [HAZARD H989 P2] GridPoint3 is just a typedef for Vec3crd.  There is no
+// type distinction between a grid-space coordinate and a world-space
+// coord_t coordinate.  Mixing them compiles silently and produces wrong voxel
+// lookups.  Callers must manually track which space they are in.
 using GridPoint3 = Vec3crd;
 
 /*!
  * Class for holding the relative positiongs wrt a reference cell on which to perform a dilation.
  */
+// [INTENT] Kernel descriptor for morphological dilation of voxel cell sets.
+// Stores pre-computed relative offsets for CUBE, DIAMOND, and PRISM shapes.
+// [MEMORY] `relative_cells_` is computed eagerly in constructor; size is
+// O(kernel_x * kernel_y * kernel_z).  Large kernels with CUBE type expand
+// quadratically with depth.
+// [HAZARD H990 P2] No validation that kernel_size components are odd.  An even
+// kernel produces a slightly off-center dilation (asymmetric around input cell).
 struct DilationKernel
 {
     /*!
@@ -41,14 +89,9 @@ struct DilationKernel
      *  \ | /
      *   \|/
      */
-    enum class Type
-    {
-        CUBE,
-        DIAMOND,
-        PRISM
-    };
-    GridPoint3 kernel_size_; //!< Size of the kernel in number of voxel cells
-    Type type_;
+    enum class Type { CUBE, DIAMOND, PRISM };
+    GridPoint3              kernel_size_; //!< Size of the kernel in number of voxel cells
+    Type                    type_;
     std::vector<GridPoint3> relative_cells_; //!< All offset positions relative to some reference cell which is to be dilated
 
     DilationKernel(GridPoint3 kernel_size, Type type);
@@ -59,6 +102,11 @@ struct DilationKernel
  *
  * Contains the math for intersecting voxels with lines, polgons, areas, etc.
  */
+// [INTENT] Voxel grid walking utility.
+// `cell_size_` defines the size of one voxel in world (coord_t) units.
+// All methods are const — grid configuration is immutable after construction.
+// [HAZARD H986 P2] Zero cell_size_ in any dimension causes division by zero
+// in toGridCoord and an infinite loop in walkLine.
 class VoxelUtils
 {
 public:
@@ -66,10 +114,7 @@ public:
 
     Vec3crd cell_size_;
 
-    VoxelUtils(Vec3crd cell_size)
-        : cell_size_(cell_size)
-    {
-    }
+    VoxelUtils(Vec3crd cell_size) : cell_size_(cell_size) {}
 
     /*!
      * Process voxels which a line segment crosses.
@@ -104,10 +149,16 @@ public:
      * \param process_cell_func Function to perform on each voxel cell
      * \return Whether executing was stopped short as indicated by the \p cell_processing_function
      */
-    bool walkDilatedPolygons(const ExPolygon& polys, coord_t z, const DilationKernel& kernel, const std::function<bool(GridPoint3)>& process_cell_func) const;
-    bool walkDilatedPolygons(const ExPolygons& polys, coord_t z, const DilationKernel& kernel, const std::function<bool(GridPoint3)>& process_cell_func) const
+    bool walkDilatedPolygons(const ExPolygon&                       polys,
+                             coord_t                                z,
+                             const DilationKernel&                  kernel,
+                             const std::function<bool(GridPoint3)>& process_cell_func) const;
+    bool walkDilatedPolygons(const ExPolygons&                      polys,
+                             coord_t                                z,
+                             const DilationKernel&                  kernel,
+                             const std::function<bool(GridPoint3)>& process_cell_func) const
     {
-        for (const auto & poly : polys) {
+        for (const auto& poly : polys) {
             if (!walkDilatedPolygons(poly, z, kernel, process_cell_func)) {
                 return false;
             }
@@ -146,10 +197,16 @@ public:
      * \param process_cell_func Function to perform on each voxel cell
      * \return Whether executing was stopped short as indicated by the \p cell_processing_function
      */
-    bool walkDilatedAreas(const ExPolygon& polys, coord_t z, const DilationKernel& kernel, const std::function<bool(GridPoint3)>& process_cell_func) const;
-    bool walkDilatedAreas(const ExPolygons& polys, coord_t z, const DilationKernel& kernel, const std::function<bool(GridPoint3)>& process_cell_func) const
+    bool walkDilatedAreas(const ExPolygon&                       polys,
+                          coord_t                                z,
+                          const DilationKernel&                  kernel,
+                          const std::function<bool(GridPoint3)>& process_cell_func) const;
+    bool walkDilatedAreas(const ExPolygons&                      polys,
+                          coord_t                                z,
+                          const DilationKernel&                  kernel,
+                          const std::function<bool(GridPoint3)>& process_cell_func) const
     {
-        for (const auto & poly : polys) {
+        for (const auto& poly : polys) {
             if (!walkDilatedAreas(poly, z, kernel, process_cell_func)) {
                 return false;
             }

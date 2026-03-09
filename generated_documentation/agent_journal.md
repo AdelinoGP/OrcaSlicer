@@ -4795,3 +4795,114 @@ No remaining work in this directory.
 5. Session 73: MultiPoint, GCodeSender, calib, PerimeterGenerator
 
 **Next hazard number to assign: H982**
+
+---
+
+## Session 70 — Feature/FuzzySkin/ + Feature/Interlocking/ Modules
+
+### Files Processed
+- `src/libslic3r/Feature/FuzzySkin/FuzzySkin.hpp`
+- `src/libslic3r/Feature/FuzzySkin/FuzzySkin.cpp`
+- `src/libslic3r/Feature/Interlocking/VoxelUtils.hpp`
+- `src/libslic3r/Feature/Interlocking/VoxelUtils.cpp`
+- `src/libslic3r/Feature/Interlocking/InterlockingGenerator.hpp`
+- `src/libslic3r/Feature/Interlocking/InterlockingGenerator.cpp`
+
+---
+
+### FuzzySkin Module Key Discoveries
+
+**Design pattern**: FuzzySkin is a post-processing pass over perimeter geometry. Before perimeter generation, `group_region_by_fuzzify` partitions compatible regions by FuzzySkinConfig and pre-computes ExPolygon clip areas. During perimeter generation, `should_fuzzify` + `apply_fuzzy_skin` are called per polygon/extrusion loop to apply noise displacement.
+
+**Noise backend**: Uses the `libnoise` library (Perlin, Billow, RidgedMulti, Voronoi). Uniform random fallback uses `thread_local` RNG — thread-safe.
+
+**Multi-region support**: When multiple regions with different FuzzySkin configs coexist, `Algorithm::split_line` partitions the polygon at region boundaries, and each segment is fuzzified independently with its own noise config.
+
+**H982** (P2): In-place polygon modification — callers must copy before calling if they need the original.
+
+**H983** (P2): `FuzzySkinMode::Combined` uses hardcoded `min_extrusion_width = 0.01` (mm) — a "workaround" per source comment; real formula should reference layer height.
+
+**H984** (P3): Single-region optimization path in `apply_fuzzy_skin(Polygon)` skips region boundary clipping.
+
+**H985** (P2): Single-region path in `apply_fuzzy_skin(ExtrusionLine*)` does not copy junctions before modifying — asymmetric with multi-region path which makes a copy.
+
+---
+
+### VoxelUtils Module Key Discoveries
+
+**Design pattern**: `VoxelUtils` provides voxel grid traversal via callback functions. `walkLine`, `walkPolygons`, `walkAreas`, and their dilated variants fire a `std::function<bool(GridPoint3)>` for each cell encountered. Returning `false` from the callback short-circuits traversal.
+
+**DilationKernel**: Pre-computes all relative offsets for CUBE/DIAMOND/PRISM shapes at construction. Used by InterlockingGenerator to thicken the voxel shell during interface detection.
+
+**Origin**: CuraEngine (Ultimaker B.V.) — ported into OrcaSlicer. The original closing namespace comment said `cura` (corrected in the OrcaSlicer source).
+
+**H986** (P2): `walkLine` has no iteration limit; zero `cell_size_` causes division by zero and infinite loop.
+
+**H987** (P3): `walkPolygons` may process corner voxels multiple times.
+
+**H988** (P2): `toGridCoord` floor-divide relies on two's-complement signed integer semantics (C++20 mandated; pre-C++20 technically implementation-defined).
+
+**H989** (P2): `GridPoint3` is a plain typedef for `Vec3crd` — no type safety between grid-space and world-space coordinates.
+
+**H990** (P2): `DilationKernel` does not validate that kernel sizes are odd — even kernels produce asymmetric dilation.
+
+**H991** (P3): `spreadDotsArea` uses the full Fill subsystem for a simple grid-point enumeration — heavy dependency.
+
+**H992** (P3): Unreachable `return true` after `while(true)` in `walkLine`.
+
+---
+
+### InterlockingGenerator Module Key Discoveries
+
+**Design pattern**: The static entry `generate_interlocking_structure` iterates over all pairs of regions with different extruders. For each pair it constructs an `InterlockingGenerator` instance and calls `generateInterlockingStructure()` which:
+1. Builds voxel shell sets for each material.
+2. Intersects to find cells touching both.
+3. Optionally filters cells near air and handles thin strips.
+4. Generates beam polygons and applies to layer slices in-place.
+
+**Key algorithm detail** (H994): `has_any_mesh.merge(has_all_meshes)` simultaneously computes union (in `has_any_mesh`) and preserves intersection (remainder in `has_all_meshes`) via `std::unordered_set::merge` move semantics. This is clever but subtle.
+
+**H993** (P2): `std::hash<GridPoint3>` specialization uses signed int arithmetic that overflows for large coordinates — UB and poor collision resistance.
+
+**H994** (P2): The merge-cannibalizes-intersection pattern must be replicated exactly in a port.
+
+**H995** (P2): `cell_size.z()` is a layer count, not a physical nm distance — unit mismatch with XY voxel size.
+
+**H996** (P3): `ignored_gap_` uses unsigned literal `100u` assigned to signed `coord_t`.
+
+**H997** (P2): `beam_layer_count` of 0 causes integer division by zero in `applyMicrostructureToOutlines`.
+
+**H998** (P3): `generateMicrostructure` hardcodes 2 materials — extending to N materials requires structural rewrite.
+
+---
+
+### Hazard Summary (Session 70)
+
+| ID | Severity | Description |
+|----|----------|-------------|
+| H982 | P2 | `fuzzy_polyline`/`fuzzy_extrusion_line` modify input in-place — callers must copy |
+| H983 | P2 | Combined mode `min_extrusion_width=0.01` magic constant not tied to layer height |
+| H984 | P3 | Single-region optimization skips region boundary clip in `apply_fuzzy_skin` |
+| H985 | P2 | Single-region path no-copy asymmetric with multi-region path in `apply_fuzzy_skin` |
+| H986 | P2 | `walkLine` no iteration limit; zero cell_size causes division-by-zero and infinite loop |
+| H987 | P3 | `walkPolygons` may process corner voxels multiple times |
+| H988 | P2 | `toGridCoord` floor-divide relies on two's-complement signed integer semantics |
+| H989 | P2 | `GridPoint3` typedef for `Vec3crd` — no type safety between grid and world space |
+| H990 | P2 | `DilationKernel` does not validate odd kernel sizes — even kernels produce asymmetric dilation |
+| H991 | P3 | `spreadDotsArea` uses Fill subsystem for simple grid enumeration — heavy dependency |
+| H992 | P3 | Unreachable `return true` after `while(true)` in `walkLine` |
+| H993 | P2 | `GridPoint3` hash uses signed int overflow — UB and poor collision resistance |
+| H994 | P2 | merge-cannibalizes-intersection pattern in `generateInterlockingStructure` is subtle |
+| H995 | P2 | `cell_size.z()` is a layer count not a physical distance — unit mismatch |
+| H996 | P3 | `ignored_gap_` unsigned literal assigned to signed coord_t |
+| H997 | P2 | `beam_layer_count=0` causes integer division by zero in `applyMicrostructureToOutlines` |
+| H998 | P3 | `generateMicrostructure` hardcodes 2 materials — N-material extension requires rewrite |
+
+### Next Steps
+
+1. Commit Session 70 changes ✅ (pending)
+2. Session 71: Orient.cpp/.hpp, OpenVDBUtils.cpp/.hpp, MeshBoolean.cpp/.hpp
+3. Session 72: Emboss.cpp/.hpp, CutSurface.cpp/.hpp, Shape/TextShape.hpp/.cpp
+4. Session 73: MultiPoint.cpp/.hpp, GCodeSender.cpp/.hpp, calib.cpp/.hpp, PerimeterGenerator.hpp
+
+**Next hazard number to assign: H999**
