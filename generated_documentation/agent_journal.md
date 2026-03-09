@@ -3609,3 +3609,61 @@ For extruder shapes classified as Convex/Custom/Invalid, the switch falls throug
 **Commit:** `annotate: BuildVolume.hpp bug-fix + full annotation (H795-H802) (Session 51)`
 
 **Next hazard number to assign: H803**
+
+---
+
+## Session 52 — SLAPrint Module (SLA Resin Print Orchestration)
+
+### Files Processed
+- `src/libslic3r/SLAPrint.hpp` — fully annotated
+- `src/libslic3r/SLAPrint.cpp` — fully annotated
+- `src/libslic3r/SLAPrintSteps.hpp` — fully annotated
+- `src/libslic3r/SLAPrintSteps.cpp` — fully annotated (all step function bodies)
+
+### Summary
+
+SLAPrint is the resin-printer analogue to the FFF `Print` class. It drives a strictly ordered 7-step per-object pipeline (Hollowing → DrillHoles → ObjectSlice → SupportPoints → SupportTree → Pad → SliceSupports) followed by 2 global print-level steps (MergeSlicesAndEvalStats → Rasterize). The step state machine inherits from `PrintBase` and uses `PrintState<>` to track invalidation and scheduling.
+
+**Key architectural observations:**
+
+- `SLAPrintObject::SupportData` inherits from `sla::SupportableMesh` by value — construction performs a full O(V+T) mesh copy, not a reference-counted or pointer-based share.
+- `HollowingData::hollow_mesh_with_holes` and `hollow_mesh_with_holes_trimmed` are declared `mutable` with lazy population semantics but no mutex guard — concurrent const access (e.g., from UI thread + slicer thread) can race.
+- `SLAPrint::m_printer` is a raw pointer to `SLAArchive`. No RAII lifetime management — dangling pointer risk if archive is destroyed before `process()` completes.
+- `SLAPrint::PrintLayer` stores `reference_wrapper<const SliceRecord>` — if any object's step is invalidated mid-print, all PrintLayer references into its m_slice_index become dangling.
+- `invalidate_state_by_config_options()` has `assert(false)` for unrecognized config keys (debug only) — new config keys added without updating this function silently pass in release builds.
+
+**Dead code / no-op steps:**
+
+- `drill_holes()` body is entirely inside a `/* ... */` block — drain holes are **never actually drilled** in the current build. The AABBTreeIndirect traversal was also explicitly commented out with a BBS annotation.
+- `emesh.load_holes()` calls are commented out in both `support_points()` and `support_tree()` — drain holes are invisible to the support generator and support tree builder.
+- SlicingMode config enum switch is commented out in `slice_model()` — always uses `Regular` mode regardless of user config.
+
+**FaceHash (local struct):**
+Encodes each triangle geometrically (cross-product + centroid, scaled int64) for post-CGAL-boolean triangle identification. Used by `create_exclude_mask()` to identify interior mesh faces in the merged result. Hash collision risk is low but theoretically possible for degenerate triangles.
+
+**merge_slices_and_eval_stats() hazards:**
+- `fade_layer_time` is decremented inside a SpinningMutex, but TBB does not guarantee iteration order — fade ramp may be applied to wrong layers in parallel mode, producing a slightly inaccurate print time estimate.
+- `supports_polygons.reserve()` loop is a copy-paste error: it accumulates `soModel` sizes instead of `soSupport`, causing the supports reserve to be undersized.
+
+**initialize_printer_input() latent bug:**
+The `mx` variable intended to track the maximum slice index size across all objects is never actually set — the `if (auto m = o->get_slice_index().size() > mx)` assigns the bool comparison result to `m`, then assigns that bool to `mx`. `mx` is always 0 or 1. The `printer_input.reserve(mx)` call is effectively a no-op.
+
+**sla_trafo() constraint:**
+Uses only `instances.front()` for rotation/scale — assumes all instances of an SLA object share identical orientation. This is a valid SLA constraint (all instances printed at same angle) but is not enforced at the data layer, only by convention.
+
+### Hazards Identified (H803–H810)
+
+| ID | Summary | Severity |
+|----|---------|----------|
+| H803 | `SLAPrintObject::SupportData` inherits `sla::SupportableMesh` by value — O(V+T) mesh copy at construction | Medium |
+| H804 | `HollowingData::hollow_mesh_with_holes` and `hollow_mesh_with_holes_trimmed` are `mutable` with no mutex — concurrent const access can race | High |
+| H805 | `SLAPrint::m_printer` is a raw `SLAArchive*` pointer — no RAII; dangling pointer if archive destroyed before process() | High |
+| H806 | `SLAPrint::PrintLayer` stores `reference_wrapper<const SliceRecord>` — references dangle if any object step is invalidated after PrintLayer construction | High |
+| H807 | `invalidate_state_by_config_options()` has `assert(false)` for unrecognized keys (debug only) — new config keys silently pass in release | Medium |
+| H808 | `drill_holes()` body entirely commented out — drain holes never drilled; hollowing is non-functional end-to-end | Critical |
+| H809 | `initialize_printer_input()` mx tracking bug — bool assigned to size_t; `printer_input.reserve(mx)` always reserves 0 or 1 | Low |
+| H810 | `merge_slices_and_eval_stats()` copy-paste error — `supports_polygons.reserve()` accumulates `soModel` sizes instead of `soSupport` | Low |
+
+**Commit:** `annotate: Session 52 — SLAPrint.hpp/cpp + SLAPrintSteps.hpp/cpp (H803–H810)`
+
+**Next hazard number to assign: H811**
