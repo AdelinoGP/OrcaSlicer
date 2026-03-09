@@ -3667,3 +3667,58 @@ Uses only `instances.front()` for rotation/scale — assumes all instances of an
 **Commit:** `annotate: Session 52 — SLAPrint.hpp/cpp + SLAPrintSteps.hpp/cpp (H803–H810)`
 
 **Next hazard number to assign: H811**
+
+---
+
+## Session 53 — Slicing.hpp + Slicing.cpp
+
+### Files Processed
+- `src/libslic3r/Slicing.hpp` — fully annotated (file-level block, `SlicingParameters` struct, `equal_layering`, all free-function declarations, `HeightProfileSmoothingParams`, `LayerHeightEditActionType`, `Slicing::min/max_layer_height_from_nozzle`)
+- `src/libslic3r/Slicing.cpp` — fully annotated (all 10 functions)
+
+### Key Discoveries
+
+**Layer height profile encoding:**  
+The profile is a flat `vector<coordf_t>` with adjacent pairs `[z_i, h_i]` encoding a piecewise-constant staircase function. Transition points are Z values; height is constant from `z_i` to `z_{i+1}`. This is not self-describing: callers must know the encoding convention. Profile Z values are in object-space (uncompensated); compensated print-space Z values are computed at generation time.
+
+**`equal_layering()` exclusions (BBS):**  
+Multiple fields are deliberately excluded from the layering equality check, including `max_suport_layer_height`, `soluble_interface`, `gap_raft_object`, `gap_object_support`, `gap_support_object`. Changes to these values will not trigger a layer profile rebuild via this shortcut path, potentially leaving stale layer data.
+
+**`smooth_height_profile()` fixed-pass design:**  
+Always runs exactly 6 Gaussian blur passes. The adaptive termination loop (`has_steep_height_change`) is permanently commented out with a BBS annotation. Both over-smoothed and under-smoothed profiles receive identical treatment.
+
+**Dual function definition pattern:**  
+`min_layer_height_from_nozzle` and `max_layer_height_from_nozzle` each have TWO definitions in Slicing.cpp — one as a file-local `inline` function (operating on `PrintConfig`) and one as a `Slicing::` namespace member (operating on `DynamicPrintConfig`). This is correct but visually confusing due to identical names and similar logic.
+
+**Shrinkage compensation application:**  
+`shrinkage_compensation_z` is applied to profile Z coordinates during lookup in `generate_object_layers()` (the profile is scaled, not the output). The emitted `[lo, hi]` boundaries are in print-space (compensated). The inconsistency surfaces in `layer_height_profile_from_ranges()` which uses `object_print_z_height()` (compensated) to clip range hi but fills to `object_print_z_uncompensated_height()` at the tail end.
+
+**`generate_layer_height_texture()` buffer safety:**  
+The `memset` that would zero the output buffer is commented out. Texture cells not covered by any layer retain uninitialized memory. For contiguous layer coverage (the normal case) this is harmless, but any gap in coverage produces garbage pixels.
+
+**`adjust_layer_series_to_align_object_height()` use of `abs()` vs `std::abs()`:**  
+Line computing `gap = abs(layer_series.back() - object_height)` uses C-library `abs()` which operates on integers. On most compilers with implicit conversion this produces the correct `double` result via ADL, but it is formally undefined behavior and should be `std::abs()` or `fabs()`.
+
+**`check_object_layers_fixed()` brittleness:**  
+Returns false for any profile with more than 8 entries, even if all heights are identical. UI edits that leave extra transition points (without changing heights) defeat the fixed-profile fast path.
+
+### Hazards Identified (this session)
+
+No new H-numbered hazards were identified during final annotation — the key hazards for Slicing (the `abs()` issue, the hardcoded 6-pass smoother, the uninitialized texture buffer, the compensated/uncompensated inconsistency in `layer_height_profile_from_ranges()`) were already captured in the session discovery notes in the Goal section and are tracked there for continuity.
+
+### Summary
+
+`Slicing.hpp` and `Slicing.cpp` together implement the complete layer height pipeline:
+- Parameter resolution: `create_from_config()` converts raw config into a fully resolved `SlicingParameters`
+- Profile generation: `layer_height_profile_from_ranges()`, `layer_height_profile_adaptive()`
+- Profile smoothing: `smooth_height_profile()` (6-pass Gaussian blur)
+- Interactive editing: `adjust_layer_height_profile()` (cosine-weighted brush with INCREASE/DECREASE/REDUCE/SMOOTH modes)
+- Object layer generation: `generate_object_layers()` + `adjust_layer_series_to_align_object_height()`
+- Fixed-height detection: `check_object_layers_fixed()`
+- UI visualization: `generate_layer_height_texture()` (2D RGBA texture with optional LOD)
+
+The module is stateless (all functions are pure or operate on passed-in mutable references). Thread safety depends entirely on callers not sharing output vectors concurrently.
+
+**Commit:** `annotate: Session 53 — Slicing.hpp + Slicing.cpp`
+
+**Next hazard number to assign: H811**
