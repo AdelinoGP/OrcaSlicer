@@ -4906,3 +4906,93 @@ No remaining work in this directory.
 4. Session 73: MultiPoint.cpp/.hpp, GCodeSender.cpp/.hpp, calib.cpp/.hpp, PerimeterGenerator.hpp
 
 **Next hazard number to assign: H999**
+
+---
+
+## Session 71 — Orient, OpenVDBUtils, MeshBoolean (H999–H1021)
+
+### Files Processed
+- `src/libslic3r/Orient.hpp` — annotated and written
+- `src/libslic3r/Orient.cpp` — annotated and written
+- `src/libslic3r/OpenVDBUtils.hpp` — annotated and written
+- `src/libslic3r/OpenVDBUtils.cpp` — annotated and written
+- `src/libslic3r/MeshBoolean.hpp` — annotated and written
+- `src/libslic3r/MeshBoolean.cpp` — annotated and written
+
+### Orient Module (H999–H1011)
+
+`Orient.hpp` / `Orient.cpp` implement the automatic orientation algorithm for FDM and SLA print preparation. Key findings:
+
+- **Two nearly-identical parameter structs** (`OrientParams` vs `OrientParamsArea`) with overlapping fields and no documentation of their conceptual distinction (H999).
+- **Deprecated public API** (`orient(ModelObject*)`) has a source comment "this function should be deleted" but is still compiled and exported (H1000).
+- **Dead field**: `fun_dir` (Eigen::Vector3f) in both param structs is never read by the algorithm — appears to be an unimplemented direction-constraint feature (H1001).
+- **Threading hazard**: `progressfn` is called from TBB worker threads; callers must ensure thread-safe callbacks (H1002).
+- **Poor hash quality**: `VecHash` uses an additive linear hash on quantized normals — high collision rate for dense meshes (H1003).
+- **Verbose stdout**: Every orientation candidate logs to both Boost.Log AND `std::cout` (H1004).
+- **O(N_faces × N_candidates) copies**: `preprocess()` copies ITS once; `project_vertices()` copies on every candidate evaluation (H1005).
+- **OOB access**: After `remove_duplicates()`, `results_vector[0]` is accessed without checking empty (H1006).
+- **Misleading metric**: `costs.area_total` is set from `bounding_box().area()` (bounding box surface, not mesh face area) — misnamed (H1008).
+- **Disabled accurate contour path**: `#else` with a more accurate perimeter formula is permanently dead (H1009).
+- **Cost function degeneracy**: `target_function` denominator with `TAR_D` breaks for spherical objects where bottom projection is always near-zero (H1010).
+- **Magic stability penalty**: `(costs.bottom < BOTTOM_MIN) * 100` rejects all orientations for very small objects without any minimum-size exemption (H1011).
+
+### OpenVDBUtils Module (H1012–H1015)
+
+`OpenVDBUtils.hpp` / `OpenVDBUtils.cpp` provide TriangleMesh ↔ OpenVDB level-set grid conversion. Key findings:
+
+- **Per-call `openvdb::initialize()`**: Called on every `mesh_to_grid` and `grid_to_mesh` invocation — acquires an internal OpenVDB mutex each time. Should be called once at startup (H1012).
+- **Null grid crash**: If volume filter removes ALL split mesh parts, `grid` remains nullptr and the subsequent `grid->insertMeta(...)` unconditionally crashes (H1013).
+- **Silent scale default**: `grid_to_mesh` silently defaults `voxel_scale = 1.0` if the metadata key is missing or throws — produces 2x-sized mesh with no warning (H1014).
+- **Double→float truncation**: `redistance_grid` passes `double` ext/int ranges to a `float`-accepting `levelSetRebuild` — precision loss for thin features (H1015).
+
+### MeshBoolean Module (H1016–H1021)
+
+`MeshBoolean.hpp` / `MeshBoolean.cpp` expose three boolean backends: libigl/CGAL (EigenMesh path), CGAL Surface_mesh (EpicKernel), and mcut (McutMesh path). Key findings:
+
+- **UB on empty mesh** (H1016): `triangle_mesh_to_eigen()` calls `vertices.front()` and `indices.front()` with no empty check.
+- **Signal-based crash recovery** (H1017): `_cgal_do()` uses `try_catch_signal({SIGSEGV, SIGFPE})` to catch CGAL crashes — non-portable longjmp, bypasses RAII, leaves heap in indeterminate state.
+- **Asymmetric overload exceptions** (H1018): `triangle_mesh_to_cgal(TriangleMesh)` throws on open mesh; `triangle_mesh_to_cgal(V,F)` does not — same input, different exception behaviour depending on which overload is called.
+- **Round-trip precision truncation** (H1019): `merge_mcut_meshes()` converts McutMesh (double) → TriangleMesh (float) → ITS → McutMesh (double) as a fallback — double→float→double loses sub-micron precision and allocates two full meshes.
+- **UB on unknown op string** (H1020): `do_boolean_single()` dereferences `booleanOpts.find(boolean_opts)->second` without checking `end()` — unknown operation string causes UB.
+- **Quadratic boolean pairs** (H1021): `do_boolean()` runs O(src_parts × cut_parts) mcut operations — 10,000 context create/destroy cycles for N=100 shells each side.
+
+Notable patterns in MeshBoolean:
+- The `segment()` function (BBS addition) uses CGAL SDF-based segmentation to split meshes into N parts, each with hole-filled boundaries. The commented-out merge code suggests a planned multi-segment merge feature that was never completed.
+- The `_cgal_do` template is a clean dispatch wrapper but the signal-handler approach is a fundamental portability issue for any non-POSIX target.
+- Both CGAL and mcut paths are present in the codebase simultaneously, with mcut used for multi-shell inputs where CGAL's single-manifold requirement causes failures. The dual-backend complexity will need careful mapping in a port.
+
+### Hazard Summary
+
+| Hazard | Priority | Description |
+|--------|----------|-------------|
+| H999 | P2 | OrientParams vs OrientParamsArea — undocumented distinction, nearly-identical structs |
+| H1000 | P3 | `orient(ModelObject*)` deprecated, source comment says delete, still compiled |
+| H1001 | P3 | `fun_dir` dead field in both param structs |
+| H1002 | P1 | `progressfn` called from TBB threads — GUI callback must be thread-safe |
+| H1003 | P2 | VecHash — poor collision resistance for dense meshes |
+| H1004 | P2 | `process()` logs to stdout for every orientation candidate |
+| H1005 | P2 | O(N_faces × N_candidates) ITS copy allocations in orientation evaluation |
+| H1006 | P3 | `results_vector[0]` OOB if all orientations deduplicated away |
+| H1007 | P3 | `its.get_vertex` triangle vs vertex index ambiguity needs verification |
+| H1008 | P3 | `costs.area_total` is bounding box area, not mesh surface area |
+| H1009 | P3 | Accurate perimeter path permanently disabled by `#else` |
+| H1010 | P2 | Cost function loses grounding for spherical/convex objects |
+| H1011 | P3 | BOTTOM_MIN magic penalty rejects all orientations for small objects |
+| H1012 | P2 | `openvdb::initialize()` called per-operation — mutex overhead |
+| H1013 | P1 | Null grid dereference if all mesh parts filtered out |
+| H1014 | P2 | `voxel_scale` silent default-1.0 on metadata exception |
+| H1015 | P2 | `double`→`float` truncation in `redistance_grid` |
+| H1016 | P1 | `front()` UB on empty mesh in `triangle_mesh_to_eigen` |
+| H1017 | P1 | `try_catch_signal` SIGSEGV/SIGFPE — non-portable, bypasses RAII |
+| H1018 | P1 | Asymmetric exception semantics across `triangle_mesh_to_cgal` overloads |
+| H1019 | P2 | `merge_mcut_meshes` double→float→double round-trip precision truncation |
+| H1020 | P2 | `booleanOpts.find()` no `end()` check — UB on unknown op string |
+| H1021 | P2 | O(N_src × N_cut) quadratic mcut pairs in `do_boolean` |
+
+### Next Steps
+
+1. Commit Session 71 ✅ (pending)
+2. Session 72: `Emboss.cpp/.hpp`, `CutSurface.cpp/.hpp`, `Shape/TextShape.hpp/.cpp`
+3. Session 73: `MultiPoint.cpp/.hpp`, `GCodeSender.cpp/.hpp`, `calib.cpp/.hpp`, `PerimeterGenerator.hpp`
+
+**Next hazard number to assign: H1022**
