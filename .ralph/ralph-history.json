@@ -187,13 +187,43 @@
         "\u001b[91m\u001b[1mError: \u001b[0mCould not find oldString in the file. It must match exactly, including whitespace, indentation, and line endings.",
         "\u001b[91m\u001b[1mError: \u001b[0mThe read tool was called with invalid arguments: ["
       ]
+    },
+    {
+      "iteration": 4,
+      "startedAt": "2026-03-09T05:54:15.155Z",
+      "endedAt": "2026-03-09T06:28:58.133Z",
+      "durationMs": 2066799,
+      "agent": "opencode",
+      "model": "",
+      "toolsUsed": {},
+      "filesModified": [
+        "generated_documentation/04_refactoring_hazards.md",
+        "generated_documentation/agent_journal.md",
+        "src/libslic3r/CutSurface.cpp",
+        "src/libslic3r/Emboss.cpp",
+        "src/libslic3r/GCodeSender.cpp",
+        "src/libslic3r/GCodeSender.hpp",
+        "src/libslic3r/MultiPoint.cpp",
+        "src/libslic3r/MultiPoint.hpp",
+        "src/libslic3r/PerimeterGenerator.hpp",
+        "src/libslic3r/calib.cpp",
+        "src/libslic3r/calib.hpp"
+      ],
+      "exitCode": 0,
+      "completionDetected": false,
+      "errors": [
+        "\u001b[91m\u001b[1mError: \u001b[0mFound multiple matches for oldString. Provide more surrounding context to make the match unique.",
+        "\u001b[91m\u001b[1mError: \u001b[0mCould not find oldString in the file. It must match exactly, including whitespace, indentation, and line endings.",
+        "// printf(\"ERROR: [%d] %s\\n\", error.value(), error.message().c_str());",
+        "+//   (e.g., \"Error:Temperature sensor T:0 disconnected\") — falsely triggering connected=true."
+      ]
     }
   ],
-  "totalDurationMs": 17871473,
+  "totalDurationMs": 19938272,
   "struggleIndicators": {
     "repeatedErrors": {
       "- `StringObjectException::object` is a raw `ObjectBase const*` — dangles if Print rebuilds its objec": 2,
-      "\u001b[91m\u001b[1mError: \u001b[0mCould not find oldString in the file. It must match exactly, including whitespac": 3,
+      "\u001b[91m\u001b[1mError: \u001b[0mCould not find oldString in the file. It must match exactly, including whitespac": 4,
       "\u001b[91m\u001b[1mError: \u001b[0mThe read tool was called with invalid arguments: [": 2,
       "\u001b[91m\u001b[1mError: \u001b[0mNo changes to apply: oldString and newString are identical.": 1,
       "-            L(\"Slicing had to be stopped due to an internal error: \"": 1,
@@ -208,13 +238,15 @@
       "+| 897 | `tree_supports_show_error()` is defined as a non-static inline function at namespace scope ": 1,
       "printf(\"Error: %s, critical: %d\\n\", message.data(), int(critical));": 1,
       "| 897 | `tree_supports_show_error()` is defined as a non-static inline function at namespace scope i": 1,
-      "\u001b[91m\u001b[1mError: \u001b[0mFound multiple matches for oldString. Provide more surrounding context to make t": 1,
+      "\u001b[91m\u001b[1mError: \u001b[0mFound multiple matches for oldString. Provide more surrounding context to make t": 2,
       "2609:| 810 | `SLAPrint::Steps::merge_slices_and_eval_stats()` contains a copy-paste error: the `c = ": 1,
       "2616:| 817 | `StringObjectException::object` is a raw `ObjectBase const*` that points into the Print": 1,
       "2726:| 897 | `tree_supports_show_error()` is defined as a non-static inline function at namespace sc": 1,
       "+| 901 | `validate(FullPrintConfig&, bool)` validates `bridge_flow` twice under the comment \"bridge-": 1,
       "| 901 | `validate(FullPrintConfig&, bool)` validates `bridge_flow` twice under the comment \"bridge-f": 1,
-      "+//   - On miniz error: returns an empty EncodedRaster. No exception thrown, no error log.": 1
+      "+//   - On miniz error: returns an empty EncodedRaster. No exception thrown, no error log.": 1,
+      "// printf(\"ERROR: [%d] %s\\n\", error.value(), error.message().c_str());": 1,
+      "+//   (e.g., \"Error:Temperature sensor T:0 disconnected\") — falsely triggering connected=true.": 1
     },
     "noProgressIterations": 0,
     "shortIterations": 0
