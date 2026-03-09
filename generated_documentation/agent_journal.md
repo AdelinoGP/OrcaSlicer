@@ -3722,3 +3722,65 @@ The module is stateless (all functions are pure or operate on passed-in mutable 
 **Commit:** `annotate: Session 53 — Slicing.hpp + Slicing.cpp`
 
 **Next hazard number to assign: H811**
+
+---
+
+## Session 54 — PrintBase.hpp + PrintBase.cpp
+
+### Files Processed
+- `src/libslic3r/PrintBase.hpp` (686 lines in original; expanded to ~850 lines after annotations and clang-format reflow)
+- `src/libslic3r/PrintBase.cpp` (155 lines in original; expanded with annotations)
+
+### Key Discoveries
+
+**Global timestamp race (g_last_timestamp):**
+`PrintStateBase::g_last_timestamp` is a raw `static size_t` — not atomic, not guarded by any mutex. It is incremented with `++g_last_timestamp` in `set_started()`, `set_done()`, `invalidate()`, `invalidate_multiple()`, and `invalidate_all()`. A pre-existing FIXME comment in the header (lines 101–104 of original) explicitly calls this out. Under concurrent multi-plate slicing (two `Print` objects in separate TBB threads), this is a data race on every timestamp bump. Captured as **H816**.
+
+**m_step_active stale-on-cancel (PrintState<>):**
+`set_started()` sets `m_step_active = static_cast<int>(step)` before calling `throw_if_canceled()`. If the cancellation fires, `m_step_active` is left set to the new step while the step body never executes. The debug asserts that would catch this (`assert(m_step_active == -1)`) are explicitly commented out because they produce false positives after cancel. Downstream code in `active_step_add_warning()` asserts `m_step_active != -1` — if this races with a subsequent `invalidate()` that resets `m_step_active = -1`, the assertion fires. Captured as **H818**.
+
+**invalidate_multiple() timestamp-before-cancel window:**
+`invalidate_multiple()` sets all states to INVALID and bumps their timestamps in one loop, then fires `cancel()` in a separate call. Any thread reading timestamps in that window between the first state flip and the cancel() call will observe INVALID state with new timestamps — it may incorrectly infer steps have been fully reset when the worker thread hasn't been stopped yet. This window is inherent to the design. Captured as **H819**.
+
+**StringObjectException raw pointer (H817):**
+`StringObjectException::object` is a raw `ObjectBase const*` pointing into the Print's internal object list. If `Print::clear()` or `apply()` rebuilds the object list while the UI holds a `StringObjectException`, the pointer dangles. Captured as **H817**.
+
+**update_object_placeholders() last-instance scale (H820):**
+The loop in `update_object_placeholders()` assigns `printable = model_instance` for each printable instance without breaking — so only the LAST printable instance's scale is recorded per object. For multi-instance objects with distinct per-instance scaling, the "scale" placeholder is wrong. Same pattern as `sla_trafo()` noted in Session 52. Captured as **H820**.
+
+**m_cancel_callback is never nullptr:**
+`m_cancel_callback = [](){}` is initialized as a no-op lambda. `call_cancel_callback()` and `cancel_callback()` are always safe to call, even before a real callback is registered by `BackgroundSlicingProcess`. This is a deliberate safety design.
+
+**Two status_update_warnings overloads:**
+One takes `const PrintObjectBase*` (nullable), the other takes `PrintObjectBase&` (non-nullable). The nullable form is used for Print-level warnings (pass nullptr to tag as print-step warning); the reference form is used for object-level warnings added by BBS extension. Both end up calling `m_status_callback` with an appropriately tagged `SlicingStatus`.
+
+**PrintObjectBase bridge helpers:**
+`state_mutex(PrintBase*)` and `cancel_callback(PrintBase*)` are static methods that forward to PrintBase's protected accessors. This breaks the circular friend dependency: PrintObjectBaseWithState<> needs the mutex and callback but PrintObjectBase doesn't inherit from PrintBase, so direct access would require mutual friendship. The static bridge pattern avoids that.
+
+**PlaceholderParserError wrapping:**
+`output_filename()` catches `std::runtime_error` from `PlaceholderParser::process()` and re-throws as `Slic3r::PlaceholderParserError`. This gives the UI a typed exception to display a formatted error dialog rather than a generic runtime error.
+
+### Hazards Identified (this session)
+
+| ID   | File                  | Description |
+|------|-----------------------|-------------|
+| H816 | PrintBase.hpp/.cpp    | `g_last_timestamp` static size_t — not atomic, data race under parallel-plate slicing |
+| H817 | PrintBase.hpp         | `StringObjectException::object` raw pointer — dangles if Print rebuilds its object list |
+| H818 | PrintBase.hpp         | `PrintState::set_started()` leaves `m_step_active` stale if `throw_if_canceled()` fires |
+| H819 | PrintBase.hpp         | `invalidate_multiple()` bumps all timestamps before firing `cancel()` — INVALID-before-stop window |
+| H820 | PrintBase.cpp         | `update_object_placeholders()` records only last printable instance scale per object |
+
+### Summary
+
+`PrintBase.hpp` defines the entire abstract infrastructure that both `Print` (FFF) and `SLAPrint` (SLA) share:
+- `PrintStateBase` / `PrintState<>` — the per-step FSM with monotonic timestamps and deduplicating warning lists
+- `PrintObjectBase` / `PrintObjectBaseWithState<>` — per-object CRTP layer
+- `PrintBase` / `PrintBaseWithState<>` — top-level CRTP layer with cancellation machinery, status callback, and model/config ownership
+
+`PrintBase.cpp` implements the non-inline, non-template methods: `g_last_timestamp` definition, `PrintTryCancel::operator()`, `update_object_placeholders`, `output_filename`, `output_filepath`, `set_status`, `status_update_warnings` (two overloads), and the three `PrintObjectBase` bridge helpers.
+
+The module is well-designed for its purpose but carries three cross-cutting hazards: the unguarded global timestamp (H816), the stale m_step_active after cancel (H818), and the INVALID-before-cancel window in invalidate_multiple (H819).
+
+**Commit:** `annotate: Session 54 — PrintBase.hpp + PrintBase.cpp`
+
+**Next hazard number to assign: H821**
