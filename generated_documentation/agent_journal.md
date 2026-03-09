@@ -3841,3 +3841,80 @@ The next available hazard ID remains **H821**.
 **Commit:** `annotate: Session 55 — PrintRegion.cpp + Surface*.hpp/.cpp + PrintApply.cpp`
 
 **Next hazard number to assign: H821**
+
+---
+
+## Session 56 — Config.hpp + Config.cpp
+
+**Date:** 2026-03-08
+**Files processed:** `src/libslic3r/Config.hpp`, `src/libslic3r/Config.cpp`
+**Commit:** `e4a8fede1d` — `annotate: Config.hpp + Config.cpp — config option type hierarchy and runtime serialisation`
+**Hazards assigned:** H821–H826
+
+### Files Overview
+
+`Config.hpp` (3241+ lines) defines the entire configuration type hierarchy — from the abstract `ConfigOption` base class through the CRTP template stack (`ConfigOptionSingle<T>`, `ConfigOptionVector<T>`) to all concrete option types (`ConfigOptionFloat`, `ConfigOptionBools`, `ConfigOptionEnum<E>`, etc.).  `Config.cpp` (~1962 lines) implements serialisation, deserialisation, G-code comment parsing, and JSON loading/saving, plus the `ConfigDef` registry and `DynamicConfig`/`StaticConfig` runtime implementations.
+
+### Key Architectural Observations
+
+**ConfigOptionType bitmask layout:**
+`ConfigOptionType` uses `coVectorType = 0x4000` as a bitmask.  Scalar types are 1–11; vector types are `scalar | 0x4000`.  The BBS additions `coPointsGroups = 10 + coVectorType` and `coIntsGroups = 11 + coVectorType` fit this pattern.  Any translation MUST preserve this bitmask structure; naïve enum porting will break `is_vector()` checks everywhere.
+
+**Two-level template CRTP hierarchy:**
+All concrete option types inherit from either `ConfigOptionSingle<T>` or `ConfigOptionVector<T>`, both of which inherit from `ConfigOption`.  Virtual dispatch is used for `serialize()`, `deserialize()`, `clone()`, `equals()`, and `set()`.  A translation that flattens this hierarchy loses the runtime polymorphism required by `DynamicConfig::optptr()` and `ConfigBase::get_abs_value()`.
+
+**get_at() silent clamping (ConfigOptionVector<T>):**
+Out-of-bounds index access silently returns `values.front()` (element 0).  This is the same "default to first extruder" mechanism used throughout the multi-extruder subsystem.  A translation that throws on out-of-bounds will break single-extruder → multi-extruder fallback logic everywhere in the slicing pipeline.
+
+**ConfigOptionBools nullable sentinel:**
+Booleans are stored as `unsigned char`, not `bool`, to support `0xFF` as a nullable nil sentinel.  The non-const `get_at()` overload uses `reinterpret_cast<bool*>` on the `unsigned char` storage — UB if `sizeof(bool) != 1` on the target platform (H824).
+
+**ConfigOptionFloatsTempl NULLABLE specialisation:**
+Uses `quiet_NaN()` as nil sentinel.  NaN equality MUST use `std::isnan()`, not `==`.  A translation that uses value equality for null checks will silently treat every null float as non-null (NaN != NaN always).
+
+**ConfigOptionIntsTempl NULLABLE specialisation:**
+Uses `INT_MAX` (2147483647) as nil sentinel.  The legitimate integer value 2147483647 cannot be stored.  This is a known limitation, not a bug.
+
+**ConfigOptionPercent value semantics:**
+Stores raw double (e.g. `50.0` for 50%), NOT a 0.0–1.0 fraction.  `get_abs_value(ratio)` divides by 100.  Mixed use of percent and absolute floats in the same config struct is resolved by the `percent` boolean flag on `ConfigOptionFloatOrPercent`.
+
+**ConfigOptionPoints binary serialisation:**
+Uses cereal `saveBinary` / `loadBinary` for `std::vector<Vec2d>`.  Not portable across endianness or `sizeof(double)` differences (H825).
+
+**ConfigOptionEnumGeneric raw pointer:**
+Holds a non-owning raw `const t_config_enum_values*` pointer to the enum keys map.  The map must outlive all enum option instances.  Typically safe because maps are static-duration, but any dynamic `ConfigDef` creation risks dangling.
+
+**ConfigOptionEnumsGenericTempl (BBS addition):**
+Inherits from `ConfigOptionInts` (non-nullable base) but carries a `NULLABLE` template parameter — the NULLABLE template parameter is ignored by the base class and is therefore inconsistent/misleading.
+
+**serialization_key_ordinal — static local variable in ConfigDef::add():**
+`ConfigOptionDef::serialization_key_ordinal` is assigned from a `static int` local inside `ConfigDef::add()`.  The comment says "shall be initialised from the main thread"; if two threads call `ConfigDef::add()` concurrently, the static-local increment is a data race.  In practice, all `ConfigDef` registration is done at program startup before any threads are spawned.
+
+**ConfigBase::get_abs_value() dead throw (H821):**
+Line 780 has a `throw` statement after an unconditional `return` at lines 776–778.  The throw is permanently unreachable.  A translator who sees the throw and tries to replicate the error path will be adding dead logic.
+
+**null_nullables() implicit enum→bool conversion (H822):**
+`ConfigBase::null_nullables()` calls `set_deserialize_raw(key, value, /*substitution_rule=*/ForwardCompatibilitySubstitutionRule::Disable)` but the second parameter is typed `bool append`.  `ForwardCompatibilitySubstitutionRule::Disable` has integer value 0, which converts to `bool false`, meaning options are REPLACED not APPENDED.  **Wait — re-checking:** `Disable == 0 → false`, so values ARE replaced.  The annotation in Config.cpp records this as H822 because the intent (replace) could easily be misconstrued by a translator who sees `ForwardCompatibilitySubstitutionRule::Disable` used where a `bool` is expected.
+
+**create_default_option() memory leak (H823):**
+In the `coEnum` branch, `dft` (a `ConfigOptionEnumGeneric*`) is cloned, then the clone is returned.  The `delete dft` at the end of the function body is after all `return` paths and is therefore unreachable — `dft` leaks on the enum branch.
+
+**DynamicConfig::optptr(create=true):**
+Uses `emplace_hint` with the iterator returned by a failed `find()` call to hint insertion location.  Correct because on a failed find, the returned iterator is the position where the key would be inserted.  Not a hazard but a subtle C++ detail that a translation must preserve for correctness.
+
+### Hazards Assigned
+
+| ID | Description |
+|----|-------------|
+| H821 | `get_abs_value()` dead `throw` after unconditional `return` — permanently unreachable |
+| H822 | `null_nullables()` passes `ForwardCompatibilitySubstitutionRule::Disable` where `bool append` expected — implicit enum→bool, reads as "replace" not "append" |
+| H823 | `create_default_option()` coEnums branch: `delete dft` unreachable after all `return` paths — memory leak |
+| H824 | `ConfigOptionBools::get_at()` non-const: `reinterpret_cast<bool*>(&unsigned_char)` — UB if `sizeof(bool) != 1` |
+| H825 | `ConfigOptionPoints` uses cereal `saveBinary` — not portable across endianness or `sizeof(double)` |
+| H826 | `ConfigOptionVector::resize()` comment says "duplicate last value" but code calls `values.front()` — comment/code divergence |
+
+### Summary
+
+The Config subsystem is the backbone of all OrcaSlicer parameter management.  Its CRTP template hierarchy, runtime polymorphism, nullable sentinels, and implicit conversions are all refactoring traps that require careful handling in any target language.  All 6 new hazards (H821–H826) have been registered in `04_refactoring_hazards.md`.
+
+**Next hazard number to assign: H827**
