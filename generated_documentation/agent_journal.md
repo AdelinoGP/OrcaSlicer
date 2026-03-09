@@ -4257,3 +4257,63 @@ Session 61 extended into SupportSpotsGenerator.hpp and SupportParameters.hpp. Th
 
 **Next hazard number to assign: H882**
 
+---
+
+### Session 62
+
+**Files Annotated:**
+- `src/libslic3r/Support/SupportLayer.hpp` (146 lines)
+- `src/libslic3r/Support/TreeSupportCommon.hpp` (854 lines → 920 lines after annotation)
+
+**Context:**
+Session 62 began with SupportMaterial.cpp listed as unannotated in the task state, but inspection of git history confirmed it was fully annotated and committed in session `809fd80b3e` during a prior run. Similarly, TreeSupport.hpp/.cpp and TreeSupport3D.hpp/.cpp were already committed. The two genuinely unannotated files were SupportLayer.hpp and TreeSupportCommon.hpp. Hazard registry entries H882–H890 were written for SupportMaterial.cpp findings (sourced from prior-session analysis notes) and H891–H898 for the two files actually annotated this session.
+
+**SupportLayer.hpp:**
+
+A 146-line arena-allocator header for the support layer type system. Three main structures:
+- `SupportGeneratorLayerStorage`: a `std::deque`-backed arena with a `std::mutex`. The `allocate()` method acquires the mutex via `lock()`/`unlock()` (not RAII). If `emplace_back()` throws `std::bad_alloc`, `unlock()` is never reached, permanently deadlocking any subsequent caller on the same storage (H892).
+- `SupporLayerType` enum: the canonical definition of the missing-'t' typo present in ~30 downstream call sites. Renaming it in a refactor requires a global rename (H891).
+- `SupportGeneratorLayer::operator==`: compares only `print_z`, `height`, `bridging`. Silently ignores `layer_type`, all `Polygons` fields, and `idx_object_layer_*` — any equality-based deduplication relying on this operator will produce false positives (H893).
+
+**TreeSupportCommon.hpp:**
+
+A 854-line header mixing TreeSupportSettings, helper functions, InterfacePlacer, and LineStatus. Key findings:
+
+- `TreeSupportSettings::soluble` is declared `inline static bool = false` — a single global shared across ALL instances. Multi-object prints mixing soluble and non-soluble support have last-writer-wins semantics; whichever object was processed last sets the global for all (H894).
+- `TreeSupportSettings::operator==` compares 30+ individual fields but does NOT compare the embedded `TreeSupportMeshGroupSettings settings` beyond mirrored top-level fields. Two settings objects can compare equal while differing in interface/roof parameters, causing incorrect cache reuse (H895).
+- `TreeSupportMeshGroupSettings::support_bottom_height`: the fallback formula `support_interface_bottom_layers * layer_height` uses -1 as a sentinel for "use top interface layers count", with no documentation (H896).
+- `tree_supports_show_error()`: permanent scaffolding from "public beta" era — only `printf`s to stdout, never shows UI feedback in release builds (H897).
+- `getActualZ()` in a `#if 0` dead-code block: `+ known_z.size() ? known_z.back() : 0` — the addition result is used as the ternary condition, not a bounds check. The intended `known_z.size() > 0 ? ...` logic is broken (H898).
+- `layer_idx_floor` vs `layer_idx_ceil`: the original comment "Highest collision layer" describes floor semantics but is ambiguous; recommended rename `layer_idx_at_or_below()` for clarity.
+- `InterfacePlacer` copy constructor: each copy gets its OWN `std::mutex m_mutex_layer_storage` (value member, not a reference). This is safe only because TBB assigns disjoint layer indices to distinct copies — there is no shared mutex protecting the output vectors across copies. A future refactor that changes assignment policy could introduce races silently.
+- `add_roof_unguarded()` uses `SupporLayerType::TopContact` and `SupporLayerType::TopInterface`, preserving the canonical typo from SupportLayer.hpp.
+- `LineStatus` enum: six-state classifier for support-line propagation (INVALID, TO_MODEL, TO_MODEL_GRACIOUS, TO_MODEL_GRACIOUS_SAFE, TO_BP, TO_BP_SAFE). Used in TreeSupport3D.cpp drop-to-floor loops.
+
+#### Hazards Assigned
+
+| ID | Description |
+|----|-------------|
+| H882 | `SupportGridPattern` raw non-owning `const Polygons*` — dangling if caller destroys before `extract_support()` |
+| H883 | `buildplate_covered()` O(N²) serial prefix-union — FIXME comment present |
+| H884 | `rasterize_polygons()` unbounded grid-size allocation — potential OOM on very large models |
+| H885 | `OverhangCluster::add_overhang()` O(N×C) quadratic scan per overhang region |
+| H886 | `OverhangCluster` stores raw `ExPolygon*` — dangling on vector realloc |
+| H887 | `top_contact_layers()` `support_interface_filament - 1` unsigned underflow (same root cause as H879) |
+| H888 | `SupportGridParams::support_closing_radius` hardcoded to 2.0, ignores config value |
+| H889 | `detect_overhangs()` uses first-region-only `fw` for multi-region objects |
+| H890 | `contours_simplified()` corner-offset assumes axis-aligned edges only |
+| H891 | `SupporLayerType` enum: canonical definition of missing-'t' typo; ~30 downstream uses |
+| H892 | `SupportGeneratorLayerStorage::allocate()` manual lock/unlock — `bad_alloc` from `emplace_back` permanently deadlocks the storage |
+| H893 | `SupportGeneratorLayer::operator==` partial equality — ignores `layer_type`, all polygon fields, `idx_object_layer_*` |
+| H894 | `TreeSupportSettings::soluble` is `inline static bool` — global shared across all instances; last-writer-wins for mixed soluble/non-soluble prints |
+| H895 | `TreeSupportSettings::operator==` skips embedded `TreeSupportMeshGroupSettings` comparison — incorrect cache hits possible |
+| H896 | `support_bottom_height` negative-value sentinel (-1) for `support_interface_bottom_layers` undocumented |
+| H897 | `tree_supports_show_error()` permanent "public beta" printf-only scaffolding — no release-visible feedback |
+| H898 | `getActualZ()` (dead `#if 0` block) operator-precedence bug: addition result tested as ternary condition, not a bounds check |
+
+#### Summary
+
+Session 62 completed annotation of the final two unannotated files in the `Support/` module. The most significant new hazard is H894 (`soluble` global): it is a correctness bug for any multi-object print mixing soluble and non-soluble interface support, and will require a per-instance flag or per-object settings path in the refactored language. H892 (arena deadlock on bad_alloc) and H893 (partial equality ignoring layer content) are also high-priority for refactoring: the arena pattern should be replaced with RAII allocation, and the equality operator must be regenerated correctly from all fields. The `Support/` module is now fully annotated. Next sessions should audit remaining `src/libslic3r/` files outside `Support/` for annotation coverage.
+
+**Next hazard number to assign: H899**
+
