@@ -4373,3 +4373,66 @@ Session 63 completed inline annotation of the lower half of `PrintConfig.cpp`. T
 
 **Next hazard number to assign: H907**
 
+---
+
+## Session 65 — Fill module verification + Fill3DHoneycomb.cpp duplicate fix
+
+### Files Examined / Verified
+
+- `src/libslic3r/Fill/Fill3DHoneycomb.cpp` — **fixed** (duplicate namespace block removed)
+- `src/libslic3r/Fill/Fill3DHoneycomb.hpp` — verified fully annotated (no changes)
+- `src/libslic3r/Fill/FillHoneycomb.cpp` — verified fully annotated (no changes)
+- `src/libslic3r/Fill/FillHoneycomb.hpp` — verified fully annotated (no changes)
+- `src/libslic3r/Fill/FillPlanePath.cpp` — verified fully annotated (no changes)
+- `src/libslic3r/Fill/FillPlanePath.hpp` — verified fully annotated (no changes)
+- `src/libslic3r/Fill/FillLine.cpp` — verified fully annotated (no changes)
+- `src/libslic3r/Fill/FillLine.hpp` — verified fully annotated (no changes)
+- `src/libslic3r/Fill/FillCrossHatch.cpp` — verified fully annotated (no changes)
+- `src/libslic3r/Fill/FillCrossHatch.hpp` — verified fully annotated (no changes)
+
+### Problem Found and Fixed
+
+`Fill3DHoneycomb.cpp` had a duplicate unannotated `namespace Slic3r` block spanning lines 443–727 left over from a prior annotation session that was interrupted mid-write. The duplicate contained the original (un-annotated) versions of `triWave`, `colinearPoints`, `zip`, `gridSize`, `FillParams`, `Fill3DHoneycomb::_fill_surface_single`, etc. — creating redefinition errors that would have prevented compilation. The fix truncated the file to line 441 (end of the first, correctly annotated namespace block).
+
+### Hazard Verification
+
+- H331–H338: `Fill3DHoneycomb.cpp` hazards — confirmed in `04_refactoring_hazards.md`
+- H339–H344: `FillHoneycomb.cpp` hazards — confirmed in `04_refactoring_hazards.md`
+- H345–H358: `FillPlanePath.cpp` hazards — confirmed in `04_refactoring_hazards.md`
+- H359–H363: `FillLine.cpp` hazards — confirmed in `04_refactoring_hazards.md`
+- H364–H374: `FillCrossHatch.cpp` hazards — confirmed in `04_refactoring_hazards.md`
+
+### Fill Module Status
+
+The `src/libslic3r/Fill/` directory is **now fully annotated**. All fill pattern files have been processed:
+
+| File | Hazards | Status |
+|------|---------|--------|
+| Fill.cpp | H120–H131 (prior sessions) | Done |
+| FillBase.cpp/hpp | H132–H145 | Done |
+| FillRectilinear.cpp | H146–H200 | Done |
+| FillAdaptive.cpp/hpp | H201–H240 | Done |
+| FillLightning.cpp/hpp + Lightning/* | H241–H310 | Done |
+| FillConcentric.cpp/hpp | H311–H320 | Done |
+| FillGyroid.cpp/hpp | H321–H330 | Done |
+| Fill3DHoneycomb.cpp/hpp | H331–H338 | Done (fixed this session) |
+| FillHoneycomb.cpp/hpp | H339–H344 | Done |
+| FillPlanePath.cpp/hpp | H345–H358 | Done |
+| FillLine.cpp/hpp | H359–H363 | Done |
+| FillCrossHatch.cpp/hpp | H364–H374 | Done |
+
+### Algorithm/ Module Status
+
+`src/libslic3r/Algorithm/` contains only 4 files:
+- `LineSplit.cpp/hpp` — fully annotated (prior session)
+- `RegionExpansion.cpp/hpp` — fully annotated (prior session)
+
+No remaining work in this directory.
+
+### Next Steps
+
+1. Begin annotating `src/libslic3r/SLA/` directory — not yet annotated
+2. Consider updating `02_core_data_structures.md` and `03_algorithmic_complexities.md` with findings from sessions 39–65
+
+**Next hazard number to assign: H907**
+
