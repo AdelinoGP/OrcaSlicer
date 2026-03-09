@@ -1170,6 +1170,21 @@ PRINT_CONFIG_CLASS_DEFINE(
         (ConfigOptionBool, seam_slope_inner_walls))((ConfigOptionFloatOrPercent, scarf_joint_speed))(
         (ConfigOptionFloat, scarf_joint_flow_ratio))((ConfigOptionPercent, scarf_overhang_threshold)))
 
+// [INTENT] MachineEnvelopeConfig holds printer kinematic envelope limits:
+// max acceleration per axis (M201), max speed per axis (M203), acceleration
+// profiles (M204), jerk limits (M205), and resonance-avoidance speed band.
+// These are emitted as M-code firmware commands at the start of the G-code
+// when `emit_machine_limits_to_gcode` is true.
+// [STATE] All fields are ConfigOptionFloats (vectors with one entry per motion
+// system — typically two for Bambu dual-extruder printers to encode Normal vs.
+// Silent mode).  Index 0 = default, index 1 = silent mode.
+// [COUPLING] GCodeWriter::set_machine_max_*() functions emit the M-codes from
+// these values.  Print.cpp validate() checks that values are consistent with
+// nozzle_diameter and hardware limits.
+// [HAZARD] H708 — resonance_avoidance min/max speed band is ported from Qidi
+// Slicer with no upstream documentation.  The clamping logic that enforces
+// these bounds is in CoolingBuffer.cpp; if the band is misconfigured
+// (min > max), cooling logic silently inverts the range check.
 PRINT_CONFIG_CLASS_DEFINE(
     MachineEnvelopeConfig,
 
