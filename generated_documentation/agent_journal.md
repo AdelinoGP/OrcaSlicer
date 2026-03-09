@@ -4636,3 +4636,162 @@ No remaining work in this directory.
 
 **Next hazard number to assign: H947**
 
+
+---
+
+## Session 69 — Execution/, Optimize/, CSGMesh/ Modules
+
+### Files Processed
+- `src/libslic3r/Execution/Execution.hpp`
+- `src/libslic3r/Execution/ExecutionSeq.hpp`
+- `src/libslic3r/Execution/ExecutionTBB.hpp`
+- `src/libslic3r/Optimize/Optimizer.hpp`
+- `src/libslic3r/Optimize/NLoptOptimizer.hpp`
+- `src/libslic3r/Optimize/BruteforceOptimizer.hpp`
+- `src/libslic3r/CSGMesh/CSGMesh.hpp`
+- `src/libslic3r/CSGMesh/CSGMeshCopy.hpp`
+- `src/libslic3r/CSGMesh/ModelToCSGMesh.hpp`
+- `src/libslic3r/CSGMesh/PerformCSGMeshBooleans.hpp`
+- `src/libslic3r/CSGMesh/SliceCSGMesh.hpp`
+- `src/libslic3r/CSGMesh/TriangleMeshAdapter.hpp`
+- `src/libslic3r/CSGMesh/VoxelizeCSGMesh.hpp`
+
+---
+
+### Execution/ Module Key Discoveries
+
+**Design pattern**: Policy-based dispatch — `Execution.hpp` defines a `Traits<EP>` template with `for_each`, `reduce`, `max_concurrency` customization points; `ExecutionSeq.hpp` and `ExecutionTBB.hpp` provide sequential and parallel specializations. Callers write generic code against the policy interface and switch implementations at compile time.
+
+**H947** (P2): The primary `Traits<EP>` template has no static_assert. Any unspecialized `EP` silently generates link errors rather than a clear diagnostic.
+
+**H948** (P3): Default TBB granularity is 1. For large datasets this incurs high per-task overhead. The sequential fallback (`ExecutionSeq`) uses a plain range loop — no overhead but loses cancellation.
+
+**H949** (P1): The `reduce` API requires that the merge function be associative and commutative (TBB requirement for parallel reduction), but there is no static_assert or documentation comment enforcing this contract. A mistakenly non-commutative merge compiles and produces non-deterministic results under TBB.
+
+**H950** (P2): `ExecutionSeq` aliases `_Mtx` as both `mutex_type` and `sharedmutex_type`. Swapping to TBB execution provides real locking, but any code written against `Seq` assuming no locking semantics will break silently.
+
+**H951** (P2): `ExecutionTBB` uses `tbb::spin_mutex`. Spin mutexes are only appropriate for very short critical sections; longer critical sections under TBB will cause CPU waste.
+
+---
+
+### Optimize/ Module Key Discoveries
+
+**Design pattern**: `Optimizer<Alg>` is a generic wrapper templated on algorithm. Supported algorithms: NLopt (via `NLoptOptimizer.hpp`) and BruteForce (via `BruteforceOptimizer.hpp`). Callers set bounds, max iterations, stopping criteria, then call `optimize(objfn, initial_guess, bounds)`.
+
+**H952** (P2): `Bound` default constructor uses `std::numeric_limits<double>::min()` (smallest *positive* value ≈ 2.2e-308), not `lowest()` (most-negative value ≈ -1.8e308). Any code relying on default lower bound gets a near-zero bound instead of unconstrained negative.
+
+**H953** (P1): `max_iterations(double val)` truncates `double` to `unsigned` via `static_cast`. Negative values wrap to `UINT_MAX` (~4 billion iterations). No validation or clamp.
+
+**H954** (P2): The getter `max_iterations()` returns `double` while the stored field is `unsigned`. The round-trip through double can lose precision for large iteration counts.
+
+**H955** (P0/Critical): In `NLoptOptimizer.hpp`, the NLopt callback unconditionally dereferences `score.gradient` optional without calling `.has_value()` first. If gradient is not computed, this is UB.
+
+**H956** (P1): The C-level `gradient` pointer inside the NLopt callback is not null-checked before writing. NLopt passes null when gradient is not needed; writing to null is UB.
+
+**H957** (P3): `AlgBurteForce` is a typo (should be `AlgBruteForce`). Internal struct name inconsistency.
+
+**H958** (P3): `BruteforceOptimizer.hpp` `num_iter()` uses `std::pow` for integer grid sizing. Float exponentiation for integer dimension counts introduces precision loss for high-dimension optimization spaces.
+
+---
+
+### CSGMesh/ Module Key Discoveries
+
+**Design pattern**: CSGMesh represents a tree of Boolean operations (Union/Difference/Intersection) over triangle meshes. `CSGMesh.hpp` defines the node type and ADL accessors; `ModelToCSGMesh.hpp` converts a `Model` to a CSGMesh; `PerformCSGMeshBooleans.hpp` evaluates the tree via CGAL or mcut; `SliceCSGMesh.hpp` slices directly; `VoxelizeCSGMesh.hpp` voxelizes via OpenVDB; `TriangleMeshAdapter.hpp` bridges between the two mesh representations.
+
+**H959** (P1): Push/Pop stack protocol for CSG evaluation is unchecked. A mismatched Push without Pop (or vice versa) silently produces geometrically wrong results with no assertion or error.
+
+**H960** (P2): ADL accessors (`get_mesh`, `get_operation`, `get_transform`) have no concept constraints. A type with wrong-typed members will compile against the wrong overload silently.
+
+**H961** (P1): `copy_csgrange_shallow` wraps raw pointers for non-CSGPart types. If the source range is destroyed before the shallow copy is used, all wrapped pointers dangle.
+
+**H962** (P3): `copy_csgrange_deep` duplicates all mesh data, doubling peak memory. No guard against OOM.
+
+**H963** (P2): `is_same()` uses pointer equality, not content equality. Two semantically identical nodes at different addresses compare as different.
+
+**H964** (P2): `mpartsDrillHoles` populates drain holes but they are never exported into the CSG operation stream — drain holes are silently absent from boolean evaluation.
+
+**H965** (P1): Non-split path stores a `const*` to `vol->mesh().its` (indexed triangle set). If the `ModelVolume` is mutated or destroyed, all pointers dangle with no lifetime tracking.
+
+**H966** (P2): Split negative volume: all shells are unioned first, then subtracted. This is not equivalent to individually subtracting each overlapping shell for overlapping geometry.
+
+**H967** (P3): `csgidx` is not bounds-checked against the mesh vector in the reduce loop. Out-of-range access is possible if CSGMesh and mesh vectors diverge.
+
+**H968** (P2): `perform_csg()` treats a null operand as a silent no-op, returning an incomplete result with no error signal to the caller.
+
+**H969** (P1): `check_csgmesh_booleans` writes to `fail_reason` and `fail_part_name` from multiple TBB threads without synchronization — data race UB.
+
+**H970** (P3): A local `op` variable in the Push sentinel is set but the original `get_operation()` accessor is used in `perform_csg` — a latent source of confusion if ever refactored.
+
+**H971** (P2): The mcut validation path skips manifold and self-intersection checks that the CGAL path performs. Mixed-backend validation is inconsistent.
+
+**H972** (P2): A raw `top` pointer is captured in a TBB lambda in `slice_csgmesh_ex`. Currently safe but fragile — any future parallelization of the outer loop would create a race.
+
+**H973** (P3): An empty slice grid returns a silent empty result. No warning or error to callers.
+
+**H974** (P2): The final `union_ex` pass in `SliceCSGMesh.hpp` has an unresolved TODO comment — the semantics are uncertain.
+
+**H975** (P2): Union merge accumulates overlapping polygons until the end of the loop. Peak memory scales with the count of Union parts before the merge flush.
+
+**H976** (P2): `get_mesh(TriangleMesh* const)` has no null-check. Passing null is UB.
+
+**H977** (P2): All `TriangleMeshAdapter` `get_transform` overloads return Identity. No transform support; meshes are silently placed at origin regardless of scene transform.
+
+**H978** (P2): `get_voxelgrid` mutates `params.trafo` on a local copy. Latent race condition if the lambda capture ever changes from `[=]` to `[&]`.
+
+**H979** (P2): Cancellation in `voxelize_csgmesh` returns a partial grid with no error code. Callers cannot distinguish cancellation from success.
+
+**H980** (P1): `detail::perform_csg` for voxels has no null-guard on `dst` after OpenVDB allocation. Crash on allocation failure.
+
+**H981** (P3): `grid_union` with an empty src has implementation-defined behaviour in OpenVDB (documented as edge case).
+
+---
+
+### Hazard Summary (Session 69)
+
+| ID | Severity | Description |
+|----|----------|-------------|
+| H947 | P2 | `Traits<EP>` primary template empty — no static_assert for unspecialized policy |
+| H948 | P3 | Default granularity=1 causes fine-grained TBB task overhead |
+| H949 | P1 | `reduce` mergefn must be associative/commutative — no static check |
+| H950 | P2 | `ExecutionSeq` `_Mtx` aliased as both mutex types — swap-to-TBB loses protection |
+| H951 | P2 | `tbb::spin_mutex` busy-wait — wrong for long critical sections |
+| H952 | P2 | `Bound` default `min` uses `numeric_limits<double>::min()` not `lowest()` |
+| H953 | P1 | `max_iterations(double)` silently truncates; negative wraps to UINT_MAX |
+| H954 | P2 | `max_iterations()` getter returns `double` but field is `unsigned` |
+| H955 | P0 | NLopt callback dereferences `score.gradient` optional without has_value() — UB |
+| H956 | P1 | C-level `gradient` pointer not null-checked before write in NLopt callback |
+| H957 | P3 | `AlgBurteForce` typo in struct name |
+| H958 | P3 | `num_iter()` uses `std::pow` for integer grid sizing — float precision loss |
+| H959 | P1 | Push/Pop CSG stack protocol unchecked — mismatched push/pop → wrong geometry |
+| H960 | P2 | ADL accessors have no concept constraints — wrong-typed members compile silently |
+| H961 | P1 | `copy_csgrange_shallow` raw pointer wrapping — dangling if source destroyed |
+| H962 | P3 | `copy_csgrange_deep` doubles peak memory with no OOM guard |
+| H963 | P2 | `is_same()` uses pointer equality not content equality |
+| H964 | P2 | `mpartsDrillHoles` drain holes never exported to CSG stream — silently absent |
+| H965 | P1 | Non-split path stores `const*` to vol mesh — dangling if ModelVolume mutated |
+| H966 | P2 | Split negative volume union-then-subtract not equivalent to subtract-each |
+| H967 | P3 | `csgidx` not bounds-checked against mesh vector in reduce loop |
+| H968 | P2 | `perform_csg()` null operand → silent no-op → incomplete result, no error |
+| H969 | P1 | `check_csgmesh_booleans` parallel writes to fail_reason/fail_part_name — data race |
+| H970 | P3 | Local `op` variable overridden but original `get_operation()` used in perform_csg |
+| H971 | P2 | mcut validation skips manifold + self-intersect checks (CGAL path checks both) |
+| H972 | P2 | Raw `top` pointer in TBB lambda — brittle on future outer-loop parallelization |
+| H973 | P3 | Empty slicegrid returns silent empty result |
+| H974 | P2 | Final `union_ex` pass has unresolved TODO — semantics uncertain |
+| H975 | P2 | Union merge peak memory scales with Union part count |
+| H976 | P2 | `get_mesh(TriangleMesh*)` no null check — UB if null passed |
+| H977 | P2 | All TriangleMeshAdapter `get_transform` return Identity — no transform support |
+| H978 | P2 | `get_voxelgrid` mutates params.trafo on local copy — latent race if capture changes |
+| H979 | P2 | Cancellation in `voxelize_csgmesh` returns partial grid with no error code |
+| H980 | P1 | `detail::perform_csg` voxel path no null-guard on `dst` — crash on alloc failure |
+| H981 | P3 | `grid_union` with empty src — edge-case behaviour implementation-defined in OpenVDB |
+
+### Next Steps
+
+1. Commit all Session 69 changes ✅ (pending)
+2. Session 70: Feature/FuzzySkin/, Feature/Interlocking/, VoxelUtils/
+3. Session 71: Orient.cpp/.hpp, OpenVDBUtils, MeshBoolean
+4. Session 72: Emboss, CutSurface, Shape/TextShape
+5. Session 73: MultiPoint, GCodeSender, calib, PerimeterGenerator
+
+**Next hazard number to assign: H982**
