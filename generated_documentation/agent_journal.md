@@ -4122,3 +4122,94 @@ Session 58 covered 10 source files spanning the lower-level G-code read/write pi
 Session 59 covered 6 source files completing the mid-tier GCode utilities layer: `PrintExtents` (spatial extent reporting for UI), `RetractWhenCrossingPerimeters` (travel retraction decision via AABBTree + Clipper intersection), and `SmallAreaInfillFlowCompensator` (CSV-driven piecewise-linear flow correction for short extrusion segments). 8 new hazards (H854–H861) were catalogued, including two High/UB risks (H856, H860) that can produce undefined behaviour on valid (but edge-case) inputs. The most architecturally significant finding is the `SmallAreaInfillFlowCompensator`'s runtime-parsed CSV model: it makes the compensator's behaviour dependent on user-supplied floating-point data with no hardened parser, no locale isolation, and insufficient empty-model guards.
 
 **Next hazard number to assign: H862**
+
+---
+
+## Session 60
+
+### Files Annotated
+
+- `src/libslic3r/Support/SupportCommon.hpp` — fully annotated
+- `src/libslic3r/Support/SupportCommon.cpp` — fully annotated
+
+### Key Findings
+
+**SupportCommon.hpp:**
+- Declares the public interface for shared support-generation infrastructure: `generate_interface_layers`, `generate_raft_base`, `fill_expolygon_generate_paths`, `fill_expolygons_generate_paths`, `tree_supports_generate_paths`, `fill_expolygons_with_sheath_generate_paths`, `modulate_extrusion_by_overlapping_layers`, `generate_support_layers`, `generate_support_toolpaths`.
+- Two template helpers: `idx_higher_or_equal` / `idx_lower_or_equal` — binary search into SupportGeneratorLayer pointer arrays keyed on print_z.
+
+**SupportCommon.cpp:**
+- `generate_interface_layers()` — TBB parallel_for over intermediate_layers; `insert_layer` lambda calls `layer_storage.allocate()` from inside parallel body — potential data race if SupportGeneratorLayerStorage is not thread-safe (H862).
+- `generate_raft_base()` — nsteps inflate loop with jtRound join type (slow); handles tree support cutting through raft layers.
+- `generate_support_toolpaths()` — two TBB parallel_for passes. Pass 1: per-layer fill (contacts, interface, base). Pass 2: height modulation + ironing. Organic hollow supports have hardcoded 100 mm height threshold for double-wall enablement.
+- `generate_support_toolpaths()` — ironing path reads `support_layers[id+1]->support_islands` inside TBB Pass 2 body — assumes ascending scheduling not guaranteed by TBB (H863).
+- `link_max_length_factor` hardcoded to 0.0 — silently disables infill link-max-length clipping (H864).
+- `SupporLayerType` typo (missing 't') propagates through entire Support subsystem (H865).
+- `modulate_extrusion_by_overlapping_layers()` reduces `height` but does NOT update `mm3_per_mm` — flow mismatch (H866).
+- Dead Perl-era `clip_by_pillars()`/`clip_with_shape()` code in `/* ... */` block (permanently excluded, never ported to C++).
+
+### Hazards Assigned
+
+| ID | Description |
+|----|-------------|
+| H862 | `generate_interface_layers()`: `layer_storage.allocate()` called inside TBB parallel body via `insert_layer` lambda — potential data race if storage is not thread-safe |
+| H863 | `generate_support_toolpaths()` Pass 2 reads `support_layers[id+1]->support_islands` inside TBB parallel body — correctness assumes ascending scheduling not guaranteed by TBB |
+| H864 | `link_max_length_factor` hardcoded to 0.0 — silently disables infill link-max-length clipping for all support layers |
+| H865 | `SupporLayerType` typo (missing 't') propagated throughout entire Support subsystem |
+| H866 | `modulate_extrusion_by_overlapping_layers()` reduces extrusion height but does NOT update `mm3_per_mm` — flow mismatch |
+
+### Summary
+
+Session 60 covered the two core support infrastructure files. SupportCommon.cpp is the most complex TBB-parallel support file encountered so far, with two-pass parallel toolpath generation, height modulation, and ironing. The key architectural finding is the two-pass TBB structure with an inter-pass ordering assumption (H863) and the silent `mm3_per_mm` flow mismatch after height modulation (H866). The permanent `SupporLayerType` typo (H865) is a coordination hazard that will require broad renaming.
+
+**Next hazard number to assign: H867**
+
+---
+
+## Session 61
+
+### Files Annotated
+
+- `src/libslic3r/Support/SupportSpotsGenerator.cpp` — fully annotated
+
+### Key Findings
+
+**SupportSpotsGenerator.cpp:**
+- **Structure**: File has two distinct sections:
+  1. Live code (lines 1–333): includes, `ExtrusionLine` struct, `get_flow_width()`, `estimate_curled_up_height()`, `estimate_malformations()`.
+  2. Dead code (lines 334–1362): The entire stability analysis algorithm (~1100 lines) wrapped in a `/* ... */` block comment, including: `SupportGridFilter`, `SliceConnection`, `to_short_lines`, `check_extrusion_entity_stability`, `estimate_slice_connection`, `ObjectPart`, `build_object_part_from_slice`, `ActiveObjectParts`, `check_stability`, `full_search`, `debug_export`, `gather_issues`.
+  3. Live code resumes (lines 1363+): `estimate_supports_malformations()`.
+
+- **ExtrusionLine**: File-local struct wrapping two Vec2f endpoints + length + raw `const ExtrusionEntity*` back-pointer. Implements AABBTreeLines point-pair interface. `form_quality` (0–1) and `curled_up_height` are analysis output fields.
+
+- **estimate_curled_up_height()**: Physics model for filament curl: swelling radius + convex-turn tension (Pythagorean). Two curl mechanisms decay by 0.75×layer_height per layer. Params passed by VALUE (copy overhead — H871).
+
+- **estimate_malformations()**: Sequential layer loop. Annotates ext-perimeter segments with curl height using `estimate_points_properties<true,true,false,false>`. Sign-corrects overhang distance via `prev_layer_boundary` LinesDistancer built from lower_layer slices. First-layer sign correction is wrong when lower_layer is nullptr (H872).
+
+- **Dead block content** (never compiled):
+  - `ObjectPart` class: tracks volume centroid + sticking area + second moments of area. `is_stable_while_extruding()` computes bed-adhesion torque and weak-connection torque using elastic section modulus.
+  - `ActiveObjectParts`: union-find structure over growing connected object parts across layers.
+  - `check_stability()`: main sequential layer loop — builds ObjectPart per slice, merges connected parts, checks each extrusion for torque stability, emits SupportPoint objects.
+  - `gather_issues()`: aggregates SupportPoints into a ranked list of issue types (floating bridge, weak part, separation from bed, etc.) using a KDTree cluster-scoring approach.
+
+- **estimate_supports_malformations()**: Live. Applies same curl model to SupportLayer fills. Converts Polyline → Polygon silently (phantom closing segment — H873). Uses single flow_width scalar for all support roles (H874).
+
+### Hazards Assigned
+
+| ID | Description |
+|----|-------------|
+| H867 | ~1100 lines of live stability algorithm permanently block-commented — translator reading only live code will miss the full algorithm; public header types declared but never produced |
+| H868 | `ExtrusionLine` default ctor sets `origin_entity = nullptr`; `is_external_perimeter()` asserts non-null — dead code restoring would trigger null-deref |
+| H869 | `get_flow_width()` default branch silently returns frPerimeter width for unrecognised roles |
+| H870 | `estimate_curled_up_height()` curvature model: `sqrt(radius/100)` — very tight curves produce zero curl from tension term (counter-intuitive) |
+| H871 | `estimate_curled_up_height()` takes `Params` by value not const-ref — needless struct copy on every inner-loop call |
+| H872 | `estimate_malformations()` first-layer sign correction: `prev_layer_boundary` is empty when `lower_layer == nullptr` — incorrect sign on first layer |
+| H873 | `estimate_supports_malformations()` converts open Polyline to closed Polygon — phantom closing segment included in curl analysis |
+| H874 | `estimate_supports_malformations()` uses single scalar `flow_width` for all roles — interface/raft layers may have different width |
+
+### Summary
+
+Session 61 completed annotation of `SupportSpotsGenerator.cpp`. The most significant architectural finding is the massive permanently-disabled stability analysis block (H867): the intended full workflow (curl estimation → support point placement via torque model → issue ranking) is only half-functional. `estimate_malformations()` runs, but the placement algorithm (`check_stability` / `full_search`) and issue aggregator (`gather_issues`) are never called. This means the shipped binary generates curl annotations but does not use them to place additional support points or surface printability warnings. A refactoring translator must decide whether to port or delete the ~1100 lines of dead algorithm.
+
+**Next hazard number to assign: H875**
+
