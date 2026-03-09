@@ -1,3 +1,27 @@
+// [INTENT] GCodeReader provides a streaming G-code tokeniser that parses G-code text
+// (from a string buffer or a file) line-by-line, extracting axis coordinates, tracking
+// the current machine position, and firing a user-supplied callback for each parsed line.
+// It is used in two contexts:
+//   1. Post-processing G-code in-flight (SpiralVase, CoolingBuffer, PressureEqualizer,
+//      FanMover) — these hold a GCodeReader instance and feed completed layer G-code via
+//      parse_buffer().
+//   2. G-code analysis after-the-fact (GCodeProcessor, ConflictChecker) — these use
+//      parse_file() which streams from disk via 64kB read blocks.
+//
+// [STATE] GCodeReader owns the current machine position in m_position[NUM_AXES] (floats,
+// in mm). The position is mutated by update_coordinates() after every G0/G1/G2/G3/G92 line.
+// m_parsing is a cancellation flag: the callback can call quit_parsing() to terminate early.
+//
+// [COUPLING] GCodeReader embeds a GCodeConfig (a subset of PrintConfig) to know whether
+// relative or absolute E distances are in use. This must be applied via apply_config()
+// before the first parse call; failing to do so means the E tracking state may be wrong.
+//
+// [HAZARD] All floating-point parsing relies on fast_float::from_chars (for the hot path
+// in parse_line_internal) and strtod (in GCodeLine::has_value(char, float&)). A codebase
+// translation must ensure the target language's parser handles the same edge cases
+// (leading '+', trailing NUL, locale independence). The assert(is_decimal_separator_point())
+// guard at entry enforces locale correctness only in debug builds.
+
 #ifndef slic3r_GCodeReader_hpp_
 #define slic3r_GCodeReader_hpp_
 
@@ -11,60 +35,87 @@
 
 namespace Slic3r {
 
-class GCodeReader {
+class GCodeReader
+{
 public:
-    class GCodeLine {
+    // [INTENT] GCodeLine is the value type passed to every parse callback. It holds:
+    //   - m_raw: the raw text of the line (including comments, no trailing newline)
+    //   - m_axis[NUM_AXES]: pre-parsed float values for each axis seen on this line
+    //   - m_mask: bitmask of which axes were present (bit N = Axis N was on this line)
+    // The GCodeLine is reused across calls via reset() to avoid repeated heap allocation.
+    //
+    // [HAZARD] m_axis is indexed by the Axis enum. If the Axis enum order is ever changed,
+    // all fixed-index accesses (x(), y(), z(), e(), f(), i(), j(), p()) silently return
+    // wrong values. The enum is defined in libslic3r.h and is shared with GCodeProcessor.
+    class GCodeLine
+    {
     public:
         GCodeLine() { reset(); }
-        void reset() { m_mask = 0; memset(m_axis, 0, sizeof(m_axis)); m_raw.clear(); }
+        void reset()
+        {
+            m_mask = 0;
+            memset(m_axis, 0, sizeof(m_axis));
+            m_raw.clear();
+        }
 
-        const std::string&      raw() const { return m_raw; }
-        const std::string_view  cmd() const { 
-            const char *cmd = GCodeReader::skip_whitespaces(m_raw.c_str());
+        const std::string&     raw() const { return m_raw; }
+        const std::string_view cmd() const
+        {
+            const char* cmd = GCodeReader::skip_whitespaces(m_raw.c_str());
             return std::string_view(cmd, GCodeReader::skip_word(cmd) - cmd);
         }
-        const std::string_view  comment() const
-            { size_t pos = m_raw.find(';'); return (pos == std::string::npos) ? std::string_view() : std::string_view(m_raw).substr(pos + 1); }
+        const std::string_view comment() const
+        {
+            size_t pos = m_raw.find(';');
+            return (pos == std::string::npos) ? std::string_view() : std::string_view(m_raw).substr(pos + 1);
+        }
 
         // Return position in this->raw() string starting with the "axis" character.
         std::string_view axis_pos(char axis) const;
-        void  clear() { m_raw.clear(); }
-        bool  has(Axis axis) const { return (m_mask & (1 << int(axis))) != 0; }
-        float value(Axis axis) const { return m_axis[axis]; }
-        bool  has(char axis) const;
-        bool  has_value(char axis, float &value) const;
+        void             clear() { m_raw.clear(); }
+        bool             has(Axis axis) const { return (m_mask & (1 << int(axis))) != 0; }
+        float            value(Axis axis) const { return m_axis[axis]; }
+        bool             has(char axis) const;
+        bool             has_value(char axis, float& value) const;
         // Parse value of an axis from raw string starting at axis_pos.
-        static bool has_value(std::string_view axis_pos, float &value);
-        float new_X(const GCodeReader &reader) const { return this->has(X) ? this->x() : reader.x(); }
-        float new_Y(const GCodeReader &reader) const { return this->has(Y) ? this->y() : reader.y(); }
-        float new_Z(const GCodeReader &reader) const { return this->has(Z) ? this->z() : reader.z(); }
-        float new_E(const GCodeReader &reader) const { return this->has(E) ? this->e() : reader.e(); }
-        float new_F(const GCodeReader &reader) const { return this->has(F) ? this->f() : reader.f(); }
-        float dist_X(const GCodeReader &reader) const { return this->has(X) ? (this->x() - reader.x()) : 0; }
-        float dist_Y(const GCodeReader &reader) const { return this->has(Y) ? (this->y() - reader.y()) : 0; }
-        float dist_Z(const GCodeReader &reader) const { return this->has(Z) ? (this->z() - reader.z()) : 0; }
-        float dist_E(const GCodeReader &reader) const { return this->has(E) ? (this->e() - reader.e()) : 0; }
-        float dist_XY(const GCodeReader &reader) const {
+        static bool has_value(std::string_view axis_pos, float& value);
+        float       new_X(const GCodeReader& reader) const { return this->has(X) ? this->x() : reader.x(); }
+        float       new_Y(const GCodeReader& reader) const { return this->has(Y) ? this->y() : reader.y(); }
+        float       new_Z(const GCodeReader& reader) const { return this->has(Z) ? this->z() : reader.z(); }
+        float       new_E(const GCodeReader& reader) const { return this->has(E) ? this->e() : reader.e(); }
+        float       new_F(const GCodeReader& reader) const { return this->has(F) ? this->f() : reader.f(); }
+        float       dist_X(const GCodeReader& reader) const { return this->has(X) ? (this->x() - reader.x()) : 0; }
+        float       dist_Y(const GCodeReader& reader) const { return this->has(Y) ? (this->y() - reader.y()) : 0; }
+        float       dist_Z(const GCodeReader& reader) const { return this->has(Z) ? (this->z() - reader.z()) : 0; }
+        float       dist_E(const GCodeReader& reader) const { return this->has(E) ? (this->e() - reader.e()) : 0; }
+        float       dist_XY(const GCodeReader& reader) const
+        {
             float x = this->has(X) ? (this->x() - reader.x()) : 0;
             float y = this->has(Y) ? (this->y() - reader.y()) : 0;
-            return sqrt(x*x + y*y);
+            return sqrt(x * x + y * y);
         }
-        bool cmd_is(const char *cmd_test)          const { return cmd_is(m_raw, cmd_test); }
-        //BBS: modify to support G2 and G3
-        bool extruding(const GCodeReader &reader)  const { return (this->cmd_is("G1") || this->cmd_is("G2") || this->cmd_is("G3")) && this->dist_E(reader) > 0; }
-        bool retracting(const GCodeReader &reader) const { return (this->cmd_is("G1") || this->cmd_is("G2") || this->cmd_is("G3")) && this->dist_E(reader) < 0; }
-        bool travel()     const { return (this->cmd_is("G1") || this->cmd_is("G2") || this->cmd_is("G3")) && ! this->has(E); }
+        bool cmd_is(const char* cmd_test) const { return cmd_is(m_raw, cmd_test); }
+        // BBS: modify to support G2 and G3
+        bool extruding(const GCodeReader& reader) const
+        {
+            return (this->cmd_is("G1") || this->cmd_is("G2") || this->cmd_is("G3")) && this->dist_E(reader) > 0;
+        }
+        bool retracting(const GCodeReader& reader) const
+        {
+            return (this->cmd_is("G1") || this->cmd_is("G2") || this->cmd_is("G3")) && this->dist_E(reader) < 0;
+        }
+        bool travel() const { return (this->cmd_is("G1") || this->cmd_is("G2") || this->cmd_is("G3")) && !this->has(E); }
         void set(const Axis axis, const float new_value, const int decimal_digits = 3);
 
-        bool  has_x() const { return this->has(X); }
-        bool  has_y() const { return this->has(Y); }
-        bool  has_z() const { return this->has(Z); }
-        bool  has_e() const { return this->has(E); }
-        bool  has_f() const { return this->has(F); }
+        bool has_x() const { return this->has(X); }
+        bool has_y() const { return this->has(Y); }
+        bool has_z() const { return this->has(Z); }
+        bool has_e() const { return this->has(E); }
+        bool has_f() const { return this->has(F); }
         // BBS: add I J P axis
-        bool  has_i() const { return this->has(I); }
-        bool  has_j() const { return this->has(J); }
-        bool  has_p() const { return this->has(P); }
+        bool has_i() const { return this->has(I); }
+        bool has_j() const { return this->has(J); }
+        bool has_p() const { return this->has(P); }
 
         bool  has_unknown_axis() const { return this->has(UNKNOWN_AXIS); }
         float x() const { return m_axis[X]; }
@@ -77,44 +128,47 @@ public:
         float j() const { return m_axis[J]; }
         float p() const { return m_axis[P]; }
 
-        static bool cmd_is(const std::string &gcode_line, const char *cmd_test) {
-            const char *cmd = GCodeReader::skip_whitespaces(gcode_line.c_str());
-            size_t len = strlen(cmd_test); 
+        static bool cmd_is(const std::string& gcode_line, const char* cmd_test)
+        {
+            const char* cmd = GCodeReader::skip_whitespaces(gcode_line.c_str());
+            size_t      len = strlen(cmd_test);
             return strncmp(cmd, cmd_test, len) == 0 && GCodeReader::is_end_of_word(cmd[len]);
         }
 
-        static bool cmd_starts_with(const std::string& gcode_line, const char* cmd_test) {
+        static bool cmd_starts_with(const std::string& gcode_line, const char* cmd_test)
+        {
             return strncmp(GCodeReader::skip_whitespaces(gcode_line.c_str()), cmd_test, strlen(cmd_test)) == 0;
         }
 
-        static std::string extract_cmd(const std::string& gcode_line) {
+        static std::string extract_cmd(const std::string& gcode_line)
+        {
             GCodeLine temp;
-            temp.m_raw = gcode_line;
+            temp.m_raw                 = gcode_line;
             const std::string_view cmd = temp.cmd();
-            return { cmd.begin(), cmd.end() };
+            return {cmd.begin(), cmd.end()};
         }
+
     private:
-        std::string      m_raw;
-        float            m_axis[NUM_AXES];
-        uint32_t         m_mask;
+        std::string m_raw;
+        float       m_axis[NUM_AXES];
+        uint32_t    m_mask;
         friend class GCodeReader;
     };
 
-    typedef std::function<void(GCodeReader&, const GCodeLine&)> callback_t;
+    typedef std::function<void(GCodeReader&, const GCodeLine&)>         callback_t;
     typedef std::function<void(GCodeReader&, const char*, const char*)> raw_line_callback_t;
-    
+
     GCodeReader() : m_verbose(false) { this->reset(); }
-    void reset() { memset(m_position, 0, sizeof(m_position)); }
-    void apply_config(const GCodeConfig &config);
-    void apply_config(const DynamicPrintConfig &config);
+    void               reset() { memset(m_position, 0, sizeof(m_position)); }
+    void               apply_config(const GCodeConfig& config);
+    void               apply_config(const DynamicPrintConfig& config);
     const GCodeConfig& config() { return m_config; };
 
-    template<typename Callback>
-    void parse_buffer(const std::string &buffer, Callback callback)
+    template<typename Callback> void parse_buffer(const std::string& buffer, Callback callback)
     {
-        const char *ptr = buffer.c_str();
-        const char *end = ptr + buffer.size();
-        GCodeLine gline;
+        const char* ptr = buffer.c_str();
+        const char* end = ptr + buffer.size();
+        GCodeLine   gline;
         m_parsing = true;
         while (m_parsing && *ptr != 0) {
             gline.reset();
@@ -122,85 +176,87 @@ public:
         }
     }
 
-    void parse_buffer(const std::string &buffer)
-        { this->parse_buffer(buffer, [](GCodeReader&, const GCodeReader::GCodeLine&){}); }
+    void parse_buffer(const std::string& buffer)
+    {
+        this->parse_buffer(buffer, [](GCodeReader&, const GCodeReader::GCodeLine&) {});
+    }
 
-    template<typename Callback>
-    const char* parse_line(const char *ptr, const char *end, GCodeLine &gline, Callback &callback)
+    template<typename Callback> const char* parse_line(const char* ptr, const char* end, GCodeLine& gline, Callback& callback)
     {
         std::pair<const char*, const char*> cmd;
-        const char *line_end = parse_line_internal(ptr, end, gline, cmd);
+        const char*                         line_end = parse_line_internal(ptr, end, gline, cmd);
         callback(*this, gline);
         update_coordinates(gline, cmd);
         return line_end;
     }
 
-    template<typename Callback>
-    void parse_line(const std::string &line, Callback callback)
-        { GCodeLine gline; this->parse_line(line.c_str(), line.c_str() + line.size(), gline, callback); }
+    template<typename Callback> void parse_line(const std::string& line, Callback callback)
+    {
+        GCodeLine gline;
+        this->parse_line(line.c_str(), line.c_str() + line.size(), gline, callback);
+    }
 
     // Returns false if reading the file failed.
-    bool parse_file(const std::string &file, callback_t callback);
-    // Collect positions of line ends in the binary G-code to be used by the G-code viewer when memory mapping and displaying section of G-code
-    // as an overlay in the 3D scene.
-    bool parse_file(const std::string &file, callback_t callback, std::vector<size_t> &lines_ends);
+    bool parse_file(const std::string& file, callback_t callback);
+    // Collect positions of line ends in the binary G-code to be used by the G-code viewer when memory mapping and displaying section of
+    // G-code as an overlay in the 3D scene.
+    bool parse_file(const std::string& file, callback_t callback, std::vector<size_t>& lines_ends);
     // Just read the G-code file line by line, calls callback (const char *begin, const char *end). Returns false if reading the file failed.
-    bool parse_file_raw(const std::string &file, raw_line_callback_t callback);
+    bool parse_file_raw(const std::string& file, raw_line_callback_t callback);
 
     // To be called by the callback to stop parsing.
     void quit_parsing() { m_parsing = false; }
 
-    float& x()       { return m_position[X]; }
+    float& x() { return m_position[X]; }
     float  x() const { return m_position[X]; }
-    float& y()       { return m_position[Y]; }
+    float& y() { return m_position[Y]; }
     float  y() const { return m_position[Y]; }
-    float& z()       { return m_position[Z]; }
+    float& z() { return m_position[Z]; }
     float  z() const { return m_position[Z]; }
-    float& e()       { return m_position[E]; }
+    float& e() { return m_position[E]; }
     float  e() const { return m_position[E]; }
-    float& f()       { return m_position[F]; }
+    float& f() { return m_position[F]; }
     float  f() const { return m_position[F]; }
     // BBS: add I J axis
-    float& i()       { return m_position[I]; }
+    float& i() { return m_position[I]; }
     float  i() const { return m_position[I]; }
-    float& j()       { return m_position[J]; }
+    float& j() { return m_position[J]; }
     float  j() const { return m_position[J]; }
 
-    GCodeConfig get_config() const
-    { 
-        return m_config;
-    }
+    GCodeConfig get_config() const { return m_config; }
 
 private:
     template<typename ParseLineCallback, typename LineEndCallback>
-    bool        parse_file_raw_internal(const std::string &filename, ParseLineCallback parse_line_callback, LineEndCallback line_end_callback);
+    bool parse_file_raw_internal(const std::string& filename, ParseLineCallback parse_line_callback, LineEndCallback line_end_callback);
     template<typename ParseLineCallback, typename LineEndCallback>
-    bool        parse_file_internal(const std::string &filename, ParseLineCallback parse_line_callback, LineEndCallback line_end_callback);
+    bool parse_file_internal(const std::string& filename, ParseLineCallback parse_line_callback, LineEndCallback line_end_callback);
 
-    const char* parse_line_internal(const char *ptr, const char *end, GCodeLine &gline, std::pair<const char*, const char*> &command);
-    void        update_coordinates(GCodeLine &gline, std::pair<const char*, const char*> &command);
+    const char* parse_line_internal(const char* ptr, const char* end, GCodeLine& gline, std::pair<const char*, const char*>& command);
+    void        update_coordinates(GCodeLine& gline, std::pair<const char*, const char*>& command);
 
-    static bool         is_whitespace(char c)           { return c == ' ' || c == '\t'; }
-    static bool         is_end_of_line(char c)          { return c == '\r' || c == '\n' || c == 0; }
-    static bool         is_end_of_gcode_line(char c)    { return c == ';' || is_end_of_line(c); }
-    static bool         is_end_of_word(char c)          { return is_whitespace(c) || is_end_of_gcode_line(c); }
-    static const char*  skip_whitespaces(const char *c) { 
-        for (; is_whitespace(*c); ++ c)
+    static bool        is_whitespace(char c) { return c == ' ' || c == '\t'; }
+    static bool        is_end_of_line(char c) { return c == '\r' || c == '\n' || c == 0; }
+    static bool        is_end_of_gcode_line(char c) { return c == ';' || is_end_of_line(c); }
+    static bool        is_end_of_word(char c) { return is_whitespace(c) || is_end_of_gcode_line(c); }
+    static const char* skip_whitespaces(const char* c)
+    {
+        for (; is_whitespace(*c); ++c)
             ; // silence -Wempty-body
         return c;
     }
-    static const char*  skip_word(const char *c) { 
-        for (; ! is_end_of_word(*c); ++ c)
+    static const char* skip_word(const char* c)
+    {
+        for (; !is_end_of_word(*c); ++c)
             ; // silence -Wempty-body
         return c;
     }
-    static const char*  axis_pos(const char *raw_str, char axis);
+    static const char* axis_pos(const char* raw_str, char axis);
 
     GCodeConfig m_config;
     float       m_position[NUM_AXES];
     bool        m_verbose;
     // To be set by the callback to stop parsing.
-    bool        m_parsing{ false };
+    bool m_parsing{false};
 };
 
 } /* namespace Slic3r */

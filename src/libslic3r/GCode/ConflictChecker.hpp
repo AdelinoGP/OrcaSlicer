@@ -1,3 +1,34 @@
+// [INTENT] ConflictChecker.hpp — inter-object toolpath collision detection system.
+// Detects whether extrusion paths from two different printed objects (or the wipe
+// tower) would physically collide at the same Z layer, which would cause the nozzle
+// to crash into an already-printed feature.
+//
+// [STATE] Operates in a two-phase pipeline:
+//   Phase 1 (serial): Collect all extrusion paths layer-by-layer from every object
+//                     and the wipe tower into a sorted priority queue (LinesBucketQueue).
+//   Phase 2 (parallel): tbb::parallel_for over layers; for each layer, rasterize all
+//                       lines into 1 mm grid cells and check grid-collocated line pairs
+//                       for actual geometric intersection (line_intersect).
+//
+// [CONCURRENCY] Phase 2 uses tbb::parallel_for + tbb::concurrent_vector to collect
+// any found conflicts. The `find` atomic bool is written without std::atomic, which
+// is a data race (see H839). The per-layer find_inter_of_lines is called concurrently
+// but only reads its input LineWithIDs vector (no shared state).
+//
+// [COUPLING] ConflictChecker is invoked from GCode.cpp after the full print plan is
+// ready, before G-code output begins. It needs LayerRegionPtrs, SupportLayer pointers,
+// and PrintObject instances to flatten paths; tightly coupled to the print pipeline.
+//
+// [HAZARD H839] `bool find = false;` is written inside the TBB parallel lambda without
+// synchronization. This is a data race: std::atomic<bool> or a mutex is required.
+// The current code may report no conflict when multiple threads simultaneously set find
+// to true, or may crash on architectures without coherent cache.
+//
+// [HAZARD H840] line_rasterization() has an internal size guard `if (res.size() >= 100000)`
+// with `assert(0)` but does NOT return early — it continues the loop after the assert.
+// In release builds the assert is a no-op, so the vector will grow unboundedly for
+// pathological inputs (very long lines at an angle near 45°), causing OOM.
+
 #ifndef slic3r_ConflictChecker_hpp_
 #define slic3r_ConflictChecker_hpp_
 
@@ -15,10 +46,10 @@ namespace Slic3r {
 struct LineWithID
 {
     Line          _line;
-    const void *  _id;
+    const void*   _id;
     ExtrusionRole _role;
 
-    LineWithID(const Line &line, const void* id, ExtrusionRole role) : _line(line), _id(id), _role(role) {}
+    LineWithID(const Line& line, const void* id, ExtrusionRole role) : _line(line), _id(id), _role(role) {}
 };
 
 using LineWithIDs = std::vector<LineWithID>;
@@ -26,7 +57,7 @@ using LineWithIDs = std::vector<LineWithID>;
 struct ExtrusionLayer
 {
     ExtrusionPaths paths;
-    const Layer *  layer;
+    const Layer*   layer;
     float          bottom_z;
     float          height;
 };
@@ -62,71 +93,77 @@ public:
     Point           _offset;
 
 public:
-    LinesBucket(ExtrusionLayers &&paths, const void* id, Point offset) : _piles(paths), _id(id), _offset(offset) {}
-    LinesBucket(LinesBucket &&) = default;
+    LinesBucket(ExtrusionLayers&& paths, const void* id, Point offset) : _piles(paths), _id(id), _offset(offset) {}
+    LinesBucket(LinesBucket&&) = default;
 
     std::pair<int, int> curRange() const
     {
-        auto begin = std::lower_bound(_piles.begin(), _piles.end(), _piles[_curPileIdx], [](const ExtrusionLayer &l, const ExtrusionLayer &r) { return l.bottom_z < r.bottom_z; });
-        auto end = std::upper_bound(_piles.begin(), _piles.end(), _piles[_curPileIdx], [](const ExtrusionLayer &l, const ExtrusionLayer &r) { return l.bottom_z < r.bottom_z; });
+        auto begin = std::lower_bound(_piles.begin(), _piles.end(), _piles[_curPileIdx],
+                                      [](const ExtrusionLayer& l, const ExtrusionLayer& r) { return l.bottom_z < r.bottom_z; });
+        auto end   = std::upper_bound(_piles.begin(), _piles.end(), _piles[_curPileIdx],
+                                      [](const ExtrusionLayer& l, const ExtrusionLayer& r) { return l.bottom_z < r.bottom_z; });
         return std::make_pair<int, int>(std::distance(_piles.begin(), begin), std::distance(_piles.begin(), end));
     }
     bool valid() const { return _curPileIdx < _piles.size(); }
     void raise()
     {
-        if (!valid()) { return; }
+        if (!valid()) {
+            return;
+        }
         auto [b, e] = curRange();
         _curPileIdx += (e - b);
         _curBottomZ = _curPileIdx == _piles.size() ? _piles.back().bottom_z : _piles[_curPileIdx].bottom_z;
     }
-    float curBottomZ() const { return _curBottomZ; }
+    float       curBottomZ() const { return _curBottomZ; }
     LineWithIDs curLines() const
     {
         auto [b, e] = curRange();
         LineWithIDs lines;
         for (int i = b; i < e; ++i) {
-            for (const ExtrusionPath &path : _piles[i].paths) {
+            for (const ExtrusionPath& path : _piles[i].paths) {
                 if (path.is_force_no_extrusion() == false) {
                     Polyline check_polyline = path.polyline;
                     check_polyline.translate(_offset);
                     Lines tmpLines = check_polyline.lines();
-                    for (const Line &line : tmpLines) { lines.emplace_back(line, _id, path.role()); }
+                    for (const Line& line : tmpLines) {
+                        lines.emplace_back(line, _id, path.role());
+                    }
                 }
             }
         }
         return lines;
     }
 
-    friend bool operator>(const LinesBucket &left, const LinesBucket &right) { return left._curBottomZ > right._curBottomZ; }
-    friend bool operator<(const LinesBucket &left, const LinesBucket &right) { return left._curBottomZ < right._curBottomZ; }
-    friend bool operator==(const LinesBucket &left, const LinesBucket &right) { return left._curBottomZ == right._curBottomZ; }
+    friend bool operator>(const LinesBucket& left, const LinesBucket& right) { return left._curBottomZ > right._curBottomZ; }
+    friend bool operator<(const LinesBucket& left, const LinesBucket& right) { return left._curBottomZ < right._curBottomZ; }
+    friend bool operator==(const LinesBucket& left, const LinesBucket& right) { return left._curBottomZ == right._curBottomZ; }
 };
 
 struct LinesBucketPtrComp
 {
-    bool operator()(const LinesBucket *left, const LinesBucket *right) { return *left > *right; }
+    bool operator()(const LinesBucket* left, const LinesBucket* right) { return *left > *right; }
 };
 
 class LinesBucketQueue
 {
 public:
-    std::vector<LinesBucket>                                                           line_buckets;
-    std::priority_queue<LinesBucket *, std::vector<LinesBucket *>, LinesBucketPtrComp> line_bucket_ptr_queue;
+    std::vector<LinesBucket>                                                         line_buckets;
+    std::priority_queue<LinesBucket*, std::vector<LinesBucket*>, LinesBucketPtrComp> line_bucket_ptr_queue;
 
 public:
-    void        emplace_back_bucket(ExtrusionLayers &&els, const void *objPtr, Point offset);
+    void        emplace_back_bucket(ExtrusionLayers&& els, const void* objPtr, Point offset);
     bool        valid() const { return line_bucket_ptr_queue.empty() == false; }
     float       getCurrBottomZ();
     LineWithIDs getCurLines() const;
 };
 
-void getExtrusionPathsFromEntity(const ExtrusionEntityCollection *entity, ExtrusionPaths &paths);
+void getExtrusionPathsFromEntity(const ExtrusionEntityCollection* entity, ExtrusionPaths& paths);
 
 ExtrusionLayers getExtrusionPathsFromLayer(const LayerRegionPtrs layerRegionPtrs);
 
-ExtrusionLayer getExtrusionPathsFromSupportLayer(SupportLayer *supportLayer);
+ExtrusionLayer getExtrusionPathsFromSupportLayer(SupportLayer* supportLayer);
 
-ObjectExtrusions getAllLayersExtrusionPathsFromObject(PrintObject *obj);
+ObjectExtrusions getAllLayersExtrusionPathsFromObject(PrintObject* obj);
 
 struct ConflictComputeResult
 {
@@ -143,9 +180,9 @@ using ConflictObjName = std::optional<std::pair<std::string, std::string>>;
 
 struct ConflictChecker
 {
-    static ConflictResultOpt  find_inter_of_lines_in_diff_objs(PrintObjectPtrs objs, std::optional<const FakeWipeTower *> wtdptr);
-    static ConflictComputeOpt find_inter_of_lines(const LineWithIDs &lines);
-    static ConflictComputeOpt line_intersect(const LineWithID &l1, const LineWithID &l2);
+    static ConflictResultOpt  find_inter_of_lines_in_diff_objs(PrintObjectPtrs objs, std::optional<const FakeWipeTower*> wtdptr);
+    static ConflictComputeOpt find_inter_of_lines(const LineWithIDs& lines);
+    static ConflictComputeOpt line_intersect(const LineWithID& l1, const LineWithID& l2);
 };
 
 } // namespace Slic3r
