@@ -3555,3 +3555,57 @@ Score blending weights (0.8/0.2, 0.5/0.5, 0.2/0.8, alignment_weight) are hardcod
 **Commit:** `annotate: Arrange.cpp + Arrange.hpp (H781-H794) (Session 50)`
 
 **Next hazard number to assign: H795**
+
+---
+
+## Session 51
+
+**Files processed:**
+- `src/libslic3r/BuildVolume.hpp` — bug fixed (removed duplicate `BuildSharedVolume` struct that had been erroneously introduced) + full annotation added (H795–H796)
+- `src/libslic3r/BuildVolume.cpp` — full annotation completed for all functions (H797–H802)
+
+**Fill module confirmation (pre-annotated, verified this session):**
+- `src/libslic3r/Fill/Fill3DHoneycomb.cpp` + `.hpp` — confirmed annotated
+- `src/libslic3r/Fill/FillHoneycomb.cpp` + `.hpp` — confirmed annotated
+- `src/libslic3r/Fill/FillPlanePath.cpp` + `.hpp` — confirmed annotated
+- `src/libslic3r/Fill/FillLine.cpp` + `.hpp` — confirmed annotated
+- `src/libslic3r/Fill/FillCrossHatch.cpp` + `.hpp` — confirmed annotated
+
+**Key discoveries this session:**
+
+**BuildVolume duplicate struct bug (fixed)**
+`BuildVolume.hpp` contained a duplicate definition of `BuildSharedVolume` (lines 81-107, identical to the struct defined at lines 53-79). This was introduced in a prior annotation session. The duplicate was removed.
+
+**BuildVolume classification pipeline**
+The constructor runs a three-tier classification:
+1. Rectangle: `|area - bbox_area| < SCALED_EPSILON²`
+2. Circle: RANSAC fit + vertex error < 0.005 mm + midpoint undershoot < 3 mm
+3. Convex vs Custom: convex hull area vs polygon area comparison
+
+For Convex/Custom: builds two `top_bottom_convex_hull_decomposition` structures at `SceneEpsilon` and `BedEpsilon` — one for scene placement, one for G-code validation.
+
+**Extruder volume shared descriptor**
+`m_shared_volume` is initialised from `m_bboxf` (the bed bbox) then iteratively reduced to the minimum intersection of all extruder bboxf values. The result is the printable region reachable by all extruders simultaneously. Used by the GL preview rendering layer.
+
+**rectangle_test permanently disabled (H802)**
+A full O(T) triangle-vs-rectangle intersection test exists in `#if 0`. The active code uses only the faster vertex-only test which the in-code FIXME acknowledges as incorrect for non-convex objects against rectangular volumes.
+
+**check_object_state_with_extruder_area blind spots (H800)**
+For extruder shapes classified as Convex/Custom/Invalid, the switch falls through to `default: break`. `return_state` remains `Inside` — no check is performed. For non-rectangular non-circular multi-extruder printers, extruder reachability is silently unvalidated.
+
+### Hazards Identified (H795–H802)
+
+| ID | Summary | Severity |
+|----|---------|----------|
+| H795 | `m_shared_volume.zs[1]` can be silently reduced below printable_height if any extruder bboxf was inflated | Medium |
+| H796 | `assert(printable_height >= 0)` is no-op in release — negative height silently sets bboxf.max.z < 0 | Medium |
+| H797 | `object_state_templ` counts vertices not triangles — surface-straddle edge cases may be missed for large meshes | Low |
+| H798 | `BuildVolume_Type::Custom` uses convex hull test — non-convex notch areas falsely reported Inside | High |
+| H799 | `all_paths_inside()` Rectangle path uses O(1) bbox shortcut — per-move testing never performed | Low |
+| H800 | `check_object_state_with_extruder_area()` silently returns Inside for Convex/Custom/Invalid extruder shapes | High |
+| H801 | Custom and Convex use identical containment code — Custom classification semantics are not honoured | Medium |
+| H802 | `rectangle_test()` accurate triangle-vs-rect test is `#if 0` disabled — active vertex-only path is documented as incorrect | Medium |
+
+**Commit:** `annotate: BuildVolume.hpp bug-fix + full annotation (H795-H802) (Session 51)`
+
+**Next hazard number to assign: H803**
