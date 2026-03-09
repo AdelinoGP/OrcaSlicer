@@ -1,7 +1,24 @@
+// [INTENT] Implementation of the SLA pad geometry generator.
+// Produces a 3D mesh for the base pad beneath support structures.
+// Three skeleton strategies are used depending on config:
+//   BelowPadSkeleton:  pad directly under model+supports (most common).
+//   AroundPadSkeleton: pad wraps model (embed_object.enabled == true,
+//                      embed_object.everywhere == false).
+//   BrimPadSkeleton:   pad everywhere under model brim.
+// Each skeleton produces inner and outer ExPolygon sets; outer gets
+// waffled edges via ConcaveHull + offset_waffle_style_ex.
+// [CONCURRENCY] Single-threaded. ThrowOnCancel callbacks are used for
+//               cooperative cancellation.
+// [HAZARD] create_pad_geometry() unconditionally writes a debug SVG
+//   ("pad_skeleton.svg") in #ifndef NDEBUG builds. This is disk I/O in
+//   debug builds that silently writes to the working directory.
+// [HAZARD] get_merge_distance() uses magic factor 1.8 with no comment:
+//   `2. * (1.8 * c.wall_thickness_mm) + c.max_merge_dist_mm`.
+//   The 1.8 is unexplained; changing it will alter pad island merging.
 #include <libslic3r/SLA/Pad.hpp>
 #include <libslic3r/SLA/SpatIndex.hpp>
 #include <libslic3r/SLA/BoostAdapter.hpp>
-//#include <libslic3r/SLA/Contour3D.hpp>
+// #include <libslic3r/SLA/Contour3D.hpp>
 #include <libslic3r/TriangleMeshSlicer.hpp>
 
 #include "ConcaveHull.hpp"
@@ -29,39 +46,25 @@ namespace Slic3r { namespace sla {
 
 namespace {
 
-indexed_triangle_set walls(
-    const Polygon &lower,
-    const Polygon &upper,
-    double         lower_z_mm,
-    double         upper_z_mm)
+indexed_triangle_set walls(const Polygon& lower, const Polygon& upper, double lower_z_mm, double upper_z_mm)
 {
     indexed_triangle_set w;
-    triangulate_wall(w.vertices, w.indices, lower, upper, lower_z_mm,
-                     upper_z_mm);
-    
+    triangulate_wall(w.vertices, w.indices, lower, upper, lower_z_mm, upper_z_mm);
+
     return w;
 }
 
 // Same as walls() but with identical higher and lower polygons.
-inline indexed_triangle_set straight_walls(const Polygon &plate,
-                                           double         lo_z,
-                                           double         hi_z)
-{
-    return walls(plate, plate, lo_z, hi_z);
-}
+inline indexed_triangle_set straight_walls(const Polygon& plate, double lo_z, double hi_z) { return walls(plate, plate, lo_z, hi_z); }
 
 // Function to cut tiny connector cavities for a given polygon. The input poly
 // will be offsetted by "padding" and small rectangle shaped cavities will be
 // inserted along the perimeter in every "stride" distance. The stick rectangles
 // will have a with about "stick_width". The input dimensions are in world
 // measure, not the scaled clipper units.
-void breakstick_holes(Points& pts,
-                      double padding,
-                      double stride,
-                      double stick_width,
-                      double penetration)
+void breakstick_holes(Points& pts, double padding, double stride, double stick_width, double penetration)
 {
-    if(stride <= EPSILON || stick_width <= EPSILON || padding <= EPSILON)
+    if (stride <= EPSILON || stick_width <= EPSILON || padding <= EPSILON)
         return;
 
     // SVG svg("bridgestick_plate.svg");
@@ -96,7 +99,8 @@ void breakstick_holes(Points& pts,
         out.emplace_back(a);
 
         // dodge the start point, do not make sticks on the joins
-        while (t < sbottom) t += sbottom;
+        while (t < sbottom)
+            t += sbottom;
         double tend = nrm - sbottom;
 
         while (t < tend) { // insert the stick on the polygon perimeter
@@ -124,52 +128,47 @@ void breakstick_holes(Points& pts,
     pts.swap(out);
 }
 
-template<class...Args>
-ExPolygons breakstick_holes(const ExPolygons &input, Args...args)
+template<class... Args> ExPolygons breakstick_holes(const ExPolygons& input, Args... args)
 {
     ExPolygons ret = input;
-    for (ExPolygon &p : ret) {
+    for (ExPolygon& p : ret) {
         breakstick_holes(p.contour.points, args...);
-        for (auto &h : p.holes) breakstick_holes(h.points, args...);
+        for (auto& h : p.holes)
+            breakstick_holes(h.points, args...);
     }
 
     return ret;
 }
 
-static inline coord_t get_waffle_offset(const PadConfig &c)
-{
-    return scaled(c.brim_size_mm + c.wing_distance());
-}
+static inline coord_t get_waffle_offset(const PadConfig& c) { return scaled(c.brim_size_mm + c.wing_distance()); }
 
-static inline double get_merge_distance(const PadConfig &c)
-{
-    return 2. * (1.8 * c.wall_thickness_mm) + c.max_merge_dist_mm;
-}
+// [INTENT] Merge-distance threshold for island ConcaveHull.
+// [HAZARD] Magic constant 1.8 is empirically tuned but undocumented.
+//   Changing this value alters which pad islands get merged together.
+static inline double get_merge_distance(const PadConfig& c) { return 2. * (1.8 * c.wall_thickness_mm) + c.max_merge_dist_mm; }
 
 // Part of the pad configuration that is used for 3D geometry generation
-struct PadConfig3D {
+struct PadConfig3D
+{
     double thickness, height, wing_height, slope;
 
-    explicit PadConfig3D(const PadConfig &cfg2d)
-        : thickness{cfg2d.wall_thickness_mm}
-        , height{cfg2d.full_height()}
-        , wing_height{cfg2d.wall_height_mm}
-        , slope{cfg2d.wall_slope}
+    explicit PadConfig3D(const PadConfig& cfg2d)
+        : thickness{cfg2d.wall_thickness_mm}, height{cfg2d.full_height()}, wing_height{cfg2d.wall_height_mm}, slope{cfg2d.wall_slope}
     {}
 
-    inline double bottom_offset() const
-    {
-        return (thickness + wing_height) / std::tan(slope);
-    }
+    inline double bottom_offset() const { return (thickness + wing_height) / std::tan(slope); }
 };
 
 // Outer part of the skeleton is used to generate the waffled edges of the pad.
 // Inner parts will not be waffled or offsetted. Inner parts are only used if
 // pad is generated around the object and correspond to holes and inner polygons
 // in the model blueprint.
-struct PadSkeleton { ExPolygons inner, outer; };
+struct PadSkeleton
+{
+    ExPolygons inner, outer;
+};
 
-PadSkeleton divide_blueprint(const ExPolygons &bp)
+PadSkeleton divide_blueprint(const ExPolygons& bp)
 {
     ClipperLib::PolyTree ptree = union_pt(bp);
 
@@ -177,10 +176,10 @@ PadSkeleton divide_blueprint(const ExPolygons &bp)
     ret.inner.reserve(size_t(ptree.Total()));
     ret.outer.reserve(size_t(ptree.Total()));
 
-    for (ClipperLib::PolyTree::PolyNode *node : ptree.Childs) {
+    for (ClipperLib::PolyTree::PolyNode* node : ptree.Childs) {
         ExPolygon poly;
         poly.contour.points = std::move(node->Contour);
-        for (ClipperLib::PolyTree::PolyNode *child : node->Childs) {
+        for (ClipperLib::PolyTree::PolyNode* child : node->Childs) {
             poly.holes.emplace_back(std::move(child->Contour));
 
             traverse_pt(child->Childs, &ret.inner);
@@ -188,27 +187,27 @@ PadSkeleton divide_blueprint(const ExPolygons &bp)
 
         ret.outer.emplace_back(poly);
     }
-    
+
     return ret;
 }
 
 // A helper class for storing polygons and maintaining a spatial index of their
 // bounding boxes.
-class Intersector {
-    BoxIndex       m_index;
-    ExPolygons     m_polys;
+class Intersector
+{
+    BoxIndex   m_index;
+    ExPolygons m_polys;
 
 public:
-
     // Add a new polygon to the index
-    void add(const ExPolygon &ep)
+    void add(const ExPolygon& ep)
     {
         m_polys.emplace_back(ep);
         m_index.insert(get_extents(ep), unsigned(m_index.size()));
     }
 
     // Check an arbitrary polygon for intersection with the indexed polygons
-    bool intersects(const ExPolygon &poly)
+    bool intersects(const ExPolygon& poly)
     {
         // Create a suitable query bounding box.
         auto bb = poly.contour.bounding_box();
@@ -228,22 +227,18 @@ public:
 // This dummy intersector to implement the "force pad everywhere" feature
 struct DummyIntersector
 {
-    inline void add(const ExPolygon &) {}
-    inline bool intersects(const ExPolygon &) { return true; }
+    inline void add(const ExPolygon&) {}
+    inline bool intersects(const ExPolygon&) { return true; }
 };
 
-template<class _Intersector>
-class _AroundPadSkeleton : public PadSkeleton
+template<class _Intersector> class _AroundPadSkeleton : public PadSkeleton
 {
     // A spatial index used to be able to efficiently find intersections of
     // support polygons with the model polygons.
     _Intersector m_intersector;
 
 public:
-    _AroundPadSkeleton(const ExPolygons &support_blueprint,
-                       const ExPolygons &model_blueprint,
-                       const PadConfig & cfg,
-                       ThrowOnCancel     thr)
+    _AroundPadSkeleton(const ExPolygons& support_blueprint, const ExPolygons& model_blueprint, const PadConfig& cfg, ThrowOnCancel thr)
     {
         // We need to merge the support and the model contours in a special
         // way in which the model contours have to be substracted from the
@@ -254,24 +249,17 @@ public:
 
         add_supports_to_index(support_blueprint);
 
-        auto model_bp_offs =
-            offset_ex(model_blueprint,
-                      scaled<float>(cfg.embed_object.object_gap_mm),
-                      ClipperLib::jtMiter, 1);
+        auto model_bp_offs = offset_ex(model_blueprint, scaled<float>(cfg.embed_object.object_gap_mm), ClipperLib::jtMiter, 1);
 
-        ExPolygons fullcvh =
-            wafflized_concave_hull(support_blueprint, model_bp_offs, cfg, thr);
+        ExPolygons fullcvh = wafflized_concave_hull(support_blueprint, model_bp_offs, cfg, thr);
 
-        auto model_bp_sticks =
-            breakstick_holes(model_bp_offs, cfg.embed_object.object_gap_mm,
-                             cfg.embed_object.stick_stride_mm,
-                             cfg.embed_object.stick_width_mm,
-                             cfg.embed_object.stick_penetration_mm);
+        auto model_bp_sticks = breakstick_holes(model_bp_offs, cfg.embed_object.object_gap_mm, cfg.embed_object.stick_stride_mm,
+                                                cfg.embed_object.stick_width_mm, cfg.embed_object.stick_penetration_mm);
 
         ExPolygons fullpad = diff_ex(fullcvh, model_bp_sticks);
 
         PadSkeleton divided = divide_blueprint(fullpad);
-        
+
         remove_redundant_parts(divided.outer);
         remove_redundant_parts(divided.inner);
 
@@ -280,36 +268,32 @@ public:
     }
 
 private:
-
     // Add the support blueprint to the search index to be queried later
-    void add_supports_to_index(const ExPolygons &supp_bp)
+    void add_supports_to_index(const ExPolygons& supp_bp)
     {
-        for (auto &ep : supp_bp) m_intersector.add(ep);
+        for (auto& ep : supp_bp)
+            m_intersector.add(ep);
     }
 
     // Create the wafflized pad around all object in the scene. This pad doesnt
     // have any holes yet.
-    ExPolygons wafflized_concave_hull(const ExPolygons &supp_bp,
-                                       const ExPolygons &model_bp,
-                                       const PadConfig  &cfg,
-                                       ThrowOnCancel     thr)
+    ExPolygons wafflized_concave_hull(const ExPolygons& supp_bp, const ExPolygons& model_bp, const PadConfig& cfg, ThrowOnCancel thr)
     {
         auto allin = reserve_vector<ExPolygon>(supp_bp.size() + model_bp.size());
 
-        for (auto &ep : supp_bp) allin.emplace_back(ep.contour);
-        for (auto &ep : model_bp) allin.emplace_back(ep.contour);
+        for (auto& ep : supp_bp)
+            allin.emplace_back(ep.contour);
+        for (auto& ep : model_bp)
+            allin.emplace_back(ep.contour);
 
         ConcaveHull cchull{allin, get_merge_distance(cfg), thr};
         return offset_waffle_style_ex(cchull, get_waffle_offset(cfg));
     }
 
     // To remove parts of the pad skeleton which do not host any supports
-    void remove_redundant_parts(ExPolygons &parts)
+    void remove_redundant_parts(ExPolygons& parts)
     {
-        auto endit = std::remove_if(parts.begin(), parts.end(),
-                                    [this](const ExPolygon &p) {
-                                        return !m_intersector.intersects(p);
-                                    });
+        auto endit = std::remove_if(parts.begin(), parts.end(), [this](const ExPolygon& p) { return !m_intersector.intersects(p); });
 
         parts.erase(endit, parts.end());
     }
@@ -321,15 +305,14 @@ using BrimPadSkeleton   = _AroundPadSkeleton<DummyIntersector>;
 class BelowPadSkeleton : public PadSkeleton
 {
 public:
-    BelowPadSkeleton(const ExPolygons &support_blueprint,
-                     const ExPolygons &model_blueprint,
-                     const PadConfig & cfg,
-                     ThrowOnCancel     thr)
+    BelowPadSkeleton(const ExPolygons& support_blueprint, const ExPolygons& model_blueprint, const PadConfig& cfg, ThrowOnCancel thr)
     {
         outer.reserve(support_blueprint.size() + model_blueprint.size());
 
-        for (auto &ep : support_blueprint) outer.emplace_back(ep.contour);
-        for (auto &ep : model_blueprint) outer.emplace_back(ep.contour);
+        for (auto& ep : support_blueprint)
+            outer.emplace_back(ep.contour);
+        for (auto& ep : model_blueprint)
+            outer.emplace_back(ep.contour);
 
         ConcaveHull ochull{outer, get_merge_distance(cfg), thr};
 
@@ -338,29 +321,28 @@ public:
 };
 
 // Offset the contour only, leave the holes untouched
-template<class...Args>
-ExPolygon offset_contour_only(const ExPolygon &poly, coord_t delta, Args...args)
+template<class... Args> ExPolygon offset_contour_only(const ExPolygon& poly, coord_t delta, Args... args)
 {
     Polygons tmp = offset(poly.contour, float(delta), args...);
 
-    if (tmp.empty()) return {};
+    if (tmp.empty())
+        return {};
 
     Polygons holes = poly.holes;
-    for (auto &h : holes) h.reverse();
+    for (auto& h : holes)
+        h.reverse();
 
     ExPolygons tmp2 = diff_ex(tmp, holes);
 
-    if (tmp2.empty()) return {};
+    if (tmp2.empty())
+        return {};
 
     return std::move(tmp2.front());
 }
 
-bool add_cavity(indexed_triangle_set &pad,
-                ExPolygon &           top_poly,
-                const PadConfig3D &   cfg,
-                ThrowOnCancel         thr)
+bool add_cavity(indexed_triangle_set& pad, ExPolygon& top_poly, const PadConfig3D& cfg, ThrowOnCancel thr)
 {
-    auto logerr = []{BOOST_LOG_TRIVIAL(error)<<"Could not create pad cavity";};
+    auto logerr = [] { BOOST_LOG_TRIVIAL(error) << "Could not create pad cavity"; };
 
     double    wing_distance = cfg.wing_height / std::tan(cfg.slope);
     coord_t   delta_inner   = -scaled(cfg.thickness + wing_distance);
@@ -368,11 +350,17 @@ bool add_cavity(indexed_triangle_set &pad,
     ExPolygon inner_base    = offset_contour_only(top_poly, delta_inner);
     ExPolygon middle_base   = offset_contour_only(top_poly, delta_middle);
 
-    if (inner_base.empty() || middle_base.empty()) { logerr(); return false; }
+    if (inner_base.empty() || middle_base.empty()) {
+        logerr();
+        return false;
+    }
 
     ExPolygons pdiff = diff_ex(top_poly, middle_base.contour);
 
-    if (pdiff.size() != 1) { logerr(); return false; }
+    if (pdiff.size() != 1) {
+        logerr();
+        return false;
+    }
 
     top_poly = pdiff.front();
 
@@ -384,29 +372,27 @@ bool add_cavity(indexed_triangle_set &pad,
     return true;
 }
 
-indexed_triangle_set create_outer_pad_geometry(const ExPolygons & skeleton,
-                                               const PadConfig3D &cfg,
-                                               ThrowOnCancel      thr)
+indexed_triangle_set create_outer_pad_geometry(const ExPolygons& skeleton, const PadConfig3D& cfg, ThrowOnCancel thr)
 {
     indexed_triangle_set ret;
 
-    for (const ExPolygon &pad_part : skeleton) {
+    for (const ExPolygon& pad_part : skeleton) {
         ExPolygon top_poly{pad_part};
-        ExPolygon bottom_poly =
-            offset_contour_only(pad_part, -scaled(cfg.bottom_offset()));
+        ExPolygon bottom_poly = offset_contour_only(pad_part, -scaled(cfg.bottom_offset()));
 
-        if (bottom_poly.empty()) continue;
+        if (bottom_poly.empty())
+            continue;
         thr();
-        
+
         double z_min = -cfg.height, z_max = 0;
         its_merge(ret, walls(top_poly.contour, bottom_poly.contour, z_max, z_min));
 
         if (cfg.wing_height > 0. && add_cavity(ret, top_poly, cfg, thr))
             z_max = -cfg.wing_height;
 
-        for (auto &h : bottom_poly.holes)
+        for (auto& h : bottom_poly.holes)
             its_merge(ret, straight_walls(h, z_max, z_min));
-        
+
         its_merge(ret, triangulate_expolygon_3d(bottom_poly, z_min, NORMALS_DOWN));
         its_merge(ret, triangulate_expolygon_3d(top_poly, NORMALS_UP));
     }
@@ -414,20 +400,18 @@ indexed_triangle_set create_outer_pad_geometry(const ExPolygons & skeleton,
     return ret;
 }
 
-indexed_triangle_set create_inner_pad_geometry(const ExPolygons & skeleton,
-                                               const PadConfig3D &cfg,
-                                               ThrowOnCancel      thr)
+indexed_triangle_set create_inner_pad_geometry(const ExPolygons& skeleton, const PadConfig3D& cfg, ThrowOnCancel thr)
 {
     indexed_triangle_set ret;
 
     double z_max = 0., z_min = -cfg.height;
-    for (const ExPolygon &pad_part : skeleton) {
+    for (const ExPolygon& pad_part : skeleton) {
         thr();
         its_merge(ret, straight_walls(pad_part.contour, z_max, z_min));
 
-        for (auto &h : pad_part.holes)
+        for (auto& h : pad_part.holes)
             its_merge(ret, straight_walls(h, z_max, z_min));
-    
+
         its_merge(ret, triangulate_expolygon_3d(pad_part, z_min, NORMALS_DOWN));
         its_merge(ret, triangulate_expolygon_3d(pad_part, z_max, NORMALS_UP));
     }
@@ -435,11 +419,12 @@ indexed_triangle_set create_inner_pad_geometry(const ExPolygons & skeleton,
     return ret;
 }
 
-indexed_triangle_set create_pad_geometry(const PadSkeleton &skelet,
-                                         const PadConfig &  cfg,
-                                         ThrowOnCancel      thr)
+indexed_triangle_set create_pad_geometry(const PadSkeleton& skelet, const PadConfig& cfg, ThrowOnCancel thr)
 {
 #ifndef NDEBUG
+    // [HAZARD] Debug SVG written unconditionally to working directory in debug builds.
+    // In production/CI this silently produces "pad_skeleton.svg" in whatever
+    // directory the process was started from. No path config, no opt-out.
     SVG svg("pad_skeleton.svg");
     svg.draw(skelet.outer, "green");
     svg.draw(skelet.inner, "blue");
@@ -447,16 +432,13 @@ indexed_triangle_set create_pad_geometry(const PadSkeleton &skelet,
 #endif
 
     PadConfig3D cfg3d(cfg);
-    auto pg = create_outer_pad_geometry(skelet.outer, cfg3d, thr);
+    auto        pg = create_outer_pad_geometry(skelet.outer, cfg3d, thr);
     its_merge(pg, create_inner_pad_geometry(skelet.inner, cfg3d, thr));
 
     return pg;
 }
 
-indexed_triangle_set create_pad_geometry(const ExPolygons &supp_bp,
-                                         const ExPolygons &model_bp,
-                                         const PadConfig & cfg,
-                                         ThrowOnCancel     thr)
+indexed_triangle_set create_pad_geometry(const ExPolygons& supp_bp, const ExPolygons& model_bp, const PadConfig& cfg, ThrowOnCancel thr)
 {
     PadSkeleton skelet;
 
@@ -473,39 +455,35 @@ indexed_triangle_set create_pad_geometry(const ExPolygons &supp_bp,
 
 } // namespace
 
-void pad_blueprint(const indexed_triangle_set &mesh,
-                   ExPolygons &                output,
-                   const std::vector<float> &  heights,
-                   ThrowOnCancel               thrfn)
+void pad_blueprint(const indexed_triangle_set& mesh, ExPolygons& output, const std::vector<float>& heights, ThrowOnCancel thrfn)
 {
-    if (mesh.empty()) return;
+    if (mesh.empty())
+        return;
 
     std::vector<ExPolygons> out = slice_mesh_ex(mesh, heights, thrfn);
 
     size_t count = 0;
-    for(auto& o : out) count += o.size();
+    for (auto& o : out)
+        count += o.size();
 
     // Unification is expensive, a simplify also speeds up the pad generation
     auto tmp = reserve_vector<ExPolygon>(count);
-    for(ExPolygons& o : out)
-        for(ExPolygon& e : o) {
+    for (ExPolygons& o : out)
+        for (ExPolygon& e : o) {
             auto&& exss = e.simplify(scaled<double>(0.1));
-            for(ExPolygon& ep : exss) tmp.emplace_back(std::move(ep));
+            for (ExPolygon& ep : exss)
+                tmp.emplace_back(std::move(ep));
         }
 
     ExPolygons utmp = union_ex(tmp);
 
-    for(auto& o : utmp) {
+    for (auto& o : utmp) {
         auto&& smp = o.simplify(scaled<double>(0.1));
         output.insert(output.end(), smp.begin(), smp.end());
     }
 }
 
-void pad_blueprint(const indexed_triangle_set &mesh,
-                   ExPolygons &                output,
-                   float                       h,
-                   float                       layerh,
-                   ThrowOnCancel               thrfn)
+void pad_blueprint(const indexed_triangle_set& mesh, ExPolygons& output, float h, float layerh, ThrowOnCancel thrfn)
 {
     float gnd = float(bounding_box(mesh).min(Z));
 
@@ -513,11 +491,8 @@ void pad_blueprint(const indexed_triangle_set &mesh,
     pad_blueprint(mesh, output, slicegrid, thrfn);
 }
 
-void create_pad(const ExPolygons &    sup_blueprint,
-                const ExPolygons &    model_blueprint,
-                indexed_triangle_set &out,
-                const PadConfig &     cfg,
-                ThrowOnCancel         thr)
+void create_pad(
+    const ExPolygons& sup_blueprint, const ExPolygons& model_blueprint, indexed_triangle_set& out, const PadConfig& cfg, ThrowOnCancel thr)
 {
     auto t = create_pad_geometry(sup_blueprint, model_blueprint, cfg, thr);
     its_merge(out, t);
@@ -527,9 +502,7 @@ std::string PadConfig::validate() const
 {
     static const double constexpr MIN_BRIM_SIZE_MM = .1;
 
-    if (brim_size_mm < MIN_BRIM_SIZE_MM ||
-        bottom_offset() > brim_size_mm + wing_distance() ||
-        get_waffle_offset(*this) <= MIN_BRIM_SIZE_MM)
+    if (brim_size_mm < MIN_BRIM_SIZE_MM || bottom_offset() > brim_size_mm + wing_distance() || get_waffle_offset(*this) <= MIN_BRIM_SIZE_MM)
         return L("Pad brim size is too small for the current configuration.");
 
     return "";

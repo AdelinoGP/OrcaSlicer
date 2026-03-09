@@ -4540,3 +4540,99 @@ No remaining work in this directory.
 
 **Next hazard number to assign: H920**
 
+---
+
+## Session 68 — SLA Hollowing / Pad / Rotfinder / bicubic / SupportTree hierarchy (H920–H946)
+
+### Files Annotated
+
+- `src/libslic3r/SLA/ReprojectPointsOnMesh.hpp` — H920: null-check after dereference (UB)
+- `src/libslic3r/SLA/IndexedMesh.hpp` — H921: `m_tm` non-owning raw pointer; H922: `SLIC3R_HOLE_RAYCASTER` unconditionally undef'd (dead code); H923 cross-ref
+- `src/libslic3r/SLA/IndexedMesh.cpp` — H923: deduplication of hits commented out (BBS STUDIO-2591); H924: `normals()` O(N×M) brute-force
+- `src/libslic3r/SLA/Hollowing.cpp` — H925: `Interior::accessor` mutable, not thread-safe; double-swap of VDB grid annotated
+- `src/libslic3r/SLA/Hollowing.hpp` — H925 cross-ref; H926: `DrainHole::get_intersections()` unsigned wrap loop; H927: single-arg `hollow_mesh` silently discards cancellation
+- `src/libslic3r/SLA/Pad.hpp` — wall_slope misleading comment annotated
+- `src/libslic3r/SLA/Pad.cpp` — H930: magic factor 1.8; H931: unconditional debug SVG write
+- `src/libslic3r/SLA/Rotfinder.hpp` — H928: `statucb()` typo setter vs `statuscb()` getter
+- `src/libslic3r/SLA/Rotfinder.cpp` — H929: `get_misalginment_score` name typo; H940: `sum_score<int_fast64_t>` overflow; H941: `instances[0]` only
+- `src/libslic3r/SLA/bicubic.h` — H942: lambda missing parameter type (non-standard C++); H943: self-referential lambda capture (UB)
+- `src/libslic3r/SLA/SupportTreeMesher.hpp` — H939: `FromTwoVectors` antiparallel undefined
+- `src/libslic3r/SLA/SupportTreeMesher.cpp` — file-level INTENT annotation
+- `src/libslic3r/SLA/SupportTree.hpp` — file-level INTENT annotation
+- `src/libslic3r/SLA/SupportTree.cpp` — H935: `cap` reserves wrong size
+- `src/libslic3r/SLA/SupportTreeBuilder.hpp` — H932: `add_anchor()` wrong ID from `m_junctions`; H933: copy/move ctors omit 4 collections
+- `src/libslic3r/SLA/SupportTreeBuilder.cpp` — H933/H934 cross-ref; H934: `merge_and_cleanup()` misses 4 collections
+- `src/libslic3r/SLA/SupportTreeBuildsteps.hpp` — H936: `PointRing` division by near-zero nZ; H937: `pairhash()` assert-only collision in release
+- `src/libslic3r/SLA/SupportTreeBuildsteps.cpp` — H938: `add_pinheads()` completely empty stub (P0/Critical)
+- `src/libslic3r/SLA/SupportPointGenerator.hpp` — H944 cross-ref; H945 cross-ref; H946: `rng` parameter unused
+- `src/libslic3r/SLA/SupportPointGenerator.cpp` — H944: `pixel_area` hardcoded; H945: O(N²) island overlap linking
+
+### Key Discoveries
+
+**ReprojectPointsOnMesh / IndexedMesh**
+- `reproject_points_and_holes()` has a null-check that arrives too late (H920).
+- `IndexedMesh` non-owning raw pointer is the primary lifetime hazard in SLA ray-casting (H921).
+- Entire hole-aware raycasting subsystem is dead code via unconditional `#undef` (H922).
+- Deduplication of ray hits was intentionally disabled by BBL (BBS STUDIO-2591) — callers must be audited to confirm parity-correctness without dedup (H923).
+
+**Hollowing**
+- `Interior::accessor` being `mutable` paired with an explicit "not thread safe" comment describes an architectural race condition baked into the SLA hollowing pipeline (H925).
+- `hollow_mesh` convenience overload silently creates an uncancellable job (H927).
+
+**SupportTreeBuilder — Critical Multi-Hazard**
+- `add_anchor()` assigns wrong ID (`m_junctions.size()` instead of `m_anchors.size()`) — anchor-by-ID lookups are corrupt (H932, P1/High).
+- Copy/move constructors silently drop 4 of 9 collections — copied builders produce incomplete support trees (H933, P1/High).
+- `merge_and_cleanup()` leaves 4 collections populated after cleanup — subsequent builds produce mixed stale+new data (H934, P2/Medium).
+
+**SupportTreeBuildsteps — P0 Critical**
+- `add_pinheads()` is an **empty stub** with no code (H938, P0/Critical). This means the entire pin-head generation phase of SLA tree support is absent.
+
+**bicubic.h — Portability Hazards**
+- H942: Lambda without typed parameter — non-standard C++17 (P1/High).
+- H943: Self-referential lambda capture — undefined behaviour (P1/High). Both hazards only appear to work on GCC/Clang via implementation-specific behaviour.
+
+**SupportPointGenerator**
+- `pixel_area` hardcoded to 47-micron value regardless of printer resolution (H944, FIXME in source).
+- Island-overlap linking is O(N²) per layer pair (H945, FIXME in source).
+
+### Hazard Summary
+
+| ID | Severity | Description |
+|----|----------|-------------|
+| H920 | P1 | `reproject_points_and_holes()` null-check after dereference (UB if object==nullptr) |
+| H921 | P1 | `IndexedMesh::m_tm` non-owning raw pointer — dangling pointer if mesh is moved/destroyed |
+| H922 | P2 | `SLIC3R_HOLE_RAYCASTER` unconditionally `#undef`d — entire hole-aware subsystem is dead code |
+| H923 | P1 | `query_ray_hits()` deduplication commented out — callers may receive duplicate hits |
+| H924 | P2 | `normals()` O(N×M) brute-force — no adjacency structure for edge/vertex hits |
+| H925 | P1 | `Interior::accessor` mutable, explicitly not thread-safe — concurrent distance queries race |
+| H926 | P3 | `DrainHole::get_intersections()` loop correct only by unsigned wrap coincidence |
+| H927 | P2 | `hollow_mesh` single-arg overload silently discards cancellation hooks |
+| H928 | P3 | `RotOptimizeParams::statucb()` typo setter vs `statuscb()` getter — asymmetric API |
+| H929 | P3 | `get_misalginment_score()` typo in function name |
+| H930 | P3 | `get_merge_distance()` magic factor `1.8` — no justification or name |
+| H931 | P3 | Debug SVG written unconditionally to disk in non-NDEBUG builds |
+| H932 | P1 | `add_anchor()` assigns ID from `m_junctions.size()` instead of `m_anchors.size()` |
+| H933 | P1 | Copy/move ctors omit `m_junctions`, `m_diffbridges`, `m_pedestals`, `m_anchors` |
+| H934 | P2 | `merge_and_cleanup()` skips clearing 4 of 9 collections |
+| H935 | P3 | `SupportTree::slice()` `cap` reserves tail size but copy fills head |
+| H936 | P2 | `PointRing` ctor divides by near-zero `n(Z)` for near-horizontal directions |
+| H937 | P2 | `pairhash()` release-build collision for indices ≥ 2^32 |
+| H938 | P0 | `add_pinheads()` is a completely empty stub — pin-head generation absent |
+| H939 | P2 | `FromTwoVectors({0,0,-1}, {0,0,1})` antiparallel — undefined result |
+| H940 | P2 | `sum_score<int_fast64_t>` overflow for large meshes |
+| H941 | P2 | `get_mesh_to_rotate()` uses `instances[0]` only — multi-instance ignored |
+| H942 | P1 | `bicubic.h` lambda missing parameter type — non-standard C++ |
+| H943 | P1 | `bicubic.h` self-referential lambda capture — undefined behaviour |
+| H944 | P2 | `pixel_area` hardcoded 47-micron — FIXME in source |
+| H945 | P2 | Island overlap O(N²) per layer pair — FIXME in source |
+| H946 | P3 | `sample_expolygon_boundary()` `rng` parameter declared but unused |
+
+### Next Steps
+
+1. Append H920–H946 to `04_refactoring_hazards.md` ✅
+2. Commit Session 68 changes ✅
+3. Verify all 35 SLA files are covered
+4. Move to next module (check what follows SLA/ in the module plan)
+
+**Next hazard number to assign: H947**
+

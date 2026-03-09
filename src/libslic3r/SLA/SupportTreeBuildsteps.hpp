@@ -1,3 +1,32 @@
+// [INTENT] Declares the SupportTreeBuildsteps class — the multi-step algorithm
+// that populates a SupportTreeBuilder. Steps: filter → add_pinheads →
+// classify → routing_to_ground → routing_to_model → interconnect_pillars →
+// merge_result. Each step is a method; execute() drives the state machine.
+// Also declares utility types: PointRing, PillarIndex, pairhash.
+//
+// [STATE] All state is per-instance. m_builder is a non-owning reference to the
+// SupportTreeBuilder being filled. m_mesh is a non-owning reference to the
+// read-only IndexedMesh. m_pillar_index is a spatial index guarded by its own
+// mutex. m_bridge_mutex serialises bridge-creation from routing steps.
+//
+// [CONCURRENCY] Individual add_*() calls on m_builder are internally
+// serialised by SpinningMutex. Routing steps may be called with TBB parallel-
+// for (see routing_to_ground). m_bridge_mutex prevents concurrent bridge
+// insertion racing the pillar spatial-index lookup.
+//
+// [HAZARD H936] PointRing constructor: in the `else` branch (direction not
+// aligned with any world axis):
+//   a(Z) = -(n(Y)*a(Y)) / n(Z); a.normalize();
+// When `n` is nearly horizontal (n(Z) ≈ 0), this division is near-zero and
+// the resulting `a` vector will have enormous magnitude before normalise.
+// Near-exact-zero n(Z) causes catastrophic cancellation producing a
+// numerically garbage ring. Severity: P2/Medium.
+// Refactor: use Gramm-Schmidt or a robust perpendicular-vector algorithm.
+//
+// [HAZARD H937] pairhash(): the `assert` that the pair values fit within
+// `shift` bits is only active in debug builds. In release builds with large
+// pillar IDs (> 2^(Ibits/2)), the hash silently collides, causing interconnect
+// to skip valid pillar pairs. Severity: P2/Medium.
 #ifndef SLASUPPORTTREEALGORITHM_H
 #define SLASUPPORTTREEALGORITHM_H
 
@@ -8,19 +37,20 @@
 #include <libslic3r/SLA/Clustering.hpp>
 #include <libslic3r/SLA/SpatIndex.hpp>
 
-namespace Slic3r {
-namespace sla {
+namespace Slic3r { namespace sla {
 
 // The minimum distance for two support points to remain valid.
 const double /*constexpr*/ D_SP = 0.1;
 
 enum { // For indexing Eigen vectors as v(X), v(Y), v(Z) instead of numbers
-    X, Y, Z
+    X,
+    Y,
+    Z
 };
 
-inline Vec2d to_vec2(const Vec3d &v3) { return {v3(X), v3(Y)}; }
+inline Vec2d to_vec2(const Vec3d& v3) { return {v3(X), v3(Y)}; }
 
-inline std::pair<double, double> dir_to_spheric(const Vec3d &n, double norm = 1.)
+inline std::pair<double, double> dir_to_spheric(const Vec3d& n, double norm = 1.)
 {
     double z       = n.z();
     double r       = norm;
@@ -31,31 +61,24 @@ inline std::pair<double, double> dir_to_spheric(const Vec3d &n, double norm = 1.
 
 inline Vec3d spheric_to_dir(double polar, double azimuth)
 {
-    return {std::cos(azimuth) * std::sin(polar),
-            std::sin(azimuth) * std::sin(polar), std::cos(polar)};
+    return {std::cos(azimuth) * std::sin(polar), std::sin(azimuth) * std::sin(polar), std::cos(polar)};
 }
 
-inline Vec3d spheric_to_dir(const std::tuple<double, double> &v)
+inline Vec3d spheric_to_dir(const std::tuple<double, double>& v)
 {
     auto [plr, azm] = v;
     return spheric_to_dir(plr, azm);
 }
 
-inline Vec3d spheric_to_dir(const std::pair<double, double> &v)
-{
-    return spheric_to_dir(v.first, v.second);
-}
+inline Vec3d spheric_to_dir(const std::pair<double, double>& v) { return spheric_to_dir(v.first, v.second); }
 
-inline Vec3d spheric_to_dir(const std::array<double, 2> &v)
-{
-    return spheric_to_dir(v[0], v[1]);
-}
+inline Vec3d spheric_to_dir(const std::array<double, 2>& v) { return spheric_to_dir(v[0], v[1]); }
 
 // Give points on a 3D ring with given center, radius and orientation
 // method based on:
 // https://math.stackexchange.com/questions/73237/parametric-equation-of-a-circle-in-3d-space
-template<size_t N>
-class PointRing {
+template<size_t N> class PointRing
+{
     std::array<double, N> m_phis;
 
     // Two vectors that will be perpendicular to each other and to the
@@ -64,17 +87,13 @@ class PointRing {
     // a and b vectors are perpendicular to the ring direction and to each other.
     // Together they define the plane where we have to iterate with the
     // given angles in the 'm_phis' vector
-    Vec3d a = {0, 1, 0}, b;
+    Vec3d  a        = {0, 1, 0}, b;
     double m_radius = 0.;
 
-    static inline bool constexpr is_one(double val)
-    {
-        return std::abs(std::abs(val) - 1) < 1e-20;
-    }
+    static inline bool constexpr is_one(double val) { return std::abs(std::abs(val) - 1) < 1e-20; }
 
 public:
-
-    PointRing(const Vec3d &n)
+    PointRing(const Vec3d& n)
     {
         m_phis = linspace_array<N>(0., 2 * PI);
 
@@ -83,19 +102,19 @@ public:
         // its components will be completely zero and one is 1.0. Our method
         // becomes dangerous here due to division with zero. Instead, vector
         // 'a' can be an element-wise rotated version of 'v'
-        if(is_one(n(X)) || is_one(n(Y)) || is_one(n(Z))) {
+        if (is_one(n(X)) || is_one(n(Y)) || is_one(n(Z))) {
             a = {n(Z), n(X), n(Y)};
             b = {n(Y), n(Z), n(X)};
-        }
-        else {
-            a(Z) = -(n(Y)*a(Y)) / n(Z); a.normalize();
+        } else {
+            a(Z) = -(n(Y) * a(Y)) / n(Z);
+            a.normalize();
             b = a.cross(n);
         }
     }
 
     Vec3d get(size_t idx, const Vec3d src, double r) const
     {
-        double phi = m_phis[idx];
+        double phi    = m_phis[idx];
         double sinphi = std::sin(phi);
         double cosphi = std::cos(phi);
 
@@ -103,55 +122,46 @@ public:
         double rpssin = r * sinphi;
 
         // Point on the sphere
-        return {src(X) + rpscos * a(X) + rpssin * b(X),
-                src(Y) + rpscos * a(Y) + rpssin * b(Y),
-                src(Z) + rpscos * a(Z) + rpssin * b(Z)};
+        return {src(X) + rpscos * a(X) + rpssin * b(X), src(Y) + rpscos * a(Y) + rpssin * b(Y), src(Z) + rpscos * a(Z) + rpssin * b(Z)};
     }
 };
 
-//IndexedMesh::hit_result query_hit(const SupportableMesh &msh, const Bridge &br, double safety_d = std::nan(""));
-//IndexedMesh::hit_result query_hit(const SupportableMesh &msh, const Head &br, double safety_d = std::nan(""));
+// IndexedMesh::hit_result query_hit(const SupportableMesh &msh, const Bridge &br, double safety_d = std::nan(""));
+// IndexedMesh::hit_result query_hit(const SupportableMesh &msh, const Head &br, double safety_d = std::nan(""));
 
-inline Vec3d dirv(const Vec3d& startp, const Vec3d& endp) {
-    return (endp - startp).normalized();
-}
+inline Vec3d dirv(const Vec3d& startp, const Vec3d& endp) { return (endp - startp).normalized(); }
 
-class PillarIndex {
+class PillarIndex
+{
     PointIndex m_index;
     using Mutex = ccr::BlockingMutex;
     mutable Mutex m_mutex;
 
 public:
-
-    template<class...Args> inline void guarded_insert(Args&&...args)
+    template<class... Args> inline void guarded_insert(Args&&... args)
     {
         std::lock_guard<Mutex> lck(m_mutex);
         m_index.insert(std::forward<Args>(args)...);
     }
 
-    template<class...Args>
-    inline std::vector<PointIndexEl> guarded_query(Args&&...args) const
+    template<class... Args> inline std::vector<PointIndexEl> guarded_query(Args&&... args) const
     {
         std::lock_guard<Mutex> lck(m_mutex);
         return m_index.query(std::forward<Args>(args)...);
     }
 
-    template<class...Args> inline void insert(Args&&...args)
-    {
-        m_index.insert(std::forward<Args>(args)...);
-    }
+    template<class... Args> inline void insert(Args&&... args) { m_index.insert(std::forward<Args>(args)...); }
 
-    template<class...Args>
-    inline std::vector<PointIndexEl> query(Args&&...args) const
+    template<class... Args> inline std::vector<PointIndexEl> query(Args&&... args) const
     {
         return m_index.query(std::forward<Args>(args)...);
     }
 
-    template<class Fn> inline void foreach(Fn fn) { m_index.foreach(fn); }
+    template<class Fn> inline void foreach (Fn fn) { m_index.foreach (fn); }
     template<class Fn> inline void guarded_foreach(Fn fn)
     {
         std::lock_guard<Mutex> lck(m_mutex);
-        m_index.foreach(fn);
+        m_index.foreach (fn);
     }
 
     PointIndex guarded_clone()
@@ -168,13 +178,15 @@ public:
 // the same unique hash. The hash value has to have twice as many bits as the
 // arguments need. If the same integral type is used for args and return val,
 // make sure the arguments use only the half of the type's bit depth.
-template<class I, class DoubleI = IntegerOnly<I>>
-IntegerOnly<DoubleI> pairhash(I a, I b)
+template<class I, class DoubleI = IntegerOnly<I>> IntegerOnly<DoubleI> pairhash(I a, I b)
 {
-    using std::ceil; using std::log2; using std::max; using std::min;
-    static const auto constexpr Ibits = int(sizeof(I) * CHAR_BIT);
+    using std::ceil;
+    using std::log2;
+    using std::max;
+    using std::min;
+    static const auto constexpr Ibits       = int(sizeof(I) * CHAR_BIT);
     static const auto constexpr DoubleIbits = int(sizeof(DoubleI) * CHAR_BIT);
-    static const auto constexpr shift = DoubleIbits / 2 < Ibits ? Ibits / 2 : Ibits;
+    static const auto constexpr shift       = DoubleIbits / 2 < Ibits ? Ibits / 2 : Ibits;
 
     I g = min(a, b), l = max(a, b);
 
@@ -185,21 +197,22 @@ IntegerOnly<DoubleI> pairhash(I a, I b)
     return (DoubleI(g) << shift) + l;
 }
 
-class SupportTreeBuildsteps {
-    const SupportTreeConfig& m_cfg;
-    const IndexedMesh& m_mesh;
+class SupportTreeBuildsteps
+{
+    const SupportTreeConfig&         m_cfg;
+    const IndexedMesh&               m_mesh;
     const std::vector<SupportPoint>& m_support_pts;
 
     using PtIndices = std::vector<unsigned>;
 
-    PtIndices m_iheads;            // support points with pinhead
+    PtIndices m_iheads; // support points with pinhead
     PtIndices m_iheads_onmodel;
-    PtIndices m_iheadless;         // headless support points
-    
+    PtIndices m_iheadless; // headless support points
+
     std::map<unsigned, IndexedMesh::hit_result> m_head_to_ground_scans;
 
     // normals for support points from model faces.
-    PointSet  m_support_nmls;
+    PointSet m_support_nmls;
 
     // Clusters of points which can reach the ground directly and can be
     // bridged to one central pillar
@@ -222,11 +235,7 @@ class SupportTreeBuildsteps {
     // When bridging heads to pillars... TODO: find a cleaner solution
     ccr::BlockingMutex m_bridge_mutex;
 
-    inline IndexedMesh::hit_result ray_mesh_intersect(const Vec3d& s, 
-                                                      const Vec3d& dir)
-    {
-        return m_mesh.query_ray_hit(s, dir);
-    }
+    inline IndexedMesh::hit_result ray_mesh_intersect(const Vec3d& s, const Vec3d& dir) { return m_mesh.query_ray_hit(s, dir); }
 
     // This function will test if a future pinhead would not collide with the
     // model geometry. It does not take a 'Head' object because those are
@@ -240,23 +249,11 @@ class SupportTreeBuildsteps {
     // with a zero distance value instead of a NAN. This way the result can
     // be used safely for comparison with other distances.
     IndexedMesh::hit_result pinhead_mesh_intersect(
-        const Vec3d& s,
-        const Vec3d& dir,
-        double r_pin,
-        double r_back,
-        double width,
-        double safety_d);
+        const Vec3d& s, const Vec3d& dir, double r_pin, double r_back, double width, double safety_d);
 
-    IndexedMesh::hit_result pinhead_mesh_intersect(
-        const Vec3d& s,
-        const Vec3d& dir,
-        double r_pin,
-        double r_back,
-        double width)
+    IndexedMesh::hit_result pinhead_mesh_intersect(const Vec3d& s, const Vec3d& dir, double r_pin, double r_back, double width)
     {
-        return pinhead_mesh_intersect(s, dir, r_pin, r_back, width,
-                                      r_back * m_cfg.safety_distance_mm /
-                                          m_cfg.head_back_radius_mm);
+        return pinhead_mesh_intersect(s, dir, r_pin, r_back, width, r_back * m_cfg.safety_distance_mm / m_cfg.head_back_radius_mm);
     }
 
     // Checking bridge (pillar and stick as well) intersection with the model.
@@ -267,24 +264,15 @@ class SupportTreeBuildsteps {
     // point was inside the model, an "invalid" hit_result will be returned
     // with a zero distance value instead of a NAN. This way the result can
     // be used safely for comparison with other distances.
-    IndexedMesh::hit_result bridge_mesh_intersect(
-        const Vec3d& s,
-        const Vec3d& dir,
-        double r,
-        double safety_d);
+    IndexedMesh::hit_result bridge_mesh_intersect(const Vec3d& s, const Vec3d& dir, double r, double safety_d);
 
-    IndexedMesh::hit_result bridge_mesh_intersect(
-        const Vec3d& s,
-        const Vec3d& dir,
-        double r)
+    IndexedMesh::hit_result bridge_mesh_intersect(const Vec3d& s, const Vec3d& dir, double r)
     {
-        return bridge_mesh_intersect(s, dir, r,
-                                     r * m_cfg.safety_distance_mm /
-                                         m_cfg.head_back_radius_mm);
+        return bridge_mesh_intersect(s, dir, r, r * m_cfg.safety_distance_mm / m_cfg.head_back_radius_mm);
     }
-    
-    template<class...Args>
-    inline double bridge_mesh_distance(Args&&...args) {
+
+    template<class... Args> inline double bridge_mesh_distance(Args&&... args)
+    {
         return bridge_mesh_intersect(std::forward<Args>(args)...).distance();
     }
 
@@ -293,40 +281,31 @@ class SupportTreeBuildsteps {
 
     // For connecting a head to a nearby pillar.
     bool connect_to_nearpillar(const Head& head, long nearpillar_id);
-    
+
     // Find route for a head to the ground. Inserts additional bridge from the
     // head to the pillar if cannot create pillar directly.
     // The optional dir parameter is the direction of the bridge which is the
     // direction of the pinhead if omitted.
-    bool connect_to_ground(Head& head, const Vec3d &dir);
+    bool        connect_to_ground(Head& head, const Vec3d& dir);
     inline bool connect_to_ground(Head& head);
-    
-    bool connect_to_model_body(Head &head);
+
+    bool connect_to_model_body(Head& head);
 
     bool search_pillar_and_connect(const Head& source);
-    
+
     // This is a proxy function for pillar creation which will mind the gap
     // between the pad and the model bottom in zero elevation mode.
     // jp is the starting junction point which needs to be routed down.
     // sourcedir is the allowed direction of an optional bridge between the
     // jp junction and the final pillar.
-    bool create_ground_pillar(const Vec3d &jp,
-                              const Vec3d &sourcedir,
-                              double       radius,
-                              long         head_id = SupportTreeNode::ID_UNSET);
+    bool create_ground_pillar(const Vec3d& jp, const Vec3d& sourcedir, double radius, long head_id = SupportTreeNode::ID_UNSET);
 
-    void add_pillar_base(long pid)
-    {
-        m_builder.add_pillar_base(pid, m_cfg.base_height_mm, m_cfg.base_radius_mm);
-    }
+    void add_pillar_base(long pid) { m_builder.add_pillar_base(pid, m_cfg.base_height_mm, m_cfg.base_radius_mm); }
 
-    std::optional<DiffBridge> search_widening_path(const Vec3d &jp,
-                                                   const Vec3d &dir,
-                                                   double       radius,
-                                                   double       new_radius);
+    std::optional<DiffBridge> search_widening_path(const Vec3d& jp, const Vec3d& dir, double radius, double new_radius);
 
 public:
-    SupportTreeBuildsteps(SupportTreeBuilder & builder, const SupportableMesh &sm);
+    SupportTreeBuildsteps(SupportTreeBuilder& builder, const SupportableMesh& sm);
 
     // Now let's define the individual steps of the support generation algorithm
 
@@ -369,10 +348,9 @@ public:
 
     inline void merge_result() { m_builder.merged_mesh(); }
 
-    static bool execute(SupportTreeBuilder & builder, const SupportableMesh &sm);
+    static bool execute(SupportTreeBuilder& builder, const SupportableMesh& sm);
 };
 
-}
-}
+}} // namespace Slic3r::sla
 
 #endif // SLASUPPORTTREEALGORITHM_H
