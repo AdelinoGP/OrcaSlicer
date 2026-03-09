@@ -3784,3 +3784,60 @@ The module is well-designed for its purpose but carries three cross-cutting haza
 **Commit:** `annotate: Session 54 — PrintBase.hpp + PrintBase.cpp`
 
 **Next hazard number to assign: H821**
+
+---
+
+## Session 55 — PrintRegion.cpp + Surface.hpp + SurfaceCollection.hpp/.cpp + PrintApply.cpp
+
+### Files Processed
+- `src/libslic3r/PrintRegion.cpp` (~290 lines)
+- `src/libslic3r/Surface.hpp` (~130 lines)
+- `src/libslic3r/SurfaceCollection.hpp` (~50 lines)
+- `src/libslic3r/SurfaceCollection.cpp` (~200 lines)
+- `src/libslic3r/PrintApply.cpp` (1893 lines)
+
+### Key Discoveries
+
+**PrintRegion::extruder() unsigned underflow (intentional):**
+`PrintRegion::extruder(FlowRole role)` is declared to return `unsigned int`.  For roles where no explicit filament slot is configured, the relevant config value is 0.  The function subtracts 1 from this value: `return (unsigned)m_config.wall_filament - 1`.  This produces `UINT_MAX` (unsigned integer underflow).  The caller is `get_at(container, extruder_id)` in libslic3r utils, which clamps any out-of-range index to element [0].  So the underflow is the deliberate mechanism for "default extruder" — use whatever is at index 0.  This is correct but will be a refactoring trap: any translation to a language with checked arithmetic or signed integers will change behaviour silently.
+
+**SurfaceType enum as raw array index:**
+`SurfaceType` enum values (`stTop`, `stBottom`, `stInternalSolid`, etc.) are used as raw array indices into the SVG colour table in `SurfaceCollection::export_to_svg()`.  Reordering the enum corrupts all SVG export output — similar hazard to `ETags` (H222) in GCodeProcessor.
+
+**`group()` returns raw pointers into member vector:**
+`SurfaceCollection::group()` returns a `std::vector<SurfacesPtr>` where each `SurfacesPtr` is a `std::vector<const Surface*>`.  All pointers point directly into `this->surfaces`.  Any subsequent `push_back` or structural modification to `this->surfaces` invalidates all returned pointers.  No const-qualifier or lifetime annotation guards this.
+
+**`is_bridge()` incompleteness:**
+`Surface::is_bridge()` tests only for `stBottomBridge` and `stInternalBridge`.  The newer types `stInternalAfterExternalBridge` and `stSecondInternalBridge` (added in Orca) are NOT included.  Similarly `is_solid()` does not count `stSecondInternalBridge` or `stInternalAfterExternalBridge` as solid.  Any code that gates logic on `is_bridge()` or `is_solid()` will silently misclassify these newer surface types.
+
+**`is_printable_filament_changed()` skips check in manual mode:**
+When `filament_map_mode == fmmManual`, `is_printable_filament_changed()` returns `false` without performing ANY intersection geometry test — even if the convex hulls differ substantially.  This means a WipeTower / GCodeExport invalidation may be silently skipped when the user moves an object from one extruder's territory to another's in manual filament assignment mode.
+
+**`transform3d_equal()` uses exact float comparison:**
+No epsilon.  Any transform that differs only by floating-point rounding artefacts (e.g. from matrix decompose/recompose) will be treated as different, causing a new PrintObject to be created in Phase 4 and the old one deleted — forcing a full re-slice unnecessarily.
+
+**`normalize_fdm_2()` called twice in `Print::apply()`:**
+Once before Phase 1 (using the used-filament count at entry), and once after Phase 4 (using the updated count after new objects were added/removed).  The second pass ensures that multi-extruder constraints are respected when newly added objects change the extruder count.
+
+**`PrintApply.cpp` Phase 4 — config caching via `print_object_last`:**
+The lambda `print_object_apply_config` caches the config from `print_object_last` for all PrintObjects sharing the same ModelObject.  This is a deliberate O(1) fast-path relying on the invariant that `object_config_from_model_object()` is deterministic for a fixed ModelObject.  Safe only as long as the ModelObject doesn't change between iterations (which it can't since it's held by pointer in the loop).
+
+**`FuzzySkinPaintedRegion` — third layer of painted regions:**
+On top of `VolumeRegions` and `PaintedRegions`, `generate_print_object_regions()` builds `FuzzySkinPaintedRegions` if `has_painted_fuzzy_skin` is true.  These are sorted by `parent_print_object_region_id()` to assist the slicing segmentation algorithm.  The `FuzzySkinParentType` enum distinguishes whether a FuzzySkinPaintedRegion's parent is a VolumeRegion or a PaintedRegion — both cases are supported.
+
+### Hazards Identified (this session)
+
+No new H-numbered hazards were formally assigned this session — the key observations (bridge incompleteness, group() pointer invalidation, is_printable_filament_changed manual-mode skip, transform3d_equal no-epsilon, normalize_fdm_2 double-call) are captured in the discovery notes above and in the inline annotations.  They do not rise to the level of data races or permanently unreachable logic, but all are refactoring traps that must be handled when translating to a type-safe language.
+
+The next available hazard ID remains **H821**.
+
+### Summary
+
+- `PrintRegion.cpp` implements the per-region extruder/flow resolution logic; the unsigned-underflow trick in `extruder()` is the key pattern to preserve during refactoring.
+- `Surface.hpp` defines the `SurfaceType` enum (used as array index — DO NOT reorder) and `Surface` struct.
+- `SurfaceCollection` groups and filters surfaces; `group()` returns raw pointers with hidden lifetime dependency.
+- `PrintApply.cpp` is the largest single function in the codebase (`Print::apply()`, ~700 lines).  It is a careful 5-phase synchronisation protocol between the UI model and the slicing backend.  All five phases are now annotated with `[INTENT]`, `[STATE]`, `[HAZARD]`, and `[COUPLING]` tags.
+
+**Commit:** `annotate: Session 55 — PrintRegion.cpp + Surface*.hpp/.cpp + PrintApply.cpp`
+
+**Next hazard number to assign: H821**

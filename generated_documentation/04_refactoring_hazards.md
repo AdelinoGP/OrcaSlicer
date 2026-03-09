@@ -2617,3 +2617,14 @@ When `only_overhangs = true`, the fan delay is only active while `current_role =
 | 818 | `PrintState<>::set_started()` sets `m_step_active = static_cast<int>(step)` before calling `throw_if_canceled()`. If cancellation fires inside `set_started()`, `m_step_active` is left pointing at the new step while the step body never actually executes. The debug asserts that would catch this inconsistency (`assert(m_step_active == -1)`) are explicitly commented out in the source because they produce false positives after cancel. A subsequent `active_step_add_warning()` call from a different thread would assert `m_step_active != -1` against a stale value | PrintBase.hpp:PrintState:set_started:m_step_active-stale-after-cancel | Medium | P2 |
 | 819 | `PrintState<>::invalidate_multiple()` sets ALL supplied steps to INVALID and bumps their timestamps in one forward loop, then fires `cancel()` in a separate call. Any observer thread that reads step timestamps in the window between the first state flip and the `cancel()` call will see INVALID states with new timestamps while the worker thread has not yet been stopped. This window is inherent to the "set all, then cancel" design. A reader in this window may incorrectly decide it is safe to re-enter a step that is still executing | PrintBase.hpp:PrintState:invalidate_multiple:invalid-before-stop-window | Medium | P2 |
 | 820 | `PrintBase::update_object_placeholders()` iterates all instances of each ModelObject but does NOT break after finding the first printable one — `printable` is reassigned for each printable instance. Only the LAST printable instance's scaling factors appear in the "scale" placeholder vector. For multi-instance objects with non-uniform per-instance scaling, the placeholder reports incorrect values and the generated output filename may be misleading | PrintBase.cpp:update_object_placeholders:last-instance-scale-only | Low | P3 |
+
+<!-- Session 55 (PrintRegion.cpp, Surface.hpp, SurfaceCollection.hpp/.cpp, PrintApply.cpp):
+     No new H-IDs assigned. Key refactoring traps documented inline and in agent_journal.md:
+     - SurfaceType enum used as array index in SVG export (same pattern as ETags H222)
+     - SurfaceCollection::group() returns raw pointers into member vector — push_back invalidates
+     - Surface::is_bridge() / is_solid() do NOT cover stInternalAfterExternalBridge / stSecondInternalBridge
+     - is_printable_filament_changed() skips geometry test in fmmManual mode
+     - transform3d_equal() exact float compare — no epsilon (Phase 4 of Print::apply())
+     - normalize_fdm_2() called twice in Print::apply() — intentional double-pass design
+     Next available ID: H821 -->
+
