@@ -1,3 +1,43 @@
+// [INTENT] SupportSpotsGenerator.cpp — physical stability analysis for FDM print objects.
+// Two public entry points exist:
+//   estimate_malformations()          — per-layer curl/overhang height estimation for object layers
+//   estimate_supports_malformations() — same model applied to support-fill layers
+// A third, much larger body of code (stability torque analysis, check_stability, full_search,
+// ObjectPart, ActiveObjectParts, check_extrusion_entity_stability, gather_issues, etc.) was written
+// but is entirely wrapped in a block comment /* ... */ (lines 218–1299).
+// This dead code contains the full automatic-support-point-placement algorithm; it is compiled out
+// of every build.  The living code exposes only the curl-height estimator.
+//
+// [STATE] All state is local to function call stacks.  No module-level mutable globals.
+//         `LD` (AABBTreeLines::LinesDistancer<ExtrusionLine>) is a function-local value rebuilt
+//         per layer inside both estimate_*() loops.
+//
+// [MEMORY] ExtrusionLine stores a raw `const ExtrusionEntity*` back-pointer.
+//          Lifetime: ExtrusionEntity objects are owned by LayerRegion and must outlive any
+//          ExtrusionLine that references them.  Both estimate_*() functions are called from
+//          Print::process() before LayerRegion data is freed, so no lifetime violation currently.
+//          A refactor that reorders or caches ExtrusionLine objects must preserve this contract.
+//
+// [CONCURRENCY] Both estimate_*() functions iterate layers SEQUENTIALLY.  Each layer depends
+//              on `prev_layer_lines` built from the previous layer — this is an inherent serial
+//              data dependency.  No TBB parallelism is used in the live code.
+//
+// [COUPLING] Depends on: Layer, LayerRegion, ExtrusionEntity, ExtrusionEntityCollection,
+//            AABBTreeLines::LinesDistancer, GCode/ExtrusionProcessor (estimate_points_properties),
+//            SupportSpotsGenerator::Params, CurledLine.
+//
+// [HAZARD] H867: The large block comment (lines 218–1299) contains the entire support-point
+//          placement algorithm including ObjectPart, ActiveObjectParts, check_stability,
+//          full_search, check_extrusion_entity_stability, and gather_issues.  This is LIVE
+//          business logic permanently disabled by a /* */ block comment.  Any translator who
+//          reads only the live code will miss the intended algorithm entirely.  The public header
+//          SupportSpotsGenerator.hpp still declares SupportPointCause, SupportPoint, PartialObject
+//          types defined only in the dead block.  This means the types exist in the binary but
+//          the algorithm that produces them is never called.
+//
+// [UNCLEAR] It is not clear whether the block-comment disabling was intentional (feature deferred)
+//           or an accidental check-in.  No TODO, FIXME, or issue reference accompanies the comment.
+
 #include "SupportSpotsGenerator.hpp"
 
 #include "BoundingBox.hpp"
@@ -45,20 +85,37 @@
 #include "libslic3r/Color.hpp"
 #endif
 
-
 namespace Slic3r {
 
+// [INTENT] ExtrusionLine — file-local segment type used throughout the stability analysis.
+// Wraps two 2-D float endpoints (a, b), precomputed length, and a back-pointer to the
+// owning ExtrusionEntity.  Carries two analysis outputs:
+//   support_point_generated  — set when this segment triggers a support point request
+//   curled_up_height         — estimated curl height (mm) above the layer surface
+//   form_quality             — 0–1 quality metric; 1 = well-supported, <0 = poor
+//
+// [MEMORY] origin_entity is a raw non-owning pointer.  Caller is responsible for ensuring
+//          the pointed-to ExtrusionEntity outlives all ExtrusionLine objects derived from it.
+//
+// [COUPLING] Implements the AABBTreeLines point-pair interface (get_a / get_b, Dim = 2,
+//            Scalar = Vec2f::Scalar) so ExtrusionLine objects can be stored directly in
+//            AABBTreeLines::LinesDistancer<ExtrusionLine> (aliased as LD in this file).
+//
+// [HAZARD] H868: The default constructor zero-initialises a and b but leaves origin_entity
+//          = nullptr.  is_external_perimeter() asserts origin_entity != nullptr.  Any code
+//          path that constructs a default ExtrusionLine and then calls is_external_perimeter()
+//          will assert-fail in debug or crash in release.  The dead block comment contains
+//          several sites that construct default ExtrusionLine{} objects (e.g., nearest_prev_layer_line
+//          fallback at lines 420–422) and then pass them to code that reads role() fields.
 class ExtrusionLine
 {
 public:
     ExtrusionLine() : a(Vec2f::Zero()), b(Vec2f::Zero()), len(0.0), origin_entity(nullptr) {}
-    ExtrusionLine(const Vec2f &a, const Vec2f &b, float len, const ExtrusionEntity *origin_entity)
+    ExtrusionLine(const Vec2f& a, const Vec2f& b, float len, const ExtrusionEntity* origin_entity)
         : a(a), b(b), len(len), origin_entity(origin_entity)
     {}
 
-    ExtrusionLine(const Vec2f &a, const Vec2f &b)
-        : a(a), b(b), len((a-b).norm()), origin_entity(nullptr)
-    {}
+    ExtrusionLine(const Vec2f& a, const Vec2f& b) : a(a), b(b), len((a - b).norm()), origin_entity(nullptr) {}
 
     bool is_external_perimeter() const
     {
@@ -69,36 +126,70 @@ public:
     Vec2f                  a;
     Vec2f                  b;
     float                  len;
-    const ExtrusionEntity *origin_entity;
+    const ExtrusionEntity* origin_entity;
 
     std::optional<SupportSpotsGenerator::SupportPointCause> support_point_generated = {};
-    float form_quality            = 1.0f;
-    float curled_up_height        = 0.0f;
+    float                                                   form_quality            = 1.0f;
+    float                                                   curled_up_height        = 0.0f;
 
     static const constexpr int Dim = 2;
     using Scalar                   = Vec2f::Scalar;
 };
 
-auto get_a(ExtrusionLine &&l) { return l.a; }
-auto get_b(ExtrusionLine &&l) { return l.b; }
+auto get_a(ExtrusionLine&& l) { return l.a; }
+auto get_b(ExtrusionLine&& l) { return l.b; }
 
 namespace SupportSpotsGenerator {
 
 using LD = AABBTreeLines::LinesDistancer<ExtrusionLine>;
 
-float get_flow_width(const LayerRegion *region, ExtrusionRole role)
+// [INTENT] get_flow_width — map ExtrusionRole → LayerRegion flow width (mm, unscaled).
+// Used throughout stability analysis to determine how wide each deposited line is,
+// which in turn determines whether a point is "floating" (distance > flow_width).
+// [HAZARD] H869: Default branch (all unrecognised roles) silently falls through to
+// frPerimeter width.  Roles added in future (e.g. erWipeTower, erMilling) receive
+// perimeter width without warning, which may be incorrect for stability calculations.
+float get_flow_width(const LayerRegion* region, ExtrusionRole role)
 {
-    if (role == ExtrusionRole::erBridgeInfill) return region->flow(FlowRole::frExternalPerimeter).width();
-    if (role == ExtrusionRole::erExternalPerimeter) return region->flow(FlowRole::frExternalPerimeter).width();
-    if (role == ExtrusionRole::erGapFill) return region->flow(FlowRole::frInfill).width();
-    if (role == ExtrusionRole::erPerimeter) return region->flow(FlowRole::frPerimeter).width();
-    if (role == ExtrusionRole::erSolidInfill) return region->flow(FlowRole::frSolidInfill).width();
-    if (role == ExtrusionRole::erInternalInfill) return region->flow(FlowRole::frInfill).width();
-    if (role == ExtrusionRole::erTopSolidInfill) return region->flow(FlowRole::frTopSolidInfill).width();
+    if (role == ExtrusionRole::erBridgeInfill)
+        return region->flow(FlowRole::frExternalPerimeter).width();
+    if (role == ExtrusionRole::erExternalPerimeter)
+        return region->flow(FlowRole::frExternalPerimeter).width();
+    if (role == ExtrusionRole::erGapFill)
+        return region->flow(FlowRole::frInfill).width();
+    if (role == ExtrusionRole::erPerimeter)
+        return region->flow(FlowRole::frPerimeter).width();
+    if (role == ExtrusionRole::erSolidInfill)
+        return region->flow(FlowRole::frSolidInfill).width();
+    if (role == ExtrusionRole::erInternalInfill)
+        return region->flow(FlowRole::frInfill).width();
+    if (role == ExtrusionRole::erTopSolidInfill)
+        return region->flow(FlowRole::frTopSolidInfill).width();
     // default
     return region->flow(FlowRole::frPerimeter).width();
 }
 
+// [INTENT] estimate_curled_up_height — physics-based model for filament curl height (mm).
+// Models two curl mechanisms:
+//   1. Swelling: the free-hanging portion of a line rounds back toward nozzle diameter.
+//      swelling_radius = (layer_height + curling_section) / 2
+//   2. Convex-turn tension: outer edge of a convex curve has higher shrink force.
+//      Uses Pythagorean approximation: c = sqrt(a^2 - b^2) where b = curling_t * flow_width.
+// curl height decays by (layer_height * 0.75) per layer when the line is well-supported
+// (|distance| < 3*flow_width), propagating accumulated curl upward through the stack.
+//
+// [STATE] Pure function given inputs; no side effects.
+//
+// [HAZARD] H870: The curvature model uses sqrt(radius/100) as curling_t where
+// radius = 1/curvature.  For curvature close to zero, radius is very large, curling_t
+// is large, b > a, and sqrt(max(0, a^2-b^2)) clamps to 0 — correct.  But curvature is
+// passed as a float; for extremely tight curves (curvature > ~1/layer_height), the model
+// may overestimate curl significantly.  No empirical validation reference is cited.
+//
+// [HAZARD] H871: `params` is passed BY VALUE (not by const-ref).  Params is a struct with
+// ~20+ fields.  On every call from the inner layer loop this is a full struct copy.
+// In `estimate_malformations()` this is called once per ExtendedPoint per extrusion, which
+// can be millions of calls per print.  This is a needless copy overhead.
 float estimate_curled_up_height(
     float distance, float curvature, float layer_height, float flow_width, float prev_line_curled_height, Params params)
 {
@@ -138,35 +229,59 @@ float estimate_curled_up_height(
     return curled_up_height;
 }
 
-void estimate_malformations(LayerPtrs &layers, const Params &params)
+// [INTENT] estimate_malformations — annotate every external-perimeter segment in each object
+// layer with a curled_up_height estimate, then store segments above curling_tolerance_limit
+// into Layer::curled_lines for downstream use (UI visualisation, support enforcement, etc.).
+//
+// Algorithm per layer:
+//   1. Build AABBTreeLines LinesDistancer over the previous layer's ext-perim lines.
+//   2. For each extrusion in current layer that is erExternalPerimeter:
+//      a. estimate_points_properties() — annotates points with overhang distance and curvature.
+//      b. For each segment: sign-correct distance using slice polygon boundary.
+//      c. estimate_curled_up_height() — physics model.
+//   3. Collect segments with height > curling_tolerance_limit into l->curled_lines.
+//
+// [CONCURRENCY] Sequential layer loop.  prev_layer_lines is rebuilt each iteration.
+//               NOT parallelisable without restructuring the LD rebuild dependency.
+//
+// [MEMORY] curled_lines is cleared at the start of each layer pass (l->curled_lines.clear()).
+//          If this function is called twice on the same layers vector, previous results
+//          are discarded — no accumulation.
+//
+// [HAZARD] H872: estimate_points_properties is called with the non-boundary `prev_layer_lines`
+// (LD of extrusion segments) as the reference.  The sign of distance is then corrected via
+// a separate `prev_layer_boundary` LinesDistancer built from l->lower_layer->lslices.
+// If l->lower_layer is nullptr (first layer), boundary_lines is empty and the LinesDistancer
+// is empty.  In that case distance_from_lines<true>() returns a default value; the sign
+// correction applies an incorrect sign.  The result is that curled_up_height for the first
+// layer always uses the wrong sign, potentially suppressing or amplifying curl estimates.
+void estimate_malformations(LayerPtrs& layers, const Params& params)
 {
 #ifdef DEBUG_FILES
-    FILE *debug_file = boost::nowide::fopen(debug_out_path("object_malformations.obj").c_str(), "w");
-    FILE *full_file  = boost::nowide::fopen(debug_out_path("object_full.obj").c_str(), "w");
+    FILE* debug_file = boost::nowide::fopen(debug_out_path("object_malformations.obj").c_str(), "w");
+    FILE* full_file  = boost::nowide::fopen(debug_out_path("object_full.obj").c_str(), "w");
 #endif
 
     LD prev_layer_lines{};
 
-    for (Layer *l : layers) {
+    for (Layer* l : layers) {
         l->curled_lines.clear();
         std::vector<Linef> boundary_lines = l->lower_layer != nullptr ? to_unscaled_linesf(l->lower_layer->lslices) : std::vector<Linef>();
         AABBTreeLines::LinesDistancer<Linef> prev_layer_boundary{std::move(boundary_lines)};
         std::vector<ExtrusionLine>           current_layer_lines;
-        for (const LayerRegion *layer_region : l->regions()) {
-            for (const ExtrusionEntity *extrusion : layer_region->perimeters.flatten().entities) {
+        for (const LayerRegion* layer_region : l->regions()) {
+            for (const ExtrusionEntity* extrusion : layer_region->perimeters.flatten().entities) {
                 if (extrusion->role() != Slic3r::erExternalPerimeter)
                     continue;
 
                 Points extrusion_pts;
                 extrusion->collect_points(extrusion_pts);
                 float flow_width       = get_flow_width(layer_region, extrusion->role());
-                auto  annotated_points = estimate_points_properties<true, true, false, false>(extrusion_pts,
-                                                                                                                 prev_layer_lines,
-                                                                                                                 flow_width,
-                                                                                                                 params.bridge_distance);
+                auto  annotated_points = estimate_points_properties<true, true, false, false>(extrusion_pts, prev_layer_lines, flow_width,
+                                                                                              params.bridge_distance);
                 for (size_t i = 0; i < annotated_points.size(); ++i) {
-                    const ExtendedPoint &a = i > 0 ? annotated_points[i - 1] : annotated_points[i];
-                    const ExtendedPoint &b = annotated_points[i];
+                    const ExtendedPoint& a = i > 0 ? annotated_points[i - 1] : annotated_points[i];
+                    const ExtendedPoint& b = annotated_points[i];
                     ExtrusionLine line_out{a.position.cast<float>(), b.position.cast<float>(), float((a.position - b.position).norm()),
                                            extrusion};
 
@@ -179,28 +294,29 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
                     float sign = (prev_layer_boundary.distance_from_lines<true>(middle.cast<double>()) + 0.5f * flow_width) < 0.0f ? -1.0f :
                                                                                                                                      1.0f;
 
-                    line_out.curled_up_height = estimate_curled_up_height(middle_distance * sign * params.curled_distance_expansion, 0.5 * (a.curvature + b.curvature),
-                                                                          l->height, flow_width, bottom_line.curled_up_height, params);
+                    line_out.curled_up_height = estimate_curled_up_height(middle_distance * sign * params.curled_distance_expansion,
+                                                                          0.5 * (a.curvature + b.curvature), l->height, flow_width,
+                                                                          bottom_line.curled_up_height, params);
 
                     current_layer_lines.push_back(line_out);
                 }
             }
         }
 
-        for (const ExtrusionLine &line : current_layer_lines) {
+        for (const ExtrusionLine& line : current_layer_lines) {
             if (line.curled_up_height > params.curling_tolerance_limit) {
                 l->curled_lines.push_back(CurledLine{Point::new_scale(line.a), Point::new_scale(line.b), line.curled_up_height});
             }
         }
 
 #ifdef DEBUG_FILES
-        for (const ExtrusionLine &line : current_layer_lines) {
+        for (const ExtrusionLine& line : current_layer_lines) {
             if (line.curled_up_height > params.curling_tolerance_limit) {
                 Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_curled_height_factor, line.curled_up_height);
                 fprintf(debug_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
             }
         }
-        for (const ExtrusionLine &line : current_layer_lines) {
+        for (const ExtrusionLine& line : current_layer_lines) {
             Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_curled_height_factor, line.curled_up_height);
             fprintf(full_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
         }
@@ -215,6 +331,31 @@ void estimate_malformations(LayerPtrs &layers, const Params &params)
 #endif
 }
 
+// ============================================================
+// [HAZARD] H867 (see file-level block above): DEAD CODE BLOCK BEGINS HERE
+// Everything from this /* to the matching */ (lines 334-1362) is permanently
+// compiled out.  The block contains:
+//   - SupportGridFilter struct   (3-D voxel grid for deduplicating support points)
+//   - SliceConnection struct     (cross-section area / first+second moment of area)
+//   - to_short_lines()           (subdivides ExtrusionEntity into segments ≤ length_limit)
+//   - check_extrusion_entity_stability()  (bridge / perimeter overhang stability check)
+//   - estimate_slice_connection()         (overlap polygon → SliceConnection moments)
+//   - ObjectPart class           (per-object-part volume + sticking area + torque analysis)
+//   - build_object_part_from_slice()      (constructs ObjectPart from slice extrusions)
+//   - ActiveObjectParts class    (union-find structure over growing object parts)
+//   - check_stability()          (full sequential layer loop — the main placement algorithm)
+//   - full_search()              (thin wrapper calling check_stability + optional debug export)
+//   - debug_export()             (OBJ file writer, guarded by #ifdef DEBUG_FILES)
+//   - estimate_supports_malformations()   (support-fill curl estimation — ALSO dead here;
+//     note: this function IS redefined and alive below this block)
+//   - gather_issues()            (aggregates SupportPoints → human-readable issue list)
+//
+// [INTENT] The intended full workflow was:
+//   estimate_malformations() → annotate object layers with curl data
+//   full_search() → place automatic support points based on torque model
+//   gather_issues() → surface a ranked list of print-quality concerns
+// Only the first step is currently active.
+// ============================================================
 /*
 
 
@@ -660,7 +801,8 @@ public:
 
             float conn_weight_arm    = (conn_centroid.head<2>() - mass_centroid.head<2>()).norm();
             if (layer_z - conn_centroid.z() < 30.0) {
-                conn_weight_arm = 0.0f; // Given that we do not have very good info about the weight distribution between the connection and current layer,
+                conn_weight_arm = 0.0f; // Given that we do not have very good info about the weight distribution between the connection and
+current layer,
                 // do not consider the weight until quite far away from the weak connection segment
             }
             float conn_weight_torque = conn_weight_arm * weight * (1.0f - conn_centroid.z() / layer_z) * (1.0f - conn_centroid.z() / layer_z);
@@ -764,9 +906,8 @@ std::tuple<ObjectPart, float> build_object_part_from_slice(const size_t &slice_i
         if (params.brim_type == BrimType::btOuterAndInner || params.brim_type == BrimType::btOuterOnly) {
             Polygon brim_hole = slice_poly.contour;
             brim_hole.reverse();
-            Polygons c = expand(slice_poly.contour, scale_(params.brim_width)); // For very small polygons, the expand may result in empty vector, even thought the input is correct.
-            if (!c.empty()) {
-                brim.push_back(ExPolygon{c.front(), brim_hole});
+            Polygons c = expand(slice_poly.contour, scale_(params.brim_width)); // For very small polygons, the expand may result in empty
+vector, even thought the input is correct. if (!c.empty()) { brim.push_back(ExPolygon{c.front(), brim_hole});
             }
         }
         if (params.brim_type == BrimType::btOuterAndInner || params.brim_type == BrimType::btInnerOnly) {
@@ -949,7 +1090,7 @@ std::tuple<SupportPoints, PartialObjects> check_stability(const PrintObject *po,
             SliceConnection           &weakest_conn = prev_slice_idx_to_weakest_connection[slice_idx];
 
             std::vector<Linef> boundary_lines;
-            for (const auto &link : slice.overlaps_below) { 
+            for (const auto &link : slice.overlaps_below) {
                 auto ls = to_unscaled_linesf({layer->lower_layer->lslices[link.slice_idx]});
                 boundary_lines.insert(boundary_lines.end(), ls.begin(), ls.end());
             }
@@ -1049,8 +1190,8 @@ std::tuple<SupportPoints, PartialObjects> check_stability(const PrintObject *po,
                 //                       get_extents(scaledl));
                 //     svg.draw(scaledl, "red", scale_(0.4));
                 //     svg.draw(perimsl, "blue", scale_(0.25));
-                    
-                    
+
+
                 //     svg.Close();
                 // }
             }
@@ -1138,74 +1279,99 @@ std::tuple<SupportPoints, PartialObjects> full_search(const PrintObject *po, con
     return results;
 }
 
+// ============================================================
+// END OF DEAD CODE BLOCK (the */
+that closes the /* at line ~360 is just above here)
+// ============================================================
+
+// [INTENT] estimate_supports_malformations — apply the same curl-height model used in
+// estimate_malformations() to support-fill layers.  Each SupportLayer's support_fills
+// are flattened, converted to polygons (Polyline → Polygon via pol.make_counter_clockwise()),
+// then annotated with overhang distance + curvature using estimate_points_properties().
+// Segments with curled_up_height > 0.3 mm are stored in SupportLayer::malformed_lines
+// for downstream use (e.g. UI visualisation, structural checks).
+//
+// [CONCURRENCY] Sequential layer loop with prev_layer_lines dependency.
+//               NOT safe to parallelise without restructuring.
+//
+// [HAZARD] H873: Support extrusions are converted via `Polygon pol(pl.points)` — this drops
+// the last point of the polyline (open path → closed polygon). For non-looping support lines
+// this wraps the endpoint back to the start, creating a phantom segment from the endpoint
+// back to the startpoint.  This phantom segment will be analysed for curl height, potentially
+// generating a false malformed_line entry at the support line endpoints.
+//
+// [HAZARD] H874: `flow_width` is a single scalar passed for ALL support-fill extrusions,
+// regardless of their role (e.g. support base vs interface vs raft).  The function does
+// not call get_flow_width() per-role.  If interface layers or raft layers have different
+// widths than the base support, curl estimates will be incorrect.
 void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width, const Params &params)
 {
 #ifdef DEBUG_FILES
-    FILE *debug_file = boost::nowide::fopen(debug_out_path("supports_malformations.obj").c_str(), "w");
-    FILE *full_file = boost::nowide::fopen(debug_out_path("supports_full.obj").c_str(), "w");
+FILE *debug_file = boost::nowide::fopen(debug_out_path("supports_malformations.obj").c_str(), "w");
+FILE *full_file = boost::nowide::fopen(debug_out_path("supports_full.obj").c_str(), "w");
 #endif
 
-    AABBTreeLines::LinesDistancer<ExtrusionLine> prev_layer_lines{};
+AABBTreeLines::LinesDistancer<ExtrusionLine> prev_layer_lines{};
 
-    for (SupportLayer *l : layers) {
-        std::vector<ExtrusionLine> current_layer_lines;
+for (SupportLayer *l : layers) {
+std::vector<ExtrusionLine> current_layer_lines;
 
-        for (const ExtrusionEntity *extrusion : l->support_fills.flatten().entities) {
-            Polyline pl = extrusion->as_polyline();
-            Polygon  pol(pl.points);
-            pol.make_counter_clockwise();
+for (const ExtrusionEntity *extrusion : l->support_fills.flatten().entities) {
+Polyline pl = extrusion->as_polyline();
+Polygon  pol(pl.points);
+pol.make_counter_clockwise();
 
-            auto annotated_points = estimate_points_properties<true, true, false, false>(pol.points, prev_layer_lines, flow_width);
+auto annotated_points = estimate_points_properties<true, true, false, false>(pol.points, prev_layer_lines, flow_width);
 
-            for (size_t i = 0; i < annotated_points.size(); ++i) {
-                ExtendedPoint &curr_point = annotated_points[i];
-                float          line_len   = i > 0 ? ((annotated_points[i - 1].position - curr_point.position).norm()) : 0.0f;
-                ExtrusionLine  line_out{i > 0 ? annotated_points[i - 1].position.cast<float>() : curr_point.position.cast<float>(),
-                                       curr_point.position.cast<float>(), line_len, extrusion};
+for (size_t i = 0; i < annotated_points.size(); ++i) {
+ExtendedPoint &curr_point = annotated_points[i];
+float          line_len   = i > 0 ? ((annotated_points[i - 1].position - curr_point.position).norm()) : 0.0f;
+ExtrusionLine  line_out{i > 0 ? annotated_points[i - 1].position.cast<float>() : curr_point.position.cast<float>(),
+     curr_point.position.cast<float>(), line_len, extrusion};
 
-                const ExtrusionLine nearest_prev_layer_line = prev_layer_lines.get_lines().size() > 0 ?
-                                                                  prev_layer_lines.get_line(curr_point.nearest_prev_layer_line) :
-                                                                  ExtrusionLine{};
+const ExtrusionLine nearest_prev_layer_line = prev_layer_lines.get_lines().size() > 0 ?
+                                prev_layer_lines.get_line(curr_point.nearest_prev_layer_line) :
+                                ExtrusionLine{};
 
-                Vec2f v1 = (nearest_prev_layer_line.b - nearest_prev_layer_line.a);
-                Vec2f v2 = (curr_point.position.cast<float>() - nearest_prev_layer_line.a);
-                auto  d  = (v1.x() * v2.y()) - (v1.y() * v2.x());
-                if (d > 0) {
-                    curr_point.distance *= -1.0f;
-                }
+Vec2f v1 = (nearest_prev_layer_line.b - nearest_prev_layer_line.a);
+Vec2f v2 = (curr_point.position.cast<float>() - nearest_prev_layer_line.a);
+auto  d  = (v1.x() * v2.y()) - (v1.y() * v2.x());
+if (d > 0) {
+curr_point.distance *= -1.0f;
+}
 
-                line_out.curled_up_height = estimate_curled_up_height(curr_point, l->height, flow_width,
-                                                                      nearest_prev_layer_line.curled_up_height, params);
+line_out.curled_up_height = estimate_curled_up_height(curr_point, l->height, flow_width,
+                                    nearest_prev_layer_line.curled_up_height, params);
 
-                current_layer_lines.push_back(line_out);
-            }
-        }
+current_layer_lines.push_back(line_out);
+}
+}
 
-        for (const ExtrusionLine &line : current_layer_lines) {
-            if (line.curled_up_height > 0.3f) {
-                l->malformed_lines.push_back(Line{Point::new_scale(line.a), Point::new_scale(line.b)});
-            }
-        }
+for (const ExtrusionLine &line : current_layer_lines) {
+if (line.curled_up_height > 0.3f) {
+l->malformed_lines.push_back(Line{Point::new_scale(line.a), Point::new_scale(line.b)});
+}
+}
 
 #ifdef DEBUG_FILES
-        for (const ExtrusionLine &line : current_layer_lines) {
-            if (line.curled_up_height > 0.3f) {
-                Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_curled_height_factor, line.curled_up_height);
-                fprintf(debug_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
-            }
-        }
-        for (const ExtrusionLine &line : current_layer_lines) {
-            Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_curled_height_factor, line.curled_up_height);
-            fprintf(full_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
-        }
+for (const ExtrusionLine &line : current_layer_lines) {
+if (line.curled_up_height > 0.3f) {
+Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_curled_height_factor, line.curled_up_height);
+fprintf(debug_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
+}
+}
+for (const ExtrusionLine &line : current_layer_lines) {
+Vec3f color = value_to_rgbf(-EPSILON, l->height * params.max_curled_height_factor, line.curled_up_height);
+fprintf(full_file, "v %f %f %f  %f %f %f\n", line.b[0], line.b[1], l->print_z, color[0], color[1], color[2]);
+}
 #endif
 
-        prev_layer_lines = LD{current_layer_lines};
-    }
+prev_layer_lines = LD{current_layer_lines};
+}
 
 #ifdef DEBUG_FILES
-    fclose(debug_file);
-    fclose(full_file);
+fclose(debug_file);
+fclose(full_file);
 #endif
 }
 
@@ -1213,87 +1379,87 @@ void estimate_supports_malformations(SupportLayerPtrs &layers, float flow_width,
 
 std::vector<std::pair<SupportPointCause, bool>> gather_issues(const SupportPoints &support_points, PartialObjects &partial_objects)
 {
-    std::vector<std::pair<SupportPointCause, bool>> result;
-    // The partial object are most likely sorted from smaller to larger as the print continues, so this should save some sorting time
-    std::reverse(partial_objects.begin(), partial_objects.end());
-    std::sort(partial_objects.begin(), partial_objects.end(),
-              [](const PartialObject &left, const PartialObject &right) { return left.volume > right.volume; });
+std::vector<std::pair<SupportPointCause, bool>> result;
+// The partial object are most likely sorted from smaller to larger as the print continues, so this should save some sorting time
+std::reverse(partial_objects.begin(), partial_objects.end());
+std::sort(partial_objects.begin(), partial_objects.end(),
+[](const PartialObject &left, const PartialObject &right) { return left.volume > right.volume; });
 
-    // Object may have zero extrusions and thus no partial objects. (e.g. very tiny object)
-    float max_volume_part = partial_objects.empty() ? 0.0f : partial_objects.front().volume;
-    for (const PartialObject &p : partial_objects) {
-        if (p.volume > max_volume_part / 200.0f && !p.connected_to_bed) {
-                result.emplace_back(SupportPointCause::UnstableFloatingPart, true);
-                break;
-        }
-    }
+// Object may have zero extrusions and thus no partial objects. (e.g. very tiny object)
+float max_volume_part = partial_objects.empty() ? 0.0f : partial_objects.front().volume;
+for (const PartialObject &p : partial_objects) {
+if (p.volume > max_volume_part / 200.0f && !p.connected_to_bed) {
+result.emplace_back(SupportPointCause::UnstableFloatingPart, true);
+break;
+}
+}
 
-    // should be detected in previous step
-    // if (!unstable_floating_part_added) {
-    //     for (const SupportPoint &sp : support_points) {
-    //             if (sp.cause == SupportPointCause::UnstableFloatingPart) {
-    //             result.emplace_back(SupportPointCause::UnstableFloatingPart, true);
-    //             break;
-    //             }
-    //     }
-    // }
+// should be detected in previous step
+// if (!unstable_floating_part_added) {
+//     for (const SupportPoint &sp : support_points) {
+//             if (sp.cause == SupportPointCause::UnstableFloatingPart) {
+//             result.emplace_back(SupportPointCause::UnstableFloatingPart, true);
+//             break;
+//             }
+//     }
+// }
 
-    std::vector<SupportPoint> ext_supp_points{};
-    ext_supp_points.reserve(support_points.size());
-    for (const SupportPoint &sp : support_points) {
-        switch (sp.cause) {
-        case SupportPointCause::FloatingBridgeAnchor:
-        case SupportPointCause::FloatingExtrusion: ext_supp_points.push_back(sp); break;
-        default: break;
-        }
-    }
+std::vector<SupportPoint> ext_supp_points{};
+ext_supp_points.reserve(support_points.size());
+for (const SupportPoint &sp : support_points) {
+switch (sp.cause) {
+case SupportPointCause::FloatingBridgeAnchor:
+case SupportPointCause::FloatingExtrusion: ext_supp_points.push_back(sp); break;
+default: break;
+}
+}
 
-    auto coord_fn = [&ext_supp_points](size_t idx, size_t dim) { return ext_supp_points[idx].position[dim]; };
-    KDTreeIndirect<3, float, decltype(coord_fn)> ext_points_tree{coord_fn, ext_supp_points.size()};
-    for (const SupportPoint &sp : ext_supp_points) {
-        auto cluster         = find_nearby_points(ext_points_tree, sp.position, 3.0);
-        int  score           = 0;
-        bool floating_bridge = false;
-        for (size_t idx : cluster) {
-                score += ext_supp_points[idx].cause == SupportPointCause::FloatingBridgeAnchor ? 3 : 1;
-                floating_bridge = floating_bridge || ext_supp_points[idx].cause == SupportPointCause::FloatingBridgeAnchor;
-        }
-        if (score > 5) {
-                if (floating_bridge) {
-                result.emplace_back(SupportPointCause::FloatingBridgeAnchor, true);
-                } else {
-                result.emplace_back(SupportPointCause::FloatingExtrusion, true);
-                }
-                break;
-        }
-    }
+auto coord_fn = [&ext_supp_points](size_t idx, size_t dim) { return ext_supp_points[idx].position[dim]; };
+KDTreeIndirect<3, float, decltype(coord_fn)> ext_points_tree{coord_fn, ext_supp_points.size()};
+for (const SupportPoint &sp : ext_supp_points) {
+auto cluster         = find_nearby_points(ext_points_tree, sp.position, 3.0);
+int  score           = 0;
+bool floating_bridge = false;
+for (size_t idx : cluster) {
+score += ext_supp_points[idx].cause == SupportPointCause::FloatingBridgeAnchor ? 3 : 1;
+floating_bridge = floating_bridge || ext_supp_points[idx].cause == SupportPointCause::FloatingBridgeAnchor;
+}
+if (score > 5) {
+if (floating_bridge) {
+result.emplace_back(SupportPointCause::FloatingBridgeAnchor, true);
+} else {
+result.emplace_back(SupportPointCause::FloatingExtrusion, true);
+}
+break;
+}
+}
 
-    for (const SupportPoint &sp : support_points) {
-        if (sp.cause == SupportPointCause::SeparationFromBed) {
-                result.emplace_back(SupportPointCause::SeparationFromBed, true);
-                break;
-        }
-    }
+for (const SupportPoint &sp : support_points) {
+if (sp.cause == SupportPointCause::SeparationFromBed) {
+result.emplace_back(SupportPointCause::SeparationFromBed, true);
+break;
+}
+}
 
-    for (const SupportPoint &sp : support_points) {
-        if (sp.cause == SupportPointCause::WeakObjectPart) {
-                result.emplace_back(SupportPointCause::WeakObjectPart, true);
-                break;
-        }
-    }
+for (const SupportPoint &sp : support_points) {
+if (sp.cause == SupportPointCause::WeakObjectPart) {
+result.emplace_back(SupportPointCause::WeakObjectPart, true);
+break;
+}
+}
 
-    if (ext_supp_points.size() > max_volume_part / 200.0f) {
-        result.emplace_back(SupportPointCause::FloatingExtrusion, false);
-    }
+if (ext_supp_points.size() > max_volume_part / 200.0f) {
+result.emplace_back(SupportPointCause::FloatingExtrusion, false);
+}
 
-    for (const SupportPoint &sp : support_points) {
-        if (sp.cause == SupportPointCause::LongBridge) {
-                result.emplace_back(SupportPointCause::LongBridge, false);
-                break;
-        }
-    }
+for (const SupportPoint &sp : support_points) {
+if (sp.cause == SupportPointCause::LongBridge) {
+result.emplace_back(SupportPointCause::LongBridge, false);
+break;
+}
+}
 
-    return result;
+return result;
 }
 
 */
