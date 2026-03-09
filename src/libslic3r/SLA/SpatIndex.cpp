@@ -1,3 +1,19 @@
+// [INTENT] SpatIndex.cpp — Pimpl implementation for PointIndex and BoxIndex.
+// The Boost.Geometry R*-tree is instantiated here (not in the header) to keep
+// compilation of heavy Boost headers confined to a single translation unit.
+//
+// [MEMORY] Both Impl structs own their rtrees by value. Copy ctor deep-copies
+// via `new Impl(*cpy.m_impl)` — O(N) cost. Move ctor transfers unique_ptr — O(1).
+//
+// [CONCURRENCY] No thread-safety. Concurrent insert/remove/query on the same
+// index produces a data race. All callers must provide external locking.
+//
+// [COUPLING] rstar<16,4> parameters are hardcoded here. The '?' comments on the
+// rtree template lines reflect original developer uncertainty about optimal values.
+// Changing these requires recompiling this TU; no runtime configurability.
+//
+// [HAZARD] H911 reminder — BoxIndex::query() pre-reserves to store.size() (line 138).
+
 #include "SpatIndex.hpp"
 
 // for concave hull merging decisions
@@ -5,8 +21,8 @@
 
 #ifdef _MSC_VER
 #pragma warning(push)
-#pragma warning(disable: 4244)
-#pragma warning(disable: 4267)
+#pragma warning(disable : 4244)
+#pragma warning(disable : 4267)
 #endif
 
 #include "boost/geometry/index/rtree.hpp"
@@ -21,44 +37,39 @@ namespace Slic3r { namespace sla {
  * PointIndex implementation
  * ************************************************************************** */
 
-class PointIndex::Impl {
+// [STATE] Impl wraps the Boost rtree. Hidden from callers behind Pimpl.
+// rstar<16,4>: max 16 elements per node, min fill factor 4 — standard R*-tree params.
+class PointIndex::Impl
+{
 public:
-    using BoostIndex = boost::geometry::index::rtree< PointIndexEl,
-                                                     boost::geometry::index::rstar<16, 4> /* ? */ >;
+    using BoostIndex = boost::geometry::index::rtree<PointIndexEl, boost::geometry::index::rstar<16, 4> /* ? */>;
 
     BoostIndex m_store;
 };
 
-PointIndex::PointIndex(): m_impl(new Impl()) {}
+PointIndex::PointIndex() : m_impl(new Impl()) {}
 PointIndex::~PointIndex() {}
 
-PointIndex::PointIndex(const PointIndex &cpy): m_impl(new Impl(*cpy.m_impl)) {}
-PointIndex::PointIndex(PointIndex&& cpy): m_impl(std::move(cpy.m_impl)) {}
+PointIndex::PointIndex(const PointIndex& cpy) : m_impl(new Impl(*cpy.m_impl)) {}
+PointIndex::PointIndex(PointIndex&& cpy) : m_impl(std::move(cpy.m_impl)) {}
 
-PointIndex& PointIndex::operator=(const PointIndex &cpy)
+PointIndex& PointIndex::operator=(const PointIndex& cpy)
 {
     m_impl.reset(new Impl(*cpy.m_impl));
     return *this;
 }
 
-PointIndex& PointIndex::operator=(PointIndex &&cpy)
+PointIndex& PointIndex::operator=(PointIndex&& cpy)
 {
     m_impl.swap(cpy.m_impl);
     return *this;
 }
 
-void PointIndex::insert(const PointIndexEl &el)
-{
-    m_impl->m_store.insert(el);
-}
+void PointIndex::insert(const PointIndexEl& el) { m_impl->m_store.insert(el); }
 
-bool PointIndex::remove(const PointIndexEl& el)
-{
-    return m_impl->m_store.remove(el) == 1;
-}
+bool PointIndex::remove(const PointIndexEl& el) { return m_impl->m_store.remove(el) == 1; }
 
-std::vector<PointIndexEl>
-PointIndex::query(std::function<bool(const PointIndexEl &)> fn) const
+std::vector<PointIndexEl> PointIndex::query(std::function<bool(const PointIndexEl&)> fn) const
 {
     namespace bgi = boost::geometry::index;
 
@@ -67,95 +78,84 @@ PointIndex::query(std::function<bool(const PointIndexEl &)> fn) const
     return ret;
 }
 
-std::vector<PointIndexEl> PointIndex::nearest(const Vec3d &el, unsigned k = 1) const
+std::vector<PointIndexEl> PointIndex::nearest(const Vec3d& el, unsigned k = 1) const
 {
     namespace bgi = boost::geometry::index;
-    std::vector<PointIndexEl> ret; ret.reserve(k);
+    std::vector<PointIndexEl> ret;
+    ret.reserve(k);
     m_impl->m_store.query(bgi::nearest(el, k), std::back_inserter(ret));
     return ret;
 }
 
-size_t PointIndex::size() const
+size_t PointIndex::size() const { return m_impl->m_store.size(); }
+
+void PointIndex::foreach (std::function<void(const PointIndexEl&)> fn)
 {
-    return m_impl->m_store.size();
+    for (auto& el : m_impl->m_store)
+        fn(el);
 }
 
-void PointIndex::foreach(std::function<void (const PointIndexEl &)> fn)
+void PointIndex::foreach (std::function<void(const PointIndexEl&)> fn) const
 {
-    for(auto& el : m_impl->m_store) fn(el);
-}
-
-void PointIndex::foreach(std::function<void (const PointIndexEl &)> fn) const
-{
-    for(const auto &el : m_impl->m_store) fn(el);
+    for (const auto& el : m_impl->m_store)
+        fn(el);
 }
 
 /* **************************************************************************
  * BoxIndex implementation
  * ************************************************************************** */
 
-class BoxIndex::Impl {
+class BoxIndex::Impl
+{
 public:
-    using BoostIndex = boost::geometry::index::
-        rtree<BoxIndexEl, boost::geometry::index::rstar<16, 4> /* ? */>;
+    using BoostIndex = boost::geometry::index::rtree<BoxIndexEl, boost::geometry::index::rstar<16, 4> /* ? */>;
 
     BoostIndex m_store;
 };
 
-BoxIndex::BoxIndex(): m_impl(new Impl()) {}
+BoxIndex::BoxIndex() : m_impl(new Impl()) {}
 BoxIndex::~BoxIndex() {}
 
-BoxIndex::BoxIndex(const BoxIndex &cpy): m_impl(new Impl(*cpy.m_impl)) {}
-BoxIndex::BoxIndex(BoxIndex&& cpy): m_impl(std::move(cpy.m_impl)) {}
+BoxIndex::BoxIndex(const BoxIndex& cpy) : m_impl(new Impl(*cpy.m_impl)) {}
+BoxIndex::BoxIndex(BoxIndex&& cpy) : m_impl(std::move(cpy.m_impl)) {}
 
-BoxIndex& BoxIndex::operator=(const BoxIndex &cpy)
+BoxIndex& BoxIndex::operator=(const BoxIndex& cpy)
 {
     m_impl.reset(new Impl(*cpy.m_impl));
     return *this;
 }
 
-BoxIndex& BoxIndex::operator=(BoxIndex &&cpy)
+BoxIndex& BoxIndex::operator=(BoxIndex&& cpy)
 {
     m_impl.swap(cpy.m_impl);
     return *this;
 }
 
-void BoxIndex::insert(const BoxIndexEl &el)
-{
-    m_impl->m_store.insert(el);
-}
+void BoxIndex::insert(const BoxIndexEl& el) { m_impl->m_store.insert(el); }
 
-bool BoxIndex::remove(const BoxIndexEl& el)
-{
-    return m_impl->m_store.remove(el) == 1;
-}
+bool BoxIndex::remove(const BoxIndexEl& el) { return m_impl->m_store.remove(el) == 1; }
 
-std::vector<BoxIndexEl> BoxIndex::query(const BoundingBox &qrbb,
-                                        BoxIndex::QueryType qt)
+std::vector<BoxIndexEl> BoxIndex::query(const BoundingBox& qrbb, BoxIndex::QueryType qt)
 {
     namespace bgi = boost::geometry::index;
 
-    std::vector<BoxIndexEl> ret; ret.reserve(m_impl->m_store.size());
+    std::vector<BoxIndexEl> ret;
+    ret.reserve(m_impl->m_store.size());
 
     switch (qt) {
-    case qtIntersects:
-        m_impl->m_store.query(bgi::intersects(qrbb), std::back_inserter(ret));
-        break;
-    case qtWithin:
-        m_impl->m_store.query(bgi::within(qrbb), std::back_inserter(ret));
+    case qtIntersects: m_impl->m_store.query(bgi::intersects(qrbb), std::back_inserter(ret)); break;
+    case qtWithin: m_impl->m_store.query(bgi::within(qrbb), std::back_inserter(ret));
     }
 
     return ret;
 }
 
-size_t BoxIndex::size() const
-{
-    return m_impl->m_store.size();
-}
+size_t BoxIndex::size() const { return m_impl->m_store.size(); }
 
-void BoxIndex::foreach(std::function<void (const BoxIndexEl &)> fn)
+void BoxIndex::foreach (std::function<void(const BoxIndexEl&)> fn)
 {
-    for(auto& el : m_impl->m_store) fn(el);
+    for (auto& el : m_impl->m_store)
+        fn(el);
 }
 
 }} // namespace Slic3r::sla

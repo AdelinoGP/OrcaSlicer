@@ -4476,3 +4476,67 @@ No remaining work in this directory.
 
 **Next hazard number to assign: H912**
 
+---
+
+## Session 67 — SLA SpatIndex.cpp / ConcaveHull / Clustering / Raster Files (H912–H919)
+
+### Files Annotated
+
+- `src/libslic3r/SLA/SpatIndex.cpp` — Pimpl implementation of `PointIndex` and `BoxIndex`; cross-references H911
+- `src/libslic3r/SLA/ConcaveHull.hpp` — interface; H912 documented
+- `src/libslic3r/SLA/ConcaveHull.cpp` — H912: `return` instead of `continue` in `add_connector_rectangles()` exits loop early, leaving all subsequent islands without bridge connectors
+- `src/libslic3r/SLA/Clustering.hpp` — interface annotations
+- `src/libslic3r/SLA/Clustering.cpp` — H913: `erase`-while-iterate brittle pattern; `cluster_centroid()` O(n²)
+- `src/libslic3r/SLA/RasterBase.hpp` — H914, H915 in `Trafo` struct
+- `src/libslic3r/SLA/RasterBase.cpp` — H916: non-standard `#ifndef SLARASTER_CPP` include-guard on .cpp file
+- `src/libslic3r/SLA/AGGRaster.hpp` — H917: zero pixel-dim silent blank raster; H918: explicit polygon closure duplicate edge
+- `src/libslic3r/SLA/RasterToPolygons.hpp` — interface annotations
+- `src/libslic3r/SLA/RasterToPolygons.cpp` — H919: `pxd.h_mm`/`w_mm` swapped in width/height computation
+
+### Key Discoveries
+
+**ConcaveHull**
+- "Concave hull" is misleadingly named — produces a star-topology union of connector rectangles from each island's convex hull to a global centroid-of-centroids. True concavity is not computed.
+- `add_connector_rectangles()` iterates islands and builds rectangular bridges to the nearest island. The early-`return` bug (H912) means only the first island that finds a close neighbour gets a connector; subsequent islands are silently skipped.
+
+**Clustering**
+- Density-connected BFS via recursive R*-tree expansion. Correctness depends on no cluster exceeding a small constant size (≤3 intended for `cluster_centroid()`).
+- `distance_queryfn` uses the erase-while-iterate pattern (H913) — safe in C++ for `std::vector` but fragile under refactoring.
+
+**RasterBase / Trafo**
+- Three hazards in `Trafo`: `get_mirror()` hardcodes `roPortrait` literal (H914), ctor silently inverts `mirror_y` semantic (H915), and `.cpp` file uses a non-standard include guard (H916).
+- `Trafo` combines pixel-dimension scaling, optional XY flip (portrait/landscape), and independent X/Y mirror flags. All five fields interact; any port must reproduce the exact transformation composition order.
+
+**AGGRaster**
+- Templated over pixel renderer, renderer, rasterizer, scanline — four independent type parameters. Port must replicate all four independently.
+- Zero pixel-dimension path (H917) produces a blank raster silently — no exception, no error return.
+- Explicit polygon closure (H918) adds a degenerate edge per polygon — likely benign in practice but produces incorrect path buffer geometry.
+
+**RasterToPolygons**
+- Marching Squares with 128 threshold. XOR parity `(mirror_x + mirror_y + flipXY) % 2` determines winding reversal after polygon reconstruction.
+- H919 (h_mm/w_mm swap) is latent — only manifests for non-square pixels, which are rare on current SLA printers.
+
+### Hazard Summary
+
+| ID | Severity | Description |
+|----|----------|-------------|
+| H912 | P2 | `add_connector_rectangles()` `return` instead of `continue` — all islands after first-failed exit are never bridged |
+| H913 | P3 | `distance_queryfn` erase-while-iterate brittle; `cluster_centroid()` O(n²) |
+| H914 | P2 | `Trafo::get_mirror()` uses literal `roPortrait` (always truthy) — always returns `!mirror_x` |
+| H915 | P2 | `Trafo` ctor silently inverts `mirror_y` polarity vs input — callers reading field get wrong sign |
+| H916 | P3 | `RasterBase.cpp` wrapped in `#ifndef SLARASTER_CPP` — non-standard include-guard on .cpp |
+| H917 | P2 | Zero pixel-dimension in `AGGRaster` ctor skips scale setup — produces blank raster silently |
+| H918 | P3 | `_to_path()` explicit polygon closure creates duplicate edge (AGG auto-closes) |
+| H919 | P2 | `raster_to_polygons()` swaps `pxd.h_mm`/`w_mm` in width/height — wrong for non-square pixels |
+
+### Next Steps
+
+1. Append H912–H919 to `04_refactoring_hazards.md` ✅ (done this session)
+2. Continue annotation: `ReprojectPointsOnMesh.hpp`, `IndexedMesh.hpp/.cpp`
+3. Then: `Hollowing.hpp/.cpp`, `Pad.hpp/.cpp`, `Rotfinder.hpp/.cpp`
+4. Then: `SupportTree.hpp/.cpp`, `SupportTreeBuilder.hpp/.cpp`
+5. Then: `SupportTreeBuildsteps.hpp/.cpp` (largest, 1277 lines), `SupportTreeMesher.hpp/.cpp`
+6. Then: `SupportPointGenerator.hpp/.cpp`, `bicubic.h`
+
+**Next hazard number to assign: H920**
+
