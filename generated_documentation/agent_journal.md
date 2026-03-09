@@ -4065,3 +4065,60 @@ The Preset subsystem is the central configuration management layer between the U
 Session 58 covered 10 source files spanning the lower-level G-code read/write pipeline (GCodeReader), the conflict detection subsystem (ConflictChecker), the post-processing script launcher (PostProcessor), the spiral vase Z-ramp rewriter (SpiralVase), and the multi-extruder tool ordering optimizer (ToolOrderUtils). 20 new hazards (H834–H853) were catalogued, including two Critical/High data races (H839), two OOM risks (H843, H850), and one high-severity incorrect G-code output bug (H849). The next hazard number to assign is **H854**.
 
 **Next hazard number to assign: H854**
+
+---
+
+## Session 59 — GCode Subsystem: PrintExtents, RetractWhenCrossingPerimeters, SmallAreaInfillFlowCompensator
+
+### Files Annotated
+
+| File | Status |
+|------|--------|
+| `src/libslic3r/GCode/PrintExtents.hpp` | Fully annotated |
+| `src/libslic3r/GCode/PrintExtents.cpp` | Fully annotated |
+| `src/libslic3r/GCode/RetractWhenCrossingPerimeters.hpp` | Fully annotated |
+| `src/libslic3r/GCode/RetractWhenCrossingPerimeters.cpp` | Fully annotated |
+| `src/libslic3r/GCode/SmallAreaInfillFlowCompensator.hpp` | Fully annotated |
+| `src/libslic3r/GCode/SmallAreaInfillFlowCompensator.cpp` | Fully annotated |
+
+### Key Discoveries
+
+**PrintExtents:**
+- `get_print_extrusions_extents()` and `get_print_wipe_tower_extrusions_extents()` both iterate `Print::m_objects` TBB-parallel region output without any lock. Both are documented as "call from the UI thread after slicing has finished"; if called while any slicing thread is still writing, this is a data race.
+- `get_wipe_tower_extrusions_extents()` dispatches by `GCodeFlavor` (Marlin/Klipper/etc.) to select the correct wipe tower G-code reader. Unsupported flavours silently skip wipe-tower extent reporting.
+- All four public functions return `BoundingBoxf` by value; callers that union multiple extents must do so explicitly.
+
+**RetractWhenCrossingPerimeters:**
+- `travel_inside_object()` is the sole public method. It builds an AABBTree of island bounding boxes lazily on first call, then does a two-phase intersection: AABB test → `intersects_with()` leaf test → `diff_pl()` clip.
+- `bbox_travel_eigen` (un-expanded) used for tree descent; `bbox_travel` (SCALED_EPSILON-expanded) used for leaf predicate — asymmetry (H854).
+- `diff_pl(travel, clipped)` called once per passing candidate island — O(N_candidates × |travel|) Clipper operations in worst case (H855).
+- Return value: empty polylines → don't retract; non-empty → retract.
+
+**SmallAreaInfillFlowCompensator:**
+- CSV-driven piecewise-linear flow compensation keyed on extrusion length.
+- Constructor: reads `small_area_infill_flow_compensation_model` config key → parses CSV lines with `std::regex` (compiled per-line — H858) → builds `eFlows`/`eLengths` sorted knot vectors → validates monotonicity and boundary conditions.
+- `interpolate()`: binary search for interval + linear interpolation; safe only when knot vectors are non-empty.
+- `modify_flow()`: filters by extrusion role (erPerimeter, erExternalPerimeter, erOverhangPerimeter, erThinWall, erTopSolidInfill, erSolidInfill, erIroning only) — erInternalInfill and erBridgeInfill excluded (H861).
+- `max_modified_length()`: calls `eLengths.back()` — UB if empty (H856).
+- `nearly_equal()` at file scope pollutes Slic3r namespace (H857).
+- `catch(...)` in constructor swallows `std::bad_alloc` (H859).
+- Zero-knot model passes all validation guards; `interpolate()` on empty vectors is UB (H860).
+
+### Hazards Assigned
+
+| ID | Description |
+|----|-------------|
+| H854 | `RetractWhenCrossingPerimeters`: `bbox_travel_eigen` (unexpanded) used for AABB tree descent but `bbox_travel` (SCALED_EPSILON-expanded) used in leaf predicate — asymmetry may mis-prune valid intersecting nodes |
+| H855 | `RetractWhenCrossingPerimeters`: `diff_pl(travel, clipped)` runs full Clipper diff per candidate island — O(N_candidates × |travel|) cost |
+| H856 | `SmallAreaInfillFlowCompensator::max_modified_length()` calls `eLengths.back()` unconditionally — UB if `eLengths` is empty |
+| H857 | `nearly_equal()` defined at file scope without `static`/anonymous-namespace — pollutes `Slic3r` namespace with generic name |
+| H858 | CSV parsing compiles `std::regex` per input line and uses `std::stod` (locale-dependent) — performance + locale hazard |
+| H859 | Inner `catch(...)` in constructor swallows `std::bad_alloc` and other non-parse exceptions, masking OOM as no-model state |
+| H860 | Zero-knot model (all CSV lines empty/malformed) passes all four constructor validation checks; subsequent `interpolate()` call on empty vectors is UB |
+| H861 | `modify_flow()` excludes `erInternalInfill` and `erBridgeInfill` — short internal/bridge infill lines never flow-compensated; undocumented design choice |
+
+### Summary
+
+Session 59 covered 6 source files completing the mid-tier GCode utilities layer: `PrintExtents` (spatial extent reporting for UI), `RetractWhenCrossingPerimeters` (travel retraction decision via AABBTree + Clipper intersection), and `SmallAreaInfillFlowCompensator` (CSV-driven piecewise-linear flow correction for short extrusion segments). 8 new hazards (H854–H861) were catalogued, including two High/UB risks (H856, H860) that can produce undefined behaviour on valid (but edge-case) inputs. The most architecturally significant finding is the `SmallAreaInfillFlowCompensator`'s runtime-parsed CSV model: it makes the compensator's behaviour dependent on user-supplied floating-point data with no hardened parser, no locale isolation, and insufficient empty-model guards.
+
+**Next hazard number to assign: H862**
