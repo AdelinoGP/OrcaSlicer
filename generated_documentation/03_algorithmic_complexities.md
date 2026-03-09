@@ -586,3 +586,67 @@ The cross-section normal at waypoints is the bisector direction: `(v1 + v2).norm
 | `organic_smooth_branches_avoid_collisions()` | O(100 × N × L) | Dominant cost for tall complex models |
 | `extrude_branch()` | O(path_len × nsteps) | nsteps ∝ 1/eps ≈ 50–200 vertices/ring |
 | `organic_draw_branches()` TBB slice | O(B × layer_count) | B = number of branches |
+
+---
+
+## 8. Overhang Extra Perimeters (PerimeterGenerator.cpp)
+
+**Files:** [`PerimeterGenerator.cpp`](../src/libslic3r/PerimeterGenerator.cpp)
+
+### paths_touch()
+
+Checks whether any point of either path is within `limit_distance` of the other path's line segments. Builds two `AABBTreeLines::LinesDistancer` objects locally per call:
+
+- AABB build: O(n + m) where n, m = segment counts of the two paths
+- Distance queries: O(n × log m) + O(m × log n)
+- Called O(p²) times from `sort_extra_perimeters()` for p overhang path fragments
+- **Total:** O(p² × (n + m) × log(max(n,m))) per overhang region
+
+### reconnect_polylines()
+
+Greedy endpoint-merge of clipped overhang arc fragments:
+
+- Nested O(p²) loop over all polyline pairs
+- Acceptable for small p (typical: 5–30 fragments per overhang)
+- Degrades for high-resolution complex overhangs
+
+### sort_extra_perimeters()
+
+Two-phase algorithm:
+1. Dependency graph construction: O(p²) `paths_touch()` calls
+2. Topological ordering (while-change loop): O(p²) worst case
+3. Nearest-neighbour reconnection: O(p²) with 5mm cutoff heuristic
+
+**Total:** O(p²) where p = number of overhang perimeter fragments per region.
+
+### generate_extra_perimeters_over_overhangs()
+
+For each overhang ExPolygon:
+1. Iterative inward offset (while perimeter_polygon not empty): O(k) iterations, k = continuation_loops (= 2 + overhang_depth/spacing)
+2. Each iteration: Clipper intersection + offset — O(v log v) where v = vertex count
+3. gap fill: `ExPolygon::medial_axis()` — O(v log v)
+
+**Total per overhang:** O(k × v log v)
+
+### findAllTouchingPerimeters() / reorderPerimetersByProximity()
+
+BFS-style wall ordering for Arachne extrusions:
+- `findAllTouchingPerimeters()`: O(|refIndices| × N) per call, where N = total extrusion count
+- `reorderPerimetersByProximity()` calls it D times (D = max inset depth)
+- `MultiPoint::minimumDistanceBetweenLinesDefinedByPoints()`: O(|ref_pts| × |pts|) per pair
+- **Total:** O(D × N² × avg_pts_per_extrusion) per island
+
+For a typical island with 8 walls and 20 extrusion segments this is manageable. For complex variable-width islands (Arachne thin-wall mode) with 200+ segments across 15 inset levels, this becomes the dominant cost in `process_arachne()`.
+
+### Complexity Summary (PerimeterGenerator.cpp)
+
+| Operation | Complexity | Notes |
+|-----------|------------|-------|
+| `paths_touch()` | O(n log m) per call | Called O(p²) times |
+| `reconnect_polylines()` | O(p²) | p = fragment count |
+| `sort_extra_perimeters()` | O(p²) | Including dependency graph |
+| `generate_extra_perimeters_over_overhangs()` | O(k × v log v) | k ≈ 3–10, v = vertices |
+| `findAllTouchingPerimeters()` | O(|ref| × N × pts) | Per BFS level |
+| `reorderPerimetersByProximity()` | O(D × N² × pts) | D = inset depth |
+| `process_classic()` full island | O(wall_loops × v log v) | Clipper offset chain |
+| `process_arachne()` full island | O(v log v) + O(D×N²) | Arachne + ordering |

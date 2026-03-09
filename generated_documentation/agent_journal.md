@@ -5206,3 +5206,86 @@ All constructor initialiser list items annotated, including the `EPSILON`-clampe
 2. Session 74: `PerimeterGenerator.cpp` (classic + Arachne implementations), `FuzzySkin` feature files
 
 **Next hazard number to assign: H1069**
+
+---
+
+## Session 74 — PerimeterGenerator.cpp Complete Annotation
+
+### Files Processed
+- `src/libslic3r/PerimeterGenerator.cpp` (3113 lines after annotation; previously partially annotated)
+
+### Continuation Context
+Session 74 spans multiple iterations. Previous iterations (1–4) had already annotated:
+- File-level header and module overview
+- `PerimeterGeneratorLoop` class
+- `detect_steep_overhang()` template function
+- `traverse_loops()` and `clip_extrusion()`
+- `PerimeterGeneratorArachneExtrusion` struct
+- `traverse_extrusions()` and `split_top_surfaces()`
+- `process_classic()` and `process_arachne()` function headers
+
+This iteration (5) completed the annotation of all remaining functions in the lower half of the file.
+
+### Functions Annotated This Session
+
+| Function | Lines (approx) | Key Notes |
+|----------|----------------|-----------|
+| `paths_touch()` | ~880 | AABB proximity test for overhang perimeter dependency graph |
+| `reconnect_polylines()` | ~897 | Greedy O(n²) endpoint merge for clipped overhang arcs |
+| `sort_extra_perimeters()` | ~948 | Topological + nearest-neighbour sort; cycle/sentinel hazards |
+| `generate_extra_perimeters_over_overhangs()` | ~1088 | Full overhang extra perimeter algorithm; bridging check |
+| `apply_extra_perimeters()` | ~1314 | Integrates extra perims into loops + fill_surfaces |
+| `reorient_perimeters()` | ~1344 | Steep-overhang loop reversal; non-recursive limitation |
+| `add_infill_contour_for_arachne()` | ~1947 | Arachne infill boundary offset2 registration |
+| `process_no_bridge()` | ~1982 | SuperSlicer counterbore hole bridging; three mode branches |
+| `findAllTouchingPerimeters()` | ~2216 | BFS proximity helper; O(n²) accumulation across levels |
+| `reorderPerimetersByProximity()` | ~2267 | BFS wall ordering; heuristic front/end swap note |
+| `bringContoursToFront()` | ~2368 | stable_partition for OuterInner ordering; conflict note |
+| `is_internal_contour()` | ~2891 | Predicate for innermost contour in loop nest |
+| `generate_lower_polygons_series()` | ~2902 | Two-sample overhang detection offset series |
+
+### Key Architectural Discoveries
+
+**Overhang Extra Perimeters (PrusaSlicer port)**
+The `generate_extra_perimeters_over_overhangs()` / `apply_extra_perimeters()` / `sort_extra_perimeters()` cluster is a self-contained subsystem ported from PrusaSlicer (author: PavelMikus). It runs after the regular perimeter generation and injects additional concentric paths specifically over unbridgeable overhang zones in the infill area. The anchor-first printing order is enforced by a topological sort with a dependency graph built from `paths_touch()`.
+
+**Counterbore Hole Bridging (SuperSlicer port)**
+`process_no_bridge()` implements a "sacrificial layer" approach for counterbore holes: the algorithm detects convex unsupported voids, runs `BridgeDetector` to confirm bridgeability, then reclassifies those areas as bridge infill rather than perimeter geometry. Three modes (`chbNone`, `chbBridges`, `chbFilled`) select different amounts of area reclassification. The filled mode has a known limitation with slightly non-convex holes.
+
+**Arachne Inner–Outer–Inner Wall Ordering**
+Three functions (`findAllTouchingPerimeters`, `reorderPerimetersByProximity`, `bringContoursToFront`) implement the "Inner Outer Inner" wall print ordering optimisation for Arachne. The BFS-style reordering clusters inner walls near the outer wall that they are geometrically proximate to, minimising travel. The outer walls (inset_idx == 0) are explicitly excluded from reordering and are handled separately.
+
+**process_no_bridge() Mutation Risk**
+The `all_surfaces` vector is passed by reference and mutated in-place (erase + push_back) during iteration. Index arithmetic is used to compensate, but this pattern is fragile and represents a real reallocation/invalidation risk (H1079).
+
+### Hazard Summary (Session 74)
+
+| ID | Priority | Description |
+|----|----------|-------------|
+| H1069 | P3/Low | `paths_touch()` O(n×m) with per-call AABB rebuild — hot in large overhang layers |
+| H1070 | P2/Medium | `reconnect_polylines()` O(n²) merge loop |
+| H1071 | P2/Medium | `reconnect_polylines()` no self-intersection detection on merged result |
+| H1072 | P2/Medium | `sort_extra_perimeters()` silently drops paths if dependency graph has cycle |
+| H1073 | P3/Low | `sort_extra_perimeters()` null_idx = size_t(-1) sentinel — theoretical wrap-around |
+| H1074 | P3/Low | `generate_extra_perimeters_over_overhangs()` continuation_loops=2 magic constant |
+| H1075 | P2/Medium | `generate_extra_perimeters_over_overhangs()` 20% bridgeable threshold may misclassify |
+| H1076 | P1/High | `apply_extra_perimeters()` no guard against empty loops->entities — UB on empty |
+| H1077 | P2/Medium | `reorient_perimeters()` not recursive — skips loops in nested collections |
+| H1078 | P2/Medium | `add_infill_contour_for_arachne()` silent discard on Clipper precision glitch |
+| H1079 | P1/High | `process_no_bridge()` all_surfaces mutated via push_back during index-based loop |
+| H1080 | P3/Low | `process_no_bridge()` disabled upper_slices check — open holes = roofed holes |
+| H1081 | P2/Medium | `process_no_bridge()` convexity gate excludes tessellated non-convex counterbores |
+| H1082 | P2/Medium | `findAllTouchingPerimeters()` O(n²) accumulation with no spatial index |
+| H1083 | P2/Medium | `findAllTouchingPerimeters()` unconditionally skips inset_idx==0 entities |
+| H1084 | P3/Low | `reorderPerimetersByProximity()` "front" heuristic actually places at end-1 |
+| H1085 | P2/Medium | `bringContoursToFront()` may conflict with InnerOuter wall_sequence mode |
+| H1086 | P3/Low | `generate_lower_polygons_series()` reserve(2)/size() coupling fragility |
+
+### Next Steps
+
+1. Begin `src/libslic3r/PrintObject.cpp` annotation (large file — multiple islands, support generation dispatch)
+2. Then `src/libslic3r/Print.cpp` (print-level orchestration, parallel slicing)
+3. Then `src/libslic3r/LayerRegion.cpp` (region-level fill/perimeter merge)
+4. Continue updating all five documentation files after each major file
+
+**Next hazard number to assign: H1087**
