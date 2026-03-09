@@ -4317,3 +4317,59 @@ Session 62 completed annotation of the final two unannotated files in the `Suppo
 
 **Next hazard number to assign: H899**
 
+---
+
+## Session 63 — PrintConfig.cpp (lower half: multi-filament helpers, validate, CLI config defs)
+
+### Files Annotated
+
+- `src/libslic3r/PrintConfig.cpp` (lines ~8119–9990) — lower portion of the config registry
+
+### Summary
+
+Session 63 completed inline annotation of the lower half of `PrintConfig.cpp`. The upper half (H770–H785) was annotated in a prior session and committed. This session covered the multi-filament value propagation helpers, the `validate(FullPrintConfig&)` function, and the three CLI config definition classes.
+
+**Note:** During this session, hazard numbers H807–H814 were initially assigned inside the `.cpp` comments, conflicting with already-assigned SLAPrint/Slicing hazard IDs. These were corrected to H899–H906 in the subsequent cleanup pass before committing.
+
+#### Key Functions Annotated
+
+| Lines | Function/Block | Description |
+|-------|----------------|-------------|
+| 8119–8152 | `min_object_distance()` | Hardcoded 6mm floor (H779) |
+| 8154–8246 | `normalize_fdm()` | Idempotency hazard (H780) |
+| 8248–8305 | `normalize_fdm_1()` | Near-duplicate of normalize_fdm (H781) |
+| 8305–8368 | `normalize_fdm_2()` | Null-deref if PrintSequence absent (H782); pointer-alias brittleness (H900) |
+| 8369–8434 | `handle_legacy_sla()` | `values[1]` out-of-bounds (H783) |
+| 8435–8539 | `extend_extruder_variant()` | Assert-then-deref UB (H784, H785) |
+| 8540–8606 | `compute_filament_override_value()` | Raw delete on clone (H899); `opt_long_retraction_default` alias (H900) |
+| 8596–8840 | `validate(FullPrintConfig&, bool)` | bridge_flow validated twice (H901); sizeof issue (H902); coFloatOrPercent not range-checked (H903) |
+| 8840–8872 | `PRINT_CONFIG_CACHE_INITIALIZE` | `volatile ret` insufficient DCE guard (H904) |
+| 8874–9040 | `CLIActionsConfigDef::CLIActionsConfigDef()` | Commented-out options with no dispatch arm (H905) |
+| 9040–9100 | `CLITransformConfigDef::CLITransformConfigDef()` | Rotation order undocumented (H906) |
+| 9100+ | `CLIMiscConfigDef`, `DynamicPrintAndCLIConfig::handle_legacy()`, remaining config defs | No new hazards |
+| 9848+ | `get_shared_poly()`, `get_bed_excluded_area()`, `get_bed_shape()` etc. | H777/H778 already assigned in prior session |
+
+#### Hazards Assigned
+
+| ID | Description | Severity |
+|----|-------------|----------|
+| H899 | `compute_filament_override_value()` raw `delete opt_copy` — exception-path memory leak | P2/Medium |
+| H900 | `normalize_fdm_2()` pointer-aliasing between two locals via `opt_new_filament` — brittle for future merges | P3/Low |
+| H901 | `validate()` validates `bridge_flow` twice; `internal_bridge_flow` is never validated | P2/Medium |
+| H902 | `validate()` `sizeof(widths)/sizeof(widths[i])` — non-portable idiom; should use `widths[0]` | P3/Low |
+| H903 | `validate()` range check missing for `coFloatOrPercent` / `coFloatsOrPercents` types | P3/Low |
+| H904 | `PRINT_CONFIG_CACHE_INITIALIZE` `static volatile int ret` — `volatile` does not prevent dead-code elimination | P3/Low |
+| H905 | `CLIActionsConfigDef` commented-out options have no dispatch arm in `CLI.cpp` — silent no-op if re-enabled | P3/Low |
+| H906 | `CLITransformConfigDef` `--rotate` / `--rotate_x` / `--rotate_y` rotation order undocumented; GUI mismatch possible | P3/Low |
+
+#### Summary
+
+`PrintConfig.cpp` is now fully annotated. The file is 9,990 lines (the largest single file in the repository) and serves as the sole source of truth for all slicing parameter definitions, enum serialization, and legacy key migration. Its most dangerous properties for refactoring are:
+
+1. **Cereal serialization order** (H770 context): all `StaticPrintConfig` field offsets are positional; any field insertion/removal silently corrupts `.3mf` files.
+2. **L() vs _() confusion** (H774): the translation extraction marker is NOT a runtime translator; swapping them in a port will produce either untranslated UI or runtime crashes during static init.
+3. **Unsigned underflow** (H779/H782/H783): several filament-index calculations use `value - 1` where `value` can be 0, producing `SIZE_MAX`.
+4. **assert-then-deref** (H784/H785): two functions in the normalize chain assert a pointer is non-null, then dereference it unconditionally. In release builds the assert is eliminated, producing UB.
+
+**Next hazard number to assign: H907**
+
