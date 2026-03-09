@@ -719,3 +719,183 @@ Hand-maintained config-key → slicing-step mapping:
 | `detect_surfaces_type()` | O(L × R × v log v) | TBB parallel | Per-layer parallel |
 | `process_external_surfaces()` | O(L × R × v log v) | TBB parallel | Per-layer parallel |
 
+---
+
+## Section 9 — G-code Export Pipeline (GCode.cpp, GCodeWriter.cpp, CoolingBuffer.cpp)
+
+### Overview
+
+G-code export is the final serialisation stage: it converts sliced layer data (ExtrusionEntityCollections, toolpaths, config) into a linear stream of G-code text. The pipeline is driven from `Print::export_gcode()` → `GCode::do_export()` → `GCode::_do_export()`.
+
+### TBB Pipeline Architecture
+
+`_do_export()` builds a `tbb::parallel_pipeline` with **all `serial_in_order` filters** — providing pipelining overlap (I/O and string construction can overlap across layers), but **no true parallelism**:
+
+```
+generator (serial)  →  [spiral_mode (serial)]  →  [pressure_equalizer (serial)]  →  cooling (serial)  →  output (serial)
+```
+
+- **generator:** calls `process_layer()` once per layer; emits `LayerResult` (a `std::string` of G-code for that layer)
+- **spiral_mode filter:** optional; applies vase-mode stitching — O(v) per layer
+- **pressure_equalizer filter:** optional; scans G-code string with regex to adjust E values — O(chars) per layer
+- **cooling filter:** `CoolingBuffer::process_layer()` — adjusts fan speeds and print speeds — O(segments) per layer
+- **output filter:** appends string to `GCodeOutputStream` (tee to file + `GCodeProcessor`) — O(chars)
+
+Because all filters are `serial_in_order`, `m_writer`, `m_last_pos`, and all other `GCode` state are safe despite the pipeline wrapper. The pipeline purely provides overlap between the I/O stage and the string-building stage.
+
+**Combinatorial pipeline hazard:** Four pipeline configurations are hardcoded (`{spiral × pressure_equalizer} = 4` variants). Adding a new optional stage doubles the required pipeline count.
+
+### process_layer() Complexity
+
+The core per-layer function. Complexity breakdown:
+
+- **Island ordering:** `sort_print_object_instances()` — O(I log I) where I = print instances in layer
+- **Perimeter/infill extrusion:** iterates `ExtrusionEntity` tree — O(E) where E = total extrusion entities
+- **Travel path generation:** `AvoidCrossingPerimeters::travel_to()` — O(v log v) per travel move (Clipper + BFS on boundary graph)
+- **Seam picking:** `SeamPlacer::place_seam()` — O(1) amortised (pre-built per-object cost map)
+- **Wipe / retract:** O(1) per extrusion entity
+
+**Total per layer:** O(E + V × log V) where V = total vertices in layer boundary polygons
+
+### CoolingBuffer.process_layer() Complexity
+
+CoolingBuffer rescans G-code strings to apply time-based fan and speed adjustments:
+
+- Parse G-code string token by token: O(chars)
+- Build time-estimate segment list: O(segments)
+- Scan forward/backward over segments to compute fan activation time: O(segments × lookahead_window)
+- Rescale F-values in affected segments: O(affected_segments)
+
+**Total:** O(chars + segments²) worst-case (when the entire layer is within the fan lookahead window). For typical layers: O(chars).
+
+The resonance-avoidance band check is O(1) per segment — frequency lookup in two config floats.
+
+### PlaceholderParser — Template G-code Expansion
+
+`PlaceholderParser` (PlaceholderParser.cpp, 2453 lines) expands template strings (start G-code, end G-code, tool-change G-code, etc.) that contain `[variable_name]` and `{expression}` placeholders:
+
+- **Parsing:** Spirit X3 grammar (Boost.Spirit) — O(chars) for well-formed templates
+- **Expression evaluation:** full arithmetic + comparison + if/else/for expression language — O(expression_depth) per expression node
+- **Variable resolution:** hash map lookup — O(1) amortised
+- **Output:** single-pass expansion — O(output_chars)
+
+**Key hazard:** The expression language supports arbitrary loops (`{for i = 0 to N}...{endfor}`). A misconfigured start G-code can loop indefinitely. There is no iteration-count limit guard.
+
+### Complexity Summary (G-code Export)
+
+| Operation | Complexity | Parallelism | Notes |
+|-----------|------------|-------------|-------|
+| `process_layer()` | O(E + V log V) | Serial (pipeline) | E = extrusions, V = boundary vertices |
+| `CoolingBuffer::process_layer()` | O(chars) typical | Serial | O(segments²) worst case |
+| `PlaceholderParser::process()` | O(chars) | Serial | Spirit X3; unbounded for-loops |
+| TBB pipeline overhead | O(L) | Pipelined | All filters serial_in_order |
+| `GCodeProcessor::process()` | O(chars) | Serial | Post-export statistics pass |
+
+---
+
+## Section 10 — Wipe Tower Planning and G-code Generation (WipeTower2.cpp)
+
+### Overview
+
+The wipe (purge) tower is a disposable multi-material artifact printed alongside the actual model. It purges residual filament from the nozzle between tool changes. `WipeTower2` handles both **planning** (computing tower geometry and toolchange order) and **G-code generation** (emitting the purge extrusions).
+
+### Two-Phase Design
+
+**Phase 1 — Planning:** `Print::process()` calls `Print::_make_wipe_tower()` which calls `WipeTower2::plan_toolchange()` for each toolchange event (in Z-ascending order), then calls `WipeTower2::plan_tower()` to finalize tower dimensions.
+
+**Phase 2 — G-code generation:** `GCode::_do_export()` calls `WipeTower2::tool_change()` at each layer boundary to generate the actual purge extrusions.
+
+### plan_toolchange() Complexity
+
+Called once per toolchange event (total T toolchanges across the print):
+
+- Computes `required_depth = ramming_depth + wiping_depth` for this toolchange: O(1)
+- Appends to per-layer plan list: O(1) amortised
+
+**Total planning pass:** O(T)
+
+### plan_tower() Complexity
+
+Called once after all toolchanges are registered. Computes final `m_wipe_tower_depth`:
+
+- Scans all layers top-down to find the maximum accumulated depth: O(L)
+- **Depth propagation loop:** For each new deeper layer, visits all prior layers to update their depth record
+  - This is noted in the source (`[HAZARD]`) as O(L²) worst case — when tower depth increases monotonically
+- **Typical case:** O(L) when tower depth stabilizes quickly
+
+### tool_change() Complexity
+
+Called once per toolchange during G-code export. Sequences:
+
+1. `toolchange_Unload()`: ramp filament out — O(ramming_steps) where ramming_steps ≈ 15
+2. `toolchange_Change()`: emit toolchange placeholder — O(1)
+3. `toolchange_Load()`: push new filament in — O(1) for multi-material; O(retraction_steps) for SEMM
+4. `toolchange_Wipe()`: purge by extruding rows — O(purge_volume / row_volume) rows, each O(1)
+5. `finish_layer()`: perimeter + infill — O(tower_perimeter_vertices)
+
+**Total per toolchange:** O(rows) where rows ∝ purge_volume / (tower_width × layer_height × line_width)
+
+### Wipe Volume Matrix
+
+Purge volumes are stored in `flush_volumes_matrix` (N×N flat float array). For each toolchange from filament A to filament B:
+
+- Lookup: `flush_volumes_matrix[A * N + B]` — O(1)
+- N reconstructed from `sqrt(matrix.size())` — O(1) but fragile (H699)
+
+### Complexity Summary (Wipe Tower)
+
+| Operation | Complexity | Notes |
+|-----------|------------|-------|
+| `plan_toolchange()` × T | O(T) total | T = total toolchanges |
+| `plan_tower()` | O(L²) worst, O(L) typical | L = layers with toolchanges |
+| `tool_change()` | O(rows) | rows ∝ purge_volume |
+| `finish_layer()` | O(tower_perimeter_vertices) | Per layer |
+| Volume matrix lookup | O(1) | Flat N×N array |
+
+---
+
+## Section 11 — Adaptive Layer Heights (SlicingAdaptive.cpp)
+
+### Overview
+
+`SlicingAdaptive` computes a non-uniform layer height profile that maximizes layer heights in low-detail regions and minimizes them in high-curvature regions, subject to a quality threshold.
+
+### Algorithm
+
+1. **Face normal classification:** For each mesh triangle, compute the deviation angle from horizontal. Store the maximum angle at each Z height band — O(T) where T = triangles.
+2. **Height profile sweep:** Binary search for maximum allowable layer height at each Z level such that the chord deviation error < threshold. Height candidates are sampled from a precomputed `layer_height_profile_adaptive` curve — O(L log L) where L = layers.
+3. **Smoothing pass:** Apply a running-average smoothing over the height profile to prevent abrupt layer-height transitions — O(L).
+
+**Total:** O(T + L log L)
+
+### Complexity Summary
+
+| Operation | Complexity | Notes |
+|-----------|------------|-------|
+| Face normal scan | O(T) | T = triangles |
+| Height profile sweep | O(L log L) | Binary search per layer candidate |
+| Smoothing | O(L) | Running average |
+
+---
+
+## Section 12 — Jump-Point Search Pathfinding (JumpPointSearch.cpp)
+
+### Overview
+
+`JumpPointSearch` implements the Jump Point Search (JPS) algorithm on a 2D grid to compute collision-free travel paths for nozzle moves (used in `AvoidCrossingPerimeters`).
+
+### Algorithm
+
+JPS is an optimized A* variant for uniform-cost grids:
+
+- **Grid:** Boolean occupancy grid at configurable resolution (typically 0.5–1.0 mm/cell)
+- **Heuristic:** Octile distance — O(1) per node
+- **Jump point detection:** Horizontal/vertical/diagonal scans until a wall or jump point is found — O(grid_width) per scan in worst case
+- **Open set:** Binary heap — O(log N) per insert/extract where N = open set size
+
+**Complexity:** O(N log N) where N = expanded nodes. JPS typically expands far fewer nodes than A* on obstacle-sparse grids.
+
+**Key hazard:** Grid resolution is fixed at construction time. Very dense obstacle configurations (many thin perimeters) may require a finer grid, increasing N quadratically.
+
+---
+

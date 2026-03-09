@@ -1,3 +1,39 @@
+// [INTENT] JumpPointSearch: grid-based pathfinding using Jump Point Search (JPS),
+// an optimized A* variant for uniform-cost grids. Used by AvoidCrossingPerimeters
+// to compute collision-free nozzle travel paths between two points on a layer.
+//
+// [STATE] JPSPathFinder holds:
+//   inpassable      — unordered_set<Pixel> of grid cells blocked by obstacle lines
+//   max_search_box  — bounding box of all obstacles (used to bound A* search)
+//   bed_shape       — Lines defining the print bed boundary (always-on obstacle)
+// Grid resolution is fixed at RESOLUTION = scaled(0.5) mm (0.5 mm grid cells).
+//
+// [COUPLING] Called from AvoidCrossingPerimeters::travel_to() for each travel move
+// that would cross a perimeter. Perimeter lines are rasterized into the grid via DDA.
+// The A* search uses the libslic3r/AStar.hpp generic A* implementation with
+// JPSTracer as the graph adapter.
+//
+// [CONCURRENCY] JPSPathFinder is not thread-safe. It is owned per-GCode instance
+// and only accessed from the serial_in_order pipeline generator filter.
+//
+// [HAZARD] unique_id() encodes position as (uint16_t(x) << 16) | uint16_t(y).
+// Grid coordinates are clipped to 16 bits — for print beds larger than 65536 cells
+// (32768 mm at 0.5 mm resolution = 32.7 m) coordinates alias and JPS may silently
+// treat distinct cells as identical, producing incorrect paths. Beds up to ~30 m
+// are safe; all practical printers are within this range.
+//
+// [HAZARD] double_dda_with_offset() draws two DDA lines (line + 1-pixel normal offset)
+// to ensure thin lines are properly blocked. The normal direction is computed with
+// ceil(normalized), which rounds the normal to axis-aligned ±1 — this may cause
+// the offset copy to be drawn in the wrong direction for nearly-diagonal lines.
+//
+// [HAZARD] inpassable uses std::unordered_set<Pixel>. For prints with many
+// perimeter segments, the set can become very large. The TBB scalable_allocator
+// (line 22) is used but the set itself is still a hash table with O(1) amortised
+// lookup — no AABBTree or bitmap acceleration is used.
+//
+// [MEMORY] TBB scalable_allocator included at line 22 but not directly used for
+// the inpassable set (which uses default allocator). May be a leftover include.
 #include "JumpPointSearch.hpp"
 #include "BoundingBox.hpp"
 #include "ExPolygon.hpp"
@@ -21,15 +57,18 @@
 
 #include <oneapi/tbb/scalable_allocator.h>
 
-//#define DEBUG_FILES
+// #define DEBUG_FILES
 #ifdef DEBUG_FILES
 #include "libslic3r/SVG.hpp"
 #endif
 
 namespace Slic3r {
 
+// [INTENT] dda(): Bresenham digital differential analyzer — rasterizes a line segment between
+// two grid coordinates, calling fn(x,y) for each cell. Early-terminates if fn returns false.
+// Used to mark obstacle cells and for path collision-checking.
 // execute fn for each pixel on the line. If fn returns false, terminate the iteration
-template<typename PointFn> void dda(coord_t x0, coord_t y0, coord_t x1, coord_t y1, const PointFn &fn)
+template<typename PointFn> void dda(coord_t x0, coord_t y0, coord_t x1, coord_t y1, const PointFn& fn)
 {
     coord_t dx    = abs(x1 - x0);
     coord_t dy    = abs(y1 - y0);
@@ -43,7 +82,8 @@ template<typename PointFn> void dda(coord_t x0, coord_t y0, coord_t x1, coord_t 
     dy *= 2;
 
     for (; n > 0; --n) {
-        if (!fn(x, y)) return;
+        if (!fn(x, y))
+            return;
 
         if (error > 0) {
             x += x_inc;
@@ -55,9 +95,14 @@ template<typename PointFn> void dda(coord_t x0, coord_t y0, coord_t x1, coord_t 
     }
 }
 
-// will draw the line twice, second time with and offset of 1 in the direction of normal
+// [INTENT] double_dda_with_offset(): draws two parallel DDA lines (the original and a 1-cell
+// normal offset). Ensures thin obstacle lines occupy two pixels of grid width so the path
+// planner does not thread through hairline gaps between perimeter segments.
+// [HAZARD] The normal direction uses ceil(normalized) which rounds to axis-aligned ±1.
+// For near-diagonal lines this may offset in the wrong axis, leaving one side of the line
+// under-blocked. See file-header [HAZARD].
 // may call the fn on the same coordiantes multiple times!
-template<typename PointFn> void double_dda_with_offset(coord_t x0, coord_t y0, coord_t x1, coord_t y1, const PointFn &fn)
+template<typename PointFn> void double_dda_with_offset(coord_t x0, coord_t y0, coord_t x1, coord_t y1, const PointFn& fn)
 {
     Vec2d normal       = Point{y1 - y0, x1 - x0}.cast<double>().normalized();
     normal.x()         = ceil(normal.x());
@@ -69,6 +114,22 @@ template<typename PointFn> void double_dda_with_offset(coord_t x0, coord_t y0, c
     dda(start_offset.x(), start_offset.y(), end_offset.x(), end_offset.y(), fn);
 }
 
+// [INTENT] JPSTracer: graph adapter for the generic astar::search_route() template in AStar.hpp.
+// Implements the Jump Point Search pruning rules that allow A* to skip interior nodes on uniform-cost
+// grids, visiting only "jump points" where forced neighbours exist. CellPositionType is Pixel (coord_t x,y);
+// CellQueryFn is a lambda returning bool (passable/blocked).
+//
+// [STATE] Stateless aside from the immutable `target` and `is_passable` functor captured at construction.
+// Node carries both grid position AND the direction from which it was reached (incoming_dir), because
+// JPS pruning rules are direction-dependent — the same cell reached from different directions yields
+// different successor sets.
+//
+// [COUPLING] This class is tightly coupled to AStar.hpp's interface contract:
+//   - foreach_reachable(node, fn): enumerates successors
+//   - distance(a, b): edge cost
+//   - goal_heuristic(n): admissible heuristic (returns -1 to signal goal reached)
+//   - unique_id(n): must map each (position, incoming_dir) pair to a unique size_t key
+//     NOTE: unique_id() uses only position, not incoming_dir — see [HAZARD] in file header.
 template<typename CellPositionType, typename CellQueryFn> class JPSTracer
 {
 public:
@@ -85,10 +146,18 @@ private:
     CellPositionType target;
     CellQueryFn      is_passable; // should return boolean whether the cell is passable or not
 
+    // [INTENT] find_jump_point(): scans forward from `start` in direction `forward_dir` until:
+    //   (a) the target is reached (stop and return that cell),
+    //   (b) a cell is impassable (return start — no jump point found), or
+    //   (c) the current cell is itself a jump point (return it).
+    // This is the core JPS scan that replaces A*'s single-step neighbour expansion with a
+    // direction-aligned ray march, skipping all interior cells that have no forced neighbours.
     CellPositionType find_jump_point(CellPositionType start, CellPositionType forward_dir) const
     {
         CellPositionType next = start + forward_dir;
-        while (next != target && is_passable(next) && !(is_jump_point(next, forward_dir))) { next = next + forward_dir; }
+        while (next != target && is_passable(next) && !(is_jump_point(next, forward_dir))) {
+            next = next + forward_dir;
+        }
 
         if (is_passable(next)) {
             return next;
@@ -97,6 +166,13 @@ private:
         }
     }
 
+    // [INTENT] is_jump_point(): returns true if `pos` has a forced neighbour when approached from
+    // `forward_dir`. JPS definition: a cell N is a jump point if at least one of its neighbours
+    // can only be reached optimally by going through N.
+    // Two cases:
+    //   - Diagonal movement: forced if an obstacle blocks one of the cardinal components
+    //     AND a cell beyond that obstacle is passable; OR if a cardinal-direction scan finds a jump point.
+    //   - Cardinal movement: forced if an obstacle is adjacent perpendicular AND a cell beyond it diagonally is passable.
     bool is_jump_point(CellPositionType pos, CellPositionType forward_dir) const
     {
         if (abs(forward_dir.x()) + abs(forward_dir.y()) == 2) {
@@ -104,31 +180,49 @@ private:
             CellPositionType horizontal_check_dir = CellPositionType{forward_dir.x(), 0};
             CellPositionType vertical_check_dir   = CellPositionType{0, forward_dir.y()};
 
-            if (!is_passable(pos - horizontal_check_dir) && is_passable(pos + forward_dir - 2 * horizontal_check_dir)) { return true; }
+            if (!is_passable(pos - horizontal_check_dir) && is_passable(pos + forward_dir - 2 * horizontal_check_dir)) {
+                return true;
+            }
 
-            if (!is_passable(pos - vertical_check_dir) && is_passable(pos + forward_dir - 2 * vertical_check_dir)) { return true; }
+            if (!is_passable(pos - vertical_check_dir) && is_passable(pos + forward_dir - 2 * vertical_check_dir)) {
+                return true;
+            }
 
-            if (find_jump_point(pos, horizontal_check_dir) != pos) { return true; }
+            if (find_jump_point(pos, horizontal_check_dir) != pos) {
+                return true;
+            }
 
-            if (find_jump_point(pos, vertical_check_dir) != pos) { return true; }
+            if (find_jump_point(pos, vertical_check_dir) != pos) {
+                return true;
+            }
 
             return false;
         } else { // horizontal or vertical
             CellPositionType side_dir = CellPositionType(forward_dir.y(), forward_dir.x());
 
-            if (!is_passable(pos + side_dir) && is_passable(pos + forward_dir + side_dir)) { return true; }
+            if (!is_passable(pos + side_dir) && is_passable(pos + forward_dir + side_dir)) {
+                return true;
+            }
 
-            if (!is_passable(pos - side_dir) && is_passable(pos + forward_dir - side_dir)) { return true; }
+            if (!is_passable(pos - side_dir) && is_passable(pos + forward_dir - side_dir)) {
+                return true;
+            }
 
             return false;
         }
     }
 
 public:
-    template<class Fn> void foreach_reachable(const Node &from, Fn &&fn) const
+    // [INTENT] foreach_reachable(): implements the JPS successor enumeration for the A* adapter.
+    // For the start node (incoming_dir == {0,0}), all 8 directions are tried.
+    // For cardinal moves, only the forward direction and any forced diagonal neighbours are scanned.
+    // For diagonal moves, the two cardinal components + forward + any forced neighbours are scanned.
+    // Each direction is then passed to find_jump_point(); only actual jump points (jp != pos) are
+    // returned as successors via fn(). This eliminates all collinear interior nodes from the A* open set.
+    template<class Fn> void foreach_reachable(const Node& from, Fn&& fn) const
     {
-        const CellPositionType &      pos         = from.position;
-        const CellPositionType &      forward_dir = from.incoming_dir;
+        const CellPositionType&       pos         = from.position;
+        const CellPositionType&       forward_dir = from.incoming_dir;
         std::vector<CellPositionType> dirs_to_check{};
 
         if (abs(forward_dir.x()) + abs(forward_dir.y()) == 0) { // special case for starting point
@@ -153,27 +247,50 @@ public:
         } else { // horizontal or vertical
             CellPositionType side_dir = CellPositionType(forward_dir.y(), forward_dir.x());
 
-            if (!is_passable(pos + side_dir) && is_passable(pos + forward_dir + side_dir)) { dirs_to_check.push_back(forward_dir + side_dir); }
+            if (!is_passable(pos + side_dir) && is_passable(pos + forward_dir + side_dir)) {
+                dirs_to_check.push_back(forward_dir + side_dir);
+            }
 
-            if (!is_passable(pos - side_dir) && is_passable(pos + forward_dir - side_dir)) { dirs_to_check.push_back(forward_dir - side_dir); }
+            if (!is_passable(pos - side_dir) && is_passable(pos + forward_dir - side_dir)) {
+                dirs_to_check.push_back(forward_dir - side_dir);
+            }
             dirs_to_check.push_back(forward_dir);
         }
 
-        for (const CellPositionType &dir : dirs_to_check) {
+        for (const CellPositionType& dir : dirs_to_check) {
             CellPositionType jp = find_jump_point(pos, dir);
-            if (jp != pos) fn(Node{jp, dir});
+            if (jp != pos)
+                fn(Node{jp, dir});
         }
     }
 
+    // [INTENT] distance(): Euclidean distance between two nodes — correct for the 8-directional
+    // uniform-cost grid because diagonal moves cost sqrt(2) and cardinal moves cost 1.
     float distance(Node a, Node b) const { return (a.position - b.position).template cast<double>().norm(); }
 
+    // [INTENT] goal_heuristic(): admissible heuristic for A* — Euclidean distance to target.
+    // Returns -1 to signal to astar::search_route() that the goal node has been reached.
     float goal_heuristic(Node n) const { return n.position == target ? -1.f : (target - n.position).template cast<double>().norm(); }
 
-    size_t unique_id(Node n) const { return (static_cast<size_t>(uint16_t(n.position.x())) << 16) + static_cast<size_t>(uint16_t(n.position.y())); }
+    // [INTENT] unique_id(): maps a Node to a size_t hash key for the A* open/closed set.
+    // [HAZARD] Encodes only position, not incoming_dir. Two nodes at the same cell reached from
+    // different directions get the same ID — the A* cache will treat them as duplicates. In practice
+    // JPS ensures each cell is expanded at most once per direction, so this rarely causes incorrect
+    // results but may cause a node reached from a suboptimal direction to suppress the optimal one.
+    // [HAZARD] uint16_t cast clips grid coords — see file header.
+    size_t unique_id(Node n) const
+    {
+        return (static_cast<size_t>(uint16_t(n.position.x())) << 16) + static_cast<size_t>(uint16_t(n.position.y()));
+    }
 
     const std::vector<CellPositionType> all_directions{{1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}};
 };
 
+// [INTENT] clear(): resets obstacle state for a new layer. Clears the inpassable set and resets
+// max_search_box to inverted-infinity so it is correctly rebuilt by the first add_obstacles() call.
+// Immediately re-adds the bed boundary (bed_shape) as permanent obstacles so the pathfinder never
+// routes the nozzle off the bed.
+// [STATE] After clear(), the only obstacles present are the bed boundary lines.
 void JPSPathFinder::clear()
 {
     inpassable.clear();
@@ -182,7 +299,13 @@ void JPSPathFinder::clear()
     add_obstacles(bed_shape);
 }
 
-void JPSPathFinder::add_obstacles(const Lines &obstacles)
+// [INTENT] add_obstacles(): rasterizes a set of line segments into the obstacle grid.
+// Each line is converted to grid coordinates via pixelize() (divides by RESOLUTION = scaled(0.5)),
+// then double_dda_with_offset() draws two parallel pixel-width raster lines to ensure the obstacle
+// occupies at least 2 grid cells width — preventing the pathfinder from passing through hairline gaps.
+// Simultaneously expands max_search_box to encompass all obstacle pixels, bounding the A* search area.
+// [STATE] Mutates: inpassable (adds pixels), max_search_box (expands).
+void JPSPathFinder::add_obstacles(const Lines& obstacles)
 {
     auto store_obstacle = [&](coord_t x, coord_t y) {
         max_search_box.max.x() = std::max(max_search_box.max.x(), x);
@@ -193,18 +316,45 @@ void JPSPathFinder::add_obstacles(const Lines &obstacles)
         return true;
     };
 
-    for (const Line &l : obstacles) {
+    for (const Line& l : obstacles) {
         Pixel start = pixelize(l.a);
         Pixel end   = pixelize(l.b);
         double_dda_with_offset(start.x(), start.y(), end.x(), end.y(), store_obstacle);
     }
 }
 
-Polyline JPSPathFinder::find_path(const Point &p0, const Point &p1)
+// [INTENT] find_path(): main entry point — finds a collision-avoiding polyline from p0 to p1.
+// Pipeline:
+//   1. Pixelize p0/p1 to grid coords.
+//   2. Fast-exit: if no obstacles or points are less than 3 pixels apart, return direct segment.
+//   3. Start/end adjustment: if start or end pixel is blocked, walk toward the other endpoint via DDA
+//      until a passable pixel is found (prevents A* from starting/ending inside an obstacle).
+//   4. Construct search_box: intersection of max_search_box (all known obstacles) with a square
+//      centered on and enlarged around the start/end pair — limits A* search area for performance.
+//   5. Run astar::search_route() with JPSTracer as the graph adapter.
+//   6. Fallback: if no path found, build a KDTree of A* cache nodes, find the closest visited node
+//      to the goal, and reconstruct a partial path. This is a best-effort fallback that may cross
+//      obstacles if the goal is completely surrounded.
+//   7. Post-process: reverse path (A* returns reversed), remove collinear points, then apply a
+//      shortcutting pass (try to connect non-adjacent waypoints directly via DDA; skip intermediate
+//      nodes when the shortcut is clear) to reduce zigzag artefacts from the JPS grid.
+//   8. Unpixelize path back to real coordinates; restore exact p0/p1 at ends.
+//
+// [STATE] Read-only on inpassable, max_search_box, bed_shape. Does not mutate JPSPathFinder.
+// [COUPLING] Calls astar::search_route (AStar.hpp), KDTreeIndirect (KDTreeIndirect.hpp).
+// [HAZARD] The fallback partial-path (step 6) constructs a path via the closest explored A* node,
+// which may pass through obstacles. Callers (AvoidCrossingPerimeters) accept this gracefully —
+// the travel move will cross a perimeter rather than failing to complete.
+// [HAZARD] search_box is shrunk by 1 on each side (lines 299–300 in original) to exclude the
+// exact obstacle boundary — pixels exactly at max_search_box.max/min are excluded from passable
+// cells. This prevents edge-case infinite loops in find_jump_point() near the grid boundary.
+Polyline JPSPathFinder::find_path(const Point& p0, const Point& p1)
 {
     Pixel start = pixelize(p0);
     Pixel end   = pixelize(p1);
-    if (inpassable.empty() || (start - end).cast<float>().norm() < 3.0) { return Polyline{p0, p1}; }
+    if (inpassable.empty() || (start - end).cast<float>().norm() < 3.0) {
+        return Polyline{p0, p1};
+    }
 
     if (inpassable.find(start) != inpassable.end()) {
         dda(start.x(), start.y(), end.x(), end.y(), [&](coord_t x, coord_t y) {
@@ -243,7 +393,9 @@ Polyline JPSPathFinder::find_path(const Point &p0, const Point &p1)
     search_box.max = search_box.max.cwiseMin(bounding_square.max);
     search_box.min = search_box.min.cwiseMax(bounding_square.min);
 
-    auto cell_query = [&](Pixel pixel) { return search_box.contains(pixel) && (pixel == start || pixel == end || inpassable.find(pixel) == inpassable.end()); };
+    auto cell_query = [&](Pixel pixel) {
+        return search_box.contains(pixel) && (pixel == start || pixel == end || inpassable.find(pixel) == inpassable.end());
+    };
 
     JPSTracer<Pixel, decltype(cell_query)> tracer(end, cell_query);
     using QNode = astar::QNode<JPSTracer<Pixel, decltype(cell_query)>>;
@@ -258,7 +410,9 @@ Polyline JPSPathFinder::find_path(const Point &p0, const Point &p1)
         auto                coordiante_func = [&astar_cache](size_t idx, size_t dim) { return float(astar_cache[idx].node.position[dim]); };
         std::vector<size_t> keys;
         keys.reserve(astar_cache.size());
-        for (const auto &pair : astar_cache) { keys.push_back(pair.first); }
+        for (const auto& pair : astar_cache) {
+            keys.push_back(pair.first);
+        }
         KDTreeIndirect<2, float, decltype(coordiante_func)> kd_tree(coordiante_func, keys);
         size_t                                              closest_qnode = find_closest_point(kd_tree, end.cast<float>());
 
@@ -268,21 +422,29 @@ Polyline JPSPathFinder::find_path(const Point &p0, const Point &p1)
             closest_qnode = astar_cache[closest_qnode].parent;
         }
     } else {
-        for (const auto &node : out_nodes) { out_path.push_back(node.position); }
+        for (const auto& node : out_nodes) {
+            out_path.push_back(node.position);
+        }
         out_path.push_back(start);
     }
 
 #ifdef DEBUG_FILES
-    auto scaled_points = [](const Points &ps) {
+    auto scaled_points = [](const Points& ps) {
         Points r;
-        for (const Point &p : ps) { r.push_back(Point::new_scale(p.x(), p.y())); }
+        for (const Point& p : ps) {
+            r.push_back(Point::new_scale(p.x(), p.y()));
+        }
         return r;
     };
-    auto          scaled_point = [](const Point &p) { return Point::new_scale(p.x(), p.y()); };
+    auto          scaled_point = [](const Point& p) { return Point::new_scale(p.x(), p.y()); };
     ::Slic3r::SVG svg(debug_out_path(("path_jps" + std::to_string(print_z) + "_" + std::to_string(rand() % 1000)).c_str()).c_str(),
                       BoundingBox(scaled_point(search_box.min), scaled_point(search_box.max)));
-    for (const auto &p : inpassable) { svg.draw(scaled_point(p), "black", scale_(0.4)); }
-    for (const auto &qn : astar_cache) { svg.draw(scaled_point(qn.second.node.position), "blue", scale_(0.3)); }
+    for (const auto& p : inpassable) {
+        svg.draw(scaled_point(p), "black", scale_(0.4));
+    }
+    for (const auto& qn : astar_cache) {
+        svg.draw(scaled_point(qn.second.node.position), "blue", scale_(0.3));
+    }
     svg.draw(Polyline(scaled_points(out_path)), "yellow", scale_(0.25));
     svg.draw(scaled_point(end), "purple", scale_(0.4));
     svg.draw(scaled_point(start), "green", scale_(0.4));
@@ -295,7 +457,9 @@ Polyline JPSPathFinder::find_path(const Point &p0, const Point &p1)
     {
         tmp_path.push_back(out_path.front()); // first point
         for (size_t i = 1; i < out_path.size() - 1; i++) {
-            if ((out_path[i] - out_path[i - 1]).cast<float>().normalized() != (out_path[i + 1] - out_path[i]).cast<float>().normalized()) { tmp_path.push_back(out_path[i]); }
+            if ((out_path[i] - out_path[i - 1]).cast<float>().normalized() != (out_path[i + 1] - out_path[i]).cast<float>().normalized()) {
+                tmp_path.push_back(out_path[i]);
+            }
         }
         tmp_path.push_back(out_path.back()); // last_point
         out_path = tmp_path;
@@ -313,7 +477,8 @@ Polyline JPSPathFinder::find_path(const Point &p0, const Point &p1)
         tmp_path.push_back(out_path.front()); // first point
         size_t index_of_last_stored_point = 0;
         for (size_t i = 1; i < out_path.size(); i++) {
-            if (i - index_of_last_stored_point < 2) continue;
+            if (i - index_of_last_stored_point < 2)
+                continue;
             bool passable       = true;
             auto store_obstacle = [&](coord_t x, coord_t y) {
                 if (Pixel(x, y) != start && Pixel(x, y) != end && inpassable.find(Pixel(x, y)) != inpassable.end()) {
@@ -339,7 +504,9 @@ Polyline JPSPathFinder::find_path(const Point &p0, const Point &p1)
 
     // before returing the path, transform it from pixels back to points.
     // Also replace the first and last pixel by input points so that result path patches input params exactly.
-    for (Pixel &p : out_path) { p = unpixelize(p); }
+    for (Pixel& p : out_path) {
+        p = unpixelize(p);
+    }
     out_path.front() = p0;
     out_path.back()  = p1;
 

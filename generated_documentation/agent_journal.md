@@ -5402,3 +5402,208 @@ Seam and support enforcer/blocker painting is projected from 3D triangle meshes 
 3. Continue updating all five documentation files after each major file
 
 **Next hazard number to assign: H1100**
+
+---
+
+## Session 76 — PrintConfig.hpp Full Structured-Tag Pass (H690–H708)
+
+### Files Processed
+- `src/libslic3r/PrintConfig.hpp` (~3700 lines)
+
+### Annotations Added
+
+| Section | Tags Added | Key Notes |
+|---------|-----------|-----------|
+| File header (lines 1–32) | `[INTENT]`, `[STATE]`, `[COUPLING]`, `[HAZARD]` | Dual config hierarchy (DynamicPrintConfig + StaticPrintConfig); cereal serialisation coupling |
+| GCodeFlavor, InfillPattern enums | `[INTENT]` | Enum ordering must be preserved for cereal ordinal serialisation |
+| SupportType helpers `is_tree()`/`is_auto()` | `[HAZARD H691]`, `[HAZARD H692]` | Construct `std::set` on every call — hot-path heap allocation |
+| NozzleType maps `NozzleTypeEumnToStr`/`NozzleTypeStrToEumn` | `[HAZARD H690]` | `static` in header = per-TU copy; ODR-safe but wasteful; typo "Eumn" in name |
+| `bed_type_to_gcode_string()` | `[HAZARD H693]` | `static` function in header — per-TU copy |
+| `PrintConfigDef` | `[INTENT]`, `[STATE]`, `[COUPLING]` | Single global config schema; options registered by key string |
+| `DynamicPrintConfig` | `[INTENT]`, `[STATE]` | Runtime-typed config; used for file I/O and UI |
+| `StaticPrintConfig::optptr()` | `[HAZARD H695]` | `reinterpret_cast` with byte offsets — breaks under virtual or multi-inheritance |
+| `PrintObjectConfig` acceleration/jerk fields | `[HAZARD H696]` | Fields migrated from PrintConfig; `handle_legacy()` must reroute or values silently zero |
+| `PrintObjectConfig` nullable filament_ironing_* | `[HAZARD H697]` | Complex slot-indexed resolution logic must be replicated exactly in a port |
+| `GCodeConfig adaptive_pressure_advance_model` | `[HAZARD H698]` | Vector of JSON/math expression strings; no schema validation at load |
+| `GCodeConfig flush_volumes_matrix` | `[HAZARD H699]` | Flat float array with implicit N×N shape; N = `sqrt(size())`; non-square = silent mis-index |
+| `GCodeConfig`/`PrintConfig` flush/wipe-tower split | `[HAZARD H700]` | flush_volumes in GCodeConfig, wipe_tower_* in PrintConfig — both must reach planner together |
+| `PrintConfig wipe_tower_x/y` | `[HAZARD H701]` | Vectors indexed by plate; miscounted plates → wrong tower position silently |
+| `FullPrintConfig` diamond-inheritance | `[HAZARD H702]` | Key collision debug-assert only; silent wrong offset in release |
+| `ModelConfig::assign_config()` | `[HAZARD H703]` | Skips assignment when timestamps match, even if content differs |
+| `get_flush_volumes_matrix()` | `[HAZARD H704]`, `[HAZARD H705]` | `extruder_id` defaults to `-1` as `size_t` (wraps to SIZE_MAX); `is_multi_extruder` declared but unused |
+| cereal `load()`/`save()` | `[HAZARD H706]`, `[HAZARD H707]` | Ordinal serialisation: reused ordinal silently maps to wrong option; debug-only assert on unknown ordinal = UB in release |
+| `MachineEnvelopeConfig` resonance_avoidance | `[HAZARD H708]` | If `resonance_avoidance_freq_start > resonance_avoidance_freq_end`, CoolingBuffer silently inverts range check |
+| `DynamicPrintConfig::validate()` | `[HAZARD H694]` | Returns errors but callers may ignore silently |
+
+### Key Architectural Discoveries
+
+**Config Hierarchy**
+PrintConfig.hpp defines a two-track config system:
+1. `DynamicPrintConfig` — heap-allocated option map, fully runtime-typed, used for file I/O and UI bindings.
+2. `StaticPrintConfig` — struct of typed fields accessed via `reinterpret_cast` byte-offset table. Used by slicing engine for zero-overhead access.
+
+`FullPrintConfig` inherits from both (and from `PrintConfig`, `PrintObjectConfig`, `PrintRegionConfig`, `GCodeConfig`, `MachineEnvelopeConfig`) via diamond inheritance. The `optptr()` function maps a key to a `void*` using a baked offset table — valid only for simple single-inheritance flat struct layouts.
+
+**Cereal Serialization**
+Config options are serialised by ordinal (integer index), not by key string. Adding a new option between two existing ones shifts all subsequent ordinals, silently mis-mapping old project files. The DEBUG-only assert on unknown ordinals means Release builds dereference null on unknown ordinals — a latent crash on any project saved by a newer version and loaded by an older one.
+
+**Flush Volume Matrix**
+`flush_volumes_matrix` is a flat `std::vector<float>` encoding an N×N purge volume matrix. N is reconstructed from `sqrt(values.size())`. Any non-square size silently produces an incorrect N and wrong purge volumes for every tool change.
+
+### Hazard Summary (Session 76)
+
+| ID | Priority | Description |
+|----|----------|-------------|
+| H690 | P3/Low | `NozzleTypeEumnToStr`/`NozzleTypeStrToEumn` are `static` in header — per-TU copy; typo "Eumn" |
+| H691 | P2/Medium | `SupportType::is_tree()` constructs `std::set` on every call — hot-path heap alloc |
+| H692 | P2/Medium | `SupportType::is_auto()` constructs `std::set` on every call — hot-path heap alloc |
+| H693 | P3/Low | `bed_type_to_gcode_string()` is `static` function in header — per-TU copy |
+| H694 | P2/Medium | `validate()` returns errors but callers can silently ignore |
+| H695 | P1/High | `optptr()` uses `reinterpret_cast` with byte offsets — breaks under virtual/multi-inheritance |
+| H696 | P2/Medium | acceleration/jerk fields migrated PrintConfig→PrintObjectConfig; `handle_legacy()` must reroute |
+| H697 | P2/Medium | nullable `filament_ironing_*` slot-indexed resolution logic must be replicated exactly in port |
+| H698 | P2/Medium | `adaptive_pressure_advance_model` vector of expression strings — no schema validation |
+| H699 | P1/High | `flush_volumes_matrix` flat array with implicit N×N shape — non-square = silent mis-indexing |
+| H700 | P2/Medium | flush_volumes in GCodeConfig, wipe_tower_* in PrintConfig — both must reach wipe-tower planner |
+| H701 | P2/Medium | `wipe_tower_x/y` plate-indexed vectors — miscounted plates → wrong tower position silently |
+| H702 | P1/High | `FullPrintConfig` diamond-inheritance key collision — debug assert only; UB in release |
+| H703 | P2/Medium | `ModelConfig::assign_config()` skips on timestamp match even if content differs |
+| H704 | P2/Medium | `get_flush_volumes_matrix()` extruder_id defaults to SIZE_MAX; correct by coincidence |
+| H705 | P3/Low | `is_multi_extruder` declared but never used in `set_flush_volumes_matrix()` |
+| H706 | P1/High | cereal ordinal serialisation — reused ordinal silently maps old snapshots to wrong option |
+| H707 | P1/High | cereal `load()` debug-only assert on unknown ordinal — null pointer dereference in release |
+| H708 | P2/Medium | `MachineEnvelopeConfig` resonance band: min > max silently inverts CoolingBuffer range check |
+
+### Commit
+- `16db2509c0` — annotate: PrintConfig.hpp full structured-tag pass (H690–H708)
+
+---
+
+## Session 77 — Print.cpp Full Structured-Tag Pass (H1100–H1102)
+
+### Files Processed
+- `src/libslic3r/Print.cpp` (~4989 lines)
+
+### Annotations Added
+
+All major functions annotated with structured tags. Key sections:
+
+| Section | Lines | Key Notes |
+|---------|-------|-----------|
+| File header / PrintStep / PrintObjectStep enum docs | 1–30 | Step DAG overview; TBB parallelism scope |
+| `Print::clear()` | ~97 | Raw pointer ownership cleanup; mutex ordering |
+| `Print::has_wipe_tower_with_lcm()` | ~122 | Reads tool_ordering (populated by psWipeTower) |
+| `Print::invalidate_state_by_config_options()` | ~140 | Static step-sets initialized once; coupling to PrintApply |
+| `sequential_print_horizontal_clearance_valid()` | ~555 | Sequential validation; `#if 0` dead block H1100 |
+| `layered_print_cleareance_valid()` | ~934 | Reads `wipe_tower_data()` — side-effecting const (H1101) |
+| `check_multi_filaments_compatibility()` | ~1061 | Delegates to `get_filament_temp_type()` (H1102) |
+| `Print::process()` | ~2077 | Main per-plate slicing pipeline; TBB parallel support generation |
+| `Print::wipe_tower_data()` | ~3082 | `const` method does `const_cast` mutation — side-effecting const (H1101) |
+| `Print::get_filament_temp_type()` | ~2821 | Static unordered_map lazy-init from JSON — not thread-safe (H1102) |
+
+### Key Architectural Discoveries
+
+**`Print::process()` — Central Slicing Pipeline**
+`Print::process()` is the top-level per-plate driver. It runs all `PrintObjectStep` phases for each object in dependency order, then runs the `PrintStep` phases (skirt, brim, wipe tower, G-code export). Only `generate_support_material()` is parallelised across objects via TBB. All other steps run serially per-object.
+
+**`wipe_tower_data()` side-effecting const**
+`wipe_tower_data(size_t filaments_cnt)` is declared `const` but uses `const_cast<Print*>(this)->m_wipe_tower_data.depth = ...` to lazily compute and cache the tower depth estimate. This means calling it from a multi-threaded context before `psWipeTower` completes is not thread-safe.
+
+**`get_filament_temp_type()` JSON-static map**
+The function stores a `static std::unordered_map` that is lazily initialized from `resources/info/filament_info.json` on first call. If two threads call this simultaneously for the first time (possible in the parallelised support-generation TBB loop), the map is initialized twice, producing a data race on the static variable. All subsequent calls use the cached map safely, but the first-call race is a latent crash.
+
+**Dead Code — `#if 0` Sequential Sort Block**
+Lines 707–809 contain ~100 lines of dead code: a topological sort algorithm for sequential print ordering with Chinese developer comments. The active path simply uses UI list order. This block should be deleted, not ported.
+
+### Hazard Summary (Session 77)
+
+| ID | Priority | Description |
+|----|----------|-------------|
+| H1100 | P2/Medium | Lines 707–809: `#if 0` dead sequential-sort block with Chinese dev comments — do not port as live logic |
+| H1101 | P1/High | `wipe_tower_data()` is `const` but uses `const_cast` to mutate `m_wipe_tower_data` — not thread-safe before psWipeTower completes |
+| H1102 | P1/High | `get_filament_temp_type()` uses `static` unordered_map lazily init'd from JSON — data race on first call from multiple threads |
+
+### Commit
+- `4df28a97d3` — annotate: Print.cpp full structured-tag pass (H1100+)
+
+---
+
+## Session 78 — PlaceholderParser, SlicingAdaptive, JumpPointSearch, FilamentGroup (Annotations)
+
+### Files Annotated
+- `src/libslic3r/PlaceholderParser.cpp` — file-header + full function bodies; `expr` struct union aliasing; `MyContext` re-entrant stack; `g_macro_processor_instance` static; Boost.Spirit Qi grammar; `ratio_over` unbounded dependency; `for/endfor` unbounded loops
+- `src/libslic3r/SlicingAdaptive.cpp` — file-header + all functions; 4 commented-out formula variants; `horizontal_facet_distance()` O(L×T); quality_factor mapping counterintuitive
+- `src/libslic3r/JumpPointSearch.cpp` — file-header + JPSTracer class; `unique_id()` clips to uint16_t (coordinate aliasing for beds >32 km); `double_dda_with_offset()` possible wrong normal for near-diagonal; `dda()` standard Bresenham; `JPSTracer::unique_id()` encodes only position not incoming_dir
+- `src/libslic3r/FilamentGroup.cpp` — file-header + all functions; K-Medoids PAM2 (no swap phase) for ≥10 filaments; MCMF three-pass for <10; `bit_count_one` dead code; `select_best_group_for_ams` hardcodes resize(2)
+
+### Key Discoveries
+None beyond what was already documented in prior sessions.
+
+### Hazards
+No new H-numbers assigned this session.
+
+### Commit Status
+Files annotated but NOT committed at end of session (pending VariableWidth, journal, and hazards doc).
+
+---
+
+## Session 79 — VariableWidth, TriangleSelector (Annotations + Documentation Update)
+
+### Files Annotated
+- `src/libslic3r/VariableWidth.cpp` — file-header was already in place (Session 78); added function-level `[INTENT]`/`[HAZARD]` blocks for `thick_polyline_to_multi_path()`, `thick_polyline_to_extrusion_paths_2()`, and `variable_width()`
+- `src/libslic3r/TriangleSelector.cpp` (2327 lines after annotations) — full annotation pass:
+  - File-header: overall architecture, state encoding, free-list memcpy aliasing, perform_split reserve contract, serialization format, HeightRange brute-force O(N), HeightRange edge_limit hardcoded
+  - `test_line_inside_sphere()` / `test_line_inside_cylinder()` / `test_line_inside_capsule()` — geometry helpers (Ericson RTCD)
+  - `select_patch()` — BFS painting entry point; HeightRange O(N) brute-force cliff
+  - `seed_fill_select_triangles()` — angle-based BFS propagation
+  - `bucket_fill_select_triangles()` — state-flood-fill with precompute_all_neighbors() O(N) cost
+  - `select_triangle_recursive()` — recursive descend/subdivide; pointer re-acquisition after split
+  - `split_triangle()` — edge-length threshold subdivision decision
+  - `undivide_triangle()` — recursive free with free-list encoding (memcpy aliasing)
+  - `remove_useless_children()` — tree compaction after paint
+  - `garbage_collect()` — compacts m_triangles/m_vertices vectors, invalidates all external indices
+  - `perform_split()` — allocates child triangles + midpoint vertices; critical reserve() contract
+  - `serialize()` — 4-bit nibble bitstream; no version field; reverse child order
+  - `deserialize()` — explicit DFS stack; BBS filament remapping; reverse child order
+
+### Key Discoveries
+
+**TriangleSelector per-triangle painting model**
+Each original mesh triangle can be recursively subdivided into a quadtree-like tree of smaller triangles using midpoint refinement. Leaf triangles carry an `EnforcerBlockerType` state (NONE, Enforcer, Blocker, or MMU filament 1–16). The subdivision is driven by cursor overlap tests per edge length vs `m_edge_limit`. The tree is stored as flat vectors with intrusive free-lists (encoded as memcpy aliasing into float storage), enabling O(1) allocation/deallocation without heap fragmentation.
+
+**Free-list encoding aliasing hazard**
+`undivide_triangle()` uses `memcpy(&m_vertices[iv].v[0], &m_free_vertices_head, sizeof(int))` to store the linked-list next-pointer in the first float of a `Vec3f`. This is technically UB under C++ strict aliasing, but is universally safe in practice. A port to another language must use a proper tagged union or separate free-list array.
+
+**Serialization: no version, reverse child order**
+The 4-bit nibble bitstream has no format version. Children are stored in reverse order to match PrusaSlicer 2.3.1. Both of these constraints must be preserved exactly in any port that needs backward compatibility with existing project files.
+
+**HeightRange cursor O(N) brute-force**
+The `HeightRange` cursor (used for layer-range painting) falls into a brute-force scan of all `m_orig_size_indices` original triangles inside `select_patch()` (because there is no single BFS starting facet). For meshes with 100k+ triangles this is a visible performance cliff during interactive painting.
+
+### Hazards (Session 79)
+
+| ID | Priority | Description |
+|----|----------|-------------|
+| H1103 | P2/Medium | TriangleSelector free-list: `memcpy` aliasing of `int` into `Vec3f::v[0]` float storage in `undivide_triangle()` and `triangle_midpoint_or_allocate()`. Technically UB under C++ strict aliasing. Works on all known platforms. Port must use proper union. |
+| H1104 | P1/High | `perform_split()` `Triangle &tr` reference can be invalidated if any `push_triangle()` call triggers `m_triangles` reallocation. The `reserve()` at the top of `perform_split()` prevents this, but any future code path calling `push_triangle()` without a matching reserve will cause use-after-realloc (silent corruption). |
+| H1105 | P2/Medium | `TriangleSplittingData` bitstream: no version field. Format changes silently corrupt painted state on project reload. |
+| H1106 | P3/Low | `HeightRange::is_pointer_in_triangle()` always returns `false` (line ~1102 post-annotation). HeightRange uses only `is_edge_inside_cursor()` and `is_mesh_point_inside()`. This is probably intentional but undocumented. |
+| H1107 | P2/Medium | `HeightRange` cursor in `select_patch()` triggers O(N) brute-force scan of all `m_orig_size_indices` triangles. Performance cliff for dense meshes. |
+
+### Next Hazard Number
+H1108
+
+### Files Committed (this session)
+All of the following (after this journal update):
+- `src/libslic3r/PlaceholderParser.cpp`
+- `src/libslic3r/SlicingAdaptive.cpp`
+- `src/libslic3r/JumpPointSearch.cpp`
+- `src/libslic3r/FilamentGroup.cpp`
+- `src/libslic3r/VariableWidth.cpp`
+- `src/libslic3r/TriangleSelector.cpp`
+- `generated_documentation/agent_journal.md`
+- `generated_documentation/04_refactoring_hazards.md`
+- `generated_documentation/03_algorithmic_complexities.md`
+
+---
+
