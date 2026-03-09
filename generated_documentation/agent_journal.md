@@ -5671,4 +5671,72 @@ H1118
 
 ---
 
+## Session 81
+
+### Objective
+Complete Session 81 work: finish annotations on `AppConfig.cpp` and `Measure.cpp`, update the hazards document with H1118–H1129, and commit.
+
+### Files Processed
+
+**`src/libslic3r/AppConfig.cpp`** (1692 lines)
+- Singleton persistent configuration store; stringly-typed `m_storage` map; parallel out-of-`m_storage` vectors for `m_filament_presets`, `m_filament_colors`, `m_filament_multi_colors`, `m_filament_color_types`.
+- Two `load()`/`save()` implementations (JSON active, INI legacy) compiled into the same TU but only one ever runs. The INI path would lose multi-filament data if `USE_JSON_CONFIG` were undefined.
+- `set_defaults()` ~430 lines; ~30% is dead code behind undefined macros (`SUPPORT_AUTO_CENTER` etc.) interleaved with the live defaults.
+- Windows-only: MD5 checksum appended using `boost::uuids::detail::md5` (unstable internal namespace). CRLF assumption in `substr(last_pos+2)` hazard.
+- `get_country_code()` maps `"Europe"` → `"US"` (copy-paste bug).
+
+Tags injected:
+- File-level `[INTENT]`, `[STATE]`, `[CONCURRENCY]`, `[COUPLING]`
+- `set_defaults()`: `[INTENT]`, `[HAZARD H1118]`, `[COUPLING]`
+- `appconfig_md5_hash_line()`: `[INTENT]`, `[HAZARD H1119]`
+- `AppConfig::load()` (JSON): `[INTENT]`, `[STATE]`, `[HAZARD H1120]`, `[MEMORY]`, `[HAZARD H1121]`
+- `AppConfig::save()`: `[INTENT]`, `[CONCURRENCY]`, `[HAZARD H1122]`, `[COUPLING]`
+- `get_variant()`/`set_variant()`: `[INTENT]`, `[COUPLING]`
+- `get_country_code()`: `[INTENT]`, `[HAZARD H1123]`
+- `save_custom_color_to_config()`: `[INTENT]`, `[HAZARD H1124]`
+
+**`src/libslic3r/Measure.cpp`** (1450 lines)
+- Two-phase feature extraction: `update_planes()` (TBB flood-fill + border walk) + `extract_features()` (lazy, GUI thread).
+- RANSAC circle fit (`get_center_and_radius()`); arc detection; `goto PLANE_FAILURE` inside TBB lambda.
+- `get_measurement()` dispatches 10 type-combination pairs; `Point×Plane` `distance_strict` left as TODO.
+- Hardcoded debug `if (face_idx == 7516 || face_idx == 7517)` leftover.
+- `get_assembly_action()` only implements `Plane×Plane`; all other combinations return default-constructed action.
+
+Tags injected:
+- File-level `[INTENT]`, `[STATE]`, `[CONCURRENCY]`, `[COUPLING]`
+- `update_planes()`: `[INTENT]`, `[HAZARD H1125]`, `[HAZARD H1126]`
+- `extract_features()`: `[INTENT]`, `[STATE]`, `[HAZARD H1127]`, `[UNCLEAR]`
+- `get_feature()`: `[INTENT]`, `[HAZARD H1128]`, `[STATE]`, `[COUPLING]`
+- `get_measurement()`: `[INTENT]`, `[HAZARD H1129]`, `[COUPLING]`
+- `can_set_xyz_distance()`: `[INTENT]`, `[COUPLING]`
+- `get_assembly_action()`: `[INTENT]`, `[COUPLING]`
+
+### Hazards (Session 81)
+
+| ID | Priority | Description |
+|----|----------|-------------|
+| H1118 | P2/Medium | `set_defaults()` ~430 lines; ~30% is dead code behind undefined macros interleaved with live defaults. |
+| H1119 | P3/Low | `appconfig_md5_hash_line()` uses `boost::uuids::detail::md5` — internal/unstable Boost namespace. |
+| H1120 | P1/High | JSON and INI `load()` paths have diverged; disabling `USE_JSON_CONFIG` silently loses all multi-filament data. |
+| H1121 | P2/Medium | Windows `substr(last_pos+2)` assumes LF-only line endings; CRLF corrupts JSON parse and MD5 check. |
+| H1122 | P2/Medium | `m_filament_presets` etc. serialized nested inside `j["app"]` — fragile round-trip asymmetry. |
+| H1123 | P1/High | `get_country_code()` maps `"Europe"` → `"US"` (copy-paste bug; should be `"Others"` or `"EU"`). |
+| H1124 | P3/Low | `save_custom_color_to_config()` uses `const_cast` on `get_section()` return — misleading pattern, should be value copy. |
+| H1125 | P2/Medium | `goto PLANE_FAILURE` in TBB lambda silently clears borders for broken-mesh planes; no error logged. |
+| H1126 | P3/Low | `is_same_normal` tolerance 0.001 per component hardcoded; produces many tiny planes on curved surfaces. |
+| H1127 | P2/Medium | No synchronization between TBB `update_planes()` and lazy `extract_features()` on GUI thread. |
+| H1128 | P3/Low | Debug `if (face_idx == 7516 || face_idx == 7517)` leftover — evaluated on every hover event. |
+| H1129 | P2/Medium | `get_measurement()` `Point×Plane` `distance_strict` left as TODO; silently skipped by callers. |
+
+### Next Hazard Number
+H1130
+
+### Files Committed (this session)
+- `src/libslic3r/AppConfig.cpp`
+- `src/libslic3r/Measure.cpp`
+- `generated_documentation/agent_journal.md`
+- `generated_documentation/04_refactoring_hazards.md`
+
+---
+
 
