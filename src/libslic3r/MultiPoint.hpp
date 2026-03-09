@@ -1,6 +1,12 @@
 #ifndef slic3r_MultiPoint_hpp_
 #define slic3r_MultiPoint_hpp_
 
+// [INTENT] MultiPoint is the abstract base class for all ordered sequences of 2D integer
+// coordinates (Points) in OrcaSlicer. Polygon and Polyline both inherit from it.
+// All coordinates are in "scaled" integer units: 1 unit = 1e-6 mm = 1 nanometer.
+// [COUPLING] Depends on Point (coord_t = int32), Line, BoundingBox.
+//            Subclasses must implement last_point() and lines() as pure virtual.
+
 #include "libslic3r.h"
 #include <algorithm>
 #include <vector>
@@ -15,73 +21,105 @@ class BoundingBox3;
 class MultiPoint
 {
 public:
+    // [STATE] The ordered sequence of 2D integer-scaled coordinates.
+    // Public by design: callers mutate points directly in hot paths (e.g., offset, clip).
     Points points;
-    
+
     MultiPoint() {}
-    MultiPoint(const MultiPoint &other) : points(other.points) {}
-    MultiPoint(MultiPoint &&other) : points(std::move(other.points)) {}
+    MultiPoint(const MultiPoint& other) : points(other.points) {}
+    MultiPoint(MultiPoint&& other) : points(std::move(other.points)) {}
     MultiPoint(std::initializer_list<Point> list) : points(list) {}
-    explicit MultiPoint(const Points &_points) : points(_points) {}
-    MultiPoint& operator=(const MultiPoint &other) { points = other.points; return *this; }
-    MultiPoint& operator=(MultiPoint &&other) { points = std::move(other.points); return *this; }
+    explicit MultiPoint(const Points& _points) : points(_points) {}
+    MultiPoint& operator=(const MultiPoint& other)
+    {
+        points = other.points;
+        return *this;
+    }
+    MultiPoint& operator=(MultiPoint&& other)
+    {
+        points = std::move(other.points);
+        return *this;
+    }
+    // [INTENT] Uniform and non-uniform scaling of all points in integer-scaled space.
+    // [HAZARD] H1050 P2/Medium: scale(factor_x, factor_y) truncates via coord_t cast — may
+    //   accumulate rounding error when called repeatedly (e.g., per-layer shrinkage loops).
     void scale(double factor);
     void scale(double factor_x, double factor_y);
     void translate(double x, double y) { this->translate(Point(coord_t(x), coord_t(y))); }
-    void translate(const Point &vector);
+    void translate(const Point& vector);
+    // [INTENT] rotate(angle) is a convenience wrapper that pre-computes cos/sin.
+    //   rotate(cos, sin) is the hot-path form used in tight loops.
     void rotate(double angle) { this->rotate(cos(angle), sin(angle)); }
     void rotate(double cos_angle, double sin_angle);
-    void rotate(double angle, const Point &center);
+    void rotate(double angle, const Point& center);
     void reverse() { std::reverse(this->points.begin(), this->points.end()); }
 
-    const Point& front() const { return this->points.front(); }
-    const Point& back() const { return this->points.back(); }
-    const Point& first_point() const { return this->front(); }
+    const Point&         front() const { return this->points.front(); }
+    const Point&         back() const { return this->points.back(); }
+    const Point&         first_point() const { return this->front(); }
     virtual const Point& last_point() const = 0;
-    virtual Lines lines() const = 0;
-    size_t size() const { return points.size(); }
-    bool   empty() const { return points.empty(); }
-    double length() const;
-    bool   is_valid() const { return this->points.size() >= 2; }
+    virtual Lines        lines() const      = 0;
+    size_t               size() const { return points.size(); }
+    bool                 empty() const { return points.empty(); }
+    double               length() const;
+    bool                 is_valid() const { return this->points.size() >= 2; }
 
     // Return index of a polygon point exactly equal to point.
     // Return -1 if no such point exists.
-    int  find_point(const Point &point) const;
+    int find_point(const Point& point) const;
     // Return index of the closest point to point closer than scaled_epsilon.
     // Return -1 if no such point exists.
-    int  find_point(const Point &point, const double scaled_epsilon) const;
-    bool has_boundary_point(const Point &point) const;
-    int  closest_point_index(const Point &point) const {
+    int  find_point(const Point& point, const double scaled_epsilon) const;
+    bool has_boundary_point(const Point& point) const;
+    // [INTENT] O(n) linear scan — finds closest vertex, NOT closest point on edge.
+    // [HAZARD] H1051 P2/Medium: vertex-only search; a point near midpoint of a long
+    //   segment can return a distant vertex. Silent semantic mismatch vs. callers
+    //   expecting closest-point-on-segment semantics.
+    int closest_point_index(const Point& point) const
+    {
         int idx = -1;
-        if (! this->points.empty()) {
-            idx = 0;
+        if (!this->points.empty()) {
+            idx             = 0;
             double dist_min = (point - this->points.front()).cast<double>().norm();
-            for (int i = 1; i < int(this->points.size()); ++ i) {
+            for (int i = 1; i < int(this->points.size()); ++i) {
                 double d = (this->points[i] - point).cast<double>().norm();
                 if (d < dist_min) {
                     dist_min = d;
-                    idx = i;
+                    idx      = i;
                 }
             }
         }
         return idx;
     }
-    const Point* closest_point(const Point &point) const { return this->points.empty() ? nullptr : &this->points[this->closest_point_index(point)]; }
+    const Point* closest_point(const Point& point) const
+    {
+        return this->points.empty() ? nullptr : &this->points[this->closest_point_index(point)];
+    }
     // The distance of polygon to point is defined as:
     //  the minimum distance of all points to that point
-    double distance_to(const Point& point) const {
+    // [HAZARD] H1052 P2/Medium: dereferences closest_point() result without nullptr
+    //   check — will crash if points is empty. Callers must guard; no API-level protection.
+    double distance_to(const Point& point) const
+    {
         const Point* cl = closest_point(point);
         return (*cl - point).cast<double>().norm();
     }
     BoundingBox bounding_box() const;
     // Return true if there are exact duplicates.
+    // [INTENT] Checks only adjacent duplicates (not all-pairs). Adequate for detecting
+    //   consecutive dups from simplification/clipping; will miss non-adjacent dups.
     bool has_duplicate_points() const;
     // Remove exact duplicates, return true if any duplicate has been removed.
+    // [INTENT] In-place compaction via two-pointer approach — O(n), no allocation.
     bool remove_duplicate_points();
     void clear() { this->points.clear(); }
-    void append(const Point &point) { this->points.push_back(point); }
-    void append(const Points &src) { this->append(src.begin(), src.end()); }
-    void append(const Points::const_iterator &begin, const Points::const_iterator &end) { this->points.insert(this->points.end(), begin, end); }
-    void append(Points &&src)
+    void append(const Point& point) { this->points.push_back(point); }
+    void append(const Points& src) { this->append(src.begin(), src.end()); }
+    void append(const Points::const_iterator& begin, const Points::const_iterator& end)
+    {
+        this->points.insert(this->points.end(), begin, end);
+    }
+    void append(Points&& src)
     {
         if (this->points.empty()) {
             this->points = std::move(src);
@@ -93,27 +131,45 @@ public:
 
     bool intersection(const Line& line, Point* intersection) const;
     bool first_intersection(const Line& line, Point* intersection) const;
-    bool intersections(const Line &line, Points *intersections) const;
-    void symmetric_y(const coord_t &y_axis);
-    static Points _douglas_peucker(const Points &points, const double tolerance);
+    bool intersections(const Line& line, Points* intersections) const;
+    void symmetric_y(const coord_t& y_axis);
+    // [INTENT] Ramer-Douglas-Peucker polyline simplification. Iterative stack-based
+    //   implementation — O(n log n) average, O(n²) worst case (already-simplified input).
+    static Points _douglas_peucker(const Points& points, const double tolerance);
+    // [INTENT] Visvalingam-Whyatt simplification, area-based.
+    // [HAZARD] H1053 P2/Medium: visivalingam() calls std::make_heap() after every node
+    //   update — O(n) per update, so O(n²) total. For large polylines this is noticeably
+    //   slower than a proper indexed priority queue. The original author notes this in a comment.
     static Points visivalingam(const Points& pts, const double tolerance);
+    // [INTENT] Computes the lower convex hull using a concave-hull variant (not a true
+    //   concave hull — the function builds the lower hull with a curvature tolerance).
+    // [UNCLEAR] The parameter name is "tolerence" (typo). The condition mixes ccw() and
+    //   norm() in a way that approximates a concaveness threshold but is not documented.
     static Points concave_hull_2d(const Points& pts, const double tolerence);
-    
-    //Orca: Distancing function used by IOI wall ordering algorithm for arachne
+
+    // Orca: Distancing function used by IOI wall ordering algorithm for arachne
+    // [INTENT] Returns min distance between two polylines by checking all segment-point
+    //   pairs. O(|A| * |B|) — quadratic complexity. Fine for small walls; avoid for large
+    //   polygon sets.
+    // [COUPLING] Used only by the IOI (Inside-Out Infill?) arachne wall ordering heuristic.
     static double minimumDistanceBetweenLinesDefinedByPoints(const Points& A, const Points& B);
 
-    inline auto begin()        { return points.begin(); }
-    inline auto begin()  const { return points.begin(); }
-    inline auto end()          { return points.end();   }
-    inline auto end()    const { return points.end();   }
+    inline auto begin() { return points.begin(); }
+    inline auto begin() const { return points.begin(); }
+    inline auto end() { return points.end(); }
+    inline auto end() const { return points.end(); }
     inline auto cbegin() const { return points.begin(); }
-    inline auto cend()   const { return points.end();   }
-    
+    inline auto cend() const { return points.end(); }
+
 private:
-    //Orca: Distancing function used by IOI wall ordering algorithm for arachne
+    // Orca: Distancing function used by IOI wall ordering algorithm for arachne
     static double squaredDistanceToLineSegment(const Point& p, const Point& v, const Point& w);
 };
 
+// [INTENT] MultiPoint3 is the 3D analogue: an ordered sequence of Vec3crd (int64 3D coords).
+// Notably thinner API than MultiPoint — no rotate, no scale, no simplification.
+// [COUPLING] Used primarily by Polyline3; no polygon variant exists (3D polygons use
+//   indexed triangle sets, not ordered points).
 class MultiPoint3
 {
 public:
@@ -121,11 +177,11 @@ public:
 
     void append(const Vec3crd& point) { this->points.push_back(point); }
 
-    void translate(double x, double y);
-    void translate(const Point& vector);
+    void           translate(double x, double y);
+    void           translate(const Point& vector);
     virtual Lines3 lines() const = 0;
-    double length() const;
-    bool is_valid() const { return this->points.size() >= 2; }
+    double         length() const;
+    bool           is_valid() const { return this->points.size() >= 2; }
 
     BoundingBox3 bounding_box() const;
 
@@ -133,24 +189,32 @@ public:
     bool remove_duplicate_points();
 };
 
-extern BoundingBox get_extents(const MultiPoint &mp);
-extern BoundingBox get_extents_rotated(const Points &points, double angle);
-extern BoundingBox get_extents_rotated(const MultiPoint &mp, double angle);
+extern BoundingBox get_extents(const MultiPoint& mp);
+extern BoundingBox get_extents_rotated(const Points& points, double angle);
+extern BoundingBox get_extents_rotated(const MultiPoint& mp, double angle);
 
-inline double length(const Points &pts) {
+inline double length(const Points& pts)
+{
     double total = 0;
-    if (! pts.empty()) {
+    if (!pts.empty()) {
         auto it = pts.begin();
-        for (auto it_prev = it ++; it != pts.end(); ++ it, ++ it_prev)
+        for (auto it_prev = it++; it != pts.end(); ++it, ++it_prev)
             total += (*it - *it_prev).cast<double>().norm();
     }
     return total;
 }
 
-inline double area(const Points &polygon) {
+// [INTENT] area() computes the signed shoelace area. Returns positive for CCW polygons
+//   (OrcaSlicer convention), negative for CW. Callers must halve the value to get true
+//   geometric area — the formula here returns 2× area (shoelace without /2).
+// [HAZARD] H1054 P1/High: The function returns 2× the signed area without dividing by 2.
+//   Callers using this for true area calculations will be off by 2×. The naming gives no
+//   indication of this. Cross-check against Polygon::area() which does divide by 2.
+inline double area(const Points& polygon)
+{
     double area = 0.;
-    for (size_t i = 0, j = polygon.size() - 1; i < polygon.size(); j = i ++)
-		area += double(polygon[i](0) + polygon[j](0)) * double(polygon[i](1) - polygon[j](1));
+    for (size_t i = 0, j = polygon.size() - 1; i < polygon.size(); j = i++)
+        area += double(polygon[i](0) + polygon[j](0)) * double(polygon[i](1) - polygon[j](1));
     return area;
 }
 

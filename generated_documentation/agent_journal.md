@@ -5098,3 +5098,111 @@ New body annotations added this session:
 2. Session 73: `MultiPoint.hpp/.cpp`, `GCodeSender.hpp/.cpp`, `calib.hpp/.cpp`, `PerimeterGenerator.hpp`
 
 **Next hazard number to assign: H1050**
+
+---
+
+## Session 73 — MultiPoint + GCodeSender + calib + PerimeterGenerator.hpp (H1050–H1068)
+
+**Branch:** `agent/analysis`
+**Files annotated:** `src/libslic3r/MultiPoint.hpp`, `src/libslic3r/MultiPoint.cpp`, `src/libslic3r/GCodeSender.hpp`, `src/libslic3r/GCodeSender.cpp`, `src/libslic3r/calib.hpp`, `src/libslic3r/calib.cpp`, `src/libslic3r/PerimeterGenerator.hpp`
+
+### MultiPoint Module (H1050–H1056)
+
+`MultiPoint.hpp` (246 lines) — Declares `MultiPoint` base (array of `Point`s), plus `Polyline` and `Polygon` subclasses. Key hazards:
+
+- **H1050 P2/Medium** (`scale(factor_x, factor_y)`): each coordinate truncated via `coord_t` cast — rounding accumulation in loops.
+- **H1051 P2/Medium** (`closest_point_index()`): scans vertices only, not edge interiors — semantic mismatch for callers expecting closest point on the polyline geometry.
+- **H1052 P2/Medium** (`distance_to()`): dereferences `closest_point()` without nullptr check — crash on empty MultiPoint.
+- **H1053 P2/Medium** (`visivalingam()`): calls `std::make_heap()` after every node update → O(n²) reheap total.
+- **H1054 P1/High** (`area(const Points&)`): returns **2× the signed area** — the Shoelace sum is not divided by 2. All callers expecting true area are off by a factor of 2.
+- **H1055 P3/Low** (`_douglas_peucker()`): dead `#if 0` SVG debug block inside implementation.
+- **H1056 P2/Medium** (`concave_hull_2d()`): parameter name "tolerence" — typo vs "tolerance".
+
+`MultiPoint.cpp` (256 lines) — Implements all `MultiPoint`, `Polyline`, `Polygon`, `Points` free functions. All major functions annotated with `[INTENT]`, `[STATE]`, `[MEMORY]`, `[COUPLING]` blocks. Notable:
+- `minimumDistanceBetweenLinesDefinedByPoints()`: asymmetric coverage — computes point-to-segment but not segment-to-segment; documented with `[UNCLEAR]`.
+- `visivalingam()`: priority-queue rebuilding hazard annotated; n-squared reheap scenario documented.
+
+### GCodeSender Module (H1057–H1058)
+
+`GCodeSender.hpp` (121 lines) — Declares the serial G-code sender used for direct USB/serial printer communication. Key hazards:
+
+- **H1057 P2/Medium**: Three separate mutexes (`m_send_mutex`, `m_queue_mutex`, `m_error_mutex`) guard overlapping state. No atomic read across mutex boundaries — compound state reads (queue empty + not sending) are not atomically consistent.
+
+All public interface, private members, and concurrency fields annotated.
+
+`GCodeSender.cpp` (565 lines) — Serial port management, ACK state machine, checksum-gated send loop. Key hazards:
+
+- **H1058 P3/Low** (`DEBUG_SERIAL` macro): defined as `if(0)` — accidental enable risk if changed to `if(1)` during debugging.
+- `connect()`: two-phase port open documented; FIXME for commented-out early M105 send annotated.
+- `set_baud_rate()`: platform matrix documented (macOS `IOSSIOSPEED`, Linux `termios2`, OpenBSD `cfsetspeed`, others silent no-op).
+- `on_read()`: full ACK state machine documented; connection-detection heuristic ("start", "Grbl ", "ok", "T:") annotated; resend underflow hazard annotated.
+- `do_send()`: stop-and-wait (one-command-in-flight) protocol documented; XOR checksum; write_buffer lifetime; last_sent sliding window.
+- `set_DTR()`: WIN32 vs POSIX platform split; POSIX read-modify-write is non-atomic.
+- `reset()`: DTR toggle timing sequence documented.
+
+### Calibration Module (H1059–H1066)
+
+`calib.hpp` (274 lines) — Declares pressure advance and flow calibration classes. Key hazards:
+
+- **H1059 P3/Low** (`calib_pressure_advance_dd`): dead feature-flag macro — never defined in build system.
+- **H1060 P2/Medium** (`m_encroachment = 1/3`): hardcoded magic constant with no config option.
+- **H1061 P3/Low**: Many hardcoded geometry constants in `CalibPressureAdvanceLine` (digit_segment_len=2, wall_side_length=30, corner_angle=90, num_layers=4, handle_xy_size=5, handle_spacing=1.2).
+- **H1062 P2/Medium** (`CalibPressureAdvanceLine` defaults): hardcoded defaults (layer=0.2, line_width=0.6, etc.) — no config derivation.
+- **H1063 P2/Medium** (`generate_custom_gcodes()`): reads config via `option<T>()->value` — no null guard.
+
+Architecture documented:
+- `CalibPressureAdvancePattern` generates `CustomGCode::Info` directly — completely bypasses the normal slicing pipeline.
+- `CalibPressureAdvanceLine` operates in-pipeline via `GCode*` pointer.
+- `SuggestedConfigCalibPAPattern` documented as UI-facing config recommendation struct.
+
+`calib.cpp` (503 lines) — Implements calibration geometry generation. Key hazards:
+
+- **H1064 P2/Medium** (`draw_box()`): 45° fill algorithm handles non-trivial diagonal cases — source comment acknowledges "not robust".
+- **H1065 P2/Medium** (`generate_custom_gcodes()`): double `refresh_setup()` call (constructor + explicit method call) — redundant initialisation.
+- **H1066 P2/Medium**: `object.volumes.front()` used without empty-check in both `refresh_setup()` and `_refresh_writer()`.
+
+Other annotations:
+- `find_optimal_PA_speed()`: bounded speed computation documented.
+- `refresh_setup()`: config chain (print → object → volume) application documented.
+- `_refresh_starting_point()`: bounding box relative positioning documented.
+- `_refresh_writer()`: standalone `GCodeWriter` initialisation documented.
+
+### PerimeterGenerator.hpp (H1067–H1068)
+
+`PerimeterGenerator.hpp` (207 lines) — Declares `FuzzySkinConfig` and `PerimeterGenerator`. Full class body annotated this session. Key hazards:
+
+- **H1067 P2/Medium**: Nine raw pointer inputs plus four raw pointer outputs — no smart pointer protection; lifetimes are caller-managed and unchecked.
+- **H1068 P2/Medium**: `hash<FuzzySkinConfig>` does NOT include the `mode` field. Two configs differing only in `mode` hash to the same bucket — latent hash collision in `regions_by_fuzzify`.
+
+All constructor initialiser list items annotated, including the `EPSILON`-clamped resolution, nullptr-sentinel upper/lower slices, and `-1`-sentinel mm3_per_mm metrics. All private methods and private member fields annotated.
+
+### Hazard Summary (Session 73)
+
+| ID | Priority | Description |
+|----|----------|-------------|
+| H1050 | P2/Medium | `scale(factor_x, factor_y)` truncates via `coord_t` cast — rounding accumulation |
+| H1051 | P2/Medium | `closest_point_index()` scans vertices only, not edges — semantic mismatch |
+| H1052 | P2/Medium | `distance_to()` dereferences `closest_point()` without nullptr check — crash on empty |
+| H1053 | P2/Medium | `visivalingam()` full heap rebuild after every update — O(n²) |
+| H1054 | P1/High | `area(const Points&)` returns 2× the signed area — no ÷2 |
+| H1055 | P3/Low | Dead `#if 0` SVG debug block in `_douglas_peucker()` |
+| H1056 | P2/Medium | Typo "tolerence" in `concave_hull_2d()` parameter |
+| H1057 | P2/Medium | Three separate mutexes — no atomic compound read across state boundaries |
+| H1058 | P3/Low | `DEBUG_SERIAL` accidental-enable risk |
+| H1059 | P3/Low | `calib_pressure_advance_dd` dead feature-flag macro |
+| H1060 | P2/Medium | `m_encroachment = 1/3` hardcoded magic constant |
+| H1061 | P3/Low | Multiple hardcoded geometry constants in calibration classes |
+| H1062 | P2/Medium | `CalibPressureAdvanceLine` hardcoded flow/layer defaults |
+| H1063 | P2/Medium | `generate_custom_gcodes()` config option reads without null guard |
+| H1064 | P2/Medium | `draw_box()` 45° fill algorithm — acknowledged "not robust" in source |
+| H1065 | P2/Medium | Double `refresh_setup()` call — redundant initialisation |
+| H1066 | P2/Medium | `object.volumes.front()` used without empty-check |
+| H1067 | P2/Medium | Nine raw pointer inputs + four raw pointer outputs in `PerimeterGenerator` |
+| H1068 | P2/Medium | `hash<FuzzySkinConfig>` omits `mode` field — latent hash collision |
+
+### Next Steps
+
+1. Commit Session 73
+2. Session 74: `PerimeterGenerator.cpp` (classic + Arachne implementations), `FuzzySkin` feature files
+
+**Next hazard number to assign: H1069**

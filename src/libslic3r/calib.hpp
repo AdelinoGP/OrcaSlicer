@@ -1,5 +1,32 @@
 #pragma once
+// [INTENT] calib.hpp: Calibration subsystem for OrcaSlicer.
+//   Defines the data types, enumerations, and class hierarchy used across multiple printer
+//   calibration workflows: Pressure Advance (line, tower, pattern), Flow Rate, Temperature Tower,
+//   Volumetric Speed Tower, VFA Tower, Retraction Tower, and Input Shaping.
+//
+//   Architecture overview:
+//     - CalibMode enum: identifies which calibration type is active
+//     - Calib_Params struct: unified parameter container for all calibration modes
+//     - CalibPressureAdvance (base): G-code generation utilities (draw_line, draw_box, draw_digit)
+//       └── CalibPressureAdvanceLine: line-pattern PA calibration (direct gcode into GCode pipeline)
+//       └── CalibPressureAdvancePattern: pattern-based PA calibration (bypasses normal slicing;
+//           generates CustomGCode::Info directly and injects into the model's custom_gcode_per_print_z)
+//     - X1CCalibInfos / PACalibResult / PACalibIndexInfo: BambuLab X1C cloud-assisted calibration
+//       data transfer objects
+//     - FlowRatioCalibResult: result of flow ratio calibration
+//     - CaliPresetInfo / PrinterCaliInfo: per-printer calibration state for UI
+//
+// [COUPLING] CalibPressureAdvancePattern owns a GCodeWriter (m_writer) and generates raw G-code
+//   strings. It does NOT go through the normal slicing pipeline (Print/PrintObject/GCode).
+//   generate_custom_gcodes() returns a CustomGCode::Info which the UI inserts into
+//   Model::custom_gcode_per_print_z at the appropriate layers.
+// [HAZARD] calib_pressure_advance_dd is defined as an empty macro (line 3). It appears to be
+//   a dead define — possibly a feature-flag leftover. No code conditioned on it is visible in
+//   this file. Renaming or removing requires a codebase-wide search.
 #include <string>
+// [HAZARD] H1059 P3/Low: `calib_pressure_advance_dd` defined as empty macro with no body and
+//   no conditional usage visible in this header. Likely a dead feature flag or debug remnant.
+//   Safe to remove, but requires grep across all TUs to confirm no #ifdef references.
 #define calib_pressure_advance_dd
 
 #include "GCodeWriter.hpp"
@@ -13,6 +40,9 @@ class GCode;
 class Model;
 class ModelObject;
 
+// [INTENT] CalibMode: Discriminator enum for the active calibration workflow.
+//   Passed through Calib_Params to distinguish which algorithm/UI path is active.
+//   Auto_PA_Line is a BambuLab-specific variant that uses the printer's own PA detection.
 enum class CalibMode : int {
     Calib_None = 0,
     Calib_PA_Line,
@@ -31,15 +61,24 @@ enum class CalibMode : int {
 
 enum class CalibState { Start = 0, Preset, Calibration, CoarseSave, FineCalibration, Save, Finish };
 
+// [INTENT] Calib_Params: Unified parameter bag for all calibration modes.
+//   start/end/step: the sweep range (PA value, temperature, speed, etc. depending on mode).
+//   print_numbers: whether to print numeric labels on test patterns.
+//   freqStart/End X/Y: input shaping frequency sweep range per axis.
+//   test_model: integer selector for test geometry variant.
+//   shaper_type: input shaping algorithm name (e.g., "mzv", "ei").
+//   accelerations/speeds: multi-point sweep values for cornering/VFA tests.
+// [STATE] mode field serves as discriminator — consumers must check mode before reading
+//   mode-specific fields (freqStartX, shaper_type, etc. are only valid for their CalibMode).
 struct Calib_Params
 {
-    Calib_Params() : mode(CalibMode::Calib_None){};
-    int extruder_id = 0;
-    double    start, end, step;
-    bool      print_numbers;
-    double freqStartX, freqEndX, freqStartY, freqEndY;
-    int test_model;
-    std::string shaper_type;
+    Calib_Params() : mode(CalibMode::Calib_None) {};
+    int                 extruder_id = 0;
+    double              start, end, step;
+    bool                print_numbers;
+    double              freqStartX, freqEndX, freqStartY, freqEndY;
+    int                 test_model;
+    std::string         shaper_type;
     std::vector<double> accelerations;
     std::vector<double> speeds;
 
@@ -51,51 +90,57 @@ enum FlowRatioCalibrationType {
     FINE_CALIBRATION,
 };
 
+// [INTENT] X1CCalibInfos: Data transfer object for BambuLab X1C cloud-assisted calibration.
+//   Packages per-extruder calibration parameters for upload to the BambuLab cloud service.
+//   max_volumetric_speed and flow_rate are float (not double) — precision is intentionally limited
+//   for the JSON payload format used by the X1C API.
+// [COUPLING] Used by the BambuLab-specific calibration UI and cloud communication layer.
+//   Not used in the offline/manual calibration path.
 class X1CCalibInfos
 {
 public:
     struct X1CCalibInfo
     {
-        int         extruder_id = 0;
-        int         tray_id;
-        int         ams_id = 0;
-        int         slot_id = 0;
-        int         bed_temp;
-        ExtruderType        extruder_type{ExtruderType::etDirectDrive};
-        NozzleVolumeType    nozzle_volume_type = NozzleVolumeType::nvtStandard;
-        int         nozzle_temp;
-        float       nozzle_diameter;
-        std::string filament_id;
-        std::string setting_id;
-        float       max_volumetric_speed;
-        float       flow_rate = 0.98f; // for flow ratio
+        int              extruder_id = 0;
+        int              tray_id;
+        int              ams_id  = 0;
+        int              slot_id = 0;
+        int              bed_temp;
+        ExtruderType     extruder_type{ExtruderType::etDirectDrive};
+        NozzleVolumeType nozzle_volume_type = NozzleVolumeType::nvtStandard;
+        int              nozzle_temp;
+        float            nozzle_diameter;
+        std::string      filament_id;
+        std::string      setting_id;
+        float            max_volumetric_speed;
+        float            flow_rate = 0.98f; // for flow ratio
     };
 
     std::vector<X1CCalibInfo> calib_datas;
-    CalibMode                 cali_mode{ CalibMode::Calib_None };
+    CalibMode                 cali_mode{CalibMode::Calib_None};
 };
 
 class CaliPresetInfo
 {
 public:
-    int         tray_id;
-    int         extruder_id;
+    int              tray_id;
+    int              extruder_id;
     NozzleVolumeType nozzle_volume_type;
-    BedType     bed_type;
-    float       nozzle_diameter;
-    std::string filament_id;
-    std::string setting_id;
-    std::string name;
+    BedType          bed_type;
+    float            nozzle_diameter;
+    std::string      filament_id;
+    std::string      setting_id;
+    std::string      name;
 
-    CaliPresetInfo &operator=(const CaliPresetInfo &other)
+    CaliPresetInfo& operator=(const CaliPresetInfo& other)
     {
-        this->tray_id         = other.tray_id;
-        this->extruder_id     = other.extruder_id;
+        this->tray_id            = other.tray_id;
+        this->extruder_id        = other.extruder_id;
         this->nozzle_volume_type = other.nozzle_volume_type;
-        this->nozzle_diameter = other.nozzle_diameter;
-        this->filament_id     = other.filament_id;
-        this->setting_id      = other.setting_id;
-        this->name            = other.name;
+        this->nozzle_diameter    = other.nozzle_diameter;
+        this->filament_id        = other.filament_id;
+        this->setting_id         = other.setting_id;
+        this->name               = other.name;
         return *this;
     }
 };
@@ -117,31 +162,31 @@ public:
         CALI_RESULT_PROBLEM = 1,
         CALI_RESULT_FAILED  = 2,
     };
-    int         extruder_id = 0;
+    int              extruder_id = 0;
     NozzleVolumeType nozzle_volume_type;
-    int         tray_id = 0;
-    int         ams_id = 0;
-    int         slot_id = 0;
-    int         cali_idx = -1;
-    float       nozzle_diameter;
-    std::string filament_id;
-    std::string setting_id;
-    std::string name;
-    float       k_value    = 0.0;
-    float       n_coef     = 0.0;
-    int         confidence = -1; // 0: success  1: uncertain  2: failed
+    int              tray_id  = 0;
+    int              ams_id   = 0;
+    int              slot_id  = 0;
+    int              cali_idx = -1;
+    float            nozzle_diameter;
+    std::string      filament_id;
+    std::string      setting_id;
+    std::string      name;
+    float            k_value    = 0.0;
+    float            n_coef     = 0.0;
+    int              confidence = -1; // 0: success  1: uncertain  2: failed
 };
 
 struct PACalibIndexInfo
 {
-    int         extruder_id = 0;
+    int              extruder_id = 0;
     NozzleVolumeType nozzle_volume_type;
-    int         tray_id = 0;
-    int         ams_id = 0;
-    int         slot_id = 0;
-    int         cali_idx = -1; // -1 means default
-    float       nozzle_diameter;
-    std::string filament_id;
+    int              tray_id  = 0;
+    int              ams_id   = 0;
+    int              slot_id  = 0;
+    int              cali_idx = -1; // -1 means default
+    float            nozzle_diameter;
+    std::string      filament_id;
 };
 
 struct PACalibExtruderInfo
@@ -156,8 +201,8 @@ struct PACalibExtruderInfo
 
 struct PACalibTabInfo
 {
-    float pa_calib_tab_nozzle_dia;
-    int   extruder_id;
+    float            pa_calib_tab_nozzle_dia;
+    int              extruder_id;
     NozzleVolumeType nozzle_volume_type;
 };
 
@@ -184,22 +229,40 @@ struct DrawBoxOptArgs
     double line_width;
     double speed;
 };
+// [INTENT] CalibPressureAdvance (base class): G-code generation utilities shared by all PA
+//   calibration variants. Provides:
+//     - draw_line(): extrude a single line segment at given width/height/speed
+//     - draw_box(): extrude a filled/unfilled rectangular box with optional perimeters
+//     - draw_digit() / draw_number(): render numeric labels as extruded 7-segment-style lines
+//     - move_to(): travel to a 2D point with optional Z-hop
+//     - e_per_mm(): compute extruder advance (mm of filament) per mm of travel
+//   All method return values are accumulated G-code strings — caller is responsible for
+//   injecting them into the output at the correct point.
+// [STATE] m_last_pos tracks the current 3D pen position across calls.
+//   m_config holds a copy of DynamicPrintConfig (not a reference) — callers must ensure
+//   the config copy is current before constructing.
+// [HAZARD] H1060 P2/Medium: m_encroachment = 1/3 is a hardcoded magic constant controlling
+//   how much adjacent extrusions overlap. No config option — cannot be changed by user or preset.
+// [HAZARD] H1061 P3/Low: m_digit_segment_len=2, m_digit_gap_len=1, m_wall_side_length=30,
+//   m_corner_angle=90, m_num_layers=4, m_handle_xy_size=5, m_handle_spacing=1.2 are all
+//   hardcoded class constants. A refactor target would need to parameterize these.
 class CalibPressureAdvance
 {
 public:
-    static float find_optimal_PA_speed(const DynamicPrintConfig &config, double line_width, double layer_height, int extruder_id = 0, int filament_idx = 0);
+    static float find_optimal_PA_speed(
+        const DynamicPrintConfig& config, double line_width, double layer_height, int extruder_id = 0, int filament_idx = 0);
 
 protected:
-    CalibPressureAdvance()  = default;
-    CalibPressureAdvance(const DynamicPrintConfig& config) : m_config(config){};
-    CalibPressureAdvance(const FullPrintConfig &config) { m_config.apply(config); };
+    CalibPressureAdvance() = default;
+    CalibPressureAdvance(const DynamicPrintConfig& config) : m_config(config) {};
+    CalibPressureAdvance(const FullPrintConfig& config) { m_config.apply(config); };
     ~CalibPressureAdvance() = default;
 
     enum class DrawDigitMode { Left_To_Right, Bottom_To_Top };
 
-    void delta_scale_bed_ext(BoundingBoxf &bed_ext) const { bed_ext.scale(1.0f / 1.41421f); }
+    void delta_scale_bed_ext(BoundingBoxf& bed_ext) const { bed_ext.scale(1.0f / 1.41421f); }
 
-    std::string move_to(Vec2d pt, GCodeWriter &writer, std::string comment = std::string(), double z = 0, double layer_height = -1);
+    std::string move_to(Vec2d pt, GCodeWriter& writer, std::string comment = std::string(), double z = 0, double layer_height = -1);
     double e_per_mm(double line_width, double layer_height, float nozzle_diameter, float filament_diameter, float print_flow_ratio) const;
     double speed_adjust(int speed) const { return speed * 60; };
 
@@ -211,7 +274,7 @@ protected:
                            CalibPressureAdvance::DrawDigitMode mode,
                            double                              line_width,
                            double                              e_per_mm,
-                           GCodeWriter                        &writer);
+                           GCodeWriter&                        writer);
     std::string draw_number(double                              startx,
                             double                              starty,
                             double                              value,
@@ -219,19 +282,19 @@ protected:
                             double                              line_width,
                             double                              e_per_mm,
                             double                              speed,
-                            GCodeWriter                        &writer);
+                            GCodeWriter&                        writer);
 
     std::string draw_line(
-        GCodeWriter &writer, Vec2d to_pt, double line_width, double layer_height, double speed, const std::string &comment = std::string());
-    std::string draw_box(GCodeWriter &writer, double min_x, double min_y, double size_x, double size_y, DrawBoxOptArgs opt_args);
+        GCodeWriter& writer, Vec2d to_pt, double line_width, double layer_height, double speed, const std::string& comment = std::string());
+    std::string draw_box(GCodeWriter& writer, double min_x, double min_y, double size_x, double size_y, DrawBoxOptArgs opt_args);
 
     double to_radians(double degrees) const { return degrees * M_PI / 180; };
     double get_distance(Vec2d from, Vec2d to) const;
 
-    Vec3d m_last_pos;
+    Vec3d              m_last_pos;
     DynamicPrintConfig m_config;
 
-    const double m_encroachment{1. / 3.};
+    const double                 m_encroachment{1. / 3.};
     DrawDigitMode                m_draw_digit_mode{DrawDigitMode::Left_To_Right};
     const double                 m_digit_segment_len{2};
     const double                 m_digit_gap_len{1};
@@ -239,11 +302,21 @@ protected:
     std::string::size_type       m_number_len{m_max_number_len}; /* Current length of number labels */
 };
 
+// [INTENT] CalibPressureAdvanceLine: Generates a PA line-sweep test pattern by printing
+//   pairs of long/short lines at incrementally increasing PA values.
+//   The fast/slow speed contrast between segments isolates the PA compensation effect.
+//   Operates in-pipeline: generate_test() returns a G-code string that is inserted by
+//   the GCode generator into the normal print stream (mp_gcodegen provides context).
+// [COUPLING] Holds a raw non-owning pointer to GCode (mp_gcodegen). GCode must outlive
+//   this object. is_delta() queries the printer geometry via gcodegen.
+// [HAZARD] H1062 P2/Medium: m_height_layer=0.2, m_line_width=0.6, m_thin_line_width=0.44,
+//   m_number_line_width=0.48, m_space_y=3.5, m_length_short=20, m_length_long=40 are all
+//   hardcoded defaults. Users cannot change them via config; they are applied unconditionally.
 class CalibPressureAdvanceLine : public CalibPressureAdvance
 {
 public:
     CalibPressureAdvanceLine(GCode* gcodegen);
-    ~CalibPressureAdvanceLine(){};
+    ~CalibPressureAdvanceLine() {};
 
     std::string generate_test(double start_pa = 0, double step_pa = 0.002, int count = 50);
 
@@ -253,31 +326,36 @@ public:
         m_fast_speed = fast;
     }
 
-    const double &line_width() { return m_line_width; };
-    const double &height_layer() { return m_height_layer; };
+    const double& line_width() { return m_line_width; };
+    const double& height_layer() { return m_height_layer; };
     bool          is_delta() const;
-    bool         &draw_numbers() { return m_draw_numbers; }
+    bool&         draw_numbers() { return m_draw_numbers; }
 
 private:
     std::string print_pa_lines(double start_x, double start_y, double start_pa, double step_pa, int num);
 
-    void delta_modify_start(double &startx, double &starty, int count);
+    void delta_modify_start(double& startx, double& starty, int count);
 
-    GCode *mp_gcodegen;
+    GCode* mp_gcodegen;
 
     double m_nozzle_diameter;
     double m_slow_speed, m_fast_speed;
 
-    double m_height_layer{0.2};
-    double m_line_width{0.6};
-    double m_thin_line_width{0.44};
-    double m_number_line_width{0.48};
+    double       m_height_layer{0.2};
+    double       m_line_width{0.6};
+    double       m_thin_line_width{0.44};
+    double       m_number_line_width{0.48};
     const double m_space_y{3.5};
 
     double m_length_short{20.0}, m_length_long{40.0};
     bool   m_draw_numbers{true};
 };
 
+// [INTENT] SuggestedConfigCalibPAPattern: A plain struct that documents the recommended config
+//   overrides for running the PA pattern calibration. These are displayed/applied by the UI
+//   to warn or auto-configure the user's slicer settings before printing.
+//   nozzle_ratio_pairs: values expressed as % of nozzle diameter (e.g., line_width=112.5%).
+// [COUPLING] Read by the UI calibration wizard; not directly used in G-code generation.
 struct SuggestedConfigCalibPAPattern
 {
     const std::vector<std::pair<std::string, double>> float_pairs{{"initial_layer_speed", 30}};
@@ -289,25 +367,44 @@ struct SuggestedConfigCalibPAPattern
     const std::pair<std::string, BrimType> brim_pair{"brim_type", BrimType::btNoBrim};
 };
 
+// [INTENT] CalibPressureAdvancePattern: Generates a PA "anchor pattern" calibration print
+//   that bypasses the normal slicing pipeline entirely.
+//   generate_custom_gcodes() returns a CustomGCode::Info struct containing raw G-code
+//   strings that are injected directly into Model::custom_gcode_per_print_z at each
+//   layer transition. The actual test object (the "anchor" geometry) is sliced normally,
+//   but the PA sweep lines are appended via custom G-code at layer change hooks.
+// [COUPLING] Owns a GCodeWriter (m_writer) — distinct from the GCodeWriter used by the
+//   main GCode generator. This is a separate, independent G-code emission path.
+//   Callers inject results into ModelObject's custom_gcode_per_print_z after construction.
+// [HAZARD] H1063 P2/Medium: generate_custom_gcodes() calls refresh_setup() which reads
+//   config values directly via option<ConfigOptionFloat>("key")->value. Any missing key
+//   will dereference a null pointer (no nullptr checks). Safe only if the config was
+//   populated from a complete preset.
+// [HAZARD] H1061 (continued): Hardcoded constants:
+//   m_handle_xy_size=5mm, m_handle_spacing=1.2mm, m_num_layers=4, m_wall_side_length=30mm,
+//   m_corner_angle=90°, m_pattern_spacing=2mm, m_glyph_padding_{horizontal,vertical}=1mm.
 class CalibPressureAdvancePattern : public CalibPressureAdvance
 {
     friend struct DrawBoxOptArgs;
 
 public:
     CalibPressureAdvancePattern(
-        const Calib_Params &params, const DynamicPrintConfig &config, bool is_bbl_machine, const ModelObject &object, const Vec3d &origin);
+        const Calib_Params& params, const DynamicPrintConfig& config, bool is_bbl_machine, const ModelObject& object, const Vec3d& origin);
 
     double handle_xy_size() const { return m_handle_xy_size; };
     double handle_spacing() const { return m_handle_spacing; };
-    Vec3d handle_pos_offset() const;
+    Vec3d  handle_pos_offset() const;
     double print_size_x() const { return object_size_x() + pattern_shift(); };
     double print_size_y() const { return object_size_y(); };
     double max_layer_z() const { return height_first_layer() + ((m_num_layers - 1) * height_layer()); };
     double flow_val() const;
 
-    CustomGCode::Info generate_custom_gcodes(const DynamicPrintConfig &config, bool is_bbl_machine, const ModelObject &object, const Vec3d &origin);
+    CustomGCode::Info generate_custom_gcodes(const DynamicPrintConfig& config,
+                                             bool                      is_bbl_machine,
+                                             const ModelObject&        object,
+                                             const Vec3d&              origin);
 
-    void set_start_offset(const Vec3d &offset);
+    void  set_start_offset(const Vec3d& offset);
     Vec3d get_start_offset();
 
 protected:
@@ -325,9 +422,9 @@ protected:
     int    wall_count() const { return m_config.option<ConfigOptionInt>("wall_loops")->value; };
 
 private:
-    void refresh_setup(const DynamicPrintConfig &config, bool is_bbl_machine, const ModelObject &object, const Vec3d &origin);
-    void _refresh_starting_point(const ModelObject &object);
-    void _refresh_writer(bool is_bbl_machine, const ModelObject &object, const Vec3d &origin);
+    void refresh_setup(const DynamicPrintConfig& config, bool is_bbl_machine, const ModelObject& object, const Vec3d& origin);
+    void _refresh_starting_point(const ModelObject& object);
+    void _refresh_writer(bool is_bbl_machine, const ModelObject& object, const Vec3d& origin);
 
     double    height_first_layer() const { return m_config.option<ConfigOptionFloat>("initial_layer_print_height")->value; };
     double    height_z_offset() const { return m_config.option<ConfigOptionFloat>("z_offset")->value; };
@@ -356,11 +453,11 @@ private:
 
     double pattern_shift() const;
 
-    const Calib_Params &m_params;
+    const Calib_Params& m_params;
 
-    GCodeWriter        m_writer;
-    Vec3d              m_starting_point;
-    bool               m_is_start_point_fixed = false;
+    GCodeWriter m_writer;
+    Vec3d       m_starting_point;
+    bool        m_is_start_point_fixed = false;
 
     const double m_handle_xy_size{5};
     const double m_handle_spacing{1.2};
