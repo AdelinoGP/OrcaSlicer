@@ -4436,3 +4436,43 @@ No remaining work in this directory.
 
 **Next hazard number to assign: H907**
 
+---
+
+## Session 66 — SLA Module Infrastructure Files (H907–H911)
+
+### Files Annotated
+
+- `src/libslic3r/SLA/SupportPoint.hpp` — H907 (float bit-equality in operator==)
+- `src/libslic3r/SLA/JobController.hpp` — H908 (stopcondition vs cancelfn ambiguity)
+- `src/libslic3r/SLA/Concurrency.hpp` — H909 (typo `max_concurreny` missing 'c')
+- `src/libslic3r/SLA/BoostAdapter.hpp` — H910 (range_value in boost:: root namespace)
+- `src/libslic3r/SLA/SpatIndex.hpp` — H911 (BoxIndex::query pre-reserves O(N) memory)
+
+### Key Discoveries
+
+**SLA Infrastructure Overview**
+- `SupportPoint` is a Cereal-serialized POD: pos (Vec3f), head_front_radius (float), is_new_island (bool). Positional serialization means any field insertion silently corrupts project files.
+- `JobController` has two distinct cancellation mechanisms: `stopcondition` (flag-poll, graceful) and `cancelfn` (throw, hard-abort). The hard-abort path exists solely because `TriangleMeshSlicer` cannot check a flag mid-operation.
+- `Concurrency.hpp` is marked DEPRECATED in-source. The preferred replacement is `Execution/ExecutionTBB.hpp`. The misspelled `max_concurreny()` is a public API that cannot be silently corrected.
+- `BoostAdapter.hpp` injects Slic3r type traits into `boost::geometry::traits::` and one into `boost::` root namespace (`range_value`). All boost::geometry operations across the codebase implicitly depend on this header being included before use.
+- `SpatIndex` R*-tree uses rstar<16,4> parameters. `BoxIndex::query()` pre-allocates its return vector to the full tree size — O(N) allocation regardless of expected result count (H911).
+
+### Hazard Summary
+
+| ID | Severity | Description |
+|----|----------|-------------|
+| H907 | P2 | `SupportPoint::operator==` uses float bit-equality for `pos` — geometrically identical points via different arithmetic paths compare not-equal |
+| H908 | P2 | `JobController` dual cancellation paths (stopcondition vs cancelfn) — no documented contract for which to use in which context |
+| H909 | P3 | `max_concurreny()` typo (missing 'c') in `Concurrency.hpp` — public API spelling error that cannot be corrected without breaking all call sites |
+| H910 | P3 | `range_value<vector<Vec2d>>` specialization in `boost::` root namespace — uses Boost internal extension point that may change between versions |
+| H911 | P2 | `BoxIndex::query()` pre-reserves return vector to `store.size()` — O(N) memory per query regardless of actual result count |
+
+### Next Steps
+
+1. Continue SLA annotation: SpatIndex.cpp, ConcaveHull.hpp/.cpp, Clustering.hpp/.cpp
+2. Then: RasterBase.hpp/.cpp, RasterToPolygons.hpp/.cpp, AGGRaster.hpp
+3. Then: IndexedMesh, Hollowing, Pad, Rotfinder, SupportTree hierarchy
+4. Append H907–H911 to `04_refactoring_hazards.md`
+
+**Next hazard number to assign: H912**
+
