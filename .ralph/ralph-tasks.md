@@ -22,7 +22,7 @@ Last updated: 2026-03-09T00:00:00Z
              next hazard ID, open questions from Session 1 items 1–4 — verify
              which are still unresolved and list them. Commit with prefix `docs:`.
 
-- [ ] TB003  BOOTSTRAP · Compact `agent_journal.md`. The file is ~6000 lines
+- [x] TB003  BOOTSTRAP · Compact `agent_journal.md`. The file is ~6000 lines
              covering 84 sessions. Archive Sessions 1–83 into a single new file
              `agent_journal_archive_s01_s83.md` (verbatim, no summarization),
              then replace those sessions in agent_journal.md with a single
