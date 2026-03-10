@@ -450,7 +450,7 @@ Last updated: 2026-03-09T00:00:00Z
             Use the same format as existing entries: fields, invariants,
             lifecycle, consumers. Commit with prefix `docs:`.
 
-- [/] T211  Add missing algorithm sections to `03_algorithmic_complexities.md`:
+- [x] T211  Add missing algorithm sections to `03_algorithmic_complexities.md`:
             (a) ArcFitter.cpp — segment-to-arc conversion (G2/G3), including
                 the chord-error threshold and the minimum-arc-length guard.
             (b) MultiMaterialSegmentation.cpp — the painting-based filament
@@ -461,7 +461,7 @@ Last updated: 2026-03-09T00:00:00Z
                 explained in Section 2.
             Commit with prefix `docs:`.
 
-- [ ] T205A  Create `pseudocode_triangle_mesh_slicer_chaining.md` — Phase 2
+- [/] T205A  Create `pseudocode_triangle_mesh_slicer_chaining.md` — Phase 2
              line-chaining algorithm (hash map assembly → greedy chain walk →
              T-junction handling → degenerate discard). This is the phase most
              obscured by the C++ implementation. Include Translation Notes

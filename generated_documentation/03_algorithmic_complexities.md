@@ -76,10 +76,12 @@ After per-layer `Polygons` are produced by `slice_mesh()`, `slice_mesh_ex()` app
 
 ### Arachne Variable-Width Generator
 
-- Computes a **straight skeleton** (medial axis) of the polygon
+- Computes a **straight skeleton** (medial axis) of the polygon via a Voronoi diagram of the polygon edges
 - Distributes wall widths continuously, allowing walls to taper rather than abruptly stop
 - Produces `ExtrusionPath` segments with varying `width` values
 - Used when `perimeter_generator = arachne` in config
+
+**For full algorithm details see Section 15 — Arachne: Straight Skeleton and Variable-Width Perimeters.**
 
 ---
 
@@ -896,6 +898,227 @@ JPS is an optimized A* variant for uniform-cost grids:
 **Complexity:** O(N log N) where N = expanded nodes. JPS typically expands far fewer nodes than A* on obstacle-sparse grids.
 
 **Key hazard:** Grid resolution is fixed at construction time. Very dense obstacle configurations (many thin perimeters) may require a finer grid, increasing N quadratically.
+
+---
+
+## Section 13 — Arc Fitting: Segment-to-Arc Conversion (ArcFitter.cpp)
+
+**File:** [`src/libslic3r/ArcFitter.cpp`](../src/libslic3r/ArcFitter.cpp), [`src/libslic3r/ArcFitter.hpp`](../src/libslic3r/ArcFitter.hpp)
+
+### Overview
+
+`ArcFitter` converts dense polylines (sequences of `coord_t` scaled-integer Points) into mixed sequences of arc moves (G2/G3) and linear moves (G1), stored as `PathFittingData`. The algorithm is a greedy sliding-window approach that is O(n) amortized over the input point count.
+
+This is a BBS addition — PrusaSlicer does not include arc fitting. The output `PathFittingData` vector is consumed by `GCode.cpp` / `GCodeWriter.cpp` for arc-move emission.
+
+### Algorithm: `do_arc_fitting()`
+
+**Input:** `points` (dense polyline in scaled integers), `tolerance` (chord-error threshold in scaled units)
+
+**Output:** `result` — a vector of `PathFittingData`, each entry covering a contiguous range of `points[]` with a type of `Linear_move`, `Arc_move_cw`, or `Arc_move_ccw`.
+
+**Steps:**
+
+1. **Degenerate guard:** If `points.size() < 3`, emit a single `Linear_move` spanning `[0, size-1]` and return. (Note: `size == 0` is UB — callers must guard against empty input.)
+
+2. **Greedy window expansion:** Maintain `front_index` (window start) and `back_index` (current end). For each new point added:
+   - Attempt `ArcSegment::try_create_arc(current_segment, target_arc, length, MAX_RADIUS, tolerance, LENGTH_PERCENT_TOLERANCE)`.
+   - If the fit succeeds: save `target_arc` as `last_arc`. If we've reached the last point, commit immediately.
+   - If the fit fails:
+     - **Window size > 3:** The previous arc (up to `back_index - 1`) was valid — commit it. Reset window to `[back_index - 1, back_index]`.
+     - **Window size == 3:** Three points could not form an arc — emit/extend a `Linear_move` for `[front_index, front_index+1]`. Adjacent linear entries are **merged** by extending `end_point_index` rather than appending a new entry. Reset window to `[back_index - 1, back_index]`.
+
+3. **Tail flush:** After the loop, if `front_index != back_index`, any uncommitted tail is emitted as a linear segment (or merged with a preceding linear entry).
+
+**Tolerance parameters (from `ArcSegment::try_create_arc`):**
+- Chord error: All intermediate points must lie within `tolerance` of the fitted circle's circumference.
+- `DEFAULT_ARC_LENGTH_PERCENT_TOLERANCE` (≈ 5%): The ratio of the straight chord length to the arc length must be above this threshold. This guards against near-degenerate arcs where a near-straight segment would produce a circle with enormous radius — such arcs are rejected and emitted as linear moves instead.
+- `DEFAULT_SCALED_MAX_RADIUS`: Arc radius ceiling. Arcs with radius above this threshold are rejected (too shallow to be worth emitting as G2/G3).
+
+### Algorithm: `do_arc_fitting_and_simplify()`
+
+A two-pass pipeline combining arc fitting with Douglas-Peucker simplification:
+
+1. **Pass 1:** Call `do_arc_fitting()` to classify the polyline into arc and linear spans.
+2. **Pass 2 (mixed path):** For each span independently, apply `MultiPoint::_douglas_peucker()` at the same `tolerance`. This thins both linear spans (removes redundant collinear points) and arc spans (reduces intermediate points while preserving wipe-compatible path accuracy).
+3. **Index remapping:** After DP, each span has fewer points. A prefix-sum of per-span `reduce_count[]` values is computed and subtracted from `end_point_index` in each `PathFittingData` entry. Correctness depends on spans being contiguous and non-overlapping (see HAZARD H762).
+
+**Special case (all-linear):** If the entire result is one linear span, a global DP is applied directly and the single entry's index is updated — no per-span loop needed.
+
+**HAZARD H761:** `points` is modified **in place** during `do_arc_fitting_and_simplify()`. Callers that pass a reference to a shared `Points` array will see the array mutated. The function signature does not communicate this mutation.
+
+**HAZARD H762:** Index remapping relies on `PathFittingData` entries being in ascending order with contiguous, non-overlapping index ranges. There is no assertion to verify this. If `do_arc_fitting()` produces out-of-order or overlapping entries (a bug in the greedy loop), the prefix-sum remapping will silently produce wrong indices without any error.
+
+**HAZARD H763:** `points.size() == 0` is not guarded — `points[size - 1]` in the degenerate path is UB for empty input. The `size == 1` case emits `PathFittingData{0, 0, Linear_move}` which is valid but produces a zero-length segment.
+
+### Complexity Summary
+
+| Operation | Complexity | Notes |
+|-----------|------------|-------|
+| `do_arc_fitting` | O(n) amortized | Greedy window; each point committed at most twice |
+| `try_create_arc` per window | O(w) | w = window size; circle fit is O(w) |
+| Douglas-Peucker per span | O(k log k) | k = points in span |
+| Index prefix-sum | O(s) | s = number of result spans |
+| **Total `do_arc_fitting_and_simplify`** | **O(n log n)** | Dominated by DP passes |
+
+---
+
+## Section 14 — Multi-Material Segmentation by Painting (MultiMaterialSegmentation.cpp)
+
+**File:** [`src/libslic3r/MultiMaterialSegmentation.cpp`](../src/libslic3r/MultiMaterialSegmentation.cpp)
+
+### Overview
+
+`multi_material_segmentation_by_painting()` converts 3D per-facet color annotations (painted by the user in the MMU painting gizmo) into per-layer, per-extruder `ExPolygon` regions. These regions are used by `PrintObject::slice()` to assign different filaments to different parts of each layer.
+
+This is an entirely BBS-original algorithm — PrusaSlicer uses a different region-assignment mechanism. The algorithm is absent from the original PrusaSlicer `03_algorithmic_complexities` documentation despite being noted in the Session 2 journal.
+
+### Data Flow
+
+```
+ModelVolume::mmu_segmentation_facets (TriangleFacetAnnotations)
+    ↓  [TBB parallel: per extruder × per facet]
+    → Project painted triangle edges onto 2D layer planes using EdgeGrid
+    → PaintedLine[] per layer (color-tagged line segments on slice contours)
+    ↓  [TBB parallel: per layer]
+    → post_process_painted_lines(): resolve overlaps, assign dominant color per contour segment
+    → colorize_contours(): produce ColoredLines[] (per-edge color assignments on polygon contours)
+    → build_graph(): construct MMU_Graph (Voronoi + contour arcs)
+    → remove_multiple_edges_in_vertices() + remove_nodes_with_one_arc(): prune graph
+    → extract_colored_segments(): flood-fill graph to assign extruder colors to enclosed regions
+    ↓
+segmented_regions[layer_idx][extruder_idx] = ExPolygons
+```
+
+### Algorithm Phases
+
+**Phase 1 — Slice preprocessing (parallel over layers):**
+- Merge all `LayerRegion::slices` into a single `ExPolygons` per layer.
+- Apply `offset_ex(+ε)` → `union_ex` → `offset_ex(-ε)` to close hairline gaps.
+- Remove regions with area < 0.1 mm².
+- Run `expolygons_simplify` to remove self-intersections that would corrupt the Voronoi diagram.
+- Build an `EdgeGrid::Grid` per layer for spatial queries during triangle projection.
+
+**Phase 2 — Triangle projection (nested parallel: extruder × facet):**
+- For each `ModelVolume`, for each extruder color (1..N), for each painted facet:
+  - Transform the triangle to print coordinates.
+  - Find the layer range that intersects the triangle's Z extent.
+  - For each intersecting layer, compute the 2D cross-section of the triangle at that Z height.
+  - Project the resulting line segment onto the layer's `EdgeGrid` to find which polygon edges it crosses (via `PaintedLineVisitor::visit_cells_intersecting_line`).
+  - Write the resulting `PaintedLine` to `painted_lines[layer_idx]` under a per-layer-bucket mutex (`layer_idx & 0x3F` selects 1 of 64 mutexes).
+
+**Phase 3 — Layer segmentation (parallel over layers):**
+- For each layer with non-empty `painted_lines`:
+  1. `post_process_painted_lines`: Resolve color conflicts on edges where multiple painted lines overlap — assigns a single dominant color per contour segment.
+  2. `colorize_contours`: Annotates each contour edge with its assigned color, producing `ColoredLines[]`.
+  3. **Fast path:** If all edges have the same color, assign `input_expolygons` directly to that extruder's slot without building a Voronoi diagram.
+  4. `build_graph`: Constructs `MMU_Graph`:
+     - BORDER arcs follow input polygon edges (directed, one per edge).
+     - NON_BORDER arcs come from the Voronoi diagram edges (bidirectional) computed from the colored contour lines.
+     - Voronoi vertices are appended as interior nodes; their indices are stored in `vertex.color()` fields during construction.
+  5. `remove_multiple_edges_in_vertices`: Removes duplicate arcs at high-valence nodes.
+  6. `graph.remove_nodes_with_one_arc`: Prunes dead-end Voronoi branches (queue-based iterative pruning).
+  7. `extract_colored_segments`: Flood-fill traversal of the `MMU_Graph` to assign extruder regions. Each enclosed face in the graph receives the color of its bounding BORDER arcs.
+
+**Phase 4 — Optional top/bottom layer propagation:**
+- For `IncludeTopAndBottomLayers::Yes` (MMU mode): propagate segmentation upward/downward to cover top/bottom surfaces that were not directly painted.
+
+**Phase 5 — Optional width limiting (`cut_segmented_layers`):**
+- If `segmentation_max_width > 0`: trim each colored region to a maximum width from the color boundary using a negative offset, preventing very thin painted regions from being discarded but also preventing them from growing arbitrarily wide.
+
+### Complexity Summary
+
+| Phase | Complexity | Notes |
+|-------|------------|-------|
+| Slice preprocessing | O(L × P log P) | L = layers, P = polygon points per layer |
+| Triangle projection | O(E × F × L_f) | E = extruders, F = painted facets, L_f = layers per facet |
+| Mutex contention | 64 buckets | Fixed; not a function of input size |
+| Graph construction | O(P + V log V) per layer | P = contour points, V = Voronoi vertices |
+| Graph pruning | O(degree) per node | Typically < 10; see HAZARD H566 |
+| Flood-fill segmentation | O(nodes + arcs) per layer | Linear traversal |
+| **Total** | **O(L × (P log P + V log V) + E × F × L_f)** | Memory O(L × E) for segmented_regions |
+
+### Key Hazards
+
+**HAZARD H561:** `MMU_Graph::Arc::color()` is overloaded across construction phases. Before node indices are assigned, `color()` holds `VD_ANNOTATION` sentinel values (1 = ON_CONTOUR, 2 = DELETED). After assignment, it holds node indices. Code that reads `color()` without tracking the current construction phase will misinterpret the value.
+
+**HAZARD H562 (memory):** `segmented_regions` is allocated as `num_layers × num_facets_states` `ExPolygons`. For a 500-layer, 5-extruder print with complex geometry, this can exceed hundreds of MB before any simplification. No memory cap exists on this structure.
+
+**HAZARD H566:** `MMU_Graph::append_edge` deduplicates by scanning adjacency lists — O(degree) per call. For high-valence Voronoi vertices, this degrades to O(degree²) per vertex. In practice degree stays below 10, but no assertion enforces this.
+
+---
+
+## Section 15 — Arachne: Straight Skeleton and Variable-Width Perimeters
+
+**Files:** [`src/libslic3r/Arachne/WallToolPaths.cpp`](../src/libslic3r/Arachne/WallToolPaths.cpp), [`src/libslic3r/Arachne/SkeletalTrapezoidation.cpp`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp)
+
+### Overview
+
+The Arachne perimeter generator (activated when `perimeter_generator = arachne`) produces variable-width extrusion paths that taper smoothly at thin regions and junctions, rather than abruptly stopping as the classic generator does. The core is a **straight skeleton** (also called medial axis) computation implemented via the `SkeletalTrapezoidation` algorithm.
+
+The Arachne algorithm was developed by Kuipers et al. (TU Delft / Ultimaker) and is described in the paper "Variable-width contouring for additive manufacturing" (ACM SIGGRAPH 2022). OrcaSlicer inherits it from PrusaSlicer, which ported it from the original CuraEngine implementation.
+
+### Phase 1 — Preprocessing (`WallToolPaths::generate()`)
+
+1. Apply `simplifyPolygons` to remove near-degenerate vertices that cause numerical instability in the Voronoi phase.
+2. Compute the minimum bead count and wall-width constraints from `BeadingStrategyFactory` based on configured `min_bead_width`, `min_feature_size`, `wall_transition_angle`, and `inward_distributed_beads`.
+3. Call `SkeletalTrapezoidation::generateToolpaths()` on the processed polygon.
+
+### Phase 2 — Straight Skeleton via Voronoi (`SkeletalTrapezoidation`)
+
+The straight skeleton is computed indirectly using the Voronoi diagram of the polygon edges:
+
+1. **Voronoi diagram:** Build a boost::polygon Voronoi diagram of the polygon edge set (in scaled integer coordinates). The Voronoi edges are the locus of points equidistant from two polygon edges — this is precisely the straight skeleton of the polygon.
+2. **Graph construction:** Walk the Voronoi diagram edges to build a `SkeletalTrapezoidationGraph`:
+   - Each Voronoi edge becomes a graph edge tagged with the distance from the two nearest polygon edges (its "bead width capacity").
+   - Voronoi vertices become graph nodes.
+   - Polygon vertices map to source nodes (marked as `is_central = false`).
+3. **Bead count propagation:** For each graph edge, compute the local bead count from the edge's "thickness" (twice the distance to the nearest polygon boundary) using the configured `BeadingStrategy`.
+4. **Transition placement:** Where bead count changes along an edge (e.g., from 3 beads to 2), `TransitionEnd` markers are inserted at the exact point along the edge where the local wall width can accommodate one fewer bead.
+
+### Phase 3 — Toolpath Extraction
+
+1. **Inset computation:** Walk the skeleton graph, propagating bead widths from the source edges inward. Each "bead" corresponds to one extrusion path at a specific inset distance from the polygon boundary.
+2. **Variable-width path generation:** For each bead, trace the corresponding isocurve through the trapezoidation graph. Path width varies continuously along the isocurve — wider in thick regions, narrower at junctions and taper zones.
+3. **`ExtrusionLine` emission:** Each traced isocurve becomes an `ExtrusionLine` with per-point `width` values (in scaled integer microns), collected into `WallToolPaths::m_toolpaths`.
+4. **Ordering:** `WallToolPaths::getToolPaths()` returns the toolpaths; `PerimeterGenerator` then calls `process_arachne()` to order them for printing (outer-first or inner-first per config).
+
+### Beading Strategies
+
+The `BeadingStrategy` abstraction controls how wall widths are distributed. OrcaSlicer uses:
+
+| Strategy | Description |
+|----------|-------------|
+| `DistributedBeadingStrategy` | Distributes width evenly across all beads |
+| `RedistributeBeadingStrategy` | Keeps outer/inner beads at nominal width; redistributes excess to inner beads |
+| `OuterWallInsetBeadingStrategy` | Applies a configured inset to the outermost bead for overhang compensation |
+| `WideningBeadingStrategy` | Allows beads to widen beyond nominal when there are too few beads for the local thickness |
+| `LimitedBeadingStrategy` | Caps bead count to a configured maximum |
+
+Strategies are composed by wrapping (decorator pattern) in `BeadingStrategyFactory::makeStrategy()`.
+
+### Complexity Summary
+
+| Phase | Complexity | Notes |
+|-------|------------|-------|
+| Polygon simplification | O(V) | V = polygon vertices |
+| Voronoi diagram construction | O(V log V) | boost::polygon Voronoi |
+| Graph walk and annotation | O(E) | E = Voronoi edges ≈ O(V) |
+| Bead count propagation | O(E × max_beads) | max_beads typically 2–20 |
+| Transition insertion | O(E) | One pass over all edges |
+| Toolpath extraction | O(E × max_beads) | One isocurve trace per bead per edge |
+| **Total per polygon** | **O(V log V + E × B)** | B = max bead count; E ≈ 2V for simple polygons |
+
+For a typical layer with 10 islands averaging 200 polygon vertices each and B = 6:
+
+- Voronoi: O(2000 log 2000) ≈ 22,000 ops
+- Toolpath: O(4000 × 6) = 24,000 ops
+
+Arachne is the dominant cost in `PerimeterGenerator` for layers with many thin features; it replaces the cheaper O(V) Clipper offset of the classic generator with an O(V log V) Voronoi-based computation.
+
+### Relationship to Section 2
+
+Section 2 of this document describes the classic perimeter generator and notes Arachne uses a "straight skeleton (medial axis)" without explaining the implementation. The Voronoi-based straight skeleton construction described here is that implementation. The key insight: the Voronoi diagram of polygon edges **is** the straight skeleton; Arachne does not run a separate medial axis algorithm.
 
 ---
 
