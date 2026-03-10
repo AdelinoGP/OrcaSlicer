@@ -15,6 +15,10 @@
 // [COUPLING] ObjInfo output struct carries per-face colours, UV coordinates, PNG references,
 //            and vertex colours — all consumed by the GUI import pipeline.
 //            ObjParser is a separate module (objparser.hpp); MTL parsing is also delegated there.
+// [HAZARD] Named OBJ `o` / `g` sections are parsed by objparser but ignored here.
+//          All faces are flattened into one TriangleMesh, so load_obj(path, model, ...) creates
+//          exactly one ModelObject containing one merged mesh regardless of how many named objects
+//          or groups were present in the source OBJ.
 //
 // [HAZARD] store_obj() always returns true even if the underlying WriteOBJFile() fails (known FIXME).
 // [HAZARD] MTL lookup via unordered map — missing material silently records lost_material_name
@@ -39,7 +43,7 @@
 #define DIR_SEPARATOR '/'
 #endif
 
-//Translation
+// Translation
 #include "I18N.hpp"
 #define _L(s) Slic3r::I18N::translate(s)
 
@@ -51,14 +55,14 @@ namespace Slic3r {
 //         should not use *meshptr after a false return.
 // [MEMORY] ObjParser::ObjData and MtlData are local temporaries; ITS is built inline and
 //          move-assigned into *meshptr at the end (line ~205).
-bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::string &message)
+bool load_obj(const char* path, TriangleMesh* meshptr, ObjInfo& obj_info, std::string& message)
 {
     if (meshptr == nullptr)
         return false;
     // Parse the OBJ file.
     ObjParser::ObjData data;
     ObjParser::MtlData mtl_data;
-    if (! ObjParser::objparse(path, data)) {
+    if (!ObjParser::objparse(path, data)) {
         BOOST_LOG_TRIVIAL(error) << "load_obj: failed to parse " << path;
         message = _L("load_obj: failed to parse");
         return false;
@@ -69,10 +73,10 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
     bool exist_mtl = false;
     if (data.mtllibs.size() > 0) { // read mtl
         for (auto mtl_name : data.mtllibs) {
-            if (mtl_name.size() == 0){
+            if (mtl_name.size() == 0) {
                 continue;
             }
-            exist_mtl = true;
+            exist_mtl                                = true;
             bool                    mtl_name_is_path = false;
             boost::filesystem::path mtl_abs_path(mtl_name);
             if (boost::filesystem::exists(mtl_abs_path)) {
@@ -81,49 +85,53 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
             boost::filesystem::path mtl_path;
             if (!mtl_name_is_path) {
                 boost::filesystem::path full_path(path);
-                std::string             dir = full_path.parent_path().string();
+                std::string             dir      = full_path.parent_path().string();
                 auto                    mtl_file = dir + "/" + mtl_name;
                 boost::filesystem::path temp_mtl_path(mtl_file);
                 mtl_path = temp_mtl_path;
             }
-            auto    _mtl_path = mtl_name_is_path ? mtl_abs_path.string().c_str() : mtl_path.string().c_str();
+            auto _mtl_path = mtl_name_is_path ? mtl_abs_path.string().c_str() : mtl_path.string().c_str();
             if (boost::filesystem::exists(mtl_name_is_path ? mtl_abs_path : mtl_path)) {
                 if (!ObjParser::mtlparse(_mtl_path, mtl_data)) {
                     BOOST_LOG_TRIVIAL(error) << "load_obj:load_mtl: failed to parse " << _mtl_path;
                     message = _L("load mtl in obj: failed to parse");
                     return false;
                 }
-            }
-            else {
+            } else {
                 BOOST_LOG_TRIVIAL(error) << "load_obj: failed to load mtl_path:" << _mtl_path;
             }
         }
     }
     // [INTENT] First pass: count faces and validate polygon vertex counts.
     //          data.vertices is a flat array of ObjVertex structs; coordIdx==-1 marks face boundaries.
+    // [COUPLING] data.objects / data.groups are intentionally ignored here. Their metadata survives
+    //            parsing but does not participate in ModelObject / ModelVolume partitioning.
     // [HAZARD] Polygons with 5+ vertices immediately abort loading with an error.
     //          Polygons with exactly 4 vertices (quads) are counted separately for index pre-allocation.
     size_t num_faces = 0;
     size_t num_quads = 0;
-    for (size_t i = 0; i < data.vertices.size(); ++ i) {
+    for (size_t i = 0; i < data.vertices.size(); ++i) {
         // Find the end of face.
         size_t j = i;
-        for (; j < data.vertices.size() && data.vertices[j].coordIdx != -1; ++ j) ;
+        for (; j < data.vertices.size() && data.vertices[j].coordIdx != -1; ++j)
+            ;
         if (size_t num_face_vertices = j - i; num_face_vertices > 0) {
             if (num_face_vertices > 4) {
                 // Non-triangular and non-quad faces are not supported as of now.
-                BOOST_LOG_TRIVIAL(error) << "load_obj: failed to parse " << path << ". The file contains polygons with more than 4 vertices.";
+                BOOST_LOG_TRIVIAL(error) << "load_obj: failed to parse " << path
+                                         << ". The file contains polygons with more than 4 vertices.";
                 message = _L("The file contains polygons with more than 4 vertices.");
                 return false;
             } else if (num_face_vertices < 3) {
                 // Non-triangular and non-quad faces are not supported as of now.
-                BOOST_LOG_TRIVIAL(error) << "load_obj: failed to parse " << path << ". The file contains polygons with less than 2 vertices.";
+                BOOST_LOG_TRIVIAL(error) << "load_obj: failed to parse " << path
+                                         << ". The file contains polygons with less than 2 vertices.";
                 message = _L("The file contains polygons with less than 2 vertices.");
                 return false;
             }
             if (num_face_vertices == 4)
-                ++ num_quads;
-            ++ num_faces;
+                ++num_quads;
+            ++num_faces;
             i = j;
         }
     }
@@ -141,12 +149,12 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
     // [INTENT] Copy vertex positions. OBJ_VERTEX_LENGTH = 7 (x, y, z, r, g, b, a) to support
     //          per-vertex colours stored as extra coordinate fields in extended OBJ variants.
     bool has_color = data.has_vertex_color;
-    for (size_t i = 0; i < num_vertices; ++ i) {
+    for (size_t i = 0; i < num_vertices; ++i) {
         size_t j = i * OBJ_VERTEX_LENGTH;
         its.vertices.emplace_back(data.coordinates[j], data.coordinates[j + 1], data.coordinates[j + 2]);
         if (data.has_vertex_color) {
-            RGBA color{std::clamp(data.coordinates[j + 3], 0.f, 1.f), std::clamp(data.coordinates[j + 4], 0.f, 1.f), std::clamp(data.coordinates[j + 5], 0.f, 1.f),
-                       std::clamp(data.coordinates[j + 6], 0.f, 1.f)};
+            RGBA color{std::clamp(data.coordinates[j + 3], 0.f, 1.f), std::clamp(data.coordinates[j + 4], 0.f, 1.f),
+                       std::clamp(data.coordinates[j + 5], 0.f, 1.f), std::clamp(data.coordinates[j + 6], 0.f, 1.f)};
             obj_info.vertex_colors.emplace_back(color);
         }
     }
@@ -156,11 +164,11 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
     //          (terminated by coordIdx==-1 sentinel) and building triangle indices.
     for (size_t i = 0; i < data.vertices.size();)
         if (data.vertices[i].coordIdx == -1)
-            ++ i;
+            ++i;
         else {
             int cnt = 0;
             while (i < data.vertices.size())
-                if (const ObjParser::ObjVertex &vertex = data.vertices[i ++]; vertex.coordIdx == -1) {
+                if (const ObjParser::ObjVertex& vertex = data.vertices[i++]; vertex.coordIdx == -1) {
                     break;
                 } else {
                     assert(cnt < OBJ_VERTEX_LENGTH);
@@ -177,7 +185,7 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
                 assert(cnt == 3 || cnt == 4);
                 // Insert one or two faces (triangulate a quad).
                 its.indices.emplace_back(indices[0], indices[1], indices[2]);
-                int  face_index =its.indices.size() - 1;
+                int  face_index = its.indices.size() - 1;
                 RGBA face_color;
                 // [INTENT] Resolve material colour for a face by name lookup.
                 //          Colour = Ka+Kd if their sum stays ≤1 per channel, else Kd only.
@@ -190,15 +198,16 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
                         bool is_merge_ka_kd = true;
                         for (size_t n = 0; n < 3; n++) {
                             if (float(mtl_data.new_mtl_unmap[mtl_name]->Ka[n] + mtl_data.new_mtl_unmap[mtl_name]->Kd[n]) > 1.0) {
-                                is_merge_ka_kd=false;
+                                is_merge_ka_kd = false;
                                 break;
                             }
                         }
                         for (size_t n = 0; n < 3; n++) {
                             if (is_merge_ka_kd) {
-                                face_color[n] = std::clamp(float(mtl_data.new_mtl_unmap[mtl_name]->Ka[n] + mtl_data.new_mtl_unmap[mtl_name]->Kd[n]), 0.f, 1.f);
-                            }
-                            else {
+                                face_color[n] = std::clamp(float(mtl_data.new_mtl_unmap[mtl_name]->Ka[n] +
+                                                                 mtl_data.new_mtl_unmap[mtl_name]->Kd[n]),
+                                                           0.f, 1.f);
+                            } else {
                                 face_color[n] = std::clamp(float(mtl_data.new_mtl_unmap[mtl_name]->Kd[n]), 0.f, 1.f);
                             }
                         }
@@ -206,7 +215,9 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
                         if (mtl_data.new_mtl_unmap[mtl_name]->map_Kd.size() > 0) {
                             auto png_name       = mtl_data.new_mtl_unmap[mtl_name]->map_Kd;
                             obj_info.has_uv_png = true;
-                            if (obj_info.pngs.find(png_name) == obj_info.pngs.end()) { obj_info.pngs[png_name] = false; }
+                            if (obj_info.pngs.find(png_name) == obj_info.pngs.end()) {
+                                obj_info.pngs[png_name] = false;
+                            }
                             obj_info.uv_map_pngs[face_index] = png_name;
                         }
                         if (data.textureCoordinates.size() > 0) {
@@ -217,8 +228,7 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
                             obj_info.uvs.emplace_back(uv_array);
                         }
                         obj_info.face_colors.emplace_back(face_color);
-                    }
-                    else {
+                    } else {
                         if (obj_info.lost_material_name.empty()) {
                             obj_info.lost_material_name = mtl_name;
                         }
@@ -271,20 +281,22 @@ bool load_obj(const char *path, TriangleMesh *meshptr, ObjInfo& obj_info, std::s
 }
 
 // [INTENT] Convenience overload: loads OBJ into a temporary mesh then inserts into Model.
+// [STATE] Successful import appends exactly one ModelObject to `model`, even if the OBJ declared
+//         multiple `o`/`g` sections; this adapter does not split them into separate volumes.
 // [COUPLING] object_name_in follows same basename fallback as load_stl().
-bool load_obj(const char *path, Model *model, ObjInfo& obj_info, std::string &message, const char *object_name_in)
+bool load_obj(const char* path, Model* model, ObjInfo& obj_info, std::string& message, const char* object_name_in)
 {
     TriangleMesh mesh;
 
     bool ret = load_obj(path, &mesh, obj_info, message);
 
     if (ret) {
-        std::string  object_name;
+        std::string object_name;
         if (object_name_in == nullptr) {
-            const char *last_slash = strrchr(path, DIR_SEPARATOR);
+            const char* last_slash = strrchr(path, DIR_SEPARATOR);
             object_name.assign((last_slash == nullptr) ? path : last_slash + 1);
         } else
-           object_name.assign(object_name_in);
+            object_name.assign(object_name_in);
         model->add_object(object_name.c_str(), path, std::move(mesh));
     }
 
@@ -293,22 +305,22 @@ bool load_obj(const char *path, Model *model, ObjInfo& obj_info, std::string &me
 
 // [INTENT] Write a TriangleMesh to OBJ format.
 // [HAZARD] Always returns true even if WriteOBJFile() fails (known FIXME).
-bool store_obj(const char *path, TriangleMesh *mesh)
+bool store_obj(const char* path, TriangleMesh* mesh)
 {
-    //FIXME returning false even if write failed.
+    // FIXME returning false even if write failed.
     mesh->WriteOBJFile(path);
     return true;
 }
 
 // [INTENT] Convenience overload: merges ModelObject volumes into a single mesh before writing.
-bool store_obj(const char *path, ModelObject *model_object)
+bool store_obj(const char* path, ModelObject* model_object)
 {
     TriangleMesh mesh = model_object->mesh();
     return store_obj(path, &mesh);
 }
 
 // [INTENT] Convenience overload: merges all Model objects into a single mesh before writing.
-bool store_obj(const char *path, Model *model)
+bool store_obj(const char* path, Model* model)
 {
     TriangleMesh mesh = model->mesh();
     return store_obj(path, &mesh);

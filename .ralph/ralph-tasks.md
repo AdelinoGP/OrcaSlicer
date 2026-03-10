@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer Analysis Agent
-Last updated: 2026-03-10T22:44:00Z
+Last updated: 2026-03-10T23:06:00Z
 
 ## Legend
 - [ ] PENDING   — not started
@@ -433,7 +433,7 @@ its header to understand the data contract.)
              done after verification. If partial or absent, complete them.
              Commit: `annotate: STL parser (T4010)`
 
-- [ ] T4011  annotate+verify: src/libslic3r/Format/OBJ.cpp
+- [x] T4011  annotate+verify: src/libslic3r/Format/OBJ.cpp
                             + src/libslic3r/Format/OBJ.hpp
              Context: OBJ mesh loading. OBJ supports multiple named objects in
              one file — document how multi-object OBJ maps to ModelVolume count.
