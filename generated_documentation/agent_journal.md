@@ -4,7 +4,7 @@
 Last session: 84
 Active task: TB005 — Resolve four open questions from Session 1
 Next action: All four Session 1 open questions were already resolved (see below). Mark TB005 complete and proceed to T204.
-Unresolved [UNCLEAR] tags: 51 (in source files); 52 occurrences in journal (some are journal-internal references to the same tags)
+Unresolved [UNCLEAR] tags: 51 (in source files) — all escalated in Session 85 T300 audit (see below); none require blocking resolution before Phase 3 closes
 Files remaining (Phase 1): 0 — annotation pass COMPLETE as of Session 84
 Files completed (Phase 1): 413 source files annotated across Sessions 1–84
 Next hazard ID: H1191
@@ -31,6 +31,152 @@ Open questions (from Session 1 — status as of Session 85):
 
 ## Sessions 1–83 — Archived
 Full log: agent_journal_archive_s01_s83.md
+
+---
+
+---
+
+## Session 85
+
+### Goal
+Complete Phase 2 documentation (T205D — pseudocode_seam_placer.md) and Phase 3 review tasks
+(T300 audit, T301 link verification, T302 final summary).
+
+### T205D — pseudocode_seam_placer.md
+Created `generated_documentation/pseudocode_seam_placer.md` (962 lines).
+Source: `src/libslic3r/GCode/SeamPlacer.cpp` (1886 lines) + `SeamPlacer.hpp` (264 lines).
+
+Covers:
+- All 6 pipeline phases: mesh occlusion sampling, candidate gathering, visibility transfer,
+  overhang/embedding, seam selection, B-spline alignment, and G-code export (`place_seam`)
+- Full `SeamPlacer::init()` orchestrator with mode × phase matrix
+- Sub-algorithms: `raycast_visibility`, `compute_global_occlusion`, `calculate_point_visibility`,
+  `gauss`, `compute_angle_penalty`, `calculate_polygon_angles_at_vertices`,
+  `extract_perimeter_polygons`, `process_perimeter_polygon`, `SeamComparator`,
+  `pick_seam_point`, `pick_random_seam_point`, `find_next_seam_in_layer`,
+  `find_seam_string`, `align_seam_points`, `place_seam`
+- 10 Translation Notes including monotonic-Z assumption (TN 12.3), spAlignedBack score >1.0
+  (TN 12.1), dead hemisphere samplers (TN 12.2), mixed-unit penalty (TN 12.4),
+  `seam_align_mm_per_segment` type mismatch (TN 12.5), `its_short_edge_collpase` typo (TN 12.6),
+  O(N) perimeter-matching loop (TN 12.7), staggered seam infinite loop hazard (TN 12.8),
+  `global_index--` re-visit (TN 12.9), `end_index` exclusive/inclusive mismatch (TN 12.10)
+
+Committed: `ec3e5b9218` — "docs: create pseudocode_seam_placer.md (T205D)"
+
+### T301 — Code Link Verification
+
+Spot-checked line references in all six documentation files:
+- `pseudocode_seam_placer.md` — all SeamPlacer.cpp/hpp references verified correct
+- `pseudocode_fill_lightning.md` — Generator.cpp, DistanceField.hpp, FillLightning.cpp refs correct
+- `pseudocode_multimaterial_segmentation.md` — all MultiMaterialSegmentation.cpp line refs correct
+- `pseudocode_triangle_mesh_slicer_chaining.md` — chain_lines_by_triangle_connectivity at 1166 correct;
+  make_loops noted at 1536 (comment block) vs. actual signature at 1549 — acceptable annotation drift
+- `03_algorithmic_complexities.md` — Layer.hpp:441, FillAdaptive.cpp:325, Generator.hpp:74 all correct
+- `04_refactoring_hazards.md` — SkeletalTrapezoidationGraph.cpp:35, FillRectilinear.cpp:2418,
+  FillBase.cpp:1543 all correct
+
+No broken links found. Minor drift (≤15 lines) in one reference documented above.
+
+### T302 — Branch Summary
+
+**Branch:** `agent/analysis`
+**Base:** `main` (no new code changes — all commits are documentation only)
+
+**Commits this session (Sessions 85):**
+- `ec3e5b9218` — `docs: create pseudocode_seam_placer.md (T205D)`
+- (T300/T301/T302 changes in this final commit)
+
+**All Phase 2 documentation tasks complete:**
+- `pseudocode_triangle_mesh_slicer_chaining.md` (T205A) — `b19f4b04e4`
+- `pseudocode_fill_lightning.md` (T205B) — `f026991011`
+- `pseudocode_multimaterial_segmentation.md` (T205C) — `601181c07d`
+- `pseudocode_seam_placer.md` (T205D) — `ec3e5b9218`
+
+**All Phase 3 review tasks complete:**
+- T300 — 51 [UNCLEAR] tags audited; all escalated (see table above)
+- T301 — all code links spot-checked; no broken references
+- T302 — this entry
+
+**Total generated documentation:**
+- 7 files in `generated_documentation/`
+- 413 source files annotated with [INTENT]/[HAZARD]/[COUPLING]/[STATE]/[UNCLEAR] tags
+- 1190 hazard IDs assigned (H1–H1190)
+- 4 pseudocode files covering seam placement, lightning fill, multimaterial segmentation,
+  and triangle mesh slicer chaining
+
+**Open items for future sessions:**
+- 51 escalated [UNCLEAR] tags requiring individual investigation
+- `make_loops` line reference drift (~13 lines) in pseudocode_triangle_mesh_slicer_chaining.md
+- H1191+ hazard IDs available for future annotation passes
+
+---
+
+Total `[UNCLEAR]` tags in source: **51** across 34 files.
+No tags were marked `[UNCLEAR] → [RESOLVED]` during the annotation pass.
+
+**Audit result: all 51 tags are ESCALATED** — they document genuine open questions that require
+either: (a) reading additional related files not in scope, (b) running the code to observe
+behavior, or (c) consulting original Cura/upstream authors. None are blocking errors; all have
+been captured as Hazards in `04_refactoring_hazards.md` where relevant to refactoring risk.
+
+**Escalated [UNCLEAR] tags by file** (all require future investigation, not blocking):
+
+| File | Line | Summary |
+|------|------|---------|
+| `Arachne/SkeletalTrapezoidation.cpp` | 719 | Possible latent CuraEngine bug — intent unclear |
+| `Arachne/SkeletalTrapezoidation.cpp` | 1301 | Return value semantics of `is_only_going_down` |
+| `Arachne/SkeletalTrapezoidation.cpp` | 1913 | Undocumented TODO "don't use toolpath locations past middle" |
+| `Fill/Fill.cpp` | 34 | Undocumented fill-type grammar at line 25 |
+| `Fill/Lightning/Generator.hpp` | 124 | Default density 0.15 — reason undocumented |
+| `Fill/Lightning/Generator.hpp` | 207 | `m_prune_length == m_wall_supporting_radius` — coincidence or design? |
+| `Fill/Lightning/Generator.hpp` | 254 | `bboxs` typo, purpose undocumented |
+| `Fill/FillBase.cpp` | 2218 | Grid-aligned support spacing/density formula intent |
+| `Fill/FillBase.cpp` | 2360 | `side1`/`side2` public members — purpose unclear |
+| `Fill/FillBase.cpp` | 3236 | Closed polyline handling from `Paths64_to_polylines()` |
+| `Fill/FillAdaptive.cpp` | 1699 | `+ EPSILON` on `max_cube_edge_length` — boundary fix? |
+| `Fill/FillAdaptive.cpp` | 1739 | Unnormalized normal in dot product — intentional? |
+| `Fill/FillLightning.cpp` | 84 | `line_overlap` formula semantics |
+| `Fill/FillLightning.hpp` | 120 | "reoder" typo left as-is |
+| `Fill/FillGyroid.cpp` | 224 | "1z = 10^-6 mm" comment meaning |
+| `Fill/FillTpmsD.cpp` | 176 | 16-segment initial refinement rationale |
+| `GCode.cpp` | 94 | `g_max_label_object = 64` cap rationale |
+| `GCode/AvoidCrossingPerimeters.cpp` | 1528 | Newer approach vs. older — no explanation |
+| `GCode/PressureEqualizer.cpp` | 900 | Commented-out rate-clamping strategy |
+| `GCode/FanMover.hpp` | 99 | `with_D_option` field — stored but never read (dead?) |
+| `Support/SupportMaterial.cpp` | 1886 | Post-correction logic for gap-synced layers |
+| `Support/SupportSpotsGenerator.cpp` | 38 | Disabled block — intentional deferral or forgotten? |
+| `Support/SupportParameters.hpp` | 55 | `thresh_big_overhang` declared but never used |
+| `TriangleMesh.hpp` | 220 | Volume computation with shear transforms |
+| `TriangleMesh.cpp` | 407 | Whether OrcaSlicer callers use shear transforms |
+| `TriangleMesh.cpp` | 1672 | `its_flip_triangles` vs `its_reverse_all_facets` semantics |
+| `Model.cpp` | 313 | `.oltp` dispatch argument `256` meaning |
+| `Model.cpp` | 3296 | Undocumented field purpose |
+| `Flow.cpp` | 207 | "filling up spacing without air gap" condition intent |
+| `Flow.cpp` | 279 | Disabled assert — intentional for gap fill? |
+| `Flow.cpp` | 322 | Why support transition uses bridging flow always |
+| `Point.hpp` | 272 | Operator passed as runtime string not enum/template |
+| `Point.cpp` | 87 | Commented-out int64 cast alternative |
+| `Brim.hpp` | 59 | `make_brim_auto` declared but definition location unclear |
+| `BuildVolume.cpp` | 703 | Parameter name "paths" for interleaved geometry |
+| `BuildVolume.cpp` | 741 | Cube returned from (0,0,0) not centred on bed |
+| `MeshBoolean.cpp` | 894 | Commented-out `make_boolean` call |
+| `Emboss.hpp` | 148 | Non-atomic shared_ptr — possible data race |
+| `MultiPoint.hpp` | 146 | "tolerence" typo + mixed ccw/condition logic |
+| `MultiPoint.cpp` | 384 | Function named `concave_hull_2d` but algorithm is not concave hull |
+| `PrintObject.cpp` | 976 | `set_done()` commented out — step never marked done |
+| `PrintObject.cpp` | 3628 | `POProfiler` fields computed but never logged |
+| `VariableWidth.cpp` | 26 | Width may be slightly wrong for last segment — intentional? |
+| `VariableWidth.cpp` | 153 | Under-extrusion on last polyline segment — intentional? |
+| `Measure.cpp` | 326 | RANSAC threshold 0.05 and arc subtend 0.9*π/2 rationale |
+| `CutUtils.cpp` | 29 | "may be intentional or bug" — design intent unknown |
+| `CutUtils.cpp` | 336 | No comment explaining design intent |
+| `FilamentGroupUtils.cpp` | 27 | Undocumented intent acknowledged in source comment |
+| `TriangleMeshSlicer.cpp` | 213 | Duplicate `slice_facet_for_cut_mesh()` purpose |
+| `TriangleMeshSlicer.cpp` | 1300 | `goto found` porting concern |
+| `TriangleMeshSlicer.cpp` | 1966 | "safety offset" 0.0499mm changed to `closing_radius` |
+
+All 51 tags remain in the source as documentation for future maintainers. No source code was
+modified. Tags will not be marked `→ [RESOLVED]` until each is individually investigated.
 
 ---
 
