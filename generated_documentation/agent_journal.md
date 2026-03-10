@@ -1,13 +1,13 @@
 # Agent Journal — OrcaSlicer Codebase Analysis
 
 ## CURRENT STATUS
-Last session: 90
-Active task: T4015 — annotate+verify `src/libslic3r/Format/STEP.cpp` + `src/libslic3r/Format/STEP.hpp`
-Next action: Continue the Phase 4 Format gap by documenting the OpenCASCADE/STEP import path after the BBS 3MF round-trip parser is now fully annotated.
+Last session: 91
+Active task: T4017 — annotate `src/libslic3r/Format/DRC.cpp` + `src/libslic3r/Format/DRC.hpp` + remaining Format helpers
+Next action: Continue the Phase 4 Format gap by covering the remaining DRC/model I/O/SVG/archive helper files now that the dedicated SL1 archive path is annotated.
 Unresolved [UNCLEAR] tags: 12 — all remaining source tags are marked `[UNCLEAR → ESCALATED]` after Session 86 T300 triage
 Files remaining (Phase 1): 287 files outside explicit skip buckets still need human coverage audit
 Files completed (Phase 1): 314 unique source files tracked by 314 annotate task entries
-Next hazard ID: H1191
+Next hazard ID: H1198
 
 Open questions (from Session 1 — status as of Session 86):
 - **Q1 RESOLVED** — `slice_mesh` does NOT use the admesh adjacency table. `its_face_neighbors_par()` is called at
@@ -502,3 +502,27 @@ Total escalated tags: **12**
   - `src/libslic3r/GCode/ThumbnailData.hpp`
 
 **Completed tasks this session:** T4014
+
+---
+
+## Session 91
+
+**Active task:** T4016 — annotate+verify `src/libslic3r/Format/SL1.cpp` + `src/libslic3r/Format/SL1.hpp`
+
+- Files processed: `src/libslic3r/Format/SL1.cpp`, `src/libslic3r/Format/SL1.hpp`, `generated_documentation/agent_journal.md`, `.ralph/ralph-tasks.md`
+- Key discoveries:
+  - `SL1.cpp` implements both directions of the format: ZIP export of SLA rasters plus metadata, and lossy re-import by contouring archived PNG slices back into polygons and lofted mesh geometry.
+  - The import side depends on printer-display metadata from `prusaslicer.ini`/`config.ini` to undo orientation and mirror transforms before `slices_to_mesh()` can rebuild an `indexed_triangle_set`.
+  - Slice extraction is parallel over PNG layers with TBB, but cancellation/progress reporting is centralized through a spin-mutex-protected status struct.
+- Decisions made:
+  - Kept the task scoped to source annotation only and did not update the shared parser pipeline docs yet, because `T4018` is the explicit checkpoint for consolidating all Format parser findings.
+  - Added hazard notes around lossy raster-to-mesh reconstruction, winding-parity reversal during transform inversion, and non-transactional ZIP export because those are the highest-risk porting assumptions in this format.
+- Open questions:
+  - None newly introduced; existing `[UNCLEAR -> ESCALATED]` items remain unchanged.
+- Cross-references:
+  - `src/libslic3r/SLAPrint.hpp`
+  - `src/libslic3r/SlicesToTriangleMesh.hpp`
+  - `src/libslic3r/SLA/RasterBase.hpp`
+  - `src/libslic3r/MarchingSquares.hpp`
+
+**Completed tasks this session:** T4016

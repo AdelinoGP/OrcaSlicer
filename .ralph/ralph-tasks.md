@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer Analysis Agent
-Last updated: 2026-03-10T00:35:00Z
+Last updated: 2026-03-10T01:42:00Z
 
 ## Legend
 - [ ] PENDING   — not started
@@ -474,7 +474,7 @@ its header to understand the data contract.)
              section 16 (OCCT).
              Commit: `annotate: STEP/OCCT parser (T4015)`
 
-- [ ] T4016  annotate+verify: src/libslic3r/Format/SL1.cpp
+- [x] T4016  annotate+verify: src/libslic3r/Format/SL1.cpp
                             + src/libslic3r/Format/SL1.hpp
              Context: SLA archive format I/O for the Prusa SL1 ZIP container.
              These are output-only formats for the SLA pipeline. Document the
