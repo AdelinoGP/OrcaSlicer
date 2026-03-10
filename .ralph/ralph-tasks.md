@@ -435,7 +435,7 @@ Last updated: 2026-03-09T00:00:00Z
 - [x] T2202  Write 03_algorithmic_complexities.md (Session 33 and ongoing)
 - [x] T2203  Write 04_refactoring_hazards.md (Sessions 2–84, ongoing)
 
-- [ ] T204  Create `05_external_dependencies.md`. Follow the structure in the
+- [x] T204  Create `05_external_dependencies.md`. Follow the structure in the
             prompt exactly. Priority order: Clipper/Clipper2 → TBB → Eigen →
             admesh → OpenVDB → remaining 16 libraries. For each: API surface
             used, algorithmic role, porting strategy (REPLICATE / FIND_EQUIVALENT
