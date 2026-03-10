@@ -32,7 +32,7 @@ Last updated: 2026-03-09T00:00:00Z
              Keep Session 84 and the new CURRENT STATUS block intact.
              Commit with prefix `docs:`.
 
-- [ ] TB004  BOOTSTRAP · Add the `## Critical Blockers (P1/High — Read First)`
+- [x] TB004  BOOTSTRAP · Add the `## Critical Blockers (P1/High — Read First)`
              section to `04_refactoring_hazards.md`, immediately after the Table
              of Contents. Scan the entire file for every entry marked `P1/High`
              and list each as a single line:

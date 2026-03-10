@@ -33,6 +33,284 @@
 
 ---
 
+## Critical Blockers (P1/High — Read First)
+
+The 270 entries below are every hazard in this file rated **High/P1** or **Critical/P0**.
+They are listed in H-number order. Fix or consciously accept each one before porting.
+
+Format: `H<id> · [SEVERITY/PRIORITY] · <description> · <file:location>`
+
+P0/Critical entries are marked `[CRITICAL/P0]` and must be resolved first.
+
+---
+
+H52 · [HIGH/P1] · `discretize_circle()` degenerate normal → NaN mesh · `TreeSupport3D.cpp:3056`
+H56 · [HIGH/P1] · Operator precedence bug in `generate_support_infill_lines()` · `TreeSupport3D.cpp:651`
+H62 · [HIGH/P1] · `TreeSupportSettings::soluble` static race · `TreeSupportCommon.hpp`
+H66 · [HIGH/P1] · `m_layer_results` public raw pointer queue · `PressureEqualizer.hpp`
+H71 · [HIGH/P1] · `processing_last_mesh` bug — anti_overhang never applied (single mesh) · `TreeModelVolumes.cpp`
+H77 · [HIGH/P1] · Mixed scaled/unscaled Z contract at public API boundaries · `TriangleMeshSlicer.cpp`
+H81 · [HIGH/P1] · `finalize()` post-process no backup before atomic rename · `GCodeProcessor.cpp`
+H82 · [HIGH/P1] · `calculate_time()` invalidates all move indices · `GCodeProcessor.cpp`
+H83 · [HIGH/P1] · `m_result.moves` unbounded RAM growth (2GB+ for large prints) · `GCodeProcessor.cpp`
+H84 · [HIGH/P1] · `G92 E` vs `G92 XYZ` asymmetric origin update · `GCodeProcessor.cpp`
+H96 · [CRITICAL/P1] · `change_axis_value()` wraps npos+2, silently corrupts line · `FanMover.cpp`
+H97 · [HIGH/P1] · `change_axis_value()` catastrophic replace if no trailing space/semicolon · `FanMover.cpp`
+H111 · [CRITICAL/P1] · CSV silent discard on any parse exception — no partial recovery · `AdaptivePAInterpolator.cpp`
+H112 · [HIGH/P1] · CSV column order (PA, flow, accel) undocumented; wrong order poisons model silently · `AdaptivePAInterpolator.cpp`
+H113 · [HIGH/P1] · `accel_value` is `unsigned int`; populated via `std::stod()` — silent truncation of fractional values · `AdaptivePAProcessor.cpp`
+H118 · [HIGH/P1] · Partially-parsed CSV line (1 or 2 of 3 fields read) contributes flowRate=0 or accel=0 entry · `AdaptivePAInterpolator.cpp`
+H122 · [HIGH/P1] · PCHIP requires sorted inputs; inner (flow_rate, PA) pairs per acceleration group are unsorted · `AdaptivePAInterpolator.cpp`
+H126 · [HIGH/P1] · Triple-offset in generate() destroys features < ~11500nm before SkeletalTrapezoidation · `WallToolPaths.cpp`
+H127 · [HIGH/P1] · `transition_filter_dist` hardcoded to 100mm — may suppress all wall-count transitions on small parts · `WallToolPaths.cpp`
+H131 · [HIGH/P1] · `outline` stored as `const Polygons&` — dangling reference if caller's polygon is a temporary · `WallToolPaths.hpp`
+H136 · [HIGH/P1] · `stitchToolPaths`: `stitch_distance = bead_width_x - 1`; if bead_width_x is 0, distance = -1 (UB) · `WallToolPaths.cpp`
+H141 · [HIGH/P1] · `filterCentral()` tautological always-false condition — recursive filter body is dead code · `SkeletalTrapezoidation.cpp`
+H142 · [HIGH/P1] · `dissolveNearbyTransitions()` recursion depth unbounded; up to ~500 levels — stack overflow risk · `SkeletalTrapezoidation.cpp`
+H143 · [HIGH/P1] · `transition_filter_dist` = 100mm hardcoded — dissolves nearly all transitions on small parts · `WallToolPaths.cpp / SkeletalTrapezoidation.cpp`
+H145 · [CRITICAL/P0] · `beading_strategy` stored as `const BeadingStrategy&` — dangling reference risk · `SkeletalTrapezoidation.hpp`
+H146 · [CRITICAL/P0] · `p_generated_toolpaths` raw non-owning pointer — null-deref if accessed before generateToolpaths() · `SkeletalTrapezoidation.hpp`
+H147 · [HIGH/P1] · `SKELETAL_TRAPEZOIDATION_BEAD_SEARCH_MAX` = 1000 cap — silent fallback creates zero-width gap · `SkeletalTrapezoidation.cpp`
+H151 · [HIGH/P1] · `generateTransitionEnd()`: division by zero if start_pos == end_pos (zero-length transition) · `SkeletalTrapezoidation.cpp`
+H162 · [HIGH/P1] · `getOrCreateBeading()`: bead_count == -1 degenerate — fallback returns wrong-R beading · `SkeletalTrapezoidation.cpp`
+H164 · [HIGH/P1] · `addToolpathSegment()`: CCW-wound even walls logs error but continues — incorrect winding persists · `SkeletalTrapezoidation.cpp`
+H165 · [CRITICAL/P0] · `connectJunctions()`: do-while with comma-operator — malformed DCEL causes null-deref · `SkeletalTrapezoidation.cpp`
+H166 · [HIGH/P1] · `connectJunctions()`: mismatched junction sizes logged but not corrected — broken paths in output · `SkeletalTrapezoidation.cpp`
+H176 · [HIGH/P1] · `BeadingStrategy::getTransitionAnchorPos()` divides by (upper_optimum - lower_optimum) — div-by-zero if optimal_width == 0 · `BeadingStrategy.cpp`
+H182 · [HIGH/P1] · `DistributedBeadingStrategy::compute()`: negative to_be_divided can produce negative bead widths · `DistributedBeadingStrategy.cpp`
+H184 · [HIGH/P1] · `LimitedBeadingStrategy::compute()` overflow path guarded by assert only — release builds proceed garbled · `LimitedBeadingStrategy.cpp`
+H186 · [HIGH/P1] · `LimitedBeadingStrategy::getOptimalThickness()` returns 1 m sentinel — propagates silently into geometry · `LimitedBeadingStrategy.cpp`
+H199 · [HIGH/P1] · `BeadingStrategyFactory::makeStrategy()`: SPECIAL CASE max_bead_count <= 2 must be preserved · `BeadingStrategyFactory.cpp`
+H200 · [HIGH/P1] · `BeadingStrategyFactory::makeStrategy()`: decorator stack order fixed at compile time — no runtime config · `BeadingStrategyFactory.cpp`
+H205 · [HIGH/P1] · `STHalfEdge::canGoUp()` / `distToGoUp()` recurse through equidistant fans — no cycle guard · `SkeletalTrapezoidationGraph.cpp:35`
+H209 · [HIGH/P1] · `collapseSmallEdges()` Pattern A: re-linking loop breaks at count > 1000 — dangling from-pointers · `SkeletalTrapezoidationGraph.cpp:247`
+H213 · [HIGH/P1] · `insertRib()` exits with twin == nullptr — twin-patching contract must be preserved in port · `SkeletalTrapezoidationGraph.cpp:424`
+H215 · [HIGH/P1] · `PrintEstimatedStatistics::reset()` iterates modes by value — actual modes[] elements NOT cleared · `GCodeProcessor.hpp:97`
+H220 · [HIGH/P1] · `GCodeProcessorResult::result_mutex` mutable — const accessors are silently un-threadsafe · `GCodeProcessor.hpp:257`
+H221 · [HIGH/P1] · `GCodeProcessorResult::operator=()` omits copying many fields — stale/zero after copy-assignment · `GCodeProcessor.hpp:258`
+H222 · [HIGH/P1] · `ETags` values are raw array indices — adding/removing/reordering enum silently reads wrong tag · `GCodeProcessor.hpp:327`
+H226 · [HIGH/P1] · `m_print` is a raw non-owning pointer to Print — use-after-free on cancellation race · `GCodeProcessor.hpp:831`
+H229 · [HIGH/P1] · `monotonic_3_opt()` function body is entirely comments — stub, 3-opt improvement never runs · `FillRectilinear.cpp:2418`
+H236 · [HIGH/P1] · `SegmentIntersection::pos_q == 0` zero-denominator — integer division UB in release builds · `FillRectilinear.cpp:179`
+H237 · [HIGH/P1] · `BoundaryInfillGraph::map_infill_end_point_to_boundary` linked-list pointers invalidated on vector realloc · `FillBase.cpp:1543`
+H243 · [HIGH/P1] · `emit_loops_in_band()`: `add_interpolated_point()` division by zero if p1->x() == p2->x() · `FillBase.cpp:2354`
+H252 · [HIGH/P1] · `Intersection*` pointers in intersections vector carry raw `Polyline*` — dangling on realloc · `FillAdaptive.cpp:600`
+H261 · [HIGH/P1] · `Octree::insert_triangle()`: `--depth` before 8-child loop — depth = 0 causes infinite recursion · `FillAdaptive.cpp:1573`
+H264 · [HIGH/P1] · `GeneratorDeleter` pattern: include order dependency between FillLightning.hpp and Generator.hpp · `FillLightning.hpp:52`
+H267 · [HIGH/P1] · `Filler::generator` raw non-owning pointer — dangling if PrintObject destroyed first · `FillLightning.cpp:96`
+H268 · [HIGH/P1] · `this->layer_id` used as index into `Generator::m_lightning_layers` — no bounds check · `FillLightning.cpp:96`
+H270 · [HIGH/P1] · Two Generator constructors have DIFFERENT `m_supporting_radius` formulas — inconsistent geometry · `Generator.hpp:31`
+H287 · [HIGH/P1] · `GroundingLocation::p()`: assert(tree_node || boundary_location) debug-only — release UB · `Layer.hpp:46`
+H291 · [HIGH/P1] · `reconnectRoots()`: root already removed from tree but iterator still used — UB · `Layer.hpp:140`
+H307 · [HIGH/P1] · Multiple recursive DFS functions (deepCopy, realign, reroot, etc.) with no depth limit · `TreeNode.hpp:multiple`
+H321 · [HIGH/P1] · `FillGyroid.cpp` static f(): asin(a/r) — argument may exceed [-1,1] causing NaN · `FillGyroid.cpp:58-65`
+H331 · [HIGH/P1] · `Fill3DHoneycomb::_fill_surface_single()` casts params.density to coord_t via scale_() — precision loss · `Fill3DHoneycomb.cpp:_fill_surface_single`
+H334 · [HIGH/P1] · `_fill_surface_single()` hardcodes layerHeight = scale_(1.0) — always 1 mm regardless of config · `Fill3DHoneycomb.cpp:_fill_surface_single`
+H336 · [HIGH/P1] · `zip()` assert(a.size() == b.size()) debug-only — release UB on mismatched arrays · `Fill3DHoneycomb.cpp:zip`
+H339 · [HIGH/P1] · `FillHoneycomb` geometry cache not invalidated on config change — stale geometry silently reused · `FillHoneycomb.cpp:cache`
+H352 · [HIGH/P1] · `~Layer()` manually deletes raw `LayerRegion*` pointers — no RAII · `Layer.cpp:destructor`
+H355 · [HIGH/P1] · `merged()` returns ExPolygons via Clipper subtraction — may drop coincident surfaces · `Layer.cpp:merged`
+H356 · [HIGH/P1] · `generate_archimedean_chords()`: if resolution <= 0 after normalization, dθ = acos(1) → infinite loop · `FillPlanePath.cpp:generate_archimedean_chords:188`
+H360 · [HIGH/P1] · `SupportLayer::AreaGroup` contains raw `ExPolygon*` — dangling on vector realloc · `Layer.cpp:SupportLayer`
+H361 · [HIGH/P1] · `Layer::lslices_ex` cleared and rebuilt inside `make_slices()` — data race if multi-threaded · `Layer.hpp/Layer.cpp`
+H362 · [HIGH/P1] · `Layer::lower_layer` / `upper_layer` raw back-pointers — dangle after PrintObject rebuild · `Layer.hpp`
+H365 · [HIGH/P1] · `make_perimeters()`: `upper_layer->get_region(region_id)` has no bounds check · `LayerRegion.cpp:154`
+H368 · [HIGH/P1] · `process_external_surfaces()`: expansion_zones mutated in-place — order-dependent and fragile · `LayerRegion.cpp:559-589`
+H370 · [HIGH/P1] · `expansion_zones.pop_back()` removes top zone after tops expanded — leaves zones mismatched · `LayerRegion.cpp:583`
+H379 · [HIGH/P1] · `merge_bridges()`: `assert(false && "Bridge angle must be pre-calculated!")` debug-only · `LayerRegion.cpp:356-360`
+H391 · [HIGH/P1] · Legacy `process_external_surfaces()`: fill_boundaries computed from fill_expolygons then overwritten · `LayerRegion.cpp:727`
+H393 · [HIGH/P1] · `TriangleMeshStats::volume = -1.f` sentinel — any code comparing to 0 misreads uninitialized volume · `TriangleMesh.hpp:TriangleMeshStats`
+H394 · [HIGH/P1] · `TriangleMeshStats` raw-binary serialised via cereal — field addition/removal silently corrupts saves · `TriangleMesh.hpp:TriangleMeshStats`
+H396 · [HIGH/P1] · `TriangleMesh::its` is public — any code can mutate triangle/vertex data directly · `TriangleMesh.hpp:TriangleMesh`
+H397 · [HIGH/P1] · `TriangleMesh::volume()` lazily initialised through mutable stats — not thread-safe · `TriangleMesh.hpp:volume()`
+H402 · [HIGH/P1] · `VertexFaceIndex` CSR index invalidated by any mesh mutation — no notification mechanism · `TriangleMesh.hpp:VertexFaceIndex`
+H408 · [HIGH/P1] · `its_volume()` on open meshes: signed-tetrahedra formula gives incorrect result · `TriangleMesh.hpp:its_volume()`
+H409 · [HIGH/P1] · `its_make_snap()` groove alignment loop may fail to converge — no iteration cap · `TriangleMesh.hpp:its_make_snap()`
+H414 · [HIGH/P1] · `stl_fill_holes()` is `#if 0` disabled — open meshes pass repair pipeline unrepaired · `TriangleMesh.cpp:trianglemesh_repair_on_import`
+H425 · [HIGH/P1] · `ExPolygonProvider` requires holes CW — wrong winding silently misassigns contour/hole · `ClipperUtils.hpp:ExPolygonProvider`
+H426 · [HIGH/P1] · `SurfacesPtrProvider` holds raw pointers to Surface objects — dangling if owning container reallocates · `ClipperUtils.hpp:SurfacesPtrProvider`
+H435 · [HIGH/P1] · `_foreach_node<ON>` iterates original nodes vector instead of output — silent no-op bug · `ClipperUtils.hpp:_foreach_node`
+H437 · [HIGH/P1] · `mittered_offset_path_scaled()`: mixed positive/negative deltas asserted debug-only — release UB · `ClipperUtils.hpp:mittered_offset_path_scaled`
+H443 · [HIGH/P1] · `PolyTreeToExPolygons` silently misassigns contours and holes if PolyTree depth is wrong · `ClipperUtils.cpp:PolyTreeToExPolygons`
+H454 · [HIGH/P1] · `mittered_offset_path_scaled` short-edge skip uses max_element(deltas) — wrong for mixed-sign deltas · `ClipperUtils.cpp:mittered_offset_path_scaled`
+H456 · [HIGH/P1] · `variable_offset_inner/outer`: deltas vector size mismatch is debug-only assert · `ClipperUtils.cpp:variable_offset_inner/outer`
+H458 · [HIGH/P1] · Raw-pointer ownership vectors (`ModelObjectPtrs`, `ModelVolumePtrs`, `ModelInstancePtrs`) — emplace_back(new T) leaks on exception · `Model.hpp:ModelObjectPtrs / ModelVolumePtrs`
+H459 · [HIGH/P1] · Static members `Model::extruderParamsMap` and `printSpeedMap` — global mutable state, no sync · `Model.hpp:Model::extruderParamsMap / printSpeedMap`
+H464 · [HIGH/P1] · Five separate bounding-box caches each with independent dirty flags — easy to desync · `Model.hpp:ModelObject bounding box caches`
+H487 · [HIGH/P1] · TOCTOU on `object_backup_id_map`: find() + emplace() + erase() not atomic · `Model.cpp:Model::add_object(const ModelObject&)`
+H489 · [HIGH/P1] · `Model::clear_objects()` calls delete_object_mesh() (filesystem I/O) inside loop — no error handling · `Model.cpp:Model::clear_objects`
+H491 · [HIGH/P1] · `Model::get_object_backup_id()` non-const: find + insert not atomic — concurrent callers race · `Model.cpp:Model::get_object_backup_id`
+H492 · [HIGH/P1] · `Model::get_object_backup_id()` const: find() without end() check — null-deref if not found · `Model.cpp:Model::get_object_backup_id (const)`
+H493 · [HIGH/P1] · `Model::get_backup_path()` calls `std::localtime()` — not thread-safe on most platforms · `Model.cpp:Model::get_backup_path:localtime`
+H498 · [HIGH/P1] · `ModelObject::add_volume_with_shared_mesh()`: shared TriangleMesh mutated via one volume affects other · `Model.cpp:ModelObject::add_volume_with_shared_mesh`
+H502 · [HIGH/P1] · `ModelObject::center_around_origin()` accumulates `origin_translation` on each call without reset · `Model.cpp:ModelObject::center_around_origin`
+H504 · [HIGH/P1] · `ModelObject::translate()` partially updates caches — raw_bounding_box and m_min_max_z left stale · `Model.cpp:ModelObject::translate`
+H506 · [HIGH/P1] · `ModelObject::rotate(Axis)` calls `center_around_origin()` after every axis-aligned rotation — accumulation · `Model.cpp:ModelObject::rotate(Axis)`
+H507 · [HIGH/P1] · `ModelObject::rotate(Vec3d axis)` same center_around_origin() accumulation risk as H506 · `Model.cpp:ModelObject::rotate(Vec3d)`
+H508 · [HIGH/P1] · `scale_mesh_after_creation()` / `scale_geometry_after_creation()` use const_cast to mutate through shared_ptr · `Model.cpp:scale_mesh_after_creation / scale_geometry_after_creation`
+H510 · [HIGH/P1] · `ModelObject::bake_xy_rotation_into_meshes()`: after baking, mesh vertices in new coordinate but transform unchanged · `Model.cpp:ModelObject::bake_xy_rotation_into_meshes`
+H512 · [HIGH/P1] · `ModelObject::split()` multi-volume path: meshes std::moved into all_meshes — original volumes left empty · `Model.cpp:ModelObject::split`
+H513 · [HIGH/P1] · `ModelObject::split()` transform-correction: multiple floating-point matrix inversions — degenerate if singular · `Model.cpp:ModelObject::split`
+H514 · [HIGH/P1] · `ModelVolume::get_extruders()` const method mutates mmuseg_extruders and mmuseg_ts — not thread-safe · `Model.cpp:ModelVolume::get_extruders`
+H515 · [HIGH/P1] · `ModelVolume::center_geometry_after_creation()` uses const_cast to mutate m_mesh and m_convex_hull · `Model.cpp:ModelVolume::center_geometry_after_creation`
+H518 · [HIGH/P1] · `ModelVolume::transform_this_mesh()`: FacetsAnnotation data not re-projected after transform · `Model.cpp:ModelVolume::transform_this_mesh`
+H521 · [HIGH/P1] · `obj_import_vertex_color_deal()`: vertex_filament_ids[] array-indexed without bounds checking · `Model.cpp:obj_import_vertex_color_deal`
+H524 · [HIGH/P1] · `FacetsAnnotation::get_triangle_as_string()` 4-bit nibble hex encoding has no version header · `Model.cpp:FacetsAnnotation::get_triangle_as_string`
+H525 · [HIGH/P1] · `FacetsAnnotation::set_triangle_from_string()` strict ordering asserted debug-only — release proceeds corrupted · `Model.cpp:FacetsAnnotation::set_triangle_from_string`
+H526 · [HIGH/P1] · `model_volume_list_changed()` compares by (type, id, transform) but NOT by mesh content · `Model.cpp:model_volume_list_changed`
+H529 · [HIGH/P1] · `extract_euler_angles()` uses Eigen ZYX eulerAngles() — documented gimbal-lock singularity · `Geometry.cpp:extract_euler_angles`
+H530 · [HIGH/P1] · `transform3d_from_string()` uses ::atof() — locale-dependent decimal separator · `Geometry.cpp:transform3d_from_string:atof`
+H531 · [HIGH/P1] · `Transformation::volume_to_bed_transformation()` case 2: denominator (source_size - 1) can be zero · `Geometry.cpp:volume_to_bed_transformation:degenerate-bbox`
+H532 · [HIGH/P1] · `mat_around_a_point_rotate()` calls get_matrix().inverse() without checking invertibility · `Geometry.cpp:mat_around_a_point_rotate:unchecked-inverse`
+H536 · [HIGH/P1] · `Transformation::set_scaling_factor()` asserts all components > 0 debug-only — release accepts zero · `Geometry.cpp:Transformation::set_scaling_factor:debug-only-assert`
+H537 · [HIGH/P1] · `TransformationSVD`: mirror pre-multiplies by diag(-1,1,1) — must be preserved in port · `Geometry.cpp:TransformationSVD:mirror-pre-multiply`
+H538 · [HIGH/P1] · `generate_transform()` calls normalized() on potentially zero-length vectors — NaN result · `Geometry.cpp:generate_transform:zero-vector-normalized`
+H539 · [HIGH/P1] · `EdgeGrid::Contour` stores raw `const Point*` pointers into caller-owned Polygon — dangling risk · `EdgeGrid.cpp:Contour:raw-pointer-lifetime`
+H546 · [HIGH/P1] · `Grid::inside()` and `Grid::line_cell_intersect()` inside `#if 0` block — unfinished dead code · `EdgeGrid.cpp:#if0-inside:unfinished-dead-code`
+H548 · [HIGH/P1] · `support_material_flow()` uses `support_filament - 1` as array index without empty check · `Flow.cpp:support_material_flow`
+H553 · [HIGH/P1] · `chain_and_reorder_extrusion_entities` unconditional static_cast to ExtrusionEntityCollection — UB if wrong type · `ShortestPath.cpp:chain_and_reorder_extrusion_entities`
+H556 · [HIGH/P1] · V2 greedy chaining: `num_iter = num_segments * 16` guard — overflow for large segment counts · `ShortestPath.cpp:chain_segments_greedy_constrained_reversals2_`
+H561 · [HIGH/P1] · `MMU_Graph::append_voronoi_vertices()`: vertex.color() field repurposed across three distinct phases · `MultiMaterialSegmentation.cpp:append_voronoi_vertices`
+H562 · [HIGH/P1] · `extract_colored_segments()` repair path: arc_id -1 cast to size_t — underflow sentinel · `MultiMaterialSegmentation.cpp:extract_colored_segments:repair-path-sentinel`
+H564 · [HIGH/P1] · `segmentation_top_and_bottom_layers()` uses layer_idx_offset interleave trick — must preserve in port · `MultiMaterialSegmentation.cpp:segmentation_top_and_bottom_layers:interleave-trick`
+H565 · [HIGH/P1] · `layer_color_stat()` always uses nozzle_diameter.get_at(0) — hardcoded extruder 0 · `MultiMaterialSegmentation.cpp:layer_color_stat:hardcoded-extruder-0`
+H568 · [HIGH/P1] · `merge_segmented_layers()` indexing: top_and_bottom_layers sized [num_facets_states][num_layers] — 1-based extruder index · `MultiMaterialSegmentation.cpp:merge_segmented_layers:indexing-convention`
+H571 · [HIGH/P1] · `ray_circle_intersections()` calls non-existent helper with typo suffix — compile-time failure · `Geometry/Circle.cpp:ray_circle_intersections:typo-suffix`
+H587 · [HIGH/P1] · `VoronoiUtils::decode_input_segment_endpoint()`: color == 0 path computes segment_idx via underflow · `Geometry/VoronoiUtils.cpp:decode_input_segment_endpoint:color-0-underflow`
+H599 · [HIGH/P1] · `Polyline::fitting_result` parallel vector to points — must be kept in sync on all mutations · `Polyline.hpp:fitting_result:parallel-vector-invariant`
+H604 · [HIGH/P1] · `ClosestPointInRadiusLookup` searches only 2×2 cell neighborhood — misses points in corner cells · `Point.hpp:ClosestPointInRadiusLookup:4-cell-approximation`
+H605 · [HIGH/P1] · `Vec2crd` and `Vec2d` have implicit-cast paths — unit mismatch (scaled vs mm) compiles silently · `Point.hpp:Vec2crd-Vec2d:implicit-cast-unit-mismatch`
+H609 · [HIGH/P1] · Boost.Polygon polygon_traits<ExPolygon> exposes only contour — holes ignored by Boost algorithms · `ExPolygon.hpp:boost-polygon_traits:holes-ignored`
+H610 · [HIGH/P1] · `ExPolygon` winding convention (contour CCW, holes CW) not enforced by type system · `ExPolygon.hpp:ExPolygon:winding-not-enforced`
+H624 · [HIGH/P1] · `to_expolygons(Polygons)` wraps each Polygon with no hole nesting — incorrect for nested polygons · `ExPolygon.hpp:to_expolygons:no-hole-nesting`
+H627 · [HIGH/P1] · `keep_largest_contour_only()` crashes on nullptr contour; misidentifies CW-only polygon · `ExPolygon.cpp:keep_largest_contour_only:nullptr-crash-CW-only`
+H639 · [HIGH/P1] · `Linef3::intersect_plane()` divides by v(2) — division by zero for horizontal lines · `Line.hpp:Linef3::intersect_plane:division-by-zero`
+H640 · [HIGH/P1] · Boost.Polygon segment_concept for Line uses coord_t — int64 insufficient for Voronoi · `Line.hpp:boost-polygon-segment_concept:int64-voronoi-mismatch`
+H644 · [HIGH/P1] · `Line::overlap()` divides by X component — division by zero for vertical lines · `Line.cpp:overlap:vertical-division-by-zero`
+H646 · [CRITICAL/P1] · `Extruder::m_share_E` and `m_share_retracted` are static class-level — global shared state · `Extruder.hpp:m_share_E:static-global-state`
+H649 · [HIGH/P1] · `Extruder` asymmetric config indexing: filament_diameter uses m_id, others use extruder_id · `Extruder.hpp:config-indexing:asymmetric-m_id-vs-extruder_id`
+H650 · [HIGH/P1] · `Extruder::m_config` raw non-owning pointer to GCodeConfig — use-after-free risk · `Extruder.hpp:m_config:raw-non-owning-pointer`
+H669 · [HIGH/P1] · `RegionExpansionParameters` float fields are in scaled units — undocumented, easy to pass mm · `Algorithm/RegionExpansion.hpp:parameters:scaled-float-units`
+H673 · [HIGH/P1] · `propagate_waves()` requires seeds sorted by (boundary, src) — sort contract undocumented · `Algorithm/RegionExpansion.hpp:propagate_waves:sort-required`
+H674 · [HIGH/P1] · `merge_expansions_into_expolygons()`: union_safety_offset_ex > 1 result causes sample-in-hole drop · `Algorithm/RegionExpansion.hpp:merge_expansions:sample-in-hole-drop`
+H695 · [HIGH/P1] · `StaticPrintConfig::optptr()` resolves option pointer via byte-offset reinterpret_cast — breaks under virtual/multi-inheritance · `PrintConfig.hpp:StaticPrintConfig:optptr-reinterpret-cast`
+H697 · [HIGH/P1] · `PrintRegionConfig` nullable filament-override arrays — null check required before every access · `PrintConfig.hpp:PrintRegionConfig:nullable-filament-arrays`
+H699 · [HIGH/P1] · `flush_volumes_matrix` flat array encodes N×N matrix — N computed via sqrt, non-square silently wrong · `PrintConfig.hpp:flush_volumes_matrix-flat-array-N-from-sqrt-non-square-silent-mis-index`
+H701 · [HIGH/P1] · `wipe_tower_x` and `wipe_tower_y` are ConfigOptionFloats indexed by plate — not per-extruder · `PrintConfig.hpp:PrintConfig:wipe_tower_xy-plate-indexed`
+H702 · [HIGH/P1] · `FullPrintConfig` diamond inheritance — key collision debug-only assert; release returns wrong value · `PrintConfig.hpp:FullPrintConfig-diamond-inheritance-key-collision-debug-only-assert`
+H706 · [HIGH/P1] · Config options serialised by cereal ordinal — insertion shifts all subsequent ordinals, corrupts saves · `PrintConfig.hpp:cereal-ordinal-serialisation-insertion-shifts-all-subsequent-ordinals`
+H707 · [HIGH/P1] · cereal load(): null ptr deref on unknown ordinal — assert only, release crashes · `PrintConfig.hpp:cereal-load-null-ptr-deref-on-unknown-ordinal-debug-only-assert`
+H708 · [HIGH/P1] · `AABBTreeIndirect::Tree<>` is static — adding/removing primitives requires full rebuild · `AABBTreeIndirect.hpp:Tree:static-no-incremental-update`
+H717 · [HIGH/P1] · `point_outside_closed_contours()` horizontal ray — indeterminate result for point exactly on edge · `AABBTreeLines.hpp:point_outside_closed_contours:indeterminate-zero`
+H718 · [HIGH/P1] · `LinesDistancer::distance_from_lines_extra<SIGNED_DISTANCE>` outside() == 0 returns unsigned distance — ambiguous sign · `AABBTreeLines.hpp:LinesDistancer:distance_from_lines_extra:outside-zero-signed`
+H727 · [HIGH/P1] · `ExtrusionLoop::clip_front()` for erPerimeter overrides clip_dist — near-zero clip may loop · `ExtrusionEntity.cpp:clip_front:erPerimeter-clip_dist-near-zero-loop`
+H728 · [HIGH/P1] · `extrusion_entities_append_paths_with_wipe()`: ExtrusionMultiPath wipe-connector polylines aliased on shallow copy · `ExtrusionEntity.hpp:ExtrusionMultiPath:wipe-connector-alias-on-shallow-copy`
+H735 · [HIGH/P1] · `ExtrusionEntityCollection::filter_by_extrusion_role()` returns raw pointers into original collection — dangling risk · `ExtrusionEntityCollection.hpp:filter_by_extrusion_role:shallow-raw-ptr-view`
+H736 · [HIGH/P1] · `filter_by_extrusion_role_in_place()` erases elements without deleting heap objects — memory leak · `ExtrusionEntityCollection.hpp:filter_by_extrusion_role_in_place:no-delete-on-erase`
+H738 · [HIGH/P1] · `AABBMesh::m_tm` raw `const indexed_triangle_set*` — mesh lifetime must exceed AABBMesh · `AABBMesh.cpp:AABBMesh:m_tm-raw-pointer`
+H740 · [HIGH/P1] · `AABBMesh` copy constructor shallow-copies m_tm raw pointer — double-free / dangling risk · `AABBMesh.cpp:AABBMesh:copy-ctor-shallow-m_tm`
+H746 · [HIGH/P1] · `AABBMesh::normal_by_face_id()` degenerate zero-area triangle produces NaN normal · `AABBMesh.cpp:normal_by_face_id:degenerate-triangle-nan`
+H748 · [HIGH/P1] · Dead-code `filter_hits()`: post-increments `next_hole_hit` past back() — UB if compiled · `AABBMesh.cpp:filter_hits:post-increment-past-back-ub`
+H752 · [HIGH/P1] · `compSecondMoment()` returns scaled-coords 4th power — callers must apply SCALING_FACTOR^4 · `Brim.cpp:compSecondMoment-returns-scaled-coords-4th-power-undocumented`
+H753 · [HIGH/P1] · `configBrimWidthByVolumeGroups`: height / (Ixx + Iyy) — divide by near-zero second moment · `Brim.cpp:configBrimWidthByVolumeGroups:divide-by-near-zero-moment`
+H757 · [HIGH/P1] · `tryExPolygonOffset()` offset loop with no max iteration cap — potential infinite loop · `Brim.cpp:tryExPolygonOffset-no-max-iteration-cap-potential-infinite-loop`
+H761 · [HIGH/P1] · `ArcFitter::do_arc_fitting_and_simplify()` mutates points in-place — caller's vector modified · `ArcFitter.cpp:do_arc_fitting_and_simplify:points-mutated-in-place`
+H762 · [HIGH/P1] · `do_arc_fitting_and_simplify()` index-remapping prefix-sum correctness — must be preserved in port · `ArcFitter.cpp:do_arc_fitting_and_simplify:prefix-sum-remapping-correctness`
+H768 · [HIGH/P1] · `band` parameter in Laplacian smoothing step passed in scaled units — undocumented · `ElephantFootCompensation.cpp:laplacian-smooth:band-in-scaled-units`
+H773 · [HIGH/P1] · `get_extruder_ams_count()` calls stoi() on split strings — no exception handling · `PrintConfig.cpp:get_extruder_ams_count:stoi-uncaught-exception`
+H774 · [HIGH/P1] · L(s) vs _(s) translation markers mixed — L() not extracted by gettext toolchain · `PrintConfig.cpp:L-vs-underscore-translation-distinction`
+H776 · [HIGH/P1] · `handle_legacy()` ~244-line if/else-if chain — no test coverage, silent drop on unknown key · `PrintConfig.cpp:handle_legacy:no-test-coverage-silent-drop`
+H777 · [HIGH/P1] · `get_shared_poly()` iterates extruder printable areas — empty intersection causes OOB · `PrintConfig.cpp:get_shared_poly:empty-intersection-oob`
+H798 · [HIGH/P1] · `BuildVolume_Type::Custom` non-convex but containment check uses convex hull · `BuildVolume.cpp:object_state:custom-uses-convex-hull`
+H800 · [HIGH/P1] · `check_object_state_with_extruder_area()` switch omits Convex/Custom build volume types · `BuildVolume.cpp:check_object_state_with_extruder_area:convex-custom-untested`
+H804 · [HIGH/P1] · `SLAPrintObject::HollowingData` hollow_mesh fields mutable — lazy populate not thread-safe · `SLAPrint.hpp:HollowingData:mutable-no-mutex-race`
+H805 · [HIGH/P1] · `SLAPrint::m_printer` raw `SLAArchive*` — no RAII, dangling on exception · `SLAPrint.hpp:SLAPrint:m_printer-raw-pointer-dangling`
+H806 · [HIGH/P1] · `SLAPrint::PrintLayer` stores `reference_wrapper<const SliceRecord>` — dangling on invalidation · `SLAPrint.hpp:PrintLayer:reference_wrapper-dangling-on-invalidation`
+H808 · [CRITICAL/P1] · `SLAPrint::Steps::drill_holes()` entire function body is commented out — dead code · `SLAPrintSteps.cpp:drill_holes:body-commented-out-dead-code`
+H811 · [HIGH/P1] · `adjust_layer_series_to_align_object_height()` uses C-library abs() on double — integer truncation · `Slicing.cpp:adjust_layer_series_to_align_object_height:abs-integer-truncation`
+H816 · [HIGH/P1] · `PrintStateBase::g_last_timestamp` static size_t shared across ALL Print instances — data race · `PrintBase.hpp:PrintStateBase:g_last_timestamp-not-atomic-data-race`
+H817 · [HIGH/P1] · `StringObjectException::object` raw `ObjectBase const*` — dangles after Print rebuild · `PrintBase.hpp:StringObjectException:raw-pointer-dangles-after-print-rebuild`
+H824 · [HIGH/P1] · `ConfigOptionBools::get_at()` reinterpret_cast<bool*>(&values[idx]) — strict-aliasing UB · `Config.hpp:ConfigOptionBools:get_at:reinterpret_cast-bool-ptr-UB`
+H825 · [HIGH/P1] · `ConfigOptionPoints` uses cereal saveBinary/loadBinary — not portable across platforms · `Config.hpp:ConfigOptionPoints:saveBinary-not-portable`
+H828 · [HIGH/P1] · `PresetCollection::get_preset_base()` recursive with no depth limit or cycle detection · `Preset.cpp:get_preset_base:unbounded-recursion-no-cycle-detection`
+H829 · [HIGH/P1] · `PresetCollection::load_user_preset()` manual mutex lock/unlock — not released on exception · `Preset.cpp:load_user_preset:mutex-not-released-on-exception`
+H839 · [HIGH/P1] · `ConflictChecker::find_inter_of_lines_in_parallel()` TBB parallel_for writes non-atomic bool — data race · `GCode/ConflictChecker.cpp:find_inter_of_lines_in_parallel:bool-find-non-atomic-data-race`
+H840 · [HIGH/P1] · `LinesBucketQueue::line_rasterization()` calls assert(0) on default branch — no return in release · `GCode/ConflictChecker.cpp:line_rasterization:assert0-no-return-and-OOM`
+H843 · [HIGH/P1] · `gcode_add_line_number()` reads entire G-code file into RAM — OOM for large prints · `GCode/PostProcessor.cpp:gcode_add_line_number:entire-file-into-RAM-OOM`
+H844 · [HIGH/P1] · `run_post_process_scripts()` Win32: WaitForSingleObject(INFINITE) — hangs if script hangs · `GCode/PostProcessor.cpp:run_post_process_scripts:WaitForSingleObject-INFINITE-no-timeout`
+H849 · [HIGH/P1] · `SpiralVase::process_layer()` transition_out uses delta E as absolute — incorrect E output · `GCode/SpiralVase.cpp:process_layer:transition_out-absolute-E-incorrect`
+H850 · [HIGH/P1] · `ToolOrderUtils` TSP DP bitmask table dp[1<<n][n] — OOM for n >= 20 · `GCode/ToolOrderUtils.cpp:get_order_1_3:TSP-DP-bitmask-OOM-n20`
+H856 · [HIGH/P1] · `SmallAreaInfillFlowCompensator::max_modified_length()` calls eLengths.back() — UB on empty vector · `GCode/SmallAreaInfillFlowCompensator.cpp:max_modified_length:back-on-empty-eLengths-UB`
+H860 · [HIGH/P1] · All-empty CSV input passes validation — zero-knot model produces undefined interpolation · `GCode/SmallAreaInfillFlowCompensator.cpp:ctor:zero-knot-model-passes-validation`
+H862 · [HIGH/P1] · `generate_interface_layers()` calls layer_storage.allocate() inside TBB parallel_for — data race · `Support/SupportCommon.cpp:generate_interface_layers:layer_storage-allocate-inside-TBB-data-race`
+H863 · [HIGH/P1] · `generate_support_toolpaths()` Pass 2 reads support_layers[id+1] in parallel — data race · `Support/SupportCommon.cpp:generate_support_toolpaths:ironing-reads-id+1-in-parallel`
+H866 · [HIGH/P1] · `modulate_extrusion_by_overlapping_layers()` reduces height but does not update mm3_per_mm · `Support/SupportCommon.cpp:modulate_extrusion_by_overlapping_layers:height-reduced-but-mm3_per_mm-not-updated`
+H867 · [HIGH/P1] · `SupportSpotsGenerator.cpp` entire stability analysis (~1100 lines) is block-commented dead code · `Support/SupportSpotsGenerator.cpp:1100-lines-of-live-algorithm-permanently-block-commented`
+H868 · [HIGH/P1] · `ExtrusionLine` default constructor: origin_entity = nullptr — is_external_perimeter() asserts on deref · `Support/SupportSpotsGenerator.cpp:ExtrusionLine:default-ctor-nullptr-origin_entity-deref`
+H879 · [HIGH/P1] · `SupportParameters` ctor: support_interface_filament - 1 on unsigned — underflow to UINT_MAX · `Support/SupportParameters.hpp:ctor:support_interface_filament-minus-1-unsigned-underflow`
+H881 · [HIGH/P1] · `support_layer_height_min` declared coordf_t (unscaled mm) but initialised to scaled value · `Support/SupportParameters.hpp:ctor:support_layer_height_min-scaled-vs-unscaled-unit-confusion`
+H882 · [HIGH/P1] · `SupportGridPattern` stores raw non-owning `const Polygons*` — dangling if caller destroys polygon · `Support/SupportMaterial.cpp:SupportGridPattern:raw-non-owning-polygon-pointer-dangling`
+H884 · [HIGH/P1] · `rasterize_polygons()` allocates grid_size.x() * grid_size.y() vector — unbounded potential OOM · `Support/SupportMaterial.cpp:rasterize_polygons:grid_size-unbounded-potential-OOM`
+H886 · [HIGH/P1] · `OverhangCluster` stores raw `ExPolygon*` — dangling on vector realloc · `Support/SupportMaterial.cpp:OverhangCluster:ExPolygon-raw-pointer-dangling-on-realloc`
+H887 · [HIGH/P1] · `top_contact_layers()`: support_interface_filament - 1 on unsigned — underflow to UINT_MAX · `Support/SupportMaterial.cpp:top_contact_layers:support_interface_filament-minus-1-unsigned-underflow`
+H892 · [HIGH/P1] · `SupportGeneratorLayerStorage::allocate()` manual lock/unlock mutex — not released on exception · `Support/SupportLayer.hpp:SupportGeneratorLayerStorage:allocate-no-raii-mutex-guard`
+H894 · [HIGH/P1] · `TreeSupportSettings::soluble` inline static bool — shared global state across all Print instances · `Support/TreeSupportCommon.hpp:358:TreeSupportSettings-soluble-inline-static-shared-global-state`
+H920 · [HIGH/P1] · `reproject_points_and_holes()` dereferences object pointer before null-check — UB · `SLA/ReprojectPointsOnMesh.hpp:reproject_points_and_holes:null-check-after-dereference-UB`
+H921 · [HIGH/P1] · `IndexedMesh` holds `m_tm` as raw non-owning pointer — dangling if TriangleMesh destroyed · `SLA/IndexedMesh.hpp:IndexedMesh:m_tm-non-owning-raw-pointer-dangling`
+H923 · [HIGH/P1] · `IndexedMesh::query_ray_hits()` deduplication commented out — callers may receive duplicate hits · `SLA/IndexedMesh.cpp:query_ray_hits:deduplication-commented-out-callers-may-receive-duplicates`
+H925 · [HIGH/P1] · `Interior::accessor` mutable — get_distance_raw() not thread-safe, data race on parallel access · `SLA/Hollowing.cpp:Interior:accessor-mutable-not-thread-safe-data-race`
+H932 · [HIGH/P1] · `SupportTreeBuilder::add_anchor()` sets id from m_junctions.size() instead of m_anchors.size() · `SLA/SupportTreeBuilder.hpp:add_anchor:id-assigned-from-m_junctions-not-m_anchors`
+H933 · [HIGH/P1] · `SupportTreeBuilder` copy/move ctors omit junctions, diffbridges, pedestals, anchors · `SLA/SupportTreeBuilder.hpp:copy-move-ctor-omit-junctions-diffbridges-pedestals-anchors`
+H938 · [CRITICAL/P0] · `SupportTreeBuildsteps::add_pinheads()` is a completely empty stub — no pin heads ever placed · `SLA/SupportTreeBuildsteps.cpp:add_pinheads:completely-empty-stub-no-code`
+H942 · [HIGH/P1] · `bicubic.h` lambda missing parameter type annotation — non-standard extension · `SLA/bicubic.h:lambda-missing-parameter-type-non-standard`
+H943 · [HIGH/P1] · `bicubic.h` self-referential lambda capture [&f, ...] — undefined behaviour · `SLA/bicubic.h:self-referential-lambda-capture-undefined-behaviour`
+H949 · [HIGH/P1] · `execution::reduce` mergefn must be associative — not checked, wrong results if violated · `Execution/Execution.hpp:reduce:mergefn-must-be-associative-no-check`
+H953 · [HIGH/P1] · `StopCriteria::max_iterations(double val)` truncates double to unsigned — negative sentinel wraps to UINT_MAX · `Optimize/Optimizer.hpp:StopCriteria:max_iterations-setter-double-to-unsigned-truncation`
+H955 · [CRITICAL/P0] · `NLoptOptimizer::optfunc`: optional gradient dereferenced without has_value() check — UB · `Optimize/NLoptOptimizer.hpp:optfunc:optional-gradient-dereference-without-check`
+H956 · [HIGH/P1] · `NLoptOptimizer::optfunc`: raw C gradient pointer not null-checked — UB for gradient-free NLopt · `Optimize/NLoptOptimizer.hpp:optfunc:c-gradient-pointer-not-null-checked`
+H959 · [HIGH/P1] · CSGMesh Push/Pop protocol implicit and unchecked — mismatched pairs silently corrupt geometry · `CSGMesh/CSGMesh.hpp:Push-Pop-protocol-unchecked-mismatch-silent-corrupt`
+H961 · [HIGH/P1] · `copy_csgrange_shallow()` non-CSGPart path: non-owning mesh pointer — dangling if source destroyed · `CSGMesh/CSGMeshCopy.hpp:copy_csgrange_shallow:non-CSGPart-non-owning-dangling-pointer`
+H965 · [HIGH/P1] · `model_to_csgmesh()` non-split path: raw const* to vol->mesh().its — dangling if mesh replaced · `CSGMesh/ModelToCSGMesh.hpp:non-split-path:raw-pointer-to-vol-mesh-dangling`
+H969 · [HIGH/P1] · `check_csgmesh_booleans()` TBB parallel writes to non-atomic fail_reason — data race UB · `CSGMesh/PerformCSGMeshBooleans.hpp:check_csgmesh_booleans:unsynchronised-writes-fail_reason-fail_part_name`
+H980 · [HIGH/P1] · `detail::perform_csg()` voxel path: null dst not guarded — crash on OpenVDB alloc failure · `CSGMesh/VoxelizeCSGMesh.hpp:perform_csg:null-dst-no-guard-crash`
+H1002 · [HIGH/P1] · `progressfn` invoked from TBB worker threads — GUI callback must be thread-safe · `Orient.cpp:progressfn-called-from-TBB-thread-GUI-callback-must-be-thread-safe`
+H1013 · [HIGH/P1] · `mesh_to_grid()`: all parts filtered by volume > 0 leaves grid nullptr — null-deref crash · `OpenVDBUtils.cpp:mesh_to_grid-grid-null-deref-if-all-parts-filtered`
+H1016 · [HIGH/P1] · `triangle_mesh_to_eigen()` accesses .front() on potentially empty mesh vectors — UB · `MeshBoolean.cpp:triangle_mesh_to_eigen:front-UB-on-empty-mesh`
+H1017 · [HIGH/P1] · `_cgal_do()` uses try_catch_signal/longjmp for CGAL crashes — non-portable, bypasses RAII · `MeshBoolean.cpp:_cgal_do:try_catch_signal-longjmp-non-portable-bypasses-RAII`
+H1018 · [HIGH/P1] · `triangle_mesh_to_cgal` overloads: asymmetric exception semantics for open meshes · `MeshBoolean.cpp:triangle_mesh_to_cgal-overload-asymmetric-exception-semantics`
+H1022 · [HIGH/P1] · `FontFile::operator==` uses == instead of != for descent and linegap fields — inverted equality · `Emboss.hpp:FontFile::operator==-inverted-equality-descent-linegap`
+H1026 · [CRITICAL/P0] · Third coordinate system: SHAPE_SCALE 0.001 mm/unit — wrong coords cause 1000x scale error · `Emboss.cpp/Emboss.hpp:SHAPE_SCALE-third-coordinate-system-1-unit-0.001mm-silent-1000x-scale-error`
+H1027 · [HIGH/P1] · `heal_dupl_inter()` fallback: bounding-rect hollow replaces degenerate glyph — silent corruption · `Emboss.cpp:heal_dupl_inter-fallback-bounding-rect-hollow-corrupts-glyph`
+H1034 · [HIGH/P1] · `g_occt_fonts_maps` static map written by main thread, read by job threads — no sync · `Shape/TextShape.cpp:g_occt_fonts_maps-global-static-no-sync-main-vs-job-threads`
+H1035 · [HIGH/P1] · `Prism()` allocates BRepPrimAPI_MakePrism with new, never deleted — memory leak per call · `Shape/TextShape.cpp:Prism-BRepPrimAPI_MakePrism-new-never-deleted-memory-leak`
+H1054 · [HIGH/P1] · `area(const Points&)` returns 2× signed area — callers expecting true area get wrong result · `MultiPoint.hpp:area-returns-2x-signed-area-no-divide-by-2`
+H1076 · [HIGH/P1] · `apply_extra_perimeters()` calls entities.back() without empty-check — UB on zero-loop island · `PerimeterGenerator.cpp:apply_extra_perimeters-no-guard-loops-entities-empty`
+H1079 · [HIGH/P1] · `process_no_bridge()` dangling Surface* after push_back() realloc inside index loop · `PerimeterGenerator.cpp:process_no_bridge-all_surfaces-push_back-dangling-surface-pointer`
+H1089 · [HIGH/P1] · `invalidate_state_by_config_options()` ~270-line hand-maintained switch — omissions cause silent stale output · `PrintObject.cpp:invalidate_state_by_config_options-hand-maintained-mapping-silent-stale-output`
+H1092 · [HIGH/P1] · `bridge_over_infill()` std::move lightning data without exception safety — fill_surfaces left empty · `PrintObject.cpp:bridge_over_infill-lightning-move-exception-leaves-fill_surfaces-empty`
+H1101 · [HIGH/P1] · `Print::wipe_tower_data()` const method uses const_cast to mutate — not thread-safe · `Print.cpp:wipe_tower_data-const-method-uses-const_cast-to-mutate-not-thread-safe`
+H1102 · [HIGH/P1] · `Print::get_filament_temp_type()` static map lazy-init without mutex — data race on first call · `Print.cpp:get_filament_temp_type-static-map-lazy-init-no-mutex-data-race-on-first-call`
+H1103 · [HIGH/P1] · TriangleSelector free-list: memcpy int bits into float field — strict-aliasing UB · `TriangleSelector.cpp:free-list-memcpy-int-into-float-field-strict-aliasing-UB`
+H1104 · [HIGH/P1] · `TriangleSelector::perform_split()` ref into m_triangles invalidated by push_triangle realloc · `TriangleSelector.cpp:perform_split-ref-invalidated-by-push_triangle-reserve-contract`
+H1105 · [HIGH/P1] · `TriangleSelector::serialize()` 4-bit nibble format: no version, PrusaSlicer 2.3.1 child-reversal must be preserved · `TriangleSelector.cpp:serialize-no-version-field-PrusaSlicer-2.3.1-compat-child-reversal`
+H1106 · [HIGH/P1] · `TriangleSelector::HeightRange::is_pointer_in_triangle()` always returns false — O(N) brute-force fallback · `TriangleSelector.cpp:HeightRange-is_pointer_in_triangle-always-false-O-N-brute-force`
+H1108 · [HIGH/P1] · `construct_full_config()` and `full_fff_config()` ~80% duplicated merge logic — must be unified in port · `PresetBundle.cpp:construct_full_config-full_fff_config-~80pct-duplicated-merge-logic`
+H1109 · [HIGH/P1] · `PresetBundle::get_required_hrc_by_filament_type()` static map lazy-init without mutex — data race · `PresetBundle.cpp:get_required_hrc_by_filament_type-static-map-lazy-init-no-mutex-data-race`
+H1120 · [HIGH/P1] · `AppConfig::load()` two diverged implementations (JSON vs INI) — INI path silently loses multi-filament data · `AppConfig.cpp:load-two-diverged-implementations-JSON-active-INI-legacy-disabling-loses-multi-filament`
+H1123 · [HIGH/P1] · `AppConfig::get_country_code()`: "Europe" branch returns "US" — copy-paste bug, wrong cloud endpoint · `AppConfig.cpp:get_country_code-Europe-maps-to-US-copy-paste-bug-wrong-endpoint`
+H1134 · [HIGH/P1] · `TriangleInfo::is_deleted()` encodes deletion as n.x() > 2.f — re-normalization resurrects deleted triangles · `QuadricEdgeCollapse.cpp:TriangleInfo-is_deleted-encodes-deletion-in-nx-gt-2-normal-field-aliasing`
+H1135 · [HIGH/P1] · `change_neighbors()` complex erase/insert recompaction with no invariant assertions · `QuadricEdgeCollapse.cpp:change_neighbors-complex-erase-insert-recompaction-no-invariant-checks`
+H1142 · [HIGH/P1] · `Triangulation::triangulate()` all preconditions asserted debug-only — release CGAL UB on violation · `Triangulation.cpp:triangulate-core-all-precondition-checks-are-assert-only-stripped-in-release`
+H1144 · [HIGH/P1] · `predictor_instances` static unordered_map lazy-init without mutex — data race on first call · `FlushVolPredictor.cpp:predictor_instances-static-unordered_map-lazy-init-no-mutex-data-race`
+H1152 · [HIGH/P1] · `get_arrange_poly(const Model&)` re-rotates accumulator instead of per-instance copy — wrong hull · `ModelArrange.cpp:get_arrange_poly-Model-overload-re-rotates-accumulator-instead-of-per-instance-copy`
+H1154 · [HIGH/P1] · `get_instance_arrange_poly()` accesses extrude_ids.front() without empty check — UB · `ModelArrange.cpp:get_instance_arrange_poly-extrude_ids-front-no-empty-check-UB-on-unassigned`
+H1166 · [HIGH/P1] · `get_utf8_sequence_length()` returns -1 for invalid bytes — callers don't check, off-by-one walk · `LocalesUtils.cpp:get_utf8_sequence_length-negative-return-unchecked-by-callers-off-by-one`
+H1168 · [HIGH/P1] · `MinAreaBoundingBox` uses boost::multiprecision::int128_t — must retain or port will silently overflow · `MinAreaBoundingBox.cpp:uses-boost-multiprecision-int128-overflow-if-replaced`
+H1179 · [HIGH/P1] · `write_rgb_or_gray_to_file()` libpng setjmp/longjmp — C++ objects on stack cause UB on longjmp · `PNGReadWrite.cpp:write_rgb_or_gray_to_file-libpng-setjmp-longjmp-UB-with-cpp-objects-on-stack`
+H1190 · [HIGH/P1] · `name_tbb_thread_pool_threads_set_locale()` static bool initialized not thread-safe — double-init race · `Thread.cpp:name_tbb_thread_pool_threads_set_locale-static-bool-initialized-not-thread-safe`
+
+---
+
 ## 1. Raw-Pointer Ownership Chains
 
 **Location:**
