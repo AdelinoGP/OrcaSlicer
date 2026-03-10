@@ -1,37 +1,45 @@
+// [INTENT] Vertex normal computation strategies for mesh rendering and surface operations.
+//          Three strategies: simple average, angle-weighted, and Nelson-Max weighted (edge-length
+//          squared reciprocal). Used by painting, TriangleSelector, and rendering subsystems.
+// [STATE]  All functions are pure — take indexed_triangle_set by const reference, return normals
+//          by value. No shared mutable state.
+// [COUPLING] Depends only on NormalUtils.hpp and Eigen for Vec3f arithmetic.
+// [MEMORY]  Returns normals as std::vector<Vec3f> by value — O(V) allocation per call.
+// [HAZARD H1171] All three create_normals_* functions use `&normal - &normals.front()` to
+//               compute the current index during the normalisation loop. This pointer arithmetic
+//               is valid C++17 for contiguous std::vector storage, but is fragile — if the
+//               vector were ever changed to a non-contiguous container this silently breaks.
+//               A port should replace this with an explicit `size_t index = 0; ++index;` idiom.
 #include "NormalUtils.hpp"
 
 using namespace Slic3r;
 
-Vec3f NormalUtils::create_triangle_normal(
-    const stl_triangle_vertex_indices &indices,
-    const std::vector<stl_vertex> &    vertices)
+Vec3f NormalUtils::create_triangle_normal(const stl_triangle_vertex_indices& indices, const std::vector<stl_vertex>& vertices)
 {
-    const stl_vertex &v0        = vertices[indices[0]];
-    const stl_vertex &v1        = vertices[indices[1]];
-    const stl_vertex &v2        = vertices[indices[2]];
+    const stl_vertex& v0        = vertices[indices[0]];
+    const stl_vertex& v1        = vertices[indices[1]];
+    const stl_vertex& v2        = vertices[indices[2]];
     Vec3f             direction = (v1 - v0).cross(v2 - v0);
     direction.normalize();
     return direction;
 }
 
-std::vector<Vec3f> NormalUtils::create_triangle_normals(
-    const indexed_triangle_set &its)
+std::vector<Vec3f> NormalUtils::create_triangle_normals(const indexed_triangle_set& its)
 {
     std::vector<Vec3f> normals;
     normals.reserve(its.indices.size());
-    for (const auto &index : its.indices) {
+    for (const auto& index : its.indices) {
         normals.push_back(create_triangle_normal(index, its.vertices));
     }
     return normals;
 }
 
-NormalUtils::Normals NormalUtils::create_normals_average_neighbor(
-    const indexed_triangle_set &its)
+NormalUtils::Normals NormalUtils::create_normals_average_neighbor(const indexed_triangle_set& its)
 {
-    size_t             count_vertices = its.vertices.size();
-    std::vector<Vec3f> normals(count_vertices, Vec3f(.0f, .0f, .0f));
+    size_t                    count_vertices = its.vertices.size();
+    std::vector<Vec3f>        normals(count_vertices, Vec3f(.0f, .0f, .0f));
     std::vector<unsigned int> count(count_vertices, 0);
-    for (const auto &indice : its.indices) {
+    for (const auto& indice : its.indices) {
         Vec3f normal = create_triangle_normal(indice, its.vertices);
         for (int i = 0; i < 3; ++i) {
             normals[indice[i]] += normal;
@@ -39,7 +47,7 @@ NormalUtils::Normals NormalUtils::create_normals_average_neighbor(
         }
     }
     // normalize to size 1
-    for (auto &normal : normals) {
+    for (auto& normal : normals) {
         size_t index = &normal - &normals.front();
         normal /= static_cast<float>(count[index]);
     }
@@ -47,9 +55,7 @@ NormalUtils::Normals NormalUtils::create_normals_average_neighbor(
 }
 
 // calc triangle angle of vertex defined by index to triangle indices
-float NormalUtils::indice_angle(int                            i,
-                                const Vec3i32 &                indice,
-                                const std::vector<stl_vertex> &vertices)
+float NormalUtils::indice_angle(int i, const Vec3i32& indice, const std::vector<stl_vertex>& vertices)
 {
     int i1 = (i == 0) ? 2 : (i - 1);
     int i2 = (i == 2) ? 0 : (i + 1);
@@ -68,44 +74,41 @@ float NormalUtils::indice_angle(int                            i,
     return acos(w);
 }
 
-NormalUtils::Normals NormalUtils::create_normals_angle_weighted(
-    const indexed_triangle_set &its)
+NormalUtils::Normals NormalUtils::create_normals_angle_weighted(const indexed_triangle_set& its)
 {
     size_t             count_vertices = its.vertices.size();
     std::vector<Vec3f> normals(count_vertices, Vec3f(.0f, .0f, .0f));
     std::vector<float> count(count_vertices, 0.f);
-    for (const auto &indice : its.indices) {
+    for (const auto& indice : its.indices) {
         Vec3f normal = create_triangle_normal(indice, its.vertices);
-        Vec3f angles(indice_angle(0, indice, its.vertices),
-                     indice_angle(1, indice, its.vertices), 0.f);
+        Vec3f angles(indice_angle(0, indice, its.vertices), indice_angle(1, indice, its.vertices), 0.f);
         angles[2] = (M_PI - angles[0] - angles[1]);
         for (int i = 0; i < 3; ++i) {
-            const float &weight = angles[i];
+            const float& weight = angles[i];
             normals[indice[i]] += normal * weight;
             count[indice[i]] += weight;
         }
     }
     // normalize to size 1
-    for (auto &normal : normals) {
+    for (auto& normal : normals) {
         size_t index = &normal - &normals.front();
         normal /= count[index];
     }
     return normals;
 }
 
-NormalUtils::Normals NormalUtils::create_normals_nelson_weighted(
-    const indexed_triangle_set &its)
+NormalUtils::Normals NormalUtils::create_normals_nelson_weighted(const indexed_triangle_set& its)
 {
-    size_t             count_vertices = its.vertices.size();
-    std::vector<Vec3f> normals(count_vertices, Vec3f(.0f, .0f, .0f));
-    std::vector<float> count(count_vertices, 0.f);
-    const std::vector<stl_vertex> &vertices = its.vertices;
-    for (const auto &indice : its.indices) {
+    size_t                         count_vertices = its.vertices.size();
+    std::vector<Vec3f>             normals(count_vertices, Vec3f(.0f, .0f, .0f));
+    std::vector<float>             count(count_vertices, 0.f);
+    const std::vector<stl_vertex>& vertices = its.vertices;
+    for (const auto& indice : its.indices) {
         Vec3f normal = create_triangle_normal(indice, vertices);
 
-        const stl_vertex &v0 = vertices[indice[0]];
-        const stl_vertex &v1 = vertices[indice[1]];
-        const stl_vertex &v2 = vertices[indice[2]];
+        const stl_vertex& v0 = vertices[indice[0]];
+        const stl_vertex& v1 = vertices[indice[1]];
+        const stl_vertex& v2 = vertices[indice[2]];
 
         float e0 = (v0 - v1).norm();
         float e1 = (v1 - v2).norm();
@@ -113,13 +116,13 @@ NormalUtils::Normals NormalUtils::create_normals_nelson_weighted(
 
         Vec3f coefs(e0 * e2, e0 * e1, e1 * e2);
         for (int i = 0; i < 3; ++i) {
-            const float &weight = coefs[i];
+            const float& weight = coefs[i];
             normals[indice[i]] += normal * weight;
             count[indice[i]] += weight;
         }
     }
     // normalize to size 1
-    for (auto &normal : normals) {
+    for (auto& normal : normals) {
         size_t index = &normal - &normals.front();
         normal /= count[index];
     }
@@ -127,16 +130,12 @@ NormalUtils::Normals NormalUtils::create_normals_nelson_weighted(
 }
 
 // calculate normals by averaging normals of neghbor triangles
-std::vector<Vec3f> NormalUtils::create_normals(
-    const indexed_triangle_set &its, VertexNormalType type)
+std::vector<Vec3f> NormalUtils::create_normals(const indexed_triangle_set& its, VertexNormalType type)
 {
     switch (type) {
-    case VertexNormalType::AverageNeighbor:
-        return create_normals_average_neighbor(its);
-    case VertexNormalType::AngleWeighted:
-        return create_normals_angle_weighted(its);
+    case VertexNormalType::AverageNeighbor: return create_normals_average_neighbor(its);
+    case VertexNormalType::AngleWeighted: return create_normals_angle_weighted(its);
     case VertexNormalType::NelsonMaxWeighted:
-    default:
-        return create_normals_nelson_weighted(its);
+    default: return create_normals_nelson_weighted(its);
     }
 }

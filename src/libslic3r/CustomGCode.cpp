@@ -1,13 +1,21 @@
+// [INTENT] Custom G-code per print-Z helpers: mode inference from item list, and extraction
+//          of tool-change events with their heights.
+// [STATE]  Operates on Info& and const Info& value structs. No global state.
+// [COUPLING] Depends on Config.hpp for DynamicPrintConfig (used only by dead #if 0 block).
+// [MEMORY]  No heap allocation; all operations on vectors passed by reference/value.
 #include "CustomGCode.hpp"
 #include "Config.hpp"
 #include "GCode.hpp"
 #include "GCodeWriter.hpp"
 
-namespace Slic3r {
+namespace Slic3r { namespace CustomGCode {
 
-namespace CustomGCode {
-
-//BBS: useless config and function
+// [INTENT] Dead code — legacy colorprint_heights migration path from older Slicer format.
+//          Preserved in case import of very old project files needs revival.
+// [HAZARD H1160] This entire block is disabled with #if 0. If re-enabled, the Config.hpp /
+//               GCode.hpp / GCodeWriter.hpp includes at the top become live dependencies,
+//               introducing heavy coupling for a trivial migration utility.
+// BBS: useless config and function
 #if 0
 // If loaded configuration has a "colorprint_heights" option (if it was imported from older Slicer), 
 // and if CustomGCode::Info.gcodes is empty (there is no color print data available in a new format
@@ -44,8 +52,7 @@ extern void check_mode_for_custom_gcode_per_print_z(Info& info)
         return;
 
     bool is_single_extruder = true;
-    for (auto item : info.gcodes) 
-    {
+    for (auto item : info.gcodes) {
         if (item.type == ToolChange) {
             info.mode = MultiAsSingle;
             return;
@@ -57,6 +64,13 @@ extern void check_mode_for_custom_gcode_per_print_z(Info& info)
     info.mode = is_single_extruder ? SingleExtruder : MultiExtruder;
 }
 
+// [INTENT] custom_tool_changes: extract (print_z, extruder_id) pairs for ToolChange events.
+//          Falls back to extruder=1 when the stored extruder index exceeds num_extruders
+//          (printer settings changed after G-code was set up).
+// [HAZARD H1161] When custom_gcode.extruder > num_extruders the fallback is extruder 1 (index 1),
+//               NOT extruder 0 (the first). This is intentional (1-based extruder numbering) but
+//               silently changes the intended tool without any warning or log message. A port must
+//               preserve this sentinel value of 1, not 0.
 // Return pairs of <print_z, 1-based extruder ID> sorted by increasing print_z from custom_gcode_per_print_z.
 // print_z corresponds to the first layer printed with the new extruder.
 std::vector<std::pair<double, unsigned int>> custom_tool_changes(const Info& custom_gcode_per_print_z, size_t num_extruders)
@@ -66,11 +80,11 @@ std::vector<std::pair<double, unsigned int>> custom_tool_changes(const Info& cus
         if (custom_gcode.type == ToolChange) {
             // If extruder count in PrinterSettings was changed, use default (0) extruder for extruders, more than num_extruders
             assert(custom_gcode.extruder >= 0);
-            custom_tool_changes.emplace_back(custom_gcode.print_z, static_cast<unsigned int>(size_t(custom_gcode.extruder) > num_extruders ? 1 : custom_gcode.extruder));
+            custom_tool_changes.emplace_back(custom_gcode.print_z, static_cast<unsigned int>(size_t(custom_gcode.extruder) > num_extruders ?
+                                                                                                 1 :
+                                                                                                 custom_gcode.extruder));
         }
     return custom_tool_changes;
 }
 
-} // namespace CustomGCode
-
-} // namespace Slic3r
+}} // namespace Slic3r::CustomGCode

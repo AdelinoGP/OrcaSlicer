@@ -1,15 +1,26 @@
+// [INTENT] Locale management for decimal-point-safe floating point I/O. RAII setter that
+//          forces LC_NUMERIC to "C" (dot as decimal separator) for the scope of any code
+//          that reads/writes numbers in G-code, config files, or binary formats.
+// [STATE]  CNumericLocalesSetter saves/restores the caller's locale on construction/destruction.
+//          Platform-specific: Win32 uses per-thread locale; POSIX uses uselocale()/duplocale().
+// [COUPLING] Minimal — only depends on system locale headers and fast_float for parsing.
+// [CONCURRENCY] CNumericLocalesSetter is per-thread on all platforms. Instances must not be
+//               shared across threads (each thread should construct its own setter).
+// [HAZARD H1166] On Linux/BSD the constructor calls duplocale then newlocale, replacing the
+//               duplicated locale with the new one (line 27). If newlocale() fails (returns
+//               (locale_t)0) the duplicate from duplocale() is leaked and m_new_locale is
+//               invalid. The destructor will then call freelocale((locale_t)0) which is UB.
+//               No error checking exists on the newlocale() return value.
 #include "LocalesUtils.hpp"
 
 #ifdef _WIN32
-    #include <charconv>
+#include <charconv>
 #endif
 #include <stdexcept>
 
 #include <fast_float/fast_float.h>
 
-
 namespace Slic3r {
-
 
 CNumericLocalesSetter::CNumericLocalesSetter()
 {
@@ -18,18 +29,16 @@ CNumericLocalesSetter::CNumericLocalesSetter()
     m_orig_numeric_locale = std::setlocale(LC_NUMERIC, nullptr);
     std::setlocale(LC_NUMERIC, "C");
 #elif __APPLE__
-    m_original_locale = uselocale((locale_t)0);
-    m_new_locale = newlocale(LC_NUMERIC_MASK, "C", m_original_locale);
+    m_original_locale = uselocale((locale_t) 0);
+    m_new_locale      = newlocale(LC_NUMERIC_MASK, "C", m_original_locale);
     uselocale(m_new_locale);
 #else // linux / BSD
-    m_original_locale = uselocale((locale_t)0);
-    m_new_locale = duplocale(m_original_locale);
-    m_new_locale = newlocale(LC_NUMERIC_MASK, "C", m_new_locale);
+    m_original_locale = uselocale((locale_t) 0);
+    m_new_locale      = duplocale(m_original_locale);
+    m_new_locale      = newlocale(LC_NUMERIC_MASK, "C", m_new_locale);
     uselocale(m_new_locale);
 #endif
 }
-
-
 
 CNumericLocalesSetter::~CNumericLocalesSetter()
 {
@@ -41,15 +50,12 @@ CNumericLocalesSetter::~CNumericLocalesSetter()
 #endif
 }
 
-
-
 bool is_decimal_separator_point()
 {
     char str[5] = "";
     sprintf(str, "%.1f", 0.5f);
     return str[1] == '.';
 }
-
 
 double string_to_double_decimal_point(const std::string_view str, size_t* pos /* = nullptr*/)
 {
@@ -60,18 +66,18 @@ double string_to_double_decimal_point(const std::string_view str, size_t* pos /*
     return out;
 }
 
-std::string float_to_string_decimal_point(double value, int precision/* = -1*/)
+std::string float_to_string_decimal_point(double value, int precision /* = -1*/)
 {
     // Our Windows build server fully supports C++17 std::to_chars. Let's use it.
     // Other platforms are behind, fall back to slow stringstreams for now.
 #ifdef _WIN32
-    constexpr size_t SIZE = 20;
-    char out[SIZE] = "";
+    constexpr size_t     SIZE      = 20;
+    char                 out[SIZE] = "";
     std::to_chars_result res;
-    if (precision >=0)
-        res = std::to_chars(out, out+SIZE, value, std::chars_format::fixed, precision);
+    if (precision >= 0)
+        res = std::to_chars(out, out + SIZE, value, std::chars_format::fixed, precision);
     else
-        res = std::to_chars(out, out+SIZE, value, std::chars_format::general, 6);
+        res = std::to_chars(out, out + SIZE, value, std::chars_format::general, 6);
     if (res.ec == std::errc::value_too_large)
         throw std::invalid_argument("float_to_string_decimal_point conversion failed.");
     return std::string(out, res.ptr - out);
@@ -84,6 +90,4 @@ std::string float_to_string_decimal_point(double value, int precision/* = -1*/)
 #endif
 }
 
-
 } // namespace Slic3r
-

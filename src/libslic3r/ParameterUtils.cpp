@@ -1,9 +1,24 @@
+// [INTENT] Utility functions for multi-extruder parameter indexing and
+// layer print-sequence serialization/deserialization.
+// get_other_layers_print_sequence: converts flat integer vector (from config)
+// into structured LayerPrintSequence pairs (layer-range + extruder ordering).
+// get_index_for_extruder_parameter: maps a logical extruder ID + nozzle variant
+// to the correct config-array index for per-extruder parameters.
+// [COUPLING] Depends on DynamicPrintConfig::get_index_for_extruder (PrintConfig),
+// and on the variant set constants (printer_options_with_variant_1/2,
+// filament_options_with_variant, print_options_with_variant) in ParameterUtils.hpp.
+// [HAZARD H1175] get_index_for_extruder_parameter: when variant_index < 0 (i.e.,
+// the extruder ID / variant combination is not found in config), the code executes
+// `assert(false); return 0` — silently falls back to index 0 in release builds.
+// This means mismatched nozzle variant queries silently use the first extruder's
+// parameter value instead of failing or signalling an error.
+// [STATE] Stateless — no file-level mutable state.
 #include "ParameterUtils.hpp"
 #include <cassert>
 
 namespace Slic3r {
 
-std::vector<LayerPrintSequence> get_other_layers_print_sequence(int sequence_nums, const std::vector<int> &sequence)
+std::vector<LayerPrintSequence> get_other_layers_print_sequence(int sequence_nums, const std::vector<int>& sequence)
 {
     std::vector<LayerPrintSequence> res;
     if (sequence_nums == 0 || sequence.empty())
@@ -29,21 +44,29 @@ std::vector<LayerPrintSequence> get_other_layers_print_sequence(int sequence_num
     return res;
 }
 
-void get_other_layers_print_sequence(const std::vector<LayerPrintSequence> &customize_sequences, int &sequence_nums, std::vector<int> &sequence)
+void get_other_layers_print_sequence(const std::vector<LayerPrintSequence>& customize_sequences,
+                                     int&                                   sequence_nums,
+                                     std::vector<int>&                      sequence)
 {
     sequence_nums = 0;
     sequence.clear();
-    if (customize_sequences.empty()) { return; }
+    if (customize_sequences.empty()) {
+        return;
+    }
 
     sequence_nums = (int) customize_sequences.size();
-    for (const auto &customize_sequence : customize_sequences) {
+    for (const auto& customize_sequence : customize_sequences) {
         sequence.push_back(customize_sequence.first.first);
         sequence.push_back(customize_sequence.first.second);
         sequence.insert(sequence.end(), customize_sequence.second.begin(), customize_sequence.second.end());
     }
 }
 
-int get_index_for_extruder_parameter(const DynamicPrintConfig &config, const std::string &opt_key, int cur_extruder_id, ExtruderType extruder_type, NozzleVolumeType nozzle_volume_type)
+int get_index_for_extruder_parameter(const DynamicPrintConfig& config,
+                                     const std::string&        opt_key,
+                                     int                       cur_extruder_id,
+                                     ExtruderType              extruder_type,
+                                     NozzleVolumeType          nozzle_volume_type)
 {
     std::string  id_name, variant_name;
     unsigned int stride = 1;

@@ -1,16 +1,28 @@
+// [INTENT] Computes the two principal-component axes of a set of 2D polygons by
+// numerical integration of the second moment of area (moment of inertia) via
+// triangle decomposition + coordinate transform. Used for optimal print-bed rotation.
+// The algorithm fans each polygon from its first point into triangles, accumulates
+// area, centroid, and variance/covariance, then solves the 2×2 symmetric eigenvalue
+// problem analytically. Returns eigenvectors sorted largest eigenvalue first.
+// [STATE] Stateless — no file-level mutable state.
+// [COUPLING] Point (unscaled), Polygon (poly.points), cross2 helper.
+// [HAZARD H1182] compute_principal_components: when covariance is near zero but
+// variance.x == variance.y exactly, the result {Vec2f{variance.x, 0}, Vec2f{0, variance.y}}
+// returns unnormalised eigenvectors scaled by the eigenvalue, not unit vectors.
+// Callers that assume unit-length eigenvectors will get incorrectly scaled rotation axes.
+// [HAZARD H1183] Commented-out debug std::cout blocks (lines 98-103, 126-131) left in
+// the release path behind `#if 0`; no hazard at runtime but noise for port.
 #include "PrincipalComponents2D.hpp"
 #include "Point.hpp"
 
 namespace Slic3r {
-
-
 
 // returns triangle area, first_moment_of_area_xy, second_moment_of_area_xy, second_moment_of_area_covariance
 // none of the values is divided/normalized by area.
 // The function computes intgeral over the area of the triangle, with function f(x,y) = x for first moments of area (y is analogous)
 // f(x,y) = x^2 for second moment of area
 // and f(x,y) = x*y for second moment of area covariance
-std::tuple<float, Vec2f, Vec2f, float> compute_moments_of_area_of_triangle(const Vec2f &a, const Vec2f &b, const Vec2f &c)
+std::tuple<float, Vec2f, Vec2f, float> compute_moments_of_area_of_triangle(const Vec2f& a, const Vec2f& b, const Vec2f& c)
 {
     // based on the following guide:
     // Denote the vertices of S by a, b, c. Then the map
@@ -64,14 +76,14 @@ std::tuple<float, Vec2f, Vec2f, float> compute_moments_of_area_of_triangle(const
 };
 
 // returns two eigenvectors of the area covered by given polygons. The vectors are sorted by their corresponding eigenvalue, largest first
-std::tuple<Vec2f, Vec2f> compute_principal_components(const Polygons &polys)
+std::tuple<Vec2f, Vec2f> compute_principal_components(const Polygons& polys)
 {
     Vec2f centroid_accumulator                         = Vec2f::Zero();
     Vec2f second_moment_of_area_accumulator            = Vec2f::Zero();
     float second_moment_of_area_covariance_accumulator = 0.0f;
     float area                                         = 0.0f;
 
-    for (const Polygon &poly : polys) {
+    for (const Polygon& poly : polys) {
         Vec2f p0 = unscaled(poly.first_point()).cast<float>();
         for (size_t i = 2; i < poly.points.size(); i++) {
             Vec2f p1 = unscaled(poly.points[i - 1]).cast<float>();
@@ -120,8 +132,8 @@ std::tuple<Vec2f, Vec2f> compute_principal_components(const Polygons &polys)
                                  sqrt((variance.x() - variance.y()) * (variance.x() - variance.y()) + 4.0f * covariance * covariance));
     float eigenvalue_b = 0.5f * (variance.x() + variance.y() -
                                  sqrt((variance.x() - variance.y()) * (variance.x() - variance.y()) + 4.0f * covariance * covariance));
-    Vec2f  eigenvector_a{(eigenvalue_a - variance.y()) / covariance, 1.0f};
-    Vec2f  eigenvector_b{(eigenvalue_b - variance.y()) / covariance, 1.0f};
+    Vec2f eigenvector_a{(eigenvalue_a - variance.y()) / covariance, 1.0f};
+    Vec2f eigenvector_b{(eigenvalue_b - variance.y()) / covariance, 1.0f};
 
 #if 0
         std::cout << "eigenvalue_a: " << eigenvalue_a << std::endl;
@@ -137,4 +149,4 @@ std::tuple<Vec2f, Vec2f> compute_principal_components(const Polygons &polys)
     }
 }
 
-}
+} // namespace Slic3r
