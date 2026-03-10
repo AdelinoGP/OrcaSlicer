@@ -4,39 +4,39 @@
 
 - Source scan basis: all `*.cpp`, `*.hpp`, and `*.h` files under `src/`.
 - Total source files found: **1264**.
-- Annotated in Phase 1 task registry: **313 task entries / 312 unique source paths**.
+- Annotated in the Phase 1 registry: **313 task entries / 312 unique source paths**.
 - Duplicate registry entry: `src/libslic3r/PrintObject.cpp` appears as both `T105` and `T413`.
-- Explicitly skipped by current scope rules: **663**.
+- Explicitly skipped by the recorded scope rules: **663**.
   - `SKIP_GUI`: **619** files under `src/slic3r/GUI/`
   - `SKIP_GUI`: **43** files under `src/libvgcode/`
   - `SKIP_TRIVIAL`: **1** file: `src/libslic3r/pchheader.hpp`
-- Coverage gap still requiring human judgment: **289** source files are neither annotated nor covered by the explicit skip buckets above.
-  - Largest buckets: `src/slic3r/Utils/` (98), `src/libslic3r/Format/` (23), `src/libslic3r/Arachne/` (17), `src/libslic3r/GCode/` (15), `src/libslic3r/Fill/` (11)
+- Coverage gap still requiring human judgment: **289** files are neither annotated nor covered by the explicit skip buckets above.
+  - Largest unresolved buckets: `src/slic3r/Utils/` (98), `src/libslic3r/Format/` (23), `src/libslic3r/Arachne/` (17), `src/libslic3r/GCode/` (15), `src/libslic3r/Fill/` (11)
 
 ## 2. Documentation File Inventory
 
-| File | Line count | Last-updated session | Coverage |
+| File | Line count | Last-updated session / checkpoint | Coverage |
 | --- | ---: | --- | --- |
-| `generated_documentation/01_system_architecture.md` | 262 | Session 33+ | High-level module map, build/dependency overview, and dominant C++ patterns across OrcaSlicer. |
-| `generated_documentation/02_core_data_structures.md` | 616 | Session 65 / T210 follow-up | Ownership, invariants, lifecycle, and consumers for the main slicer-side runtime data structures. |
-| `generated_documentation/03_algorithmic_complexities.md` | 1124 | Session 85 / T211 visible in surviving journal | Core slicing, infill, support, segmentation, and geometry algorithms with complexity and data-flow notes. |
-| `generated_documentation/04_refactoring_hazards.md` | 3429 | Session 87 / T301 | Exhaustive hazard catalogue with severity, code links, and the critical-blockers front section. |
-| `generated_documentation/05_external_dependencies.md` | 796 | Phase 2 / T204 (session not pinned in surviving journal excerpt) | External library inventory, API surface actually used, porting strategy, and migration hazards. |
-| `generated_documentation/agent_journal.md` | 450 | Session 88 | Current-status handoff plus the surviving Session 84-88 narrative for late-phase work. |
-| `generated_documentation/agent_journal_archive_s01_s83.md` | 5898 | Session 84 bootstrap archive | Verbatim archive of Sessions 1-83 from the original long-form analysis log. |
-| `generated_documentation/link_verification_report.md` | 31 | Session 87 / T301 | Human-reviewable proof that all extracted source links were checked and updated where needed. |
-| `generated_documentation/pseudocode_fill_lightning.md` | 693 | Session 85 / T205B | Language-agnostic pseudocode for Lightning infill tree growth, grounding, pruning, and export. |
-| `generated_documentation/pseudocode_multimaterial_segmentation.md` | 757 | Session 85 / T205C | Pseudocode for painted-region graph building, Voronoi processing, and colored-segment extraction. |
-| `generated_documentation/pseudocode_seam_placer.md` | 961 | Session 85 / T205D, re-capped in Session 87 | Detailed pseudocode for seam visibility scoring, alignment, and seam export decisions. |
-| `generated_documentation/pseudocode_triangle_mesh_slicer_chaining.md` | 250 | Session 85 / T205A | Pseudocode for TriangleMeshSlicer Phase 2 line chaining, continuation lookup, and loop assembly. |
-| `generated_documentation/REVIEW_PACKAGE.md` | 77 | Session 88 | Final human-review handoff summarizing coverage, inventories, open items, and recommended reading order. |
+| `generated_documentation/01_system_architecture.md` | 262 | Archived pre-84 docs checkpoint (`7173d07b76`) | High-level module map, build/dependency overview, and dominant C++ patterns across OrcaSlicer. |
+| `generated_documentation/02_core_data_structures.md` | 616 | T210 follow-up commit (`c5934559e2`, archived pre-84 session) | Ownership, invariants, lifecycle, and consumers for the main slicer-side runtime data structures. |
+| `generated_documentation/03_algorithmic_complexities.md` | 1124 | T211 follow-up commit (`a4506c32fb`, archived pre-84 session) | Core slicing, infill, support, segmentation, and geometry algorithms with complexity and data-flow notes. |
+| `generated_documentation/04_refactoring_hazards.md` | 3429 | Session 87 / T301 (`2c698967ef`) | Exhaustive hazard catalogue with severity, code links, and the critical-blockers front section. |
+| `generated_documentation/05_external_dependencies.md` | 796 | T204 commit (`01eacd60c9`, archived pre-84 session) | External library inventory, the API surface actually used, porting strategy, and migration hazards. |
+| `generated_documentation/agent_journal.md` | 480 | Session 89 / T303 refresh | Current-status handoff plus the surviving Session 84-89 narrative for late-phase work. |
+| `generated_documentation/agent_journal_archive_s01_s83.md` | 5898 | Session 84 bootstrap archive (`4441531b30`) | Verbatim archive of Sessions 1-83 from the original long-form analysis log. |
+| `generated_documentation/link_verification_report.md` | 31 | Session 87 / T301 (`2c698967ef`) | Human-reviewable proof that extracted source links were checked and updated where needed. |
+| `generated_documentation/pseudocode_fill_lightning.md` | 693 | T205B commit (`f026991011`, archived pre-84 session) | Language-agnostic pseudocode for Lightning infill tree growth, grounding, pruning, and export. |
+| `generated_documentation/pseudocode_multimaterial_segmentation.md` | 757 | T205C commit (`601181c07d`, archived pre-84 session) | Pseudocode for painted-region graph building, Voronoi processing, and colored-segment extraction. |
+| `generated_documentation/pseudocode_seam_placer.md` | 961 | Session 85 / T205D (`ec3e5b9218`) | Detailed pseudocode for seam visibility scoring, alignment, and seam export decisions. |
+| `generated_documentation/pseudocode_triangle_mesh_slicer_chaining.md` | 250 | T205A commit (`b19f4b04e4`, archived pre-84 session) | Pseudocode for TriangleMeshSlicer Phase 2 line chaining, continuation lookup, and loop assembly. |
+| `generated_documentation/REVIEW_PACKAGE.md` | 77 | Session 89 / T303 refresh | Final human-review handoff summarizing coverage, inventories, open items, and recommended reading order. |
 
 ## 3. Pseudocode File Inventory
 
 | Pseudocode file | Source coverage | Translation Notes |
 | --- | --- | ---: |
 | `generated_documentation/pseudocode_triangle_mesh_slicer_chaining.md` | `src/libslic3r/TriangleMeshSlicer.cpp` | 6 |
-| `generated_documentation/pseudocode_fill_lightning.md` | `src/libslic3r/Fill/FillLightning.cpp`, `src/libslic3r/Fill/Lightning/Generator.cpp`, `src/libslic3r/Fill/Lightning/Layer.cpp`, `src/libslic3r/Fill/Lightning/TreeNode.cpp`, `src/libslic3r/Fill/Lightning/DistanceField.hpp` | 10 |
+| `generated_documentation/pseudocode_fill_lightning.md` | `src/libslic3r/Fill/FillLightning.cpp`, `src/libslic3r/Fill/Lightning/Generator.cpp`, `src/libslic3r/Fill/Lightning/Layer.cpp`, `src/libslic3r/Fill/Lightning/TreeNode.cpp`, `src/libslic3r/Fill/Lightning/DistanceField.hpp` | 9 |
 | `generated_documentation/pseudocode_multimaterial_segmentation.md` | `src/libslic3r/MultiMaterialSegmentation.cpp` | 8 |
 | `generated_documentation/pseudocode_seam_placer.md` | `src/libslic3r/GCode/SeamPlacer.cpp`, `src/libslic3r/GCode/SeamPlacer.hpp` | 10 |
 
