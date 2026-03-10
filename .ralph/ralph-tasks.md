@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer Analysis Agent
-Last updated: 2026-03-10T22:26:09Z
+Last updated: 2026-03-10T22:44:00Z
 
 ## Legend
 - [ ] PENDING   — not started
@@ -606,7 +606,7 @@ and must not be started until that task's commit exists on the branch.
 loaded into ModelVolume. Read each parser's output construction together with
 its header to understand the data contract.)
 
-- [ ] T4010  annotate+verify: src/libslic3r/Format/STL.cpp
+- [x] T4010  annotate+verify: src/libslic3r/Format/STL.cpp
                             + src/libslic3r/Format/STL.hpp
              Context: Binary and ASCII STL loading via admesh. This is the most
              common input format. Cross-reference TriangleMesh.cpp (T114) for
