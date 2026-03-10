@@ -36,6 +36,9 @@ struct ThumbnailData;
 #define BBL_DESIGNER_MODEL_ID_TAG        "DesignModelId"
 
 
+// [INTENT] Scratch bundle for export-only relationship targets. The exporter discovers the
+//          final cover and printer-thumbnail paths late in the save pipeline, then feeds them
+//          back into `_rels/.rels` generation through this temporary object.
 //BBS: define assistant struct to store temporary variable during exporting 3mf
 class PackingTemporaryData
 {
@@ -48,6 +51,15 @@ public:
 };
 
 
+// [INTENT] Per-build-plate state restored from or embedded into BBS 3MF. This is the bridge
+//          between archive sidecars (`Metadata/plate_N.*`, `slice_info.config`) and the in-memory
+//          plater model used by the UI and cached G-code restore path.
+// [STATE] Import populates this from XML / sidecar files, then hands ownership to callers via
+//         `PlateDataPtrs`. Export reads the same structure to decide which thumbnails, G-code,
+//         filament stats, and warning payloads to persist for each plate.
+// [MEMORY] `PlateData` itself is value-like, but the surrounding API still passes raw `PlateData*`
+//          through `PlateDataPtrs`; lifetime remains manual and is released by
+//          `release_PlateData_list()`.
 //BBS: define plate data list related structures
 struct PlateData
 {
@@ -118,6 +130,12 @@ struct PlateData
     bool locked;
 };
 
+// [INTENT] Export policy bitmask. A single save call can produce a lightweight backup archive,
+//          a full round-trip project file with cached G-code, or an encrypted production bundle
+//          by combining these flags.
+// [HAZARD] Composite presets such as `Encrypted` and `Backup` encode assumptions about which
+//          sidecar files must be present; translators should preserve the semantic combinations,
+//          not just the integer values.
 // BBS: encrypt
 enum class SaveStrategy
 {
@@ -156,6 +174,11 @@ enum {
     brim_points_format_version = 0
 };
 
+// [INTENT] Import policy bitmask controlling whether a caller wants only a version probe,
+//          geometry plus configs, or a full restore including per-plate cached outputs.
+// [COUPLING] `Restore` means more than "load everything": importer branches use it to enable
+//            fallback-to-backup archive lookups and to hydrate plate/G-code sidecars expected by
+//            OrcaSlicer's resume workflow.
 enum class LoadStrategy
 {
     Default = 0,
@@ -221,6 +244,11 @@ typedef std::vector<PlateData*> PlateDataPtrs;
 
 typedef std::map<int, PlateData*> PlateDataMaps;
 
+    // [INTENT] Export call contract. Bundles the mutable model/config graph with all optional
+    //          BBS sidecars so callers can request a single-plate export, include preview images,
+    //          and embed preset snapshots without a 15-argument function signature.
+    // [COUPLING] Required inputs are implicit: `path`, `model`, and usually `config`; some flags
+    //            additionally require populated `plate_data_list`, thumbnails, or `project`.
 struct StoreParams
 {
     const char* path;
@@ -244,6 +272,14 @@ struct StoreParams
 };
 
 
+// [INTENT] Main BBS 3MF import entry point. Restores the model graph plus Bambu-specific project
+//          state from geometry XML, JSON config snapshots, per-plate cache files, and optional
+//          embedded presets.
+// [STATE] Populates `model` with geometry / metadata, `config` with project settings,
+//         `plate_data_list` with per-plate slice cache state, `project_presets` with embedded
+//         preset snapshots, and `project` with cloud-project identifiers when present.
+// [COUPLING] `plate_id` selects the 1-based plate to restore from the archive's sidecars; the
+//            importer assumes caller-provided output pointers are valid and writable.
 //BBS: add plate data list related logic
 // add restore logic
 // Load the content of a 3mf file into the given model and preset bundle.
@@ -256,6 +292,12 @@ extern bool load_gcode_3mf_from_stream(std::istream & data, DynamicPrintConfig* 
        Semver* file_version);
 
 
+// [INTENT] Main BBS 3MF export entry point. Writes the OPC container, geometry model(s), Orca
+//          project JSON, model-side XML config, thumbnails, embedded presets, and optional G-code
+//          cache according to `StoreParams::strategy`.
+// [HAZARD] Export may materialize temporary backup files and sidecar snapshots on disk before ZIP
+//          finalization completes; callers should treat a `false` return as "archive may be
+//          partially written" rather than a transactional rollback.
 //BBS: add plate data list related logic
 // add backup logic
 // Save the given model and the config data contained in the given Print into a 3mf file.
@@ -302,6 +344,10 @@ extern void clear_other_changes(bool backup);
 
 extern bool has_other_changes(bool backup);
 
+// [INTENT] RAII helper that temporarily serializes a `ModelObject` mesh into the backup area so
+//          destructive UI actions can be undone through the restore pipeline.
+// [MEMORY] Ownership of the guarded `ModelObject` stays external; the guard only manages the
+//          side-effecting save/delete calls in its constructor/destructor pair.
 class SaveObjectGaurd {
 public:
     SaveObjectGaurd(ModelObject& object);

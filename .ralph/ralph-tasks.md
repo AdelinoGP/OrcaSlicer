@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer Analysis Agent
-Last updated: 2026-03-11T00:10:00Z
+Last updated: 2026-03-10T00:35:00Z
 
 ## Legend
 - [ ] PENDING   — not started
@@ -454,7 +454,7 @@ its header to understand the data contract.)
              relationship between this base implementation and bbs_3mf (T4014).
              Commit: `annotate: 3MF base parser (T4013)`
 
-- [ ] T4014  annotate+verify: src/libslic3r/Format/bbs_3mf.cpp
+- [x] T4014  annotate+verify: src/libslic3r/Format/bbs_3mf.cpp
                             + src/libslic3r/Format/bbs_3mf.hpp
              Context: BBL's extended 3MF format, the primary round-trip format
              for OrcaSlicer. This is the largest parser file. Read alongside

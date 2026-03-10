@@ -1,12 +1,12 @@
 # Agent Journal — OrcaSlicer Codebase Analysis
 
 ## CURRENT STATUS
-Last session: 89
-Active task: T303 — HUMAN REVIEW GATE
-Next action: Human reviewer should read `generated_documentation/REVIEW_PACKAGE.md`, then decide whether to accept the package or reopen coverage/open-item follow-up work.
+Last session: 90
+Active task: T4015 — annotate+verify `src/libslic3r/Format/STEP.cpp` + `src/libslic3r/Format/STEP.hpp`
+Next action: Continue the Phase 4 Format gap by documenting the OpenCASCADE/STEP import path after the BBS 3MF round-trip parser is now fully annotated.
 Unresolved [UNCLEAR] tags: 12 — all remaining source tags are marked `[UNCLEAR → ESCALATED]` after Session 86 T300 triage
-Files remaining (Phase 1): 289 files outside explicit skip buckets still need human coverage audit
-Files completed (Phase 1): 312 unique source files tracked by 313 annotate task entries
+Files remaining (Phase 1): 287 files outside explicit skip buckets still need human coverage audit
+Files completed (Phase 1): 314 unique source files tracked by 314 annotate task entries
 Next hazard ID: H1191
 
 Open questions (from Session 1 — status as of Session 86):
@@ -478,3 +478,27 @@ Total escalated tags: **12**
 | `src/libslic3r/VariableWidth.cpp` | 153 | The last-segment average uses only `a_width`, so the reason for possible tail under-extrusion remains undocumented locally. |
 
 **Completed tasks this session:** T300
+
+---
+
+## Session 90
+
+**Active task:** T4014 — annotate+verify `src/libslic3r/Format/bbs_3mf.cpp` + `src/libslic3r/Format/bbs_3mf.hpp`
+
+- Files processed: `src/libslic3r/Format/bbs_3mf.cpp`, `src/libslic3r/Format/bbs_3mf.hpp`, `.ralph/ralph-tasks.md`
+- Key discoveries:
+  - `bbs_3mf.cpp` is already partially annotated, but the existing pass mostly covered the file prologue and API wrappers rather than the internal importer/exporter state machine.
+  - The BBS sidecar schema cleanly partitions into project config, model config, slice cache, embedded presets, per-plate thumbnails/G-code, and auxiliary assets; the importer rebuilds each of those in a distinct second-pass dispatch over ZIP members.
+  - Production Extension split-object loading is one of the highest-coupling points in the parser because it combines OPC relationship discovery, parallel object XML parsing, and a later merge into the single in-memory `Model` graph.
+- Decisions made:
+  - Kept the task scoped to verification plus comment injection only; no supporting docs were updated because T4014 is explicitly an annotation task and `T4018` is the follow-up docs checkpoint.
+  - Added comments at the schema, importer, and exporter boundaries rather than trying to annotate every helper branch in a 9k-line file, so downstream translators can recover the archive contract and lifecycle first.
+- Open questions:
+  - None newly introduced; existing `[UNCLEAR -> ESCALATED]` items remain unchanged.
+- Cross-references:
+  - `src/libslic3r/Format/3mf.cpp`
+  - `src/libslic3r/Model.hpp`
+  - `src/libslic3r/Preset.hpp`
+  - `src/libslic3r/GCode/ThumbnailData.hpp`
+
+**Completed tasks this session:** T4014

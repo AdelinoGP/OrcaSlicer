@@ -231,6 +231,26 @@ const std::string PROJECT_EMBEDDED_PRINT_PRESETS_FILE = "Metadata/print_setting_
 const std::string PROJECT_EMBEDDED_SLICE_PRESETS_FILE = "Metadata/process_settings_";
 const std::string PROJECT_EMBEDDED_FILAMENT_PRESETS_FILE = "Metadata/filament_settings_";
 const std::string PROJECT_EMBEDDED_PRINTER_PRESETS_FILE = "Metadata/machine_settings_";
+// [INTENT] Archive-sidecar inventory for BBS extensions beyond base 3MF geometry.
+//          Import mapping:
+//          - `Metadata/project_settings.config` -> `DynamicPrintConfig` project settings via JSON load.
+//          - `Metadata/model_settings.config` -> per-object / per-volume `ModelObject` and
+//            `ModelVolume` metadata, transforms, paint state, and text / emboss config.
+//          - `Metadata/slice_info.config` -> `PlateData::{gcode_prediction,gcode_weight,warnings,
+//            filament_maps, layer_filaments,...}` for each build plate.
+//          - `Metadata/layer_heights_profile.txt` -> `ModelObject::layer_height_profile`.
+//          - `Metadata/layer_config_ranges.xml` -> object-level per-Z config overrides.
+//          - `Metadata/brim_ear_points.txt` -> `ModelObject::brim_points` restore data.
+//          - `Metadata/custom_gcode_per_layer.xml` -> `Model::plates_custom_gcodes`.
+//          - `Metadata/plate_N.gcode` / `.md5` / `.png` / `top_N.png` / `pick_N.png` / `plate_N.json`
+//            -> `PlateData` cached toolpath, integrity hash, previews, and calibration bounding boxes.
+//          - `Metadata/*settings_*.config` -> embedded `Preset` snapshots for print / process /
+//            filament / machine selections.
+//          - `Auxiliaries/` -> external files referenced by emboss / project assets, extracted into
+//            the model's temp auxiliary directory.
+// [COUPLING] The importer/exporter rely on filenames as part of the schema. Renaming a sidecar
+//            entry without updating both the dispatch loop and consumers silently drops that state.
+
 const std::string CUT_INFORMATION_FILE = "Metadata/cut_information.xml";
 
 const unsigned int AUXILIARY_STR_LEN = 12;
@@ -700,6 +720,14 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         }
     };
 
+    // [INTENT] Stateful ZIP + SAX importer for BBS 3MF. It first resolves OPC relationships,
+    //          then parses geometry XML, and finally walks the remaining sidecars to rebuild the
+    //          full Orca project state (plate cache, presets, paint data, thumbnails, etc.).
+    // [STATE] Parser callbacks mutate importer-wide cursors (`m_curr_object`, `m_curr_config`,
+    //         `m_curr_plater`) instead of returning values, so element-order correctness matters.
+    // [COUPLING] This class touches `Model`, `ModelObject`, `ModelVolume`, `Preset`,
+    //            `DynamicPrintConfig`, `BBLProject`, and `ThumbnailData`; it is effectively the
+    //            archive-to-runtime assembly boundary for OrcaSlicer projects.
     class _BBS_3MF_Importer : public _BBS_3MF_Base
     {
         typedef std::pair<std::string, int> Id; // BBS: encrypt
@@ -724,6 +752,9 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
 
         typedef std::vector<Component> ComponentsList;
 
+        // [INTENT] Temporary decoded mesh payload for one 3MF object. Paint vectors are stored in
+        //          parallel string arrays until `model_settings.config` reattaches them to concrete
+        //          `ModelVolume` instances.
         struct Geometry
         {
             std::vector<Vec3f> vertices;
@@ -825,6 +856,10 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
 
         typedef std::vector<Metadata> MetadataList;
 
+        // [INTENT] Per-object / per-volume metadata reconstructed from `model_settings.config`.
+        //          The triangle ranges tell the importer how one merged mesh maps back onto Orca's
+        //          logical volumes, including support modifiers, negative parts, text embossing,
+        //          and repair statistics.
         struct ObjectMetadata
         {
             struct VolumeMetadata
@@ -1137,6 +1172,11 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         bool _load_model_from_file(std::string filename, Model& model, PlateDataPtrs& plate_data_list, std::vector<Preset*>& project_presets, DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions, Import3mfProgressFn proFn = nullptr,
             BBLProject* project = nullptr, int plate_id = 0);
         bool _is_svg_shape_file(const std::string &filename) const;
+        // [INTENT] Locate one ZIP member by logical path, handling UTF-8/native filename encoding
+        //          mismatches and optional restore-from-backup fallback.
+        // [HAZARD] Restore mode transparently retries missing members in backup/origin archives.
+        //          That keeps resume flows working, but it also means the effective input may span
+        //          multiple files rather than the single 3MF the user picked.
         bool _extract_from_archive(mz_zip_archive& archive, std::string const & path, std::function<bool (mz_zip_archive& archive, const mz_zip_archive_file_stat& stat)>, bool restore = false);
         bool _extract_xml_from_archive(mz_zip_archive& archive, std::string const & path, XML_StartElementHandler start_handler, XML_EndElementHandler end_handler);
         bool _extract_xml_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, XML_StartElementHandler start_handler, XML_EndElementHandler end_handler);
@@ -1153,6 +1193,11 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         void _extract_print_config_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, DynamicPrintConfig& config, ConfigSubstitutionContext& subs_context, const std::string& archive_filename);
         //BBS: add project config file logic
         void _extract_project_config_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, DynamicPrintConfig& config, ConfigSubstitutionContext& subs_context, Model& model);
+        // [INTENT] Recreate embedded preset files as runtime `Preset` objects so the imported project
+        //          keeps its exact print/process/filament/machine snapshot even if the local preset
+        //          library has changed since the file was saved.
+        // [MEMORY] Each imported preset is heap-allocated and appended to `project_presets`; caller
+        //          code owns the resulting `Preset*` collection.
         //BBS: extract project embedded presets
         void _extract_project_embedded_presets_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, std::vector<Preset*>&project_presets, Model& model, Preset::Type type, bool use_json = true);
 
@@ -1438,6 +1483,9 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         return is.gcount();
     }
 
+// [INTENT] Lightweight restore path for `.gcode.3mf` streams. Unlike full project load this
+//          assumes the archive is already in memory/stream form, rebuilds geometry and plate
+//          cache, then extracts only the config/model sidecars needed to inspect or resume it.
     bool _BBS_3MF_Importer::load_gcode_3mf_from_stream(std::istream &data, Model &model, PlateDataPtrs &plate_data_list, DynamicPrintConfig &config, Semver &file_version)
     {
         mz_zip_archive archive;
@@ -1504,6 +1552,10 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         m_model->model_info->metadata_items.emplace("Thumbnail", m_thumbnail_middle);
         m_model->model_info->metadata_items.emplace("Poster", m_thumbnail_middle);
 
+        // [INTENT] Second pass over archive members. Geometry must exist first so later config and
+        //          slice-info payloads can bind their data onto concrete `ModelObject`/plate slots.
+        // [STATE] This is where Bambu-specific sidecars are mapped into `DynamicPrintConfig`,
+        //         `m_plater_data`, and `model_info` after the base mesh graph is already alive.
         // we then loop again the entries to read other files stored in the archive
         mz_uint num_entries = mz_zip_reader_get_num_files(&archive);
         mz_zip_archive_file_stat stat;
@@ -1612,6 +1664,13 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         XML_StopParser(m_xml_parser, false);
     }
 
+// [INTENT] Full project import path. Runs a three-phase restore: discover package topology,
+//          parse model XML (including Production Extension split-object subfiles), then ingest
+//          all Orca/Bambu sidecars that rebuild per-object and per-plate runtime state.
+// [CONCURRENCY] Split-object `.model` files are parsed in parallel with TBB because each
+//               object archive is independent until the final merge into `m_current_objects`.
+// [HAZARD] `dont_load_config` disables sidecars when version compatibility is uncertain;
+//          importing only geometry can therefore silently drop plate cache or preset state.
     //BBS: add plate data related logic
     bool _BBS_3MF_Importer::_load_model_from_file(
         std::string filename,
@@ -1684,6 +1743,8 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
             return false;
         if (m_start_part_path.empty())
             return false;
+        // [INTENT] Production Extension support: Orca may shard geometry into `3D/Objects/*.model`
+        //          so large projects can save/restore individual object meshes independently.
         // BBS: load sub models (Production Extension)
         std::string sub_rels = m_start_part_path;
         sub_rels.insert(boost::find_last(sub_rels, "/").end() - sub_rels.begin(), "_rels/");
@@ -2375,6 +2436,9 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         });
     }
 
+// [INTENT] Materialize a small XML sidecar into memory, then hand it to Expat in one shot.
+//          Used for configs / metadata files where whole-buffer parsing is simpler than the
+//          streaming callback used for large geometry models.
     bool _BBS_3MF_Importer::_extract_xml_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, XML_StartElementHandler start_handler, XML_EndElementHandler end_handler)
     {
         if (stat.m_uncomp_size == 0) {
@@ -2418,6 +2482,9 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         return true;
     }
 
+// [INTENT] Stream a `.model` file through Expat without first copying the entire XML blob.
+//          This keeps the peak memory footprint bounded even for very large split-object BBS
+//          projects whose geometry payload dwarfs their metadata sidecars.
     bool _BBS_3MF_Importer::_extract_model_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat)
     {
         if (stat.m_uncomp_size == 0) {
@@ -2557,6 +2624,9 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         }
     }
 
+    // [INTENT] Restore Orca's project-level `DynamicPrintConfig` from the JSON snapshot embedded
+    //          in `Metadata/project_settings.config`. This is the main bridge from archive state
+    //          back to the preset/config subsystem.
     //BBS: extract project config from json files
     void _BBS_3MF_Importer::_extract_project_config_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions, Model& model)
     {
@@ -2680,6 +2750,10 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         }
     }
 
+// [INTENT] Spill `Auxiliaries/` payloads (SVGs, textures, other external project assets) into
+//          the model's temp auxiliary directory so later UI/tools can reopen them by path.
+// [HAZARD] The function recreates archive subdirectories on disk during import, so path
+//          sanitization (`/../` check in the caller loop) is critical for traversal safety.
     void _BBS_3MF_Importer::_extract_auxiliary_file_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, Model& model)
     {
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(", stat.m_uncomp_size is %1%")%stat.m_uncomp_size;
@@ -3122,6 +3196,9 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         }
     }
 
+// [INTENT] Restore per-plate custom G-code schedules. BBS 3MF extends base 3MF by persisting
+//          color changes / pauses / tool changes as structured XML, then hydrates them into
+//          `Model::plates_custom_gcodes` for later slicing or UI editing.
     void _BBS_3MF_Importer::_extract_custom_gcode_per_print_z_from_archive(::mz_zip_archive &archive, const mz_zip_archive_file_stat &stat)
     {
         //BBS: add plate tree related logic
@@ -3208,6 +3285,9 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         }
     }
 
+// [INTENT] Central SAX dispatcher for `.model` parsing. The importer keeps one Expat parser
+//          but fans element callbacks into specialized handlers for geometry, components,
+//          build items, metadata, and Bambu color groups.
     void _BBS_3MF_Importer::_handle_start_model_xml_element(const char* name, const char** attributes)
     {
         if (m_xml_parser == nullptr)
@@ -5604,6 +5684,12 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
     }
 
 
+    // [INTENT] Mirror-image serializer for BBS 3MF. It walks the live Orca model/config graph and
+    //          emits a standards-compliant OPC/3MF package plus Bambu-specific sidecars needed for
+    //          project round-trip fidelity and printer/cloud integrations.
+    // [STATE] Export behavior is almost entirely flag-driven (`m_save_gcode`, `m_split_model`,
+    //         `m_skip_static`, `m_share_mesh`, ...), so one instance should be treated as a
+    //         single-use state machine rather than a reusable stateless utility.
     class _BBS_3MF_Exporter : public _BBS_3MF_Base
     {
         struct BuildItem
@@ -5746,6 +5832,9 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         }
     };
 
+    // [INTENT] Public export entry point. Decodes the `SaveStrategy` bitmask into exporter state,
+    //          writes to `path.tmp`, then atomically renames on success so callers do not see a
+    //          half-written final archive under normal filesystem semantics.
     bool _BBS_3MF_Exporter::save_model_to_file(StoreParams& store_params)
     {
         clear_errors();
@@ -5845,6 +5934,11 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
     }
 
     //BBS: add plate data related logic
+    // [INTENT] Full archive writer. Serializes package scaffolding first, then geometry/config,
+    //          then optional cached outputs (G-code, slice info, previews), and finally the root
+    //          relationships file that advertises those payloads to other 3MF consumers.
+    // [COUPLING] Export order matters because later sidecars depend on IDs and filenames decided
+    //            earlier in the run (`objects_data`, plate thumbnail names, temporary asset paths).
     bool _BBS_3MF_Exporter::_save_model_to_file(const std::string& filename,
         Model& model,
         PlateDataPtrs& plate_data_list,
@@ -6313,6 +6407,10 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
         return true;
     }
 
+    // [INTENT] Generic sidecar copier used for already-materialized files such as thumbnails,
+    //          cached G-code, and auxiliary assets.
+    // [HAZARD] Compression policy is extension-based; adding a new binary sidecar type without
+    //          updating `nocomp_exts` may waste time recompressing data that is already compressed.
     bool _BBS_3MF_Exporter::_add_file_to_archive(mz_zip_archive& archive, const std::string& path_in_zip, const std::string& src_file_path)
     {
         static std::string const nocomp_exts[] = {".png", ".jpg", ".mp4", ".jpeg", ".zip", ".3mf"};
