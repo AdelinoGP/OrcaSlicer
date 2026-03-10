@@ -48,7 +48,7 @@ Last updated: 2026-03-09T00:00:00Z
               individual entries. Only remove prose that belongs in a different
               document. Commit with prefix `docs:`.
 
-- [ ] TB005  BOOTSTRAP · Resolve or explicitly escalate the four open questions
+- [x] TB005  BOOTSTRAP · Resolve or explicitly escalate the four open questions
              recorded in Session 1 of agent_journal.md:
              (1) Does slice_mesh use the admesh adjacency table or rebuild it?
              (2) Exact memory ownership of Layer objects (raw vs unique_ptr)?
@@ -441,7 +441,7 @@ Last updated: 2026-03-09T00:00:00Z
             used, algorithmic role, porting strategy (REPLICATE / FIND_EQUIVALENT
             / PORT_REQUIRED / GUI_ONLY), and hazards. Commit with prefix `docs:`.
 
-- [ ] T210  Add missing data structures to `02_core_data_structures.md`:
+- [x] T210  Add missing data structures to `02_core_data_structures.md`:
             SupportLayer + SupportLayerPtrs, FillAdaptive::Octree,
             FillLightning::Generator (note raw pointer hazard from Fill.cpp),
             UndoRedo::StackImpl (cereal stack + friend class coupling),
@@ -450,7 +450,7 @@ Last updated: 2026-03-09T00:00:00Z
             Use the same format as existing entries: fields, invariants,
             lifecycle, consumers. Commit with prefix `docs:`.
 
-- [ ] T211  Add missing algorithm sections to `03_algorithmic_complexities.md`:
+- [/] T211  Add missing algorithm sections to `03_algorithmic_complexities.md`:
             (a) ArcFitter.cpp — segment-to-arc conversion (G2/G3), including
                 the chord-error threshold and the minimum-arc-length guard.
             (b) MultiMaterialSegmentation.cpp — the painting-based filament
