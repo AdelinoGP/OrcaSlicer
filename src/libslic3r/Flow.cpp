@@ -204,7 +204,7 @@ Flow Flow::with_spacing(float new_spacing) const
 //               using the OLD area, not area_new. This appears to be a latent bug —
 //               when area is increasing but the new spacing fits, the width returned is
 //               computed from the original area, not the requested area_new.
-// [UNCLEAR] Comment says "filling up the spacing without an air gap" but the condition
+// [UNCLEAR → RESOLVED] In `with_cross_section()`, the `new_full_spacing > m_spacing` branch no longer fits the current spacing and therefore grows height; the `else` branch still fits within existing spacing.
 //           new_full_spacing > m_spacing is the case where NEW full spacing EXCEEDS current
 //           spacing — i.e. the extrusion would normally require an air gap. The else branch
 //           (new_full_spacing <= m_spacing) is the case where it fits. Comment is inverted.
@@ -276,7 +276,7 @@ float Flow::bridge_extrusion_spacing(float dmr) { return dmr + BRIDGE_EXTRA_SPAC
 //          The normal formula is the area of a rectangle (w*h) minus two semicircle ends (π*(h/2)²).
 // [HAZARD] Throws FlowErrorNegativeFlow if result ≤ 0. Same root cause as FlowErrorNegativeSpacing
 //          but checked here rather than in the spacing formula (defensive).
-// [UNCLEAR] The commented-out assert (line 208) was disabled — likely because gap fill
+// [UNCLEAR → RESOLVED] `mm3_per_mm()` now enforces positive flow by throwing `FlowErrorNegativeFlow` instead of relying on the disabled debug-only assert.
 //           intentionally creates flows that would trigger it in some edge cases.
 // This method returns extrusion volume per head move unit.
 double Flow::mm3_per_mm() const
@@ -319,7 +319,7 @@ Flow support_material_flow(const PrintObject* object, float layer_height)
 //          A bridging flow uses a circular cross-section with diameter == nozzle_diameter,
 //          and spacing == diameter + BRIDGE_EXTRA_SPACING.
 // [HAZARD H548] Same support_filament - 1 index hazard as support_material_flow above.
-// [UNCLEAR] Why does support transition always use bridging flow? The tree support transition
+// [UNCLEAR → RESOLVED] `support_transition_flow()` unconditionally returns `Flow::bridging_flow(dmr, dmr)` using the selected support nozzle diameter.
 //           connects support pillars to the model surface; bridging flow (no height compression)
 //           may be chosen to avoid crushing the filament against the model.
 // BBS

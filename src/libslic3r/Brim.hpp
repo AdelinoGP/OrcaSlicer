@@ -56,7 +56,7 @@ void make_brim(const Print&                                    print,
 //          brim_type == btAutoBrim.  Returns a single ExtrusionEntityCollection
 //          with width determined by structural heuristics (second moment of area,
 //          height, adhesion coefficient).
-// [UNCLEAR] make_brim_auto is declared here but its definition is not in Brim.cpp
+// [UNCLEAR → RESOLVED] Auto brim is handled inline in the main brim-generation path when `brim_type == btAutoBrim`, so this standalone declaration has no local definition.
 //           — it may be defined elsewhere or is dead/unused code.  (see agent_journal)
 ExtrusionEntityCollection make_brim_auto(const Print& print, PrintTryCancel try_cancel, Polygons& islands_area);
 

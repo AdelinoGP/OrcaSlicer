@@ -117,7 +117,7 @@ protected:
 
     // [INTENT] Returns false — the G-code exporter IS allowed to reorder Lightning lines.
     // (contrast: no_sort() == true would prevent reordering, used for pattern-sensitive fills)
-    // [UNCLEAR] Typo in original: "reoder" should be "reorder". Left as-is to match original.
+    // [UNCLEAR → RESOLVED] `no_sort()` returns `false`, so downstream G-code generation is allowed to reorder Lightning infill lines; only the field name keeps the original typo.
     bool no_sort() const override { return false; }
 };
 

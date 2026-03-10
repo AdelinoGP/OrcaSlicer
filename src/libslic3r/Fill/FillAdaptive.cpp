@@ -1696,7 +1696,7 @@ void Filler::_fill_surface_single(const FillParams&              params,
 //          close to the mesh size), a second level is force-added. Without this, build_octree()
 //          skips all triangle insertion (depth==1 → depth--→0 → loop body not entered), producing
 //          an empty octree and disconnected infill lines. This guard fixes the low-density bug.
-// [UNCLEAR] The "+ EPSILON" on max_cube_edge_length is to avoid floating-point boundary issues
+// [UNCLEAR → RESOLVED] `max_cube_edge_length` is bumped by `EPSILON` before the doubling loop so values landing on the boundary still satisfy the termination check after rounding.
 //           where the loop exit condition would be missed by rounding. The exact EPSILON is
 //           Slic3r::EPSILON (1e-6), which seems sufficient but is not formally proven.
 static std::vector<CubeProperties> make_cubes_properties(double max_cube_edge_length, double line_spacing)
@@ -1736,7 +1736,7 @@ static std::vector<CubeProperties> make_cubes_properties(double max_cube_edge_le
 // [HAZARD] The threshold 0.707 is a hardcoded cosine of 45°. If the overhang angle threshold
 //          setting (currently not user-exposed for adaptive infill) is ever made configurable,
 //          this constant needs to be parameterized.
-// [UNCLEAR] The normal vector `n` is NOT normalized before the dot product with `up`. The
+// [UNCLEAR → RESOLVED] The normal is intentionally left unnormalized because `n.dot(up) > 0.707 * n.norm()` compares directly against a 45 degree cosine threshold.
 //           inequality n.dot(up) > 0.707 * n.norm() is equivalent to cos(angle(n,up)) > 0.707,
 //           which is correct. But comparing with n.norm() (not n.squaredNorm()) means one sqrt
 //           per triangle — a minor performance note.

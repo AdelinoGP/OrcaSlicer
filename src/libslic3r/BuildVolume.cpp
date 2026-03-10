@@ -700,7 +700,7 @@ bool BuildVolume::all_paths_inside(const GCodeProcessorResult& paths, const Boun
 // Input is a flat float array with interleaved vertex/normal pairs (6 floats per point:
 // vx,vy,vz, nx,ny,nz). Skips vertex, reads normal, applies fn to each normal vector.
 // [COUPLING] Used by the GUI layer (GLCanvas) to validate bed mesh normals for rendering.
-// [UNCLEAR] The parameter name is "paths" but it holds interleaved geometry, not G-code paths.
+// [UNCLEAR → RESOLVED] The `paths` parameter is a flat interleaved vertex/normal float buffer, and this helper tests only each normal triplet.
 // The naming mismatch from the public-facing all_paths_inside() could confuse maintainers.
 template<typename Fn> inline bool all_inside_vertices_normals_interleaved(const std::vector<float>& paths, Fn fn)
 {
@@ -738,7 +738,7 @@ std::string_view BuildVolume::type_name(BuildVolume_Type type)
 // scale=false → outputs in mm (for OpenGL upload).
 // [COUPLING] Ignores m_polygon shape — always returns a cube even for circle/custom beds.
 //            The GL code overlays the actual bed polygon separately.
-// [UNCLEAR] Returns cube from (0,0,0) to (max_pt3), not centred. Bed origin assumed at (0,0,0).
+// [UNCLEAR → RESOLVED] `bounding_mesh()` builds an axis-aligned box from the origin to `m_bboxf.max`, so it ignores any nonzero `m_bboxf.min` bed offset.
 indexed_triangle_set BuildVolume::bounding_mesh(bool scale) const
 {
     auto max_pt3 = m_bboxf.max;

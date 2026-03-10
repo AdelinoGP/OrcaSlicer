@@ -24,7 +24,7 @@
 // [HAZARD H1148] calc_max_group_size(): `// TODO: add explanation` on the function itself.
 //   The accumulation `group_size[idx] += iter->first * iter->second` sums (AMS-unit-count × quantity)
 //   but the meaning of this product relative to actual slot capacity is undocumented.
-//   Intent is [UNCLEAR] — the comment in the source acknowledges missing documentation.
+//   [UNCLEAR → RESOLVED] `calc_max_group_size()` sums `ams_unit_count * count` per group and forces empty groups to size 1 when external filament is allowed.
 #include "FilamentGroupUtils.hpp"
 #include <regex>
 #include <sstream>

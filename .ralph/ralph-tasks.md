@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer Analysis Agent
-Last updated: 2026-03-09T00:00:00Z
+Last updated: 2026-03-10T00:00:00Z
 
 ## Legend
 - [ ] PENDING   — not started
@@ -488,6 +488,71 @@ Last updated: 2026-03-09T00:00:00Z
 
 ## Phase 3 — Review
 
-- [x] T300  Cross-check all [UNCLEAR] tags are resolved or escalated
-- [x] T301  Verify all documentation files have correct code links
-- [x] T302  Final git commit and branch summary
+- [x] T300  Resolve or escalate all [UNCLEAR] tags in annotated source files.
+            This task has a MANDATORY resolution-first policy:
+            
+            For each [UNCLEAR] tag:
+            1. Read the surrounding function — at minimum 50 lines of context.
+            2. Check if any other annotated file in the same module answers it.
+            3. If the answer is found: update the inline comment to
+               `[UNCLEAR → RESOLVED]: <one sentence explanation>` and log it
+               in agent_journal.md under a `## T300 Resolutions` section.
+            4. Only if steps 1–2 are exhausted without an answer: mark as
+               `[UNCLEAR → ESCALATED]: <reason resolution requires external
+               knowledge>` and add it to a `## T300 Escalations` table in
+               agent_journal.md with columns: File | Line | Reason blocked.
+
+            Acceptance criteria: The T300 completion entry in agent_journal.md
+            must show a non-zero resolution count. If every single tag was
+            escalated with no resolutions, that is a signal the task was not
+            genuinely attempted — do not mark T300 done.
+            Commit with prefix `annotate:`.
+- [ ] T301  Verify all documentation file code links are correct.
+            Spot-checking is NOT acceptable. This task requires systematic
+            verification of every file:line reference in every .md file
+            under /generated_documentation/.
+
+            Procedure:
+            1. For each documentation file, extract every link of the form
+               `file.cpp#L<n>` or `file.hpp#L<n>`.
+            2. For each extracted reference: open the source file and confirm
+               the referenced line is within ±20 lines of the described content.
+               Drift beyond 20 lines = broken link; update it.
+            3. Output results to a new file:
+               `/generated_documentation/link_verification_report.md`
+               with columns: Doc File | Link | Expected Content | Status (OK / UPDATED / BROKEN)
+            4. For any BROKEN link that cannot be resolved (e.g., the function
+               was removed): add a note in the doc file replacing the link with
+               `[LINK BROKEN — function removed or file restructured]`.
+
+            This file is the human-reviewable proof that T301 was done.
+            Commit the report and any updated doc files with prefix `docs:`.
+- [ ] T302  Final git commit and branch summary
+
+- [ ] T303  HUMAN REVIEW GATE — produce the review package and stop.
+            This is the final task. The agent does NOT mark the project complete.
+            Instead, produce a file `/generated_documentation/REVIEW_PACKAGE.md`
+            containing:
+
+            1. **Coverage summary:** Total source files found / annotated /
+               explicitly skipped (with skip reason breakdown).
+            2. **Documentation file inventory:** Each .md file, its line count,
+               its last-updated session, and one sentence on what it covers.
+            3. **Pseudocode file inventory:** Each pseudocode file, which source
+               file it covers, and the count of Translation Notes.
+            4. **Open items list:** Every item that requires human judgment:
+               - All [UNCLEAR → ESCALATED] tags (from T300)
+               - All BROKEN links that could not be auto-resolved (from T301)
+               - Any SKIP_GUI / SKIP_TRIVIAL decisions the human should audit
+            5. **Suggested next actions:** What the translation agents should
+               read first, second, and third.
+
+            After committing REVIEW_PACKAGE.md, write a final journal entry
+            titled `## Session N — Phase 3 Complete — Awaiting Human Review`
+            and STOP. Do not mark T303 as [x] DONE. Leave it as [/] ACTIVE.
+            The human reviewer marks it done after reviewing the package.
+
+**Rule:** No agent run may mark the entire ralph-tasks.md as complete. The
+final state of a successful run is: all tasks [x] DONE except T303 which
+remains [/] ACTIVE. If T303 is found marked [x] DONE by the agent, the run
+is considered invalid and must be restarted from T300.

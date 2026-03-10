@@ -897,7 +897,7 @@ single_slope_fallback:
 // [CONCURRENCY] This function is called from the single-threaded process_layer() loop.
 //   No TBB parallelism inside; the whole G-code pipeline step is single-threaded per plate.
 //
-// [UNCLEAR] The commented-out lines (~840, ~900) use a different rate-clamping strategy
+// [UNCLEAR → ESCALATED] The active cross-role propagator replaced the older role-specific clamping preserved in comments, but local code does not explain why that policy changed.
 //   for cross-role propagation. The current strategy always uses
 //   line.volumetric_extrusion_rate_start regardless of iRole match — the original
 //   per-role tracking is preserved only in the active code path. Unclear if the

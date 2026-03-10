@@ -143,7 +143,7 @@ public:
     static Points visivalingam(const Points& pts, const double tolerance);
     // [INTENT] Computes the lower convex hull using a concave-hull variant (not a true
     //   concave hull — the function builds the lower hull with a curvature tolerance).
-    // [UNCLEAR] The parameter name is "tolerence" (typo). The condition mixes ccw() and
+    // [UNCLEAR → RESOLVED] The misspelled `tolerence` parameter is a threshold on normalized negative turn while building the relaxed lower hull.
     //   norm() in a way that approximates a concaveness threshold but is not documented.
     static Points concave_hull_2d(const Points& pts, const double tolerence);
 

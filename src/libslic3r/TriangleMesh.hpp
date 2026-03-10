@@ -217,7 +217,7 @@ public:
     // [HAZARD H399] Non-uniform or shear transforms do not update m_stats.size
     // correctly (size is computed from axis-aligned bounding box which is
     // recomputed, but volume scaling by det(rotation) is only an approximation
-    // for shear transforms — shear changes volume non-trivially).  [UNCLEAR]
+    // for shear transforms — shear changes volume non-trivially).  [UNCLEAR → ESCALATED] `transform()` assumes cached volume scales with the linear-part determinant, and local code does not justify that approximation for arbitrary affine shear.
     void transform(const Transform3d& t, bool fix_left_handed = false);
     void transform(const Matrix3d& t, bool fix_left_handed = false);
 

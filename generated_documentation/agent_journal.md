@@ -1,15 +1,15 @@
 # Agent Journal — OrcaSlicer Codebase Analysis
 
 ## CURRENT STATUS
-Last session: 84
-Active task: TB005 — Resolve four open questions from Session 1
-Next action: All four Session 1 open questions were already resolved (see below). Mark TB005 complete and proceed to T204.
-Unresolved [UNCLEAR] tags: 51 (in source files) — all escalated in Session 85 T300 audit (see below); none require blocking resolution before Phase 3 closes
+Last session: 86
+Active task: T301 — Verify all documentation file code links
+Next action: Systematically verify every `file.cpp#L<n>` / `file.hpp#L<n>` reference under `generated_documentation/` and write `link_verification_report.md`.
+Unresolved [UNCLEAR] tags: 12 — all remaining source tags are marked `[UNCLEAR → ESCALATED]` after Session 86 T300 triage
 Files remaining (Phase 1): 0 — annotation pass COMPLETE as of Session 84
 Files completed (Phase 1): 413 source files annotated across Sessions 1–84
 Next hazard ID: H1191
 
-Open questions (from Session 1 — status as of Session 85):
+Open questions (from Session 1 — status as of Session 86):
 - **Q1 RESOLVED** — `slice_mesh` does NOT use the admesh adjacency table. `its_face_neighbors_par()` is called at
   `src/libslic3r/TriangleMeshSlicer.cpp:2437` to rebuild the face-neighbor table from scratch each call.
   The admesh repair data (`its_neighbors_par`) is separate and only used by mesh-repair code.
@@ -282,3 +282,90 @@ All files in the directory have been annotated with structured comment tags.
 Next phase: expand Task 2 (architectural deconstruction) and Task 3 documentation updates.
 
 ---
+
+---
+
+## Session 86
+
+
+**Active task:** T300 — Resolve or escalate all `[UNCLEAR]` tags in annotated source files
+
+### Goal
+Re-run T300 with the required resolution-first policy, convert every remaining inline `[UNCLEAR]` tag to either `[UNCLEAR → RESOLVED]` or `[UNCLEAR → ESCALATED]`, and record the outcome.
+
+### Files processed
+- 34 annotated source files containing all 51 remaining `[UNCLEAR]` tags
+- `generated_documentation/agent_journal.md`
+- `.ralph/ralph-tasks.md`
+
+### Key discoveries
+- 39 tags were resolved from local code context and same-module cross-references.
+- 12 tags remain escalated because the rationale is not recoverable from local code alone.
+- No plain `[UNCLEAR]` tags remain in `src/`; every outstanding question is now explicitly classified.
+
+## T300 Resolutions
+
+Total resolved tags: **39**
+
+| File | Line | Resolution |
+|------|------|------------|
+| `src/libslic3r/Arachne/SkeletalTrapezoidation.cpp` | 719 | Dead condition prevents `filterCentral()` call because the branch requires `isLocalMaximum()` and its negation. |
+| `src/libslic3r/Arachne/SkeletalTrapezoidation.cpp` | 1301 | Return value means every recursed central branch is still going down, so the caller can skip a junction ratio write. |
+| `src/libslic3r/BuildVolume.cpp` | 703 | `paths` is an interleaved vertex/normal float buffer; this helper inspects only the normal triplets. |
+| `src/libslic3r/BuildVolume.cpp` | 741 | `bounding_mesh()` constructs a box from origin to `m_bboxf.max`, ignoring any nonzero minimum bed offset. |
+| `src/libslic3r/Brim.hpp` | 59 | Auto brim is handled inline in the main brim path, leaving this declaration without a local definition. |
+| `src/libslic3r/FilamentGroupUtils.cpp` | 27 | `calc_max_group_size()` sums `ams_unit_count * count` per group and promotes empty groups to size 1 when external filament is allowed. |
+| `src/libslic3r/Fill/Fill.cpp` | 34 | The string parser either runs a rotation mini-language with repeats/interpolation/units or deserializes a plain per-layer angle list. |
+| `src/libslic3r/Fill/FillAdaptive.cpp` | 1699 | `+ EPSILON` guards the octree-size boundary test against floating-point rounding drift. |
+| `src/libslic3r/Fill/FillAdaptive.cpp` | 1739 | The dot-product check intentionally avoids normalizing because it compares against `0.707 * n.norm()` directly. |
+| `src/libslic3r/Fill/FillBase.cpp` | 2218 | The helper is support-only in practice because `connect_base_support()` is the local caller and pre-rotates lines vertical. |
+| `src/libslic3r/Fill/FillBase.cpp` | 2360 | `side1`/`side2` and `m_polyline_end` logic suppress zero-width vertical splice segments. |
+| `src/libslic3r/Fill/FillBase.cpp` | 3236 | Offset paths are force-closed before storage by appending the first point when needed. |
+| `src/libslic3r/Fill/FillGyroid.cpp` | 224 | `gridZ` is in scaled coordinates and is normalized by `scaleFactor` before gyroid phase evaluation. |
+| `src/libslic3r/Fill/FillLightning.cpp` | 84 | `line_overlap` trims branch endpoints through `convertToLines()` / `removeJunctionOverlap()` to reduce junction overlap. |
+| `src/libslic3r/Fill/FillLightning.hpp` | 120 | `no_sort()` returns `false`, so Lightning infill may still be reordered downstream; only the field name keeps the original typo. |
+| `src/libslic3r/Fill/Lightning/Generator.hpp` | 124 | Support Lightning defaults density to the same 15% minimum enforced by the constructor floor. |
+| `src/libslic3r/Fill/Lightning/Generator.hpp` | 207 | `m_prune_length` and `m_wall_supporting_radius` both derive from the same hardcoded 45 degree overhang angle. |
+| `src/libslic3r/Fill/Lightning/Generator.hpp` | 254 | `bboxs` stores one infill-outline bounding box per layer and is populated in both tree-generation paths. |
+| `src/libslic3r/Flow.cpp` | 207 | `with_cross_section()` grows height only when the requested full spacing no longer fits the current spacing. |
+| `src/libslic3r/Flow.cpp` | 279 | `mm3_per_mm()` enforces positive flow by throwing `FlowErrorNegativeFlow`, replacing the disabled debug assert. |
+| `src/libslic3r/Flow.cpp` | 322 | `support_transition_flow()` always returns `Flow::bridging_flow(dmr, dmr)` for the selected support nozzle diameter. |
+| `src/libslic3r/GCode.cpp` | 94 | `g_max_label_object` is capped at 64 because label membership is bit-packed into a `uint64_t` and `M624` emission asserts that limit. |
+| `src/libslic3r/GCode/AvoidCrossingPerimeters.cpp` | 1528 | The active implementation lazily initializes boundary data in `travel_to()`, unlike the older eager-init block left disabled below. |
+| `src/libslic3r/GCode/FanMover.hpp` | 99 | `with_D_option` is a stored-but-unused constructor flag; `GCode` passes it in, but `FanMover` never reads it. |
+| `src/libslic3r/MeshBoolean.cpp` | 894 | The commented call was inlined into the explicit convert -> boolean -> reconvert pipeline around it. |
+| `src/libslic3r/Model.cpp` | 313 | The `.oltp` loader passes `256` as the custom binary STL header length instead of the normal 80-byte STL header. |
+| `src/libslic3r/Model.cpp` | 3296 | Extruder 0 parameters are duplicated at keys 0 and 1 because later lookups use 1-based extruder IDs. |
+| `src/libslic3r/MultiPoint.cpp` | 384 | `concave_hull_2d()` is actually a tolerance-relaxed lower-hull builder over X-sorted points. |
+| `src/libslic3r/MultiPoint.hpp` | 146 | The misspelled `tolerence` parameter acts as a normalized negative-turn threshold in that relaxed hull builder. |
+| `src/libslic3r/Point.cpp` | 87 | `ccw()` uses `double` cross products to avoid overflow with scaled `coord_t` values. |
+| `src/libslic3r/Point.hpp` | 272 | `both_comp()` / `any_comp()` only support literal `>` and `<`, returning `false` for any other operator string. |
+| `src/libslic3r/PrintObject.cpp` | 976 | The commented `set_done()` leaves executed objects at `posEstimateCurledExtrusions`, so the step may rerun later. |
+| `src/libslic3r/PrintObject.cpp` | 3628 | `generate_support_preview()` fills a local `POProfiler` with slice/support timings but currently discards those values. |
+| `src/libslic3r/Support/SupportMaterial.cpp` | 1886 | After overshooting the target gap, the code keeps whichever neighboring object-layer boundary is closer to the requested gap. |
+| `src/libslic3r/Support/SupportParameters.hpp` | 55 | `thresh_big_overhang` is the fixed scaled-area threshold used by tree-hybrid support generation to special-case large overhangs. |
+| `src/libslic3r/TriangleMesh.cpp` | 1672 | `its_reverse_all_facets()` is an unused alternative helper here; active callers in this module use `its_flip_triangles()`. |
+| `src/libslic3r/TriangleMeshSlicer.cpp` | 213 | `slice_facet_for_cut_mesh()` is the epsilon-tolerant cut-mesh variant so near-plane triangles still produce cut edges and caps. |
+| `src/libslic3r/TriangleMeshSlicer.cpp` | 1300 | The `goto found` is only an early exit once an unconsumed continuation polyline has been located. |
+| `src/libslic3r/TriangleMeshSlicer.cpp` | 1966 | `closing_radius` now selects either morphological closing or pure outward offset, replacing the former fixed safety offset. |
+
+## T300 Escalations
+
+Total escalated tags: **12**
+
+| File | Line | Reason blocked |
+|------|------|----------------|
+| `src/libslic3r/Arachne/SkeletalTrapezoidation.cpp` | 1913 | Local code does not justify whether using toolpath locations past the middle is safe or just heuristic legacy. |
+| `src/libslic3r/CutUtils.cpp` | 29 | The lower-half cut path forces `flip` when `PlaceOnCutLower` is set, but local code does not explain whether that coupling is intentional. |
+| `src/libslic3r/CutUtils.cpp` | 336 | No local rationale explains why `PlaceOnCutLower` implies flipping in `post_process()`. |
+| `src/libslic3r/Emboss.hpp` | 148 | Thread-safety depends on an undocumented external discipline for replacing/reading the shared font cache pointer. |
+| `src/libslic3r/Fill/FillTpmsD.cpp` | 176 | The adaptive sampler starts each period with 16 seed segments, but local code gives no reason for choosing 16. |
+| `src/libslic3r/GCode/PressureEqualizer.cpp` | 900 | Comments preserve an older role-specific clamping policy, but local code does not explain why the active cross-role policy replaced it. |
+| `src/libslic3r/Measure.cpp` | 326 | The `err < 0.05` and `0.9 * PI / 2` thresholds are hardcoded without a local derivation or tuning note. |
+| `src/libslic3r/Support/SupportSpotsGenerator.cpp` | 38 | The larger support-point placement block is commented out, and local code does not show whether that disablement is intentional. |
+| `src/libslic3r/TriangleMesh.cpp` | 407 | Volume is scaled by affine determinant, but local code does not show whether any callers depend on accurate shear-transformed volume. |
+| `src/libslic3r/TriangleMesh.hpp` | 220 | The cached-volume contract under arbitrary affine shear is not justified in local code. |
+| `src/libslic3r/VariableWidth.cpp` | 26 | Tail-group width uses `length * a_width` instead of the trapezoid average, and local code does not say whether that bias is deliberate. |
+| `src/libslic3r/VariableWidth.cpp` | 153 | The last-segment average uses only `a_width`, so the reason for possible tail under-extrusion remains undocumented locally. |
+
+**Completed tasks this session:** T300

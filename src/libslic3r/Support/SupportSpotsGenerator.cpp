@@ -35,7 +35,7 @@
 //          types defined only in the dead block.  This means the types exist in the binary but
 //          the algorithm that produces them is never called.
 //
-// [UNCLEAR] It is not clear whether the block-comment disabling was intentional (feature deferred)
+// [UNCLEAR → ESCALATED] This file currently compiles only the malformation estimators, and local code does not show whether the larger block-commented support-point logic was intentionally disabled.
 //           or an accidental check-in.  No TODO, FIXME, or issue reference accompanies the comment.
 
 #include "SupportSpotsGenerator.hpp"

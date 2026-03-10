@@ -1883,7 +1883,7 @@ static inline std::tuple<Polygons, Polygons, double> detect_contacts(
 // [HAZARD] If the linked list is not fully built (lower_layer/upper_layer null for
 //   intermediate layers during initialization), the while-loop exits prematurely and
 //   returns a stale pointer.  Callers must ensure the layer graph is complete.
-// [UNCLEAR] The post-correction logic (comparing gap_synced - last_valid_gap_layer->height
+// [UNCLEAR → RESOLVED] After accumulating layers past the requested gap, the code keeps whichever adjacent object-layer boundary is closer to the target gap.
 //   vs gap_synced - gap_support_object) is subtle: it picks the neighbour layer that
 //   minimizes the gap overshoot without a clear comment explaining the geometry.
 // find the object layer that is closest to the {layer.bottom_z-gap_support_object} for top contact,

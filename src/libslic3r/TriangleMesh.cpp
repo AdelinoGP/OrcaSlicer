@@ -404,7 +404,7 @@ void TriangleMesh::mirror(const Axis axis)
 // Bounding box is re-scanned O(V) via update_bounding_box.
 // [HAZARD H399] (from .hpp) For shear or non-uniform transforms, multiplying
 // volume by det(rotation block) is only an approximation.  True volume of a
-// sheared shape requires re-integration.  [UNCLEAR] Whether any OrcaSlicer
+// sheared shape requires re-integration.  [UNCLEAR → ESCALATED] The transform path scales cached volume by the affine determinant, but local code does not show whether any callers rely on accurate shear-transformed volume.
 // code path applies a shear transform — needs audit of all call sites.
 void TriangleMesh::transform(const Transform3d& t, bool fix_left_handed)
 {
@@ -1669,7 +1669,7 @@ indexed_triangle_set its_convex_hull(const std::vector<Vec3f>& pts)
 // [INTENT] Reverse all face winding orders.  Different from its_flip_triangles
 // in that it swaps indices [0] and [1] rather than [1] and [2]; the result is
 // the same topological flip (reverses orientation) just using a different pair.
-// [UNCLEAR] Whether both its_flip_triangles and its_reverse_all_facets are
+// [UNCLEAR → RESOLVED] `its_reverse_all_facets()` is an unused alternative helper here, while active callers in this module use `its_flip_triangles()`.
 // needed or if one is dead code.  Both appear in the codebase.
 void its_reverse_all_facets(indexed_triangle_set& its)
 {

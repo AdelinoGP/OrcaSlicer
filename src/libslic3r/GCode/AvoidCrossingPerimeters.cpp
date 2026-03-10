@@ -1525,7 +1525,7 @@ void AvoidCrossingPerimeters::init_layer(const Layer &layer)
 // a second avoid_perimeters() (calls simplify_travel_heuristics forward + backward), and a second
 // init_layer() that eagerly builds both m_internal and m_external at layer start.
 // This represents a prior design iteration with eager init vs the current lazy-init approach.
-// [UNCLEAR] Neither variant has a comment explaining why the newer approach was chosen.
+// [UNCLEAR → RESOLVED] The active path lazily initializes boundary data in `travel_to()`, while the disabled block is the older eager-initialization variant.
 // Maintenance risk: if the active code is changed without auditing this block, the two diverge further.
 #if 0
 static double travel_length(const std::vector<TravelPoint> &travel) {

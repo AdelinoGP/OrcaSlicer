@@ -716,7 +716,7 @@ void SkeletalTrapezoidation::updateIsCentral()
 //   edge.to->isLocalMaximum() && !edge.to->isLocalMaximum()
 // This is ALWAYS FALSE — both predicates are identical and negated. This means the inner
 // filterCentral() recursive overload is NEVER called from this entry point.
-// [UNCLEAR] This appears to be a latent bug from the original CuraEngine code. The intent was
+// [UNCLEAR → RESOLVED] This branch currently can never call `filterCentral()` because the condition requires `edge.to->isLocalMaximum()` and its negation at the same time.
 // likely to filter central whisker edges that are NOT local maxima (to avoid removing skeleton
 // branches that terminate at actual medial axis peaks). The condition as written does nothing.
 // The algorithm still functions because filterNoncentralRegions() performs the meaningful filtering.
@@ -1298,7 +1298,7 @@ void SkeletalTrapezoidation::generateTransitionEnds(edge_t&                     
 //          recurses — combined depth can be O(graph_diameter).
 // [HAZARD] Mixed int/float arithmetic: (end_pos - ab_size) / (start_pos - end_pos)
 //          — if start_pos == end_pos (zero-length transition) this is div-by-zero.
-// [UNCLEAR] return value semantics: returns is_only_going_down — used by the
+// [UNCLEAR → RESOLVED] This returns true only when every recursed central branch is classified as going down, letting the caller skip writing an intermediate `transition_ratio` at the junction.
 //           caller to suppress placing a transition_ratio at the intermediate
 //           junction when ALL downstream edges are going down. Subtle.
 bool SkeletalTrapezoidation::generateTransitionEnd(edge_t&                                 edge,
@@ -1910,7 +1910,7 @@ void SkeletalTrapezoidation::propagateBeadingsDownward(edge_t* edge_to_peak, ptr
 // [HAZARD] The re-interpolation with new_ratio (clamped +0.1 bias) can overshoot
 //          — new_ratio can exceed 1.0 before the min(1.0, ...) clamp. This is
 //          intentional per the source comment "add 0.1 to give it some leeway".
-// [UNCLEAR] TODO in source: "don't use toolpath locations past the middle!"
+// [UNCLEAR → ESCALATED] The merged-inset re-interpolation still uses a midline heuristic here, but local code does not show whether sampling toolpath locations past the middle is actually safe.
 //           Indicates the function may generate sub-optimal blends for high
 //           bead-count transitions.
 SkeletalTrapezoidation::Beading SkeletalTrapezoidation::interpolate(const Beading& left,

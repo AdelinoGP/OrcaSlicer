@@ -81,7 +81,7 @@ namespace Slic3r::FillLightning {
 // generator construction and fill), getTreesForLayer() fires assert(layer_id < size) in debug
 // but reads out-of-bounds in release (UB). No range check in release builds.
 //
-// [UNCLEAR] `scaled<coord_t>(0.5 * this->spacing - this->overlap)` is the line_overlap
+// [UNCLEAR → RESOLVED] `line_overlap` is forwarded to `Layer::convertToLines()` and `Node::removeJunctionOverlap()` to trim each branch back from shared junctions.
 // parameter passed to convertToLines → removeJunctionOverlap. It controls how much tree-node
 // junction endpoints are retracted to avoid double-printing the junction area. The 0.5 factor
 // halves the spacing because junctions from both sides contribute. No comment in original code.

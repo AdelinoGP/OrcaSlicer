@@ -173,7 +173,7 @@ static Polylines make_waves(double gridZ, double density_adjusted, double line_s
         }
     }
     // todo: select the step better
-    //  [UNCLEAR] The comment above is from the original authors — the 16-segment initial
+    //  [UNCLEAR → ESCALATED] The wave sampler starts each period with 16 uniform segments before adaptive refinement, but local code does not explain why 16 is the right seed count.
     //  discretization is a fixed heuristic. No analysis of optimal initial step count
     //  for different density/tolerance combinations has been documented.
     return result;

@@ -31,7 +31,7 @@
 //   infill across layers. The template string grammar supports absolute/relative angles,
 //   repetition (*Z), sinus/cubic/random joint interpolation (N,Z,$,U,Q,~,^), and length
 //   units (mm,cm,m,",',%). When template_string is empty, falls back to fixed_infill_angle.
-//   [UNCLEAR] The grammar is undocumented in the codebase; the comment at line 25 is the only
+//   [UNCLEAR → RESOLVED] When metacharacters are present this parses a rotation mini-language with repeats/interpolation/units; otherwise it deserializes a plain per-layer angle list.
 //   authoritative description. It is not covered by any automated tests.
 //
 // Surface grouping (group_fills()):

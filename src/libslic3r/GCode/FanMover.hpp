@@ -96,7 +96,7 @@ private:
     // [STATE] Configuration (all const after construction):
     //   `nb_seconds_delay` — how far back in time to push fan speed-up commands.
     //                        Clamped to max(0.01, requested) to avoid division issues.
-    //   `with_D_option`    — [UNCLEAR] field stored but never read in .cpp. Dead option?
+    //   `with_D_option`    — [UNCLEAR → RESOLVED] constructor flag stored but never read; `GCode` passes it in, yet `FanMover` treats it as a current no-op.
     //   `relative_e`       — whether the G-code uses relative extrusion (affects E-split)
     //   `only_overhangs`   — if true, delays only applied during overhang perimeter extrusion
     //   `kickstart`        — duration (seconds per 100% speed) for M106 S255 pulse before

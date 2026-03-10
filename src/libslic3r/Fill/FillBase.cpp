@@ -2215,7 +2215,7 @@ void Fill::chain_or_connect_infill(
 // [HAZARD] The comparison `dist_y_prev < dist_y_next ? extend_prev_idx : extend_next_idx = -1;`
 //          on line ~2172 uses ternary as lvalue — this is legal C++ but highly unusual and likely
 //          to confuse a port to another language. In Rust/Python this would need explicit if/else.
-// [UNCLEAR] The function is labeled for "grid aligned support" and references spacing/density but
+// [UNCLEAR → RESOLVED] This helper is support-specific in practice because `connect_base_support()` is its local caller and rotates the geometry so the processed infill lines are vertical first.
 //           does not guard against non-grid fills. It is only called from connect_base_support().
 // Called by Fill::connect_base_support() as part of the sparse support infill generator.
 static inline void base_support_extend_infill_lines(Polylines&           infill,
@@ -2357,7 +2357,7 @@ static inline void base_support_extend_infill_lines(Polylines&           infill,
 // [HAZARD] `m_polyline.points.erase(... begin() + m_polyline_end ...)` (finalize) assumes
 //          m_polyline_end < m_polyline.size(). A logic error in add_interpolated_point ordering
 //          could violate this, producing UB. Only guarded by assert in debug.
-// [UNCLEAR] The `side1` and `side2` public members on State and the conditional vertical-segment
+// [UNCLEAR → RESOLVED] `side1`, `side2`, and the `m_polyline_end` checks suppress zero-width vertical splice segments by either merging through the split point or starting a new polyline.
 //           merging logic in `add_interpolated_point()` implement an implicit "don't create
 //           degenerate vertical segments" heuristic that is not documented inline.
 // Called by Fill::connect_base_support() as part of the sparse support infill generator.
@@ -3233,7 +3233,7 @@ void Fill::connect_base_support(Polylines&&        infill_ordered,
 // [HAZARD] The offsetter is created once and reused for all offset distances via a single
 //          AddPaths + repeated Execute calls. This is correct Clipper2 usage (Execute may be
 //          called multiple times after a single AddPaths), but is not obviously safe to a reader.
-// [UNCLEAR] Closed polylines from Paths64_to_polylines() (detected by front==back) are closed
+// [UNCLEAR → RESOLVED] After offsetting, every returned path with at least three points is forced closed before storage by appending the first point when needed.
 //           by re-appending the front point. The rationale is not documented — presumably needed
 //           to form a closed perimeter-like loop for certain connection patterns.
 // Fill Multiline -Clipper2 version

@@ -221,7 +221,7 @@ static Polylines make_gyroid_waves(double gridZ, double density_adjusted, double
 
     // [INTENT] Convert gridZ from Slic3r scaled units to normalized Gyroid units.
     // scale factor for 5% : 8 712 388
-    // [UNCLEAR] The comment "1z = 10^-6 mm ?" refers to Slic3r's coord_t scale where
+    // [UNCLEAR → RESOLVED] `gridZ` is in Slic3r scaled coordinates and is normalized by `scaleFactor` before the gyroid phase is evaluated.
     // 1 unit = 10^-6 m = 1 μm. This is a developer note, not a formula.
     const double z     = gridZ / scaleFactor;
     const double z_sin = sin(z);

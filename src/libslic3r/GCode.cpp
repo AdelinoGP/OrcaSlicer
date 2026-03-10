@@ -91,7 +91,7 @@
 //   via check_placeholder_parser_failed() (GCode.cpp:3510) inside the pipeline generator.
 //   A template failure aborts the entire G-code export at the next layer boundary, not immediately.
 //
-// [UNCLEAR] g_max_label_object = 64 (GCode.cpp:92) caps the number of exclude-object labels
+// [UNCLEAR → RESOLVED] `g_max_label_object` is 64 because label membership is packed into a `uint64_t`, and `M624` emission/asserts enforce that cap.
 //   in BBL firmware mode. It is not validated against firmware limits or documented in config.
 #include "BoundingBox.hpp"
 #include "Config.hpp"

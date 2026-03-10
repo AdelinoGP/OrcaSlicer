@@ -23,7 +23,7 @@
 // [HAZARD] thick_polyline_to_extrusion_paths_2() uses sum = length * a_width (endpoint only, not
 // trapezoid) for the average-width calculation in the final segment flush block, whereas it uses
 // 0.5*(a_width+b_width) for mid-loop segments. This inconsistency means the last group's average
-// width may be slightly wrong. Annotated as [UNCLEAR] — may be intentional to reduce over-extrusion
+// width may be slightly wrong. Annotated as [UNCLEAR → ESCALATED] because the tail-group width uses `length * a_width` instead of the trapezoid average and local code does not explain whether that bias is intentional.
 // at path ends, or it may be a bug.
 #include "VariableWidth.hpp"
 
@@ -150,7 +150,7 @@ ExtrusionMultiPath thick_polyline_to_multi_path(
 //
 // [HAZARD] Width-averaging for the final (tail) group uses `a_width` only (not the trapezoid
 // average 0.5*(a+b)). Mid-loop groups use the correct trapezoid average. This inconsistency
-// may slightly under-extrude the last segment of a polyline. Marked [UNCLEAR] — could be
+// may slightly under-extrude the last segment of a polyline. Marked [UNCLEAR → ESCALATED] because the tail-group average uses only `a_width`, and local code does not explain whether that tradeoff is deliberate.
 // intentional to reduce over-extrusion at path ends, or could be a latent BBS bug.
 //
 // [HAZARD] The inner subdivision block (when a single segment's own a_width/b_width span > tolerance)

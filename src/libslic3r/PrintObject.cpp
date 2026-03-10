@@ -973,7 +973,7 @@ void PrintObject::generate_support_material()
 // with malformation (curling) lines — used later in GCode generation to slow down
 // over curled regions. set_done() is intentionally commented out (TODO note in code)
 // suggesting this step may be repeated or its done-tracking is not yet finalized.
-// [UNCLEAR] The set_done() call is commented out — this step is technically never
+// [UNCLEAR → RESOLVED] The set_done() call stays commented out, so executed objects leave `posEstimateCurledExtrusions` unfinished here and may rerun this step later.
 // marked as completed, so it will be re-run on every call.
 void PrintObject::estimate_curled_extrusions()
 {
@@ -3625,7 +3625,7 @@ struct POProfiler
 // [INTENT] generate_support_preview(): thin timing wrapper that drives a slice+support
 // pass for interactive support-preview mode. Records wall-clock milliseconds for each
 // phase into POProfiler (currently unused beyond local variables).
-// [UNCLEAR] POProfiler fields are computed but never returned or logged — likely
+// [UNCLEAR → RESOLVED] `generate_support_preview()` records slice/support timings into a local `POProfiler`, but the values are currently discarded.
 // placeholder instrumentation left from early development.
 void PrintObject::generate_support_preview()
 {

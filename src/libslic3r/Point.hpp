@@ -269,7 +269,7 @@ public:
     // [INTENT] both_comp/any_comp: component-wise comparison helpers.
     //          both_comp returns true iff the condition holds for BOTH x and y.
     //          any_comp  returns true iff the condition holds for EITHER x or y.
-    // [UNCLEAR] Operator is passed as a runtime std::string rather than a template or enum.
+    // [UNCLEAR → RESOLVED] `both_comp()` and `any_comp()` only accept the literal operators `>` and `<` and return `false` for any other string.
     //           This incurs string comparison overhead and is a code-smell; likely added for
     //           scripting convenience. A port should replace with typed overloads or an enum.
     bool both_comp(const Point& rhs, const std::string& op)

@@ -26,7 +26,7 @@
 //   changed to unique_ptr this code double-frees.
 // [HAZARD H1141] post_process() for lower half always passes flip=true when
 //   PlaceOnCutLower is set, regardless of whether FlipLower is also set (line ~278).
-//   Comment says "may be intentional or bug" — document as [UNCLEAR].
+//   [UNCLEAR → ESCALATED] The lower-half path also forces flip by passing `PlaceOnCutLower || FlipLower` into `post_process()`, but local code does not explain whether that coupling is intentional.
 #include "Geometry.hpp"
 #include "libslic3r.h"
 #include "Model.hpp"
@@ -333,7 +333,7 @@ void Cut::post_process(ModelObject* upper, ModelObject* lower, ModelObjectPtrs& 
     // [HAZARD H1141] flip for lower is set to TRUE whenever PlaceOnCutLower is set,
     // regardless of whether FlipLower is separately requested.  This means "place on
     // cut surface" always implies "flip", which may or may not be intentional.  There
-    // is no comment explaining the design intent.  [UNCLEAR] — porting must preserve
+    // is no comment explaining the design intent.  [UNCLEAR → ESCALATED] Porting must preserve the behavior, but local code does not explain why `PlaceOnCutLower` implies flipping.
     // this exact semantic or verify intended behaviour with geometry tests.
     post_process(lower, cut_object_ptrs, m_attributes.has(ModelObjectCutAttribute::KeepLower),
                  m_attributes.has(ModelObjectCutAttribute::PlaceOnCutLower),

@@ -52,7 +52,7 @@
 //          a large integer (~10000) as its initial value and is then updated with small double
 //          values (~0.01 mm), resulting in an unexpected minimum.
 //
-// [UNCLEAR] `thresh_big_overhang` is declared as a member with a default initialiser but is
+// [UNCLEAR → RESOLVED] `thresh_big_overhang` is the fixed scaled-area threshold used by tree-hybrid support generation to special-case large overhang regions.
 //           never set in the constructor.  Its value depends on `sqr(scale_(10))` which is a
 //           scaled-coordinate calculation (~100e12).  It is unclear which callers read this
 //           field and whether the value is intentional.

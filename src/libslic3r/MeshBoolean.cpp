@@ -891,7 +891,7 @@ void do_boolean(McutMesh& srcMesh, const McutMesh& cutMesh, const std::string& b
 // [INTENT] Top-level public API for mcut boolean: src_mesh OP cut_mesh → dst_mesh vector.
 //          Converts to McutMesh, calls do_boolean, converts result back to TriangleMesh.
 // [STATE] dst_mesh receives 0 or 1 results depending on whether the output is non-empty.
-// [UNCLEAR] Commented-out line `//dst_mesh = make_boolean(srcMesh, cutMesh, boolean_opts);`
+// [UNCLEAR → RESOLVED] The commented-out call was replaced by the equivalent explicit sequence: convert meshes to `McutMesh`, run `do_boolean()`, then convert the single non-empty result back.
 //           suggests a prior API; the current call chain is do_boolean()+mcut_to_triangle_mesh().
 void make_boolean(const TriangleMesh&        src_mesh,
                   const TriangleMesh&        cut_mesh,

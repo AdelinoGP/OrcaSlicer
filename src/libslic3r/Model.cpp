@@ -310,7 +310,7 @@ _finished:
 //   are still on the stack — reentrant use is not protected.
 // [HAZARD H485] The .oltp extension is dispatched to load_stl() with a special 256 argument
 //   that is not documented in this file.  Its meaning is opaque without reading load_stl's
-//   implementation.  [UNCLEAR] — likely a resolution or segment count hint.
+//   implementation.  [UNCLEAR → RESOLVED] The `256` argument is the custom binary STL header length used for `.oltp` files instead of the default 80-byte STL header.
 // BBS: add part plate related logic
 // BBS: backup & restore
 // Loading model from a file, it may be a simple geometry file as STL or OBJ, however it may be a project file as well.
@@ -3293,7 +3293,7 @@ void Model::setPrintSpeedTable(const DynamicPrintConfig& config, const PrintConf
 // This means key 0 holds extruder 0's params, and key 1 starts with extruder 0 but is
 // overwritten by extruder 1. Downstream consumers using key 0 get different data than key 1,
 // even when there is only one extruder. This is likely intentional (0 = "any extruder" default)
-// but is not documented. [UNCLEAR]
+// but is not documented. [UNCLEAR → RESOLVED] This duplicates extruder 0 parameters at keys 0 and 1 because downstream model-volume lookups use 1-based extruder IDs.
 // find temperature of heatend and bed and matierial of an given extruder
 void Model::setExtruderParams(const DynamicPrintConfig& config, int extruders_count)
 {

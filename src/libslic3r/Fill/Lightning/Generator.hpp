@@ -121,7 +121,7 @@ public:
     // Calls generateTreesforSupport() instead of generateInitialInternalOverhangs() + generateTrees().
     // [HAZARD H270] Different m_supporting_radius formula than the primary constructor.
     // density is clamped to min 0.15 to prevent near-zero divison producing enormous radius.
-    // [UNCLEAR] density parameter default 0.15 — why this specific value? No comment in original.
+    // [UNCLEAR → RESOLVED] Support-mode Lightning clamps density to a 15% minimum, so the 0.15 default matches the constructor floor used to compute `m_supporting_radius`.
     // Corresponds to 15% infill density as the minimum practical lightning infill density.
     Generator(PrintObject*                 m_object,
               std::vector<Polygons>&       contours,
@@ -204,7 +204,7 @@ protected:
     // [INTENT] Controls Node::prune() — how far leaf endpoints are retracted when
     // propagating trees to the next layer below. Prevents overhanging leaf endpoints.
     // Fixed at 45°: m_prune_length = layer_thickness * tan(45°) = layer_thickness.
-    // [UNCLEAR] Why is m_prune_length the same as m_wall_supporting_radius? Both use 45°.
+    // [UNCLEAR → RESOLVED] `m_prune_length` matches `m_wall_supporting_radius` because both are derived from the same hardcoded 45 degree overhang angle and reduce to one layer thickness.
     // In Cura, prune_angle and overhang_angle are separate configurable values.
     coord_t m_prune_length;
 
@@ -251,7 +251,7 @@ protected:
     // [STATE] Per-layer bounding boxes of infill outlines. Populated alongside m_lightning_layers.
     // Used in getBestGroundingLocation to convert world coordinates to grid addresses.
     // [COUPLING] Consumed by Layer methods that take current_outlines_bbox.
-    // [UNCLEAR] bboxs is not documented and its name is a typo (should be "bboxes").
+    // [UNCLEAR → RESOLVED] `bboxs` stores one infill-outline bounding box per layer and is filled alongside `m_lightning_layers` in both tree-generation paths.
     std::vector<BoundingBox> bboxs;
 };
 

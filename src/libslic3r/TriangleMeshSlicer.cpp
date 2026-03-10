@@ -210,7 +210,7 @@ enum class FacetSliceType { NoSlice = 0, Slicing = 1, Cutting = 2 };
 // [HAZARD] Zero-length edges CAN be produced by int rounding (see FIXME at line ~335);
 //   the downstream chain_lines_by_triangle_connectivity() silently accepts them, but they
 //   may cause stitch artifacts in degenerate meshes.
-// [UNCLEAR] The duplicate `slice_facet_for_cut_mesh()` below differs only in the
+// [UNCLEAR → RESOLVED] `cut_mesh()` uses `slice_facet_for_cut_mesh()` as an epsilon-tolerant variant so near-plane triangles still contribute cut edges and cap geometry.
 //   floating-point equality test (1e-3 epsilon vs bit-exact ==). This split is a maintenance hazard.
 // Return true, if the facet has been sliced and line_out has been filled.
 static FacetSliceType slice_facet(
@@ -1297,7 +1297,7 @@ std::vector<OpenPolyline*> open_polylines_sorted(std::vector<OpenPolyline>& open
 // [HAZARD] The find_polyline_end() linear scan inside a binary-search range is O(duplicates)
 //   per lookup. For meshes with many coincident edge IDs (star-shaped vertices) this could
 //   be O(degree²) per vertex.
-// [UNCLEAR] A `goto found` is used inside the inner loop — same porting concern as
+// [UNCLEAR → RESOLVED] The `goto found` is only an early exit once an unconsumed continuation polyline has been found.
 //   the PressureEqualizer goto. Refactor to a lambda or flag in a port.
 // called by make_loops() to connect remaining open polylines across shared triangle edges and vertices.
 // Depending on "try_connect_reversed", it may or may not connect segments crossing triangles of opposite orientation.
@@ -1963,7 +1963,7 @@ static ExPolygons make_expolygons_simple(std::vector<IntersectionLine>& lines)
 // [HAZARD] Extensive commented-out sorting code (winding-order based) was tried and abandoned due
 //   to issue #661. The current union_ex() + Clipper approach is the settled workaround. Any
 //   future refactor must understand why the sorted approach produced wrong polygons.
-// [UNCLEAR] The original "safety offset" value 0.0499 mm was changed to a closing_radius parameter.
+// [UNCLEAR → RESOLVED] `make_expolygons()` now uses `closing_radius` to choose either a morphological close or a pure outward offset instead of the old fixed safety offset.
 //   The historical motivation (issues #520, #1029, #1364) is preserved in comments but the exact
 //   numerical choice is not explained in the code.
 static void make_expolygons(

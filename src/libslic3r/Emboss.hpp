@@ -145,7 +145,7 @@ struct FontFile
 // [STATE] cache is a shared_ptr<Glyphs> — main thread clears by assigning a new shared_ptr,
 // job thread holds a local copy of the shared_ptr. This is a lock-free handoff pattern that
 // relies on shared_ptr atomic operations (C++20: std::atomic<shared_ptr>). Pre-C++20 this
-// is technically a data race if not using atomic shared_ptr operations. [UNCLEAR] confirm
+// is technically a data race if not using atomic shared_ptr operations. [UNCLEAR → ESCALATED] Local code relies on an external thread-discipline contract, but no synchronization guarantee is documented here.
 // whether the shared_ptr swap on main thread is atomic.
 struct FontFileWithCache
 {

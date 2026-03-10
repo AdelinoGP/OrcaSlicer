@@ -84,7 +84,7 @@ void Point::rotate(double angle, const Point& center)
 // [INTENT] ccw(p1, p2): signed area of the triangle (p1, p2, this).
 //          Positive = CCW turn, Negative = CW turn, Zero = collinear.
 //          Uses cast<double>() to avoid integer overflow in the cross product.
-// [UNCLEAR] A commented-out alternative using int64_t cast exists above — that would be
+// [UNCLEAR → RESOLVED] `ccw()` uses `double` cross products to avoid overflow with the current scaled-coordinate `coord_t` range.
 //           exact (no floating-point rounding) but risks overflow for large coord_t values.
 //           The current float path introduces tiny rounding errors but is overflow-safe.
 double Point::ccw(const Point& p1, const Point& p2) const

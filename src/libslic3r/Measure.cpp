@@ -323,7 +323,7 @@ void MeasuringImpl::update_planes()
 //   on the GUI thread, but update_planes() runs parallel TBB across planes. If any TBB
 //   thread is still reading plane.borders while extract_features() clears them, this is UB.
 //   In practice, TBB finishes before any GUI interaction, but there is no synchronization.
-// [UNCLEAR] The 0.05 RANSAC error threshold and 0.9*PI/2 arc subtend minimum are
+// [UNCLEAR → ESCALATED] `extract_features()` hardcodes `err < 0.05` and an arc span above about 81 degrees, but the rationale for those thresholds is not documented in local code.
 //   empirically tuned constants with no documented source.
 void MeasuringImpl::extract_features(int plane_idx)
 {
