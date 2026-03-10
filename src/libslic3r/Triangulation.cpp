@@ -1,3 +1,25 @@
+// [INTENT] Triangulation.cpp — CGAL Constrained Delaunay Triangulation (CDT) wrapper.
+//   Converts Slic3r Polygon / ExPolygon / ExPolygons into indexed triangle sets by:
+//   1. Encoding contour and hole edges as directed half-edge pairs.
+//   2. Inserting points into a CGAL CDT with spatial sorting for performance.
+//   3. Running a flood-fill from "inside" seed faces to classify interior triangles.
+//   Returns a vector of Vec3i32 triangle index triples (indices into input point array).
+// [STATE] Stateless free functions; no persistent state.
+//   Handles duplicate input points via create_changes() + Changes remapping.
+// [COUPLING] Used by CutUtils.cpp (cutting operations require triangulated cross-sections),
+//   by SLA support generation, and by wall triangulation in TriangulateWall.cpp.
+//   Depends on CGAL (Exact_predicates_inexact_constructions_kernel, CDT_2).
+// [CONCURRENCY] Thread-safe: all data is local. Can be called in TBB tasks.
+// [HAZARD H1142] The flood-fill interior classification (lines ~172–193) seeds from every face
+//   that initially passes `inside()`. The `inside()` predicate checks for at least one constrained
+//   edge AND that the face is not the infinite face. For non-manifold or self-intersecting input
+//   (checked only in assert, stripped in release), this may seed from incorrect faces, producing
+//   triangles outside the polygon boundary or missing interior regions.
+//   assert(!priv::has_self_intersection(...)) is release-stripped — no runtime guard in production.
+// [HAZARD H1143] `VISUALIZE_TRIANGULATION` #ifdef leaves hardcoded Windows paths
+//   ("C:/data/temp/triangulation*.obj") that would write files on any Windows build that defines
+//   this macro. The macro is not defined in production but the paths are not portable if ever
+//   enabled on a non-Windows machine or different user directory.
 #include "Triangulation.hpp"
 #include "IntersectionPoints.hpp"
 #include <boost/next_prior.hpp>
@@ -7,26 +29,29 @@
 #include <CGAL/spatial_sort.h>
 
 using namespace Slic3r;
-namespace priv{
-inline void insert_edges(Triangulation::HalfEdges &edges, uint32_t &offset, const Polygon &polygon, const Triangulation::Changes& changes) {
-    const Points &pts = polygon.points;
-    uint32_t size = static_cast<uint32_t>(pts.size());
-    uint32_t last_index = offset + size - 1;
-    uint32_t prev_index = changes[last_index];
+namespace priv {
+inline void insert_edges(Triangulation::HalfEdges& edges, uint32_t& offset, const Polygon& polygon, const Triangulation::Changes& changes)
+{
+    const Points& pts        = polygon.points;
+    uint32_t      size       = static_cast<uint32_t>(pts.size());
+    uint32_t      last_index = offset + size - 1;
+    uint32_t      prev_index = changes[last_index];
     for (uint32_t i = 0; i < size; ++i) {
         uint32_t index = changes[offset + i];
         // when duplicit points are neighbor
-        if (prev_index == index) continue; 
+        if (prev_index == index)
+            continue;
         edges.push_back({prev_index, index});
         prev_index = index;
     }
     offset += size;
 }
 
-inline void insert_edges(Triangulation::HalfEdges &edges, uint32_t &offset, const Polygon &polygon) {
-    const Points &pts = polygon.points;
-    uint32_t size = static_cast<uint32_t>(pts.size());
-    uint32_t prev_index = offset + size - 1;
+inline void insert_edges(Triangulation::HalfEdges& edges, uint32_t& offset, const Polygon& polygon)
+{
+    const Points& pts        = polygon.points;
+    uint32_t      size       = static_cast<uint32_t>(pts.size());
+    uint32_t      prev_index = offset + size - 1;
     for (uint32_t i = 0; i < size; ++i) {
         uint32_t index = offset + i;
         edges.push_back({prev_index, index});
@@ -35,62 +60,69 @@ inline void insert_edges(Triangulation::HalfEdges &edges, uint32_t &offset, cons
     offset += size;
 }
 
-inline bool has_bidirectional_constrained(
-    const Triangulation::HalfEdges &constrained)
+inline bool has_bidirectional_constrained(const Triangulation::HalfEdges& constrained)
 {
-    for (const auto &c : constrained) {
+    for (const auto& c : constrained) {
         auto key = std::make_pair(c.second, c.first);
-        auto it  = std::lower_bound(constrained.begin(), constrained.end(),
-                                    key);
-        if (it != constrained.end() && *it == key) return true;
+        auto it  = std::lower_bound(constrained.begin(), constrained.end(), key);
+        if (it != constrained.end() && *it == key)
+            return true;
     }
     return false;
 }
 
-inline bool is_unique(const Points &points) { 
+inline bool is_unique(const Points& points)
+{
     Points pts = points; // copy
     std::sort(pts.begin(), pts.end());
     auto it = std::adjacent_find(pts.begin(), pts.end());
     return it == pts.end();
 }
 
-inline bool has_self_intersection(
-    const Points                   &points,
-    const Triangulation::HalfEdges &constrained_half_edges)
+inline bool has_self_intersection(const Points& points, const Triangulation::HalfEdges& constrained_half_edges)
 {
     Lines lines;
     lines.reserve(constrained_half_edges.size());
-    for (const auto &he : constrained_half_edges)
+    for (const auto& he : constrained_half_edges)
         lines.emplace_back(points[he.first], points[he.second]);
     return !get_intersections(lines).empty();
 }
 
 } // namespace priv
 
-//#define VISUALIZE_TRIANGULATION
+// #define VISUALIZE_TRIANGULATION
 #ifdef VISUALIZE_TRIANGULATION
 #include "admesh/stl.h" // indexed triangle set
-static void visualize(const Points                 &points,
-               const Triangulation::Indices &indices,
-               const char                   *filename)
+static void visualize(const Points& points, const Triangulation::Indices& indices, const char* filename)
 {
     // visualize
     indexed_triangle_set its;
     its.vertices.reserve(points.size());
-    for (const Point &p : points) its.vertices.emplace_back(p.x(), p.y(), 0.);
+    for (const Point& p : points)
+        its.vertices.emplace_back(p.x(), p.y(), 0.);
     its.indices = indices;
     its_write_obj(its, filename);
 }
 #endif // VISUALIZE_TRIANGULATION
 
-Triangulation::Indices Triangulation::triangulate(const Points    &points,
-                                                  const HalfEdges &constrained_half_edges)
+// [INTENT] Core CDT triangulation entry point.
+//   Preconditions (checked by assert, stripped in release):
+//     - constrained_half_edges is sorted; no duplicates; no bidirectional pairs; points are unique; no self-intersections.
+//   Algorithm:
+//     1. Spatial-sort input points for CGAL insertion efficiency.
+//     2. Insert constrained edges.
+//     3. Unmark constrained edges of faces that straddle the boundary (outside faces).
+//     4. Flood-fill inward from seed faces to classify all interior triangles.
+// [HAZARD H1142] All precondition checks are debug-only asserts. In release builds,
+//   duplicate points, bidirectional edges, or self-intersections pass silently;
+//   CGAL's behavior on violated CDT preconditions is undefined.
+// [COUPLING] All higher-level triangulate() overloads delegate to this function.
+Triangulation::Indices Triangulation::triangulate(const Points& points, const HalfEdges& constrained_half_edges)
 {
     assert(!points.empty());
     assert(!constrained_half_edges.empty());
     // constrained must be sorted
-    assert(std::is_sorted(constrained_half_edges.begin(),
-                          constrained_half_edges.end()));
+    assert(std::is_sorted(constrained_half_edges.begin(), constrained_half_edges.end()));
     // check that there is no duplicit constrained edge
     assert(std::adjacent_find(constrained_half_edges.begin(), constrained_half_edges.end()) == constrained_half_edges.end());
     // edges can NOT contain bidirectional constrained
@@ -110,27 +142,26 @@ Triangulation::Indices Triangulation::triangulate(const Points    &points,
     {
         std::vector<CDT::Vertex_handle> vertices_handle(points.size()); // for constriants
         using Point_with_ord = std::pair<CDT::Point, size_t>;
-        using SearchTrait    = CGAL::Spatial_sort_traits_adapter_2
-            <K, CGAL::First_of_pair_property_map<Point_with_ord> >;
+        using SearchTrait    = CGAL::Spatial_sort_traits_adapter_2<K, CGAL::First_of_pair_property_map<Point_with_ord>>;
 
         std::vector<Point_with_ord> cdt_points;
         cdt_points.reserve(points.size());
         size_t ord = 0;
-        for (const auto &p : points)
+        for (const auto& p : points)
             cdt_points.emplace_back(std::make_pair(CDT::Point{p.x(), p.y()}, ord++));
-        
+
         SearchTrait st;
         CGAL::spatial_sort(cdt_points.begin(), cdt_points.end(), st);
         CDT::Face_handle f;
         for (const auto& p : cdt_points) {
-            auto handle = cdt.insert(p.first, f);
-            handle->info() = p.second;
+            auto handle               = cdt.insert(p.first, f);
+            handle->info()            = p.second;
             vertices_handle[p.second] = handle;
-            f = handle->face();
+            f                         = handle->face();
         }
 
         // Constrain the triangulation.
-        for (const HalfEdge &edge : constrained_half_edges)
+        for (const HalfEdge& edge : constrained_half_edges)
             cdt.insert_constraint(vertices_handle[edge.first], vertices_handle[edge.second]);
     }
 
@@ -140,53 +171,55 @@ Triangulation::Indices Triangulation::triangulate(const Points    &points,
     size_t num_faces = 0;
     for (CDT::Face_handle fh : faces) {
         for (int i = 0; i < 3; ++i) {
-            if (!fh->is_constrained(i)) continue;
+            if (!fh->is_constrained(i))
+                continue;
             auto key = std::make_pair(fh->vertex((i + 2) % 3)->info(), fh->vertex((i + 1) % 3)->info());
-            auto it = std::lower_bound(constrained_half_edges.begin(), constrained_half_edges.end(), key);
-            if (it == constrained_half_edges.end() || *it != key) continue;
+            auto it  = std::lower_bound(constrained_half_edges.begin(), constrained_half_edges.end(), key);
+            if (it == constrained_half_edges.end() || *it != key)
+                continue;
             // This face contains a constrained edge and it is outside.
-            for (int j = 0; j < 3; ++ j)
+            for (int j = 0; j < 3; ++j)
                 fh->set_constraint(j, false);
             --num_faces;
-            break;            
+            break;
         }
         ++num_faces;
     }
 
-    auto inside = [](CDT::Face_handle &fh) { 
-        return fh->neighbor(0) != fh && 
-               (fh->is_constrained(0) ||
-                fh->is_constrained(1) ||
-                fh->is_constrained(2)); 
+    auto inside = [](CDT::Face_handle& fh) {
+        return fh->neighbor(0) != fh && (fh->is_constrained(0) || fh->is_constrained(1) || fh->is_constrained(2));
     };
 
 #ifdef VISUALIZE_TRIANGULATION
     std::vector<Vec3i32> indices2;
     indices2.reserve(num_faces);
     for (CDT::Face_handle fh : faces)
-        if (inside(fh)) indices2.emplace_back(fh->vertex(0)->info(), fh->vertex(1)->info(), fh->vertex(2)->info());
+        if (inside(fh))
+            indices2.emplace_back(fh->vertex(0)->info(), fh->vertex(1)->info(), fh->vertex(2)->info());
     visualize(points, indices2, "C:/data/temp/triangulation_without_floodfill.obj");
 #endif // VISUALIZE_TRIANGULATION
 
     // Propagate inside the constrained regions.
     std::vector<CDT::Face_handle> queue;
     queue.reserve(num_faces);
-    for (CDT::Face_handle seed : faces){
-        if (!inside(seed)) continue;    
+    for (CDT::Face_handle seed : faces) {
+        if (!inside(seed))
+            continue;
         // Seed fill to neighbor faces.
         queue.emplace_back(seed);
-        while (! queue.empty()) {
+        while (!queue.empty()) {
             CDT::Face_handle fh = queue.back();
             queue.pop_back();
             for (int i = 0; i < 3; ++i) {
-                if (fh->is_constrained(i)) continue;
+                if (fh->is_constrained(i))
+                    continue;
                 // Propagate along this edge.
                 fh->set_constraint(i, true);
-                CDT::Face_handle nh = fh->neighbor(i);
-                bool was_inside = inside(nh);
+                CDT::Face_handle nh         = fh->neighbor(i);
+                bool             was_inside = inside(nh);
                 // Mark the other side of this edge.
                 nh->set_constraint(nh->index(fh), true);
-                if (! was_inside)
+                if (!was_inside)
                     queue.push_back(nh);
             }
         }
@@ -205,10 +238,10 @@ Triangulation::Indices Triangulation::triangulate(const Points    &points,
     return indices;
 }
 
-Triangulation::Indices Triangulation::triangulate(const Polygon &polygon)
+Triangulation::Indices Triangulation::triangulate(const Polygon& polygon)
 {
-    const Points &pts = polygon.points;
-    HalfEdges edges;
+    const Points& pts = polygon.points;
+    HalfEdges     edges;
     edges.reserve(pts.size());
     uint32_t offset = 0;
     priv::insert_edges(edges, offset, polygon);
@@ -216,7 +249,7 @@ Triangulation::Indices Triangulation::triangulate(const Polygon &polygon)
     return triangulate(pts, edges);
 }
 
-Triangulation::Indices Triangulation::triangulate(const Polygons &polygons)
+Triangulation::Indices Triangulation::triangulate(const Polygons& polygons)
 {
     size_t count = count_points(polygons);
     Points points;
@@ -224,9 +257,9 @@ Triangulation::Indices Triangulation::triangulate(const Polygons &polygons)
 
     HalfEdges edges;
     edges.reserve(count);
-    uint32_t  offset = 0;
+    uint32_t offset = 0;
 
-    for (const Polygon &polygon : polygons) {
+    for (const Polygon& polygon : polygons) {
         Slic3r::append(points, polygon.points);
         priv::insert_edges(edges, offset, polygon);
     }
@@ -235,15 +268,30 @@ Triangulation::Indices Triangulation::triangulate(const Polygons &polygons)
     return triangulate(points, edges);
 }
 
-Triangulation::Indices Triangulation::triangulate(const ExPolygon &expolygon){
-    ExPolygons expolys({expolygon}); 
+Triangulation::Indices Triangulation::triangulate(const ExPolygon& expolygon)
+{
+    ExPolygons expolys({expolygon});
     return triangulate(expolys);
 }
 
-Triangulation::Indices Triangulation::triangulate(const ExPolygons &expolygons){
-    Points pts = to_points(expolygons);
+// [INTENT] ExPolygons overload — detects duplicate points (e.g. contour/hole vertices that share
+//   a coordinate) and applies a changes[] remapping to merge them before CDT insertion.
+//   After triangulation the indices are reverse-mapped back to the original (un-merged) point set.
+//   Without this, CGAL's CDT would receive duplicate spatial positions — a precondition violation.
+// [STATE] Allocates pts (flat point list), d_pts (sorted duplicates), changes (index remap),
+//   and changes2 (reverse remap). All are local temporaries.
+// [HAZARD H1142] changes2 reverse-map is built as: "for i, changes2[changes[i]] = i".
+//   If two distinct original indices map to the same canonical index (the duplicate-merge case),
+//   changes2 records only the last one. For the reverse-mapped triangle indices, this means a
+//   triangle vertex that was the non-canonical copy of a duplicate point silently maps to the
+//   canonical copy instead. This is intentional but not documented; a port must replicate the
+//   same "last-writer-wins" convention.
+Triangulation::Indices Triangulation::triangulate(const ExPolygons& expolygons)
+{
+    Points pts   = to_points(expolygons);
     Points d_pts = collect_duplicates(pts);
-    if (d_pts.empty()) return triangulate(expolygons, pts);
+    if (d_pts.empty())
+        return triangulate(expolygons, pts);
 
     Changes changes = create_changes(pts, d_pts);
     Indices indices = triangulate(expolygons, pts, changes);
@@ -253,13 +301,14 @@ Triangulation::Indices Triangulation::triangulate(const ExPolygons &expolygons){
         changes2[changes[i]] = i;
 
     // convert indices into expolygons indicies
-    for (Vec3i32 &t : indices) 
-        for (size_t ti = 0; ti < 3; ti++) t[ti] = changes2[t[ti]];
-    
+    for (Vec3i32& t : indices)
+        for (size_t ti = 0; ti < 3; ti++)
+            t[ti] = changes2[t[ti]];
+
     return indices;
 }
 
-Triangulation::Indices Triangulation::triangulate(const ExPolygons &expolygons, const Points &points)
+Triangulation::Indices Triangulation::triangulate(const ExPolygons& expolygons, const Points& points)
 {
     assert(count_points(expolygons) == points.size());
     // when contain duplicit coordinate in points will not work properly
@@ -268,32 +317,32 @@ Triangulation::Indices Triangulation::triangulate(const ExPolygons &expolygons, 
     HalfEdges edges;
     edges.reserve(points.size());
     uint32_t offset = 0;
-    for (const ExPolygon &expolygon : expolygons) {
+    for (const ExPolygon& expolygon : expolygons) {
         priv::insert_edges(edges, offset, expolygon.contour);
-        for (const Polygon &hole : expolygon.holes)
+        for (const Polygon& hole : expolygon.holes)
             priv::insert_edges(edges, offset, hole);
     }
     std::sort(edges.begin(), edges.end());
     return triangulate(points, edges);
 }
 
-Triangulation::Indices Triangulation::triangulate(const ExPolygons &expolygons, const Points& points, const Changes& changes)
+Triangulation::Indices Triangulation::triangulate(const ExPolygons& expolygons, const Points& points, const Changes& changes)
 {
     assert(!points.empty());
     assert(count_points(expolygons) == points.size());
     assert(changes.size() == points.size());
     // IMPROVE: search from end and somehow distiquish that value is not a change
-    uint32_t count_points = *std::max_element(changes.begin(), changes.end())+1;
-    Points pts(count_points);
+    uint32_t count_points = *std::max_element(changes.begin(), changes.end()) + 1;
+    Points   pts(count_points);
     for (size_t i = 0; i < changes.size(); i++)
-        pts[changes[i]] = points[i];    
+        pts[changes[i]] = points[i];
 
     HalfEdges edges;
     edges.reserve(points.size());
     uint32_t offset = 0;
-    for (const ExPolygon &expolygon : expolygons) {
+    for (const ExPolygon& expolygon : expolygons) {
         priv::insert_edges(edges, offset, expolygon.contour, changes);
-        for (const Polygon &hole : expolygon.holes)
+        for (const Polygon& hole : expolygon.holes)
             priv::insert_edges(edges, offset, hole, changes);
     }
 
@@ -301,22 +350,22 @@ Triangulation::Indices Triangulation::triangulate(const ExPolygons &expolygons, 
     return triangulate(pts, edges);
 }
 
-Triangulation::Changes Triangulation::create_changes(const Points &points, const Points &duplicits)
+Triangulation::Changes Triangulation::create_changes(const Points& points, const Points& duplicits)
 {
     assert(!duplicits.empty());
-    assert(duplicits.size() < points.size()/2);
+    assert(duplicits.size() < points.size() / 2);
     std::vector<uint32_t> duplicit_indices(duplicits.size(), std::numeric_limits<uint32_t>::max());
-    Changes changes; 
+    Changes               changes;
     changes.reserve(points.size());
     uint32_t index = 0;
-    for (const Point &p: points) {
+    for (const Point& p : points) {
         auto it = std::lower_bound(duplicits.begin(), duplicits.end(), p);
-        if (it == duplicits.end() || *it != p) { 
+        if (it == duplicits.end() || *it != p) {
             changes.push_back(index);
             ++index;
             continue;
         }
-        uint32_t &d_index = duplicit_indices[it - duplicits.begin()];
+        uint32_t& d_index = duplicit_indices[it - duplicits.begin()];
         if (d_index == std::numeric_limits<uint32_t>::max()) {
             d_index = index;
             changes.push_back(index);
