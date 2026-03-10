@@ -466,7 +466,7 @@ its header to understand the data contract.)
              batch with any other file.
              Commit: `annotate: BBS 3MF extended parser (T4014)`
 
-- [ ] T4015  annotate+verify: src/libslic3r/Format/STEP.cpp
+- [x] T4015  annotate+verify: src/libslic3r/Format/STEP.cpp
                             + src/libslic3r/Format/STEP.hpp
              Context: STEP/CAD import via OpenCASCADE (OCCT). Document which
              OCCT API calls are used and what tessellation parameters control

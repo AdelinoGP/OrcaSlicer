@@ -1,3 +1,18 @@
+// [INTENT] STEP/OCCT importer for CAD solids.
+//
+// Unlike STL/OBJ/3MF mesh importers, this path starts from OpenCASCADE B-Rep topology:
+//   - STEPCAFControl_Reader parses the STEP assembly tree into an XCAF document.
+//   - getNamedSolids() flattens that tree into named TopoDS shapes while preserving transforms.
+//   - BRepMesh_IncrementalMesh tessellates each shape using caller-supplied linear and angular deflection.
+//   - The resulting triangles are copied into admesh-style `stl_file` buffers, then converted to TriangleMesh.
+//
+// [COUPLING] This file is tightly bound to OCCT's document/shape/triangulation APIs and to OrcaSlicer's
+//            TriangleMesh::from_stl() conversion path. The rest of libslic3r never sees B-Rep data directly.
+// [CONCURRENCY] File parsing is isolated in a worker thread for responsive cancellation; tessellation fans out
+//               across solids with TBB. Cancellation is cooperative and only checked at coarse boundaries.
+// [HAZARD] Tessellation quality is not intrinsic to the STEP file. The chosen deflection values materially
+//          change triangle count, import time, and downstream repair / slicing behavior.
+
 #include "../libslic3r.h"
 #include "../Model.hpp"
 #include "../TriangleMesh.hpp"
@@ -37,11 +52,11 @@
 #include "BRepTools.hxx"
 #include <IMeshTools_Parameters.hxx>
 
-
 namespace Slic3r {
 
-bool StepPreProcessor::preprocess(const char* path, std::string &output_path)
+bool StepPreProcessor::preprocess(const char* path, std::string& output_path)
 {
+    // [INTENT] Rewrite GBK-encoded STEP text to a UTF-8 temporary copy before OCCT opens it.
     boost::nowide::ifstream infile(path);
     if (!infile.good()) {
         throw Slic3r::RuntimeError(std::string("Load step file failed.\nCannot open file for reading.\n"));
@@ -49,29 +64,31 @@ bool StepPreProcessor::preprocess(const char* path, std::string &output_path)
     }
 
     boost::filesystem::path temp_path(temporary_dir());
-    std::string temp_step_path = temp_path.string() + "/temp.step";
+    std::string             temp_step_path = temp_path.string() + "/temp.step";
     boost::nowide::remove(temp_step_path.c_str());
     boost::nowide::ofstream temp_file(temp_step_path, std::ios::app);
-    std::string temp_line;
+    std::string             temp_line;
     while (std::getline(infile, temp_line)) {
         if (m_encode_type == EncodedType::UTF8) {
-            //BBS: continue to judge whether is other type
+            // BBS: continue to judge whether is other type
             if (isUtf8(temp_line)) {
-                //BBS: do nothing, but must be checked before checking whether is GBK
+                // BBS: do nothing, but must be checked before checking whether is GBK
             }
-            //BBS: not utf8, then maybe GBK
+            // BBS: not utf8, then maybe GBK
             else if (isGBK(temp_line)) {
                 m_encode_type = EncodedType::GBK;
             }
-            //BBS: not UTF8 and not GBK, then maybe some kind of special encoded type which we can't handle
-            // Load the step as UTF and user will see garbage characters in slicer but we have no solution at the moment
+            // BBS: not UTF8 and not GBK, then maybe some kind of special encoded type which we can't handle
+            //  Load the step as UTF and user will see garbage characters in slicer but we have no solution at the moment
             else {
                 m_encode_type = EncodedType::OTHER;
             }
         }
         if (m_encode_type == EncodedType::GBK)
-            //BBS: transform to UTF8 format if is GBK
-            //todo: use gbkToUtf8 function to replace
+            // [HAZARD] decode_path() is reused as a text transcoder even though it is primarily a filesystem-path
+            //          helper; the conversion is heuristic and only intended to salvage display names.
+            // BBS: transform to UTF8 format if is GBK
+            // todo: use gbkToUtf8 function to replace
             temp_file << decode_path(temp_line.c_str()) << std::endl;
         else
             temp_file << temp_line.c_str() << std::endl;
@@ -110,8 +127,9 @@ bool StepPreProcessor::isUtf8File(const char* path)
 
 bool StepPreProcessor::isUtf8(const std::string str)
 {
+    // [INTENT] Lightweight byte-pattern check used only for import preprocessing.
     size_t num = 0;
-    int i = 0;
+    int    i   = 0;
     while (i < str.length()) {
         if ((str[i] & 0x80) == 0x00) {
             i++;
@@ -129,22 +147,19 @@ bool StepPreProcessor::isUtf8(const std::string str)
     return true;
 }
 
-bool StepPreProcessor::isGBK(const std::string str) {
+bool StepPreProcessor::isGBK(const std::string str)
+{
+    // [HAZARD] Reads `str[i + 1]` without an end-of-string guard; a truncated trailing multibyte sequence is UB.
     size_t i = 0;
     while (i < str.length()) {
         if (str[i] <= 0x7f) {
             i++;
             continue;
         } else {
-            if (str[i] >= 0x81 &&
-                str[i] <= 0xfe &&
-                str[i + 1] >= 0x40 &&
-                str[i + 1] <= 0xfe &&
-                str[i + 1] != 0xf7) {
+            if (str[i] >= 0x81 && str[i] <= 0xfe && str[i + 1] >= 0x40 && str[i + 1] <= 0xfe && str[i + 1] != 0xf7) {
                 i += 2;
                 continue;
-            }
-            else {
+            } else {
                 return false;
             }
         }
@@ -152,9 +167,10 @@ bool StepPreProcessor::isGBK(const std::string str) {
     return true;
 }
 
-int StepPreProcessor::preNum(const unsigned char byte) {
+int StepPreProcessor::preNum(const unsigned char byte)
+{
     unsigned char mask = 0x80;
-    int num = 0;
+    int           num  = 0;
     for (int i = 0; i < 8; i++) {
         if ((byte & mask) == mask) {
             mask = mask >> 1;
@@ -167,42 +183,47 @@ int StepPreProcessor::preNum(const unsigned char byte) {
 }
 
 static void getNamedSolids(const TopLoc_Location& location,
-                           const std::string& prefix,
-                           unsigned int& id,
+                           const std::string&     prefix,
+                           unsigned int&          id,
                            const Handle(XCAFDoc_ShapeTool) shapeTool,
-                           const TDF_Label label,
+                           const TDF_Label          label,
                            std::vector<NamedSolid>& namedSolids,
-                           bool isSplitCompound = false) {
+                           bool                     isSplitCompound = false)
+{
+    // [INTENT] Flatten the XCAF assembly tree into a list of transformed leaf solids / shells that OrcaSlicer
+    // can later tessellate independently into ModelVolumes.
+    // [COUPLING] Depends on XCAF references, component hierarchies, and TDataStd_Name metadata.
     TDF_Label referredLabel{label};
     if (shapeTool->IsReference(label))
         shapeTool->GetReferredShape(label, referredLabel);
 
     std::string name;
     Handle(TDataStd_Name) shapeName;
-    if (referredLabel.FindAttribute(TDataStd_Name::GetID(), shapeName) ||
-        label.FindAttribute(TDataStd_Name::GetID(), shapeName))
+    if (referredLabel.FindAttribute(TDataStd_Name::GetID(), shapeName) || label.FindAttribute(TDataStd_Name::GetID(), shapeName))
         name = TCollection_AsciiString(shapeName->Get()).ToCString();
 
     if (name == "" || !StepPreProcessor::isUtf8(name))
         name = std::to_string(id++);
     std::string fullName{name};
 
-    TopLoc_Location localLocation = location * shapeTool->GetLocation(label);
+    TopLoc_Location   localLocation = location * shapeTool->GetLocation(label);
     TDF_LabelSequence components;
     if (shapeTool->GetComponents(referredLabel, components)) {
         for (Standard_Integer compIndex = 1; compIndex <= components.Length(); ++compIndex) {
+            // [INTENT] Accumulate parent transforms through nested assemblies before emitting leaf solids.
             getNamedSolids(localLocation, fullName, id, shapeTool, components.Value(compIndex), namedSolids, isSplitCompound);
         }
     } else {
-        TopoDS_Shape shape;
+        TopoDS_Shape    shape;
         TopExp_Explorer explorer;
         shapeTool->GetShape(referredLabel, shape);
-        TopAbs_ShapeEnum shape_type = shape.ShapeType();
+        TopAbs_ShapeEnum         shape_type = shape.ShapeType();
         BRepBuilderAPI_Transform transform(shape, localLocation, Standard_True);
         int                      i = 0;
         switch (shape_type) {
         case TopAbs_COMPOUND:
             if (!isSplitCompound) {
+                // [INTENT] Preserve a compound as one logical volume unless the caller explicitly requests splitting.
                 namedSolids.emplace_back(TopoDS::Compound(transform.Shape()), fullName);
                 break;
             }
@@ -213,226 +234,217 @@ static void getNamedSolids(const TopLoc_Location& location,
                 for (explorer.Init(transform.Shape(), TopAbs_SOLID); explorer.More(); explorer.Next()) {
                     i++;
                     const TopoDS_Shape& currentShape = explorer.Current();
+                    // [STATE] Splitting one compsolid into many entries changes downstream ModelVolume count.
                     namedSolids.emplace_back(TopoDS::Solid(currentShape), fullName + "-SOLID-" + std::to_string(i));
                 }
             }
             break;
-        case TopAbs_SOLID:
-            namedSolids.emplace_back(TopoDS::Solid(transform.Shape()), fullName);
-            break;
-        case TopAbs_SHELL:
-            namedSolids.emplace_back(TopoDS::Shell(transform.Shape()), fullName);
-            break;
-        default:
-            break;
+        case TopAbs_SOLID: namedSolids.emplace_back(TopoDS::Solid(transform.Shape()), fullName); break;
+        case TopAbs_SHELL: namedSolids.emplace_back(TopoDS::Shell(transform.Shape()), fullName); break;
+        default: break;
         }
     }
 }
 
-//bool load_step(const char *path, Model *model, bool& is_cancel,
-//               double linear_defletion/*=0.003*/,
-//               double angle_defletion/*= 0.5*/,
-//               bool isSplitCompound,
-//               ImportStepProgressFn stepFn, StepIsUtf8Fn isUtf8Fn, long& mesh_face_num)
+// bool load_step(const char *path, Model *model, bool& is_cancel,
+//                double linear_defletion/*=0.003*/,
+//                double angle_defletion/*= 0.5*/,
+//                bool isSplitCompound,
+//                ImportStepProgressFn stepFn, StepIsUtf8Fn isUtf8Fn, long& mesh_face_num)
 //{
-//    bool cb_cancel = false;
-//    if (stepFn) {
-//        stepFn(LOAD_STEP_STAGE_READ_FILE, 0, 1, cb_cancel);
-//        is_cancel = cb_cancel;
-//        if (cb_cancel) {
-//            return false;
-//        }
-//    }
+//     bool cb_cancel = false;
+//     if (stepFn) {
+//         stepFn(LOAD_STEP_STAGE_READ_FILE, 0, 1, cb_cancel);
+//         is_cancel = cb_cancel;
+//         if (cb_cancel) {
+//             return false;
+//         }
+//     }
 //
-//    if (!StepPreProcessor::isUtf8File(path) && isUtf8Fn)
-//        isUtf8Fn(false);
-//    std::string file_after_preprocess = std::string(path);
+//     if (!StepPreProcessor::isUtf8File(path) && isUtf8Fn)
+//         isUtf8Fn(false);
+//     std::string file_after_preprocess = std::string(path);
 //
-//    std::vector<NamedSolid> namedSolids;
-//    Handle(TDocStd_Document) document;
-//    Handle(XCAFApp_Application) application = XCAFApp_Application::GetApplication();
-//    application->NewDocument(file_after_preprocess.c_str(), document);
-//    STEPCAFControl_Reader reader;
-//    reader.SetNameMode(true);
-//    //BBS: Todo, read file is slow which cause the progress_bar no update and gui no response
-//    IFSelect_ReturnStatus stat = reader.ReadFile(file_after_preprocess.c_str());
-//    if (stat != IFSelect_RetDone || !reader.Transfer(document)) {
-//        application->Close(document);
-//        throw std::logic_error{ std::string{"Could not read '"} + path + "'" };
-//        return false;
-//    }
-//    Handle(XCAFDoc_ShapeTool) shapeTool = XCAFDoc_DocumentTool::ShapeTool(document->Main());
-//    TDF_LabelSequence topLevelShapes;
-//    shapeTool->GetFreeShapes(topLevelShapes);
+//     std::vector<NamedSolid> namedSolids;
+//     Handle(TDocStd_Document) document;
+//     Handle(XCAFApp_Application) application = XCAFApp_Application::GetApplication();
+//     application->NewDocument(file_after_preprocess.c_str(), document);
+//     STEPCAFControl_Reader reader;
+//     reader.SetNameMode(true);
+//     //BBS: Todo, read file is slow which cause the progress_bar no update and gui no response
+//     IFSelect_ReturnStatus stat = reader.ReadFile(file_after_preprocess.c_str());
+//     if (stat != IFSelect_RetDone || !reader.Transfer(document)) {
+//         application->Close(document);
+//         throw std::logic_error{ std::string{"Could not read '"} + path + "'" };
+//         return false;
+//     }
+//     Handle(XCAFDoc_ShapeTool) shapeTool = XCAFDoc_DocumentTool::ShapeTool(document->Main());
+//     TDF_LabelSequence topLevelShapes;
+//     shapeTool->GetFreeShapes(topLevelShapes);
 //
-//    unsigned int id{1};
-//    Standard_Integer topShapeLength = topLevelShapes.Length() + 1;
-//    auto stage_unit2 = topShapeLength / LOAD_STEP_STAGE_UNIT_NUM + 1;
+//     unsigned int id{1};
+//     Standard_Integer topShapeLength = topLevelShapes.Length() + 1;
+//     auto stage_unit2 = topShapeLength / LOAD_STEP_STAGE_UNIT_NUM + 1;
 //
-//    for (Standard_Integer iLabel = 1; iLabel < topShapeLength; ++iLabel) {
-//        if (stepFn) {
-//            if ((iLabel % stage_unit2) == 0) {
-//                stepFn(LOAD_STEP_STAGE_GET_SOLID, iLabel, topShapeLength, cb_cancel);
-//                is_cancel = cb_cancel;
-//            }
-//            if (cb_cancel) {
-//                shapeTool.reset(nullptr);
-//                application->Close(document);
-//                return false;
-//            }
-//        }
-//        getNamedSolids(TopLoc_Location{}, "", id, shapeTool, topLevelShapes.Value(iLabel), namedSolids, isSplitCompound);
-//    }
+//     for (Standard_Integer iLabel = 1; iLabel < topShapeLength; ++iLabel) {
+//         if (stepFn) {
+//             if ((iLabel % stage_unit2) == 0) {
+//                 stepFn(LOAD_STEP_STAGE_GET_SOLID, iLabel, topShapeLength, cb_cancel);
+//                 is_cancel = cb_cancel;
+//             }
+//             if (cb_cancel) {
+//                 shapeTool.reset(nullptr);
+//                 application->Close(document);
+//                 return false;
+//             }
+//         }
+//         getNamedSolids(TopLoc_Location{}, "", id, shapeTool, topLevelShapes.Value(iLabel), namedSolids, isSplitCompound);
+//     }
 //
-//    std::vector<stl_file> stl;
-//    stl.resize(namedSolids.size());
-//    tbb::parallel_for(tbb::blocked_range<size_t>(0, namedSolids.size()), [&](const tbb::blocked_range<size_t> &range) {
-//        for (size_t i = range.begin(); i < range.end(); i++) {
-//            BRepMesh_IncrementalMesh mesh(namedSolids[i].solid, linear_defletion, false, angle_defletion, true);
-//            // BBS: calculate total number of the nodes and triangles
-//            int aNbNodes     = 0;
-//            int aNbTriangles = 0;
-//            for (TopExp_Explorer anExpSF(namedSolids[i].solid, TopAbs_FACE); anExpSF.More(); anExpSF.Next()) {
-//                TopLoc_Location aLoc;
-//                Handle(Poly_Triangulation) aTriangulation = BRep_Tool::Triangulation(TopoDS::Face(anExpSF.Current()), aLoc);
-//                if (!aTriangulation.IsNull()) {
-//                    aNbNodes += aTriangulation->NbNodes();
-//                    aNbTriangles += aTriangulation->NbTriangles();
-//                }
-//            }
+//     std::vector<stl_file> stl;
+//     stl.resize(namedSolids.size());
+//     tbb::parallel_for(tbb::blocked_range<size_t>(0, namedSolids.size()), [&](const tbb::blocked_range<size_t> &range) {
+//         for (size_t i = range.begin(); i < range.end(); i++) {
+//             BRepMesh_IncrementalMesh mesh(namedSolids[i].solid, linear_defletion, false, angle_defletion, true);
+//             // BBS: calculate total number of the nodes and triangles
+//             int aNbNodes     = 0;
+//             int aNbTriangles = 0;
+//             for (TopExp_Explorer anExpSF(namedSolids[i].solid, TopAbs_FACE); anExpSF.More(); anExpSF.Next()) {
+//                 TopLoc_Location aLoc;
+//                 Handle(Poly_Triangulation) aTriangulation = BRep_Tool::Triangulation(TopoDS::Face(anExpSF.Current()), aLoc);
+//                 if (!aTriangulation.IsNull()) {
+//                     aNbNodes += aTriangulation->NbNodes();
+//                     aNbTriangles += aTriangulation->NbTriangles();
+//                 }
+//             }
 //
-//            if (aNbTriangles == 0 || aNbNodes == 0)
-//                // BBS: No triangulation on the shape.
-//                continue;
+//             if (aNbTriangles == 0 || aNbNodes == 0)
+//                 // BBS: No triangulation on the shape.
+//                 continue;
 //
-//            stl[i].stats.type                = inmemory;
-//            stl[i].stats.number_of_facets    = (uint32_t) aNbTriangles;
-//            stl[i].stats.original_num_facets = stl[i].stats.number_of_facets;
-//            stl_allocate(&stl[i]);
+//             stl[i].stats.type                = inmemory;
+//             stl[i].stats.number_of_facets    = (uint32_t) aNbTriangles;
+//             stl[i].stats.original_num_facets = stl[i].stats.number_of_facets;
+//             stl_allocate(&stl[i]);
 //
-//            std::vector<Vec3f> points;
-//            points.reserve(aNbNodes);
-//            // BBS: count faces missing triangulation
-//            Standard_Integer aNbFacesNoTri = 0;
-//            // BBS: fill temporary triangulation
-//            Standard_Integer aNodeOffset    = 0;
-//            Standard_Integer aTriangleOffet = 0;
-//            for (TopExp_Explorer anExpSF(namedSolids[i].solid, TopAbs_FACE); anExpSF.More(); anExpSF.Next()) {
-//                const TopoDS_Shape &aFace = anExpSF.Current();
-//                TopLoc_Location     aLoc;
-//                Handle(Poly_Triangulation) aTriangulation = BRep_Tool::Triangulation(TopoDS::Face(aFace), aLoc);
-//                if (aTriangulation.IsNull()) {
-//                    ++aNbFacesNoTri;
-//                    continue;
-//                }
-//                // BBS: copy nodes
-//                gp_Trsf aTrsf = aLoc.Transformation();
-//                for (Standard_Integer aNodeIter = 1; aNodeIter <= aTriangulation->NbNodes(); ++aNodeIter) {
-//                    gp_Pnt aPnt = aTriangulation->Node(aNodeIter);
-//                    aPnt.Transform(aTrsf);
-//                    points.emplace_back(std::move(Vec3f(aPnt.X(), aPnt.Y(), aPnt.Z())));
-//                }
-//                // BBS: copy triangles
-//                const TopAbs_Orientation anOrientation = anExpSF.Current().Orientation();
-//                Standard_Integer anId[3] = {};
-//                for (Standard_Integer aTriIter = 1; aTriIter <= aTriangulation->NbTriangles(); ++aTriIter) {
-//                    Poly_Triangle aTri = aTriangulation->Triangle(aTriIter);
+//             std::vector<Vec3f> points;
+//             points.reserve(aNbNodes);
+//             // BBS: count faces missing triangulation
+//             Standard_Integer aNbFacesNoTri = 0;
+//             // BBS: fill temporary triangulation
+//             Standard_Integer aNodeOffset    = 0;
+//             Standard_Integer aTriangleOffet = 0;
+//             for (TopExp_Explorer anExpSF(namedSolids[i].solid, TopAbs_FACE); anExpSF.More(); anExpSF.Next()) {
+//                 const TopoDS_Shape &aFace = anExpSF.Current();
+//                 TopLoc_Location     aLoc;
+//                 Handle(Poly_Triangulation) aTriangulation = BRep_Tool::Triangulation(TopoDS::Face(aFace), aLoc);
+//                 if (aTriangulation.IsNull()) {
+//                     ++aNbFacesNoTri;
+//                     continue;
+//                 }
+//                 // BBS: copy nodes
+//                 gp_Trsf aTrsf = aLoc.Transformation();
+//                 for (Standard_Integer aNodeIter = 1; aNodeIter <= aTriangulation->NbNodes(); ++aNodeIter) {
+//                     gp_Pnt aPnt = aTriangulation->Node(aNodeIter);
+//                     aPnt.Transform(aTrsf);
+//                     points.emplace_back(std::move(Vec3f(aPnt.X(), aPnt.Y(), aPnt.Z())));
+//                 }
+//                 // BBS: copy triangles
+//                 const TopAbs_Orientation anOrientation = anExpSF.Current().Orientation();
+//                 Standard_Integer anId[3] = {};
+//                 for (Standard_Integer aTriIter = 1; aTriIter <= aTriangulation->NbTriangles(); ++aTriIter) {
+//                     Poly_Triangle aTri = aTriangulation->Triangle(aTriIter);
 //
-//                    aTri.Get(anId[0], anId[1], anId[2]);
-//                    if (anOrientation == TopAbs_REVERSED)
-//                        std::swap(anId[1], anId[2]);
-//                    // BBS: save triangles facets
-//                    stl_facet facet;
-//                    facet.vertex[0] = points[anId[0] + aNodeOffset - 1].cast<float>();
-//                    facet.vertex[1] = points[anId[1] + aNodeOffset - 1].cast<float>();
-//                    facet.vertex[2] = points[anId[2] + aNodeOffset - 1].cast<float>();
-//                    facet.extra[0]  = 0;
-//                    facet.extra[1]  = 0;
-//                    stl_normal normal;
-//                    stl_calculate_normal(normal, &facet);
-//                    stl_normalize_vector(normal);
-//                    facet.normal                                      = normal;
-//                    stl[i].facet_start[aTriangleOffet + aTriIter - 1] = facet;
-//                }
+//                     aTri.Get(anId[0], anId[1], anId[2]);
+//                     if (anOrientation == TopAbs_REVERSED)
+//                         std::swap(anId[1], anId[2]);
+//                     // BBS: save triangles facets
+//                     stl_facet facet;
+//                     facet.vertex[0] = points[anId[0] + aNodeOffset - 1].cast<float>();
+//                     facet.vertex[1] = points[anId[1] + aNodeOffset - 1].cast<float>();
+//                     facet.vertex[2] = points[anId[2] + aNodeOffset - 1].cast<float>();
+//                     facet.extra[0]  = 0;
+//                     facet.extra[1]  = 0;
+//                     stl_normal normal;
+//                     stl_calculate_normal(normal, &facet);
+//                     stl_normalize_vector(normal);
+//                     facet.normal                                      = normal;
+//                     stl[i].facet_start[aTriangleOffet + aTriIter - 1] = facet;
+//                 }
 //
-//                aNodeOffset += aTriangulation->NbNodes();
-//                aTriangleOffet += aTriangulation->NbTriangles();
-//            }
-//        }
-//    });
+//                 aNodeOffset += aTriangulation->NbNodes();
+//                 aTriangleOffet += aTriangulation->NbTriangles();
+//             }
+//         }
+//     });
 //
-//    if (mesh_face_num != -1) {
-//        for (size_t i = 0; i < stl.size(); i++) {
-//            // Test for overflow
-//            mesh_face_num += stl[i].stats.number_of_facets;
-//        }
-//        return true;
-//    }
+//     if (mesh_face_num != -1) {
+//         for (size_t i = 0; i < stl.size(); i++) {
+//             // Test for overflow
+//             mesh_face_num += stl[i].stats.number_of_facets;
+//         }
+//         return true;
+//     }
 //
-//    ModelObject *new_object = model->add_object();
-//    const char * last_slash = strrchr(path, DIR_SEPARATOR);
-//    new_object->name.assign((last_slash == nullptr) ? path : last_slash + 1);
-//    new_object->input_file = path;
+//     ModelObject *new_object = model->add_object();
+//     const char * last_slash = strrchr(path, DIR_SEPARATOR);
+//     new_object->name.assign((last_slash == nullptr) ? path : last_slash + 1);
+//     new_object->input_file = path;
 //
-//    auto stage_unit3 = stl.size() / LOAD_STEP_STAGE_UNIT_NUM + 1;
-//    for (size_t i = 0; i < stl.size(); i++) {
-//        if (stepFn) {
-//            if ((i % stage_unit3) == 0) {
-//                stepFn(LOAD_STEP_STAGE_GET_MESH, i, stl.size(), cb_cancel);
-//                is_cancel = cb_cancel;
-//            }
-//            if (cb_cancel) {
-//                model->delete_object(new_object);
-//                shapeTool.reset(nullptr);
-//                application->Close(document);
-//                return false;
-//            }
-//        }
+//     auto stage_unit3 = stl.size() / LOAD_STEP_STAGE_UNIT_NUM + 1;
+//     for (size_t i = 0; i < stl.size(); i++) {
+//         if (stepFn) {
+//             if ((i % stage_unit3) == 0) {
+//                 stepFn(LOAD_STEP_STAGE_GET_MESH, i, stl.size(), cb_cancel);
+//                 is_cancel = cb_cancel;
+//             }
+//             if (cb_cancel) {
+//                 model->delete_object(new_object);
+//                 shapeTool.reset(nullptr);
+//                 application->Close(document);
+//                 return false;
+//             }
+//         }
 //
-//        //BBS: maybe mesh is empty from step file. Don't add
-//        if (stl[i].stats.number_of_facets > 0) {
-//            TriangleMesh triangle_mesh;
-//            triangle_mesh.from_stl(stl[i]);
-//            ModelVolume* new_volume = new_object->add_volume(std::move(triangle_mesh));
-//            new_volume->name = namedSolids[i].name;
-//            new_volume->source.input_file = path;
-//            new_volume->source.object_idx = (int)model->objects.size() - 1;
-//            new_volume->source.volume_idx = (int)new_object->volumes.size() - 1;
-//        }
-//    }
+//         //BBS: maybe mesh is empty from step file. Don't add
+//         if (stl[i].stats.number_of_facets > 0) {
+//             TriangleMesh triangle_mesh;
+//             triangle_mesh.from_stl(stl[i]);
+//             ModelVolume* new_volume = new_object->add_volume(std::move(triangle_mesh));
+//             new_volume->name = namedSolids[i].name;
+//             new_volume->source.input_file = path;
+//             new_volume->source.object_idx = (int)model->objects.size() - 1;
+//             new_volume->source.volume_idx = (int)new_object->volumes.size() - 1;
+//         }
+//     }
 //
-//    shapeTool.reset(nullptr);
-//    application->Close(document);
+//     shapeTool.reset(nullptr);
+//     application->Close(document);
 //
-//    //BBS: no valid shape from the step, delete the new object as well
-//    if (new_object->volumes.size() == 0) {
-//        model->delete_object(new_object);
-//        return false;
-//    }
+//     //BBS: no valid shape from the step, delete the new object as well
+//     if (new_object->volumes.size() == 0) {
+//         model->delete_object(new_object);
+//         return false;
+//     }
 //
-//    return true;
-//}
+//     return true;
+// }
 
-Step::Step(fs::path path, ImportStepProgressFn stepFn, StepIsUtf8Fn isUtf8Fn):
-    m_stepFn(stepFn),
-    m_utf8Fn(isUtf8Fn)
+Step::Step(fs::path path, ImportStepProgressFn stepFn, StepIsUtf8Fn isUtf8Fn) : m_stepFn(stepFn), m_utf8Fn(isUtf8Fn)
 {
     m_path = path.string();
+    // [MEMORY] The parsed XCAF document is cached on the Step instance so later mesh/count calls can reuse it.
     m_app->NewDocument(TCollection_ExtendedString("BinXCAF"), m_doc);
 }
 
-Step::Step(std::string path, ImportStepProgressFn stepFn, StepIsUtf8Fn isUtf8Fn) :
-    m_path(path),
-    m_stepFn(stepFn),
-    m_utf8Fn(isUtf8Fn)
+Step::Step(std::string path, ImportStepProgressFn stepFn, StepIsUtf8Fn isUtf8Fn) : m_path(path), m_stepFn(stepFn), m_utf8Fn(isUtf8Fn)
 {
+    // [MEMORY] Same lifetime rule as the fs::path overload: Step owns the document until destruction.
     m_app->NewDocument(TCollection_ExtendedString("BinXCAF"), m_doc);
 }
 
-Step::~Step()
-{
-    m_app->Close(m_doc);
-}
+// [MEMORY] Close releases OCCT-owned document state, including triangulation caches attached to shapes.
+Step::~Step() { m_app->Close(m_doc); }
 
 void Step::update_process(int load_stage, int current, int total, bool& cancel)
 {
@@ -443,45 +455,51 @@ void Step::update_process(int load_stage, int current, int total, bool& cancel)
 
 Step::Step_Status Step::load()
 {
+    // [INTENT] Parse STEP/XCAF metadata first so the caller can inspect/cancel before paying tessellation cost.
     if (!StepPreProcessor::isUtf8File(m_path.c_str()) && m_utf8Fn) {
         m_utf8Fn(false);
         return Step_Status::LOAD_ERROR;
     }
-    std::atomic<bool> stop_load_flag = false;
+    std::atomic<bool> stop_load_flag          = false;
     Handle(StepProgressIncdicator) incdicator = new StepProgressIncdicator(stop_load_flag);
-    bool task_result = false;
-    bool cb_cancel = false;
-    int progress = 0;
-    bool load_result = false;
-    auto task = new boost::thread(Slic3r::create_thread([&]() -> void {
-
+    bool task_result                          = false;
+    bool cb_cancel                            = false;
+    int  progress                             = 0;
+    bool load_result                          = false;
+    auto task                                 = new boost::thread(Slic3r::create_thread([&]() -> void {
+        // [CONCURRENCY] OCCT parsing happens on a worker thread; the outer thread just polls progress/cancel.
         STEPCAFControl_Reader reader;
         reader.SetNameMode(true);
+        // [INTENT] STEPCAFControl_Reader keeps assembly names/structure, which the simpler STEPControl reader would lose.
         IFSelect_ReturnStatus stat = reader.ReadFile(m_path.c_str());
-        if (cb_cancel) return;
+        if (cb_cancel)
+            return;
         progress = 3;
         if (stat != IFSelect_RetDone || !reader.Transfer(m_doc, incdicator->Start())) {
             load_result = false;
             task_result = true;
             return;
         }
-        if (cb_cancel) return;
-        progress = 6;
+        if (cb_cancel)
+            return;
+        progress     = 6;
         m_shape_tool = XCAFDoc_DocumentTool::ShapeTool(m_doc->Main());
         TDF_LabelSequence topLevelShapes;
         m_shape_tool->GetFreeShapes(topLevelShapes);
-        unsigned int id{ 1 };
+        unsigned int     id{1};
         Standard_Integer topShapeLength = topLevelShapes.Length() + 1;
         for (Standard_Integer iLabel = 1; iLabel < topShapeLength; ++iLabel) {
-            if (cb_cancel) return;
+            if (cb_cancel)
+                return;
             getNamedSolids(TopLoc_Location{}, "", id, m_shape_tool, topLevelShapes.Value(iLabel), m_name_solids);
         }
-        progress = 10;
+        progress    = 10;
         load_result = true;
         task_result = true;
     }));
     while (!task_result) {
         boost::this_thread::sleep_for(boost::chrono::milliseconds(200));
+        // [STATE] Progress is synthetic here (0..10 milestones), not exact byte/file progress.
         update_process(LOAD_STEP_STAGE_READ_FILE, progress, 10, cb_cancel);
         if (cb_cancel) {
             stop_load_flag.store(true);
@@ -494,7 +512,7 @@ Step::Step_Status Step::load()
             return Step_Status::CANCEL;
         }
     }
-    if (task){
+    if (task) {
         if (task->joinable()) {
             task->join();
             delete task;
@@ -502,38 +520,36 @@ Step::Step_Status Step::load()
     }
     if (load_result) {
         return Step_Status::LOAD_SUCCESS;
-    }else {
+    } else {
         return Step_Status::LOAD_ERROR;
     }
-    
 }
 
-Step::Step_Status Step::mesh(Model* model,
-                             bool& is_cancel,
-                             bool isSplitCompound,
-                             double linear_defletion/*=0.003*/,
-                             double angle_defletion/*= 0.5*/)
+Step::Step_Status Step::mesh(
+    Model* model, bool& is_cancel, bool isSplitCompound, double linear_defletion /*=0.003*/, double angle_defletion /*= 0.5*/)
 
 {
-    bool task_result = false;
-    bool cb_cancel = false;
-    float progress = .0;
-    std::atomic<int> meshed_solid_num = 0;
+    // [INTENT] Tessellate the loaded OCCT solids and append the resulting triangle meshes to the Model.
+    // [STATE] Mutates `model` by creating one ModelObject, then one ModelVolume per solid that produces triangles.
+    bool                    task_result      = false;
+    bool                    cb_cancel        = false;
+    float                   progress         = .0;
+    std::atomic<int>        meshed_solid_num = 0;
     std::vector<NamedSolid> namedSolids;
-    float progress_2 = .0;
-    ModelObject* new_object = model->add_object();
-    const char* last_slash = strrchr(m_path.c_str(), DIR_SEPARATOR);
+    float                   progress_2 = .0;
+    ModelObject*            new_object = model->add_object();
+    const char*             last_slash = strrchr(m_path.c_str(), DIR_SEPARATOR);
     new_object->name.assign((last_slash == nullptr) ? m_path.c_str() : last_slash + 1);
     new_object->input_file = m_path.c_str();
 
     auto task = new boost::thread(Slic3r::create_thread([&]() -> void {
         TDF_LabelSequence topLevelShapes;
         m_shape_tool->GetFreeShapes(topLevelShapes);
-        unsigned int id{ 1 };
+        unsigned int     id{1};
         Standard_Integer topShapeLength = topLevelShapes.Length() + 1;
-        
+
         for (Standard_Integer iLabel = 1; iLabel < topShapeLength; ++iLabel) {
-            progress = static_cast<double>(iLabel) / (topShapeLength-1);
+            progress = static_cast<double>(iLabel) / (topShapeLength - 1);
             if (cb_cancel) {
                 return;
             }
@@ -544,9 +560,11 @@ Step::Step_Status Step::mesh(Model* model,
         stl.resize(namedSolids.size());
         tbb::parallel_for(tbb::blocked_range<size_t>(0, namedSolids.size()), [&](const tbb::blocked_range<size_t>& range) {
             for (size_t i = range.begin(); i < range.end(); i++) {
+                // [INTENT] `linear_defletion` is OCCT's chordal tolerance and `angle_defletion` is its angular
+                // tolerance; together they control how finely the CAD surface is approximated by triangles.
                 BRepMesh_IncrementalMesh mesh(namedSolids[i].solid, linear_defletion, false, angle_defletion, true);
                 // BBS: calculate total number of the nodes and triangles
-                int aNbNodes = 0;
+                int aNbNodes     = 0;
                 int aNbTriangles = 0;
                 for (TopExp_Explorer anExpSF(namedSolids[i].solid, TopAbs_FACE); anExpSF.More(); anExpSF.Next()) {
                     TopLoc_Location aLoc;
@@ -561,9 +579,11 @@ Step::Step_Status Step::mesh(Model* model,
                     // BBS: No triangulation on the shape.
                     continue;
 
-                stl[i].stats.type = inmemory;
-                stl[i].stats.number_of_facets = (uint32_t)aNbTriangles;
+                stl[i].stats.type                = inmemory;
+                stl[i].stats.number_of_facets    = (uint32_t) aNbTriangles;
                 stl[i].stats.original_num_facets = stl[i].stats.number_of_facets;
+                // [MEMORY] Raw admesh facet storage is allocated here so TriangleMesh::from_stl() can reuse the
+                // existing STL conversion path instead of building indexed_triangle_set directly from OCCT output.
                 stl_allocate(&stl[i]);
 
                 std::vector<Vec3f> points;
@@ -571,7 +591,7 @@ Step::Step_Status Step::mesh(Model* model,
                 // BBS: count faces missing triangulation
                 Standard_Integer aNbFacesNoTri = 0;
                 // BBS: fill temporary triangulation
-                Standard_Integer aNodeOffset = 0;
+                Standard_Integer aNodeOffset    = 0;
                 Standard_Integer aTriangleOffet = 0;
                 for (TopExp_Explorer anExpSF(namedSolids[i].solid, TopAbs_FACE); anExpSF.More(); anExpSF.Next()) {
                     const TopoDS_Shape& aFace = anExpSF.Current();
@@ -590,24 +610,26 @@ Step::Step_Status Step::mesh(Model* model,
                     }
                     // BBS: copy triangles
                     const TopAbs_Orientation anOrientation = anExpSF.Current().Orientation();
-                    Standard_Integer anId[3] = {};
+                    Standard_Integer         anId[3]       = {};
                     for (Standard_Integer aTriIter = 1; aTriIter <= aTriangulation->NbTriangles(); ++aTriIter) {
                         Poly_Triangle aTri = aTriangulation->Triangle(aTriIter);
 
                         aTri.Get(anId[0], anId[1], anId[2]);
                         if (anOrientation == TopAbs_REVERSED)
+                            // [INTENT] Reverse the vertex order for topologically flipped faces so computed normals
+                            // point consistently outward after tessellation.
                             std::swap(anId[1], anId[2]);
                         // BBS: save triangles facets
                         stl_facet facet;
                         facet.vertex[0] = points[anId[0] + aNodeOffset - 1].cast<float>();
                         facet.vertex[1] = points[anId[1] + aNodeOffset - 1].cast<float>();
                         facet.vertex[2] = points[anId[2] + aNodeOffset - 1].cast<float>();
-                        facet.extra[0] = 0;
-                        facet.extra[1] = 0;
+                        facet.extra[0]  = 0;
+                        facet.extra[1]  = 0;
                         stl_normal normal;
                         stl_calculate_normal(normal, &facet);
                         stl_normalize_vector(normal);
-                        facet.normal = normal;
+                        facet.normal                                      = normal;
                         stl[i].facet_start[aTriangleOffet + aTriIter - 1] = facet;
                     }
 
@@ -618,21 +640,22 @@ Step::Step_Status Step::mesh(Model* model,
             }
         });
 
-
         for (size_t i = 0; i < stl.size(); i++) {
             progress_2 = static_cast<float>(i) / stl.size();
             if (cb_cancel)
                 return;
 
-            //BBS: maybe mesh is empty from step file. Don't add
+            // BBS: maybe mesh is empty from step file. Don't add
             if (stl[i].stats.number_of_facets > 0) {
                 TriangleMesh triangle_mesh;
+                // [COUPLING] STEP import intentionally feeds into the STL/admesh mesh constructor so repair and
+                // downstream slicing behave like any other triangle-based model import.
                 triangle_mesh.from_stl(stl[i]);
-                ModelVolume* new_volume = new_object->add_volume(std::move(triangle_mesh));
-                new_volume->name = namedSolids[i].name;
+                ModelVolume* new_volume       = new_object->add_volume(std::move(triangle_mesh));
+                new_volume->name              = namedSolids[i].name;
                 new_volume->source.input_file = m_path.c_str();
-                new_volume->source.object_idx = (int)model->objects.size() - 1;
-                new_volume->source.volume_idx = (int)new_object->volumes.size() - 1;
+                new_volume->source.object_idx = (int) model->objects.size() - 1;
+                new_volume->source.volume_idx = (int) new_object->volumes.size() - 1;
             }
         }
         task_result = true;
@@ -643,11 +666,12 @@ Step::Step_Status Step::mesh(Model* model,
         if (progress_2 > 0) {
             // third progress
             update_process(LOAD_STEP_STAGE_GET_MESH, static_cast<int>(progress_2 * 100), 100, cb_cancel);
-        }else {
+        } else {
             if (meshed_solid_num.load()) {
                 // second progress
                 int meshed_solid = meshed_solid_num.load();
-                update_process(LOAD_STEP_STAGE_GET_SOLID, static_cast<int>((float)meshed_solid / namedSolids.size() * 10) + 10, 20, cb_cancel);
+                update_process(LOAD_STEP_STAGE_GET_SOLID, static_cast<int>((float) meshed_solid / namedSolids.size() * 10) + 10, 20,
+                               cb_cancel);
             } else {
                 if (progress > 0) {
                     // first progress
@@ -655,9 +679,10 @@ Step::Step_Status Step::mesh(Model* model,
                 }
             }
         }
-        
-        
+
         if (cb_cancel) {
+            // [HAZARD] Cancellation is cooperative only at phase boundaries; one expensive solid may continue
+            // meshing until OCCT returns because the TBB body does not poll the cancel flag internally.
             if (task) {
                 if (task->joinable()) {
                     task->join();
@@ -674,7 +699,7 @@ Step::Step_Status Step::mesh(Model* model,
         }
     }
 
-    //BBS: no valid shape from the step, delete the new object as well
+    // BBS: no valid shape from the step, delete the new object as well
     if (new_object->volumes.size() == 0) {
         model->delete_object(new_object);
         return Step_Status::MESH_ERROR;
@@ -684,6 +709,7 @@ Step::Step_Status Step::mesh(Model* model,
 
 void Step::clean_mesh_data()
 {
+    // [INTENT] Clear cached OCCT triangulations so later remesh/count requests use the latest tolerances.
     for (const auto& name_solid : m_name_solids) {
         BRepTools::Clean(name_solid.solid);
     }
@@ -691,14 +717,16 @@ void Step::clean_mesh_data()
 
 unsigned int Step::get_triangle_num(double linear_defletion, double angle_defletion)
 {
+    // [INTENT] Serial preflight that estimates tessellation cost without constructing ModelVolumes yet.
     unsigned int tri_num = 0;
     try {
         Handle(StepProgressIncdicator) progress = new StepProgressIncdicator(m_stop_mesh);
         clean_mesh_data();
         IMeshTools_Parameters param;
         param.Deflection = linear_defletion;
-        param.Angle = angle_defletion;
+        param.Angle      = angle_defletion;
         param.InParallel = true;
+        // [COUPLING] This uses OCCT's generic meshing-parameter object instead of the shorthand constructor used by mesh().
         for (int i = 0; i < m_name_solids.size(); ++i) {
             BRepMesh_IncrementalMesh mesh(m_name_solids[i].solid, param, progress->Start());
             for (TopExp_Explorer anExpSF(m_name_solids[i].solid, TopAbs_FACE); anExpSF.More(); anExpSF.Next()) {
@@ -712,21 +740,22 @@ unsigned int Step::get_triangle_num(double linear_defletion, double angle_deflet
                 return 0;
             }
         }
-    } catch(Exception e) {
+    } catch (Exception e) {
+        // [HAZARD] Any OCCT exception collapses to `0`, so callers cannot distinguish failure from an empty result.
         return 0;
     }
-    
+
     return tri_num;
 }
 
 unsigned int Step::get_triangle_num_tbb(double linear_defletion, double angle_defletion)
 {
+    // [INTENT] Parallel version of the preflight triangle count for large assemblies with many independent solids.
     unsigned int tri_num = 0;
     clean_mesh_data();
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, m_name_solids.size()),
-    [&](const tbb::blocked_range<size_t>& range) {
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, m_name_solids.size()), [&](const tbb::blocked_range<size_t>& range) {
         for (size_t i = range.begin(); i < range.end(); i++) {
-            unsigned int solids_tri_num = 0;
+            unsigned int             solids_tri_num = 0;
             BRepMesh_IncrementalMesh mesh(m_name_solids[i].solid, linear_defletion, false, angle_defletion, true);
             for (TopExp_Explorer anExpSF(m_name_solids[i].solid, TopAbs_FACE); anExpSF.More(); anExpSF.Next()) {
                 TopLoc_Location aLoc;
@@ -735,9 +764,9 @@ unsigned int Step::get_triangle_num_tbb(double linear_defletion, double angle_de
                     solids_tri_num += aTriangulation->NbTriangles();
                 }
             }
+            // [CONCURRENCY] Each worker writes a unique vector slot, avoiding cross-thread contention.
             m_name_solids[i].tri_face_cout = solids_tri_num;
         }
-
     });
     for (int i = 0; i < m_name_solids.size(); ++i) {
         tri_num += m_name_solids[i].tri_face_cout;
