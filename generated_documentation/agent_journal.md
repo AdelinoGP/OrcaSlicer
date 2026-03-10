@@ -1,5 +1,34 @@
 # Agent Journal — OrcaSlicer Codebase Analysis
 
+## CURRENT STATUS
+Last session: 84
+Active task: TB003 — Compact agent_journal.md (archive Sessions 1–83)
+Next action: Archive Sessions 1–83 verbatim into agent_journal_archive_s01_s83.md, then replace in this file with two-line stub
+Unresolved [UNCLEAR] tags: 51 (in source files); 52 occurrences in journal (some are journal-internal references to the same tags)
+Files remaining (Phase 1): 0 — annotation pass COMPLETE as of Session 84
+Files completed (Phase 1): 413 source files annotated across Sessions 1–84
+Next hazard ID: H1191
+
+Open questions (from Session 1 — status as of Session 85):
+- **Q1 RESOLVED** — `slice_mesh` does NOT use the admesh adjacency table. `its_face_neighbors_par()` is called at
+  `src/libslic3r/TriangleMeshSlicer.cpp:2437` to rebuild the face-neighbor table from scratch each call.
+  The admesh repair data (`its_neighbors_par`) is separate and only used by mesh-repair code.
+- **Q2 RESOLVED** — `Layer` objects are owned by `PrintObject::m_layers` as raw pointers
+  (`LayerPtrs = std::vector<Layer*>`, defined in `src/libslic3r/Layer.hpp:40`).
+  Destruction is via manual `delete` in `PrintObject`'s clear routine — no `unique_ptr`.
+  This is Hazard H352 (`~Layer()` manual raw pointer delete, P1/High).
+- **Q3 RESOLVED** — Arachne and classic `PerimeterGenerator` are mutually exclusive.
+  Dispatch is in `LayerRegion.cpp:120`: `process_arachne()` fires only when
+  `wall_generator == Arachne AND !spiral_vase`; all other conditions invoke `process_classic()`.
+  They share the same `LayerRegion` inputs but produce different output extrusion types.
+- **Q4 RESOLVED** — `ClipperZUtils` Z-metadata is used for intersection provenance tracking in
+  `src/libslic3r/Algorithm/LineSplit.cpp`. The Z value encodes whether a Clipper intersection
+  point originated from the source path (z >= 0) or the clip polygon (z == CLIP_IDX), enabling
+  LineSplit to reconstruct which segments are inside vs outside the clipping boundary after
+  the boolean operation.
+
+---
+
 ## Session 1 — Orientation Phase
 
 ### Files Processed

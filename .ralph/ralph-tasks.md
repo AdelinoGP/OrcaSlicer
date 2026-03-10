@@ -16,7 +16,7 @@ Last updated: 2026-03-09T00:00:00Z
              using the session log in agent_journal.md as the source of truth.
              Assign T1xx IDs to every annotated file. Commit with prefix `docs:`.
 
-- [ ] TB002  BOOTSTRAP · Add the CURRENT STATUS living block to the very top of
+- [x] TB002  BOOTSTRAP · Add the CURRENT STATUS living block to the very top of
              `agent_journal.md` (above Session 1). Populate it from Session 84
              state: annotation pass complete, Phase 2 docs in progress, H1191 is
              next hazard ID, open questions from Session 1 items 1–4 — verify
