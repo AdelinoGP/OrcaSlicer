@@ -1,5 +1,32 @@
 
 #include "CutUtils.hpp"
+// [INTENT] Model cutting operations.  The Cut class encapsulates a planar cut of a
+// ModelObject and exposes three entry points:
+//   perform_with_plane()   — axis-aligned planar bisection (upper/lower halves)
+//   perform_by_contour()   — distribute pre-split contour parts to upper/lower
+//   perform_with_groove()  — tongue-and-groove joint via 7 sequential cut_mesh() calls
+// [STATE] Cut constructor deep-copies the source ModelObject into a private m_model.
+//         All mutating operations run on that copy; results are returned via
+//         m_model.objects.  Caller must not retain raw pointers into the returned
+//         ModelObjectPtrs after the Cut object is destroyed.
+// [COUPLING] Depends on cut_mesh() (TriangleMeshSlicer), ModelObject::clone_for_cut(),
+//            TriangleMesh::transform(), and the Geometry rotation/translation helpers.
+// [CONCURRENCY] No TBB parallelism — all three entry points are strictly sequential.
+// [HAZARD H1138] apply_tolerance(): magic constant -0.05 Z offset applied for
+//   Plug and Snap connectors ("add small Z offset to better preview") — undocumented
+//   design choice.  No config exposure; any preview geometry will be wrong by 0.05mm
+//   for these connector types if tolerance or layer height changes.
+// [HAZARD H1139] process_connector_cut(): Snap connector mesh is created with
+//   its_make_cylinder(1.0, 1.0, PI/180.) — radius=1, height=1, angle_step=1°.
+//   All three are magic numbers with no config exposure or comment explaining why
+//   1mm cylinder is the canonical snap-fit shape.
+// [HAZARD H1140] perform_by_contour(): raw volume pointers are manually deleted
+//   before erase() (lines ~485-487).  Pattern: `delete *(volumes.begin()+id); ... erase()`
+//   — relies on ModelVolumePtrs being owning raw pointers.  If the container is ever
+//   changed to unique_ptr this code double-frees.
+// [HAZARD H1141] post_process() for lower half always passes flip=true when
+//   PlaceOnCutLower is set, regardless of whether FlipLower is also set (line ~278).
+//   Comment says "may be intentional or bug" — document as [UNCLEAR].
 #include "Geometry.hpp"
 #include "libslic3r.h"
 #include "Model.hpp"
@@ -15,6 +42,11 @@ using namespace Geometry;
 
 static void apply_tolerance(ModelVolume* vol)
 {
+    // [INTENT] Scale and offset a connector volume to account for manufacturing
+    //          tolerance (radius_tolerance, height_tolerance stored in CutInfo).
+    //          Called after the connector geometry has been processed.
+    // [HAZARD H1138 detail] -0.05 Z offset for Plug/Snap is undocumented magic;
+    //          correct value depends on nozzle/layer height but is hardcoded.
     ModelVolume::CutInfo& cut_info = vol->cut_info;
 
     assert(cut_info.is_connector);
@@ -38,14 +70,18 @@ static void apply_tolerance(ModelVolume* vol)
         rot_norm.normalize();
 
     double z_offset = 0.5 * static_cast<double>(cut_info.height_tolerance);
-    if (cut_info.connector_type == CutConnectorType::Plug || 
-        cut_info.connector_type == CutConnectorType::Snap)
+    if (cut_info.connector_type == CutConnectorType::Plug || cut_info.connector_type == CutConnectorType::Snap)
         z_offset -= 0.05; // add small Z offset to better preview
 
     vol->set_offset(vol->get_offset() + rot_norm * z_offset);
 }
 
-static void add_cut_volume(TriangleMesh& mesh, ModelObject* object, const ModelVolume* src_volume, const Transform3d& cut_matrix, const std::string& suffix = {}, ModelVolumeType type = ModelVolumeType::MODEL_PART)
+static void add_cut_volume(TriangleMesh&      mesh,
+                           ModelObject*       object,
+                           const ModelVolume* src_volume,
+                           const Transform3d& cut_matrix,
+                           const std::string& suffix = {},
+                           ModelVolumeType    type   = ModelVolumeType::MODEL_PART)
 {
     if (mesh.empty())
         return;
@@ -63,13 +99,18 @@ static void add_cut_volume(TriangleMesh& mesh, ModelObject* object, const ModelV
     vol->cut_info = src_volume->cut_info;
 }
 
-static void process_volume_cut( ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix,
-                                ModelObjectCutAttributes attributes, TriangleMesh& upper_mesh, TriangleMesh& lower_mesh)
+static void process_volume_cut(ModelVolume*             volume,
+                               const Transform3d&       instance_matrix,
+                               const Transform3d&       cut_matrix,
+                               ModelObjectCutAttributes attributes,
+                               TriangleMesh&            upper_mesh,
+                               TriangleMesh&            lower_mesh)
 {
     const auto volume_matrix = volume->get_matrix();
 
     const Transformation cut_transformation = Transformation(cut_matrix);
-    const Transform3d invert_cut_matrix = cut_transformation.get_rotation_matrix().inverse() * translation_transform(-1 * cut_transformation.get_offset());
+    const Transform3d    invert_cut_matrix  = cut_transformation.get_rotation_matrix().inverse() *
+                                          translation_transform(-1 * cut_transformation.get_offset());
 
     // Transform the mesh by the combined transformation matrix.
     // Flip the triangles in case the composite transformation is left handed.
@@ -84,10 +125,20 @@ static void process_volume_cut( ModelVolume* volume, const Transform3d& instance
         lower_mesh = TriangleMesh(lower_its);
 }
 
-static void process_connector_cut(  ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix,
-                                    ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower,
-                                    std::vector<ModelObject*>& dowels)
+static void process_connector_cut(ModelVolume*               volume,
+                                  const Transform3d&         instance_matrix,
+                                  const Transform3d&         cut_matrix,
+                                  ModelObjectCutAttributes   attributes,
+                                  ModelObject*               upper,
+                                  ModelObject*               lower,
+                                  std::vector<ModelObject*>& dowels)
 {
+    // [INTENT] Route a connector volume to upper/lower objects or to the dowels list,
+    //          depending on its connector_type (Dowel / Plug / Snap / other).
+    //          Applies tolerance scaling and Z offset before adding to result objects.
+    // [HAZARD H1139 detail] Snap connector: mesh = its_make_cylinder(1.0, 1.0, PI/180.)
+    //   — radius=1mm, height=1mm, 360 facets.  No config path; changing snap size
+    //   requires source edit.
     assert(volume->cut_info.is_connector);
     volume->cut_info.set_processed();
 
@@ -106,9 +157,8 @@ static void process_connector_cut(  ModelVolume* volume, const Transform3d& inst
                 vol->set_type(ModelVolumeType::NEGATIVE_VOLUME);
 
                 vol->cut_info = volume->cut_info;
-                vol->name = volume->name;
-            }
-            else
+                vol->name     = volume->name;
+            } else
                 vol = upper->add_volume(*volume);
 
             vol->set_transformation(volume_matrix);
@@ -120,10 +170,9 @@ static void process_connector_cut(  ModelVolume* volume, const Transform3d& inst
             // for lower part change type of connector from NEGATIVE_VOLUME to MODEL_PART if this connector is a plug
             vol->set_type(ModelVolumeType::MODEL_PART);
         }
-    }
-    else {
+    } else {
         if (attributes.has(ModelObjectCutAttribute::CreateDowels)) {
-            ModelObject* dowel{ nullptr };
+            ModelObject* dowel{nullptr};
             // Clone the object to duplicate instances, materials etc.
             volume->get_object()->clone_for_cut(&dowel);
 
@@ -155,8 +204,12 @@ static void process_connector_cut(  ModelVolume* volume, const Transform3d& inst
     }
 }
 
-static void process_modifier_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& inverse_cut_matrix,
-                                 ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower)
+static void process_modifier_cut(ModelVolume*             volume,
+                                 const Transform3d&       instance_matrix,
+                                 const Transform3d&       inverse_cut_matrix,
+                                 ModelObjectCutAttributes attributes,
+                                 ModelObject*             upper,
+                                 ModelObject*             lower)
 {
     const auto volume_matrix = instance_matrix * volume->get_matrix();
 
@@ -170,7 +223,7 @@ static void process_modifier_cut(ModelVolume* volume, const Transform3d& instanc
     }
 
     // Some logic for the negative volumes/connectors. Add only needed modifiers
-    auto bb = volume->mesh().transformed_bounding_box(inverse_cut_matrix * volume_matrix);
+    auto bb                = volume->mesh().transformed_bounding_box(inverse_cut_matrix * volume_matrix);
     bool is_crossed_by_cut = bb.min[Z] <= 0 && bb.max[Z] >= 0;
     if (attributes.has(ModelObjectCutAttribute::KeepUpper) && (bb.min[Z] >= 0 || is_crossed_by_cut))
         upper->add_volume(*volume);
@@ -178,8 +231,12 @@ static void process_modifier_cut(ModelVolume* volume, const Transform3d& instanc
         lower->add_volume(*volume);
 }
 
-static void process_solid_part_cut(ModelVolume* volume, const Transform3d& instance_matrix, const Transform3d& cut_matrix,
-                            ModelObjectCutAttributes attributes, ModelObject* upper, ModelObject* lower)
+static void process_solid_part_cut(ModelVolume*             volume,
+                                   const Transform3d&       instance_matrix,
+                                   const Transform3d&       cut_matrix,
+                                   ModelObjectCutAttributes attributes,
+                                   ModelObject*             upper,
+                                   ModelObject*             lower)
 {
     // Perform cut
     TriangleMesh upper_mesh, lower_mesh;
@@ -203,16 +260,18 @@ static void process_solid_part_cut(ModelVolume* volume, const Transform3d& insta
         add_cut_volume(lower_mesh, lower, volume, cut_matrix);
 }
 
-static void reset_instance_transformation(ModelObject* object, size_t src_instance_idx, 
-                                          const Transform3d& cut_matrix = Transform3d::Identity(),
-                                          bool place_on_cut = false, bool flip = false)
+static void reset_instance_transformation(ModelObject*       object,
+                                          size_t             src_instance_idx,
+                                          const Transform3d& cut_matrix   = Transform3d::Identity(),
+                                          bool               place_on_cut = false,
+                                          bool               flip         = false)
 {
     // Reset instance transformation except offset and Z-rotation
 
     for (size_t i = 0; i < object->instances.size(); ++i) {
-        auto& obj_instance = object->instances[i];
-        const double rot_z = obj_instance->get_rotation().z();
-        
+        auto&        obj_instance = object->instances[i];
+        const double rot_z        = obj_instance->get_rotation().z();
+
         Transformation inst_trafo = Transformation(obj_instance->get_transformation().get_matrix_no_scaling_factor());
         // add respect to mirroring
         if (obj_instance->is_left_handed())
@@ -222,10 +281,9 @@ static void reset_instance_transformation(ModelObject* object, size_t src_instan
 
         Vec3d rotation = Vec3d::Zero();
         if (!flip && !place_on_cut) {
-            if ( i != src_instance_idx)
-            rotation[Z] = rot_z;
-        }
-        else {
+            if (i != src_instance_idx)
+                rotation[Z] = rot_z;
+        } else {
             Transform3d rotation_matrix = Transform3d::Identity();
             if (flip)
                 rotation_matrix = rotation_transform(PI * Vec3d::UnitX());
@@ -243,9 +301,11 @@ static void reset_instance_transformation(ModelObject* object, size_t src_instan
     }
 }
 
-
-Cut::Cut(const ModelObject* object, int instance, const Transform3d& cut_matrix,
-         ModelObjectCutAttributes attributes/*= ModelObjectCutAttribute::KeepUpper | ModelObjectCutAttribute::KeepLower | ModelObjectCutAttribute::KeepAsParts*/)
+Cut::Cut(const ModelObject* object,
+         int                instance,
+         const Transform3d& cut_matrix,
+         ModelObjectCutAttributes
+             attributes /*= ModelObjectCutAttribute::KeepUpper | ModelObjectCutAttribute::KeepLower | ModelObjectCutAttribute::KeepAsParts*/)
     : m_instance(instance), m_cut_matrix(cut_matrix), m_attributes(attributes)
 {
     m_model = Model();
@@ -255,42 +315,49 @@ Cut::Cut(const ModelObject* object, int instance, const Transform3d& cut_matrix,
 
 void Cut::post_process(ModelObject* object, ModelObjectPtrs& cut_object_ptrs, bool keep, bool place_on_cut, bool flip)
 {
-    if (!object) return;
+    if (!object)
+        return;
 
     if (keep && !object->volumes.empty()) {
         reset_instance_transformation(object, m_instance, m_cut_matrix, place_on_cut, flip);
         cut_object_ptrs.push_back(object);
-    }
-    else
+    } else
         m_model.objects.push_back(object); // will be deleted in m_model.clear_objects();
 }
 
 void Cut::post_process(ModelObject* upper, ModelObject* lower, ModelObjectPtrs& cut_object_ptrs)
 {
-    post_process(upper, cut_object_ptrs,
-        m_attributes.has(ModelObjectCutAttribute::KeepUpper),
-        m_attributes.has(ModelObjectCutAttribute::PlaceOnCutUpper),
-        m_attributes.has(ModelObjectCutAttribute::FlipUpper));
+    post_process(upper, cut_object_ptrs, m_attributes.has(ModelObjectCutAttribute::KeepUpper),
+                 m_attributes.has(ModelObjectCutAttribute::PlaceOnCutUpper), m_attributes.has(ModelObjectCutAttribute::FlipUpper));
 
-    post_process(lower, cut_object_ptrs,
-        m_attributes.has(ModelObjectCutAttribute::KeepLower),
-        m_attributes.has(ModelObjectCutAttribute::PlaceOnCutLower),
-        m_attributes.has(ModelObjectCutAttribute::PlaceOnCutLower) || m_attributes.has(ModelObjectCutAttribute::FlipLower));
+    // [HAZARD H1141] flip for lower is set to TRUE whenever PlaceOnCutLower is set,
+    // regardless of whether FlipLower is separately requested.  This means "place on
+    // cut surface" always implies "flip", which may or may not be intentional.  There
+    // is no comment explaining the design intent.  [UNCLEAR] — porting must preserve
+    // this exact semantic or verify intended behaviour with geometry tests.
+    post_process(lower, cut_object_ptrs, m_attributes.has(ModelObjectCutAttribute::KeepLower),
+                 m_attributes.has(ModelObjectCutAttribute::PlaceOnCutLower),
+                 m_attributes.has(ModelObjectCutAttribute::PlaceOnCutLower) || m_attributes.has(ModelObjectCutAttribute::FlipLower));
 }
-
 
 void Cut::finalize(const ModelObjectPtrs& objects)
 {
-    //clear model from temporarry objects
+    // clear model from temporarry objects
     m_model.clear_objects();
 
     // add to model result objects
     m_model.objects = objects;
 }
 
-
 const ModelObjectPtrs& Cut::perform_with_plane()
 {
+    // [INTENT] Primary cut entry point: bisects m_model.objects.front() by the plane
+    //          encoded in m_cut_matrix.  Distributes volumes to 'upper' and 'lower'
+    //          ModelObjects, processes connectors (Plug/Snap/Dowel), runs post_process
+    //          to set instance transformations, and returns the surviving objects via
+    //          finalize().
+    // [COUPLING] Calls process_solid_part_cut, process_connector_cut,
+    //            process_modifier_cut, post_process, finalize.
     if (!m_attributes.has(ModelObjectCutAttribute::KeepUpper) && !m_attributes.has(ModelObjectCutAttribute::KeepLower)) {
         m_model.clear_objects();
         return m_model.objects;
@@ -301,11 +368,11 @@ const ModelObjectPtrs& Cut::perform_with_plane()
     BOOST_LOG_TRIVIAL(trace) << "ModelObject::cut - start";
 
     // Clone the object to duplicate instances, materials etc.
-    ModelObject* upper{ nullptr };
+    ModelObject* upper{nullptr};
     if (m_attributes.has(ModelObjectCutAttribute::KeepUpper))
         mo->clone_for_cut(&upper);
 
-    ModelObject* lower{ nullptr };
+    ModelObject* lower{nullptr};
     if (m_attributes.has(ModelObjectCutAttribute::KeepLower) && !m_attributes.has(ModelObjectCutAttribute::KeepAsParts))
         mo->clone_for_cut(&lower);
 
@@ -316,9 +383,10 @@ const ModelObjectPtrs& Cut::perform_with_plane()
     // except for translation and Z-rotation on instances, which are preserved
     // in the transformation matrix and not applied to the mesh transform.
 
-    const auto              instance_matrix = mo->instances[m_instance]->get_transformation().get_matrix_no_offset();
-    const Transformation    cut_transformation = Transformation(m_cut_matrix);
-    const Transform3d       inverse_cut_matrix = cut_transformation.get_rotation_matrix().inverse() * translation_transform(-1. * cut_transformation.get_offset());
+    const auto           instance_matrix    = mo->instances[m_instance]->get_transformation().get_matrix_no_offset();
+    const Transformation cut_transformation = Transformation(m_cut_matrix);
+    const Transform3d    inverse_cut_matrix = cut_transformation.get_rotation_matrix().inverse() *
+                                           translation_transform(-1. * cut_transformation.get_offset());
 
     for (ModelVolume* volume : mo->volumes) {
         volume->reset_extra_facets();
@@ -328,8 +396,7 @@ const ModelObjectPtrs& Cut::perform_with_plane()
                 process_modifier_cut(volume, instance_matrix, inverse_cut_matrix, m_attributes, upper, lower);
             else
                 process_connector_cut(volume, instance_matrix, m_cut_matrix, m_attributes, upper, lower, dowels);
-        }
-        else if (!volume->mesh().empty())
+        } else if (!volume->mesh().empty())
             process_solid_part_cut(volume, instance_matrix, m_cut_matrix, m_attributes, upper, lower);
     }
 
@@ -346,17 +413,16 @@ const ModelObjectPtrs& Cut::perform_with_plane()
     if (m_attributes.has(ModelObjectCutAttribute::KeepAsParts) && !upper->volumes.empty()) {
         reset_instance_transformation(upper, m_instance, m_cut_matrix);
         cut_object_ptrs.push_back(upper);
-    }
-    else {
+    } else {
         // Delete all modifiers which are not intersecting with solid parts bounding box
         auto delete_extra_modifiers = [this](ModelObject* mo) {
-            if (!mo) return;
-            const BoundingBoxf3 obj_bb = mo->instance_bounding_box(m_instance);
-            const Transform3d inst_matrix = mo->instances[m_instance]->get_transformation().get_matrix();
+            if (!mo)
+                return;
+            const BoundingBoxf3 obj_bb      = mo->instance_bounding_box(m_instance);
+            const Transform3d   inst_matrix = mo->instances[m_instance]->get_transformation().get_matrix();
 
             for (int i = int(mo->volumes.size()) - 1; i >= 0; --i)
-                if (const ModelVolume* vol = mo->volumes[i];
-                    !vol->is_model_part() && !vol->is_cut_connector()) {
+                if (const ModelVolume* vol = mo->volumes[i]; !vol->is_model_part() && !vol->is_cut_connector()) {
                     auto bb = vol->mesh().transformed_bounding_box(inst_matrix * vol->get_matrix());
                     if (!obj_bb.intersects(bb))
                         mo->delete_volume(i);
@@ -385,8 +451,8 @@ const ModelObjectPtrs& Cut::perform_with_plane()
 
 static void distribute_modifiers_from_object(ModelObject* from_obj, const int instance_idx, ModelObject* to_obj1, ModelObject* to_obj2)
 {
-    auto              obj1_bb = to_obj1 ? to_obj1->instance_bounding_box(instance_idx) : BoundingBoxf3();
-    auto              obj2_bb = to_obj2 ? to_obj2->instance_bounding_box(instance_idx) : BoundingBoxf3();
+    auto              obj1_bb     = to_obj1 ? to_obj1->instance_bounding_box(instance_idx) : BoundingBoxf3();
+    auto              obj2_bb     = to_obj2 ? to_obj2->instance_bounding_box(instance_idx) : BoundingBoxf3();
     const Transform3d inst_matrix = from_obj->instances[instance_idx]->get_transformation().get_matrix();
 
     for (ModelVolume* vol : from_obj->volumes)
@@ -417,7 +483,7 @@ static void merge_solid_parts_inside_object(ModelObjectPtrs& objects)
         }
         if (!mesh.empty()) {
             ModelVolume* new_volume = mo->add_volume(mesh);
-            new_volume->name = mo->name;
+            new_volume->name        = mo->name;
             // Delete all merged SolidPart but not Connectors
             for (int i = int(mo->volumes.size()) - 2; i >= 0; --i) {
                 const ModelVolume* mv = mo->volumes[i];
@@ -430,16 +496,26 @@ static void merge_solid_parts_inside_object(ModelObjectPtrs& objects)
     }
 }
 
-
 const ModelObjectPtrs& Cut::perform_by_contour(std::vector<Part> parts, int dowels_count)
 {
+    // [INTENT] Distribute pre-segmented contour parts (each Part has a selected flag)
+    //          to upper/lower objects.  If connectors exist (volumes.size() > cut_parts_cnt),
+    //          delegates to perform_with_plane() to process connectors then copies the
+    //          resulting connector volumes into upper/lower.
+    // [HAZARD H1140 detail] When volumes.size() > cut_parts_cnt, raw pointer deletion
+    //   is performed manually: `delete *(volumes.begin()+id)` before `erase()`.
+    //   This is safe only if ModelVolumePtrs stores raw owning pointers (currently true).
+    //   Migration to std::unique_ptr would cause double-free here.
+    // [COUPLING] May recursively create a Cut and call perform_with_plane() internally.
     ModelObject* cut_mo = m_model.objects.front();
 
     // Clone the object to duplicate instances, materials etc.
-    ModelObject* upper{ nullptr };
-    if (m_attributes.has(ModelObjectCutAttribute::KeepUpper)) cut_mo->clone_for_cut(&upper);
-    ModelObject* lower{ nullptr };
-    if (m_attributes.has(ModelObjectCutAttribute::KeepLower)) cut_mo->clone_for_cut(&lower);
+    ModelObject* upper{nullptr};
+    if (m_attributes.has(ModelObjectCutAttribute::KeepUpper))
+        cut_mo->clone_for_cut(&upper);
+    ModelObject* lower{nullptr};
+    if (m_attributes.has(ModelObjectCutAttribute::KeepLower))
+        cut_mo->clone_for_cut(&lower);
 
     if (upper && lower) {
         upper->name = upper->name + "_A";
@@ -447,7 +523,7 @@ const ModelObjectPtrs& Cut::perform_by_contour(std::vector<Part> parts, int dowe
     }
 
     const size_t cut_parts_cnt = parts.size();
-    bool has_modifiers = false;
+    bool         has_modifiers = false;
 
     // Distribute SolidParts to the Upper/Lower object
     for (size_t id = 0; id < cut_parts_cnt; ++id) {
@@ -474,20 +550,19 @@ const ModelObjectPtrs& Cut::perform_by_contour(std::vector<Part> parts, int dowe
         // Now merge all model parts together:
         merge_solid_parts_inside_object(cut_object_ptrs);
 
-        // replace initial objects in model with cut object 
+        // replace initial objects in model with cut object
         finalize(cut_object_ptrs);
-    }
-    else if (volumes.size() > cut_parts_cnt) {
+    } else if (volumes.size() > cut_parts_cnt) {
         // Means that object is cut with connectors
 
         // All volumes are distributed to Upper / Lower object,
         // So we don’t need them anymore
         for (size_t id = 0; id < cut_parts_cnt; id++)
-            delete* (volumes.begin() + id);
+            delete *(volumes.begin() + id);
         volumes.erase(volumes.begin(), volumes.begin() + cut_parts_cnt);
 
         // Perform cut just to get connectors
-        Cut cut(cut_mo, m_instance, m_cut_matrix, m_attributes);
+        Cut                    cut(cut_mo, m_instance, m_cut_matrix, m_attributes);
         const ModelObjectPtrs& cut_connectors_obj = cut.perform_with_plane();
         assert(dowels_count > 0 ? cut_connectors_obj.size() >= 3 : cut_connectors_obj.size() == 2);
 
@@ -517,15 +592,27 @@ const ModelObjectPtrs& Cut::perform_by_contour(std::vector<Part> parts, int dowe
     return m_model.objects;
 }
 
-
-const ModelObjectPtrs& Cut::perform_with_groove(const Groove& groove, const Transform3d& rotation_m, bool keep_as_parts/* = false*/)
+const ModelObjectPtrs& Cut::perform_with_groove(const Groove& groove, const Transform3d& rotation_m, bool keep_as_parts /* = false*/)
 {
+    // [INTENT] Produce a tongue-and-groove joint by running 7 sequential planar cuts:
+    //   1. upper plane cut  (keep lower, extract upper cap)
+    //   2. lower plane cut  (keep upper, extract lower cap)
+    //   3. angle1 cut       (lateral flap)
+    //   4. angle2 cut       (other lateral flap)
+    //   5-7. tolerance cuts (3 planes with depth_tolerance / width_tolerance offsets)
+    // Each cut calls perform_with_plane() internally via the lambda `cut`.
+    // [STATE] tmp_model_for_cut and tmp_model hold intermediate results; both are
+    //         stack-allocated and cleared between cuts.  7 full mesh-clip passes for
+    //         every groove operation — O(7 * cut_mesh cost).
+    // [COUPLING] Uses perform_with_plane() recursively 7 times; groove geometry
+    //            parameters (depth, width, flaps_angle, angle, tolerances) are all
+    //            caller-supplied via the Groove struct.
     ModelObject* cut_mo = m_model.objects.front();
 
     // Clone the object to duplicate instances, materials etc.
-    ModelObject* upper{ nullptr };
+    ModelObject* upper{nullptr};
     cut_mo->clone_for_cut(&upper);
-    ModelObject* lower{ nullptr };
+    ModelObject* lower{nullptr};
     cut_mo->clone_for_cut(&lower);
 
     if (upper && lower) {
@@ -552,8 +639,8 @@ const ModelObjectPtrs& Cut::perform_with_groove(const Groove& groove, const Tran
             }
     };
 
-    auto cut = [this, add_volumes_from_cut]
-                (ModelObject* object, const Transform3d& cut_matrix, const ModelObjectCutAttribute add_volumes_attribute, Model& tmp_model_for_cut) {
+    auto cut = [this, add_volumes_from_cut](ModelObject* object, const Transform3d& cut_matrix,
+                                            const ModelObjectCutAttribute add_volumes_attribute, Model& tmp_model_for_cut) {
         Cut cut(object, m_instance, cut_matrix);
 
         tmp_model_for_cut = Model();
@@ -587,7 +674,8 @@ const ModelObjectPtrs& Cut::perform_with_groove(const Groove& groove, const Tran
 
     // cut by angle1 plane
     {
-        const Transform3d cut_matrix_angle1 = translation_transform(rotation_m * (-h_side_shift * Vec3d::UnitX())) * m_cut_matrix * rotation_transform(Vec3d(0, -groove.flaps_angle, -groove.angle));
+        const Transform3d cut_matrix_angle1 = translation_transform(rotation_m * (-h_side_shift * Vec3d::UnitX())) * m_cut_matrix *
+                                              rotation_transform(Vec3d(0, -groove.flaps_angle, -groove.angle));
 
         cut(tmp_object, cut_matrix_angle1, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut);
         add_volumes_from_cut(lower, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
@@ -595,7 +683,8 @@ const ModelObjectPtrs& Cut::perform_with_groove(const Groove& groove, const Tran
 
     // cut by angle2 plane
     {
-        const Transform3d cut_matrix_angle2 = translation_transform(rotation_m * (h_side_shift * Vec3d::UnitX())) * m_cut_matrix * rotation_transform(Vec3d(0, groove.flaps_angle, groove.angle));
+        const Transform3d cut_matrix_angle2 = translation_transform(rotation_m * (h_side_shift * Vec3d::UnitX())) * m_cut_matrix *
+                                              rotation_transform(Vec3d(0, groove.flaps_angle, groove.angle));
 
         cut(tmp_object, cut_matrix_angle2, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut);
         add_volumes_from_cut(lower, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
@@ -603,17 +692,20 @@ const ModelObjectPtrs& Cut::perform_with_groove(const Groove& groove, const Tran
 
     // apply tolerance to the middle part
     {
-        const double h_groove_shift_tolerance = groove_half_depth - (double)groove.depth_tolerance;
+        const double h_groove_shift_tolerance = groove_half_depth - (double) groove.depth_tolerance;
 
-        const Transform3d cut_matrix_lower_tolerance = translation_transform(rotation_m * (-h_groove_shift_tolerance * Vec3d::UnitZ())) * m_cut_matrix;
+        const Transform3d cut_matrix_lower_tolerance = translation_transform(rotation_m * (-h_groove_shift_tolerance * Vec3d::UnitZ())) *
+                                                       m_cut_matrix;
         cut(tmp_object, cut_matrix_lower_tolerance, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
 
         const double h_side_shift_tolerance = h_side_shift - 0.5 * double(groove.width_tolerance);
 
-        const Transform3d cut_matrix_angle1_tolerance = translation_transform(rotation_m * (-h_side_shift_tolerance * Vec3d::UnitX())) * m_cut_matrix * rotation_transform(Vec3d(0, -groove.flaps_angle, -groove.angle));
+        const Transform3d cut_matrix_angle1_tolerance = translation_transform(rotation_m * (-h_side_shift_tolerance * Vec3d::UnitX())) *
+                                                        m_cut_matrix * rotation_transform(Vec3d(0, -groove.flaps_angle, -groove.angle));
         cut(tmp_object, cut_matrix_angle1_tolerance, ModelObjectCutAttribute::KeepLower, tmp_model_for_cut);
 
-        const Transform3d cut_matrix_angle2_tolerance = translation_transform(rotation_m * (h_side_shift_tolerance * Vec3d::UnitX())) * m_cut_matrix * rotation_transform(Vec3d(0, groove.flaps_angle, groove.angle));
+        const Transform3d cut_matrix_angle2_tolerance = translation_transform(rotation_m * (h_side_shift_tolerance * Vec3d::UnitX())) *
+                                                        m_cut_matrix * rotation_transform(Vec3d(0, groove.flaps_angle, groove.angle));
         cut(tmp_object, cut_matrix_angle2_tolerance, ModelObjectCutAttribute::KeepUpper, tmp_model_for_cut);
     }
 
@@ -626,7 +718,7 @@ const ModelObjectPtrs& Cut::perform_with_groove(const Groove& groove, const Tran
         // add volumes from lower object to the upper, but mark them as a lower
         const auto& volumes = lower->volumes;
         for (const ModelVolume* volume : volumes) {
-            ModelVolume* new_vol = upper->add_volume(*volume);
+            ModelVolume* new_vol            = upper->add_volume(*volume);
             new_vol->cut_info.is_from_upper = false;
         }
 
@@ -639,8 +731,7 @@ const ModelObjectPtrs& Cut::perform_with_groove(const Groove& groove, const Tran
 
         // add lower object to the cut_object_ptrs just to correct delete it from the Model destructor and avoid memory leaks
         cut_object_ptrs.push_back(lower);
-    }
-    else {
+    } else {
         // add modifiers if object has any
         for (const ModelVolume* volume : cut_mo->volumes)
             if (!volume->is_model_part()) {
@@ -664,4 +755,3 @@ const ModelObjectPtrs& Cut::perform_with_groove(const Groove& groove, const Tran
 }
 
 } // namespace Slic3r
-

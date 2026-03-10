@@ -5739,4 +5739,161 @@ H1130
 
 ---
 
+## Session 82 — ExtrusionSimulator.cpp, QuadricEdgeCollapse.cpp, utils.cpp, CutUtils.cpp
+
+### Files Processed
+- `src/libslic3r/ExtrusionSimulator.cpp` (1030 lines)
+- `src/libslic3r/QuadricEdgeCollapse.cpp` (995 lines)
+- `src/libslic3r/utils.cpp` (1738 lines)
+- `src/libslic3r/CutUtils.cpp` (752 lines)
+
+### Key Discoveries
+
+**ExtrusionSimulator.cpp:**
+- Pixel rasterizer for visual extrusion width simulation. Uses Boost.Geometry exclusively — the only production file in libslic3r using Boost.Geometry as its primary data model.
+- `gcode_paint_layer()`: Sutherland-Hodgman clips extrusion rectangles against pixel cells. Reads `path.height` then overrides it with hardcoded `0.5f`.
+- `gcode_spread_points()`: two spread modes (SpreadFull/SpreadExcess); contains large `#if 0` dead block (span-based circle fill).
+- `evaluate_accumulator()`: `#if 1 / #else` — else branch permanently dead.
+- `set_image_size()`: fills image with red vertical stripes via `//FIXME` — debug leftover.
+
+**QuadricEdgeCollapse.cpp:**
+- Garland-Heckbert 1997 QEM mesh decimation. Operates on `indexed_triangle_set`.
+- `TriangleInfo::is_deleted()` / `set_deleted()`: encodes deletion via `n.x() > 2.f` — same normal-field aliasing as TriangleSelector.cpp H1103.
+- `change_neighbors()`: most complex function — in-place recompaction of `e_infos` array. No invariant assertions.
+- TBB parallel_for in `init()` (normals + errors phases); main collapse loop uses MutablePriorityQueue.
+
+**utils.cpp:**
+- Platform utility layer: logging, file I/O, path helpers, UTF-8, TBB thread count.
+- Windows `copy_file()` error path: `"Error: " + errCode` where errCode is DWORD — produces garbage single char, not numeric error.
+- `normalize_utf8_nfc()`: static local `std::locale` — C++11 thread-safe guard but Boost locale generator / ICU reentrance risk.
+- `xml_escape()`: O(n²) for strings with many escapes.
+- `disable_multi_threading()`: supports both TBB ≥2021 `global_control` and old `task_scheduler_init(1)` via compile-time version check.
+
+**CutUtils.cpp:**
+- `Cut` class encapsulates planar model cuts. Entry points: `perform_with_plane()`, `perform_by_contour()`, `perform_with_groove()`.
+- `perform_with_groove()`: 7 sequential `cut_mesh()` calls for tongue-and-groove joint.
+- `apply_tolerance()`: magic `-0.05` Z offset for Plug/Snap connectors — undocumented.
+- `process_connector_cut()`: Snap cylinders use hardcoded `its_make_cylinder(1.0, 1.0, PI/180.)`.
+- `perform_by_contour()`: raw `delete ptr` before `erase()` — exception-unsafe.
+- `post_process()`: PlaceOnCutLower alone implies flip=true — intent unclear.
+
+### Tags Injected
+- File-level headers with `[INTENT]`, `[STATE]`, `[COUPLING]`, `[CONCURRENCY]`, hazard overview blocks
+- Function-level `[INTENT]`, `[STATE]`, `[HAZARD]`, `[COUPLING]` on all significant functions
+
+### Hazards (Session 82)
+
+| ID | Priority | Description |
+|----|----------|-------------|
+| H1130 | P2/Medium | `gcode_paint_layer()` overrides `path.height` with hardcoded 0.5f; actual layer height ignored. |
+| H1131 | P3/Low | `set_image_size()` fills image with red vertical stripes — debug FIXME leftover. |
+| H1132 | P3/Low | Dead `#if 0` span-circle block in `gcode_spread_points()`; dead `#else` in `evaluate_accumulator()`. |
+| H1133 | P3/Low | ExtrusionSimulator.cpp is the only libslic3r file using Boost.Geometry as its primary data model. |
+| H1134 | P1/High | `TriangleInfo::is_deleted()` encodes deletion via `n.x() > 2.f` — normal-field aliasing. |
+| H1135 | P1/High | `change_neighbors()` complex recompaction — no invariant assertions; subtle index arithmetic. |
+| H1136 | P2/Medium | Windows `copy_file()` DWORD error string concat produces garbage char, not numeric code. |
+| H1137 | P3/Low | `normalize_utf8_nfc()` static locale: C++11-safe but Boost/ICU reentrance risk on some platforms. |
+| H1138 | P2/Medium | `apply_tolerance()` magic -0.05mm Z offset for Plug/Snap — undocumented. |
+| H1139 | P3/Low | Snap connector `its_make_cylinder(1.0, 1.0, PI/180.)` — all three params hardcoded magic. |
+| H1140 | P2/Medium | `perform_by_contour()` manual `delete ptr` before `erase()` — exception-unsafe. |
+| H1141 | P3/Low | `post_process()` PlaceOnCutLower alone implies flip=true — intent undocumented [UNCLEAR]. |
+
+### Next Hazard Number
+H1142
+
+### Files Committed (this session)
+- `src/libslic3r/ExtrusionSimulator.cpp`
+- `src/libslic3r/QuadricEdgeCollapse.cpp`
+- `src/libslic3r/utils.cpp`
+- `src/libslic3r/CutUtils.cpp`
+- `generated_documentation/agent_journal.md`
+- `generated_documentation/04_refactoring_hazards.md`
+
+---
+
+## Session 83 — MutablePolygon.cpp, Triangulation.cpp, FlushVolPredictor.cpp, FilamentGroupUtils.cpp, Clipper2Utils.cpp, ModelArrange.cpp
+
+### Files Processed
+- `src/libslic3r/MutablePolygon.cpp` (387 lines)
+- `src/libslic3r/Triangulation.cpp` (329 lines)
+- `src/libslic3r/FlushVolPredictor.cpp` (343 lines)
+- `src/libslic3r/FilamentGroupUtils.cpp` (277 lines)
+- `src/libslic3r/Clipper2Utils.cpp` (215 lines)
+- `src/libslic3r/ModelArrange.cpp` (185 lines)
+
+### Key Discoveries
+
+**MutablePolygon.cpp:**
+- Three `remove_duplicates()` overloads: exact, epsilon-distance, and angle-constrained (used as pre-pass by Arachne).
+- `clip_narrow_corner()`: Cura port (Tim Kuipers); walks forward/backward from a removed concave corner to close narrow cracks. Status state machine: Free/Blocked/Far. Contains `//FIXME` on diagonal-choice heuristic.
+- `smooth_outward()`: main entry point; visits each source vertex once via MutablePolygon::range. Three cases: sharp concave (narrow crack → `clip_narrow_corner`), acute concave (bisector clip or partial arm clip), and degenerate final triangle check.
+- No new P1/P2 hazards; entirely algorithm-in-the-clear with adequate existing comments.
+
+**Triangulation.cpp:**
+- CGAL CDT wrapper. All precondition checks (sorted edges, no duplicates, bidirectional pairs, unique points, no self-intersections) are `assert()`-only — stripped in release.
+- Flood-fill interior classification from inside seed faces; inside() predicate may misclassify on non-manifold input.
+- ExPolygons overload handles duplicate points via `create_changes()` + reverse-map; "last-writer-wins" for reverse-map.
+- `VISUALIZE_TRIANGULATION` ifdef: hardcoded Windows absolute paths.
+
+**FlushVolPredictor.cpp:**
+- Three layers: color utilities (RGB2LAB + CIEDE2000), `FlushVolPredictor` class (loads flush data file, looks up by closest color), `GenericFlushPredictor` facade (static instance map per dataset_value).
+- `predictor_instances` static map: unprotected lazy init — same data-race pattern as H1109/H1102.
+- `predict()` linear scan: returns first color within threshold (not nearest neighbor) — match order is file-load-order dependent.
+- CIEDE2000 formula fully implemented including RT rotational term; K_L=K_C=K_H=1.0 (standard).
+
+**FilamentGroupUtils.cpp:**
+- Utilities for dual-extruder filament group assignment. All functions hardcode group count = 2 in four separate sites.
+- `build_full_machine_filaments()`: detects external tray by `tray_name == "Ext"` (hardcoded sentinel string).
+- `calc_max_group_size()`: `// TODO: add explanation` — formula undocumented.
+- `collect_unprintable_limits()` / `extract_unprintable_limit_indices()`: removes intersection (filaments printable on neither extruder) before building limit maps.
+
+**Clipper2Utils.cpp:**
+- Clipper2 adapter layer parallel to ClipperUtils.cpp (Clipper1). Both coexist.
+- `//BBS: FIXME` on conversion functions; spurious `std::move` on trivially-copyable types.
+- `PolyTreeToExPolygons()`: recursive helper — unbounded recursion depth for deeply nested geometry.
+- `offset2_ex_2()`: intermediate `SimplifyPolyTree(SCALED_EPSILON)` — threshold too small to have practical effect.
+
+**ModelArrange.cpp:**
+- Bridge between Model and libarrange. Rich `get_instance_arrange_poly()` gathers bed/nozzle/vitrification temps, brim width, tree-support extent.
+- `get_arrange_poly(const Model&)`: accumulator polygon re-rotated/re-translated in each loop iteration — likely produces incorrect convex hull (H1152).
+- `ap.brim_width = 24.0` hardcoded magic (not derived from `MAX_BRANCH_RADIUS_FIRST_LAYER` constant).
+- `ap.extrude_ids.front()` called 6 times with no non-empty guard — UB if unassigned.
+
+### Tags Injected
+- File-level headers: `[INTENT]`, `[STATE]`, `[COUPLING]`, `[CONCURRENCY]`, hazard summaries
+- Key functions: `[INTENT]`, `[STATE]`, `[HAZARD]`, `[COUPLING]`, `[UNCLEAR]` where appropriate
+
+### Hazards (Session 83)
+
+| ID | Priority | Description |
+|----|----------|-------------|
+| H1142 | P1/High | `Triangulation::triangulate()` core: all precondition checks are assert-only (stripped in release); CGAL behavior on violations is undefined. |
+| H1143 | P3/Low | `VISUALIZE_TRIANGULATION` ifdef contains hardcoded Windows absolute paths — not portable. |
+| H1144 | P1/High | `predictor_instances` static map in FlushVolPredictor.cpp: lazy init without mutex — same data-race pattern as H1109/H1102. |
+| H1145 | P3/Low | `FlushVolPredictor::predict()` returns first color within threshold, not nearest — match is file-order dependent. |
+| H1146 | P2/Medium | FilamentGroupUtils.cpp: extruder group count hardcoded as 2 in four separate sites — no named constant. |
+| H1147 | P2/Medium | `build_full_machine_filaments()`: external tray detected by `tray_name == "Ext"` hardcoded string sentinel. |
+| H1148 | P3/Low | `calc_max_group_size()` has `// TODO: add explanation` — formula semantics undocumented. |
+| H1149 | P3/Low | Clipper2Utils.cpp: spurious `std::move` on trivially-copyable types; `//BBS: FIXME` comments on conversion functions. |
+| H1150 | P2/Medium | `PolyTreeToExPolygons()` recursive helper — unbounded recursion depth; stack overflow on deeply nested geometry. |
+| H1151 | P3/Low | `offset2_ex_2()` intermediate `SimplifyPolyTree(SCALED_EPSILON)` — threshold too small to have practical effect; intent unclear. |
+| H1152 | P1/High | `get_arrange_poly(const Model&)` re-rotates accumulator polygon in each iteration instead of transforming per-instance copy — likely incorrect convex hull. |
+| H1153 | P2/Medium | `get_instance_arrange_poly()`: `ap.brim_width = 24.0` magic constant — not derived from TreeSupport constant; will silently desync. |
+| H1154 | P1/High | `get_instance_arrange_poly()`: `ap.extrude_ids.front()` called 6× with no non-empty guard — UB for unassigned instances. |
+
+### Next Hazard Number
+H1155
+
+### Files Committed (this session)
+- `src/libslic3r/MutablePolygon.cpp`
+- `src/libslic3r/Triangulation.cpp`
+- `src/libslic3r/FlushVolPredictor.cpp`
+- `src/libslic3r/FilamentGroupUtils.cpp`
+- `src/libslic3r/Clipper2Utils.cpp`
+- `src/libslic3r/ModelArrange.cpp`
+- `generated_documentation/agent_journal.md`
+- `generated_documentation/04_refactoring_hazards.md`
+
+---
+
 
