@@ -507,7 +507,7 @@ Last updated: 2026-03-10T00:00:00Z
             escalated with no resolutions, that is a signal the task was not
             genuinely attempted — do not mark T300 done.
             Commit with prefix `annotate:`.
-- [ ] T301  Verify all documentation file code links are correct.
+- [x] T301  Verify all documentation file code links are correct.
             Spot-checking is NOT acceptable. This task requires systematic
             verification of every file:line reference in every .md file
             under /generated_documentation/.
