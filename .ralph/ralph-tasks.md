@@ -440,7 +440,7 @@ its header to understand the data contract.)
              Same verification rule as T4010.
              Commit: `annotate: OBJ parser (T4011)`
 
-- [ ] T4012  annotate+verify: src/libslic3r/Format/AMF.cpp
+- [x] T4012  annotate+verify: src/libslic3r/Format/AMF.cpp
                             + src/libslic3r/Format/AMF.hpp
              Context: AMF (Additive Manufacturing Format) XML parser via expat.
              AMF supports material assignment inline — document how this maps to
