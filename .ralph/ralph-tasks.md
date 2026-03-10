@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer Analysis Agent
-Last updated: 2026-03-10T23:06:00Z
+Last updated: 2026-03-11T00:10:00Z
 
 ## Legend
 - [ ] PENDING   — not started
@@ -448,7 +448,7 @@ its header to understand the data contract.)
              Same verification rule as T4010.
              Commit: `annotate: AMF parser (T4012)`
 
-- [ ] T4013  annotate+verify: src/libslic3r/Format/3mf.cpp
+- [x] T4013  annotate+verify: src/libslic3r/Format/3mf.cpp
                             + src/libslic3r/Format/3mf.hpp
              Context: Base 3MF ZIP+XML parser (OPC/3MF spec). Document the
              relationship between this base implementation and bbs_3mf (T4014).

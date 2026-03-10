@@ -425,7 +425,9 @@ ModelVolumeType type_from_string(const std::string &s)
     return ModelVolumeType::MODEL_PART;
 }
 
-    // Base class with error messages management
+    // [INTENT] Shared importer/exporter base for accumulating recoverable diagnostics while keeping the
+    //          public `load_3mf()` / `store_3mf()` signature boolean-based.
+    // [STATE] Errors are buffered here and logged after the top-level operation completes.
     class _3MF_Base
     {
         std::vector<std::string> m_errors;
@@ -442,6 +444,14 @@ ModelVolumeType type_from_string(const std::string &s)
         }
     };
 
+    // [INTENT] Streaming XML/ZIP importer that reconstructs `Model`, `ModelObject`, `ModelVolume`, and
+    //          instance state from the 3MF core model plus Prusa sidecar metadata.
+    // [STATE] Parsing is staged: geometry is collected first from `3D/*.model`, then model/volume metadata is
+    //         applied from `Metadata/Slic3r_PE_model.config`.
+    // [MEMORY] Owns one expat parser handle at a time and stores temporary geometry / metadata maps until the
+    //          final `Model` graph can be assembled.
+    // [COUPLING] Hard-coupled to `Model`, `ModelObject`, `ModelVolume`, `ModelInstance`, SLA sidecar structs,
+    //            and `DynamicPrintConfig`; it is not a format-only parser.
     class _3MF_Importer : public _3MF_Base
     {
         struct Component
@@ -732,6 +742,8 @@ ModelVolumeType type_from_string(const std::string &s)
 
     bool _3MF_Importer::load_model_from_file(const std::string& filename, Model& model, DynamicPrintConfig& config, ConfigSubstitutionContext& config_substitutions, bool check_version)
     {
+        // [STATE] Importer instances are reusable, so every load must clear prior parser state before touching
+        //         the destination `Model`.
         m_version = 0;
         m_fdm_supports_painting_version = 0;
         m_seam_painting_version = 0;
@@ -1010,6 +1022,12 @@ ModelVolumeType type_from_string(const std::string &s)
 
     bool _3MF_Importer::_extract_model_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat)
     {
+        // [INTENT] Stream the main `3D/*.model` XML directly from the ZIP entry into expat so large model files
+        //          do not require a second full decompressed buffer.
+        // [MEMORY] `mz_zip_reader_extract_file_to_callback()` feeds compressed chunks into expat incrementally;
+        //          geometry vectors grow as XML callbacks fire.
+        // [HAZARD] The callback throws C++ exceptions through miniz/expat callback boundaries; this works here,
+        //          but is a fragile portability assumption for any non-C++ rewrite.
         if (stat.m_uncomp_size == 0) {
             add_error("Found invalid size");
             return false;
@@ -1383,6 +1401,10 @@ ModelVolumeType type_from_string(const std::string &s)
 
     bool _3MF_Importer::_extract_model_config_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, Model& model)
     {
+        // [INTENT] Parse the Prusa sidecar XML that maps the flat indexed triangle set back onto OrcaSlicer
+        //          concepts such as per-volume configs, source file provenance, and mesh repair stats.
+        // [COUPLING] The geometry XML alone is insufficient for round-tripping; this sidecar is what reconnects
+        //            triangle ranges to `ModelVolume` boundaries and config overrides.
         if (stat.m_uncomp_size == 0) {
             add_error("Found invalid size");
             return false;
@@ -1657,6 +1679,8 @@ ModelVolumeType type_from_string(const std::string &s)
 
     bool _3MF_Importer::_handle_start_object(const char** attributes, unsigned int num_attributes)
     {
+        // [INTENT] Start a new 3MF resource object as a provisional `ModelObject`; if later callbacks reveal
+        //          that it only aliases another object via `<components>`, the provisional object is discarded.
         // reset current data
         m_curr_object.reset();
 
@@ -1682,6 +1706,10 @@ ModelVolumeType type_from_string(const std::string &s)
 
     bool _3MF_Importer::_handle_end_object()
     {
+        // [INTENT] Finalize the current resource object by classifying it as either concrete geometry or an
+        //          alias/component node for later instance expansion.
+        // [STATE] Populates either `m_geometries` + `m_objects` or `m_objects_aliases`; the actual build items are
+        //         materialized later from `<build><item>` entries.
         if (m_curr_object.object != nullptr) {
             if (m_curr_object.geometry.empty()) {
                 // no geometry defined
@@ -1858,6 +1886,8 @@ ModelVolumeType type_from_string(const std::string &s)
 
     bool _3MF_Importer::_handle_start_item(const char** attributes, unsigned int num_attributes)
     {
+        // [INTENT] `<build><item>` is where a resource object becomes printable scene content; it references an
+        //          object graph root plus the transform/printable flags for one placed instance.
         // we are ignoring the following attributes
         // thumbnail
         // partnumber
@@ -1929,6 +1959,12 @@ ModelVolumeType type_from_string(const std::string &s)
 
     bool _3MF_Importer::_create_object_instance(int object_id, const Transform3d& transform, const bool printable, unsigned int recur_counter)
     {
+        // [INTENT] Resolve 3MF component alias graphs into concrete `ModelInstance` records, composing nested
+        //          transforms on the way down until a geometry-bearing object is reached.
+        // [STATE] Appends unresolved transforms into `m_instances`; `_apply_transform()` commits them after all
+        //         referenced objects have been created.
+        // [HAZARD] Recursion depth is capped heuristically at 10 to break circular component graphs; malformed or
+        //          deeply nested but valid files may be rejected by policy rather than by schema.
         static const unsigned int MAX_RECURSIONS = 10;
 
         // escape from circular aliasing
@@ -1975,6 +2011,10 @@ ModelVolumeType type_from_string(const std::string &s)
 
     void _3MF_Importer::_apply_transform(ModelInstance& instance, const Transform3d& transform)
     {
+        // [INTENT] Convert the raw Eigen matrix parsed from 3MF into OrcaSlicer's higher-level
+        //          `Geometry::Transformation` wrapper, which validates scale and stores decomposed transform state.
+        // [HAZARD] Non-finite / zero scaling matrices are silently ignored here, leaving the instance at its
+        //          previous transform instead of surfacing a hard parse error.
         Slic3r::Geometry::Transformation t(transform);
         // invalid scale value, return
         if (!t.get_scaling_factor().all())
@@ -2127,6 +2167,12 @@ ModelVolumeType type_from_string(const std::string &s)
 
     bool _3MF_Importer::_generate_volumes(ModelObject& object, const Geometry& geometry, const ObjectMetadata::VolumeMetadataList& volumes, ConfigSubstitutionContext& config_substitutions)
     {
+        // [INTENT] Re-slice the single 3MF indexed triangle set back into OrcaSlicer `ModelVolume` objects using
+        //          triangle index ranges recorded in `MODEL_CONFIG_FILE`.
+        // [COUPLING] This is the key bridge between standards-compliant 3MF geometry and OrcaSlicer's richer
+        //            internal scene graph; without the sidecar metadata all volumes collapse into one mesh.
+        // [MEMORY] Builds a fresh `indexed_triangle_set` per volume by copying triangle spans and the referenced
+        //          vertex window, then hands ownership to `ModelVolume` mesh storage.
         if (!object.volumes.empty()) {
             add_error("Found invalid volumes count");
             return false;
@@ -2308,6 +2354,12 @@ ModelVolumeType type_from_string(const std::string &s)
             importer->_handle_end_config_xml_element(name);
     }
 
+    // [INTENT] Serialize OrcaSlicer's scene graph into the baseline Prusa-compatible 3MF package: one core model
+    //          XML stream plus sidecar metadata/config files inside a ZIP container.
+    // [STATE] Collapses each `ModelObject` into a single 3MF resource mesh and records per-volume offsets so the
+    //         importer can later reconstruct `ModelVolume` boundaries.
+    // [COUPLING] Shares the same metadata schema as `_3MF_Importer`; any field added on one side must be mirrored
+    //            on the other or round-trips lose information.
     class _3MF_Exporter : public _3MF_Base
     {
         struct BuildItem
@@ -2574,6 +2626,10 @@ ModelVolumeType type_from_string(const std::string &s)
 
     bool _3MF_Exporter::_add_model_file_to_archive(const std::string& filename, mz_zip_archive& archive, const Model& model, IdToObjectDataMap& objects_data)
     {
+        // [INTENT] Emit the canonical `3D/3dmodel.model` entry, which contains all printable geometry and build
+        //          transforms in the part of the 3MF package that other tools can understand without Prusa sidecars.
+        // [HAZARD] ZIP64 is toggled here as an interoperability trade-off: large archives need it, but some legacy
+        //          consumers only understand classic ZIP limits.
         mz_zip_writer_staged_context context;
         if (!mz_zip_writer_add_staged_open(&archive, &context, MODEL_FILE.c_str(),
             m_zip64 ?
@@ -2738,6 +2794,11 @@ ModelVolumeType type_from_string(const std::string &s)
 
     bool _3MF_Exporter::_add_mesh_to_object_stream(mz_zip_writer_staged_context &context, ModelObject& object, VolumeToOffsetsMap& volumes_offsets)
     {
+        // [INTENT] Flatten every volume mesh of one `ModelObject` into a single 3MF mesh resource while tracking
+        //          triangle offsets so `MODEL_CONFIG_FILE` can reconstruct volume boundaries later.
+        // [STATE] Applies each volume's local matrix on export; the inverse bookkeeping is persisted separately in
+        //         volume metadata rather than in the core 3MF mesh.
+        // [MEMORY] Uses a manually flushed string buffer to avoid building one giant XML string for large models.
         std::string output_buffer;
         output_buffer += "   <";
         output_buffer += MESH_TAG;
@@ -3139,6 +3200,11 @@ ModelVolumeType type_from_string(const std::string &s)
 
     bool _3MF_Exporter::_add_model_config_file_to_archive(mz_zip_archive& archive, const Model& model, const IdToObjectDataMap &objects_data)
     {
+        // [INTENT] Write Prusa's sidecar model config file, which preserves OrcaSlicer-only structure that the
+        //          core 3MF mesh cannot express: per-object config, per-volume config, source provenance, and
+        //          triangle-span ownership.
+        // [COUPLING] Import reconstruction depends on these exact metadata keys (`matrix`, `volume_type`, source
+        //            fields, mesh stats). Renaming or dropping one silently changes import semantics.
         std::stringstream stream;
         // Store mesh transformation in full precision, as the volumes are stored transformed and they need to be transformed back
         // when loaded as accurately as possible.
@@ -3248,6 +3314,10 @@ ModelVolumeType type_from_string(const std::string &s)
         return true;
     }
 
+// [INTENT] Placeholder for a Prusa custom-G-code sidecar that OrcaSlicer no longer writes from the baseline
+//          3MF path.
+// [HAZARD] The unconditional `return true` means exports appear successful even though per-height custom G-code
+//          is dropped on the floor unless the Bambu-specific exporter handles it elsewhere.
 bool _3MF_Exporter::_add_custom_gcode_per_print_z_file_to_archive( mz_zip_archive& archive, Model& model, const DynamicPrintConfig* config)
 {
     return true;
