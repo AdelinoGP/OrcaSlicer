@@ -1123,6 +1123,8 @@ FillLightning::GeneratorPtr PrintObject::prepare_lightning_infill_data()
 // since shared objects must not own or delete layers — the primary owns them.
 // [MEMORY] Raw-pointer ownership: caller is responsible for not retaining dangling pointers
 // to freed layers after this call.
+// [RESOLVED Q2] Layer* ownership confirmed: m_layers uses raw pointers (LayerPtrs = vector<Layer*>).
+// Manual deletion via this function. No unique_ptr. See agent_journal.md Q2 and Hazard H352.
 void PrintObject::clear_layers()
 {
     if (!m_shared_object) {

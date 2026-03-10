@@ -40,7 +40,7 @@ Last updated: 2026-03-09T00:00:00Z
              Do not paraphrase existing entries — extract directly.
              Commit with prefix `docs:`.
 
-- [ ] TB004b  BOOTSTRAP · Audit `04_refactoring_hazards.md` for misplaced content:
+- [x] TB004b  BOOTSTRAP · Audit `04_refactoring_hazards.md` for misplaced content:
               find any multi-paragraph algorithm explanations that duplicate
               `03_algorithmic_complexities.md` and replace them with a single
               cross-reference line pointing to the relevant section of that file.

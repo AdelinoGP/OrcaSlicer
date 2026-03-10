@@ -32,6 +32,11 @@ static std::atomic<std::uint32_t> g_dbg_id = 0;
 // source-path points (Z >= 0, sequential index) and intersection points (Z < 0).
 // Uses the maximum value of ClipperLib_Z::cInt so it cannot collide with any
 // negative intersection encoding or valid non-negative source index.
+// [RESOLVED Q4] ClipperZUtils Z-metadata purpose: encodes intersection provenance.
+// Points with Z >= 0 && Z != CLIP_IDX originated from the source path;
+// points with Z == CLIP_IDX originated from the clip polygon. This lets LineSplit
+// reconstruct which segments are inside vs outside the clipping boundary after
+// the boolean operation. See agent_journal.md Q4.
 // [HAZARD H658] CLIP_IDX == numeric_limits<cInt>::max(). If a source path ever has
 // exactly max(cInt) points, the last point's Z index would equal CLIP_IDX — a
 // collision. In practice source paths are never that large, but the implicit contract

@@ -2,8 +2,8 @@
 
 ## CURRENT STATUS
 Last session: 84
-Active task: TB003 — Compact agent_journal.md (archive Sessions 1–83)
-Next action: Archive Sessions 1–83 verbatim into agent_journal_archive_s01_s83.md, then replace in this file with two-line stub
+Active task: TB005 — Resolve four open questions from Session 1
+Next action: All four Session 1 open questions were already resolved (see below). Mark TB005 complete and proceed to T204.
 Unresolved [UNCLEAR] tags: 51 (in source files); 52 occurrences in journal (some are journal-internal references to the same tags)
 Files remaining (Phase 1): 0 — annotation pass COMPLETE as of Session 84
 Files completed (Phase 1): 413 source files annotated across Sessions 1–84

@@ -158,6 +158,10 @@ void LayerRegion::make_perimeters(const SurfaceCollection& slices,
     g.overhang_flow      = this->bridging_flow(frPerimeter, object_config.thick_bridges);
     g.solid_infill_flow  = this->flow(frSolidInfill);
 
+    // [RESOLVED Q3] Arachne and classic PerimeterGenerator are mutually exclusive.
+    // Arachne fires only when wall_generator == Arachne AND !spiral_vase. All other
+    // conditions use classic. They share LayerRegion inputs but produce different
+    // extrusion types. See agent_journal.md Q3.
     if (this->layer()->object()->config().wall_generator.value == PerimeterGeneratorType::Arachne && !spiral_mode)
         g.process_arachne();
     else
