@@ -470,12 +470,12 @@ Last updated: 2026-03-09T00:00:00Z
              Register as ACTIVE in ralph-tasks.md before starting.
              Commit with prefix `docs:`.
 
-- [/] T205B  Create `pseudocode_fill_lightning.md` — the branch extension loop
+- [x] T205B  Create `pseudocode_fill_lightning.md` — the branch extension loop
              (unlit-point coverage → branch growth → merging heuristic). Flag
              the raw Generator pointer lifecycle in Translation Notes.
              Commit with prefix `docs:`.
 
-- [ ] T205C  Create `pseudocode_multimaterial_segmentation.md` — only after
+- [/] T205C  Create `pseudocode_multimaterial_segmentation.md` — only after
              T211(b) is complete, since the algorithm section must exist first.
              Commit with prefix `docs:`.
 
