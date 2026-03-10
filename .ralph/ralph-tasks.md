@@ -461,7 +461,7 @@ Last updated: 2026-03-09T00:00:00Z
                 explained in Section 2.
             Commit with prefix `docs:`.
 
-- [/] T205A  Create `pseudocode_triangle_mesh_slicer_chaining.md` — Phase 2
+- [x] T205A  Create `pseudocode_triangle_mesh_slicer_chaining.md` — Phase 2
              line-chaining algorithm (hash map assembly → greedy chain walk →
              T-junction handling → degenerate discard). This is the phase most
              obscured by the C++ implementation. Include Translation Notes
@@ -470,7 +470,7 @@ Last updated: 2026-03-09T00:00:00Z
              Register as ACTIVE in ralph-tasks.md before starting.
              Commit with prefix `docs:`.
 
-- [ ] T205B  Create `pseudocode_fill_lightning.md` — the branch extension loop
+- [/] T205B  Create `pseudocode_fill_lightning.md` — the branch extension loop
              (unlit-point coverage → branch growth → merging heuristic). Flag
              the raw Generator pointer lifecycle in Translation Notes.
              Commit with prefix `docs:`.
