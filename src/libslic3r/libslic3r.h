@@ -1,10 +1,8 @@
 #ifndef _libslic3r_h_
 #define _libslic3r_h_
 
-// [INTENT] libslic3r.h is the umbrella foundational header for core numeric types,
-// geometry scaling constants, and low-level utility templates shared across slicer modules.
-// [COUPLING] Nearly every libslic3r translation unit includes this header (directly or indirectly),
-// so changes here fan out to the entire build and ABI surface.
+// [INTENT] Umbrella core header: shared numeric types, scaling constants, and utility templates.
+// [COUPLING] Included throughout libslic3r; edits here propagate across most compilation units.
 
 #include "libslic3r_version.h"
 #define SLIC3R_APP_FULL_NAME "Orca Slicer"
@@ -47,9 +45,8 @@ using coord_t = int32_t;
 // FIXME At least FillRectilinear2 and std::boost Voronoi require coord_t to be 32bit.
 using coord_t = int64_t;
 #endif
-// [HAZARD] H646: coord_t width is a cross-module contract. Switching between int32/int64
-// changes numeric range, overflow behavior, binary serialization footprint, and interoperability
-// with third-party geometry code that may assume 32-bit coordinates.
+// [HAZARD] H646: coord_t bit-width is a global contract; changing it alters overflow bounds,
+// serialized value sizes, and behavior of geometry code that assumes specific integer width.
 
 using coordf_t = double;
 
@@ -76,12 +73,9 @@ static constexpr size_t MAXIMUM_EXTRUDER_NUMBER = 64;
 static constexpr float MAX_LINE_WIDTH_MULTIPLIER = 5;
 
 extern double SCALING_FACTOR;
-// [STATE] SCALING_FACTOR is mutable global process state. It controls scale_/unscale_ semantics
-// for most geometry code paths and must be initialized before geometry-heavy logic runs.
-// [CONCURRENCY] No synchronization is attached to SCALING_FACTOR reads/writes in this header.
-// Runtime code treats it as effectively write-once during startup.
-// [HAZARD] H647: Macros scale_/unscale_ read this runtime global, so numeric behavior can vary
-// by initialization order and test harness setup.
+// [STATE] Mutable process-global scale used by macros below and many geometry conversions.
+// [CONCURRENCY] Access is unsynchronized here; runtime treats this as write-once startup state.
+// [HAZARD] H647: Any late mutation changes geometric interpretation globally.
 static constexpr double PI = 3.141592653589793238;
 #define POLY_SIDE_COUNT 24 // for brim ear circle
 // When extruding a closed loop, the loop is interrupted and shortened a bit to reduce the seam.
@@ -106,8 +100,7 @@ static constexpr double WIPE_TOWER_MARGIN      = 1.;
 // inline coord_t scale_(coordf_t v) { return coord_t(floor(v / SCALING_FACTOR + 0.5f)); }
 #define scale_(val) ((val) / SCALING_FACTOR)
 #define unscale_(val) ((val) * SCALING_FACTOR)
-// [HAZARD] H648: scale_/unscale_ are macros (not typed inline functions). Arguments are evaluated
-// as written, so side-effecting expressions can be surprising and type conversions are implicit.
+// [HAZARD] H648: Macro-based conversion has no type safety and can evaluate side-effecting args.
 
 #define SCALED_EPSILON scale_(EPSILON)
 
@@ -119,8 +112,8 @@ static constexpr double WIPE_TOWER_MARGIN      = 1.;
 static constexpr bool  g_config_support_sharp_tails               = true;
 static constexpr bool  g_config_remove_small_overhangs            = true;
 static constexpr float g_config_tree_support_collision_resolution = 0.2;
-// [STATE] These compile-time feature toggles hard-code behavior and bypass user presets.
-// [COUPLING] Support and overhang pipelines depend on them implicitly instead of via PrintConfig.
+// [STATE] Compile-time toggles bypass preset/config pathways for these behaviors.
+// [COUPLING] Support and overhang code paths depend on these implicit global constants.
 
 // Write slices as SVG images into out directory during the 2D processing of the slices.
 // #define SLIC3R_DEBUG_SLICE_PROCESSING
@@ -176,8 +169,8 @@ template<typename T, typename Alloc> inline void append(std::vector<T, Alloc>& d
     src.clear();
     src.shrink_to_fit();
 }
-// [MEMORY] Move-append helpers aggressively release source capacity via shrink_to_fit().
-// This lowers peak memory retention, but may increase allocator churn in tight loops.
+// [MEMORY] Move-append clears and shrinks source vectors, reducing retained capacity but
+// potentially increasing allocator churn if callers repeatedly refill the same buffers.
 
 template<class T, class... Args> // Arbitrary allocator can be used
 void clear_and_shrink(std::vector<T, Args...>& vec)
@@ -307,8 +300,8 @@ template<typename T, typename Number> constexpr inline T lerp(const T& a, const 
     assert((t >= Number(-EPSILON)) && (t <= Number(1) + Number(EPSILON)));
     return (Number(1) - t) * a + t * b;
 }
-// [HAZARD] H649: lerp() allows a tolerance outside [0,1] (plus/minus EPSILON).
-// That improves floating-point robustness but can hide strict caller-range bugs.
+// [HAZARD] H649: EPSILON slack intentionally permits slight out-of-range t values, which improves
+// numerical robustness but can conceal strict range violations at call sites.
 
 template<typename Number> constexpr inline bool is_approx(Number value, Number test_value, Number precision = EPSILON)
 {
