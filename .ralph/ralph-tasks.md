@@ -911,7 +911,7 @@ implements.)
               + src/libslic3r/Shape/TextShape.hpp
              Commit: `annotate: src/libslic3r/Shape files (T4060w)`
 
-- [ ] T4060x  annotate: src/OrcaSlicer_app_msvc.cpp
+- [x] T4060x  annotate: src/OrcaSlicer_app_msvc.cpp
              Commit: `annotate: src files (T4060x)`
 
 - [ ] T4060y  annotate: src/slic3r/Config/Snapshot.cpp
