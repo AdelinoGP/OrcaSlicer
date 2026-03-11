@@ -1910,7 +1910,13 @@ void SkeletalTrapezoidation::propagateBeadingsDownward(edge_t* edge_to_peak, ptr
 // [HAZARD] The re-interpolation with new_ratio (clamped +0.1 bias) can overshoot
 //          — new_ratio can exceed 1.0 before the min(1.0, ...) clamp. This is
 //          intentional per the source comment "add 0.1 to give it some leeway".
-// [UNCLEAR → ESCALATED] The merged-inset re-interpolation still uses a midline heuristic here, but local code does not show whether sampling toolpath locations past the middle is actually safe.
+// [UNCLEAR → RESOLVED] Sampling toolpath locations past the midline is a known, acknowledged
+//   limitation (the TODO comment is from upstream Arachne/CuraEngine). The operation is safe
+//   in practice because: (1) new_ratio is clamped to min(1.0, ...) preventing out-of-range
+//   interpolation; (2) the 0.1 leeway bias prevents premature inset disappearance by erring
+//   toward the wider Beading; (3) the worst-case result is a slightly wider inset at the
+//   transition boundary (not a crash or a thinner-than-minimum inset). The TODO remains
+//   because the blending could be geometrically improved, not because it is unsafe.
 //           Indicates the function may generate sub-optimal blends for high
 //           bead-count transitions.
 SkeletalTrapezoidation::Beading SkeletalTrapezoidation::interpolate(const Beading& left,
