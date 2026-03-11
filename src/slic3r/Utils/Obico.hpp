@@ -34,8 +34,12 @@ public:
     bool upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const override;
 
 protected:
+    // [COUPLING] Obico authorization depends on GUI-managed cloud tokens rather than printer-local credentials,
+    // so adapter correctness is tied to the surrounding OAuth/login flow.
     virtual void set_auth(Http& http) const;
 private:
+    // [STATE] `m_port` is used as a selected remote printer identifier even though its config origin suggests a
+    // network port, so callers must preserve that semantic overload when refactoring.
     std::string m_host;
     std::string m_port;
     std::string m_apikey;

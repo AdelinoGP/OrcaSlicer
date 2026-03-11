@@ -29,6 +29,8 @@ public:
     std::string                get_host() const override { return m_host; }
 
 private:
+    // [STATE] ESP3D mixes HTTP file upload with a separate serial-console control path, so this adapter stores
+    // both the REST endpoint host and the fixed console port used for M23/M24 follow-up commands.
     std::string m_host;
     std::string m_console_port;
 

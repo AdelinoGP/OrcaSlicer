@@ -68,7 +68,8 @@ wxString Flashforge::get_test_failed_msg(wxString& msg) const
 
 bool Flashforge::connect(wxString& msg) const
 {
-    
+    // [INTENT] Flashforge requires a serial-style connection preamble before transfer; the exact handshake depends
+    // on G-code flavor, so protocol negotiation happens here instead of being implicit in upload().
     Utils::TCPConsole client(m_host, m_console_port);
 
     client.enqueue_cmd(controlCommand);
@@ -116,6 +117,8 @@ bool Flashforge::upload(PrintHostUpload upload_data, ProgressFn progress_fn, Err
     bool res = true;
     wxString errormsg;
 
+    // [MEMORY] This implementation reads the full G-code file into RAM before chunking it into SerialMessage data
+    // frames, so peak memory grows linearly with file size rather than streaming from disk.
     Utils::TCPConsole client(m_host, m_console_port);
 
     try {
@@ -148,6 +151,8 @@ bool Flashforge::upload(PrintHostUpload upload_data, ProgressFn progress_fn, Err
 
         //client.set_tcp_queue_delay(std::chrono::nanoseconds(10000));
 
+        // [HAZARD] The printer consumes a fixed-size chunk stream following M28; changing chunk boundaries or the
+        // substring slicing behavior can corrupt the device-side framing even if the total bytes match.
         for (int bytePos = 0; bytePos < gcodeFile.size(); bytePos += m_bufferSize) { // TODO: Find more efficient way of breaking ifstream
 
             int bytePosEnd  = (gcodeFile.size() - bytePos > m_bufferSize - 1) ? m_bufferSize : gcodeFile.size();

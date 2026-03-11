@@ -33,7 +33,11 @@ private:
     std::string m_host;
     std::string m_console_port;
     const int m_bufferSize;
+    // [COUPLING] The serial handshake depends on libslic3r's selected GCodeFlavor because Klipper-targeted output
+    // requires a different connection preamble than the legacy Flashforge firmware path.
     GCodeFlavor m_gcFlavor;
+    // [STATE] These canned SerialMessage values encode a vendor-specific upload state machine that TCPConsole
+    // replays verbatim; downstream ports should model them as protocol commands, not generic strings.
     Slic3r::Utils::SerialMessage controlCommand          = {"~M601 S1\r\n",Slic3r::Utils::Command};
     Slic3r::Utils::SerialMessage connectKlipperCommand   = {"~M640\r\n",Slic3r::Utils::Command};
     Slic3r::Utils::SerialMessage connectLegacyCommand    = {"~M650\r\n",Slic3r::Utils::Command};

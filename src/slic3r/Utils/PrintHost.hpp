@@ -29,6 +29,8 @@ ENABLE_ENUM_BITMASK_OPERATORS(PrintHostPostUploadAction);
 
 struct PrintHostUpload
 {
+    // [STATE] This payload carries PrintConfig-derived routing and post-upload intent from the GUI into each
+    // backend adapter; fields like `group`, `storage`, and `extended_info` are interpreted per host type.
     bool use_3mf;
     boost::filesystem::path source_path;
     boost::filesystem::path upload_path;
@@ -81,6 +83,8 @@ public:
     virtual bool get_login_url(wxString& auth_url) const { return false; }
 
 protected:
+    // [COUPLING] Concrete adapters all inherit libcurl/Http-specific error semantics through this helper instead
+    // of returning a transport-neutral error object, so backend extraction has to preserve that mapping.
     virtual wxString format_error(const std::string &body, const std::string &error, unsigned status) const;
 };
 
@@ -88,6 +92,8 @@ protected:
 struct PrintHostJob
 {
     PrintHostUpload upload_data;
+    // [MEMORY] Queue ownership of the concrete adapter is unique per job; once enqueued, the background worker is
+    // the only component allowed to use or destroy the selected PrintHost implementation.
     std::unique_ptr<PrintHost> printhost;
     bool switch_to_device_tab{false};
     bool cancelled = false;
@@ -138,6 +144,8 @@ public:
 
 private:
     struct priv;
+    // [MEMORY] The pimpl is shared so the detached worker can keep queue state alive after the facade begins
+    // destruction; that lifetime extension is part of the current cancellation/shutdown contract.
     std::shared_ptr<priv> p;
 };
 

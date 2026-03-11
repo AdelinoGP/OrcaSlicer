@@ -29,6 +29,8 @@ public:
 	std::string get_host() const override { return m_host; }
 
 private:
+	// [COUPLING] MKS relies on HTTP for the raw upload and TCPConsole for test/start commands, so translation work
+	// cannot treat this backend as a single transport implementation.
 	std::string m_host;
 	std::string m_console_port;
 

@@ -36,6 +36,8 @@ public:
 
 protected:
 #ifdef WIN32
+    // [HAZARD] The Windows path swaps in a resolved IP while manually preserving the original Host header to work
+    // around mDNS resolution failures; dropping it regresses hostname-based uploads on affected systems.
     virtual bool upload_inner_with_resolved_ip(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn, const boost::asio::ip::address& resolved_addr) const;
 #endif
     virtual bool validate_version_text(const boost::optional<std::string> &version_text) const;

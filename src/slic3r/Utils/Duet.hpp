@@ -29,7 +29,11 @@ public:
 	std::string get_host() const override { return host; }
    
 private:
+	// [INTENT] Duet has two incompatible control planes (legacy RRF and newer DSF), so the adapter records which
+	// one answered during connect() and routes every later upload/start call through that branch.
 	enum class ConnectionType { rrf, dsf, error };
+	// [STATE] Connection credentials are copied out of PrintConfig once because background uploads must run against
+	// a stable host/password snapshot even if the user changes settings mid-queue.
 	std::string host;
 	std::string password;
 

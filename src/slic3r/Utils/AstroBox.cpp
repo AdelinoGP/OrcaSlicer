@@ -35,6 +35,8 @@ bool AstroBox::test(wxString &msg) const
 {
     // Since the request is performed synchronously here,
     // it is ok to refer to `msg` from within the closure
+    // [INTENT] This probe validates both reachability and AstroBox identity before enabling uploads because the
+    // endpoint is close enough to OctoPrint that a plain HTTP success would otherwise yield false positives.
 
     const char *name = get_name();
 
@@ -119,6 +121,8 @@ bool AstroBox::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Error
 
     auto http = Http::post(std::move(url));
     set_auth(http);
+    // [STATE] The generic PrintHost action enum collapses to AstroBox's single `print=true/false` form flag, so
+    // unsupported actions must already have been filtered before reaching this backend.
     http.form_add("print", upload_data.post_action == PrintHostPostUploadAction::StartPrint ? "true" : "false")
         .form_add("path", upload_parent_path.string())      // XXX: slashes on windows ???
         .form_add_file("file", upload_data.source_path.string(), upload_filename.string())
@@ -150,6 +154,8 @@ bool AstroBox::validate_version_text(const boost::optional<std::string> &version
 
 void AstroBox::set_auth(Http &http) const
 {
+    // [COUPLING] TLS CA-file handling and API-key header injection are delegated to the shared Http wrapper, so a
+    // port must preserve libcurl-equivalent request customization rather than only translating this class surface.
     http.header("X-Api-Key", apikey);
 
     if (! cafile.empty()) {

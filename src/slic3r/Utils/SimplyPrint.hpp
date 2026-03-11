@@ -13,6 +13,8 @@ class SimplyPrint : public PrintHost
     std::string cred_file;
     std::map<std::string, std::string> cred;
 
+    // [STATE] OAuth credentials are cached in memory after loading from disk so queued cloud uploads can refresh
+    // access tokens without forcing the GUI login flow to run again.
     void load_oauth_credential();
 
     /**

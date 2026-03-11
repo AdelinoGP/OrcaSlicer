@@ -66,6 +66,8 @@ bool Duet::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn e
 	bool res = true;
 	bool dsf = (connectionType == ConnectionType::dsf);
 
+	// [INTENT] Duet normalizes two firmware families here: DSF wants a raw PUT/201 workflow, while legacy RRF
+	// expects a POST upload followed by a separate rr_gcode request for start or simulation.
 	auto upload_cmd = get_upload_url(upload_data.upload_path.string(), connectionType);
 	BOOST_LOG_TRIVIAL(info) << boost::format("Duet: Uploading file %1%, filepath: %2%, post_action: %3%, command: %4%")
 		% upload_data.source_path
@@ -123,6 +125,8 @@ bool Duet::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn e
 
 Duet::ConnectionType Duet::connect(wxString &msg) const
 {
+	// [HAZARD] Connection probing is stateful because the RRF path opens a server session (`rr_connect`) while the
+	// DSF fallback merely checks status; reordering these requests changes device-side behavior.
 	auto res = ConnectionType::error;
 	auto url = get_connect_url(false);
 
@@ -228,6 +232,8 @@ std::string Duet::timestamp_str() const
 	enum { BUFFER_SIZE = 32 };
 
 	auto t = std::time(nullptr);
+	// [HAZARD] `std::localtime()` typically uses shared static storage, so this helper is not thread-safe if Duet
+	// uploads are ever parallelized beyond the single queue worker used today.
 	auto tm = *std::localtime(&t);
 
 	char buffer[BUFFER_SIZE];
@@ -240,6 +246,8 @@ bool Duet::start_print(wxString &msg, const std::string &filename, ConnectionTyp
 {
     assert(connectionType != ConnectionType::error);
 
+	// [COUPLING] Start commands are emitted as printer-native G-code strings (M32/M37) rather than through a typed
+	// RPC object, so quoting and path formatting are protocol requirements, not incidental string building.
 	bool res = false;
 	bool dsf = (connectionType == ConnectionType::dsf);
 

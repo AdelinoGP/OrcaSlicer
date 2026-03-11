@@ -30,6 +30,8 @@ public:
 	std::string get_host() const override { return host; }
     
 private:
+	// [HAZARD] FlashAir is not a printer-native API but an SD-card CGI protocol with FAT-specific assumptions, so
+	// ports must preserve its URL and timestamp quirks exactly or uploads become card-firmware dependent.
 	std::string host;
 
 	std::string timestamp_str() const;

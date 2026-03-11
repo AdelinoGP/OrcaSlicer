@@ -49,6 +49,10 @@ PrintHost* PrintHost::get_print_host(DynamicPrintConfig *config)
     }
 
     if (tech == ptFFF) {
+        // [COUPLING] Adapter selection is hard-wired to PrintConfig enums, so adding or porting a backend always
+        // requires synchronized changes across configuration serialization, UI choice lists, and this factory.
+        // [MEMORY] Ownership leaves this factory as a raw pointer and is expected to be transferred immediately
+        // into PrintHostJob::printhost; callers that bypass the queue must preserve that convention manually.
         const auto opt = config->option<ConfigOptionEnum<PrintHostType>>("host_type");
         const auto host_type = opt != nullptr ? opt->value : htOctoPrint;
 
@@ -96,7 +100,8 @@ wxString PrintHost::format_error(const std::string &body, const std::string &err
 
 struct PrintHostJobQueue::priv
 {
-    // XXX: comment on how bg thread works
+    // [CONCURRENCY] This state is shared between the UI thread and one background worker. Channel instances provide
+    // the cross-thread queueing primitive, while wxQueueEvent hops progress/error notifications back to the UI.
 
     PrintHostJobQueue *q;
 
@@ -168,6 +173,8 @@ void PrintHostJobQueue::priv::start_bg_thread()
     if (bg_thread.joinable()) { return; }
 
     std::shared_ptr<priv> p2 = q->p;
+    // [MEMORY] Capturing shared ownership lets the worker outlive the PrintHostJobQueue facade during shutdown;
+    // the detached stop path below relies on this heap lifetime extension to avoid use-after-free.
     bg_thread = std::thread([p2]() {
         p2->bg_thread_main();
     });
@@ -178,6 +185,8 @@ void PrintHostJobQueue::priv::stop_bg_thread()
     if (bg_thread.joinable()) {
         bg_exit = true;
         channel_jobs.push(PrintHostJob()); // Push an empty job to wake up bg_thread in case it's sleeping
+        // [HAZARD] The thread is detached instead of joined, so teardown safety depends on `bg_exit`, the shared
+        // pimpl lifetime, and the worker not touching GUI state after the queue dialog goes away.
         bg_thread.detach();                // Let the background thread go, it should exit on its own
     }
 }
@@ -236,6 +245,8 @@ void PrintHostJobQueue::priv::progress_fn(Http::Progress progress, bool &cancel)
     }
 
     if (channel_cancels.size_hint() > 0) {
+        // [STATE] Cancellation mutates queue state in place: the current upload flips `cancel`, while later jobs
+        // are marked `cancelled` inside channel_jobs based on their positional id relative to `job_id`.
         // Lock both queues
         auto cancels = channel_cancels.lock_rw();
         auto jobs = channel_jobs.lock_rw();
@@ -320,6 +331,8 @@ void PrintHostJobQueue::priv::perform_job(PrintHostJob the_job)
 {
     emit_progress(0);   // Indicate the upload is starting
 
+    // [COUPLING] All concrete backends plug into the same callback trio here, so queue orchestration and host-
+    // specific upload logic are only loosely separated at the function-call boundary.
     bool success = the_job.printhost->upload(std::move(the_job.upload_data),
         [this](Http::Progress progress, bool &cancel)   { this->progress_fn(std::move(progress), cancel); },
         [this](wxString error)                          { this->error_fn(std::move(error)); },

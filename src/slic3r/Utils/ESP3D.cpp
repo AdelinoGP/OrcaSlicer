@@ -67,6 +67,8 @@ bool ESP3D::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn 
     std::string short_name = get_short_name(upload_data.upload_path.string());
     bool        res        = false;
 
+    // [HAZARD] ESP3D is limited to DOS 8.3 names; truncation is therefore part of the wire protocol and can make
+    // two distinct long filenames collide on the printer-side storage.
     auto http = Http::post((boost::format("http://%1%/upload_serial") % m_host).str());
     http.header("Connection", "keep-alive")
         .form_add_file("file", upload_data.source_path, short_name)
@@ -109,6 +111,8 @@ bool ESP3D::start_print(wxString& msg, const std::string& filename) const
     // For some reason printer firmware does not want to respond on gcode commands immediately after file upload.
     // So we just introduce artificial delay to workaround it.
     // ESP3D also locks the serial during SD transfer, this is safer
+    // [CONCURRENCY] This sleep is a readiness barrier on the queue worker; an async port still needs an equivalent
+    // device-state handshake before issuing M23/M24 or the firmware may reject the commands.
     std::this_thread::sleep_for(std::chrono::milliseconds(1500));
 
     bool ret         = false;
@@ -158,6 +162,8 @@ int ESP3D::get_err_code_from_body(const std::string& body) const
 // ESP3D only accepts 8.3 filenames else it crashes marlin and other undefined behaviour
 std::string ESP3D::get_short_name(const std::string& filename) const
 {
+    // [INTENT] Filename shortening preserves compatibility with legacy firmware/FAT assumptions even though it is a
+    // lossy mapping; correctness here is defined by printer acceptance, not by round-tripping the original name.
     std::string             shortname = "";
     boost::filesystem::path p(filename);
     std::string             stem      = p.stem().string();

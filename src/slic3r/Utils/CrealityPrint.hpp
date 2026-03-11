@@ -31,8 +31,12 @@ public:
     bool upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const override;
 
 protected:
+    // [COUPLING] CrealityPrint hardcodes bearer-token authentication, so GUI token persistence and this adapter's
+    // header construction must stay aligned even though both live outside libslic3r proper.
     virtual void set_auth(Http& http) const;
 private:
+    // [STATE] Host, port, and token values are cached from config because upload jobs may outlive the dialog that
+    // created them once they enter PrintHostJobQueue.
     std::string m_host;
     std::string m_port;
     std::string m_apikey;

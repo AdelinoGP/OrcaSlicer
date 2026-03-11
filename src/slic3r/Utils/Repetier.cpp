@@ -57,6 +57,8 @@ bool Repetier::test(wxString &msg) const
 {
     // Since the request is performed synchronously here,
     // it is ok to refer to `msg` from within the closure
+    // [INTENT] Repetier validation prefers the invariant `software` field because the server may be rebranded; a
+    // plain hostname or HTTP success check would misclassify compatible-but-renamed installations.
 
     const char *name = get_name();
 
@@ -142,6 +144,8 @@ bool Repetier::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Error
     auto http = Http::post(std::move(url));
     set_auth(http);
 
+    // [STATE] `group` is meaningful only for Repetier's multi-printer deployments, so PrintHostUpload carries
+    // backend-specific routing data that most other adapters ignore.
     if (! upload_data.group.empty() && upload_data.group != _utf8(L("Default"))) {
         http.form_add("group", upload_data.group);
     }
@@ -202,6 +206,8 @@ bool Repetier::get_groups(wxArrayString& groups) const
 {
     bool res = true;
     
+    // [COUPLING] GUI printer/group selectors depend on this backend-specific discovery call, so UI state and host
+    // routing state are coupled through Repetier's own grouping model rather than a generic PrintHost API.
     const char *name = get_name();
     auto url = make_url((boost::format("printer/api/%1%") % port).str());
 

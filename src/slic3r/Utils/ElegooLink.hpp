@@ -41,6 +41,8 @@ protected:
 #endif
 
 private:
+    // [COUPLING] This type inherits OctoPrint helpers for probing/upload URL handling but actually starts prints
+    // over WebSocketClient/SDCP, so the inheritance tree hides a real protocol boundary.
     bool elegoo_test(wxString& curl_msg) const;
     bool print(WebSocketClient&  client,
                std::string       timeLapse,

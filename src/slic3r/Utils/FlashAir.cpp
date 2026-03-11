@@ -90,6 +90,8 @@ bool FlashAir::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Error
 
 	bool res = false;
 
+    // [INTENT] FlashAir upload is a three-step SD-card workflow: prime write mode, select the destination folder,
+    // then stream the file. Treating it as a single POST loses required card-side state transitions.
     std::string strDest = upload_parent_path.string();
     if (strDest.front()!='/') // Needs a leading / else root uploads fail.
     {
@@ -180,6 +182,8 @@ bool FlashAir::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Error
 std::string FlashAir::timestamp_str() const
 {
 	auto t = std::time(nullptr);
+	// [HAZARD] The CGI API expects FAT timestamp bit-packing and this helper uses `std::localtime()`, so both time
+	// zone semantics and C-runtime thread-safety affect correctness.
 	auto tm = *std::localtime(&t);
 
 	unsigned long fattime = ((tm.tm_year - 80) << 25) | 

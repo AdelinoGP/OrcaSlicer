@@ -41,6 +41,8 @@ const char* MKS::get_name() const { return "MKS"; }
 
 bool MKS::test(wxString& msg) const
 {
+	// [COUPLING] Reachability is tested over TCPConsole instead of the HTTP upload endpoint, so this backend's
+	// health model depends on a second transport that must stay in sync with file-transfer capabilities.
 	Utils::TCPConsole console(m_host, m_console_port);
 	Slic3r::Utils::SerialMessage s("M105", Slic3r::Utils::Command);
 	console.enqueue_cmd(s);
@@ -68,6 +70,8 @@ bool MKS::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn er
 {
 	bool res = true;
 
+	// [INTENT] MKS splits work across transports: HTTP stores the file, then TCPConsole sends M23/M24 to select and
+	// start the uploaded path once the web endpoint reports success.
 	auto upload_cmd = get_upload_url(upload_data.upload_path.string());
 	BOOST_LOG_TRIVIAL(info) << boost::format("MKS: Uploading file %1%, filepath: %2%, print: %3%, command: %4%")
 		% upload_data.source_path
@@ -125,6 +129,7 @@ bool MKS::start_print(wxString& msg, const std::string& filename) const
 	// For some reason printer firmware does not want to respond on gcode commands immediately after file upload.
 	// So we just introduce artificial delay to workaround it.
 	// TODO: Inspect reasons
+	// [CONCURRENCY] This blocking wait is the current device-readiness barrier on the single queue worker thread.
 	std::this_thread::sleep_for(std::chrono::milliseconds(1500));
 
 	Utils::TCPConsole console(m_host, m_console_port);

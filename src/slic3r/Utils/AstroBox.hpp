@@ -30,9 +30,13 @@ public:
     std::string get_host() const override { return host; }
     
 protected:
+    // [INTENT] AstroBox intentionally validates the version banner instead of trusting a generic HTTP 200 so the
+    // UI does not mistake another OctoPrint-like service for an AstroBox-compatible upload target.
     bool validate_version_text(const boost::optional<std::string> &version_text) const;
 
 private:
+    // [STATE] These values are snapshotted from DynamicPrintConfig during construction, so queued jobs are immune
+    // to later GUI edits of the active preset while an upload is pending.
     std::string host;
     std::string apikey;
     std::string cafile;
