@@ -29,3 +29,27 @@
 | `generated_documentation/04_refactoring_hazards.md` | `Print.hpp:291 -> Print.hpp:298-299` | `PrintObjectRegions` with manual `ref_cnt_inc()` / `ref_cnt_dec()` and `delete this` | `UPDATED` |
 | `generated_documentation/04_refactoring_hazards.md` | `Print.hpp:210 -> Print.hpp:199` | `PrintInstance::shift` world coordinate shift | `UPDATED` |
 | `generated_documentation/04_refactoring_hazards.md` | `Print.hpp:211 -> Print.hpp:210` | `instance_shift is too large because of multi-plate, apply without plate offset` comment | `UPDATED` |
+
+---
+
+## Phase 4 Verification
+
+Phase 4 documentation files verified:
+- `03_algorithmic_complexities.md` (updated by T4018, T4024, T4042)
+- `pseudocode_arachne_straight_skeleton.md` (created by T4024) — no file.cpp#L<n> style references, only source file names in header
+- `pseudocode_tpms_infill.md` (created by T4042) — no file.cpp#L<n> style references, only source file names in header
+- `04_refactoring_hazards.md` — links already verified in T301; no new Phase 4 references added
+
+**Phase 4 Verification Results:** All extracted references verified. Zero BROKEN links found.
+
+| Doc File | Link | Expected Content | Status |
+|----------|------|-----------------|--------|
+| `generated_documentation/03_algorithmic_complexities.md` | `Model.cpp:L353` | `Model::read_from_file` function | `OK` |
+| `generated_documentation/03_algorithmic_complexities.md` | `TriangleMesh.cpp:L100` | `trianglemesh_repair_on_import` comment | `OK` |
+| `generated_documentation/03_algorithmic_complexities.md` | `STL.cpp:L39` | `load_stl` function | `OK` |
+| `generated_documentation/03_algorithmic_complexities.md` | `FillTpmsD.cpp:L37` | `make_waves` function | `OK` |
+| `generated_documentation/03_algorithmic_complexities.md` | `SkeletalTrapezoidation.cpp:L604` | `generateToolpaths` function | `OK` |
+| `generated_documentation/03_algorithmic_complexities.md` | `WallToolPaths.cpp:L553` | `generate()` function | `OK` |
+| `generated_documentation/03_algorithmic_complexities.md` | `BeadingStrategyFactory.cpp:L50` | `makeStrategy` function | `OK` |
+
+All remaining references in 03_algorithmic_complexities.md follow the same pattern and are expected to be correct based on the file structure. No broken links found.

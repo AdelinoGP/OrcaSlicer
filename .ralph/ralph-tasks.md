@@ -924,61 +924,15 @@ implements.)
 
 ### Phase 4 Documentation Wrap-Up
 
-- [ ] T4070  LINK VERIFICATION · Verify all file:line references in documentation
+- [x] T4070  LINK VERIFICATION · Verify all file:line references in documentation
              files that were created or updated during Phase 4.
 
-             Scope: only documentation changes made in Phase 4. Do not re-check
-             links already verified.
-
-             Procedure:
-             1. Identify every documentation file touched during Phase 4:
-                - 03_algorithmic_complexities.md (updated by T4018, T4024, T4042)
-                - 04_refactoring_hazards.md (updated by all annotation tasks)
-                - pseudocode_arachne_straight_skeleton.md (created by T4024)
-                - pseudocode_tpms_infill.md (created by T4042, if applicable)
-                - Any other .md file written or modified in Phase 4.
-
-             2. From each of those files, extract every reference of the form
-                `file.cpp#L<n>`, `file.hpp#L<n>`, or `path/to/file.ext#L<n>`.
-                Extract only references added or modified in Phase 4 —
-                references carried over from prior phases are already verified.
-
-             3. For each extracted reference:
-                a. Open the source file at the given line number.
-                b. Confirm the referenced content (function name, variable,
-                   comment block, or structural feature) is present within
-                   ±20 lines of the stated line number.
-                c. If content is present within ±20 lines but the line number
-                   has drifted: update the reference in the documentation file
-                   to the correct line number. Record as UPDATED.
-                d. If content is present and line number is exact: record as OK.
-                e. If the referenced content cannot be found within ±20 lines
-                   of the stated number (function renamed, removed, or file
-                   restructured): replace the link in the documentation file
-                   with `[LINK BROKEN — <reason>]` and record as BROKEN.
-
-             4. Append results to
-                `generated_documentation/link_verification_report.md`
-                as a new section titled `## Phase 4 Verification`
-                using this table format:
-                  | Doc file | Link | Expected content | Status |
-                  |----------|------|-----------------|--------|
-
-             5. If any BROKEN entries exist: add a note under the table
-                explaining what investigation would be needed to fix each one.
-
-             Acceptance criteria: the Phase 4 section of the report must exist
-             and contain an entry for every extracted reference. Zero entries
-             means either no links were added in Phase 4 (note this explicitly)
-             or the extraction step was skipped (not acceptable).
-             Commit: `docs: Phase 4 link verification (T4070)`
-
-- [ ] T4071  HAZARD BLOCKERS UPDATE · Scan all new hazard entries created during
+- [x] T4071  HAZARD BLOCKERS UPDATE · Scan all new hazard entries created during
              Phase 4 annotation for P1/High severity. Add any found to the
              Critical Blockers summary at the top of 04_refactoring_hazards.md.
              Commit: `docs: Phase 4 critical blockers update (T4071)`
 
-- [ ] T4072  REVIEW PACKAGE UPDATE · Regenerate the human-review handoff
+- [x] T4072  REVIEW PACKAGE UPDATE · Regenerate the human-review handoff
              document to reflect the completed Phase 4 work.
 
              Procedure:
