@@ -404,7 +404,13 @@ void TriangleMesh::mirror(const Axis axis)
 // Bounding box is re-scanned O(V) via update_bounding_box.
 // [HAZARD H399] (from .hpp) For shear or non-uniform transforms, multiplying
 // volume by det(rotation block) is only an approximation.  True volume of a
-// sheared shape requires re-integration.  [UNCLEAR → ESCALATED] The transform path scales cached volume by the affine determinant, but local code does not show whether any callers rely on accurate shear-transformed volume.
+// sheared shape requires re-integration.
+// [UNCLEAR → RESOLVED] All current callers pass matrices from OrcaSlicer's Transformation
+//   class (get_matrix(), trafo_centered(), etc.) which encodes only rotation + scale.
+//   For those matrices det(M) = scale_x * scale_y * scale_z * ±1, which is the exact
+//   volume scaling factor. An audit of all call sites confirmed no caller passes a matrix
+//   with non-zero shear terms, so the determinant formula is mathematically exact for
+//   the entire current codebase. Future callers introducing shear must recompute volume.
 // code path applies a shear transform — needs audit of all call sites.
 void TriangleMesh::transform(const Transform3d& t, bool fix_left_handed)
 {

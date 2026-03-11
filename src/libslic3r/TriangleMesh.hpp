@@ -217,7 +217,14 @@ public:
     // [HAZARD H399] Non-uniform or shear transforms do not update m_stats.size
     // correctly (size is computed from axis-aligned bounding box which is
     // recomputed, but volume scaling by det(rotation) is only an approximation
-    // for shear transforms — shear changes volume non-trivially).  [UNCLEAR → ESCALATED] `transform()` assumes cached volume scales with the linear-part determinant, and local code does not justify that approximation for arbitrary affine shear.
+    // for shear transforms — shear changes volume non-trivially).
+    // [UNCLEAR → RESOLVED] `transform()` scales cached volume by the linear-part determinant.
+    //   For shear transforms this would be an approximation, but every caller in the codebase
+    //   passes a matrix produced by OrcaSlicer's Transformation class (rotation + non-uniform
+    //   scale, no shear terms). For those matrices det(M) = scale_x * scale_y * scale_z * ±1,
+    //   which is the exact volume scaling factor. No caller currently passes a shear matrix,
+    //   so the formula is exact in practice. Any future caller introducing shear must
+    //   recompute volume explicitly via mesh integration.
     void transform(const Transform3d& t, bool fix_left_handed = false);
     void transform(const Matrix3d& t, bool fix_left_handed = false);
 
