@@ -1,9 +1,9 @@
 # Agent Journal — OrcaSlicer Codebase Analysis
 
 ## CURRENT STATUS
-Last session: 95
-Active task: T4022 — complete
-Next action: Begin T4023 by annotating the remaining Arachne math and polygon index helpers.
+Last session: 96
+Active task: T4024 — complete
+Next action: Begin T4030 by annotating `src/libslic3r/GCode/ExtrusionProcessor.hpp`.
 Unresolved [UNCLEAR] tags: 12 — all remaining source tags are marked `[UNCLEAR → ESCALATED]` after Session 86 T300 triage
 Files remaining (Phase 1): 287 files outside explicit skip buckets still need human coverage audit
 Files completed (Phase 1): 314 unique source files tracked by 314 annotate task entries
@@ -621,3 +621,29 @@ Total escalated tags: **12**
   - `src/libslic3r/Arachne/SkeletalTrapezoidation.cpp`
 
 **Completed tasks this session:** T4022
+
+---
+
+## Session 96
+
+**Active task:** T4024 — update `03_algorithmic_complexities.md` with the full Arachne straight-skeleton writeup and create `pseudocode_arachne_straight_skeleton.md`
+
+- Files processed: `generated_documentation/03_algorithmic_complexities.md`, `generated_documentation/pseudocode_arachne_straight_skeleton.md`, `generated_documentation/agent_journal.md`, `.ralph/ralph-tasks.md`
+- Key discoveries:
+  - The real Arachne boundary is `WallToolPaths::generate()`: it performs aggressive polygon repair up front, composes the width-policy decorators, and only then hands the result to `SkeletalTrapezoidation`, so the straight-skeleton stage never sees the raw slice polygon.
+  - `SkeletalTrapezoidation` is better modeled as a scalar-field extractor than as a simple Voronoi offsetter: the half-edge graph stores local radius-to-boundary, transition nodes split the field where bead counts change, and `generateSegments()` converts that field into width-bearing `ExtrusionJunction` samples.
+  - The newly annotated utils files are structural rather than incidental: `HalfEdgeGraph` provides topology identity, `ExtrusionLine`/`ExtrusionJunction` define the ABI into the rest of libslic3r, and the sparse-grid plus `PolylineStitcher` helpers are required to turn fragmented skeleton output back into printable loops.
+- Decisions made:
+  - Expanded both Section 2 and Section 15 in `03_algorithmic_complexities.md` so translators get a short perimeter-generation explanation near the classic-vs-Arachne split and a deeper algorithm walkthrough later in the document.
+  - Wrote the pseudocode around the actual phase boundaries in `WallToolPaths.cpp` and `SkeletalTrapezoidation.cpp` instead of mirroring class boundaries, because the porting risk comes from phase ordering and data contracts more than from individual helper names.
+- Open questions:
+  - None newly introduced; existing `[UNCLEAR -> ESCALATED]` items remain unchanged.
+- Cross-references:
+  - `src/libslic3r/Arachne/WallToolPaths.cpp`
+  - `src/libslic3r/Arachne/SkeletalTrapezoidation.cpp`
+  - `src/libslic3r/Arachne/BeadingStrategy/BeadingStrategyFactory.cpp`
+  - `src/libslic3r/Arachne/utils/HalfEdgeGraph.hpp`
+  - `src/libslic3r/Arachne/utils/ExtrusionLine.hpp`
+  - `src/libslic3r/Arachne/utils/PolylineStitcher.hpp`
+
+**Completed tasks this session:** T4024

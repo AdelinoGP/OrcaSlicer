@@ -107,7 +107,7 @@ This means "pre-admesh repair" differs sharply by parser: STL/STEP/SVG/ModelIO c
 
 ## 2. Perimeter Generation
 
-**Files:** [`PerimeterGenerator.cpp`](../src/libslic3r/PerimeterGenerator.cpp), [`Arachne/WallToolPaths.cpp`](../src/libslic3r/Arachne/)
+**Files:** [`PerimeterGenerator.cpp`](../src/libslic3r/PerimeterGenerator.cpp), [`WallToolPaths.cpp`](../src/libslic3r/Arachne/WallToolPaths.cpp#L553), [`SkeletalTrapezoidation.cpp`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L604)
 
 ### Classic Perimeter Generator
 
@@ -123,10 +123,13 @@ This means "pre-admesh repair" differs sharply by parser: STL/STEP/SVG/ModelIO c
 
 ### Arachne Variable-Width Generator
 
-- Computes a **straight skeleton** (medial axis) of the polygon via a Voronoi diagram of the polygon edges
-- Distributes wall widths continuously, allowing walls to taper rather than abruptly stop
-- Produces `ExtrusionPath` segments with varying `width` values
-- Used when `perimeter_generator = arachne` in config
+- **Entry point:** [`WallToolPaths::generate()`](../src/libslic3r/Arachne/WallToolPaths.cpp#L553) preprocesses the polygon, builds the beading-strategy decorator chain via [`BeadingStrategyFactory::makeStrategy()`](../src/libslic3r/Arachne/BeadingStrategy/BeadingStrategyFactory.cpp#L50), and then hands the cleaned outline to [`SkeletalTrapezoidation::generateToolpaths()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L604).
+- **Medial axis / straight skeleton:** [`SkeletalTrapezoidation::constructFromPolygons()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.hpp#L312) builds a Boost Voronoi diagram over polygon segments, discretizes parabolic point-segment arcs into linear pieces, and transfers the result into a half-edge graph backed by [`HalfEdgeGraph`](../src/libslic3r/Arachne/utils/HalfEdgeGraph.hpp#L27). The working graph mixes true skeleton edges with rib edges that connect the skeleton back to the original boundary.
+- **Central-edge detection:** [`SkeletalTrapezoidation::updateIsCentral()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L672) classifies which half-edges belong to the usable medial axis by comparing edge length against change in distance-to-boundary. This is the actual "straight skeleton" filter: equidistant and slowly changing regions remain central; ribs and near-boundary artifacts are filtered away.
+- **Beading strategy dispatch:** The decorator chain decides how many walls fit at each local thickness `2R` and how the leftover width is distributed. `DistributedBeadingStrategy` computes the base split, `RedistributeBeadingStrategy` protects outer-vs-inner wall roles, `WideningBeadingStrategy` optionally expands thin features, `OuterWallInsetBeadingStrategy` applies Orca's outer-wall offset, and `LimitedBeadingStrategy` caps bead count and injects the 0-width sentinel contour.
+- **Variable-width assignment:** [`SkeletalTrapezoidation::generateSegments()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L1666) computes or interpolates per-node beadings, propagates them upward and downward through the skeleton, emits per-edge junction samples, and connects those samples into [`ExtrusionLine`](../src/libslic3r/Arachne/utils/ExtrusionLine.hpp#L52) polylines built from [`ExtrusionJunction`](../src/libslic3r/Arachne/utils/ExtrusionJunction.hpp#L29). Each junction carries its own local width, so one wall can smoothly narrow or widen along its length.
+- **Post-processing and stitching:** [`WallToolPaths::stitchToolPaths()`](../src/libslic3r/Arachne/WallToolPaths.cpp#L716) uses [`PolylineStitcher`](../src/libslic3r/Arachne/utils/PolylineStitcher.hpp#L38) plus sparse-grid helpers ([`SparseGrid`](../src/libslic3r/Arachne/utils/SparseGrid.hpp#L34), [`SquareGrid`](../src/libslic3r/Arachne/utils/SquareGrid.hpp#L37), [`PolygonsPointIndex`](../src/libslic3r/Arachne/utils/PolygonsPointIndex.hpp#L158), [`PolygonsSegmentIndex`](../src/libslic3r/Arachne/utils/PolygonsSegmentIndex.hpp#L27)) to merge fragmented wall fragments back into printable loops and open centerlines.
+- **When it wins over classic perimeters:** Arachne pays extra `O(V log V)` setup cost to preserve thin features and gradual wall-count transitions that the classic repeated-offset generator would collapse or quantize.
 
 **For full algorithm details see Section 15 — Arachne: Straight Skeleton and Variable-Width Perimeters.**
 
@@ -1105,30 +1108,69 @@ The Arachne perimeter generator (activated when `perimeter_generator = arachne`)
 
 The Arachne algorithm was developed by Kuipers et al. (TU Delft / Ultimaker) and is described in the paper "Variable-width contouring for additive manufacturing" (ACM SIGGRAPH 2022). OrcaSlicer inherits it from PrusaSlicer, which ported it from the original CuraEngine implementation.
 
+The implementation in OrcaSlicer is not a single black-box function. It is a pipeline with three reusable layers:
+
+- Geometry transfer and graph storage: [`HalfEdgeGraph`](../src/libslic3r/Arachne/utils/HalfEdgeGraph.hpp#L27) plus [`SkeletalTrapezoidationGraph`](../src/libslic3r/Arachne/SkeletalTrapezoidationGraph.hpp#L78)
+- Width-bearing output types: [`ExtrusionJunction`](../src/libslic3r/Arachne/utils/ExtrusionJunction.hpp#L29) and [`ExtrusionLine`](../src/libslic3r/Arachne/utils/ExtrusionLine.hpp#L52)
+- Spatial/post-processing utilities: [`PolylineStitcher`](../src/libslic3r/Arachne/utils/PolylineStitcher.hpp#L38), [`SparseGrid`](../src/libslic3r/Arachne/utils/SparseGrid.hpp#L34), [`SquareGrid`](../src/libslic3r/Arachne/utils/SquareGrid.hpp#L37), [`PolygonsPointIndex`](../src/libslic3r/Arachne/utils/PolygonsPointIndex.hpp#L158), and [`PolygonsSegmentIndex`](../src/libslic3r/Arachne/utils/PolygonsSegmentIndex.hpp#L27)
+
+Translation agents should preserve these as separate concerns even if the target language does not keep the exact class layout.
+
 ### Phase 1 — Preprocessing (`WallToolPaths::generate()`)
 
 1. Apply `simplifyPolygons` to remove near-degenerate vertices that cause numerical instability in the Voronoi phase.
 2. Compute the minimum bead count and wall-width constraints from `BeadingStrategyFactory` based on configured `min_bead_width`, `min_feature_size`, `wall_transition_angle`, and `inward_distributed_beads`.
 3. Call `SkeletalTrapezoidation::generateToolpaths()` on the processed polygon.
 
+The real preprocessing sequence in [`WallToolPaths::generate()`](../src/libslic3r/Arachne/WallToolPaths.cpp#L553) is heavier than the three-step summary above:
+
+1. Triple offset `(-e, +2e, -e)` snaps tiny gaps and self-touching spikes.
+2. Simplify, self-intersection repair, degenerate-vertex removal, and near-colinear cleanup run in sequence.
+3. `union_()` produces a final valid polygon set before Voronoi construction.
+
+This means Arachne never sees the raw slice polygon. It sees a mesh-fixed version biased toward topological stability, which is one reason its output differs slightly from the classic offset-only perimeter path.
+
+### Phase 1.5 — Beading Strategy Construction
+
+[`BeadingStrategyFactory::makeStrategy()`](../src/libslic3r/Arachne/BeadingStrategy/BeadingStrategyFactory.cpp#L50) builds the width-policy chain once per island:
+
+1. `DistributedBeadingStrategy` decides the nominal bead count and baseline per-bead widths from local thickness.
+2. `RedistributeBeadingStrategy` preserves outer-wall quality by biasing excess or missing width toward less visible inner beads.
+3. `WideningBeadingStrategy` optionally keeps thin printable features alive by widening them instead of deleting them.
+4. `OuterWallInsetBeadingStrategy` applies the configured outer-wall inset/outset after width planning.
+5. `LimitedBeadingStrategy` caps the count and adds the 0-width contour marker used later by `separateOutInnerContour()`.
+
+This dispatch layer is why "Arachne" is not one algorithm but a geometry engine plus a width-allocation policy stack.
+
 ### Phase 2 — Straight Skeleton via Voronoi (`SkeletalTrapezoidation`)
 
 The straight skeleton is computed indirectly using the Voronoi diagram of the polygon edges:
 
-1. **Voronoi diagram:** Build a boost::polygon Voronoi diagram of the polygon edge set (in scaled integer coordinates). The Voronoi edges are the locus of points equidistant from two polygon edges — this is precisely the straight skeleton of the polygon.
-2. **Graph construction:** Walk the Voronoi diagram edges to build a `SkeletalTrapezoidationGraph`:
-   - Each Voronoi edge becomes a graph edge tagged with the distance from the two nearest polygon edges (its "bead width capacity").
-   - Voronoi vertices become graph nodes.
-   - Polygon vertices map to source nodes (marked as `is_central = false`).
-3. **Bead count propagation:** For each graph edge, compute the local bead count from the edge's "thickness" (twice the distance to the nearest polygon boundary) using the configured `BeadingStrategy`.
-4. **Transition placement:** Where bead count changes along an edge (e.g., from 3 beads to 2), `TransitionEnd` markers are inserted at the exact point along the edge where the local wall width can accommodate one fewer bead.
+1. **Voronoi construction:** `boost::polygon::construct_voronoi()` is run over the polygon segments. Point-segment cells represent corner-to-wall interactions; point-point cells represent corner-to-corner interactions.
+2. **Edge transfer:** [`transferEdge()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.hpp#L355) copies only the Voronoi arcs that lie inside the polygon into the half-edge graph. Straight edges stay straight; parabolic edges are discretized into short linear segments so the rest of the pipeline can stay piecewise-linear.
+3. **Rib insertion:** Every skeleton segment gets companion rib edges back to the source boundary. The output is therefore a trapezoidation/decomposition of the polygon interior, not just a naked centerline graph.
+4. **Central-edge marking:** [`updateIsCentral()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L672) marks which half-edges are part of the true medial axis. The test compares geometric slope in radius-space (`dR / dD`) against the configured transition angle, so sharp corners naturally produce short non-central ribs while broad valleys remain central.
+5. **Central cleanup:** `filterCentral()` removes tiny whiskers; `filterOuterCentral()` can optionally demote outermost central edges so sharp tips loop instead of ending as a single strand.
+6. **Local bead counts:** `updateBeadCount()` queries the composed beading strategy with the local diameter `2 * distance_to_boundary`. Each central node now knows how many walls should fit at that thickness.
+7. **Non-central fill:** `filterNoncentralRegions()` extends bead counts across ribs and narrow peninsulas so each trapezoid side has a coherent target wall count.
+8. **Transition placement:** [`generateTransitioningRibs()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L881) and [`generateAllTransitionEnds()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L1218) insert explicit transition markers wherever the optimal bead count changes along an edge.
+
+The crucial mental model is: Arachne does not directly offset the polygon by a fixed spacing. It first converts the interior into a graph whose scalar field is "local printable thickness," then extracts equal-bead contours from that field.
 
 ### Phase 3 — Toolpath Extraction
 
-1. **Inset computation:** Walk the skeleton graph, propagating bead widths from the source edges inward. Each "bead" corresponds to one extrusion path at a specific inset distance from the polygon boundary.
-2. **Variable-width path generation:** For each bead, trace the corresponding isocurve through the trapezoidation graph. Path width varies continuously along the isocurve — wider in thick regions, narrower at junctions and taper zones.
-3. **`ExtrusionLine` emission:** Each traced isocurve becomes an `ExtrusionLine` with per-point `width` values (in scaled integer microns), collected into `WallToolPaths::m_toolpaths`.
-4. **Ordering:** `WallToolPaths::getToolPaths()` returns the toolpaths; `PerimeterGenerator` then calls `process_arachne()` to order them for printing (outer-first or inner-first per config).
+1. **Beading propagation:** [`generateSegments()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L1666) first stores concrete `Beading` objects at nodes with known counts, then propagates them upward to unresolved maxima and downward across non-central edges. This produces a continuous local wall-width plan across the graph even where no direct `compute()` result existed.
+2. **Transition interpolation:** Nodes introduced on transition ribs may hold blended beadings rather than an exact discrete wall count. This is how Arachne changes from, for example, 3 walls to 2 walls without an abrupt step.
+3. **Junction generation:** Each graph edge is sampled into `ExtrusionJunction` points whose fields are `(x, y, local_width, perimeter_index)`. Conceptually, each junction is one point on one isocontour of the local-thickness field.
+4. **Line assembly:** [`connectJunctions()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L2254) walks each trapezoid/quad, pairs the junction lists on its two sides, and emits segments into `VariableWidthLines`. Those lines are stored as `ExtrusionLine` polylines, one inset band at a time.
+5. **Post-stitching:** [`WallToolPaths::stitchToolPaths()`](../src/libslic3r/Arachne/WallToolPaths.cpp#L716) merges fragmented lines with `PolylineStitcher`. Then `removeSmallLines()`, `separateOutInnerContour()`, and `simplifyToolPaths()` convert the raw skeleton output into printable perimeter loops plus the zero-width inner contour marker.
+6. **Print-pipeline handoff:** [`WallToolPaths::getToolPaths()`](../src/libslic3r/Arachne/WallToolPaths.cpp#L877) lazily caches the result, and `PerimeterGenerator` later orders these lines alongside other extrusion roles.
+
+### Output Contract
+
+- The output is not a polygon offset tree. It is a vector of inset bands, each containing `ExtrusionLine` polylines with per-junction widths.
+- `perimeter_index` is the stable identity of a band; translators should not infer wall role from list order alone.
+- Closed loops duplicate the first/last junction, while odd centerlines stay open. This distinction is preserved all the way into later variable-width extrusion conversion.
 
 ### Beading Strategies
 
@@ -1142,7 +1184,7 @@ The `BeadingStrategy` abstraction controls how wall widths are distributed. Orca
 | `WideningBeadingStrategy` | Allows beads to widen beyond nominal when there are too few beads for the local thickness |
 | `LimitedBeadingStrategy` | Caps bead count to a configured maximum |
 
-Strategies are composed by wrapping (decorator pattern) in `BeadingStrategyFactory::makeStrategy()`.
+Strategies are composed by wrapping (decorator pattern) in `BeadingStrategyFactory::makeStrategy()`. The order matters because later decorators assume the invariants created by earlier ones; for example, `LimitedBeadingStrategy` must run last so its 0-width sentinel contour is not widened or redistributed.
 
 ### Complexity Summary
 

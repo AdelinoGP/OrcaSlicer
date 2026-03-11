@@ -553,7 +553,7 @@ any task here — it is the public interface that contextualizes all of these.)
              helpers shared across the straight-skeleton implementation.
              Commit: `annotate: remaining Arachne/ files (T4023)`
 
-- [ ] T4024  DOCS UPDATE · After T4020–T4023 are complete: return to
+- [x] T4024  DOCS UPDATE · After T4020–T4023 are complete: return to
              03_algorithmic_complexities.md Section 2 (Perimeter Generation)
              and fully document the Arachne straight skeleton algorithm.
              Currently this section names the algorithm but does not explain
