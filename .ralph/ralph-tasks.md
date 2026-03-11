@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer Analysis Agent
-Last updated: 2026-03-11T14:31:00Z
+Last updated: 2026-03-11T03:27:15Z
 
 ## Legend
 - [ ] PENDING   — not started
@@ -654,7 +654,7 @@ implements.)
 
 ### slic3r/Utils/ Classification and Selective Annotation
 
-- [ ] T4050  CLASSIFY · Classify all files under src/slic3r/Utils/.
+- [x] T4050  CLASSIFY · Classify all files under src/slic3r/Utils/.
              For each file, check the first 30 lines for any #include of a
              libslic3r/ core header (Model.hpp, Print.hpp, PrintConfig.hpp,
              GCode*.hpp, Layer.hpp, etc.).
@@ -665,13 +665,89 @@ implements.)
              Do NOT annotate any file during this task.
              Commit: `docs: slic3r/Utils/ classification (T4050)`
 
-- [ ] T4051  annotate: ANNOTATE-classified src/slic3r/Utils/ files.
-             T4050 will determine which files these are and may split this into
-             multiple tasks if more than 4 files qualify.
-             Group by what libslic3r type they touch: files that both import
-             PrintConfig should be in the same task, files that only touch Model
-             in another, etc.
-             Commit: `annotate: slic3r/Utils/ core-touching files (T4051)`
+- [ ] T4051  annotate: src/slic3r/Utils/AstroBox.cpp
+             + src/slic3r/Utils/CrealityPrint.hpp
+             + src/slic3r/Utils/Duet.cpp
+             + src/slic3r/Utils/ESP3D.cpp
+             + src/slic3r/Utils/ElegooLink.hpp
+             + src/slic3r/Utils/FlashAir.cpp
+             + src/slic3r/Utils/Flashforge.cpp
+             + src/slic3r/Utils/Flashforge.hpp
+             + src/slic3r/Utils/MKS.cpp
+             + src/slic3r/Utils/Obico.hpp
+             + src/slic3r/Utils/OctoPrint.hpp
+             + src/slic3r/Utils/PrintHost.cpp
+             + src/slic3r/Utils/PrintHost.hpp
+             + src/slic3r/Utils/Repetier.cpp
+             Context: PrintConfig-driven print-host adapters and the shared
+             PrintHost upload entrypoints. Grouped because their first-order
+             coupling is printer/upload config extracted from libslic3r.
+             Commit: `annotate: slic3r/Utils print-host PrintConfig adapters (T4051)`
+
+- [ ] T4052  annotate: src/slic3r/Utils/CrealityPrint.cpp
+             + src/slic3r/Utils/ElegooLink.cpp
+             + src/slic3r/Utils/NetworkAgentFactory.hpp
+             + src/slic3r/Utils/Obico.cpp
+             + src/slic3r/Utils/OctoPrint.cpp
+             + src/slic3r/Utils/Process.cpp
+             + src/slic3r/Utils/bambu_networking.hpp
+             Context: AppConfig-backed network/upload helpers and process glue.
+             These files couple the GUI/network layer to persisted runtime
+             config in libslic3r.
+             Commit: `annotate: slic3r/Utils AppConfig network glue (T4052)`
+
+- [ ] T4053  annotate: src/slic3r/Utils/BBLNetworkPlugin.cpp
+             + src/slic3r/Utils/BBLNetworkPlugin.hpp
+             + src/slic3r/Utils/ICloudServiceAgent.hpp
+             + src/slic3r/Utils/NetworkAgent.cpp
+             + src/slic3r/Utils/NetworkAgent.hpp
+             + src/slic3r/Utils/OrcaCloudServiceAgent.cpp
+             + src/slic3r/Utils/SimplyPrint.cpp
+             + src/slic3r/Utils/json_diff.cpp
+             Context: ProjectTask/Utils-backed cloud-service orchestration.
+             Grouped because these files bridge libslic3r job/runtime helpers
+             into network agents rather than pure printer-specific adapters.
+             Commit: `annotate: slic3r/Utils cloud agent orchestration (T4053)`
+
+- [ ] T4054  annotate: src/slic3r/Utils/MoonrakerPrinterAgent.cpp
+             + src/slic3r/Utils/PresetUpdater.cpp
+             + src/slic3r/Utils/QidiPrinterAgent.cpp
+             + src/slic3r/Utils/SnapmakerPrinterAgent.cpp
+             Context: Preset and PresetBundle consumers in slic3r/Utils.
+             Group these because they couple network/device utilities to saved
+             printer preset state rather than direct model or geometry types.
+             Commit: `annotate: slic3r/Utils preset-driven agents (T4054)`
+
+- [ ] T4055  annotate: src/slic3r/Utils/CalibUtils.cpp
+             + src/slic3r/Utils/CalibUtils.hpp
+             + src/slic3r/Utils/RaycastManager.hpp
+             Context: Model and geometry touching utilities. CalibUtils reaches
+             into Model/CutUtils/ClipperUtils while RaycastManager exposes core
+             mesh/raycast structures to GUI tooling.
+             Commit: `annotate: slic3r/Utils model geometry helpers (T4055)`
+
+- [ ] T4056  annotate: src/slic3r/Utils/InstanceID.cpp
+             + src/slic3r/Utils/UndoRedo.cpp
+             + src/slic3r/Utils/UndoRedo.hpp
+             Context: Undo/config identity plumbing. These files couple the GUI
+             history stack to ObjectID, Config, PrintConfig, and shared runtime
+             helpers in libslic3r.
+             Commit: `annotate: slic3r/Utils undo identity bridge (T4056)`
+
+- [ ] T4057  annotate: src/slic3r/Utils/EmbossStyleManager.cpp
+             + src/slic3r/Utils/EmbossStyleManager.hpp
+             + src/slic3r/Utils/FontConfigHelp.cpp
+             + src/slic3r/Utils/WxFontUtils.cpp
+             + src/slic3r/Utils/WxFontUtils.hpp
+             Context: Emboss/text-facing utilities that pull core geometry,
+             text configuration, and emboss data types into wxWidgets helpers.
+             Commit: `annotate: slic3r/Utils emboss font helpers (T4057)`
+
+- [ ] T4058  annotate: src/slic3r/Utils/Http.hpp
+             + src/slic3r/Utils/Serial.cpp
+             Context: Remaining core-coupled utility interfaces. These files
+             only touch Exception-based libslic3r error/reporting surfaces.
+             Commit: `annotate: slic3r/Utils exception utility glue (T4058)`
 
 ---
 
@@ -991,3 +1067,58 @@ implements.)
 
 | File | Classification | Reason |
 |------|---------------|--------|
+| src/slic3r/Utils/ASCIIFolding.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/ASCIIFolding.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/AstroBox.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/BBLCloudServiceAgent.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/BBLCloudServiceAgent.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/BBLPrinterAgent.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/BBLPrinterAgent.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/Bonjour.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/Bonjour.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/ColorSpaceConvert.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/ColorSpaceConvert.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/Duet.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/ESP3D.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/FileHelp.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/FileHelp.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/FileTransferUtils.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/FileTransferUtils.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/FixModelByWin10.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/FixModelByWin10.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/FlashAir.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/FontConfigHelp.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/HexFile.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/HexFile.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/Http.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/IPrinterAgent.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/InstanceID.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/MKS.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/MacDarkMode.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/MacDarkMode.mm | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/MoonrakerPrinterAgent.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/NetworkAgentFactory.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/OrcaCloudServiceAgent.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/OrcaPrinterAgent.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/OrcaPrinterAgent.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/PresetUpdater.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/Process.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/Profile.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/ProfileDescription.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/QidiPrinterAgent.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/RaycastManager.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/Repetier.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/RetinaHelper.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/RetinaHelperImpl.hmm | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/RetinaHelperImpl.mm | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/Serial.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/SerialMessage.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/SerialMessageType.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/SimplyPrint.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/SnapmakerPrinterAgent.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/TCPConsole.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/TCPConsole.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/WebSocketClient.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/json_diff.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/minilzo_extension.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/minilzo_extension.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
