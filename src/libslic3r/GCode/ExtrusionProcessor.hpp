@@ -2,6 +2,32 @@
 #define slic3r_ExtrusionProcessor_hpp_
 
 // This algorithm is copied from PrusaSlicer, original author is Pavel Mikus(pavel.mikus.mail@seznam.cz)
+//
+// [INTENT] ExtrusionProcessor.hpp packages the BBL overhang-quality estimator used by
+// GCode generation to turn a geometric extrusion path into per-point slowdown and overlap
+// hints. The output is not G-code directly; it is an intermediate "processed polyline"
+// consumed by GCode.cpp when emitting segmented perimeter moves.
+//
+// [STATE] Runtime state lives in ExtrusionQualityEstimator caches keyed by PrintObject*.
+// Each layer handoff updates previous/next boundary and curled-line distance fields so the
+// current perimeter can query support from already printed geometry.
+//
+// [MEMORY] The estimator owns only its AABBTreeLines caches. PrintObject* / Layer* inputs are
+// borrowed references to longer-lived print graph objects; no transfer of ownership occurs.
+//
+// [CONCURRENCY] No internal locking. The estimator is mutated as GCode.cpp walks layers in print
+// order, so ports should keep it thread-confined or add explicit synchronization.
+//
+// [COUPLING] This header sits at the seam between support analysis and G-code emission:
+//   - SupportSpotsGenerator populates Layer::curled_lines.
+//   - Layer owns lslices / curled_lines for each Z slice.
+//   - GCode.cpp calls prepare_for_new_layer(), set_current_object(), then
+//     estimate_extrusion_quality() while segmenting external perimeters.
+//
+// [HAZARD] The estimator assumes the caller obeys that ordering contract. current_object is
+// not initialized here, and operator[] lookups on the boundary maps silently create empty
+// distancers if prepare_for_new_layer() was skipped. A port should make this dependency
+// explicit instead of relying on call-order discipline.
 
 #include "../AABBTreeLines.hpp"
 //#include "../SupportSpotsGenerator.hpp"
@@ -29,8 +55,16 @@ namespace Slic3r {
 
 struct ExtendedPoint
 {
+    // [STATE] position is always unscaled millimeter-space even when the input polyline is in
+    // scaled coordinates; estimate_points_properties() normalizes the representation so later
+    // distance / curvature logic can work in physical units.
     Vec2d position;
+    // [STATE] distance stores signed or unsigned overhang distance to the previous layer's
+    // supporting boundary, optionally biased by half a flow width to treat line centerlines as
+    // nozzle-width ribbons instead of mathematical curves.
     float distance;
+    // [STATE] curvature stores the maximum angle-per-mm observed across several sliding windows.
+    // GCode.cpp can then detect sharp unsupported turns without re-walking the polyline.
     float curvature;
 };
 
@@ -41,6 +75,18 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
                                                       float                                   max_line_length = -1.0f,
                                                       float                                   min_distance = -1.0f)
 {
+    // [INTENT] Sample a polyline against a previous-layer distance field and enrich each point
+    // with support distance / curvature. Optional intersection insertion and segment splitting
+    // prevent long sparse segments from hiding a short unsupported span that should trigger a
+    // slowdown.
+    //
+    // [COUPLING] unscaled_prev_layer is typically built from Layer::lslices or Layer::curled_lines
+    // through AABBTreeLines::LinesDistancer. This makes the algorithm generic over both geometric
+    // support boundaries and "curled danger" line segments.
+    //
+    // [HAZARD] Template booleans encode behavior at compile time instead of via a runtime config.
+    // Translators need to preserve the exact mode combinations used at call sites, otherwise the
+    // resulting distance semantics will drift subtly.
     bool   looped     = input_points.front() == input_points.back();
     std::function<size_t(size_t,size_t)> get_prev_index = [](size_t idx, size_t count) {
         if (idx > 0) {
@@ -70,11 +116,9 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
     };
 
     using P = typename POINTS::value_type;
-    // ORCA:
-    // minimum spacing threshold for any newly generated points
-    // Setting the minimum spacing to be 25% of the flow width ensures the points are spaced far enough apart
-    // to avoid micro stutters while the movement of the print head is still fine-grained enough to maintain
-    // print quality.
+    // [INTENT] Newly synthesized split/intersection points are filtered by a nozzle-relative
+    // spacing threshold so speed changes remain physically meaningful instead of creating a
+    // dense cloud of almost coincident G-code vertices.
     double min_spacing = flow_width*0.25;
 
     using AABBScalar = typename AABBTreeLines::LinesDistancer<L>::Scalar;
@@ -119,7 +163,9 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
         points.push_back(next_point);
     }
 
-    // Segmentation handling
+    // [INTENT] When slowdown is enabled, split segments near the support/no-support threshold so
+    // the downstream speed interpolator can localize the slowdown instead of penalizing the whole
+    // edge with one coarse sample.
     if (PREV_LAYER_BOUNDARY_OFFSET && ADD_INTERSECTIONS) {
         std::vector<ExtendedPoint> new_points;
         new_points.reserve(points.size() * 2);
@@ -184,7 +230,9 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
         points = std::move(new_points);
     }
 
-    // Maximum line length handling
+    // [INTENT] Optional max-length resampling caps the physical distance represented by any
+    // single sample pair. This stabilizes curvature / distance interpolation on long straight
+    // spans where only the endpoints would otherwise be measured.
     if (max_line_length > 0) {
         std::vector<ExtendedPoint> new_points;
         new_points.reserve(points.size() * 2);
@@ -215,7 +263,9 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
         points = std::move(new_points);
     }
 
-    // Curvature calculation
+    // [INTENT] Estimate curvature by comparing backward/forward chords across several windows
+    // (3, 9, 16 mm). Taking the maximum normalized angle highlights both tight local corners and
+    // broader unsupported bends that may curl even if any single segment looks shallow.
     float accumulated_distance = 0;
     std::vector<float> distances_for_curvature(points.size());
     for (size_t point_idx = 0; point_idx < points.size(); ++point_idx) {
@@ -283,24 +333,44 @@ std::vector<ExtendedPoint> estimate_points_properties(const POINTS              
 
 struct ProcessedPoint
 {
+    // [STATE] p is kept in scaled integer space because GCode.cpp emits motion commands using the
+    // same coordinate representation as the rest of libslic3r extrusion paths.
     Point p;
+    // [STATE] speed is an absolute mm/s target after overhang and curled-edge slowdown.
     float speed = 1.0f;
+    // [STATE] overlap encodes how much of the nozzle width is considered supported at this point.
+    // Downstream callers use it to adjust flow / visualization without recomputing distances.
     float overlap = 1.0f;
 };
 
 class ExtrusionQualityEstimator
 {
+    // [STATE] Per-object distance fields for the previous and next printed layer boundaries.
+    // prepare_for_new_layer() shifts "next" into "prev" as the G-code pipeline advances through Z.
     std::unordered_map<const PrintObject *, AABBTreeLines::LinesDistancer<Linef>> prev_layer_boundaries;
     std::unordered_map<const PrintObject *, AABBTreeLines::LinesDistancer<Linef>> next_layer_boundaries;
+    // [STATE] Parallel cache built from Layer::curled_lines. This is the BBL extension that lets
+    // normal overhang slowdown react to already-curled material, not just nominal layer overlap.
     std::unordered_map<const PrintObject *, AABBTreeLines::LinesDistancer<CurledLine>> prev_curled_extrusions;
     std::unordered_map<const PrintObject *, AABBTreeLines::LinesDistancer<CurledLine>> next_curled_extrusions;
+    // [STATE] Active object selected by GCode.cpp before each object's toolpaths are emitted.
+    // Non-owning raw pointer into Print / PrintObject lifetime.
     const PrintObject                                                            *current_object;
 
 public:
+    // [STATE] Setter-only API because the estimator is reused across many layers / objects during
+    // a single export. The current object is external scheduler state, not intrinsic estimator data.
     void set_current_object(const PrintObject *object) { current_object = object; }
 
     void prepare_for_new_layer(const PrintObject * obj, const Layer *layer)
     {
+        // [INTENT] Advance the per-object rolling window of support geometry so overhang distances
+        // for layer N are measured against the already printed layer N-1 and its curled segments.
+        // The next_* caches are populated first because GCode generation prefetches the upcoming
+        // layer before emitting paths that depend on it.
+        // [COUPLING] Reads Layer::lslices and Layer::curled_lines, which are produced earlier by
+        // slicing and SupportSpotsGenerator. This is where the support-analysis pipeline hands off
+        // its results to G-code motion planning.
         if (layer == nullptr) return;
         const PrintObject *object = obj;
         prev_layer_boundaries[object] = next_layer_boundaries[object];
@@ -316,6 +386,14 @@ public:
                                                            float                               original_speed,
                                                            bool								   slowdown_for_curled_edges)
     {
+        // [INTENT] Convert user-configured overhang bands into a monotone distance->speed curve,
+        // then sample the extrusion path against previous-layer support and optionally nearby
+        // curled material. The minimum permitted speed of each segment endpoint becomes the emitted
+        // per-point speed profile.
+        //
+        // [COUPLING] overlaps / speeds are the PrintConfig overhang tables already normalized by
+        // GCode.cpp. This method assumes they describe the same number of bands and truncates to the
+        // shorter one instead of validating config shape itself.
         size_t                               speed_sections_count = std::min(overlaps.values.size(), speeds.values.size());
         std::vector<std::pair<float, float>> speed_sections;
         
@@ -342,7 +420,8 @@ public:
             }
         }
         
-        // Orca: Find the smallest overhang distance where speed adjustments begin
+        // [INTENT] smallest_distance_with_lower_speed gates segment splitting. If the profile never
+        // slows below the original move speed, there is no benefit to inserting extra breakpoints.
         float smallest_distance_with_lower_speed = std::numeric_limits<float>::infinity(); // Initialize to a large value
         bool found = false;
         for (const auto& section : speed_sections) {
@@ -354,7 +433,9 @@ public:
             }
         }
 
-        // If a meaningful (i.e. needing slowdown) overhang distance was not found, then we shouldn't split the lines
+        // [HAZARD] A missing slowdown band is encoded as -1 instead of an optional value. Several
+        // branches in estimate_points_properties() treat any negative threshold as "feature off".
+        // Preserve that sentinel if this logic is ported verbatim.
         if (!found)
             smallest_distance_with_lower_speed=-1.f;
 
@@ -374,17 +455,25 @@ public:
             
             float artificial_distance_to_curled_lines = 0.0;
             if(slowdown_for_curled_edges) {
-            	// The following code artifically increases the distance to provide slowdown for extrusions that are over curled lines
+            	// [INTENT] Reuse the same overhang speed curve for curled-filament avoidance by
+            	// synthesizing an extra "unsupported distance" contribution near previous curled
+            	// segments. This keeps printer tuning in one table instead of adding a separate
+            	// curled-speed profile.
             	const double dist_limit = 10.0 * path.width;
 				{
 				Vec2d middle = 0.5 * (curr.position + next.position);
 				auto line_indices = prev_curled_extrusions[current_object].all_lines_in_radius(Point::new_scale(middle), scale_(dist_limit));
 					if (!line_indices.empty()) {
 						double len   = (next.position - curr.position).norm();
+						// [INTENT] Long segments are only penalized when a substantial fraction of their
+						// span overlaps the curled-line influence box; otherwise a tiny defect near the
+						// midpoint would incorrectly slow the whole move.
 						// For long lines, there is a problem with the additional slowdown. If by accident, there is small curled line near the middle of this long line
                     	//  The whole segment gets slower unnecesarily. For these long lines, we do additional check whether it is worth slowing down.
                     	// NOTE that this is still quite rough approximation, e.g. we are still checking lines only near the middle point
                     	// TODO maybe split the lines into smaller segments before running this alg? but can be demanding, and GCode will be huge
+                    	// [HAZARD] The midpoint-only probe is an acknowledged approximation. Translators should not simplify it away assuming
+                    	// exact geometry, but they may want a more principled segment subdivision strategy if output size permits.
                     	if (len > 2) {
                         	Vec2d dir   = Vec2d(next.position - curr.position) / len;
                         	Vec2d right = Vec2d(-dir.y(), dir.x());
@@ -423,6 +512,8 @@ public:
 			}	
 
             auto calculate_speed = [&speed_sections, &original_speed](float distance) {
+                // [INTENT] Piecewise-linear interpolation between configured overhang bands avoids
+                // step changes in feedrate at band boundaries, reducing abrupt acceleration changes.
                 float final_speed;
                 if (distance <= speed_sections.front().first) {
                     final_speed = original_speed;

@@ -572,7 +572,7 @@ any task here — it is the public interface that contextualizes all of these.)
 remaining files, most likely BBL additions. Read GCode.cpp (T185) and
 GCodeWriter.cpp (T186) annotations before starting any task here.)
 
-- [ ] T4030  annotate: src/libslic3r/GCode/ExtrusionProcessor.hpp
+- [x] T4030  annotate: src/libslic3r/GCode/ExtrusionProcessor.hpp
              Context: Mentioned in 03_algorithmic_complexities.md Section 9
              (curled extrusion estimation) but absent from Phase 1 registry.
              Document the curled-line detection API surface and how it feeds into
