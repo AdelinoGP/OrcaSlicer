@@ -743,7 +743,7 @@ implements.)
              text configuration, and emboss data types into wxWidgets helpers.
              Commit: `annotate: slic3r/Utils emboss font helpers (T4057)`
 
-- [ ] T4058  annotate: src/slic3r/Utils/Http.hpp
+- [x] T4058  annotate: src/slic3r/Utils/Http.hpp
              + src/slic3r/Utils/Serial.cpp
              Context: Remaining core-coupled utility interfaces. These files
              only touch Exception-based libslic3r error/reporting surfaces.
