@@ -1,9 +1,9 @@
 # Agent Journal — OrcaSlicer Codebase Analysis
 
 ## CURRENT STATUS
-Last session: 96
-Active task: T4024 — complete
-Next action: Begin T4030 by annotating `src/libslic3r/GCode/ExtrusionProcessor.hpp`.
+Last session: 97
+Active task: T4053 — complete
+Next action: Begin T4054 by annotating `src/slic3r/Utils/MoonrakerPrinterAgent.cpp`, `src/slic3r/Utils/PresetUpdater.cpp`, `src/slic3r/Utils/QidiPrinterAgent.cpp`, and `src/slic3r/Utils/SnapmakerPrinterAgent.cpp`.
 Unresolved [UNCLEAR] tags: 12 — all remaining source tags are marked `[UNCLEAR → ESCALATED]` after Session 86 T300 triage
 Files remaining (Phase 1): 287 files outside explicit skip buckets still need human coverage audit
 Files completed (Phase 1): 314 unique source files tracked by 314 annotate task entries
@@ -647,3 +647,28 @@ Total escalated tags: **12**
   - `src/libslic3r/Arachne/utils/PolylineStitcher.hpp`
 
 **Completed tasks this session:** T4024
+
+---
+
+## Session 97
+
+**Active task:** T4053 — annotate `src/slic3r/Utils/BBLNetworkPlugin.cpp`, `src/slic3r/Utils/BBLNetworkPlugin.hpp`, `src/slic3r/Utils/ICloudServiceAgent.hpp`, `src/slic3r/Utils/NetworkAgent.cpp`, `src/slic3r/Utils/NetworkAgent.hpp`, `src/slic3r/Utils/OrcaCloudServiceAgent.cpp`, `src/slic3r/Utils/SimplyPrint.cpp`, and `src/slic3r/Utils/json_diff.cpp`
+
+- Files processed: `src/slic3r/Utils/BBLNetworkPlugin.cpp`, `src/slic3r/Utils/BBLNetworkPlugin.hpp`, `src/slic3r/Utils/ICloudServiceAgent.hpp`, `src/slic3r/Utils/NetworkAgent.cpp`, `src/slic3r/Utils/NetworkAgent.hpp`, `src/slic3r/Utils/OrcaCloudServiceAgent.cpp`, `src/slic3r/Utils/SimplyPrint.cpp`, `src/slic3r/Utils/json_diff.cpp`, `generated_documentation/agent_journal.md`, `.ralph/ralph-tasks.md`
+- Key discoveries:
+  - `BBLNetworkPlugin` is the actual ABI boundary for the proprietary Bambu networking stack: it owns the opaque agent handle, the dynamically loaded function table, and the version-selection policy that higher-level wrappers rely on.
+  - `NetworkAgent` is a composition shell, not the networking implementation itself; its main architectural role is safely hot-swapping cloud and printer sub-agents while preserving callback wiring across threads.
+  - `OrcaCloudServiceAgent` mirrors the plugin-backed login surface closely enough that native Orca cloud support can replace the DLL path behind the same wide `ICloudServiceAgent` interface, but it hides important state in PKCE rotation, token persistence, and sync cursor files.
+  - `SimplyPrint` and `json_diff` are auxiliary but still core-coupled: one adapts the generic print-host API into a browser/cloud import workflow, while the other implements a stateful delta codec for printer JSON synchronization.
+- Decisions made:
+  - Annotated only the orchestration seams and hidden state transitions rather than every forwarding method, because the porting risk in this bucket is lifecycle, ABI coupling, token persistence, and callback ownership.
+  - Left existing skip classifications untouched even where sibling headers remain `SKIP_GUI`, since T4053 only covers the source files explicitly promoted into the cloud-orchestration bucket.
+- Open questions:
+  - None newly introduced; existing `[UNCLEAR -> ESCALATED]` items remain unchanged.
+- Cross-references:
+  - `src/slic3r/Utils/bambu_networking.hpp`
+  - `src/slic3r/Utils/IPrinterAgent.hpp`
+  - `src/libslic3r/ProjectTask.hpp`
+  - `src/slic3r/Utils/PrintHost.hpp`
+
+**Completed tasks this session:** T4053

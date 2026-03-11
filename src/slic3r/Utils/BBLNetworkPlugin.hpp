@@ -20,6 +20,8 @@ namespace Slic3r {
 // Function Pointer Types (copied from NetworkAgent.hpp)
 // ============================================================================
 
+// [HAZARD] This typedef block is the manually mirrored ABI for the proprietary Bambu plugin. Any signature drift
+// between this header and the shipped DLL/SO will fail only at runtime through null symbols or corrupt calls.
 typedef bool (*func_check_debug_consistent)(bool is_debug);
 typedef std::string (*func_get_version)(void);
 typedef void* (*func_create_agent)(std::string log_dir);
@@ -213,6 +215,8 @@ public:
      * Get the current agent handle.
      * Returns nullptr if no agent created.
      */
+    // [MEMORY] The plugin owns a single opaque agent allocated by foreign code. Callers may borrow the raw handle,
+    // but lifetime remains centralized here because the matching destroy routine also lives inside the loaded module.
     void* get_agent() const { return m_agent; }
 
     /**

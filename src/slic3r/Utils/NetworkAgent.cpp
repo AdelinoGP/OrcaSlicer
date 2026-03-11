@@ -114,6 +114,8 @@ NetworkAgent::NetworkAgent(std::string log_dir)
             plugin.create_agent(log_dir);
         }
 
+        // [INTENT] The default constructor path wraps the proprietary Bambu DLL in interface-based sub-agents so the
+        // rest of Orca can talk to one composed object regardless of whether the backend is native or plugin-backed.
         m_cloud_agent = std::make_shared<BBLCloudServiceAgent>();
         m_printer_agent = std::make_shared<BBLPrinterAgent>();
         m_printer_agent->set_cloud_agent(m_cloud_agent);
@@ -151,6 +153,8 @@ void NetworkAgent::set_printer_agent(std::shared_ptr<IPrinterAgent> printer_agen
             return;
         }
 
+        // [STATE] Callback bindings are treated as part of the active-printer identity, so the old agent is blanked
+        // before the swap and the cached callback set is replayed onto the replacement after the lock is released.
         // Disconnect all callbacks from the old agent
         apply_printer_callbacks(m_printer_agent, callbacks);
         // Capture the old agent before overwriting so we can disconnect it outside the lock
@@ -345,6 +349,8 @@ int NetworkAgent::set_on_local_message_fn(OnMessageFn fn)
 
 int NetworkAgent::set_queue_on_main_fn(QueueOnMainFn fn)
 {
+    // [COUPLING] Main-thread marshalling must stay identical across cloud and printer sides because UI event handling
+    // assumes either backend can surface work that needs wx-thread execution.
     // Set on both agents
     std::shared_ptr<ICloudServiceAgent> cloud_agent;
     std::shared_ptr<IPrinterAgent> printer_agent;
@@ -571,6 +577,8 @@ int NetworkAgent::set_user_selected_machine(std::string dev_id)
 
 int NetworkAgent::start_print(PrintParams params, OnUpdateStatusFn update_fn, WasCancelledFn cancel_fn, OnWaitFn wait_fn)
 {
+    // [COUPLING] Print execution is intentionally delegated only to the printer agent; the cloud half prepares tokens,
+    // metadata, and project state, but the actual device-specific upload/start workflow remains backend-specific.
     if (m_printer_agent) return m_printer_agent->start_print(params, update_fn, cancel_fn, wait_fn);
     return -1;
 }
@@ -796,6 +804,8 @@ int NetworkAgent::track_remove_files()
 
 int NetworkAgent::track_event(std::string evt_key, std::string content)
 {
+    // [STATE] Analytics enablement is cached locally in addition to the cloud agent so callers can query the current
+    // policy even if the backend is swapped or temporarily unavailable.
     if (m_cloud_agent) return m_cloud_agent->track_event(evt_key, content);
     return -1;
 }

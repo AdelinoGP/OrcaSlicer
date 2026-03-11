@@ -35,6 +35,8 @@ public:
 #endif
     static std::string get_version();
     static void* get_network_function(const char* name);
+    // [STATE] This process-global flag is latched into `BBLNetworkPlugin` during initialization so the chosen wire
+    // format/version affects every subsequently created cloud and printer agent.
     static bool use_legacy_network;
 
     static NetworkLibraryLoadError get_load_error();
@@ -178,10 +180,14 @@ private:
     void apply_printer_callbacks(const std::shared_ptr<IPrinterAgent>& printer_agent,
                                  const PrinterCallbacks& callbacks);
 
+    // [CONCURRENCY] UI callbacks, login events, and background discovery can all touch the active printer agent, so
+    // swapping the composed implementation is serialized through this mutex and local shared_ptr snapshots.
     mutable std::mutex m_agent_mutex;  // Protect agent swapping
     PrinterCallbacks m_printer_callbacks;
     bool enable_track = false;
 
+    // [MEMORY] Shared ownership lets GUI surfaces, in-flight callbacks, and temporary local snapshots keep the active
+    // sub-agents alive while `NetworkAgent` hot-swaps between native Orca and plugin-backed implementations.
     // Sub-agent composition (for Orca/BBL mixed mode)
     std::shared_ptr<ICloudServiceAgent> m_cloud_agent;
     std::shared_ptr<IPrinterAgent> m_printer_agent;

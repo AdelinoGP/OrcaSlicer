@@ -39,6 +39,10 @@ class ICloudServiceAgent {
 public:
     virtual ~ICloudServiceAgent() = default;
 
+    // [COUPLING] This interface deliberately mixes auth, cloud sync, printer metadata, publishing, and analytics in
+    // one facade so `NetworkAgent` can swap implementations without changing GUI call sites. A port may want to split
+    // these responsibilities, but today the wide surface area is the compatibility contract.
+
     // ========================================================================
     // Lifecycle Methods
     // ========================================================================
@@ -144,6 +148,8 @@ public:
      * Return the current access token for API calls.
      * Cloud and printer agents use this for Authorization headers.
      */
+    // [STATE] Access/refresh tokens live behind the interface so printer agents can borrow cloud credentials for relay
+    // APIs without owning the login flow themselves.
     virtual std::string get_access_token() const = 0;
 
     /**

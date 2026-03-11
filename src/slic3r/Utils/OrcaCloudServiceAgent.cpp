@@ -146,6 +146,8 @@ std::string sha256_base64url(const std::string& input)
 
 std::string machine_identifier()
 {
+    // [HAZARD] File-based token encryption keys are derived from machine-local identifiers rather than user secrets,
+    // which is convenient for silent login but ties decryptability to platform-specific host identity semantics.
     if (auto* cfg = Slic3r::GUI::wxGetApp().app_config) {
         const auto iid = Slic3r::instance_id::ensure(*cfg);
         if (!iid.empty()) return iid;
@@ -329,6 +331,8 @@ OrcaCloudServiceAgent::OrcaCloudServiceAgent(std::string log_dir)
 {
     auth_headers["apikey"] = ORCA_DEFAULT_PUB_KEY;
     pkce_bundle.loopback_port = choose_loopback_port();
+    // [STATE] Every login request rotates PKCE material and loopback port selection so a stale webview or intercepted
+    // callback cannot replay a previous session bootstrap.
     update_redirect_uri();
     regenerate_pkce();
     compute_fallback_path();
@@ -420,6 +424,8 @@ int OrcaCloudServiceAgent::start()
 {
     regenerate_pkce();
 
+    // [INTENT] Startup attempts silent session restoration so printer/cloud features can come online before any UI-
+    // initiated login flow, matching the plugin-backed agent behavior expected by existing screens.
     // Attempt silent sign-in from stored refresh token
     std::string stored_refresh;
     if (load_refresh_token(stored_refresh) && !stored_refresh.empty()) {
@@ -528,6 +534,8 @@ int OrcaCloudServiceAgent::change_user(std::string user_info)
             return node.get<std::string>(path, "");
         };
 
+        // [INTENT] `change_user` is the normalization funnel for every auth completion path: webview PKCE callbacks,
+        // direct token payloads, and server session blobs all converge into one `set_user_session` state mutation.
         // Check if this is a WebView login message (PKCE flow completion)
         std::string command = tree.get<std::string>("command", "");
         if (command == "user_login") {
@@ -834,6 +842,8 @@ std::string OrcaCloudServiceAgent::get_refresh_token() const
 
 bool OrcaCloudServiceAgent::ensure_token_fresh(const std::string& reason)
 {
+    // [COUPLING] All HTTP helpers depend on this preflight refresh hook because cloud APIs expose bearer-token failure
+    // as ordinary HTTP errors; centralizing refresh keeps every caller from reimplementing retry semantics.
     return refresh_if_expiring(TOKEN_REFRESH_SKEW, reason);
 }
 
@@ -961,6 +971,8 @@ int OrcaCloudServiceAgent::get_user_presets(std::map<std::string, std::map<std::
 
 std::string OrcaCloudServiceAgent::request_setting_id(std::string name, std::map<std::string, std::string>* values_map, unsigned int* http_code)
 {
+    // [INTENT] Orca Cloud treats profile ids as deterministic name-derived UUIDs so multiple clients can refer to the
+    // same logical preset without waiting for a server-assigned identifier round trip.
     std::string new_id = generate_uuid(name);
     if (new_id.empty()) {
         BOOST_LOG_TRIVIAL(error) << "OrcaCloudServiceAgent: request_setting_id failed - name is empty";
@@ -996,6 +1008,8 @@ std::string OrcaCloudServiceAgent::request_setting_id(std::string name, std::map
 
 int OrcaCloudServiceAgent::put_setting(std::string setting_id, std::string name, std::map<std::string, std::string>* values_map, unsigned int* http_code)
 {
+    // [STATE] `updated_time` is a hidden concurrency token threaded through the generic string map API; callers treat
+    // it like ordinary preset data, but sync uses it as the version fence for optimistic conflict detection.
     // Extract original_updated_at for Optimistic Concurrency Control
     // If present, server will verify version before update. If absent, treated as insert.
     // If present, server will verify version before update. If absent, treated as insert.
@@ -1326,6 +1340,8 @@ void OrcaCloudServiceAgent::save_sync_state()
 
     if (sync_state_path.empty()) return;
 
+    // [HAZARD] Sync cursors are persisted with a temp-file rename instead of a journaled store, so crash consistency
+    // depends on filesystem rename guarantees and silent catch-all handlers can hide I/O failures.
     try {
         std::string tmp_path = sync_state_path + ".tmp";
         std::ofstream ofs(tmp_path, std::ios::out | std::ios::trunc);
@@ -1398,6 +1414,8 @@ void OrcaCloudServiceAgent::persist_refresh_token(const std::string& token)
 
     bool stored = false;
 
+    // [MEMORY] Refresh tokens are the long-lived session anchor for silent login. They are intentionally persisted
+    // outside the in-memory `SessionInfo` lifetime, either in the OS secret store or an encrypted fallback file.
     if (m_use_encrypted_token_file) {
         // Use encrypted file only
         auto key = sha256_bytes(machine_identifier());

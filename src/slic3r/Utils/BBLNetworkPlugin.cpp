@@ -28,6 +28,8 @@ BBLNetworkPlugin& BBLNetworkPlugin::instance()
 {
     static std::once_flag flag;
     std::call_once(flag, [] {
+        // [MEMORY] The singleton is intentionally heap-allocated instead of function-local static so `shutdown()` can
+        // tear it down before process exit, after dynamically loaded callbacks and threads have been quiesced.
         s_instance = new BBLNetworkPlugin();
     });
     return *s_instance;
@@ -77,6 +79,8 @@ int BBLNetworkPlugin::initialize(bool using_backup, const std::string& version)
         return -1;
     }
 
+    // [INTENT] The loader preserves compatibility with pre-versioned plugin installs by copying the legacy binary into
+    // the new `<name>_<version>` naming scheme expected by the runtime selector.
     // Auto-migration: If loading legacy version and versioned library doesn't exist,
     // but unversioned legacy library does exist, copy it to versioned format
     if (version == BAMBU_NETWORK_AGENT_VERSION_LEGACY) {
@@ -156,6 +160,8 @@ int BBLNetworkPlugin::initialize(bool using_backup, const std::string& version)
         return -1;
     }
 
+    // [COUPLING] The network library is only half of the runtime surface; file-transfer hooks are initialized from a
+    // sibling module before any agent can service upload or print requests.
     // Load file transfer interface
     InitFTModule(m_networking_module);
 
@@ -248,6 +254,8 @@ void* BBLNetworkPlugin::create_agent(const std::string& log_dir)
     }
 
     if (m_create_agent) {
+        // [MEMORY] The plugin caches one foreign agent instance globally because downstream cloud/printer wrappers share
+        // websocket state, login session, and callback registration through this opaque handle.
         m_agent = m_create_agent(log_dir);
     }
 
@@ -535,6 +543,8 @@ PrintParams_Legacy BBLNetworkPlugin::as_legacy(PrintParams& param)
 
 void BBLNetworkPlugin::load_all_function_pointers()
 {
+    // [COUPLING] Symbol resolution hard-codes every exported entrypoint name, so adding/removing network features
+    // requires lockstep edits to the proprietary library, this shim, and all higher-level wrappers.
     m_check_debug_consistent = reinterpret_cast<func_check_debug_consistent>(get_function("bambu_network_check_debug_consistent"));
     m_get_version = reinterpret_cast<func_get_version>(get_function("bambu_network_get_version"));
     m_create_agent = reinterpret_cast<func_create_agent>(get_function("bambu_network_create_agent"));
@@ -638,6 +648,8 @@ void BBLNetworkPlugin::load_all_function_pointers()
 
 void BBLNetworkPlugin::clear_all_function_pointers()
 {
+    // [STATE] Unload resets the entire dispatch table to force later callers through `initialize()` again instead of
+    // accidentally invoking stale function pointers that reference an already-unloaded shared library image.
     m_check_debug_consistent = nullptr;
     m_get_version = nullptr;
     m_create_agent = nullptr;
@@ -751,6 +763,8 @@ std::vector<NetworkLibraryVersionInfo> get_all_available_versions()
         all_known_versions.insert(AVAILABLE_NETWORK_VERSIONS[i].version);
     }
 
+    // [INTENT] Runtime discovery allows OEM- or hotfixed plugin builds with suffixes to appear beside the baked-in
+    // compatibility table without changing the application binary.
     std::vector<std::string> discovered = BBLNetworkPlugin::scan_plugin_versions();
 
     std::vector<std::pair<std::string, std::string>> suffixed_versions;

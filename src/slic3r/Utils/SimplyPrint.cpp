@@ -109,6 +109,8 @@ SimplyPrint::SimplyPrint(DynamicPrintConfig* config)
 GUI::OAuthParams SimplyPrint::get_oauth_params() const
 {
     const auto verification_code = generate_verification_code();
+    // [INTENT] SimplyPrint uses the browser-based PKCE flow because upload authorization is account-scoped rather than
+    // printer-scoped; the slicer only needs a temporary localhost callback and bearer tokens afterward.
     // SimplyPrint uses S256 for PKCE
     const auto code_challenge = sha256b64(verification_code);
     const auto state          = generate_verification_code();
@@ -192,6 +194,8 @@ bool SimplyPrint::do_api_call(std::function<Http(bool)>                         
 
     bool res = true;
 
+    // [COUPLING] Every API call is wrapped in the same retry-on-401 scaffold because the upload workflow, chunk cleanup,
+    // and token introspection endpoints all depend on one refresh-token file maintained by the GUI OAuth job.
     const auto create_request = [this, &build_request, &res, &on_complete](const std::string& access_token, bool is_retry) {
         auto http = build_request(is_retry);
         set_auth(http, access_token);
@@ -282,6 +286,8 @@ bool SimplyPrint::do_temp_upload(const boost::filesystem::path& file_path,
                                  ProgressFn                     prorgess_fn,
                                  ErrorFn                        error_fn) const
 {
+    // [INTENT] The service exposes a temporary-import API instead of direct printer upload, so this helper converts a
+    // finished local file or previously uploaded chunk set into a browser-side import action inside SimplyPrint.
     if (file_path.empty() == chunk_id.empty()) {
         BOOST_LOG_TRIVIAL(error) << "SimplyPrint: Invalid arguments: both file_path and chunk_id are set or not provided";
         error_fn(_L("Internal error"));
@@ -352,6 +358,8 @@ bool SimplyPrint::do_chunk_upload(const boost::filesystem::path& file_path, cons
     std::string chunk_id;
     std::string delete_token;
 
+    // [HAZARD] Large uploads are a manual multi-request protocol with explicit cleanup; partial failures can leave
+    // orphaned server-side chunks unless this compensating delete path is kept in sync with API expectations.
     // Tell SimplyPrint that the upload has failed and the chunks should be deleted
     // Note: any error happens here won't be notified to the user
     const auto clean_up = [this, &chunk_id, &delete_token]() {
@@ -474,6 +482,8 @@ bool SimplyPrint::do_chunk_upload(const boost::filesystem::path& file_path, cons
 
 bool SimplyPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const
 {
+    // [COUPLING] `PrintHostUpload` still enters through the generic print-host API, but the backend ignores printer
+    // start commands entirely and instead hands the uploaded artifact off to the SimplyPrint web application.
     if (cred.find("access_token") == cred.end()) {
         error_fn(_L("SimplyPrint account not linked. Go to Connect options to set it up."));
         return false;

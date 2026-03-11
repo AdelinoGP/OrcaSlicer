@@ -21,6 +21,8 @@ using json = nlohmann::json;
 
 int json_diff::diff_objects(json const &in, json &out, json const &base)
 {
+    // [INTENT] This recursive walk emits only the fields that changed relative to the last full printer payload so the
+    // networking layer can send incremental device updates instead of retransmitting the whole JSON document.
     for (auto& el: in.items()) {
         if (el.value().empty()) {
             //BBL_LOG_INFO("json_c diff empty key: " << el.key());
@@ -79,6 +81,8 @@ int json_diff::all2diff_base_reset(json const &base)
 
 bool json_diff::load_compatible_settings(std::string const &type, std::string const &version)
 {
+    // [COUPLING] Compatibility baselines are loaded from slicer-managed printer JSON files, so network message decode
+    // behavior is indirectly tied to the preset/resource bundle shipped with the desktop application.
     // Reload on empty type and version
     if (!type.empty() || !version.empty()) {
         std::string type2    = type.empty() ? printer_type : type;
@@ -122,6 +126,8 @@ int json_diff::all2diff(json const &in, json &out)
         return 0;
     }
 
+    // [STATE] `all2diff_base` is mutated after every successful encode, making this object a stateful stream codec
+    // rather than a pure diff utility. Call ordering therefore changes the wire output.
     ret = diff_objects(in, out, all2diff_base);
     if (ret != 0) {
         BOOST_LOG_TRIVIAL(trace) << "json_c diff no new info";
@@ -232,6 +238,8 @@ void json_diff::merge_objects(json const &in, json &out)
 
 int json_diff::diff2all(json const &in, json &out)
 {
+    // [INTENT] Decode applies the incremental patch back onto the last known full payload, then re-appends any new
+    // branches so later diffs continue from a normalized full-message snapshot.
     if (!diff2all_base.empty()) {
         int ret = restore_objects(in, out, diff2all_base);
         if (ret < 0) {
@@ -269,6 +277,8 @@ void json_diff::compare_print(json &a, json &b)
 
 bool json_diff::is_need_request()
 {
+    // [HAZARD] After repeated decode failures the codec forces a full-state re-request, which is a recovery heuristic
+    // rather than protocol proof; ports need the same threshold or a more explicit resync signal.
     if (decode_error_count > 5) {
         return true;
     }
