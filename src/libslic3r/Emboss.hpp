@@ -145,8 +145,8 @@ struct FontFile
 // [STATE] cache is a shared_ptr<Glyphs> — main thread clears by assigning a new shared_ptr,
 // job thread holds a local copy of the shared_ptr. This is a lock-free handoff pattern that
 // relies on shared_ptr atomic operations (C++20: std::atomic<shared_ptr>). Pre-C++20 this
-// is technically a data race if not using atomic shared_ptr operations. [UNCLEAR → ESCALATED] Local code relies on an external thread-discipline contract, but no synchronization guarantee is documented here.
-// whether the shared_ptr swap on main thread is atomic.
+// is technically a data race if not using atomic shared_ptr operations. [UNCLEAR → ESCALATED] Local code relies on an external
+// thread-discipline contract, but no synchronization guarantee is documented here. whether the shared_ptr swap on main thread is atomic.
 struct FontFileWithCache
 {
     // Pointer on data of the font file
@@ -310,6 +310,8 @@ double get_align_y_offset_in_mm(FontProp::VerticalAlign align, unsigned count_li
 class IProject3d
 {
 public:
+    // [COUPLING] Shared projection contract consumed by both text projection and
+    //            CutSurface/cut2model reconstruction paths.
     virtual ~IProject3d() = default;
     /// <summary>
     /// Move point with respect to projection direction
@@ -328,6 +330,8 @@ public:
 class IProjection : public IProject3d
 {
 public:
+    // [INTENT] Bidirectional mapping API between 2D shape space and 3D world space.
+    //          Implementations define emboss style (orthographic, transformed, scaled).
     virtual ~IProjection() = default;
 
     /// <summary>

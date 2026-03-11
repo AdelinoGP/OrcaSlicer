@@ -788,7 +788,7 @@ implements.)
               + src/libslic3r/CutSurface.cpp
              Commit: `annotate: src/libslic3r files (T4060e)`
 
-- [ ] T4060f  annotate: src/libslic3r/CutSurface.hpp
+- [x] T4060f  annotate: src/libslic3r/CutSurface.hpp
               + src/libslic3r/CutUtils.hpp
               + src/libslic3r/EdgeGrid.hpp
               + src/libslic3r/Emboss.hpp

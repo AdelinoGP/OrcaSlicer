@@ -16,33 +16,43 @@
 
 namespace Slic3r {
 
-struct EmbossProjection{
+// [INTENT] Persistent data model for embossed text/SVG volumes. This header defines
+//          the serializable state saved to project/undo stacks, distinct from runtime
+//          projection engines in Emboss.hpp.
+// [COUPLING] Bridges geometry (ExPolygons), serialization (cereal), and SVG parsing
+//            cache state (NanoSVG). Changes here impact 3MF persistence and UndoRedo.
+// [MEMORY] Uses shared_ptr for SVG caches so large file/image buffers can be shared
+//          across UI/editor paths without deep copies on every state transition.
+// [HAZARD] Serialization is split between persisted fields and transient caches; ports
+//          must preserve this boundary to avoid huge undo snapshots or stale pointers.
+struct EmbossProjection
+{
     // Emboss depth, Size in local Z direction
-    double depth = 1.; // [in loacal mm] 
+    double depth = 1.; // [in loacal mm]
     // NOTE: User should see and modify mainly world size not local
 
     // Flag that result volume use surface cutted from source objects
     bool use_surface = false;
 
-    bool operator==(const EmbossProjection &other) const {
-        return depth == other.depth && use_surface == other.use_surface;
-    }
+    bool operator==(const EmbossProjection& other) const { return depth == other.depth && use_surface == other.use_surface; }
 
+    // [STATE] Serialized as part of volume metadata and undo/redo snapshots.
     // undo / redo stack recovery
-    template<class Archive> void serialize(Archive &ar) { ar(depth, use_surface); }
+    template<class Archive> void serialize(Archive& ar) { ar(depth, use_surface); }
 };
 
 // Extend expolygons with information whether it was successfull healed
-struct HealedExPolygons{
+struct HealedExPolygons
+{
     ExPolygons expolygons;
-    bool is_healed;
-    operator ExPolygons&() { return expolygons; }
+    bool       is_healed;
+               operator ExPolygons&() { return expolygons; }
 };
 
 // Help structure to identify expolygons grups
 // e.g. emboss -> per glyph -> identify character
 struct ExPolygonsWithId
-{ 
+{
     // Identificator for shape
     // In text it separate letters and the name is unicode value of letter
     // Is svg it is id of path
@@ -60,7 +70,7 @@ using ExPolygonsWithIds = std::vector<ExPolygonsWithId>;
 /// <summary>
 /// Contain plane shape information to be able emboss it and edit it
 /// </summary>
-struct EmbossShape 
+struct EmbossShape
 {
     // shapes to to emboss separately over surface
     ExPolygonsWithIds shapes_with_ids;
@@ -77,6 +87,7 @@ struct EmbossShape
     // Define how to emboss shape
     EmbossProjection projection;
 
+    // [COUPLING] 3MF round-trip compatibility hook.
     // !!! Volume stored in .3mf has transformed vertices.
     // (baked transformation into vertices position)
     // Only place for fill this is when load from .3mf
@@ -84,8 +95,9 @@ struct EmbossShape
     // Stored_Transform3d * fix_3mf_tr = Transform3d_before_store_to_3mf
     std::optional<Slic3r::Transform3d> fix_3mf_tr;
 
-    struct SvgFile {
-        // File(.svg) path on local computer 
+    struct SvgFile
+    {
+        // File(.svg) path on local computer
         // When empty can't reload from disk
         std::string path;
 
@@ -94,39 +106,48 @@ struct EmbossShape
         // and will create dialog to delete private data on save.
         std::string path_in_3mf;
 
-        // Loaded svg file data.
-        // !!! It is not serialized on undo/redo stack 
+        // [MEMORY] Runtime cache for parsed SVG tree.
+        // !!! It is not serialized on undo/redo stack
         std::shared_ptr<NSVGimage> image = nullptr;
 
-        // Loaded string data from file
+        // [MEMORY] Raw SVG text cache used to rehydrate `image` without disk IO.
+        // Serialized by value in save()/load() (not as shared_ptr identity).
         std::shared_ptr<std::string> file_data = nullptr;
 
-        template<class Archive> void save(Archive &ar) const {
+        template<class Archive> void save(Archive& ar) const
+        {
+            // [STATE] Persist only stable data; omit parsed image cache.
             // Note: image is only cache it is not neccessary to store
 
             // Store file data as plain string
             // For Embossed text file_data are nullptr
             ar(path, path_in_3mf, (file_data != nullptr) ? *file_data : std::string(""));
         }
-        template<class Archive> void load(Archive &ar) {
+        template<class Archive> void load(Archive& ar)
+        {
             // for restore shared pointer on file data
             std::string file_data_str;
             ar(path, path_in_3mf, file_data_str);
             if (!file_data_str.empty())
+                // [HAZARD] Restores with unique allocation each load; shared ownership
+                // identity across snapshots is intentionally not preserved.
                 file_data = std::make_unique<std::string>(file_data_str);
         }
     };
     // When embossing shape is made by svg file this is source data
     std::optional<SvgFile> svg_file;
 
+    // [STATE] Undo/redo persistence: includes final_shape cache payload currently.
+    // [HAZARD] `final_shape` comment says "cache" yet save()/load() serializes it;
+    // this increases snapshot size and can mask recomputation bugs across restores.
     // undo / redo stack recovery
-    template<class Archive> void save(Archive &ar) const
+    template<class Archive> void save(Archive& ar) const
     {
         // final_shape is not neccessary to store - it is only cache
         ar(shapes_with_ids, final_shape, scale, projection, svg_file);
         cereal::save(ar, fix_3mf_tr);
     }
-    template<class Archive> void load(Archive &ar)
+    template<class Archive> void load(Archive& ar)
     {
         ar(shapes_with_ids, final_shape, scale, projection, svg_file);
         cereal::load(ar, fix_3mf_tr);
@@ -136,8 +157,8 @@ struct EmbossShape
 
 // Serialization through the Cereal library
 namespace cereal {
-template<class Archive> void serialize(Archive &ar, Slic3r::ExPolygonsWithId &o) { ar(o.id, o.expoly, o.is_healed); }
-template<class Archive> void serialize(Archive &ar, Slic3r::HealedExPolygons &o) { ar(o.expolygons, o.is_healed); }
+template<class Archive> void serialize(Archive& ar, Slic3r::ExPolygonsWithId& o) { ar(o.id, o.expoly, o.is_healed); }
+template<class Archive> void serialize(Archive& ar, Slic3r::HealedExPolygons& o) { ar(o.expolygons, o.is_healed); }
 }; // namespace cereal
 
 #endif // slic3r_EmbossShape_hpp_

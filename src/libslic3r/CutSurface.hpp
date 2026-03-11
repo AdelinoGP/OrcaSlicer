@@ -27,6 +27,8 @@ namespace Slic3r {
 //          Used downstream by cut2model() to stitch side walls onto the patch.
 struct SurfaceCut : public indexed_triangle_set
 {
+    // [MEMORY] Inherits vertex/index storage by value from indexed_triangle_set.
+    //          contour indices reference `vertices` in this same object.
     // vertex indices(index to mesh vertices)
     using Index    = unsigned int;
     using Contour  = std::vector<Index>;
@@ -101,6 +103,8 @@ indexed_triangle_set its_mask(const indexed_triangle_set& its, const std::vector
 //          and a shape mesh file, returning true if CGAL corefinement succeeds without error.
 //          Not called in production code paths.
 bool corefine_test(const std::string& model_path, const std::string& shape_path);
+// [HAZARD] Diagnostic utility takes filesystem paths and may load untrusted meshes;
+//          caller is responsible for sanitizing path origin in production wrappers.
 
 } // namespace Slic3r
 #endif // slic3r_CutSurface_hpp_
