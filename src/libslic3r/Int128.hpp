@@ -77,6 +77,7 @@ class Int128
 /******************************************** Using the intrinsic 128bit x 128bit multiply ************************************************/
 
 public:
+	// [HAZARD] __int128 availability depends on compiler/ABI; keep this type internal to arithmetic predicates.
 	__int128 value;
 
 	Int128(int64_t lo = 0) : value(lo) {}
@@ -106,6 +107,7 @@ public:
 	static inline Int128 multiply(int64_t lhs, int64_t rhs) { return Int128(__int128(lhs) * __int128(rhs)); }
 
 	// Evaluate signum of a 2x2 determinant.
+	// [INTENT] Exact sign test prevents orientation flips caused by 64-bit multiplication overflow.
 	static int sign_determinant_2x2(int64_t a11, int64_t a12, int64_t a21, int64_t a22)
 	{
 		__int128 det = __int128(a11) * __int128(a22) - __int128(a12) * __int128(a21);
@@ -113,6 +115,7 @@ public:
 	}
 
 	// Compare two rational numbers.
+	// [INTENT] Fraction ordering via cross products avoids floating-point precision loss.
 	static int compare_rationals(int64_t p1, int64_t q1, int64_t p2, int64_t q2)
 	{
 		int invert = ((q1 < 0) == (q2 < 0)) ? 1 : -1;
@@ -124,6 +127,7 @@ public:
 
 /******************************************** Splitting the 128bit number into two 64bit words *********************************************/
 
+	// [INTENT] Software fallback preserves exact predicates when native 128-bit support is unavailable.
 	Int128(int64_t lo = 0) : m_lo((uint64_t)lo), m_hi((lo < 0) ? -1 : 0) {}
 	Int128(const Int128 &val) : m_lo(val.m_lo), m_hi(val.m_hi) {}
 	Int128(const int64_t& hi, const uint64_t& lo) : m_lo(lo), m_hi(hi) {}
@@ -189,11 +193,13 @@ public:
 	static inline Int128 multiply(int64_t lhs, int64_t rhs)
 	{
 #if defined(_MSC_VER) && defined(_WIN64)
+		// [COUPLING] Relies on MSVC-specific _mul128 intrinsic for signed 64x64->128 multiplication.
 		// On Visual Studio 64bit, use the _mul128() intrinsic function.
 		Int128 result;
 	    result.m_lo = (uint64_t)_mul128(lhs, rhs, &result.m_hi);
 	    return result;
 #else
+	    // [HAZARD] Manual limb multiplication assumes two's-complement math and exact carry propagation.
 	    // This branch should only be executed in case there is neither __int16 type nor _mul128 intrinsic
 	    // function available. This is mostly on 32bit operating systems.
 	    // Use a pure C implementation of _mul128().
@@ -257,6 +263,7 @@ private:
 public:
 
 	// Evaluate signum of a 2x2 determinant, use a numeric filter to avoid 128 bit multiply if possible.
+	// [INTENT] Fast filter handles easy cases in 63-bit range before falling back to exact arithmetic.
 	static int sign_determinant_2x2_filtered(int64_t a11, int64_t a12, int64_t a21, int64_t a22)
 	{
 		// First try to calculate the determinant over the upper 31 bits.
@@ -276,6 +283,7 @@ public:
 	}
 
 	// Compare two rational numbers, use a numeric filter to avoid 128 bit multiply if possible.
+	// [HAZARD] Filter error bounds are correctness-critical; adjusting constants can invert predicate decisions.
 	static int compare_rationals_filtered(int64_t p1, int64_t q1, int64_t p2, int64_t q2)
 	{
 		// First try to calculate the determinant over the upper 31 bits.

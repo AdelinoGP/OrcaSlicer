@@ -12,9 +12,12 @@
 namespace Slic3r {
 
 namespace I18N {
+	// [STATE] Process-global callback installed by UI bootstrap; null keeps identity translation.
 	typedef std::string (*translate_fn_type)(const char*);
 	extern translate_fn_type translate_fn;
+	// [COUPLING] Keeps libslic3r decoupled from GUI gettext implementation details.
 	inline void set_translate_callback(translate_fn_type fn) { translate_fn = fn; }
+	// [INTENT] Fallback preserves deterministic text in tests/CLI when translation backend is absent.
 	inline std::string translate(const std::string &s) { return (translate_fn == nullptr) ? s : (*translate_fn)(s.c_str()); }
 	inline std::string translate(const char *ptr) { return (translate_fn == nullptr) ? std::string(ptr) : (*translate_fn)(ptr); }
 } // namespace I18N
@@ -28,6 +31,7 @@ namespace I18N {
 	    #error L macro is defined where it shouldn't be. Didn't you include slic3r/GUI/I18N.hpp in libslic3r by mistake?
 	#endif
 	namespace {
+		// [HAZARD] These macro-like shims depend on include order; accidental GUI macro leakage can silently alter calls.
 		[[maybe_unused]] const char* L(const char* s)    { return s; }
 		[[maybe_unused]] const char* L_CONTEXT(const char* s, const char* context) { return s; }
 		[[maybe_unused]] std::string _u8L(const char* s) { return Slic3r::I18N::translate(s); }

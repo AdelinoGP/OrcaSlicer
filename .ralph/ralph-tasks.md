@@ -816,7 +816,7 @@ implements.)
               + src/libslic3r/Geometry.hpp
              Commit: `annotate: src/libslic3r files (T4060i)`
 
-- [ ] T4060j  annotate: src/libslic3r/I18N.hpp
+- [x] T4060j  annotate: src/libslic3r/I18N.hpp
               + src/libslic3r/Int128.hpp
               + src/libslic3r/IntersectionPoints.hpp
               + src/libslic3r/JumpPointSearch.hpp
