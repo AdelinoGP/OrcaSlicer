@@ -496,7 +496,7 @@ its header to understand the data contract.)
              DRC serialization, model I/O helpers, and ZIP archive import glue.
              Commit: `annotate: remaining Format/ files (T4017)`
 
-- [ ] T4018  DOCS UPDATE · After T4010–T4017 are all complete: add a
+- [x] T4018  DOCS UPDATE · After T4010–T4017 are all complete: add a
              "Section 2b — Model Loading in Detail" entry to
              03_algorithmic_complexities.md describing the parsing pipeline:
              which format parsers produce indexed_triangle_set directly vs
@@ -848,10 +848,53 @@ implements.)
 
 ### Phase 4 Documentation Wrap-Up
 
-- [ ] T4070  LINK VERIFICATION · Re-run T301 for all files newly annotated in
-             Phase 4. Append new rows to
-             generated_documentation/link_verification_report.md.
-             Do not re-check Phase 1/2/3 links already verified.
+- [ ] T4070  LINK VERIFICATION · Verify all file:line references in documentation
+             files that were created or updated during Phase 4.
+
+             Scope: only documentation changes made in Phase 4. Do not re-check
+             links already verified.
+
+             Procedure:
+             1. Identify every documentation file touched during Phase 4:
+                - 03_algorithmic_complexities.md (updated by T4018, T4024, T4042)
+                - 04_refactoring_hazards.md (updated by all annotation tasks)
+                - pseudocode_arachne_straight_skeleton.md (created by T4024)
+                - pseudocode_tpms_infill.md (created by T4042, if applicable)
+                - Any other .md file written or modified in Phase 4.
+
+             2. From each of those files, extract every reference of the form
+                `file.cpp#L<n>`, `file.hpp#L<n>`, or `path/to/file.ext#L<n>`.
+                Extract only references added or modified in Phase 4 —
+                references carried over from prior phases are already verified.
+
+             3. For each extracted reference:
+                a. Open the source file at the given line number.
+                b. Confirm the referenced content (function name, variable,
+                   comment block, or structural feature) is present within
+                   ±20 lines of the stated line number.
+                c. If content is present within ±20 lines but the line number
+                   has drifted: update the reference in the documentation file
+                   to the correct line number. Record as UPDATED.
+                d. If content is present and line number is exact: record as OK.
+                e. If the referenced content cannot be found within ±20 lines
+                   of the stated number (function renamed, removed, or file
+                   restructured): replace the link in the documentation file
+                   with `[LINK BROKEN — <reason>]` and record as BROKEN.
+
+             4. Append results to
+                `generated_documentation/link_verification_report.md`
+                as a new section titled `## Phase 4 Verification`
+                using this table format:
+                  | Doc file | Link | Expected content | Status |
+                  |----------|------|-----------------|--------|
+
+             5. If any BROKEN entries exist: add a note under the table
+                explaining what investigation would be needed to fix each one.
+
+             Acceptance criteria: the Phase 4 section of the report must exist
+             and contain an entry for every extracted reference. Zero entries
+             means either no links were added in Phase 4 (note this explicitly)
+             or the extraction step was skipped (not acceptable).
              Commit: `docs: Phase 4 link verification (T4070)`
 
 - [ ] T4071  HAZARD BLOCKERS UPDATE · Scan all new hazard entries created during
@@ -859,12 +902,87 @@ implements.)
              Critical Blockers summary at the top of 04_refactoring_hazards.md.
              Commit: `docs: Phase 4 critical blockers update (T4071)`
 
-- [ ] T4072  REVIEW PACKAGE · Regenerate REVIEW_PACKAGE.md. The coverage gap
-             line must read "0 unresolved files" for this phase to be considered
-             complete. Update all inventory tables with Phase 4 additions.
-             Update the CURRENT STATUS block in agent_journal.md.
-             Leave T303 as [/] ACTIVE — do not mark it done.
-             Commit: `docs: regenerate REVIEW_PACKAGE.md (T4072)`
+- [ ] T4072  REVIEW PACKAGE UPDATE · Regenerate the human-review handoff
+             document to reflect the completed Phase 4 work.
+
+             Procedure:
+             1. Open `generated_documentation/REVIEW_PACKAGE.md` and rewrite
+                it in full. Do not append to the existing file — replace it.
+                The new file must contain all five sections below.
+
+             2. Section 1 — Coverage Summary:
+                - Re-run the file enumeration:
+                    find src/ -name "*.cpp" -o -name "*.hpp" -o -name "*.h" | sort
+                - Count total source files found.
+                - Count annotated files: all [x] DONE tasks across Phase 1
+                  and Phase 4 with the `annotate:` prefix.
+                - Count explicitly skipped files: sum of all entries in the
+                  Phase 4 Skip Registry plus all prior SKIP_GUI / SKIP_TRIVIAL /
+                  SKIP_VENDORED entries recorded in T4000 and T4050.
+                - Compute: unresolved = total − annotated − skipped.
+                - The unresolved count MUST be 0. If it is not 0, do not
+                  proceed to sections 2–5. Instead, write a single line:
+                  "PHASE 4 INCOMPLETE — N files unresolved. Complete all
+                  remaining annotation tasks before regenerating this document."
+                  Commit that stub, then stop.
+
+             3. Section 2 — Documentation File Inventory:
+                Produce a table with one row per file in
+                `generated_documentation/`. Columns:
+                  | File | Line count | Last-updated task/commit | Coverage summary |
+                Count lines with `wc -l` or equivalent. Write the coverage
+                summary as one sentence describing what the file contains.
+                Include every .md file: documentation files, pseudocode files,
+                the journal, the archive, the link verification report, and
+                this review package itself.
+
+             4. Section 3 — Pseudocode File Inventory:
+                Produce a table with one row per pseudocode file. Columns:
+                  | File | Source files covered | Translation Note count |
+                Count Translation Notes by searching each pseudocode file for
+                the string "TN " or "Translation Note" — use whichever prefix
+                the existing pseudocode files use for consistency.
+
+             5. Section 4 — Open Items Requiring Human Judgment:
+                4.1 Escalated [UNCLEAR] tags: list every tag still marked
+                    `[UNCLEAR → ESCALATED]` across all annotated source files.
+                    Format as a table: File | Line | Reason blocked.
+                    Do not list tags marked `[UNCLEAR → RESOLVED]`.
+                4.2 Broken links: copy all BROKEN entries from
+                    link_verification_report.md (both the T301 section and
+                    the Phase 4 section). If none exist, write "None."
+                4.3 Skip decisions to audit: list every SKIP_GUI,
+                    SKIP_TRIVIAL, and SKIP_VENDORED entry from the Phase 4
+                    Skip Registry that a human should sanity-check before
+                    claiming full coverage. Flag any SKIP_GUI file that
+                    imports a libslic3r core header — these may have been
+                    misclassified.
+                4.4 Duplicate task entries: note that T105 and T413 both
+                    record src/libslic3r/PrintObject.cpp. Confirm the file
+                    was annotated once and the duplicate entry is harmless.
+
+             6. Section 5 — Suggested Reading Order for Translation Agents:
+                Write a numbered list of at most 8 items. Each item names a
+                specific documentation file or pseudocode file and gives one
+                sentence explaining what a translation agent will learn from
+                it and when in the porting process they need it. Base this
+                on the actual content of the files as they exist after Phase 4,
+                not on a prior version of this section.
+
+             7. Update the CURRENT STATUS block at the top of
+                `generated_documentation/agent_journal.md`:
+                - Set "Last session" to the current session number.
+                - Set "Active task" to "T4072 — complete".
+                - Set "Next action" to "Awaiting human review."
+                - Set "Unresolved files" to 0 (or the actual count if
+                  the phase is incomplete).
+                - Set "Files remaining (Phase 4)" to 0.
+
+             Acceptance criteria: REVIEW_PACKAGE.md must exist, must have all
+             five sections populated with real counts (not placeholders), and
+             the coverage summary unresolved count must be 0.
+             Commit both files together:
+             `docs: regenerate REVIEW_PACKAGE.md and update journal (T4072)`
 
 ---
 

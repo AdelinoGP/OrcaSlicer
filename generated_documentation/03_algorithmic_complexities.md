@@ -58,6 +58,53 @@ After per-layer `Polygons` are produced by `slice_mesh()`, `slice_mesh_ex()` app
 
 ---
 
+## 2b. Model Loading in Detail
+
+**Primary dispatch:** [`Model::read_from_file`](../src/libslic3r/Model.cpp#L353) selects the loader mostly by extension and normalizes every successful import into the same `Model -> ModelObject -> ModelVolume -> TriangleMesh` scene graph.
+
+### Pipeline classes
+
+| Class | Formats | Core construction path | Notes |
+|---|---|---|---|
+| Direct triangle ingestion | OBJ, AMF, 3MF, BBS 3MF, DRC | Parser builds `indexed_triangle_set` directly, then wraps it in `TriangleMesh` / `ModelVolume` | Minimal geometric normalization before the generic mesh pipeline |
+| Triangle-import bridge | STL, STEP, SVG, ModelIO fallback | Format-specific reader first produces admesh `stl_file`-style triangles, then `TriangleMesh::from_stl()` converts that to shared-vertex ITS | These are the only importers that automatically run the admesh repair pass on load |
+| Slice-reconstruction bridge | SL1 / SL1S | PNG rasters -> marching-squares contours -> `ExPolygons` -> `slices_to_mesh()` -> ITS | Geometry is reconstructed from layer silhouettes, not original triangles |
+
+### What admesh repair actually guarantees
+
+The STL conversion path is defined in [`TriangleMesh::trianglemesh_repair_on_import`](../src/libslic3r/TriangleMesh.cpp#L100) and reused by any importer that ends in `TriangleMesh::from_stl()`.
+
+- Exact shared-edge matching: `stl_check_facets_exact()` welds bitwise-identical triangle edges first.
+- Nearby-edge stitching: `stl_check_facets_nearby()` retries with a tolerance derived from shortest edge and bounding diameter.
+- Non-manifold cleanup: `stl_remove_unconnected_facets()` drops facets that still fail connectivity checks.
+- Normal/orientation normalization: `stl_fix_normal_directions()`, `stl_fix_normal_values()`, and `stl_calculate_volume()` enforce outward winding when the signed volume is negative.
+- No hole filling: `stl_fill_holes()` is explicitly disabled, so watertightness is not guaranteed even after repair.
+
+This means "pre-admesh repair" differs sharply by parser: STL/STEP/SVG/ModelIO can promise eventual edge welding + normal cleanup before slicing, while the direct-ITS parsers generally only promise index validity plus, at most, a global winding flip.
+
+### Parser-by-parser construction map
+
+| Parser | Produces `indexed_triangle_set` directly? | Intermediate representation before final mesh | Mesh quality guarantees before admesh repair |
+|---|---|---|---|
+| [`STL.cpp`](../src/libslic3r/Format/STL.cpp#L39) | No | `TriangleMesh::ReadSTLFile()` reads binary/ASCII STL into admesh `stl_file`, then `TriangleMesh::from_stl()` converts to ITS | Strongest normalization path: edge matching, nearby welding, unconnected-face removal, normal fix, signed-volume flip, but no hole fill |
+| [`OBJ.cpp`](../src/libslic3r/Format/OBJ.cpp#L58) | Yes | `ObjParser` token stream -> direct ITS assembly -> `TriangleMesh(std::move(its))` | Rejects faces with fewer than 3 or more than 4 vertices; quads are fan-triangulated; only global negative-volume winding is corrected |
+| [`AMF.cpp`](../src/libslic3r/Format/AMF.cpp#L675) | Yes | SAX parser builds shared object vertex table, then each `<volume>` is compacted into its own ITS | Validates face indices, compacts referenced vertex span, and flips the whole ITS if signed volume is negative; no edge welding or manifold repair |
+| [`3mf.cpp`](../src/libslic3r/Format/3mf.cpp#L447) | Yes | ZIP + streaming XML -> one geometry buffer per object -> sidecar triangle ranges split geometry back into per-volume ITS blocks in [`_generate_volumes`](../src/libslic3r/Format/3mf.cpp#L2168) | Validates triangle/vertex index ranges, preserves stored mesh-repair stats metadata, and flips whole-volume winding if negative; geometry itself is not re-repaired on import |
+| [`bbs_3mf.cpp`](../src/libslic3r/Format/bbs_3mf.cpp#L4798) | Yes | Same core 3MF geometry idea, but with Bambu sidecars, split object files, shared-mesh references, and per-volume extension metadata | Similar to base 3MF: validates indices, reconstructs per-volume ITS blocks, reapplies stored mesh stats/extensions, flips negative-volume meshes, but does not run admesh repair unless a later tool explicitly does so |
+| [`STEP.cpp`](../src/libslic3r/Format/STEP.cpp#L528) | No | OCCT B-Rep document -> `BRepMesh_IncrementalMesh` tessellation -> copied into admesh `stl_file` -> `TriangleMesh::from_stl()` | Tessellation quality is controlled by OCCT linear/angular deflection; after tessellation it inherits the STL/admesh repair guarantees |
+| [`svg.cpp`](../src/libslic3r/Format/svg.cpp#L1) | No | NanoSVG paths -> sampled polylines -> Clipper stroke offsets -> OCCT prism extrusion -> admesh `stl_file` -> `TriangleMesh::from_stl()` | Guarantees only sampled/extruded approximation before repair; fidelity depends on Bezier sampling and fixed extrusion depth, then admesh cleans topology like STL |
+| [`DRC.cpp`](../src/libslic3r/Format/DRC.cpp#L45) | Yes | Draco decoder -> direct ITS reconstruction from decoded position/face arrays | Verifies geometry kind is triangular mesh and remaps Draco point IDs back to position indices; only global winding is normalized |
+| [`SL1.cpp`](../src/libslic3r/Format/SL1.cpp#L344) | Yes, but only after raster reconstruction | ZIP archive -> PNG decode -> marching squares -> `ExPolygons` -> [`slices_to_mesh()`](../src/libslic3r/Format/SL1.cpp#L396) -> ITS | Guarantees a contour-lofted shell consistent with archived slice rasters; geometry is intentionally lossy and bounded by raster resolution/window smoothing |
+| [`ModelIO.hpp`](../src/libslic3r/Format/ModelIO.hpp#L4) | No | Apple-only foreign format -> temporary STL file -> normal STL loader | No format-native guarantee at all; the fallback intentionally inherits STL parsing + admesh repair semantics |
+
+### Practical translation takeaway
+
+- If the target runtime already has a robust manifold-triangle repair library, only the STL/STEP/SVG/ModelIO branch truly needs it at import time.
+- OBJ/AMF/3MF/BBS 3MF/DRC are primarily schema-to-ITS translators; the port must preserve their rebasing, volume-splitting, and global winding-correction rules more than it needs a heavyweight repair pass.
+- SL1 is not a mesh parser in the normal sense. It is a slice-stack reconstructor and should be ported next to SLA raster logic, not next to STL/OBJ readers.
+
+---
+
 ## 2. Perimeter Generation
 
 **Files:** [`PerimeterGenerator.cpp`](../src/libslic3r/PerimeterGenerator.cpp), [`Arachne/WallToolPaths.cpp`](../src/libslic3r/Arachne/)
@@ -1121,4 +1168,3 @@ Arachne is the dominant cost in `PerimeterGenerator` for layers with many thin f
 Section 2 of this document describes the classic perimeter generator and notes Arachne uses a "straight skeleton (medial axis)" without explaining the implementation. The Voronoi-based straight skeleton construction described here is that implementation. The key insight: the Voronoi diagram of polygon edges **is** the straight skeleton; Arachne does not run a separate medial axis algorithm.
 
 ---
-

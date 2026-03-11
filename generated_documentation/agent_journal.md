@@ -1,9 +1,9 @@
 # Agent Journal — OrcaSlicer Codebase Analysis
 
 ## CURRENT STATUS
-Last session: 91
-Active task: T4017 — annotate `src/libslic3r/Format/DRC.cpp` + `src/libslic3r/Format/DRC.hpp` + remaining Format helpers
-Next action: Continue the Phase 4 Format gap by covering the remaining DRC/model I/O/SVG/archive helper files now that the dedicated SL1 archive path is annotated.
+Last session: 92
+Active task: T4018 — complete
+Next action: Begin T4020 by annotating the missing Arachne straight-skeleton header/output types group.
 Unresolved [UNCLEAR] tags: 12 — all remaining source tags are marked `[UNCLEAR → ESCALATED]` after Session 86 T300 triage
 Files remaining (Phase 1): 287 files outside explicit skip buckets still need human coverage audit
 Files completed (Phase 1): 314 unique source files tracked by 314 annotate task entries
@@ -526,3 +526,27 @@ Total escalated tags: **12**
   - `src/libslic3r/MarchingSquares.hpp`
 
 **Completed tasks this session:** T4016
+
+---
+
+## Session 92
+
+**Active task:** T4018 — add `Section 2b — Model Loading in Detail` to `generated_documentation/03_algorithmic_complexities.md`
+
+- Files processed: `generated_documentation/03_algorithmic_complexities.md`, `generated_documentation/agent_journal.md`, `.ralph/ralph-tasks.md`
+- Key discoveries:
+  - The Format module now falls into three distinct import families: direct schema-to-ITS loaders (OBJ/AMF/3MF/BBS 3MF/DRC), admesh-backed triangle bridges (STL/STEP/SVG/ModelIO), and slice-stack reconstruction (`SL1`).
+  - `TriangleMesh::trianglemesh_repair_on_import()` is the real semantic boundary for the "repaired on load" claim: only importers that end in `TriangleMesh::from_stl()` get exact-edge matching, nearby welding, unconnected-face removal, normal cleanup, and signed-volume correction.
+  - Base `3mf.cpp` and `bbs_3mf.cpp` both rebuild per-volume meshes by slicing large geometry buffers back into `indexed_triangle_set` blocks using sidecar metadata; their main difference is metadata breadth, not the geometry normalization contract.
+- Decisions made:
+  - Documented parser behavior as a construction taxonomy plus a parser-by-parser table, because downstream translation work needs a stable import strategy map more than narrative prose.
+  - Included `ModelIO`, `svg`, and `DRC` in the section even though the task was triggered by T4010–T4017, because they materially affect the real model-loading dispatch path in `Model::read_from_file()`.
+- Open questions:
+  - None newly introduced; existing `[UNCLEAR -> ESCALATED]` items remain unchanged.
+- Cross-references:
+  - `src/libslic3r/Model.cpp`
+  - `src/libslic3r/TriangleMesh.cpp`
+  - `src/libslic3r/Format/3mf.cpp`
+  - `src/libslic3r/Format/bbs_3mf.cpp`
+
+**Completed tasks this session:** T4018
