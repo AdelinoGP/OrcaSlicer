@@ -7,7 +7,7 @@
 namespace Slic3r {
 
 namespace UndoRedo {
-	class StackImpl;
+class StackImpl;
 };
 
 // Unique identifier of a mutable object accross the application.
@@ -20,25 +20,26 @@ namespace UndoRedo {
 class ObjectID
 {
 public:
-	ObjectID(size_t id) : id(id) {}
-	// Default constructor constructs an invalid ObjectID.
-	ObjectID() : id(0) {}
+    // [INTENT] Wrap the numeric id in a strong type so overload resolution can distinguish IDs from plain size_t values.
+    ObjectID(size_t id) : id(id) {}
+    // Default constructor constructs an invalid ObjectID.
+    ObjectID() : id(0) {}
 
-	bool operator==(const ObjectID &rhs) const { return this->id == rhs.id; }
-	bool operator!=(const ObjectID &rhs) const { return this->id != rhs.id; }
-	bool operator< (const ObjectID &rhs) const { return this->id <  rhs.id; }
-	bool operator> (const ObjectID &rhs) const { return this->id >  rhs.id; }
-	bool operator<=(const ObjectID &rhs) const { return this->id <= rhs.id; }
-	bool operator>=(const ObjectID &rhs) const { return this->id >= rhs.id; }
+    bool operator==(const ObjectID& rhs) const { return this->id == rhs.id; }
+    bool operator!=(const ObjectID& rhs) const { return this->id != rhs.id; }
+    bool operator<(const ObjectID& rhs) const { return this->id < rhs.id; }
+    bool operator>(const ObjectID& rhs) const { return this->id > rhs.id; }
+    bool operator<=(const ObjectID& rhs) const { return this->id <= rhs.id; }
+    bool operator>=(const ObjectID& rhs) const { return this->id >= rhs.id; }
 
     bool valid() const { return id != 0; }
     bool invalid() const { return id == 0; }
 
-	size_t	id;
+    size_t id;
 
 private:
-	friend class cereal::access;
-	template<class Archive> void serialize(Archive &ar) { ar(id); }
+    friend class cereal::access;
+    template<class Archive> void serialize(Archive& ar) { ar(id); }
 };
 
 // Base for Model, ModelObject, ModelVolume, ModelInstance or ModelMaterial to provide a unique ID
@@ -52,12 +53,12 @@ class ObjectBase
 public:
     using Timestamp = uint64_t;
 
-    ObjectID     		id() const { return m_id; }
+    ObjectID id() const { return m_id; }
     // Return an optional timestamp of this object.
     // If the timestamp returned is non-zero, then the serialization framework will
     // only save this object on the Undo/Redo stack if the timestamp is different
     // from the timestmap of the object at the top of the Undo / Redo stack.
-    virtual Timestamp	timestamp() const { return 0; }
+    virtual Timestamp timestamp() const { return 0; }
 
 protected:
     // Constructors to be only called by derived classes.
@@ -68,31 +69,39 @@ protected:
     ObjectBase(int) : m_id(ObjectID(0)) {}
 
     ObjectBase(const ObjectID id) : m_id(id) {}
-	// The class tree will have virtual tables and type information.
-	virtual ~ObjectBase() = default;
+    // The class tree will have virtual tables and type information.
+    virtual ~ObjectBase() = default;
 
     // Use with caution!
-    void        set_new_unique_id() { m_id = generate_new_id(); }
-    void        set_invalid_id()    { m_id = 0; }
+    void set_new_unique_id() { m_id = generate_new_id(); }
+    void set_invalid_id() { m_id = 0; }
     // Use with caution!
-    void        copy_id(const ObjectBase &rhs) { m_id = rhs.id(); }
+    void copy_id(const ObjectBase& rhs) { m_id = rhs.id(); }
 
     // Override this method if a ObjectBase derived class owns other ObjectBase derived instances.
     virtual void assign_new_unique_ids_recursive() { this->set_new_unique_id(); }
 
 private:
-    ObjectID                m_id;
+    ObjectID m_id;
 
-	static inline ObjectID  generate_new_id() { return ObjectID(++ s_last_id); }
-    static size_t           s_last_id;
-	
-	friend ObjectID wipe_tower_object_id();
-	friend ObjectID wipe_tower_instance_id();
+    // [STATE] Global monotonic counter for ObjectBase-derived identities across the process.
+    // [CONCURRENCY] ++s_last_id is unsynchronized; callers must instantiate on one thread or provide external serialization.
+    // [HAZARD] If code starts creating ObjectBase instances from worker threads, duplicate IDs and data races are possible.
+    static inline ObjectID generate_new_id() { return ObjectID(++s_last_id); }
+    static size_t          s_last_id;
 
-	friend class cereal::access;
-	friend class Slic3r::UndoRedo::StackImpl;
-	template<class Archive> void serialize(Archive &ar) { ar(m_id); }
-  	template<class Archive> static void load_and_construct(Archive & ar, cereal::construct<ObjectBase> &construct) { ObjectID id; ar(id); construct(id); }
+    friend ObjectID wipe_tower_object_id();
+    friend ObjectID wipe_tower_instance_id();
+
+    friend class cereal::access;
+    friend class Slic3r::UndoRedo::StackImpl;
+    template<class Archive> void        serialize(Archive& ar) { ar(m_id); }
+    template<class Archive> static void load_and_construct(Archive& ar, cereal::construct<ObjectBase>& construct)
+    {
+        ObjectID id;
+        ar(id);
+        construct(id);
+    }
 };
 
 class ObjectWithTimestamp : public ObjectBase
@@ -100,34 +109,41 @@ class ObjectWithTimestamp : public ObjectBase
 protected:
     // Constructors to be only called by derived classes.
     // Default constructor to assign a new timestamp unique to this object's history.
-	ObjectWithTimestamp() = default;
+    ObjectWithTimestamp() = default;
     // Constructor with ignored int parameter to assign an invalid ID, to be replaced
     // by an existing ID copied from elsewhere.
     ObjectWithTimestamp(int) : ObjectBase(-1) {}
-	// The class tree will have virtual tables and type information.
-	virtual ~ObjectWithTimestamp() = default;
+    // The class tree will have virtual tables and type information.
+    virtual ~ObjectWithTimestamp() = default;
 
-    // The timestamp uniquely identifies content of the derived class' data, therefore it makes sense to copy the timestamp if the content data was copied.
-    void                copy_timestamp(const ObjectWithTimestamp& rhs) { m_timestamp = rhs.m_timestamp; }
+    // The timestamp uniquely identifies content of the derived class' data, therefore it makes sense to copy the timestamp if the content
+    // data was copied.
+    void copy_timestamp(const ObjectWithTimestamp& rhs) { m_timestamp = rhs.m_timestamp; }
 
 public:
     // Return an optional timestamp of this object.
     // If the timestamp returned is non-zero, then the serialization framework will
     // only save this object on the Undo/Redo stack if the timestamp is different
     // from the timestmap of the object at the top of the Undo / Redo stack.
-    Timestamp	        timestamp() const throw() override { return m_timestamp; }
-    bool 				timestamp_matches(const ObjectWithTimestamp &rhs) const throw() { return m_timestamp == rhs.m_timestamp; }
-    bool 				object_id_and_timestamp_match(const ObjectWithTimestamp &rhs) const throw() { return this->id() == rhs.id() && m_timestamp == rhs.m_timestamp; }
-    void 				touch() { m_timestamp = ++ s_last_timestamp; }
+    Timestamp timestamp() const throw() override { return m_timestamp; }
+    bool      timestamp_matches(const ObjectWithTimestamp& rhs) const throw() { return m_timestamp == rhs.m_timestamp; }
+    bool      object_id_and_timestamp_match(const ObjectWithTimestamp& rhs) const throw()
+    {
+        return this->id() == rhs.id() && m_timestamp == rhs.m_timestamp;
+    }
+    // [STATE] touch() mutates object history marker used by Undo/Redo pruning logic.
+    // [CONCURRENCY] Global timestamp generation is unsynchronized for the same reason as ObjectBase::s_last_id.
+    void touch() { m_timestamp = ++s_last_timestamp; }
 
 private:
-	// The first timestamp is non-zero, as zero timestamp means the timestamp is not reliable.
-	Timestamp 			m_timestamp { 1 };
-    static Timestamp    s_last_timestamp;
-	
-	friend class cereal::access;
-	friend class Slic3r::UndoRedo::StackImpl;
-	template<class Archive> void serialize(Archive &ar) { ar(m_timestamp); }
+    // The first timestamp is non-zero, as zero timestamp means the timestamp is not reliable.
+    Timestamp m_timestamp{1};
+    // [STATE] Process-global monotonic history stamp shared by all ObjectWithTimestamp instances.
+    static Timestamp s_last_timestamp;
+
+    friend class cereal::access;
+    friend class Slic3r::UndoRedo::StackImpl;
+    template<class Archive> void serialize(Archive& ar) { ar(m_timestamp); }
 };
 
 class CutObjectBase : public ObjectBase
@@ -144,20 +160,23 @@ public:
     // by an existing ID copied from elsewhere.
     CutObjectBase(int) : ObjectBase(-1) {}
     // Constructor to initialize full information from 3mf
-    CutObjectBase(ObjectID id, size_t check_sum, size_t connectors_cnt) : ObjectBase(id), m_check_sum(check_sum), m_connectors_cnt(connectors_cnt) {}
+    CutObjectBase(ObjectID id, size_t check_sum, size_t connectors_cnt)
+        : ObjectBase(id), m_check_sum(check_sum), m_connectors_cnt(connectors_cnt)
+    {}
     // The class tree will have virtual tables and type information.
     virtual ~CutObjectBase() = default;
 
-    bool operator<(const CutObjectBase &other) const { return other.id() > this->id(); }
-    bool operator==(const CutObjectBase &other) const { return other.id() == this->id(); }
+    bool operator<(const CutObjectBase& other) const { return other.id() > this->id(); }
+    bool operator==(const CutObjectBase& other) const { return other.id() == this->id(); }
 
-    void copy(const CutObjectBase &rhs)
+    void copy(const CutObjectBase& rhs)
     {
+        // [INTENT] Copy identity and cut metadata together so split/connector records stay coherent after assignment.
         this->copy_id(rhs);
         this->m_check_sum      = rhs.check_sum();
         this->m_connectors_cnt = rhs.connectors_cnt();
     }
-    CutObjectBase &operator=(const CutObjectBase &other)
+    CutObjectBase& operator=(const CutObjectBase& other)
     {
         this->copy(other);
         return *this;
@@ -165,14 +184,18 @@ public:
 
     void invalidate()
     {
+        // [STATE] invalidate() deliberately severs identity to signal that persisted cut metadata is no longer trustworthy.
         set_invalid_id();
         m_check_sum      = 1;
         m_connectors_cnt = 0;
     }
 
     void init() { this->set_new_unique_id(); }
-    bool has_same_id(const CutObjectBase &rhs) { return this->id() == rhs.id(); }
-    bool is_equal(const CutObjectBase &rhs) { return this->id() == rhs.id() && this->check_sum() == rhs.check_sum() && this->connectors_cnt() == rhs.connectors_cnt(); }
+    bool has_same_id(const CutObjectBase& rhs) { return this->id() == rhs.id(); }
+    bool is_equal(const CutObjectBase& rhs)
+    {
+        return this->id() == rhs.id() && this->check_sum() == rhs.check_sum() && this->connectors_cnt() == rhs.connectors_cnt();
+    }
 
     size_t check_sum() const { return m_check_sum; }
     void   set_check_sum(size_t cs) { m_check_sum = cs; }
@@ -182,14 +205,14 @@ public:
     void   increase_connectors_cnt(size_t connectors_cnt) { m_connectors_cnt += connectors_cnt; }
 
 private:
+    // [COUPLING] cereal serialization captures both ObjectBase identity and cut metadata; UndoRedo::StackImpl depends on stable field order.
     friend class cereal::access;
-    template<class Archive> void serialize(Archive &ar)
+    template<class Archive> void serialize(Archive& ar)
     {
         ar(cereal::base_class<ObjectBase>(this));
         ar(m_check_sum, m_connectors_cnt);
     }
 };
-
 
 // Unique object / instance ID for the wipe tower.
 extern ObjectID wipe_tower_object_id();

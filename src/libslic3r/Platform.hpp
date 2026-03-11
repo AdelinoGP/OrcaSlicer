@@ -5,19 +5,18 @@
 
 namespace Slic3r {
 
-enum class Platform
-{
-	Uninitialized,
-	Unknown,
-	Windows,
-	OSX,
-	Linux,
-	BSDUnix,
+enum class Platform {
+    Uninitialized,
+    Unknown,
+    // [INTENT] Coarse-grained OS family used by startup/bootstrap decisions and path conventions.
+    Windows,
+    OSX,
+    Linux,
+    BSDUnix,
 };
 
-enum class PlatformFlavor
-{
-	Uninitialized,
+enum class PlatformFlavor {
+    Uninitialized,
     Unknown,
     Generic,         // For Windows and OSX, until we need to be more specific.
     GenericLinux,    // For Platform::Linux
@@ -31,10 +30,12 @@ enum class PlatformFlavor
 };
 
 // To be called on program start-up.
-void 			detect_platform();
+// [STATE] Initializes process-wide platform singletons queried later by platform() / platform_flavor().
+// [COUPLING] Early startup code, updater logic, and filesystem helpers assume this is invoked before feature checks.
+void detect_platform();
 
-Platform 		platform();
-PlatformFlavor 	platform_flavor();
+Platform       platform();
+PlatformFlavor platform_flavor();
 
 std::string platform_to_string(Platform platform);
 std::string platform_flavor_to_string(PlatformFlavor pf);

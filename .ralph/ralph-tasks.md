@@ -858,7 +858,7 @@ implements.)
               + src/libslic3r/ObjColorUtils.hpp
              Commit: `annotate: src/libslic3r files (T4060o)`
 
-- [ ] T4060p  annotate: src/libslic3r/ObjectID.hpp
+- [x] T4060p  annotate: src/libslic3r/ObjectID.hpp
               + src/libslic3r/ParameterUtils.hpp
               + src/libslic3r/PlaceholderParser.hpp
               + src/libslic3r/Platform.hpp
