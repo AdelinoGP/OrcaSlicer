@@ -24,7 +24,7 @@ namespace Slic3r {
 enum class CloudAgentProvider { Orca, BBL };
 
 static constexpr char ORCA_PRINTER_AGENT_ID[] = "orca";
-static constexpr char BBL_PRINTER_AGENT_ID[] = "bbl";
+static constexpr char BBL_PRINTER_AGENT_ID[]  = "bbl";
 
 // Factory function type for creating printer agents
 using PrinterAgentFactory =
@@ -33,9 +33,11 @@ using PrinterAgentFactory =
 // Information about a registered printer agent
 struct PrinterAgentInfo
 {
-    std::string         id;           // e.g., "orca", "bbl"
-    std::string         display_name; // e.g., "Orca Native", "Bambu Lab"
-    PrinterAgentFactory factory;      // Function to create the agent
+    std::string id;           // e.g., "orca", "bbl"
+    std::string display_name; // e.g., "Orca Native", "Bambu Lab"
+    // [MEMORY] Factories return shared_ptr because agents are cached and reused across UI flows rather than being
+    // owned by a single controller with a strict stack lifetime.
+    PrinterAgentFactory factory; // Function to create the agent
 
     PrinterAgentInfo(const std::string& id_, const std::string& display_name_, PrinterAgentFactory factory_)
         : id(id_), display_name(display_name_), factory(std::move(factory_))
@@ -142,6 +144,8 @@ public:
         switch (provider) {
         case CloudAgentProvider::Orca: return std::make_shared<OrcaCloudServiceAgent>(log_dir);
         case CloudAgentProvider::BBL: {
+            // [COUPLING] The BBL path depends on a dynamically loaded plugin singleton; factory success is therefore
+            // gated by runtime DLL availability rather than compile-time linkage alone.
             auto& plugin = BBLNetworkPlugin::instance();
             if (!plugin.is_loaded()) {
                 return nullptr;
@@ -180,6 +184,8 @@ private:
  * @param app_config Application configuration object
  * @return NetworkAgent with cloud agent, or nullptr on failure
  */
+// [STATE] This free function is the bridge from persistent AppConfig flags into the runtime agent graph, making it the
+// point where provider choice stops being declarative settings and becomes live network state.
 std::unique_ptr<NetworkAgent> create_agent_from_config(const std::string& log_dir, AppConfig* app_config);
 
 } // namespace Slic3r

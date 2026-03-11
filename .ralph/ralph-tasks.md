@@ -684,7 +684,7 @@ implements.)
              coupling is printer/upload config extracted from libslic3r.
              Commit: `annotate: slic3r/Utils print-host PrintConfig adapters (T4051)`
 
-- [ ] T4052  annotate: src/slic3r/Utils/CrealityPrint.cpp
+- [x] T4052  annotate: src/slic3r/Utils/CrealityPrint.cpp
              + src/slic3r/Utils/ElegooLink.cpp
              + src/slic3r/Utils/NetworkAgentFactory.hpp
              + src/slic3r/Utils/Obico.cpp

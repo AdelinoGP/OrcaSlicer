@@ -38,33 +38,36 @@
 using json = nlohmann::json;
 using std::to_string;
 
-namespace beast = boost::beast;
-namespace http = beast::http;
+namespace beast     = boost::beast;
+namespace http      = beast::http;
 namespace websocket = beast::websocket;
-namespace net = boost::asio;
-using tcp = boost::asio::ip::tcp;
+namespace net       = boost::asio;
+using tcp           = boost::asio::ip::tcp;
 
 namespace fs = boost::filesystem;
 namespace pt = boost::property_tree;
 
 namespace Slic3r {
 
-CrealityPrint::CrealityPrint(DynamicPrintConfig* config) : 
-    m_host(config->opt_string("print_host")), 
-    m_web_ui(config->opt_string("print_host_webui")),
-    m_cafile(config->opt_string("printhost_cafile")),
-    m_port(config->opt_string("printhost_port")),
-    m_apikey(config->opt_string("printhost_apikey")),
-    m_ssl_revoke_best_effort(config->opt_bool("printhost_ssl_ignore_revoke"))
-{}
+CrealityPrint::CrealityPrint(DynamicPrintConfig* config)
+    : m_host(config->opt_string("print_host"))
+    , m_web_ui(config->opt_string("print_host_webui"))
+    , m_cafile(config->opt_string("printhost_cafile"))
+    , m_port(config->opt_string("printhost_port"))
+    , m_apikey(config->opt_string("printhost_apikey"))
+    , m_ssl_revoke_best_effort(config->opt_bool("printhost_ssl_ignore_revoke"))
+{
+    // [STATE] This adapter snapshots AppConfig-backed connection fields at construction time because queued uploads
+    // later run without re-reading mutable GUI state.
+}
 
 const char* CrealityPrint::get_name() const { return "Creality Print"; }
 
-std::string CrealityPrint::get_host() const {
-    return m_host;
-}
-void  CrealityPrint::set_auth(Http& http) const
+std::string CrealityPrint::get_host() const { return m_host; }
+void        CrealityPrint::set_auth(Http& http) const
 {
+    // [COUPLING] Creality's REST API uses bearer tokens rather than the OctoPrint-style X-Api-Key headers used by
+    // sibling adapters, so auth handling cannot be unified without an explicit protocol abstraction.
     http.header("Authorization", "Bearer " + m_apikey);
     if (!m_cafile.empty()) {
         http.ca_file(m_cafile);
@@ -79,24 +82,25 @@ wxString CrealityPrint::get_test_failed_msg(wxString& msg) const
 }
 
 bool CrealityPrint::test(wxString& msg) const
-{ 
-    bool res = true;
+{
+    bool        res  = true;
     const char* name = get_name();
-    auto url = make_url("info");
+    auto        url  = make_url("info");
 
     BOOST_LOG_TRIVIAL(info) << boost::format("%1%: Get version at: %2%") % name % url;
     // Here we do not have to add custom "Host" header - the url contains host filled by user and libCurl will set the header by itself.
     auto http = Http::get(std::move(url));
     set_auth(http);
+    // [INTENT] Probe the lightweight `info` endpoint before upload so the GUI fails fast on bad tokens/hosts instead
+    // of discovering connectivity issues only after it starts streaming a large file.
     http.on_error([&](std::string body, std::string error, unsigned status) {
             BOOST_LOG_TRIVIAL(error) << boost::format("%1%: Error getting version: %2%, HTTP %3%, body: `%4%`") % name % error % status %
                                             body;
             res = false;
             msg = format_error(body, error, status);
         })
-        .on_complete([&, this](std::string body, unsigned) {
-            BOOST_LOG_TRIVIAL(debug) << boost::format("%1%: Got version: %2%") % name % body;
-        })
+        .on_complete(
+            [&, this](std::string body, unsigned) { BOOST_LOG_TRIVIAL(debug) << boost::format("%1%: Got version: %2%") % name % body; })
 #ifdef WIN32
         .ssl_revoke_best_effort(m_ssl_revoke_best_effort)
         .on_ip_resolve([&](std::string address) {
@@ -110,16 +114,14 @@ bool CrealityPrint::test(wxString& msg) const
     return res;
 }
 
-PrintHostPostUploadActions CrealityPrint::get_post_upload_actions() const {
-    return PrintHostPostUploadAction::StartPrint; 
-}
+PrintHostPostUploadActions CrealityPrint::get_post_upload_actions() const { return PrintHostPostUploadAction::StartPrint; }
 
 bool CrealityPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const
-{   
-    const char* name = get_name();
-    const auto upload_filename = upload_data.upload_path.filename();
-    const auto upload_parent_path = upload_data.upload_path.parent_path();
-    wxString test_msg;
+{
+    const char* name               = get_name();
+    const auto  upload_filename    = upload_data.upload_path.filename();
+    const auto  upload_parent_path = upload_data.upload_path.parent_path();
+    wxString    test_msg;
     if (!test(test_msg)) {
         error_fn(std::move(test_msg));
         return false;
@@ -128,8 +130,10 @@ bool CrealityPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, 
     bool res = true;
     auto url = make_url("upload/" + safe_filename(upload_filename.string()));
 
-    auto  http = Http::post(url); // std::move(url));
+    auto http = Http::post(url); // std::move(url));
     set_auth(http);
+    // [INTENT] Creality expects a multipart upload whose destination path and file payload travel in the same request;
+    // unlike OctoPrint there is no secondary job-creation step after transfer completes.
     http.form_add("path", upload_parent_path.string())
         .form_add_file("file", upload_data.source_path.string(), upload_filename.string())
 
@@ -161,7 +165,7 @@ bool CrealityPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, 
     return res;
 }
 
-std::string CrealityPrint::make_url(const std::string &path) const
+std::string CrealityPrint::make_url(const std::string& path) const
 {
     if (m_host.find("http://") == 0 || m_host.find("https://") == 0) {
         if (m_host.back() == '/') {
@@ -174,7 +178,7 @@ std::string CrealityPrint::make_url(const std::string &path) const
     }
 }
 
-std::string CrealityPrint::safe_filename(const std::string &filename) const
+std::string CrealityPrint::safe_filename(const std::string& filename) const
 {
     std::string safe_filename = filename;
     std::replace(safe_filename.begin(), safe_filename.end(), ' ', '_');
@@ -182,42 +186,33 @@ std::string CrealityPrint::safe_filename(const std::string &filename) const
     return safe_filename;
 }
 
-void CrealityPrint::start_print(const std::string &filename) const
+void CrealityPrint::start_print(const std::string& filename) const
 {
     try {
         std::string host = m_host;
-        auto const port = "9999";
+        auto const  port = "9999";
 
-        json j2 = {
-            { "method", "set" },
-            {
-                "params", {
-                    { "opGcodeFile", "printprt:/usr/data/printer_data/gcodes/" + filename }
-                }    
-            }
-        };
+        json j2 = {{"method", "set"}, {"params", {{"opGcodeFile", "printprt:/usr/data/printer_data/gcodes/" + filename}}}};
 
         net::io_context ioc;
 
-        tcp::resolver resolver{ioc};
+        tcp::resolver                  resolver{ioc};
         websocket::stream<tcp::socket> ws{ioc};
 
+        // [COUPLING] Upload completion immediately pivots from REST to a proprietary WebSocket command channel on a
+        // fixed port, so any port has to preserve both transports and the printer-side path convention.
         auto const results = resolver.resolve(host, port);
 
         auto ep = net::connect(ws.next_layer(), results);
 
         host += ':' + std::to_string(ep.port());
 
-        ws.set_option(websocket::stream_base::decorator(
-            [](websocket::request_type& req)
-            {
-                req.set(http::field::user_agent,
-                    std::string(BOOST_BEAST_VERSION_STRING) +
-                        " websocket-client-coro");
-            }));
+        ws.set_option(websocket::stream_base::decorator([](websocket::request_type& req) {
+            req.set(http::field::user_agent, std::string(BOOST_BEAST_VERSION_STRING) + " websocket-client-coro");
+        }));
 
         ws.handshake(host, "/");
-        
+
         ws.write(net::buffer(to_string(j2)));
 
         beast::flat_buffer buffer;
@@ -225,10 +220,11 @@ void CrealityPrint::start_print(const std::string &filename) const
         ws.read(buffer);
 
         ws.close(websocket::close_code::normal);
-    } catch(std::exception const& e) {
+    } catch (std::exception const& e) {
+        // [HAZARD] Start-print failures are only logged to stderr here; the upload has already succeeded, so callers
+        // cannot distinguish "file transferred" from "print command failed" without out-of-band device inspection.
         std::cerr << "Error: " << e.what() << std::endl;
     }
-    
 }
 
-}
+} // namespace Slic3r
