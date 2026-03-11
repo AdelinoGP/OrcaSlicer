@@ -893,7 +893,7 @@ implements.)
               + src/libslic3r/Timer.hpp
              Commit: `annotate: src/libslic3r files (T4060t)`
 
-- [ ] T4060u  annotate: src/libslic3r/TriangleMeshDeal.hpp
+- [x] T4060u  annotate: src/libslic3r/TriangleMeshDeal.hpp
               + src/libslic3r/TriangleSelector.hpp
               + src/libslic3r/TriangleSetSampling.hpp
               + src/libslic3r/TriangulateWall.hpp
