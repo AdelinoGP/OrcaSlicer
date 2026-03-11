@@ -1,9 +1,18 @@
-//Copyright (c) 2020 Ultimaker B.V.
-//CuraEngine is released under the terms of the AGPLv3 or higher.
+// Copyright (c) 2020 Ultimaker B.V.
+// CuraEngine is released under the terms of the AGPLv3 or higher.
 
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+
+// [INTENT] Implements the lightweight geometry operations on Arachne's variable-width output
+// polylines: length calculation, topology-preserving simplification, contour detection, area, and
+// final conversion into core libslic3r extrusion paths.
+// [COUPLING] This is the handoff point from the Arachne-specific representation to the generic
+// ThickPolyline / ExtrusionPaths pipeline used by the rest of OrcaSlicer.
+// [HAZARD] Simplification works in scaled integer coordinates but uses floating-point intermediates
+// for height/intersection tests. Translating it without preserving the mixed integer/float behavior
+// can subtly change which junctions survive.
 
 #include "ExtrusionLine.hpp"
 #include "../../VariableWidth.hpp"
@@ -16,13 +25,17 @@
 
 namespace Slic3r {
 class Flow;
-}  // namespace Slic3r
+} // namespace Slic3r
 
-namespace Slic3r::Arachne
-{
+namespace Slic3r::Arachne {
 
+// [INTENT] Create an empty not-yet-closed path for one perimeter band.
 ExtrusionLine::ExtrusionLine(const size_t inset_idx, const bool is_odd) : inset_idx(inset_idx), is_odd(is_odd), is_closed(false) {}
 
+// [INTENT] Sum centerline segment lengths in scaled coordinates.
+// [HAZARD] If a closed line also stores the first point duplicated at the end, `is_closed` adds the
+// closing edge once more. Current Arachne callers rely on that convention consistently, but ports
+// should keep the representation choice aligned with this length routine.
 int64_t ExtrusionLine::getLength() const
 {
     if (junctions.empty())
@@ -30,7 +43,7 @@ int64_t ExtrusionLine::getLength() const
 
     int64_t           len  = 0;
     ExtrusionJunction prev = junctions.front();
-    for (const ExtrusionJunction &next : junctions) {
+    for (const ExtrusionJunction& next : junctions) {
         len += (next.p - prev.p).cast<int64_t>().norm();
         prev = next;
     }
@@ -40,8 +53,13 @@ int64_t ExtrusionLine::getLength() const
     return len;
 }
 
-void ExtrusionLine::simplify(const int64_t smallest_line_segment_squared, const int64_t allowed_error_distance_squared, const int64_t maximum_extrusion_area_deviation)
+void ExtrusionLine::simplify(const int64_t smallest_line_segment_squared,
+                             const int64_t allowed_error_distance_squared,
+                             const int64_t maximum_extrusion_area_deviation)
 {
+    // [INTENT] Simplify variable-width paths without violating either geometric fidelity or width
+    // fidelity. A junction may disappear only when the shortcut stays close to the old centerline
+    // AND the area implied by width interpolation remains within tolerance.
     const size_t min_path_size = is_closed ? 3 : 2;
     if (junctions.size() <= min_path_size)
         return;
@@ -80,14 +98,17 @@ void ExtrusionLine::simplify(const int64_t smallest_line_segment_squared, const 
      From this area we compute the height of the representative triangle using
      the standard formula for a triangle area: A = .5*b*h
      */
-    const ExtrusionJunction& initial = junctions[1];
-    int64_t accumulated_area_removed = int64_t(previous.p.x()) * int64_t(initial.p.y()) - int64_t(previous.p.y()) * int64_t(initial.p.x()); // Twice the Shoelace formula for area of polygon per line segment.
+    // [INTENT] `accumulated_area_removed` tracks the shoelace-area fan between the retained path and
+    // the discarded vertices so multiple consecutive deletions can be evaluated as one shortcut.
+    const ExtrusionJunction& initial                  = junctions[1];
+    int64_t                  accumulated_area_removed = int64_t(previous.p.x()) * int64_t(initial.p.y()) -
+                                       int64_t(previous.p.y()) *
+                                           int64_t(initial.p.x()); // Twice the Shoelace formula for area of polygon per line segment.
 
     // For a closed polygon we process the last point, which is the same as the first point.
-    for (size_t point_idx = 1; point_idx < junctions.size() - (this->is_closed ? 0 : 1); point_idx++)
-    {
+    for (size_t point_idx = 1; point_idx < junctions.size() - (this->is_closed ? 0 : 1); point_idx++) {
         // For the last point of a closed polygon, use the first point of the new polygon in case we modified it.
-        const bool is_last = point_idx + 1 == junctions.size();
+        const bool               is_last = point_idx + 1 == junctions.size();
         const ExtrusionJunction& current = is_last ? new_junctions[0] : junctions[point_idx];
 
         // Don't simplify closed polygons below 3 junctions.
@@ -98,55 +119,55 @@ void ExtrusionLine::simplify(const int64_t smallest_line_segment_squared, const 
 
         // Spill over in case of overflow, unless the [next] vertex will then be equal to [previous].
         const bool spill_over = this->is_closed && point_idx + 2 >= junctions.size() &&
-            point_idx + 2 - junctions.size() < new_junctions.size();
+                                point_idx + 2 - junctions.size() < new_junctions.size();
         ExtrusionJunction& next = spill_over ? new_junctions[point_idx + 2 - junctions.size()] : junctions[point_idx + 1];
 
-        const int64_t removed_area_next = int64_t(current.p.x()) * int64_t(next.p.y()) - int64_t(current.p.y()) * int64_t(next.p.x()); // Twice the Shoelace formula for area of polygon per line segment.
-        const int64_t negative_area_closing = int64_t(next.p.x()) * int64_t(previous.p.y()) - int64_t(next.p.y()) * int64_t(previous.p.x()); // Area between the origin and the short-cutting segment
+        const int64_t removed_area_next = int64_t(current.p.x()) * int64_t(next.p.y()) -
+                                          int64_t(current.p.y()) *
+                                              int64_t(next.p.x()); // Twice the Shoelace formula for area of polygon per line segment.
+        const int64_t negative_area_closing = int64_t(next.p.x()) * int64_t(previous.p.y()) -
+                                              int64_t(next.p.y()) *
+                                                  int64_t(previous.p.x()); // Area between the origin and the short-cutting segment
         accumulated_area_removed += removed_area_next;
 
         const int64_t length2 = (current - previous).cast<int64_t>().squaredNorm();
-        if (length2 < scaled<coord_t>(0.025))
-        {
+        if (length2 < scaled<coord_t>(0.025)) {
             // We're allowed to always delete segments of less than 5 micron. The width in this case doesn't matter that much.
             continue;
         }
 
         const int64_t area_removed_so_far = accumulated_area_removed + negative_area_closing; // Close the shortcut area polygon
-        const int64_t base_length_2 = (next - previous).cast<int64_t>().squaredNorm();
+        const int64_t base_length_2       = (next - previous).cast<int64_t>().squaredNorm();
 
         if (base_length_2 == 0) // Two line segments form a line back and forth with no area.
         {
             continue; // Remove the junction (vertex).
         }
-        //We want to check if the height of the triangle formed by previous, current and next vertices is less than allowed_error_distance_squared.
-        //1/2 L = A           [actual area is half of the computed shoelace value] // Shoelace formula is .5*(...) , but we simplify the computation and take out the .5
-        //A = 1/2 * b * h     [triangle area formula]
-        //L = b * h           [apply above two and take out the 1/2]
-        //h = L / b           [divide by b]
-        //h^2 = (L / b)^2     [square it]
-        //h^2 = L^2 / b^2     [factor the divisor]
-        const auto    height_2 = int64_t(double(area_removed_so_far) * double(area_removed_so_far) / double(base_length_2));
+        // We want to check if the height of the triangle formed by previous, current and next vertices is less than
+        // allowed_error_distance_squared. 1/2 L = A           [actual area is half of the computed shoelace value] // Shoelace formula is
+        // .5*(...) , but we simplify the computation and take out the .5 A = 1/2 * b * h     [triangle area formula] L = b * h [apply above
+        // two and take out the 1/2] h = L / b           [divide by b] h^2 = (L / b)^2     [square it] h^2 = L^2 / b^2     [factor the
+        // divisor]
+        const auto    height_2             = int64_t(double(area_removed_so_far) * double(area_removed_so_far) / double(base_length_2));
         const int64_t extrusion_area_error = calculateExtrusionAreaDeviationError(previous, current, next);
-        if ((height_2 <= scaled<coord_t>(0.001) //Almost exactly colinear (barring rounding errors).
-             && Line::distance_to_infinite(current.p, previous.p, next.p) <= scaled<double>(0.001)) // Make sure that height_2 is not small because of cancellation of positive and negative areas
+        if ((height_2 <= scaled<coord_t>(0.001) // Almost exactly colinear (barring rounding errors).
+             && Line::distance_to_infinite(current.p, previous.p, next.p) <=
+                    scaled<double>(0.001)) // Make sure that height_2 is not small because of cancellation of positive and negative areas
             // We shouldn't remove middle junctions of colinear segments if the area changed for the C-P segment is exceeding the maximum allowed
-             && extrusion_area_error <= maximum_extrusion_area_deviation)
-        {
+            && extrusion_area_error <= maximum_extrusion_area_deviation) {
             // Remove the current junction (vertex).
             continue;
         }
 
-        if (length2 < smallest_line_segment_squared
-            && height_2 <= allowed_error_distance_squared) // Removing the junction (vertex) doesn't introduce too much error.
+        if (length2 < smallest_line_segment_squared &&
+            height_2 <= allowed_error_distance_squared) // Removing the junction (vertex) doesn't introduce too much error.
         {
             const int64_t next_length2 = (current - next).cast<int64_t>().squaredNorm();
-            if (next_length2 > 4 * smallest_line_segment_squared)
-            {
+            if (next_length2 > 4 * smallest_line_segment_squared) {
                 // Special case; The next line is long. If we were to remove this, it could happen that we get quite noticeable artifacts.
-                // We should instead move this point to a location where both edges are kept and then remove the previous point that we wanted to keep.
-                // By taking the intersection of these two lines, we get a point that preserves the direction (so it makes the corner a bit more pointy).
-                // We just need to be sure that the intersection point does not introduce an artifact itself.
+                // We should instead move this point to a location where both edges are kept and then remove the previous point that we
+                // wanted to keep. By taking the intersection of these two lines, we get a point that preserves the direction (so it makes
+                // the corner a bit more pointy). We just need to be sure that the intersection point does not introduce an artifact itself.
                 //                o < prev_prev
                 //                |
                 //                o < prev
@@ -154,52 +175,55 @@ void ExtrusionLine::simplify(const int64_t smallest_line_segment_squared, const 
                 // intersection > +   o-------------------o < next
                 //                    ^ current
                 Point intersection_point;
-                bool has_intersection = Line(previous_previous.p, previous.p).intersection_infinite(Line(current.p, next.p), &intersection_point);
+                bool  has_intersection = Line(previous_previous.p, previous.p)
+                                            .intersection_infinite(Line(current.p, next.p), &intersection_point);
                 const auto dist_greater = [](const Point& p1, const Point& p2, const int64_t threshold) {
                     const auto vec = (p1 - p2).cwiseAbs().cast<uint64_t>().eval();
-                    if(vec.x() > threshold || vec.y() > threshold) {
+                    if (vec.x() > threshold || vec.y() > threshold) {
                         // If this condition is true, the distance is definitely greater than the threshold.
                         // We don't need to calculate the squared norm at all, which avoid potential arithmetic overflow.
                         return true;
                     }
                     return vec.squaredNorm() > threshold;
                 };
-                if (!has_intersection
-                    || Line::distance_to_infinite_squared(intersection_point, previous.p, current.p) > double(allowed_error_distance_squared)
-                    || dist_greater(intersection_point, previous.p, smallest_line_segment_squared)  // The intersection point is way too far from the 'previous'
-                    || dist_greater(intersection_point, current.p, smallest_line_segment_squared))  // and 'current' points, so it shouldn't replace 'current'
+                // [INTENT] For short-then-long corners, try moving the retained point onto the
+                // infinite-line intersection so both long-segment directions survive after removing
+                // the tiny spur.
+                if (!has_intersection ||
+                    Line::distance_to_infinite_squared(intersection_point, previous.p, current.p) > double(allowed_error_distance_squared) ||
+                    dist_greater(intersection_point, previous.p,
+                                 smallest_line_segment_squared) // The intersection point is way too far from the 'previous'
+                    || dist_greater(intersection_point, current.p,
+                                    smallest_line_segment_squared)) // and 'current' points, so it shouldn't replace 'current'
                 {
                     // We can't find a better spot for it, but the size of the line is more than 5 micron.
                     // So the only thing we can do here is leave it in...
-                }
-                else
-                {
+                } else {
                     // New point seems like a valid one.
                     const ExtrusionJunction new_to_add = ExtrusionJunction(intersection_point, current.w, current.perimeter_index);
                     // If there was a previous point added, remove it.
-                    if(!new_junctions.empty())
-                    {
+                    if (!new_junctions.empty()) {
                         new_junctions.pop_back();
                         previous = previous_previous;
                     }
 
                     // The junction (vertex) is replaced by the new one.
-                    accumulated_area_removed = removed_area_next; // So that in the next iteration it's the area between the origin, [previous] and [current]
+                    accumulated_area_removed =
+                        removed_area_next; // So that in the next iteration it's the area between the origin, [previous] and [current]
                     previous_previous = previous;
-                    previous = new_to_add; // Note that "previous" is only updated if we don't remove the junction (vertex).
+                    previous          = new_to_add; // Note that "previous" is only updated if we don't remove the junction (vertex).
                     new_junctions.push_back(new_to_add);
                     continue;
                 }
-            }
-            else
-            {
+            } else {
                 continue; // Remove the junction (vertex).
             }
         }
         // The junction (vertex) isn't removed.
-        accumulated_area_removed = removed_area_next; // So that in the next iteration it's the area between the origin, [previous] and [current]
+        accumulated_area_removed =
+            removed_area_next; // So that in the next iteration it's the area between the origin, [previous] and [current]
         previous_previous = previous;
-        previous = current; // Note that "previous" is only updated if we don't remove the junction (vertex).
+        previous          = current; // Note that "previous" is only updated if we don't remove the junction (vertex).
         new_junctions.push_back(current);
     }
 
@@ -213,10 +237,16 @@ void ExtrusionLine::simplify(const int64_t smallest_line_segment_squared, const 
         new_junctions.emplace_back(junctions.back());
     }
 
+    // [STATE] Simplification is in-place: once assigned back, removed junctions and their widths are
+    // gone. Callers that need the original path must copy before simplifying.
     junctions = new_junctions;
 }
 
-int64_t ExtrusionLine::calculateExtrusionAreaDeviationError(ExtrusionJunction A, ExtrusionJunction B, ExtrusionJunction C) {
+// [INTENT] Quantify width-induced area error from removing the middle junction of an otherwise
+// straight run. This lets simplify() protect width transitions that matter even when the geometry is
+// nearly colinear.
+int64_t ExtrusionLine::calculateExtrusionAreaDeviationError(ExtrusionJunction A, ExtrusionJunction B, ExtrusionJunction C)
+{
     /*
      * A             B                          C              A                                        C
      * ---------------                                         **************
@@ -252,12 +282,14 @@ int64_t ExtrusionLine::calculateExtrusionAreaDeviationError(ExtrusionJunction A,
 
 bool ExtrusionLine::is_contour() const
 {
+    // [INTENT] Arachne treats clockwise closed loops as solid contours and counterclockwise loops as
+    // holes after it reconstructs polygonal wall paths.
     if (!this->is_closed)
         return false;
 
     Polygon poly;
     poly.points.reserve(this->junctions.size());
-    for (const ExtrusionJunction &junction : this->junctions)
+    for (const ExtrusionJunction& junction : this->junctions)
         poly.points.emplace_back(junction.p);
 
     // Arachne produces contour with clockwise orientation and holes with counterclockwise orientation.
@@ -266,11 +298,12 @@ bool ExtrusionLine::is_contour() const
 
 double ExtrusionLine::area() const
 {
+    // [INTENT] Signed shoelace area over the centerline loop; sign preserves winding information.
     assert(this->is_closed);
     double a = 0.;
     if (this->junctions.size() >= 3) {
         Vec2d p1 = this->junctions.back().p.cast<double>();
-        for (const ExtrusionJunction &junction : this->junctions) {
+        for (const ExtrusionJunction& junction : this->junctions) {
             Vec2d p2 = junction.p.cast<double>();
             a += cross2(p1, p2);
             p1 = p2;
@@ -282,16 +315,19 @@ double ExtrusionLine::area() const
 } // namespace Slic3r::Arachne
 
 namespace Slic3r {
-void extrusion_paths_append(ExtrusionPaths &dst, const ClipperLib_Z::Paths &extrusion_paths, const ExtrusionRole role, const Flow &flow)
+void extrusion_paths_append(ExtrusionPaths& dst, const ClipperLib_Z::Paths& extrusion_paths, const ExtrusionRole role, const Flow& flow)
 {
-    for (const ClipperLib_Z::Path &extrusion_path : extrusion_paths) {
+    // [INTENT] Convert Clipper Z-annotated variable-width paths into libslic3r extrusion entities by
+    // first materializing ThickPolyline, then delegating to the shared multi-path converter.
+    for (const ClipperLib_Z::Path& extrusion_path : extrusion_paths) {
         ThickPolyline thick_polyline = Arachne::to_thick_polyline(extrusion_path);
         Slic3r::append(dst, thick_polyline_to_multi_path(thick_polyline, role, flow, scaled<float>(0.05), float(SCALED_EPSILON)).paths);
     }
 }
 
-void extrusion_paths_append(ExtrusionPaths &dst, const Arachne::ExtrusionLine &extrusion, const ExtrusionRole role, const Flow &flow)
+void extrusion_paths_append(ExtrusionPaths& dst, const Arachne::ExtrusionLine& extrusion, const ExtrusionRole role, const Flow& flow)
 {
+    // [INTENT] Single-line overload used once Arachne has finished path stitching and simplification.
     ThickPolyline thick_polyline = Arachne::to_thick_polyline(extrusion);
     Slic3r::append(dst, thick_polyline_to_multi_path(thick_polyline, role, flow, scaled<float>(0.05), float(SCALED_EPSILON)).paths);
 }

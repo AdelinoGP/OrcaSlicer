@@ -511,7 +511,7 @@ its header to understand the data contract.)
 covers files that were missed. Read WallToolPaths.hpp (T165) before starting
 any task here — it is the public interface that contextualizes all of these.)
 
-- [ ] T4020  annotate: src/libslic3r/Arachne/SkeletalTrapezoidation.hpp
+- [x] T4020  annotate: src/libslic3r/Arachne/SkeletalTrapezoidation.hpp
                      + src/libslic3r/Arachne/utils/ExtrusionJunction.hpp
                      + src/libslic3r/Arachne/utils/ExtrusionLine.cpp
                      + src/libslic3r/Arachne/utils/ExtrusionLine.hpp

@@ -1,9 +1,9 @@
 # Agent Journal — OrcaSlicer Codebase Analysis
 
 ## CURRENT STATUS
-Last session: 92
-Active task: T4018 — complete
-Next action: Begin T4020 by annotating the missing Arachne straight-skeleton header/output types group.
+Last session: 93
+Active task: T4020 — complete
+Next action: Begin T4021 by annotating the Arachne half-edge graph types.
 Unresolved [UNCLEAR] tags: 12 — all remaining source tags are marked `[UNCLEAR → ESCALATED]` after Session 86 T300 triage
 Files remaining (Phase 1): 287 files outside explicit skip buckets still need human coverage audit
 Files completed (Phase 1): 314 unique source files tracked by 314 annotate task entries
@@ -550,3 +550,27 @@ Total escalated tags: **12**
   - `src/libslic3r/Format/bbs_3mf.cpp`
 
 **Completed tasks this session:** T4018
+
+---
+
+## Session 93
+
+**Active task:** T4020 — annotate `src/libslic3r/Arachne/SkeletalTrapezoidation.hpp` + `src/libslic3r/Arachne/utils/ExtrusionJunction.hpp` + `src/libslic3r/Arachne/utils/ExtrusionLine.cpp` + `src/libslic3r/Arachne/utils/ExtrusionLine.hpp`
+
+- Files processed: `src/libslic3r/Arachne/SkeletalTrapezoidation.hpp`, `src/libslic3r/Arachne/utils/ExtrusionJunction.hpp`, `src/libslic3r/Arachne/utils/ExtrusionLine.cpp`, `src/libslic3r/Arachne/utils/ExtrusionLine.hpp`, `generated_documentation/agent_journal.md`, `.ralph/ralph-tasks.md`
+- Key discoveries:
+  - `ExtrusionJunction` is the real Arachne-to-libslic3r ABI: XY centerline sample plus local width plus perimeter band, with `z()` intentionally overloaded to mean width for generic point-like adapters.
+  - `ExtrusionLine::simplify()` protects two different contracts at once: centerline deviation via shoelace/triangle-height tests and deposited-material fidelity via `calculateExtrusionAreaDeviationError()`.
+  - `ExtrusionLine` relies on multiple sentinel conventions that downstream translators must preserve: `inset_idx(-1)` as an invalid default, duplicated first/last junctions for closed loops, and clockwise winding meaning "solid contour".
+- Decisions made:
+  - Verified `src/libslic3r/Arachne/SkeletalTrapezoidation.hpp` already met the annotation checklist from earlier work, so this session focused new comment injection on the previously uncovered Arachne output types.
+  - Annotated the conversion helpers in `ExtrusionLine.hpp/.cpp` because they form the semantic bridge from Arachne wall planning into generic `ThickPolyline`/`ExtrusionPaths` generation.
+- Open questions:
+  - None newly introduced; existing `[UNCLEAR -> ESCALATED]` items remain unchanged.
+- Cross-references:
+  - `src/libslic3r/Arachne/WallToolPaths.hpp`
+  - `src/libslic3r/Arachne/SkeletalTrapezoidation.cpp`
+  - `src/libslic3r/VariableWidth.cpp`
+  - `src/libslic3r/ExtrusionEntity.hpp`
+
+**Completed tasks this session:** T4020
