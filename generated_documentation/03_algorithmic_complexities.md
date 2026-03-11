@@ -175,13 +175,36 @@ This means "pre-admesh repair" differs sharply by parser: STL/STEP/SVG/ModelIO c
 - Minimizes material while ensuring no interior point is unsupported for top surface
 
 #### TPMS Infill (`FillTpmsD`, `FillTpmsFK`)
-- Triply Periodic Minimal Surfaces: D-surface (diamond) and FK (Fourier-Kitaev) approximations
-- Similar to Gyroid but different mathematical surfaces
+- Both patterns generate a full-plane TPMS cross-section first, then run the same finishing stages: optional `-45°` pattern rotation, multiline widening, polygon clipping, short-fragment pruning, and infill connection ([`FillTpmsD::_fill_surface_single()`](../src/libslic3r/Fill/FillTpmsD.cpp#L196), [`FillTpmsFK::_fill_surface_single()`](../src/libslic3r/Fill/FillTpmsFK.cpp#L213)).
+
+##### TPMS D / Schwartz Diamond (`FillTpmsD`)
+
+- **Implicit surface:** `sin(x)sin(y)sin(z) - cos(x)cos(y)cos(z) = 0` ([`FillTpmsD.hpp`](../src/libslic3r/Fill/FillTpmsD.hpp#L1), [`FillTpmsD.cpp`](../src/libslic3r/Fill/FillTpmsD.cpp#L37)).
+- **Analytic cross-section extraction:** the implementation rewrites the surface into `a*cos(u) = b*cos(v)` with `u = x - y`, `v = x + y`, `a = sin(z) - cos(z)`, and `b = sin(z) + cos(z)`. For a fixed layer `z`, it solves one branch explicitly as `v = acos((a / b) * cos(u))`; if `|a| > |b|`, it swaps `u` and `v` first so the `acos` argument stays in `[-1, 1]` ([`FillTpmsD.cpp`](../src/libslic3r/Fill/FillTpmsD.cpp#L39)).
+- **Adaptive sampling algorithm:** `make_waves()` seeds one `2pi` period with 16 uniform segments, evaluates the true midpoint on every chord, and inserts a midpoint whenever the deviation exceeds `min(line_spacing / 2, PatternTolerance) / scaleFactor`. This repeats until every segment satisfies the chord-error bound, then the single-period wave is tiled across the bounding box and mirrored into `+v` and `-v` branches ([`FillTpmsD.cpp`](../src/libslic3r/Fill/FillTpmsD.cpp#L114)).
+- **Density mapping:** requested density is converted into spatial frequency through `DensityAdjust = 2.1`, so denser infill means a smaller effective TPMS cell size rather than tighter 2D hatch spacing ([`FillTpmsD.hpp`](../src/libslic3r/Fill/FillTpmsD.hpp#L66), [`FillTpmsD.cpp`](../src/libslic3r/Fill/FillTpmsD.cpp#L209)).
+- **Complexity:** approximately `O(P + R x S)` per region, where `P` is the number of tiled wave periods, `R` is the number of `vShift` bands crossing the bounding box, and `S` is the refined sample count per period. Because refinement is curvature-driven, high-density or high-curvature layers cost more than flat layers, but the work still scales with covered area rather than triangle count.
+
+##### TPMS FK / Fischer-Koch S (`FillTpmsFK`)
+
+- **Implicit surface:** `cos(2x)sin(y)cos(z) + cos(2y)sin(z)cos(x) + cos(2z)sin(x)cos(y) = 0` ([`FillTpmsFK.hpp`](../src/libslic3r/Fill/FillTpmsFK.hpp#L1), [`FillTpmsFK.cpp`](../src/libslic3r/Fill/FillTpmsFK.cpp#L7)).
+- **Cross-section extraction method:** unlike TPMS D, FK is not converted into an explicit wave equation. OrcaSlicer builds a sampled scalar field over an expanded bounding box, evaluates the implicit field at the current layer height, and extracts the zero-isocontour with Marching Squares ([`ScalarField`](../src/libslic3r/Fill/FillTpmsFK.cpp#L38), [`get_polylines()`](../src/libslic3r/Fill/FillTpmsFK.cpp#L143)).
+- **Sampling grid:** the field uses a coarse marching cell size of `0.40 mm` and a raster accuracy of `0.004 mm`; Marching Squares runs with TBB parallelism, returns closed rings, and simplifies them with `SCALED_SPARSE_INFILL_RESOLUTION` before clipping ([`FillTpmsFK.cpp`](../src/libslic3r/Fill/FillTpmsFK.cpp#L51), [`FillTpmsFK.cpp`](../src/libslic3r/Fill/FillTpmsFK.cpp#L166), [`FillTpmsFK.cpp`](../src/libslic3r/Fill/FillTpmsFK.cpp#L251)).
+- **Density mapping:** the FK period is `vari_T = 4.18 * spacing * multiline / density_factor`, with `density_factor = min(0.9, params.density)`. So density changes the 3D field period directly, and the implementation intentionally caps effective density at 90% to avoid a degenerate field near solid fill ([`FillTpmsFK.cpp`](../src/libslic3r/Fill/FillTpmsFK.cpp#L225)).
+- **Complexity:** approximately `O(G + C)` per region, where `G` is the number of sampled grid cells in the expanded bounding box and `C` is the total contour length emitted by Marching Squares. In practice this is more predictable than TPMS D because cost is dominated by raster area, not adaptive subdivision.
+
+##### Practical Difference Between The Two TPMS Paths
+
+- **TPMS D** is an analytic slicer of the 3D surface: it derives one exact layer curve family and only samples enough points to approximate curvature.
+- **TPMS FK** is a raster-contour slicer: it samples the scalar field first, then extracts contours numerically.
+- The translator consequence is important: TPMS D must preserve the coordinate transform and midpoint-refinement loop, while TPMS FK must preserve the scalar-field sampling contract, Marching Squares resolution, and the 90% density clamp.
+- See `generated_documentation/pseudocode_tpms_infill.md` for language-agnostic pseudocode of both extraction paths.
 
 ### Complexity Notes
 - Most patterns: O(area / line_spacing²) — scales with infill density
 - Adaptive cubic: precomputation is O(V log V) where V = mesh vertex count; lookup per layer is O(k) where k = cells intersecting that layer
 - Lightning: O(n log n) where n = number of "unlit" points requiring coverage
+- TPMS D: adaptive-subdivision cost varies with curvature; TPMS FK: marching-grid cost varies with expanded bbox area
 
 ---
 

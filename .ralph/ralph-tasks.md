@@ -641,7 +641,7 @@ implements.)
              concentric helper internals, and the lightning distance field.
              Commit: `annotate: remaining Fill/ files (T4041)`
 
-- [ ] T4042  DOCS UPDATE · After T4040–T4041 are complete: add TPMS algorithm
+- [x] T4042  DOCS UPDATE · After T4040–T4041 are complete: add TPMS algorithm
              entries to 03_algorithmic_complexities.md Section 3 (Infill
              Algorithms). The current section mentions FillTpmsD and FillTpmsFK
              by name only. Add: the implicit surface equations for both surfaces,
