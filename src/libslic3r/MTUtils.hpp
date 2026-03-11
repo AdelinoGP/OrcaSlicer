@@ -1,10 +1,10 @@
 #ifndef MTUTILS_HPP
 #define MTUTILS_HPP
 
-#include <atomic>       // for std::atomic_flag and memory orders
-#include <mutex>        // for std::lock_guard
-#include <functional>   // for std::function
-#include <utility>      // for std::forward
+#include <atomic>     // for std::atomic_flag and memory orders
+#include <mutex>      // for std::lock_guard
+#include <functional> // for std::function
+#include <utility>    // for std::forward
 #include <vector>
 #include <algorithm>
 #include <cmath>
@@ -15,6 +15,9 @@ namespace Slic3r {
 
 /// Handy little spin mutex for the cached meshes.
 /// Implements the "Lockable" concept
+// [CONCURRENCY] Busy-wait lock intended for very short critical sections.
+// [HAZARD] SpinMutex can waste CPU and starve threads under contention;
+// callers must avoid long-running work while holding the lock.
 class SpinMutex
 {
     std::atomic_flag                m_flg;
@@ -23,7 +26,11 @@ class SpinMutex
 
 public:
     inline SpinMutex() { m_flg.clear(MO_REL); }
-    inline void lock() { while (m_flg.test_and_set(MO_ACQ)) ; }
+    inline void lock()
+    {
+        while (m_flg.test_and_set(MO_ACQ))
+            ;
+    }
     inline bool try_lock() { return !m_flg.test_and_set(MO_ACQ); }
     inline void unlock() { m_flg.clear(MO_REL); }
 };
@@ -33,7 +40,7 @@ template<class T> class CachedObject
 {
 public:
     // Method type which refreshes the object when it has been invalidated
-    using Setter = std::function<void(T &)>;
+    using Setter = std::function<void(T&)>;
 
 private:
     T         m_obj;   // the object itself
@@ -42,29 +49,32 @@ private:
 
     // the setter will be called just before the object's const value is
     // about to be retrieved.
-    std::function<void(T &)> m_setter;
+    std::function<void(T&)> m_setter;
 
 public:
     // Forwarded constructor
     template<class... Args>
-    inline CachedObject(Setter &&fn, Args &&... args)
-        : m_obj(std::forward<Args>(args)...), m_valid(false), m_setter(fn)
+    inline CachedObject(Setter&& fn, Args&&... args) : m_obj(std::forward<Args>(args)...), m_valid(false), m_setter(fn)
     {}
 
     // invalidate the value of the object. The object will be refreshed at
     // the next retrieval (Setter will be called). The data that is used in
     // the setter function should be guarded as well during modification so
     // the modification has to take place in fn.
-    template<class Fn> void invalidate(Fn &&fn)
+    template<class Fn> void invalidate(Fn&& fn)
     {
+        // [STATE] Invalidate mutates both the guarded dependency state (via fn)
+        // and cache validity bit under one lock to keep them coherent.
         std::lock_guard<SpinMutex> lck(m_lck);
         fn();
         m_valid = false;
     }
 
     // Get the const object properly updated.
-    inline const T &get()
+    inline const T& get()
     {
+        // [CONCURRENCY] Double-role critical section: checks validity and, when stale,
+        // runs the setter while still locked to serialize refresh against readers.
         std::lock_guard<SpinMutex> lck(m_lck);
         if (!m_valid) {
             m_setter(m_obj);
@@ -74,65 +84,53 @@ public:
     }
 };
 
-template<class C> bool all_of(const C &container)
+template<class C> bool all_of(const C& container)
 {
-    return std::all_of(container.begin(),
-                       container.end(),
-                       [](const typename C::value_type &v) {
-                           return static_cast<bool>(v);
-                       });
+    return std::all_of(container.begin(), container.end(), [](const typename C::value_type& v) { return static_cast<bool>(v); });
 }
 
-//template<class T>
-//using remove_cvref_t = std::remove_reference_t<std::remove_cv_t<T>>;
+// template<class T>
+// using remove_cvref_t = std::remove_reference_t<std::remove_cv_t<T>>;
 
 /// Exactly like Matlab https://www.mathworks.com/help/matlab/ref/linspace.html
 template<class T, class I, class = IntegerOnly<I>>
-inline std::vector<T> linspace_vector(const ArithmeticOnly<T> &start, 
-                                      const T &stop, 
-                                      const I &n)
+inline std::vector<T> linspace_vector(const ArithmeticOnly<T>& start, const T& stop, const I& n)
 {
+    // [INTENT] Produces n evenly spaced samples in [start, stop) (stop excluded due to
+    // stride=(stop-start)/n), matching internal sampling loops that append terminal values separately.
     std::vector<T> vals(n, T());
 
     T      stride = (stop - start) / n;
     size_t i      = 0;
-    std::generate(vals.begin(), vals.end(), [&i, start, stride] {
-        return start + i++ * stride;
-    });
+    std::generate(vals.begin(), vals.end(), [&i, start, stride] { return start + i++ * stride; });
 
     return vals;
 }
 
-template<size_t N, class T>
-inline std::array<ArithmeticOnly<T>, N> linspace_array(const T &start, const T &stop)
+template<size_t N, class T> inline std::array<ArithmeticOnly<T>, N> linspace_array(const T& start, const T& stop)
 {
     std::array<T, N> vals = {T()};
 
     T      stride = (stop - start) / N;
     size_t i      = 0;
-    std::generate(vals.begin(), vals.end(), [&i, start, stride] {
-        return start + i++ * stride;
-    });
+    std::generate(vals.begin(), vals.end(), [&i, start, stride] { return start + i++ * stride; });
 
     return vals;
 }
 
 /// A set of equidistant values starting from 'start' (inclusive), ending
 /// in the closest multiple of 'stride' less than or equal to 'end' and
-/// leaving 'stride' space between each value. 
+/// leaving 'stride' space between each value.
 /// Very similar to Matlab [start:stride:end] notation.
-template<class T>
-inline std::vector<ArithmeticOnly<T>> grid(const T &start, 
-                                           const T &stop, 
-                                           const T &stride)
+template<class T> inline std::vector<ArithmeticOnly<T>> grid(const T& start, const T& stop, const T& stride)
 {
+    // [HAZARD] Assumes stride > 0 and stop >= start; negative/zero stride yields invalid
+    // vector sizing or empty/undefined progression.
     std::vector<T> vals(size_t(std::ceil((stop - start) / stride)), T());
-    
+
     int i = 0;
-    std::generate(vals.begin(), vals.end(), [&i, start, stride] {
-        return start + i++ * stride; 
-    });
-     
+    std::generate(vals.begin(), vals.end(), [&i, start, stride] { return start + i++ * stride; });
+
     return vals;
 }
 

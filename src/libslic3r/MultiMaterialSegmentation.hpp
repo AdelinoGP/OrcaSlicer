@@ -15,6 +15,8 @@ using ExPolygons = std::vector<ExPolygon>;
 
 struct ColoredLine
 {
+    // [INTENT] Edge primitive tagged with material/color id so polygon clipping/offsetting
+    // can keep extrusion assignment attached to geometry fragments.
     Line line;
     int  color;
     int  poly_idx       = -1;
@@ -23,34 +25,43 @@ struct ColoredLine
 
 using ColoredLines = std::vector<ColoredLine>;
 
-enum class IncludeTopAndBottomLayers {
-    Yes,
-    No
-};
+enum class IncludeTopAndBottomLayers { Yes, No };
 
-struct ModelVolumeFacetsInfo {
-    const FacetsAnnotation &facets_annotation;
+struct ModelVolumeFacetsInfo
+{
+    // [COUPLING] FacetsAnnotation is produced by painting gizmo/tooling and consumed here
+    // by core segmentation to project user paint state into print regions.
+    const FacetsAnnotation& facets_annotation;
     // Indicate if model volume is painted.
-    const bool              is_painted;
+    const bool is_painted;
     // Indicate if the default extruder (TriangleStateType::NONE) should be replaced with the volume extruder.
-    const bool              replace_default_extruder;
+    const bool replace_default_extruder;
 };
 
 // Returns segmentation based on painting in segmentation gizmos.
-std::vector<std::vector<ExPolygons>> segmentation_by_painting(const PrintObject                                               &print_object,
-                                                              const std::function<ModelVolumeFacetsInfo(const ModelVolume &)> &extract_facets_info,
-                                                              size_t                                                           num_facets_states,
-                                                              float                                                            segmentation_max_width,
-                                                              float                                                            segmentation_interlocking_depth,
-                                                              bool                                                             segmentation_interlocking_beam,
-                                                              IncludeTopAndBottomLayers                                        include_top_and_bottom_layers,
-                                                              const std::function<void()>                                     &throw_on_cancel_callback);
+// [INTENT] Produces per-layer, per-state ExPolygons by intersecting painted facet classes
+// with sliced contours, optionally creating interlocking transitions between states.
+// [COUPLING] Bridges GUI-facing painting annotations and PrintObject layer geometry.
+std::vector<std::vector<ExPolygons>> segmentation_by_painting(
+    const PrintObject&                                              print_object,
+    const std::function<ModelVolumeFacetsInfo(const ModelVolume&)>& extract_facets_info,
+    size_t                                                          num_facets_states,
+    float                                                           segmentation_max_width,
+    float                                                           segmentation_interlocking_depth,
+    bool                                                            segmentation_interlocking_beam,
+    IncludeTopAndBottomLayers                                       include_top_and_bottom_layers,
+    const std::function<void()>&                                    throw_on_cancel_callback);
 
 // Returns multi-material segmentation based on painting in multi-material segmentation gizmo
-std::vector<std::vector<ExPolygons>> multi_material_segmentation_by_painting(const PrintObject &print_object, const std::function<void()> &throw_on_cancel_callback);
+// [INTENT] Specialization of segmentation_by_painting() for multi-extruder state mapping.
+std::vector<std::vector<ExPolygons>> multi_material_segmentation_by_painting(const PrintObject&           print_object,
+                                                                             const std::function<void()>& throw_on_cancel_callback);
 
 // Returns fuzzy skin segmentation based on painting in fuzzy skin segmentation gizmo
-std::vector<std::vector<ExPolygons>> fuzzy_skin_segmentation_by_painting(const PrintObject &print_object, const std::function<void()> &throw_on_cancel_callback);
+// [INTENT] Specialization that emits fuzzy-skin paint masks per layer using the same
+// geometric segmentation backbone.
+std::vector<std::vector<ExPolygons>> fuzzy_skin_segmentation_by_painting(const PrintObject&           print_object,
+                                                                         const std::function<void()>& throw_on_cancel_callback);
 
 } // namespace Slic3r
 
@@ -65,8 +76,10 @@ template<> struct segment_traits<Slic3r::ColoredLine>
     typedef coord_t       coordinate_type;
     typedef Slic3r::Point point_type;
 
-    static inline point_type get(const Slic3r::ColoredLine &line, const direction_1d &dir)
+    static inline point_type get(const Slic3r::ColoredLine& line, const direction_1d& dir)
     {
+        // [COUPLING] Adapter exposes ColoredLine to boost::polygon segment algorithms without
+        // converting to a separate geometry container.
         return dir.to_int() ? line.line.b : line.line.a;
     }
 };

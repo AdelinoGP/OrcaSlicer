@@ -300,6 +300,9 @@ Points MultiPoint::visivalingam(const Points& pts, const double tolerance)
     // We store the effective areas for each node
     std::vector<coordf_t> areas;
     areas.reserve(pts.size());
+    // [HAZARD] H1057 P1/High: reserve() does not change size; later writes use
+    // areas[curr->pt_idx] before any resize(). That is out-of-bounds UB unless
+    // some external invariant guarantees assignment is skipped (none obvious here).
     // Construct the initial set of nodes. We will make a heap out of the "heap" vector using
     // std::make_heap. node_list is used later.
     std::vector<vis_node*> node_list;
@@ -381,7 +384,8 @@ Points MultiPoint::visivalingam(const Points& pts, const double tolerance)
 //   be eliminated by the standard convex-hull test are kept if their deviation / distance
 //   ratio is below `tolerence`. This produces a concave-ish boundary that stays close to
 //   the input point cloud.
-// [UNCLEAR → RESOLVED] `concave_hull_2d()` actually builds a tolerance-relaxed lower hull over X-sorted points, not a general concave-hull solver.
+// [UNCLEAR → RESOLVED] `concave_hull_2d()` actually builds a tolerance-relaxed lower hull over X-sorted points, not a general concave-hull
+// solver.
 //   lower-convex-hull sweep. It does NOT compute a full concave hull (alpha-shape). The
 //   input is assumed pre-sorted in X; unsorted input gives incorrect results.
 // [HAZARD] H1056 P2/Medium: Typo in parameter name "tolerence" (should be "tolerance").
@@ -475,6 +479,7 @@ double MultiPoint::minimumDistanceBetweenLinesDefinedByPoints(const Points& A, c
 
 void MultiPoint3::translate(double x, double y)
 {
+    // [INTENT] 2D translation in XY only; Z is preserved for layer-height semantics.
     for (Vec3crd& p : points) {
         p(0) += coord_t(x);
         p(1) += coord_t(y);

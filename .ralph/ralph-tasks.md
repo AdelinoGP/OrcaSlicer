@@ -844,7 +844,7 @@ implements.)
               + src/libslic3r/miniz_extension.hpp
              Commit: `annotate: src/libslic3r files (T4060m)`
 
-- [ ] T4060n  annotate: src/libslic3r/ModelArrange.hpp
+- [x] T4060n  annotate: src/libslic3r/ModelArrange.hpp
               + src/libslic3r/MTUtils.hpp
               + src/libslic3r/MultiMaterialSegmentation.hpp
               + src/libslic3r/MultiPoint.cpp
