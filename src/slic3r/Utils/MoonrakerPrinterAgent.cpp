@@ -143,14 +143,18 @@ int MoonrakerPrinterAgent::connect_printer(std::string dev_id, std::string dev_i
 
     std::string base_url;
     std::string api_key;
-    uint64_t gen;
+    uint64_t    gen;
     {
         std::lock_guard<std::recursive_mutex> lock(connect_mutex);
+        // [STATE] `device_info` is the shared connection snapshot consumed by upload, control, and callback paths, so
+        // connection setup serializes all writes behind `connect_mutex` before any worker thread sees the new target.
         init_device_info(dev_id, dev_ip, username, password, use_ssl);
-        gen = ++connect_generation;
+        gen      = ++connect_generation;
         base_url = device_info.base_url;
         api_key  = device_info.api_key;
         if (connect_thread.joinable()) {
+            // [HAZARD] Detaching abandons ownership of the prior worker and relies on the generation counter to keep a
+            // stale thread from committing its results. That avoids a UI stall, but makes lifetime reasoning harder.
             connect_thread.detach();
         }
     }
@@ -165,6 +169,8 @@ int MoonrakerPrinterAgent::connect_printer(std::string dev_id, std::string dev_i
     ws_last_dispatch_ms.store(0);
     last_print_state.clear();
 
+    // [CONCURRENCY] The async connect path captures immutable copies of the endpoint/auth state so later edits to
+    // `device_info` cannot race with the in-flight handshake.
     // Launch connection in background thread (capture by value to avoid data races)
     {
         std::lock_guard<std::recursive_mutex> lock(connect_mutex);
@@ -179,7 +185,7 @@ int MoonrakerPrinterAgent::disconnect_printer()
     {
         std::lock_guard<std::recursive_mutex> lock(connect_mutex);
         device_info = MoonrakerDeviceInfo{};
-        ++connect_generation;  // Invalidate any in-flight connection
+        ++connect_generation; // Invalidate any in-flight connection
         if (connect_thread.joinable()) {
             connect_thread.detach();
         }
@@ -450,6 +456,8 @@ int MoonrakerPrinterAgent::set_queue_on_main_fn(QueueOnMainFn fn)
 
 void MoonrakerPrinterAgent::build_ams_payload(int ams_count, int max_lane_index, const std::vector<AmsTrayData>& trays)
 {
+    // [INTENT] Moonraker filament inventories are translated into the Bambu-style AMS JSON grammar expected by the
+    // existing GUI/device parser so Klipper-based machines can reuse Orca's preset-sync and tray-status UI.
 
     // Look up MachineObject via DeviceManager
     auto* dev_manager = GUI::wxGetApp().getDeviceManager();
@@ -462,22 +470,22 @@ void MoonrakerPrinterAgent::build_ams_payload(int ams_count, int max_lane_index,
     }
 
     // Build BBL-format JSON for DevFilaSystemParser::ParseV1_0
-    nlohmann::json ams_json = nlohmann::json::object();
+    nlohmann::json ams_json  = nlohmann::json::object();
     nlohmann::json ams_array = nlohmann::json::array();
 
     // Calculate ams_exist_bits and tray_exist_bits
-    unsigned long ams_exist_bits = 0;
+    unsigned long ams_exist_bits  = 0;
     unsigned long tray_exist_bits = 0;
 
     for (int ams_id = 0; ams_id < ams_count; ++ams_id) {
         ams_exist_bits |= (1 << ams_id);
 
         nlohmann::json ams_unit = nlohmann::json::object();
-        ams_unit["id"] = std::to_string(ams_id);
-        ams_unit["info"] = "0002";  // treat as AMS_LITE 
+        ams_unit["id"]          = std::to_string(ams_id);
+        ams_unit["info"]        = "0002"; // treat as AMS_LITE
 
-        nlohmann::json tray_array = nlohmann::json::array();
-        int max_slot_in_this_ams = std::min(3, max_lane_index - ams_id * 4);
+        nlohmann::json tray_array           = nlohmann::json::array();
+        int            max_slot_in_this_ams = std::min(3, max_lane_index - ams_id * 4);
         for (int slot_id = 0; slot_id <= max_slot_in_this_ams; ++slot_id) {
             int slot_index = ams_id * 4 + slot_id;
 
@@ -491,15 +499,15 @@ void MoonrakerPrinterAgent::build_ams_payload(int ams_count, int max_lane_index,
             }
 
             nlohmann::json tray_json = nlohmann::json::object();
-            tray_json["id"] = std::to_string(slot_id);
-            tray_json["tag_uid"] = "0000000000000000";
+            tray_json["id"]          = std::to_string(slot_id);
+            tray_json["tag_uid"]     = "0000000000000000";
 
             if (tray && tray->has_filament) {
                 tray_exist_bits |= (1 << slot_index);
 
                 tray_json["tray_info_idx"] = tray->tray_info_idx;
-                tray_json["tray_type"] = tray->tray_type;
-                tray_json["tray_color"] = normalize_color_value(tray->tray_color);
+                tray_json["tray_type"]     = tray->tray_type;
+                tray_json["tray_color"]    = normalize_color_value(tray->tray_color);
 
                 // Add temperature data if provided
                 if (tray->bed_temp > 0) {
@@ -509,9 +517,9 @@ void MoonrakerPrinterAgent::build_ams_payload(int ams_count, int max_lane_index,
                     tray_json["nozzle_temp_max"] = std::to_string(tray->nozzle_temp);
                 }
             } else {
-                tray_json["tray_info_idx"] = "";
-                tray_json["tray_type"] = "";
-                tray_json["tray_color"] = "00000000";
+                tray_json["tray_info_idx"]         = "";
+                tray_json["tray_type"]             = "";
+                tray_json["tray_color"]            = "00000000";
                 tray_json["tray_slot_placeholder"] = "1";
             }
 
@@ -527,14 +535,16 @@ void MoonrakerPrinterAgent::build_ams_payload(int ams_count, int max_lane_index,
     std::ostringstream tray_exist_ss;
     tray_exist_ss << std::hex << std::uppercase << tray_exist_bits;
 
-    ams_json["ams"] = ams_array;
-    ams_json["ams_exist_bits"] = ams_exist_ss.str();
+    ams_json["ams"]             = ams_array;
+    ams_json["ams_exist_bits"]  = ams_exist_ss.str();
     ams_json["tray_exist_bits"] = tray_exist_ss.str();
 
     // Wrap in the expected structure for ParseV1_0
     nlohmann::json print_json = nlohmann::json::object();
-    print_json["ams"] = ams_json;
+    print_json["ams"]         = ams_json;
 
+    // [COUPLING] This path deliberately routes through `DevFilaSystemParser` instead of a Moonraker-native model, so
+    // printer tray sync stays wired into the same GUI/runtime state used by Bambu devices.
     // Call the parser to populate DevFilaSystem
     DevFilaSystemParser::ParseV1_0(print_json, obj, obj->GetFilaSystem(), false);
     BOOST_LOG_TRIVIAL(info) << "MoonrakerPrinterAgent::build_ams_payload: Parsed " << trays.size() << " trays";
@@ -543,6 +553,8 @@ void MoonrakerPrinterAgent::build_ams_payload(int ams_count, int max_lane_index,
     // Without this, the comparison fails and all sync badges are cleared.
     obj->printer_type = device_info.model_id;
 
+    // [STATE] These counters and timestamps are mutated as readiness latches for downstream GUI code; without this
+    // synthetic push bookkeeping, pull-mode Moonraker agents look permanently uninitialized to existing widgets.
     // Set push counters so is_info_ready() returns true for pull-mode agents.
     if (obj->m_push_count == 0) {
         obj->m_push_count = 1;
@@ -560,8 +572,8 @@ void MoonrakerPrinterAgent::build_ams_payload(int ams_count, int max_lane_index,
     // Moonraker printers don't have BBL-style version info, but we need a non-empty map.
     if (obj->module_vers.empty()) {
         DevFirmwareVersionInfo ota_info;
-        ota_info.name = "ota";
-        ota_info.sw_ver = "1.0.0";  // Placeholder version for Moonraker printers
+        ota_info.name   = "ota";
+        ota_info.sw_ver = "1.0.0"; // Placeholder version for Moonraker printers
         obj->module_vers.emplace("ota", ota_info);
     }
 }
@@ -569,12 +581,12 @@ void MoonrakerPrinterAgent::build_ams_payload(int ams_count, int max_lane_index,
 bool MoonrakerPrinterAgent::fetch_filament_info(std::string dev_id)
 {
     std::vector<AmsTrayData> trays;
-    int max_lane_index = 0;
+    int                      max_lane_index = 0;
 
     // Try Happy Hare first (more widely adopted, supports more filament changers)
     if (fetch_hh_filament_info(trays, max_lane_index)) {
-        BOOST_LOG_TRIVIAL(info) << "MoonrakerPrinterAgent::fetch_filament_info: Detected Happy Hare MMU with "
-                                << (max_lane_index + 1) << " gates";
+        BOOST_LOG_TRIVIAL(info) << "MoonrakerPrinterAgent::fetch_filament_info: Detected Happy Hare MMU with " << (max_lane_index + 1)
+                                << " gates";
         int ams_count = (max_lane_index + 4) / 4;
         build_ams_payload(ams_count, max_lane_index, trays);
         return true;
@@ -582,8 +594,7 @@ bool MoonrakerPrinterAgent::fetch_filament_info(std::string dev_id)
 
     // Fallback to AFC
     if (fetch_afc_filament_info(trays, max_lane_index)) {
-        BOOST_LOG_TRIVIAL(info) << "MoonrakerPrinterAgent::fetch_filament_info: Detected AFC with "
-                                << (max_lane_index + 1) << " lanes";
+        BOOST_LOG_TRIVIAL(info) << "MoonrakerPrinterAgent::fetch_filament_info: Detected AFC with " << (max_lane_index + 1) << " lanes";
         int ams_count = (max_lane_index + 4) / 4;
         build_ams_payload(ams_count, max_lane_index, trays);
         return true;
@@ -598,8 +609,7 @@ std::string MoonrakerPrinterAgent::trim_and_upper(const std::string& input)
 {
     std::string result = input;
     boost::trim(result);
-    std::transform(result.begin(), result.end(), result.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+    std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
     return result;
 }
 
@@ -611,45 +621,68 @@ std::string MoonrakerPrinterAgent::map_filament_type_to_generic_id(const std::st
     // Source: resources/profiles/OrcaFilamentLibrary/filament/
 
     // PLA variants
-    if (upper == "PLA")           return "OGFL99";
-    if (upper == "PLA-CF")        return "OGFL98";
-    if (upper == "PLA SILK" || upper == "PLA-SILK") return "OGFL96";
-    if (upper == "PLA HIGH SPEED" || upper == "PLA-HS" || upper == "PLA HS") return "OGFL95";
+    if (upper == "PLA")
+        return "OGFL99";
+    if (upper == "PLA-CF")
+        return "OGFL98";
+    if (upper == "PLA SILK" || upper == "PLA-SILK")
+        return "OGFL96";
+    if (upper == "PLA HIGH SPEED" || upper == "PLA-HS" || upper == "PLA HS")
+        return "OGFL95";
 
     // ABS/ASA variants
-    if (upper == "ABS")           return "OGFB99";
-    if (upper == "ASA")           return "OGFB98";
+    if (upper == "ABS")
+        return "OGFB99";
+    if (upper == "ASA")
+        return "OGFB98";
 
     // PETG/PET variants
-    if (upper == "PETG" || upper == "PET") return "OGFG99";
-    if (upper == "PCTG")          return "OGFG97";
+    if (upper == "PETG" || upper == "PET")
+        return "OGFG99";
+    if (upper == "PCTG")
+        return "OGFG97";
 
     // PA/Nylon variants
-    if (upper == "PA" || upper == "NYLON") return "OGFN99";
-    if (upper == "PA-CF")         return "OGFN98";
-    if (upper == "PPA" || upper == "PPA-CF") return "OGFN97";
-    if (upper == "PPA-GF")        return "OGFN96";
+    if (upper == "PA" || upper == "NYLON")
+        return "OGFN99";
+    if (upper == "PA-CF")
+        return "OGFN98";
+    if (upper == "PPA" || upper == "PPA-CF")
+        return "OGFN97";
+    if (upper == "PPA-GF")
+        return "OGFN96";
 
     // PC variants
-    if (upper == "PC")            return "OGFC99";
+    if (upper == "PC")
+        return "OGFC99";
 
     // PP/PE variants
-    if (upper == "PE")            return "OGFP99";
-    if (upper == "PP")            return "OGFP97";
+    if (upper == "PE")
+        return "OGFP99";
+    if (upper == "PP")
+        return "OGFP97";
 
     // Support materials
-    if (upper == "PVA")           return "OGFS99";
-    if (upper == "HIPS")          return "OGFS98";
-    if (upper == "BVOH")          return "OGFS97";
+    if (upper == "PVA")
+        return "OGFS99";
+    if (upper == "HIPS")
+        return "OGFS98";
+    if (upper == "BVOH")
+        return "OGFS97";
 
     // TPU variants
-    if (upper == "TPU")           return "OGFU99";
+    if (upper == "TPU")
+        return "OGFU99";
 
     // Other materials
-    if (upper == "EVA")           return "OGFR99";
-    if (upper == "PHA")           return "OGFR98";
-    if (upper == "COPE")          return "OGFLC99";
-    if (upper == "SBS")           return "OFLSBS99";
+    if (upper == "EVA")
+        return "OGFR99";
+    if (upper == "PHA")
+        return "OGFR98";
+    if (upper == "COPE")
+        return "OGFLC99";
+    if (upper == "SBS")
+        return "OFLSBS99";
 
     // Unknown material
     return UNKNOWN_FILAMENT_ID;
@@ -728,7 +761,7 @@ bool MoonrakerPrinterAgent::fetch_afc_filament_info(std::vector<AmsTrayData>& tr
     std::string url = join_url(device_info.base_url, "/server/database/item?namespace=lane_data");
 
     std::string response_body;
-    bool success = false;
+    bool        success = false;
     std::string http_error;
 
     auto http = Http::get(url);
@@ -740,7 +773,7 @@ bool MoonrakerPrinterAgent::fetch_afc_filament_info(std::vector<AmsTrayData>& tr
         .on_complete([&](std::string body, unsigned status) {
             if (status == 200) {
                 response_body = body;
-                success = true;
+                success       = true;
             } else {
                 http_error = "HTTP error: " + std::to_string(status);
             }
@@ -781,8 +814,8 @@ bool MoonrakerPrinterAgent::fetch_afc_filament_info(std::vector<AmsTrayData>& tr
         }
 
         // Extract lane index from the "lane" field (tool number, 0-based)
-        std::string lane_str = safe_json_string(lane_obj, "lane");
-        int lane_index = -1;
+        std::string lane_str   = safe_json_string(lane_obj, "lane");
+        int         lane_index = -1;
         if (!lane_str.empty()) {
             try {
                 lane_index = std::stoi(lane_str);
@@ -796,16 +829,15 @@ bool MoonrakerPrinterAgent::fetch_afc_filament_info(std::vector<AmsTrayData>& tr
         }
 
         AmsTrayData tray;
-        tray.slot_index = lane_index;
-        tray.tray_color = safe_json_string(lane_obj, "color");
-        tray.tray_type = safe_json_string(lane_obj, "material");
-        tray.bed_temp = safe_json_int(lane_obj, "bed_temp");
-        tray.nozzle_temp = safe_json_int(lane_obj, "nozzle_temp");
-        tray.has_filament = !tray.tray_type.empty();
-        auto* bundle = GUI::wxGetApp().preset_bundle;
-        tray.tray_info_idx = bundle
-            ? bundle->filaments.filament_id_by_type(tray.tray_type)
-            : map_filament_type_to_generic_id(tray.tray_type);
+        tray.slot_index    = lane_index;
+        tray.tray_color    = safe_json_string(lane_obj, "color");
+        tray.tray_type     = safe_json_string(lane_obj, "material");
+        tray.bed_temp      = safe_json_int(lane_obj, "bed_temp");
+        tray.nozzle_temp   = safe_json_int(lane_obj, "nozzle_temp");
+        tray.has_filament  = !tray.tray_type.empty();
+        auto* bundle       = GUI::wxGetApp().preset_bundle;
+        tray.tray_info_idx = bundle ? bundle->filaments.filament_id_by_type(tray.tray_type) :
+                                      map_filament_type_to_generic_id(tray.tray_type);
 
         max_lane_index = std::max(max_lane_index, lane_index);
         trays.push_back(tray);
@@ -826,7 +858,7 @@ bool MoonrakerPrinterAgent::fetch_hh_filament_info(std::vector<AmsTrayData>& tra
     std::string url = join_url(device_info.base_url, "/printer/objects/query?mmu");
 
     std::string response_body;
-    bool success = false;
+    bool        success = false;
     std::string http_error;
 
     auto http = Http::get(url);
@@ -838,7 +870,7 @@ bool MoonrakerPrinterAgent::fetch_hh_filament_info(std::vector<AmsTrayData>& tra
         .on_complete([&](std::string body, unsigned status) {
             if (status == 200) {
                 response_body = body;
-                success = true;
+                success       = true;
             } else {
                 http_error = "HTTP error: " + std::to_string(status);
             }
@@ -863,8 +895,8 @@ bool MoonrakerPrinterAgent::fetch_hh_filament_info(std::vector<AmsTrayData>& tra
     }
 
     // Expected structure: { "result": { "status": { "mmu": { ... } } } }
-    if (!json.contains("result") || !json["result"].contains("status") ||
-        !json["result"]["status"].contains("mmu") || !json["result"]["status"]["mmu"].is_object()) {
+    if (!json.contains("result") || !json["result"].contains("status") || !json["result"]["status"].contains("mmu") ||
+        !json["result"]["status"]["mmu"].is_object()) {
         BOOST_LOG_TRIVIAL(debug) << "MoonrakerPrinterAgent::fetch_hh_filament_info: No mmu object in response";
         return false;
     }
@@ -890,13 +922,12 @@ bool MoonrakerPrinterAgent::fetch_hh_filament_info(std::vector<AmsTrayData>& tra
     }
 
     // Get arrays
-    const auto& gate_status = mmu.contains("gate_status") ? mmu["gate_status"] : nlohmann::json::array();
-    const auto& gate_material = mmu.contains("gate_material") ? mmu["gate_material"] : nlohmann::json::array();
-    const auto& gate_color = mmu.contains("gate_color") ? mmu["gate_color"] : nlohmann::json::array();
+    const auto& gate_status      = mmu.contains("gate_status") ? mmu["gate_status"] : nlohmann::json::array();
+    const auto& gate_material    = mmu.contains("gate_material") ? mmu["gate_material"] : nlohmann::json::array();
+    const auto& gate_color       = mmu.contains("gate_color") ? mmu["gate_color"] : nlohmann::json::array();
     const auto& gate_temperature = mmu.contains("gate_temperature") ? mmu["gate_temperature"] : nlohmann::json::array();
 
-    if (!gate_status.is_array() || !gate_material.is_array() ||
-        !gate_color.is_array() || !gate_temperature.is_array()) {
+    if (!gate_status.is_array() || !gate_material.is_array() || !gate_color.is_array() || !gate_temperature.is_array()) {
         BOOST_LOG_TRIVIAL(warning) << "MoonrakerPrinterAgent::fetch_hh_filament_info: HH arrays not found or invalid type";
         return false;
     }
@@ -909,13 +940,13 @@ bool MoonrakerPrinterAgent::fetch_hh_filament_info(std::vector<AmsTrayData>& tra
         // Check gate_status: -1 = unknown, 0 = empty, 1 or 2 = available
         int status = safe_array_int(gate_status, gate_idx);
         if (status <= 0) {
-            continue;  // Skip unknown or empty gates
+            continue; // Skip unknown or empty gates
         }
 
         // Extract gate data
-        std::string material = safe_array_string(gate_material, gate_idx);
-        std::string color = safe_array_string(gate_color, gate_idx);
-        int nozzle_temp = safe_array_int(gate_temperature, gate_idx);
+        std::string material    = safe_array_string(gate_material, gate_idx);
+        std::string color       = safe_array_string(gate_color, gate_idx);
+        int         nozzle_temp = safe_array_int(gate_temperature, gate_idx);
 
         // Skip if no material type (empty gate)
         if (material.empty()) {
@@ -923,17 +954,16 @@ bool MoonrakerPrinterAgent::fetch_hh_filament_info(std::vector<AmsTrayData>& tra
         }
 
         AmsTrayData tray;
-        tray.slot_index = gate_idx;
-        tray.tray_type = material;
-        tray.tray_color = color;
-        tray.nozzle_temp = nozzle_temp;
-        tray.bed_temp = 0;  // HH doesn't provide bed temp in gate arrays
+        tray.slot_index   = gate_idx;
+        tray.tray_type    = material;
+        tray.tray_color   = color;
+        tray.nozzle_temp  = nozzle_temp;
+        tray.bed_temp     = 0; // HH doesn't provide bed temp in gate arrays
         tray.has_filament = true;
 
-        auto* bundle = GUI::wxGetApp().preset_bundle;
-        tray.tray_info_idx = bundle
-            ? bundle->filaments.filament_id_by_type(tray.tray_type)
-            : map_filament_type_to_generic_id(tray.tray_type);
+        auto* bundle       = GUI::wxGetApp().preset_bundle;
+        tray.tray_info_idx = bundle ? bundle->filaments.filament_id_by_type(tray.tray_type) :
+                                      map_filament_type_to_generic_id(tray.tray_type);
 
         max_lane_index = std::max(max_lane_index, gate_idx);
         trays.push_back(tray);
@@ -971,6 +1001,8 @@ int MoonrakerPrinterAgent::handle_request(const std::string& dev_id, const std::
         }
     }
 
+    // [INTENT] The handler acts as a protocol adapter from Orca's Bambu-centric command envelopes into Moonraker HTTP
+    // and script calls so the rest of the application can stay unaware of the printer backend.
     // Handle print commands
     if (json.contains("print") && json["print"].contains("command")) {
         const auto& command = json["print"]["command"];
@@ -981,6 +1013,8 @@ int MoonrakerPrinterAgent::handle_request(const std::string& dev_id, const std::
 
         const std::string cmd = command.get<std::string>();
 
+        // [COUPLING] `gcode_line` preserves Orca's sequence/result echo contract even though Moonraker itself only
+        // needs a script string; UI callbacks depend on seeing the mirrored response packet.
         // Handle gcode_line command - this is how G-code commands are sent from OrcaSlicer
         if (cmd == "gcode_line") {
             if (!json["print"].contains("param") || !json["print"]["param"].is_string()) {
@@ -1064,6 +1098,8 @@ bool MoonrakerPrinterAgent::init_device_info(std::string dev_id, std::string dev
         return false;
     }
 
+    // [COUPLING] Initial connection metadata is seeded from the currently edited printer preset, so network discovery
+    // inherits printer type and model naming from libslic3r configuration rather than querying it entirely from LAN.
     auto&       preset      = preset_bundle->printers.get_edited_preset();
     const auto& printer_cfg = preset.config;
     device_info.dev_ip      = dev_ip;
@@ -1419,6 +1455,8 @@ void MoonrakerPrinterAgent::dispatch_printer_connected(const std::string& dev_id
 
 void MoonrakerPrinterAgent::start_status_stream(const std::string& dev_id, const std::string& base_url, const std::string& api_key)
 {
+    // [CONCURRENCY] Only one websocket worker may own `ws_thread`; reconnects always tear down the previous stream
+    // first so status-cache writes stay serialized through a single producer.
     stop_status_stream();
     if (base_url.empty()) {
         return;
@@ -1448,6 +1486,8 @@ void MoonrakerPrinterAgent::run_status_stream(std::string dev_id, std::string ba
         return;
     }
 
+    // [INTENT] The websocket stream prefers eventual continuity over immediate failure because telemetry drives status
+    // panes and remote controls continuously during a print; transient LAN outages should not orphan the device.
     // Reconnection logic
     ws_reconnect_requested.store(false); // Reset reconnect flag
     int       retry_count   = 0;
@@ -1498,6 +1538,8 @@ void MoonrakerPrinterAgent::run_status_stream(std::string dev_id, std::string ba
             if (fetch_object_list(base_url, api_key, available_objects, list_error)) {
                 {
                     std::lock_guard<std::recursive_mutex> lock(payload_mutex);
+                    // [STATE] Feature detection snapshots the available Moonraker objects into shared state so later
+                    // payload assembly can decide which temperatures, fans, and bed-leveling capabilities are legal.
                     this->available_objects = std::move(available_objects);
                 }
 
@@ -1544,6 +1586,8 @@ void MoonrakerPrinterAgent::run_status_stream(std::string dev_id, std::string ba
             subscribe["id"]                = 1;
             ws.write(net::buffer(subscribe.dump()));
 
+            // [CONCURRENCY] The read loop owns websocket I/O, while message dispatch hops to the main-thread queue if
+            // configured. The shared boundary is `status_cache`, protected by `payload_mutex`.
             // Read loop
             while (!ws_stop.load()) {
                 ws.next_layer().expires_after(std::chrono::seconds(2));
@@ -1673,6 +1717,8 @@ void MoonrakerPrinterAgent::handle_ws_message(const std::string& dev_id, const s
 
     // Check for print state changes (critical - always dispatch immediately)
     if (updated && !is_critical) {
+        // [INTENT] State transitions punch through the normal telemetry throttle so pause/resume/error UI reacts
+        // immediately, while temperature/progress chatter is coalesced to avoid flooding callback consumers.
         std::string current_state;
         {
             std::lock_guard<std::recursive_mutex> lock(payload_mutex);
@@ -1722,6 +1768,8 @@ void MoonrakerPrinterAgent::update_status_cache(const nlohmann::json& updates)
         status_cache = nlohmann::json::object();
     }
 
+    // [STATE] Incoming Moonraker deltas are merged field-by-field into `status_cache` rather than replacing whole
+    // objects because notify packets often omit unchanged siblings from the last snapshot.
     for (const auto& item : updates.items()) {
         if (item.value().is_object()) {
             nlohmann::json& target = status_cache[item.key()];
@@ -1740,6 +1788,8 @@ void MoonrakerPrinterAgent::update_status_cache(const nlohmann::json& updates)
 nlohmann::json MoonrakerPrinterAgent::build_print_payload_locked() const
 {
     nlohmann::json payload;
+    // [INTENT] Payload construction normalizes Moonraker telemetry into the Bambu-flavored `print` schema already
+    // consumed by the GUI, minimizing the amount of printer-brand-specific code above this layer.
     payload["print"]["command"]            = "push_status";
     payload["print"]["msg"]                = 0;
     payload["print"]["support_mqtt_alive"] = true;
@@ -1772,6 +1822,8 @@ nlohmann::json MoonrakerPrinterAgent::build_print_payload_locked() const
     payload["print"]["mc_print_error_code"] = 0;
     payload["print"]["print_error"]         = 0;
 
+    // [HAZARD] This lossy bitfield mapping intentionally drops Bambu-only capability bits; a future backend that needs
+    // richer status fidelity cannot round-trip them through the current `home_flag` contract.
     // Map homed axes to bit field: X=bit0, Y=bit1, Z=bit2
     // WARNING: This only sets bits 0-2, clearing support flags (bit 3+)
     // Bit 3 = 220V voltage, bit 4 = auto recovery, etc.
@@ -1907,6 +1959,8 @@ void MoonrakerPrinterAgent::dispatch_message(const std::string& dev_id, const st
         return;
     }
 
+    // [COUPLING] Local message handlers take precedence over cloud handlers, matching the existing Bambu agent routing
+    // contract where direct-LAN consumers suppress duplicate cloud delivery.
     auto dispatch = [dev_id, payload, local_fn, cloud_fn]() {
         if (local_fn) {
             local_fn(dev_id, payload);
@@ -1953,6 +2007,8 @@ bool MoonrakerPrinterAgent::upload_gcode(const std::string& local_path,
     bool        result = true;
     std::string http_error;
 
+    // [INTENT] Uploads are staged through Moonraker's file API first so the same path works for both "upload only"
+    // and "upload then print" flows, leaving print start as a second explicit action.
     // Use Http::form_add and Http::form_add_file
     auto http = Http::post(join_url(base_url, "/server/files/upload"));
     if (!api_key.empty()) {
@@ -1973,6 +2029,8 @@ bool MoonrakerPrinterAgent::upload_gcode(const std::string& local_path,
             result     = false;
         })
         .on_progress([&](Http::Progress progress, bool& cancel) {
+            // [CONCURRENCY] libcurl-style progress callbacks happen on the transfer thread; cancellation and progress
+            // propagation are therefore funneled through thread-safe callback objects provided by the caller.
             // Check for cancellation via WasCancelledFn
             if (cancel_fn && cancel_fn()) {
                 cancel = true;
@@ -2047,7 +2105,10 @@ bool MoonrakerPrinterAgent::send_jsonrpc_command(const std::string&    base_url,
     return success;
 }
 
-void MoonrakerPrinterAgent::perform_connection_async(const std::string& dev_id, const std::string& base_url, const std::string& api_key, uint64_t generation)
+void MoonrakerPrinterAgent::perform_connection_async(const std::string& dev_id,
+                                                     const std::string& base_url,
+                                                     const std::string& api_key,
+                                                     uint64_t           generation)
 {
     auto is_stale = [&]() { return generation != connect_generation.load(); };
 
@@ -2068,6 +2129,8 @@ void MoonrakerPrinterAgent::perform_connection_async(const std::string& dev_id, 
             return;
         }
 
+        // [CONCURRENCY] The generation check prevents an older detached connect thread from overwriting a newer device
+        // selection after both complete out of order.
         // Commit fetched info back to device_info under lock, only if still current
         {
             std::lock_guard<std::recursive_mutex> lock(connect_mutex);

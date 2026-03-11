@@ -709,7 +709,7 @@ implements.)
              into network agents rather than pure printer-specific adapters.
              Commit: `annotate: slic3r/Utils cloud agent orchestration (T4053)`
 
-- [ ] T4054  annotate: src/slic3r/Utils/MoonrakerPrinterAgent.cpp
+- [x] T4054  annotate: src/slic3r/Utils/MoonrakerPrinterAgent.cpp
              + src/slic3r/Utils/PresetUpdater.cpp
              + src/slic3r/Utils/QidiPrinterAgent.cpp
              + src/slic3r/Utils/SnapmakerPrinterAgent.cpp

@@ -13,8 +13,7 @@ namespace {
 constexpr const char* SNAPMAKER_AGENT_VERSION = "0.0.1";
 
 // Safely access a parallel array by index, returning a fallback if out of bounds.
-template<typename T>
-T safe_at(const std::vector<T>& vec, int index, const T& fallback)
+template<typename T> T safe_at(const std::vector<T>& vec, int index, const T& fallback)
 {
     return (index >= 0 && index < static_cast<int>(vec.size())) ? vec[index] : fallback;
 }
@@ -93,9 +92,10 @@ bool SnapmakerPrinterAgent::fetch_filament_info(std::string dev_id)
         return false;
     }
 
+    // [INTENT] Snapmaker publishes slot presence, material identity, and optional NFC temperature metadata as parallel
+    // arrays, and this adapter collapses them into Orca's per-tray record format for the shared AMS UI.
     // Navigate to result.status.print_task_config
-    if (!json.contains("result") || !json["result"].contains("status") ||
-        !json["result"]["status"].contains("print_task_config")) {
+    if (!json.contains("result") || !json["result"].contains("status") || !json["result"]["status"].contains("print_task_config")) {
         BOOST_LOG_TRIVIAL(warning) << "SnapmakerPrinterAgent::fetch_filament_info: Missing print_task_config in response";
         return false;
     }
@@ -116,8 +116,7 @@ bool SnapmakerPrinterAgent::fetch_filament_info(std::string dev_id)
 
     // Read NFC filament_detect data for temperature info (optional)
     nlohmann::json nfc_info;
-    if (json["result"]["status"].contains("filament_detect") &&
-        json["result"]["status"]["filament_detect"].contains("info")) {
+    if (json["result"]["status"].contains("filament_detect") && json["result"]["status"]["filament_detect"].contains("info")) {
         nfc_info = json["result"]["status"]["filament_detect"]["info"];
     }
 
@@ -133,18 +132,20 @@ bool SnapmakerPrinterAgent::fetch_filament_info(std::string dev_id)
         tray.has_filament = filament_exist[i];
 
         if (tray.has_filament) {
-            tray.tray_type     = combine_filament_type(safe_at(filament_type, i, empty_str),
-                                                       safe_at(filament_sub_type, i, empty_str));
-            auto* bundle = GUI::wxGetApp().preset_bundle;
-            tray.tray_info_idx = bundle
-                ? bundle->filaments.filament_id_by_type(tray.tray_type)
-                : map_filament_type_to_generic_id(tray.tray_type);
+            // [COUPLING] Material names are immediately resolved against the current `PresetBundle` because the rest of
+            // the UI keys tray compatibility off Orca filament IDs, not off vendor strings from the printer.
+            tray.tray_type     = combine_filament_type(safe_at(filament_type, i, empty_str), safe_at(filament_sub_type, i, empty_str));
+            auto* bundle       = GUI::wxGetApp().preset_bundle;
+            tray.tray_info_idx = bundle ? bundle->filaments.filament_id_by_type(tray.tray_type) :
+                                          map_filament_type_to_generic_id(tray.tray_type);
             tray.tray_color    = safe_at(filament_color, i, default_color);
 
+            // [STATE] NFC-derived temperatures are optional enrichments layered onto the tray snapshot; missing vendor
+            // tags leave the slot usable, just without preheat hints in the mirrored AMS payload.
             // Extract NFC temperature data if available
             if (nfc_info.is_array() && i < static_cast<int>(nfc_info.size()) && nfc_info[i].is_object()) {
-                auto& nfc_slot = nfc_info[i];
-                std::string vendor = nfc_slot.value("VENDOR", "NONE");
+                auto&       nfc_slot = nfc_info[i];
+                std::string vendor   = nfc_slot.value("VENDOR", "NONE");
                 if (vendor != "NONE" && !vendor.empty()) {
                     tray.bed_temp    = nfc_slot.value("BED_TEMP", 0);
                     tray.nozzle_temp = nfc_slot.value("FIRST_LAYER_TEMP", 0);

@@ -17,9 +17,7 @@ namespace {
 bool has_visible_base_preset(const PresetCollection& filaments, const std::string& filament_id)
 {
     for (const auto& p : filaments.get_presets()) {
-        if (p.is_visible && p.is_compatible
-            && filaments.get_preset_base(p) == &p
-            && p.filament_id == filament_id)
+        if (p.is_visible && p.is_compatible && filaments.get_preset_base(p) == &p && p.filament_id == filament_id)
             return true;
     }
     return false;
@@ -29,14 +27,9 @@ bool has_visible_base_preset(const PresetCollection& filaments, const std::strin
 
 const std::string QidiPrinterAgent_VERSION = "0.0.1";
 
-QidiPrinterAgent::QidiPrinterAgent(std::string log_dir) : MoonrakerPrinterAgent(std::move(log_dir))
-{
-}
+QidiPrinterAgent::QidiPrinterAgent(std::string log_dir) : MoonrakerPrinterAgent(std::move(log_dir)) {}
 
-AgentInfo QidiPrinterAgent::get_agent_info_static()
-{
-    return AgentInfo{"qidi", "Qidi", QidiPrinterAgent_VERSION, "Qidi printer agent"};
-}
+AgentInfo QidiPrinterAgent::get_agent_info_static() { return AgentInfo{"qidi", "Qidi", QidiPrinterAgent_VERSION, "Qidi printer agent"}; }
 
 bool QidiPrinterAgent::fetch_filament_info(std::string dev_id)
 {
@@ -57,6 +50,8 @@ bool QidiPrinterAgent::fetch_filament_info(std::string dev_id)
         BOOST_LOG_TRIVIAL(warning) << "QidiPrinterAgent::fetch_filament_info: Failed to fetch filament dict: " << error;
     }
 
+    // [INTENT] Qidi exposes filament identity across multiple endpoints, so the agent first learns the printer series,
+    // then joins dictionary metadata with per-slot state before emitting Orca's AMS tray model.
     // 3. Fetch slot info and build AmsTrayData directly
     std::vector<AmsTrayData> trays;
     int                      box_count = 0;
@@ -138,6 +133,8 @@ bool QidiPrinterAgent::fetch_slot_info(const std::string&        base_url,
     trays.clear();
     trays.reserve(max_slots);
 
+    // [COUPLING] Tray resolution reaches into the live `PresetBundle` because sync badges and preset matches are driven
+    // by Orca filament IDs, not by the raw material names reported by the printer.
     // Lambda to build setting_id from slot data
     auto build_setting_id = [&](int filament_type_idx, int vendor_type, const std::string& tray_type) {
         const int vendor = (vendor_type == 1) ? 1 : 0;
@@ -152,13 +149,13 @@ bool QidiPrinterAgent::fetch_slot_info(const std::string&        base_url,
         tray.slot_index = i;
 
         // Read slot variables
-        const int color_index     = variables.value("color_slot" + std::to_string(i), 1);
-        const int filament_type   = variables.value("filament_slot" + std::to_string(i), 1);
-        const int vendor_type     = variables.value("vendor_slot" + std::to_string(i), 0);
+        const int color_index   = variables.value("color_slot" + std::to_string(i), 1);
+        const int filament_type = variables.value("filament_slot" + std::to_string(i), 1);
+        const int vendor_type   = variables.value("vendor_slot" + std::to_string(i), 0);
 
         // Check filament presence via runout sensor
         std::string box_stepper_key = "box_stepper slot" + std::to_string(i);
-        tray.has_filament = false;
+        tray.has_filament           = false;
         if (status.contains(box_stepper_key)) {
             auto& box_stepper = status[box_stepper_key];
             if (box_stepper.contains("runout_button") && !box_stepper["runout_button"].is_null()) {
@@ -168,9 +165,11 @@ bool QidiPrinterAgent::fetch_slot_info(const std::string&        base_url,
         }
 
         if (tray.has_filament) {
+            // [INTENT] The slot mapper prefers Qidi-specific preset IDs when the printer series is known, then falls
+            // back to generic material-type matching so mixed or unknown firmware dictionaries still populate the UI.
             // Look up filament type name from dictionary
             std::string filament_name = "PLA";
-            auto filament_it = dict.filaments.find(filament_type);
+            auto        filament_it   = dict.filaments.find(filament_type);
             if (filament_it != dict.filaments.end()) {
                 filament_name = filament_it->second;
             }
@@ -178,7 +177,7 @@ bool QidiPrinterAgent::fetch_slot_info(const std::string&        base_url,
 
             // Try Qidi-specific setting ID first; fall back to visible preset by type
             std::string setting_id = build_setting_id(filament_type, vendor_type, tray.tray_type);
-            auto* bundle = GUI::wxGetApp().preset_bundle;
+            auto*       bundle     = GUI::wxGetApp().preset_bundle;
             if (!bundle) {
                 tray.tray_info_idx = setting_id;
             } else if (!setting_id.empty() && has_visible_base_preset(bundle->filaments, setting_id)) {
@@ -204,8 +203,8 @@ bool QidiPrinterAgent::fetch_slot_info(const std::string&        base_url,
 
 bool QidiPrinterAgent::fetch_filament_dict(const std::string& base_url,
                                            const std::string& api_key,
-                                           QidiFilamentDict& dict,
-                                           std::string& error) const
+                                           QidiFilamentDict&  dict,
+                                           std::string&       error) const
 {
     std::string url = join_url(base_url, "/server/files/config/officiall_filas_list.cfg");
 
@@ -240,6 +239,8 @@ bool QidiPrinterAgent::fetch_filament_dict(const std::string& base_url,
         return false;
     }
 
+    // [STATE] The dictionary cache is rebuilt on each fetch instead of incrementally patched, which keeps stale color
+    // or filament codes from surviving across reconnects when firmware ships a different config file.
     dict.colors.clear();
     dict.filaments.clear();
     parse_ini_section(response_body, "colordict", dict.colors);
@@ -265,6 +266,8 @@ void QidiPrinterAgent::parse_ini_section(const std::string& content, const std::
             continue;
         }
         if (in_section) {
+            // [HAZARD] This parser silently ignores malformed sections and duplicate keys, which is convenient for loose
+            // INI-ish firmware files but can hide upstream format drift from callers.
             auto pos = line.find('=');
             if (pos != std::string::npos) {
                 std::string key   = line.substr(0, pos);
@@ -352,6 +355,8 @@ std::string QidiPrinterAgent::normalize_model_key(std::string value)
 
 std::string QidiPrinterAgent::infer_series_id(const std::string& model_id, const std::string& dev_name)
 {
+    // [HAZARD] Series inference is heuristic string matching over model identifiers, so newly branded Qidi hardware can
+    // miss the specialized preset mapping until this table is updated.
     std::string source = model_id.empty() ? dev_name : model_id;
     boost::trim(source);
     if (source.empty()) {
