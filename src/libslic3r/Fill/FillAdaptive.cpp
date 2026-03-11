@@ -1770,11 +1770,17 @@ static void transform_center(Cube* current_cube, const Eigen::Matrix3d& rot)
 //            1. Compute mesh bounding box and octree center (BoundingBox3Base<Vec3f>).
 //            2. Build CubeProperties table via make_cubes_properties() for the mesh size.
 //            3. Allocate Octree with the root cube at the bounding box center.
-//            4. For each mesh triangle (and each overhang_triangle): transform_to_octree()
-//               direction is implicit — triangles are in world-space, but insert_triangle()
-//               compares against axis-aligned child bboxes in octree space. Actually: the
-//               triangle vertices are passed as-is (world-space) because transform_to_world()
-//               was applied to the mesh before calling build_octree(). [UNCLEAR: verify this]
+//            4. For each mesh triangle (and each overhang_triangle): vertices are already in
+//               octree-space (see step 5 note). insert_triangle() compares them against
+//               axis-aligned child bboxes in octree space. Actually: the triangle vertices are
+//               passed as-is in octree-coordinates because transform_to_octree() (NOT
+//               transform_to_world()) was applied to the mesh before calling build_octree().
+//               [UNCLEAR → RESOLVED] Verified from PrintObject::prepare_adaptive_infill_data():
+//               the caller applies `to_octree * trafo_centered()` (transform_to_octree() matrix)
+//               to the mesh before calling build_octree(), placing it in octree-space. The
+//               comment's original claim of "transform_to_world() was applied" was incorrect.
+//               The final transform_center() call at step 6 converts cube centers back to
+//               world-space for efficient per-layer line extraction.
 //            5. In support_overhangs_only mode: only insert triangles passing is_overhang_triangle().
 //            6. After all triangles inserted, transform all Cube::center values to world-space
 //               via transform_center().
