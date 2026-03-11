@@ -823,7 +823,7 @@ implements.)
               + src/libslic3r/KDTreeIndirect.hpp
              Commit: `annotate: src/libslic3r files (T4060j)`
 
-- [ ] T4060k  annotate: src/libslic3r/Layer.cpp
+- [x] T4060k  annotate: src/libslic3r/Layer.cpp
               + src/libslic3r/Layer.hpp
               + src/libslic3r/libslic3r.h
               + src/libslic3r/Line.cpp
