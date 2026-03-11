@@ -767,7 +767,7 @@ implements.)
               + src/libslic3r/BridgeDetector.cpp
              Commit: `annotate: src/libslic3r files (T4060b)`
 
-- [ ] T4060c  annotate: src/libslic3r/BridgeDetector.hpp
+- [x] T4060c  annotate: src/libslic3r/BridgeDetector.hpp
               + src/libslic3r/BrimEarsPoint.hpp
               + src/libslic3r/calib.cpp
               + src/libslic3r/calib.hpp
