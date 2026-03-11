@@ -18,64 +18,55 @@
 
 namespace Slic3r {
 
+// [INTENT] clonable_ptr is a unique-owner wrapper for polymorphic objects that must remain
+// copyable at API boundaries. Copy semantics are implemented by calling T::clone() so callers
+// can duplicate dynamic type without sharing ownership.
+// [MEMORY] Ownership model matches unique_ptr (single raw pointer owner, delete on reset/dtor),
+// but copy assignment deletes current storage before cloning new storage.
+// [COUPLING] Requires every managed type T to provide a compatible clone() member returning T*.
+// [HAZARD] Copy assignment is not strong-exception-safe: if clone() throws, old pointee was
+// already deleted and the pointer becomes empty. release() drops ownership without returning the
+// raw pointer, so ownership transfer requires out-of-band pointer access via get().
+
 // Detect whether the compiler supports C++11 noexcept exception specifications.
-#if defined(_MSC_VER) && _MSC_VER < 1900 && ! defined(noexcept)
-    #define noexcept throw()
+#if defined(_MSC_VER) && _MSC_VER < 1900 && !defined(noexcept)
+#define noexcept throw()
 #endif
 
-template<class T>
-class clonable_ptr
+template<class T> class clonable_ptr
 {
 public:
     /// The type of the managed object, aliased as member type
     typedef T element_type;
 
     /// @brief Default constructor
-    clonable_ptr() noexcept :
-        px(nullptr)
-    {
-    }
+    clonable_ptr() noexcept : px(nullptr) {}
     /// @brief Constructor with the provided pointer to manage
-    explicit clonable_ptr(T* p) noexcept :
-        px(p)
-    {
-    }
+    explicit clonable_ptr(T* p) noexcept : px(p) {}
     /// @brief Copy constructor, clones by calling the rhs.clone() method
-    clonable_ptr(const clonable_ptr& rhs) :
-		px(rhs ? rhs.px->clone() : nullptr)
-    {
-    }
+    clonable_ptr(const clonable_ptr& rhs) : px(rhs ? rhs.px->clone() : nullptr) {}
     /// @brief Move constructor, never throws
-    clonable_ptr(clonable_ptr&& rhs) noexcept :
-        px(rhs.px)
-    {
-        rhs.px = nullptr;
-    }
+    clonable_ptr(clonable_ptr&& rhs) noexcept : px(rhs.px) { rhs.px = nullptr; }
     /// @brief Assignment operator
     clonable_ptr& operator=(const clonable_ptr& rhs)
     {
-		delete px;
-		px = rhs ? rhs.px->clone() : nullptr;
+        // [MEMORY] Existing object is destroyed before clone() is attempted.
+        delete px;
+        px = rhs ? rhs.px->clone() : nullptr;
         return *this;
     }
     /// @brief Move operator, never throws
     clonable_ptr& operator=(clonable_ptr&& rhs)
     {
-		delete px;
-        px = rhs.px;
+        delete px;
+        px     = rhs.px;
         rhs.px = nullptr;
         return *this;
     }
     /// @brief the destructor releases its ownership and destroy the object
-    inline ~clonable_ptr() noexcept
-    {
-        destroy();
-    }
+    inline ~clonable_ptr() noexcept { destroy(); }
     /// @brief this reset releases its ownership and destroy the object
-    inline void reset() noexcept
-    {
-        destroy();
-    }
+    inline void reset() noexcept { destroy(); }
     /// @brief this reset release its ownership and re-acquire another one
     void reset(T* p) noexcept
     {
@@ -87,16 +78,13 @@ public:
     /// @brief Swap method for the copy-and-swap idiom (copy constructor and swap method)
     void swap(clonable_ptr& rhs) noexcept
     {
-        T *tmp = px;
-        px = rhs.px;
+        T* tmp = px;
+        px     = rhs.px;
         rhs.px = tmp;
     }
 
     /// @brief release the ownership of the px pointer without destroying the object!
-    inline void release() noexcept
-    {
-        px = nullptr;
-    }
+    inline void release() noexcept { px = nullptr; }
 
     // reference counter operations :
     inline operator bool() const noexcept
@@ -105,7 +93,7 @@ public:
     }
 
     // underlying pointer operations :
-    inline T& operator*()  const noexcept
+    inline T& operator*() const noexcept
     {
         assert(nullptr != px);
         return *px;
@@ -115,7 +103,7 @@ public:
         assert(nullptr != px);
         return px;
     }
-    inline T* get()  const noexcept
+    inline T* get() const noexcept
     {
         // no assert, can return nullptr
         return px;
@@ -130,10 +118,7 @@ private:
     }
 
     /// @brief hack: const-cast release the ownership of the px pointer without destroying the object!
-    inline void release() const noexcept
-    {
-        px = nullptr;
-    }
+    inline void release() const noexcept { px = nullptr; }
 
 private:
     T* px; //!< Native pointer

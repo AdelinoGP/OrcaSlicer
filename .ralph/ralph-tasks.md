@@ -781,7 +781,7 @@ implements.)
               + src/libslic3r/ClipperZUtils.hpp
              Commit: `annotate: src/libslic3r files (T4060d)`
 
-- [ ] T4060e  annotate: src/libslic3r/clonable_ptr.hpp
+- [x] T4060e  annotate: src/libslic3r/clonable_ptr.hpp
               + src/libslic3r/Color.hpp
               + src/libslic3r/CommonDefs.hpp
               + src/libslic3r/CustomGCode.hpp

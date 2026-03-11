@@ -870,6 +870,10 @@ void priv::set_skip_for_out_of_aoi(std::vector<bool>&          skip_indicies,
 
 indexed_triangle_set Slic3r::its_mask(const indexed_triangle_set& its, const std::vector<bool>& mask)
 {
+    // [INTENT] Build a compact triangle set containing only masked faces while reindexing
+    // vertices to remove holes in the vertex array.
+    // [MEMORY] Two-pass remap: first marks used source vertices, then allocates exactly-sized
+    // destination buffers. Avoids per-face reallocations in the hot emboss/cut path.
     if (its.indices.size() != mask.size()) {
         assert(false);
         return {};
@@ -923,6 +927,10 @@ void priv::set_skip_by_angle(std::vector<bool>&          skip_indicies,
                              const Project3d&            projection,
                              double                      max_angle)
 {
+    // [INTENT] Cull faces that are nearly orthogonal or opposite to projection direction so
+    // downstream corefine works on front-facing geometry likely to contribute to emboss cut.
+    // [HAZARD] Uses one vertex per triangle for projection direction estimation; for perspective
+    // projections this is an approximation that may misclassify large triangles.
     assert(max_angle < 90. && max_angle > 89.);
     assert(skip_indicies.size() == its.indices.size());
     float threshold = static_cast<float>(cos(max_angle / 180. * M_PI));
