@@ -897,7 +897,15 @@ single_slope_fallback:
 // [CONCURRENCY] This function is called from the single-threaded process_layer() loop.
 //   No TBB parallelism inside; the whole G-code pipeline step is single-threaded per plate.
 //
-// [UNCLEAR → ESCALATED] The active cross-role propagator replaced the older role-specific clamping preserved in comments, but local code does not explain why that policy changed.
+// [UNCLEAR → RESOLVED] The cross-role propagator replaced the per-role-specific clamping
+//   as an intentional improvement. The commented-out code stored `rate_start` (a role-specific
+//   computed value) for non-matching roles and `line.volumetric_extrusion_rate_start` for the
+//   matching role — this meant each role tracked its own "last seen rate" independently.
+//   The active code unconditionally stores `line.volumetric_extrusion_rate_start` (the actual
+//   constrained line rate) for ALL roles. This prevents under-deceleration at cross-role
+//   transitions: when switching from a fast role to a slow role that hasn't been seen recently,
+//   the old per-role tracker would use a stale (too-high) rate; the new code uses the current
+//   line's actual rate, giving a more conservative and accurate deceleration constraint.
 //   for cross-role propagation. The current strategy always uses
 //   line.volumetric_extrusion_rate_start regardless of iRole match — the original
 //   per-role tracking is preserved only in the active code path. Unclear if the
