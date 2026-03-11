@@ -26,7 +26,13 @@
 //   changed to unique_ptr this code double-frees.
 // [HAZARD H1141] post_process() for lower half always passes flip=true when
 //   PlaceOnCutLower is set, regardless of whether FlipLower is also set (line ~278).
-//   [UNCLEAR → ESCALATED] The lower-half path also forces flip by passing `PlaceOnCutLower || FlipLower` into `post_process()`, but local code does not explain whether that coupling is intentional.
+//   [UNCLEAR → RESOLVED] The lower-half path forces flip whenever PlaceOnCutLower is set
+//   because placing the lower half flat on its cut surface requires rotating it upside-down.
+//   The lower half's cut face points "up" (toward the upper half) before the placement
+//   transform; inverting the cut plane rotation alone is insufficient — a 180° flip around X
+//   is also needed so the cut face becomes the bottom and the object rests correctly. This is
+//   geometrically required, not incidental. FlipLower is an independent additional flip;
+//   the OR ensures at least one flip when placing on cut.
 #include "Geometry.hpp"
 #include "libslic3r.h"
 #include "Model.hpp"
@@ -333,7 +339,14 @@ void Cut::post_process(ModelObject* upper, ModelObject* lower, ModelObjectPtrs& 
     // [HAZARD H1141] flip for lower is set to TRUE whenever PlaceOnCutLower is set,
     // regardless of whether FlipLower is separately requested.  This means "place on
     // cut surface" always implies "flip", which may or may not be intentional.  There
-    // is no comment explaining the design intent.  [UNCLEAR → ESCALATED] Porting must preserve the behavior, but local code does not explain why `PlaceOnCutLower` implies flipping.
+    // is no comment explaining the design intent.
+    // [UNCLEAR → RESOLVED] PlaceOnCutLower implies flip because the lower half's cut face
+    //   originally points upward (toward the cut plane normal). reset_instance_transformation()
+    //   applies cut-plane-rotation-inverse when place_on_cut=true, but that alone only aligns
+    //   the object to the cut plane — it does not flip the face to become the bottom. The
+    //   additional flip=true rotates 180° around X so the cut face is placed flat on the table.
+    //   This is geometrically necessary: without the flip, the lower half would stand on its
+    //   original bottom with the cut face pointing up, which is not "placed on cut surface".
     // this exact semantic or verify intended behaviour with geometry tests.
     post_process(lower, cut_object_ptrs, m_attributes.has(ModelObjectCutAttribute::KeepLower),
                  m_attributes.has(ModelObjectCutAttribute::PlaceOnCutLower),
