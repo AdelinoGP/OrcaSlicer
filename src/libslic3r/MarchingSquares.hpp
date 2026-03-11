@@ -8,6 +8,18 @@
 #include <algorithm>
 #include <cassert>
 
+// [INTENT] Header-only marching-squares contour extractor that converts a scalar raster
+//          into closed rings for downstream polygon/path generation.
+// [STATE]  Grid owns mutable bit-packed tag/direction buffers and clears direction bits
+//          during ring tracing to mark edges as consumed.
+// [CONCURRENCY] Tag/direction block generation can run in parallel through ExecutionTBB;
+//               ring scanning is intentionally sequential because it mutates m_dirs in place.
+// [MEMORY] Uses contiguous std::vector<uint32_t> storage for cache-friendly bitmap scans.
+// [COUPLING] Integrates with libslic3r execution policies but keeps raster access abstract
+//            through _RasterTraits specializations.
+// [HAZARD] Bit-level packing and directional encodings are compact but fragile; any change
+//          to bit ordering (<cbda>, <urdl>) can silently invert contour topology.
+
 // Marching squares
 //
 // This algorithm generates 2D contour rings for a 2D scalar field (height
@@ -151,6 +163,8 @@ template<class ExecutionPolicy, class Enable = void> struct _Loop
 using namespace Slic3r;
 template<> struct _Loop<ExecutionTBB>
 {
+    // [CONCURRENCY] Parallelization is limited to independent blocks, so each callback only
+    //               writes its own pre-indexed slot and avoids synchronization primitives.
     template<class It, class Fn> static void for_each_idx(It from, It to, Fn&& fn)
     {
         execution::for_each(
@@ -217,6 +231,8 @@ inline void step(Coord& crd, const Dir d, const long n = 1)
 
 template<class Rst> class Grid
 {
+    // [MEMORY] m_tags packs 1 bit/corner and m_dirs packs 4 bits/cell to reduce memory
+    //          bandwidth versus byte-per-cell storage on large rasters.
     const Rst*            m_rst = nullptr;
     Coord                 m_window, m_rastsize, m_gridsize;
     size_t                m_gridlen; // The number of cells in the grid.
@@ -366,6 +382,8 @@ template<class Rst> class Grid
     {
         Dir next = get_dirs(idx);
 
+        // [HAZARD] Ambiguous checkerboard cases are resolved by entry direction; altering
+        //          this policy changes topology and can merge/split rings unexpectedly.
         // Treat ambiguous cases as two separate regions in one square. If
         // there are two possible next directions, pick based on the prev
         // direction. If prev=all we are starting a new line so pick the one

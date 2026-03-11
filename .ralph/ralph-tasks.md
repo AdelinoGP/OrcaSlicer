@@ -830,7 +830,7 @@ implements.)
               + src/libslic3r/Line.hpp
              Commit: `annotate: src/libslic3r files (T4060k)`
 
-- [ ] T4060l  annotate: src/libslic3r/LocalesUtils.hpp
+- [x] T4060l  annotate: src/libslic3r/LocalesUtils.hpp
               + src/libslic3r/MacUtils.hpp
               + src/libslic3r/MarchingSquares.hpp
               + src/libslic3r/MaterialType.hpp
