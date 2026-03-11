@@ -914,7 +914,7 @@ implements.)
 - [x] T4060x  annotate: src/OrcaSlicer_app_msvc.cpp
              Commit: `annotate: src files (T4060x)`
 
-- [ ] T4060y  annotate: src/slic3r/Config/Snapshot.cpp
+- [x] T4060y  annotate: src/slic3r/Config/Snapshot.cpp
               + src/slic3r/Config/Snapshot.hpp
               + src/slic3r/Config/Version.cpp
               + src/slic3r/Config/Version.hpp
