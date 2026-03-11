@@ -1,10 +1,10 @@
 # Agent Journal — OrcaSlicer Codebase Analysis
 
 ## CURRENT STATUS
-Last session: 98
-Active task: T4072 — complete
+Last session: 99
+Active task: UNCLEAR tag resolution pass — complete
 Next action: Awaiting human review.
-Unresolved [UNCLEAR] tags: 0 — all resolved during annotation
+Unresolved [UNCLEAR] tags: 0
 Files remaining (Phase 4): 0
 Open questions: None
 
@@ -35,6 +35,49 @@ Open questions (from Session 1 — status as of Session 86):
 Full log: agent_journal_archive_s01_s83.md
 
 ---
+
+---
+
+## Session 99 — UNCLEAR Tag Resolution Pass
+
+**Goal:** Resolve all remaining `[UNCLEAR → ESCALATED]` and bare `[UNCLEAR:]` tags in the source tree.
+
+**Method:** For each tag, read ±50 lines of context, traced call sites, and consulted the upstream
+Arachne/CuraEngine/PrusaSlicer lineage via comments, related pseudocode docs, and call-site audits.
+
+**Files modified:**
+- `src/libslic3r/Emboss.hpp`
+- `src/libslic3r/CutUtils.cpp` (2 tags)
+- `src/libslic3r/VariableWidth.cpp` (2 tags)
+- `src/libslic3r/Fill/FillTpmsD.cpp`
+- `src/libslic3r/GCode/PressureEqualizer.cpp`
+- `src/libslic3r/Arachne/SkeletalTrapezoidation.cpp`
+- `src/libslic3r/Measure.cpp`
+- `src/libslic3r/Support/SupportSpotsGenerator.cpp`
+- `src/libslic3r/TriangleMesh.hpp`
+- `src/libslic3r/TriangleMesh.cpp`
+- `src/libslic3r/Fill/FillAdaptive.cpp`
+
+**Resolution summary:**
+
+- **RESOLVED (9 tags):**
+  - `Emboss.hpp:148` — PlaterJob lifecycle provides the synchronization: job captures shared_ptr on submission; main thread swaps only after job completion. No atomic shared_ptr operations needed.
+  - `CutUtils.cpp:29` — PlaceOnCutLower forces flip intentionally: the lower half's cut face points up after cutting; placing it flat on the cut surface requires a 180° X-rotation to bring the cut face down.
+  - `CutUtils.cpp:336` — Same geometric reasoning: PlaceOnCutLower → flip is necessary for correct "place on surface" semantics. FlipLower is an independent additional flip.
+  - `PressureEqualizer.cpp:900` — Cross-role propagator is an intentional improvement: unconditionally storing the current line's actual rate for all roles prevents under-deceleration at cross-role transitions when a role hasn't been seen recently.
+  - `SkeletalTrapezoidation.cpp:1913` — Sampling past the midline is a known, safe approximation: new_ratio is clamped, 0.1 leeway bias prevents premature inset disappearance, and worst case is slightly wider (not thinner) insets.
+  - `SupportSpotsGenerator.cpp:38` — Block-commented code intentionally disabled: no callers of full_search/gather_issues exist anywhere; OrcaSlicer uses its own support pipeline; .hpp already marks them [DISABLED].
+  - `TriangleMesh.hpp:220` / `TriangleMesh.cpp:407` — Volume determinant scaling is exact for all current callers: every call site passes a Transformation matrix (rotation + scale, no shear terms), making det(M) the literal volume scaling factor. (Counted as 2 tags.)
+  - `FillAdaptive.cpp:1777` — Verified that `transform_to_octree()` (not `transform_to_world()`) was pre-applied to the mesh. PrintObject.cpp:1078 confirms: `its_transform(mesh, to_octree * trafo_centered(), true)` places the mesh in octree-space before build_octree(). The comment's claim of "world-space" was incorrect.
+
+- **MAGICNUMBER (2 tags):**
+  - `FillTpmsD.cpp:176` — 16 seed segments per period: empirical power-of-two choice sufficient to capture the smooth acos(a/b·cos(u)) wave shape and seed adaptive refinement without missing features. No formal Nyquist analysis exists.
+  - `Measure.cpp:326` — `err < 0.05` is explicitly documented as "high, only to reject complete failures"; `0.9 * π/2 ≈ 81°` is a discretization-tolerance adjustment for a design-intent 90° arc threshold. Both are empirical UI-level heuristics.
+
+- **RESOLVED as latent bug (2 tags):**
+  - `VariableWidth.cpp:26` / `VariableWidth.cpp:153` — The BBS tail-block uses only a_width (left-endpoint Riemann sum) instead of the trapezoid average 0.5*(a+b) used by mid-loop segments. Inconsistency with the mid-loop code, no design rationale, consistent with BBS oversight. (Counted as 2 tags.)
+
+**Final unresolved count:** 0
 
 ---
 
