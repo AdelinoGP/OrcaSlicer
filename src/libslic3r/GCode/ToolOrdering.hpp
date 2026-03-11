@@ -1,4 +1,19 @@
-// Ordering of the tools to minimize tool switches.
+// [INTENT] ToolOrdering.hpp defines the data structures that decide which extruder prints each
+// layer and in what order. The implementation in ToolOrdering.cpp turns Print / PrintObject layer
+// contents into LayerTools records that GCode.cpp, CoolingBuffer, and wipe-tower planning consume.
+//
+// [STATE] Tool ordering is built once per print (or per object in sequential mode). During that
+// build, LayerTools accumulates extruder lists, wipe-tower requirements, custom G-code hooks, and
+// per-entity extruder overrides used for wiping-into-object heuristics.
+//
+// [MEMORY] WipingExtrusions stores override tables keyed by raw ExtrusionEntity* / PrintObject*
+// pointers; those keys remain valid only while the underlying print graph stays alive.
+//
+// [COUPLING] This header sits on the boundary between print planning and G-code emission. It needs
+// Print, PrintRegion, ExtrusionEntity, FilamentGroup, and wipe-tower policy all at once.
+//
+// [HAZARD] Several APIs use 0-based extruder ids internally while config and UI layers often use
+// 1-based ids. Translators should make the index convention explicit instead of preserving the mix.
 
 #ifndef slic3r_ToolOrdering_hpp_
 #define slic3r_ToolOrdering_hpp_
@@ -85,6 +100,8 @@ private:
         return it == entity_map.end() ? false : it->second[copy_id] != -1;
     }
 
+    // [STATE] entity_map overrides specific extrusion entities on a per-copy basis after the wipe-
+    // into-object planner claims them for purge volume.
     std::map<std::tuple<const ExtrusionEntity*, const PrintObject *>, ExtruderPerCopy> entity_map;  // to keep track of who prints what
     // BBS
     std::map<const PrintObject*, int> support_map;
@@ -144,6 +161,8 @@ public:
     unsigned int solid_infill_filament(const PrintRegion &region) const;
 	// Returns a zero based extruder this eec should be printed with, according to PrintRegion config or extruder_override if overriden.
 	unsigned int extruder(const ExtrusionEntityCollection &extrusions, const PrintRegion &region) const;
+
+    // [STATE] print_z is the exact lookup key used by ToolOrdering::tools_for_layer().
 
     coordf_t 					print_z	= 0.;
     bool 						has_object = false;
@@ -267,6 +286,7 @@ private:
     std::vector<unsigned int> generate_first_layer_tool_order(const Print& print);
     std::vector<unsigned int> generate_first_layer_tool_order(const PrintObject& object);
 
+    // [STATE] Ordered by print_z; one entry per merged physical layer height.
     std::vector<LayerTools>    m_layer_tools;
     // First printing extruder, including the multi-material priming sequence.
     unsigned int               m_first_printing_extruder = (unsigned int)-1;

@@ -13,6 +13,12 @@
 #include "LocalesUtils.hpp"
 #include "Triangulation.hpp"
 
+// [INTENT] WipeTower.cpp contains both the geometry planner and the G-code emitter for the legacy
+// purge tower. Planning runs over all future tool changes to reserve per-layer depth; generation
+// then converts those reservations into perimeter, wipe, unload/load, and finish-layer snippets.
+//
+// [CONCURRENCY] Entirely single-threaded. The class is mutated progressively while G-code export
+// walks layers, so callers must not share one WipeTower across parallel exports.
 
 namespace Slic3r
 {
@@ -1237,6 +1243,9 @@ private:
 
 
 
+// [INTENT] Freeze the current writer state into the immutable payload consumed by the outer
+// G-code pipeline. This is the point where preview extrusions, timing, and raw gcode are
+// bundled together after a wipe-tower action finishes.
 WipeTower::ToolChangeResult WipeTower::construct_tcr(WipeTowerWriter& writer,
                                                      bool priming,
                                                      size_t old_tool,
@@ -1301,6 +1310,8 @@ const std::map<float, float> WipeTower::min_depth_per_height = {
 
 float WipeTower::get_limit_depth_by_height(float max_height)
 {
+    // [INTENT] Empirical lookup used by auto-sizing: taller towers need deeper footprints to stay
+    // mechanically stable and to fit the planned number of wipe lines.
     float min_wipe_tower_depth = 0.f;
     auto  iter                 = WipeTower::min_depth_per_height.begin();
     while (iter != WipeTower::min_depth_per_height.end()) {
@@ -1342,6 +1353,8 @@ float WipeTower::get_auto_brim_by_height(float max_height) {
 
 Vec2f WipeTower::move_box_inside_box(const BoundingBox &box1, const BoundingBox &box2,int scaled_offset)
 {
+    // [INTENT] Compute the smallest translation that keeps the tower bounding box inside the bed
+    // bounding box while respecting an optional safety offset.
     Vec2f res{0, 0};
     if (box1.size()[0] >= box2.size()[0]- 2*scaled_offset || box1.size()[1] >= box2.size()[1]-2*scaled_offset) return res;
 
@@ -1405,6 +1418,8 @@ Polygon WipeTower::rib_section(float width, float depth, float rib_length, float
 
 TriangleMesh WipeTower::its_make_rib_tower(float width, float depth, float height, float rib_length, float rib_width, bool fillet_wall)
 {
+    // [INTENT] Build a preview mesh for the tower body / rib reinforcement so the plate UI can show
+    // the generated purge structure without reparsing G-code.
     TriangleMesh res;
     Polygon      bottom = rib_section(width, depth, rib_length, rib_width, fillet_wall);
     Polygon      top    = rib_section(width, depth, std::sqrt(width * width + depth * depth), rib_width, fillet_wall);
@@ -1540,6 +1555,8 @@ WipeTower::WipeTower(const PrintConfig& config, int plate_idx, Vec3d plate_origi
 
 void WipeTower::set_extruder(size_t idx, const PrintConfig& config)
 {
+    // [STATE] Copies every filament-specific purge / temperature / speed parameter out of
+    // PrintConfig once so later planning can treat the wipe tower as a pure numeric model.
     //while (m_filpar.size() < idx+1)   // makes sure the required element is in the vector
     m_filpar.push_back(FilamentParameters());
 
@@ -1610,6 +1627,8 @@ void WipeTower::set_extruder(size_t idx, const PrintConfig& config)
 
 
 // Returns gcode to prime the nozzles at the front edge of the print bed.
+// [INTENT] Emit the pre-print priming strip sequence. This is separate from the tower body but
+// reuses the same ToolChangeResult contract so higher layers can stitch it uniformly.
 std::vector<WipeTower::ToolChangeResult> WipeTower::prime(
 	// print_z of the first layer.
 	float 						initial_layer_print_height,
@@ -1656,6 +1675,9 @@ Vec2f WipeTower::get_next_pos(const WipeTower::box_coordinates &cleaning_box, fl
 
 WipeTower::ToolChangeResult WipeTower::tool_change(size_t tool, bool extrude_perimeter, bool first_toolchange_to_nonsoluble)
 {
+    // [INTENT] Core runtime operation: unload old filament, optionally change temperatures, load
+    // the new filament, wipe until purge volume is spent, then leave the nozzle ready to return to
+    // object printing.
     m_nozzle_change_result.gcode.clear();
     if (!m_filament_map.empty() && tool < m_filament_map.size() && m_filament_map[m_current_tool] != m_filament_map[tool]) {
         m_nozzle_change_result = nozzle_change(m_current_tool, tool);
@@ -2281,6 +2303,8 @@ WipeTower::box_coordinates WipeTower::align_perimeter(const WipeTower::box_coord
 
 WipeTower::ToolChangeResult WipeTower::finish_layer(bool extrude_perimeter, bool extruder_fill)
 {
+    // [INTENT] Consume any still-reserved tower depth at the end of the current print layer so the
+    // physical tower catches up with the future plan before Z advances.
 	assert(! this->layer_finished());
     m_current_layer_finished = true;
 
@@ -2446,6 +2470,9 @@ WipeTower::ToolChangeResult WipeTower::finish_layer(bool extrude_perimeter, bool
 }
 
 // Appends a toolchange into m_plan and calculates neccessary depth of the corresponding box
+// [INTENT] Append a future tool-change requirement into m_plan. This is the only input stage of
+// the planner: later functions derive tower depth, width, and block reservations exclusively
+// from the accumulated plan.
 void WipeTower::plan_toolchange(float z_par, float layer_height_par, unsigned int old_tool,
                                 unsigned int new_tool, float wipe_volume, float purge_volume)
 {
@@ -4086,6 +4113,8 @@ void WipeTower::generate_new(std::vector<std::vector<WipeTower::ToolChangeResult
 // Resulting ToolChangeResults are appended into vector "result"
 void WipeTower::generate(std::vector<std::vector<WipeTower::ToolChangeResult>> &result)
 {
+    // [INTENT] Offline generation path used when the full plan is known up front. It walks m_plan
+    // layer by layer, invoking the same per-layer runtime helpers that live export uses.
 	if (m_plan.empty())
         return;
 

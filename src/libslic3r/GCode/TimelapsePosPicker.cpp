@@ -2,6 +2,10 @@
 #include "TimelapsePosPicker.hpp"
 #include "Layer.hpp"
 
+// [INTENT] TimelapsePosPicker.cpp turns the current print state into a 2D safe-area query: start
+// from the bed/extruder printable polygons, subtract projected object footprints plus camera / rod
+// keep-out zones, then choose a candidate point that is both reachable and visually useful.
+
 constexpr int FILTER_THRESHOLD = 5;
 constexpr int MAX_CANDIDATE_SIZE = 5;
 
@@ -66,6 +70,8 @@ namespace Slic3r {
      */
     void TimelapsePosPicker::construct_printable_area_by_printer()
     {
+        // [INTENT] Precompute the per-extruder workspace once so per-layer picks only need cheap
+        // set-difference operations. The wipe tower is treated as permanent occupied space.
         auto config = print->config();
         size_t extruder_count = config.nozzle_diameter.size();
         m_extruder_printable_area.clear();
@@ -170,6 +176,9 @@ namespace Slic3r {
     // scaled data
     Polygons TimelapsePosPicker::collect_limit_areas_for_rod(const std::vector<const PrintObject*>& object_list, const PosPickCtx& ctx)
     {
+        // [INTENT] In by-object mode the X-gantry rod can hit tall finished parts even when the
+        // nozzle itself would clear them. This projects all candidate collisions into Y intervals
+        // and keeps only the bands above / below those intervals.
         double rod_limit_height = m_nozzle_height_to_rod + ctx.curr_layer->print_z;
         std::vector<const PrintObject*> rod_collision_candidates;
         for(auto& obj : object_list){
@@ -314,6 +323,8 @@ namespace Slic3r {
     // get the real instance bounding box, remove the plate offset and add raft height , unscaled data
     BoundingBoxf3 TimelapsePosPicker::get_real_instance_bbox(const PrintInstance& instance)
     {
+        // [STATE] The cached bbox includes raft height and strips plate offset so later geometry
+        // composition can stay in one coordinate frame.
         auto iter = bbox_cache.find(&instance);
         if (iter != bbox_cache.end())
             return iter->second;
@@ -442,6 +453,8 @@ namespace Slic3r {
 
     Point TimelapsePosPicker::pick_pos(const PosPickCtx& ctx)
     {
+        // [INTENT] Public entry point: dispatch to either per-layer or whole-print strategy, then
+        // convert the internal scaled result back to unscaled plate coordinates for G-code use.
         Point res;
         if (m_based_on_all_layer)
             res = pick_pos_for_all_layer(ctx);
@@ -486,6 +499,9 @@ namespace Slic3r {
     // scaled data
     Point TimelapsePosPicker::pick_pos_for_curr_layer(const PosPickCtx& ctx)
     {
+        // [INTENT] Current-layer mode picks the safest photo position for the active layer only.
+        // It widens occupied regions by tool-clearance constraints and optionally removes any path
+        // whose travel line would cross previously printed geometry.
         float height_gap = 0;
         if (ctx.curr_extruder_id != ctx.picture_extruder_id) {
             if (m_liftable_extruder_id.has_value() && ctx.picture_extruder_id != m_liftable_extruder_id && m_extruder_height_gap.has_value())
@@ -558,6 +574,9 @@ namespace Slic3r {
 
     Point TimelapsePosPicker::pick_pos_for_all_layer(const PosPickCtx& ctx)
     {
+        // [INTENT] Smooth timelapse reuses one stable camera position for the whole job. The safe
+        // area therefore subtracts the union of all object projections instead of only the current
+        // layer geometry, then memoizes the first successful answer.
         bool by_object = m_print_seq == PrintSequence::ByObject;
         if (by_object)
             return DefaultTimelapsePos;

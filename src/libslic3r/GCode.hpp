@@ -1,3 +1,22 @@
+// [INTENT] GCode.hpp declares the top-level export orchestrator for FFF prints. GCode owns the
+// helpers that turn layered geometry into a linear command stream: tool ordering, seam placement,
+// cooling control, wipe-tower integration, thumbnail embedding, placeholder processing, and the
+// low-level writer that formats individual G/M commands.
+//
+// [STATE] A single GCode instance is mutated for one export job. It tracks current layer, current
+// nozzle position, active extruder, placeholder-parser context, cooling / wipe / ooze-prevention
+// helpers, and accumulated output-side caches.
+//
+// [MEMORY] Most members own their helper state by value; raw pointers such as m_layer and Print*
+// parameters are borrowed views into the print graph that outlive the export.
+//
+// [COUPLING] This is the tightest hub in libslic3r's FFF pipeline: it depends on Print, Layer,
+// GCodeWriter, ToolOrdering, CoolingBuffer, SeamPlacer, WipeTower, PlaceholderParser, and BBL-
+// specific processors.
+//
+// [HAZARD] Many behaviors are encoded as mutable booleans whose meaning depends on call order
+// (for example first-layer gates, one-shot travel routing flags, and current layer pointers).
+// Translators should consider splitting this monolith into explicit pipeline stages.
 #ifndef slic3r_GCode_hpp_
 #define slic3r_GCode_hpp_
 
@@ -74,6 +93,9 @@ public:
 
 class WipeTowerIntegration {
 public:
+    // [INTENT] Adapter between the standalone WipeTower planner and the main GCode stream. It keeps
+    // track of which precomputed ToolChangeResult belongs to the current print layer / toolchange
+    // index and post-processes the tower-local coordinates into bed coordinates.
     WipeTowerIntegration(
         const PrintConfig                                           &print_config,
         // BBS: add partplate logic
@@ -166,6 +188,8 @@ public:
 };
 
 struct LayerResult {
+    // [INTENT] Small handoff object used by the export pipeline when a layer's raw G-code may need
+    // later post-processing (pressure equalizer, cooling flush, spiral-vase rewrite).
     std::string gcode;
     size_t      layer_id;
     // Is spiral vase post processing enabled for this layer?
@@ -210,6 +234,8 @@ public:
         {}
     ~GCode() = default;
 
+    // [INTENT] Main entry point for FFF export. Runs the full print-to-gcode pipeline, including
+    // layer ordering, thumbnail generation, post-processing, and final file write.
     // throws std::runtime_exception on error,
     // throws CanceledException through print->throw_if_canceled().
     void            do_export(Print* print, const char* path, GCodeProcessorResult* result = nullptr, ThumbnailsGeneratorCallback thumbnail_cb = nullptr);

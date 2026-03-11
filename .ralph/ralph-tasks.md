@@ -589,7 +589,7 @@ GCodeWriter.cpp (T186) annotations before starting any task here.)
              outputs. Group these four as they form one feature unit.
              Commit: `annotate: GCode thumbnail embedding (T4031)`
 
-- [ ] T4032  annotate: src/libslic3r/GCode/AvoidCrossingPerimeters.hpp
+- [x] T4032  annotate: src/libslic3r/GCode/AvoidCrossingPerimeters.hpp
                      + src/libslic3r/GCode/CoolingBuffer.hpp
                      + src/libslic3r/GCode/PchipInterpolatorHelper.cpp
                      + src/libslic3r/GCode/PchipInterpolatorHelper.hpp

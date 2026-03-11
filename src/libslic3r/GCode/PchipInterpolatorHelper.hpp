@@ -1,75 +1,39 @@
-// PchipInterpolatorHelper.hpp
-// OrcaSlicer
+// [INTENT] PchipInterpolatorHelper implements monotone piecewise-cubic interpolation for the few
+// G-code features that need a smooth curve through sparse calibration samples without the overshoot
+// of a generic spline. It converts sorted (x, y) sample pairs into one derivative per knot, then
+// evaluates a Hermite segment at query time.
 //
-// Header file for the PchipInterpolatorHelper class, responsible for performing Piecewise Cubic Hermite Interpolating Polynomial (PCHIP) interpolation on given data points.
+// [STATE] setData() replaces the entire sample set and recomputes all cached step widths, segment
+// slopes, and knot derivatives. interpolate() is read-only after that preprocessing step.
+//
+// [MEMORY] Owns its sample and coefficient vectors by value; no external storage is referenced.
+//
+// [HAZARD] Duplicate x values collapse h(i) to zero and would produce division by zero in delta().
+// The helper validates count parity but does not reject duplicate abscissas.
 
 #ifndef PCHIPINTERPOLATORHELPER_HPP
 #define PCHIPINTERPOLATORHELPER_HPP
 
 #include <vector>
 
-/**
- * @class PchipInterpolatorHelper
- * @brief A helper class to perform Piecewise Cubic Hermite Interpolating Polynomial (PCHIP) interpolation.
- */
 class PchipInterpolatorHelper {
 public:
-    /**
-     * @brief Default constructor.
-     */
     PchipInterpolatorHelper() = default;
-
-    /**
-     * @brief Constructs the PCHIP interpolator with given data points.
-     * @param x The x-coordinates of the data points.
-     * @param y The y-coordinates of the data points.
-     */
     PchipInterpolatorHelper(const std::vector<double>& x, const std::vector<double>& y);
-
-    /**
-     * @brief Sets the data points for the interpolator.
-     * @param x The x-coordinates of the data points.
-     * @param y The y-coordinates of the data points.
-     * @throw std::invalid_argument if x and y have different sizes or if they contain fewer than two points.
-     */
     void setData(const std::vector<double>& x, const std::vector<double>& y);
-
-    /**
-     * @brief Interpolates the value at a given point.
-     * @param xi The x-coordinate at which to interpolate.
-     * @return The interpolated y-coordinate.
-     */
     double interpolate(double xi) const;
 
 private:
-    std::vector<double> x_; ///< The x-coordinates of the data points.
-    std::vector<double> y_; ///< The y-coordinates of the data points.
-    std::vector<double> h_; ///< The differences between successive x-coordinates.
-    std::vector<double> delta_; ///< The slopes of the segments between successive data points.
-    std::vector<double> d_; ///< The derivatives at the data points.
-
-    /**
-     * @brief Computes the PCHIP coefficients.
-     */
+    std::vector<double> x_;
+    std::vector<double> y_;
+    std::vector<double> h_;
+    std::vector<double> delta_;
+    // [STATE] d_[i] stores the monotone-preserving derivative at knot i chosen by the Fritsch-
+    // Carlson weighted-harmonic-mean rule.
+    std::vector<double> d_;
     void computePCHIP();
-
-    /**
-     * @brief Sorts the data points by x-coordinate.
-     */
     void sortData();
-
-    /**
-     * @brief Computes the difference between successive x-coordinates.
-     * @param i The index of the x-coordinate.
-     * @return The difference between x_[i+1] and x_[i].
-     */
     double h(int i) const { return x_[i+1] - x_[i]; }
-
-    /**
-     * @brief Computes the slope of the segment between successive data points.
-     * @param i The index of the segment.
-     * @return The slope of the segment between y_[i] and y_[i+1].
-     */
     double delta(int i) const { return (y_[i+1] - y_[i]) / h(i); }
 };
 

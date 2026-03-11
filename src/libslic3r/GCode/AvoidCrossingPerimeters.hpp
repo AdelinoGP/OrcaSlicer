@@ -1,3 +1,21 @@
+// [INTENT] AvoidCrossingPerimeters caches layer-local geometry used to reroute travel moves
+// around printed walls instead of drawing a straight line through visible perimeters. GCode.cpp
+// initializes it once per layer, then consults travel_to() whenever a non-extruding move may
+// cross shells.
+//
+// [STATE] init_layer() rebuilds both the inside-object and outside-object routing caches from the
+// current Layer's slices. The three *_once flags let GCode temporarily override the default
+// routing policy for exactly one subsequent travel.
+//
+// [MEMORY] The class owns only cached polygon / grid data by value. Returned Polyline values are
+// freshly constructed per query; no caller ever receives a borrowed pointer into the cache.
+//
+// [COUPLING] Depends on Layer slice geometry, EdgeGrid acceleration, and the current GCode nozzle
+// state. Ports need a geometry service that can answer both "is this segment inside a shell?" and
+// "where can I detour without leaving printable space?".
+//
+// [HAZARD] The "once" modifiers are temporal hidden state. Reordering travel generation or retrying
+// a move without resetting them changes later routing decisions.
 #ifndef slic3r_AvoidCrossingPerimeters_hpp_
 #define slic3r_AvoidCrossingPerimeters_hpp_
 
@@ -34,6 +52,9 @@ public:
 
     Polyline    travel_to(const GCode& gcodegen, const Point& point, bool* could_be_wipe_disabled);
 
+    // [INTENT] Boundary bundles the raw polygons plus the precomputed spatial indices needed by
+    // the travel planner. The same structure is reused for "inside this object" and
+    // "outside all objects" routing modes.
     struct Boundary {
         // Collection of boundaries used for detection of crossing perimeters for travels
         Polygons                        boundaries;
@@ -52,6 +73,7 @@ public:
     };
 
 private:
+    // [STATE] Default routing mode for later travels on this layer.
     bool           m_use_external_mp { false };
     // just for the next travel move
     bool           m_use_external_mp_once { false };
@@ -59,7 +81,9 @@ private:
     // we enable it by default for the first travel move in print
     bool           m_disabled_once { true };
 
-    // Lslices offseted by half an external perimeter width. Used for detection if line or polyline is inside of any polygon.
+    // [STATE] Offset object slices approximate the wall-safe travel corridor. Offsetting by half an
+    // external perimeter width makes the collision test operate on nozzle centerlines instead of
+    // raw wall outlines.
     ExPolygons               m_lslices_offset;
     std::vector<BoundingBox> m_lslices_offset_bboxes;
     // Used for detection of line or polyline is inside of any polygon.

@@ -1,3 +1,20 @@
+// [INTENT] GCodeWriter is the low-level command formatter used by GCode.cpp and wipe-tower code.
+// It turns geometric moves plus printer configuration into concrete G/M-code strings while keeping
+// track of the current nozzle position, selected extruder, retract/lift state, and cached machine
+// settings such as temperatures, acceleration, jerk, and fan values.
+//
+// [STATE] The writer is highly stateful: most emitters update m_pos, current extruder pointers,
+// retraction / lift bookkeeping, and "last emitted" caches used to suppress redundant commands.
+//
+// [MEMORY] Owns its Extruder objects by value in m_filament_extruders and keeps parallel pointer
+// cache m_curr_filament_extruder for O(1) access by extruder id.
+//
+// [COUPLING] Sits directly between print planning and firmware syntax. Its public API exposes
+// slicer-domain concepts (travel, retract, pressure advance, object labels) but returns raw text.
+//
+// [HAZARD] Output correctness depends on hidden mutable state, especially coordinate offsets,
+// current-position validity, and cached bed / nozzle temperatures. Replaying commands out of order
+// will desynchronize the writer from the printer model.
 #ifndef slic3r_GCodeWriter_hpp_
 #define slic3r_GCodeWriter_hpp_
 
@@ -66,6 +83,8 @@ public:
     bool        need_toolchange(unsigned int filament_id) const;
     std::string set_extruder(unsigned int filament_id);
     void init_extruder(unsigned int filament_id);
+    // [COUPLING] CoolingBuffer parses this marker back out of serialized G-code to split a layer by
+    // extruder ownership, so changing the format affects both writer and post-processor.
     // Prefix of the toolchange G-code line, to be used by the CoolingBuffer to separate sections of the G-code
     // printed with the same extruder.
     std::string toolchange_prefix() const;
@@ -97,6 +116,8 @@ public:
     //BBS: set offset for gcode writer
     void set_xy_offset(double x, double y) { m_x_offset = x; m_y_offset = y; }
     Vec2f get_xy_offset() { return Vec2f{m_x_offset, m_y_offset}; };
+    // [CONCURRENCY] Static set_fan() is thread-safe because it is pure formatting. The instance
+    // overload is used on the main export thread and relies on surrounding state instead.
     // To be called by the CoolingBuffer from another thread.
     static std::string set_fan(const GCodeFlavor gcode_flavor, unsigned int speed);
     // To be called by the main thread. It always emits the G-code, it does not remember the previous state.
@@ -128,6 +149,8 @@ public:
     // Returns whether this flavor supports separate print and travel acceleration.
     static bool supports_separate_travel_acceleration(GCodeFlavor flavor);
   private:
+	// [STATE] Extruders are sorted by id so both config application and runtime tool lookup can
+	// rely on stable index ordering.
 	// Extruders are sorted by their ID, so that binary search is possible.
     std::vector<Extruder> m_filament_extruders;
     bool            m_single_extruder_multi_material;
@@ -221,6 +244,8 @@ public:
     static constexpr const std::array<double, 10> pow_10 { 1., 10., 100., 1000., 10000., 100000., 1000000., 10000000., 100000000., 1000000000. };
     static constexpr const std::array<double, 10> pow_10_inv { 1. / 1., 1. / 10., 1. / 100., 1. / 1000., 1. / 10000., 1. / 100000., 1. / 1000000., 1. / 10000000., 1. / 100000000., 1. / 1000000000. };
 
+    // [INTENT] Formatter base class for branchless stack-buffer emission of G-code lines. Keeping a
+    // fixed-size buffer avoids heap churn inside the hottest extrusion-writing loops.
     // Quantize doubles to a resolution of the G-code.
     static double quantize(double v, size_t ndigits) { return std::round(v * pow_10[ndigits]) * pow_10_inv[ndigits]; }
     static double quantize_xyzf(double v) { return quantize(v, XYZF_EXPORT_DIGITS); }

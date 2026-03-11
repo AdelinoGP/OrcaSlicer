@@ -1,3 +1,24 @@
+// [INTENT] WipeTower.hpp defines the legacy purge-tower planner used when a multi-material print
+// needs to flush old filament before resuming object G-code. It converts a future sequence of tool
+// changes into a geometric tower plan and then into ToolChangeResult snippets that GCode.cpp can
+// splice into the final file.
+//
+// [STATE] The class has a two-phase lifecycle:
+//   1. plan_toolchange() / plan_tower()* accumulate all future layer/tool-change requirements.
+//   2. set_layer(), tool_change(), finish_layer(), and generate() walk that plan while updating
+//      current tool, current depth, and per-layer generation state.
+//
+// [MEMORY] All planning state lives in owned vectors (m_plan, m_filpar, block tables, preview
+// extrusions). Returned ToolChangeResult values own their generated G-code and preview geometry by
+// value, so callers do not borrow from the WipeTower internals.
+//
+// [COUPLING] Heavily tied to PrintConfig, GCode flavor quirks, triangle-mesh preview generation,
+// and the surrounding ToolOrdering/GCode export pipeline. A port likely wants to split geometric
+// planning from firmware-specific G-code emission.
+//
+// [HAZARD] This header mixes the original Prusa-style planner and BBL's newer block-based planner
+// in one mutable class. Many fields are meaningful only for one mode, so preserving invariants by
+// structure rather than comments would simplify a rewrite.
 #ifndef WipeTower_
 #define WipeTower_
 
@@ -62,6 +83,9 @@ public:
 
 	struct ToolChangeResult
 	{
+		// [INTENT] ToolChangeResult is the interchange object handed back to the main G-code engine:
+		// it contains both the emitted purge-tower G-code fragment and enough geometric metadata for
+		// preview rendering, travel stitching, and elapsed-time accounting.
 		// Print heigh of this tool change.
 		float					print_z;
 		float 					layer_height;
@@ -314,6 +338,8 @@ public:
     bool has_tpu_filament() const { return m_has_tpu_filament; }
 
     struct FilamentParameters {
+        // [STATE] Per-filament purge behavior and thermal policy snapshot copied from PrintConfig at
+        // construction time. The planner assumes these values stay immutable for the whole export.
         std::string 	    material = "PLA";
         int                 category;
         bool                is_soluble = false;
@@ -353,6 +379,8 @@ public:
 
 	struct WipeTowerBlock
     {
+        // [STATE] BBL planner: one block groups contiguous depth reservations for filaments with
+        // compatible adhesion behavior so a single physical tower can be partitioned by category.
         int              block_id{0};
         int              filament_adhesiveness_category{0};
         std::vector<float>      layer_depths;
@@ -554,6 +582,7 @@ private:
 			: z{z_par}, height{layer_height_par}, depth{0}, extra_spacing{1.f} {}
 	};
 
+	// [STATE] Canonical future schedule used by both the classic and new planners.
 	std::vector<WipeTowerInfo> m_plan; 	// Stores information about all layers and toolchanges for the future wipe tower (filled by plan_toolchange(...))
 	std::vector<WipeTowerInfo>::iterator m_layer_info = m_plan.end();
 
