@@ -13,9 +13,33 @@ namespace Slic3r::GCodeThumbnails {
 
 using namespace std::literals;
 
+// [INTENT] Thumbnails.cpp translates one rendered RGBA preview into the on-disk thumbnail dialect
+// expected by each target firmware or host ecosystem. PNG/JPG/QOI are generic compressed images,
+// while BTT_TFT and ColPic are vendor-specific preview payloads embedded into G-code comments.
+//
+// [STATE] The module is largely stateless; each export allocates a fresh CompressedImageBuffer and
+// returns it to the caller. The only persistent behavior comes from config parsing defaults in
+// make_and_check_thumbnail_list(), which normalize user input into an ordered format/size list.
+//
+// [MEMORY] Compression backends use allocator APIs from their respective C libraries
+// (mz_free / free / qoi_encode), so ownership is funneled through small RAII wrappers to avoid
+// leaking raw buffers across the export pipeline.
+//
+// [COUPLING] Depends on miniz, libjpeg, qoi, PrintConfig's thumbnail enum, and Orca's custom
+// ColPic encoder. This file is the format-adapter layer between ThumbnailData and the G-code
+// writer; changing output syntax here changes what printer firmware can discover from the file.
+//
+// [HAZARD] Several encoders reorient the image manually because firmware conventions disagree on
+// scanline origin. A port must preserve per-format flipping/rotation rules rather than assuming a
+// shared "top-left origin" across all thumbnail consumers.
+
 struct CompressedPNG : CompressedImageBuffer
 {
-    ~CompressedPNG() override { if (data) mz_free(data); }
+    ~CompressedPNG() override
+    {
+        if (data)
+            mz_free(data);
+    }
     std::string_view tag() const override { return "thumbnail"sv; }
 };
 
@@ -43,18 +67,22 @@ struct CompressedColPic : CompressedImageBuffer
     std::string_view tag() const override { return "thumbnail_QIDI"sv; }
 };
 
-std::unique_ptr<CompressedImageBuffer> compress_thumbnail_png(const ThumbnailData &data)
+std::unique_ptr<CompressedImageBuffer> compress_thumbnail_png(const ThumbnailData& data)
 {
-    auto out = std::make_unique<CompressedPNG>();
-    out->data = tdefl_write_image_to_png_file_in_memory_ex((const void*)data.pixels.data(), data.width, data.height, 4, &out->size, MZ_DEFAULT_LEVEL, 1);
+    auto out  = std::make_unique<CompressedPNG>();
+    out->data = tdefl_write_image_to_png_file_in_memory_ex((const void*) data.pixels.data(), data.width, data.height, 4, &out->size,
+                                                           MZ_DEFAULT_LEVEL, 1);
     return out;
 }
 
 std::unique_ptr<CompressedImageBuffer> compress_thumbnail_jpg(const ThumbnailData& data)
 {
+    // [INTENT] libjpeg expects scanlines in display order, while Orca stores RGBA pixels in the
+    // renderer's native orientation. The explicit vertical flip keeps the JPEG preview aligned
+    // with PNG/QOI exports and the 3D scene shown to the user.
     // Take vector of RGBA pixels and flip the image vertically
     std::vector<unsigned char> rgba_pixels(data.pixels.size());
-    const unsigned int row_size = data.width * 4;
+    const unsigned int         row_size = data.width * 4;
     for (unsigned int y = 0; y < data.height; ++y) {
         ::memcpy(rgba_pixels.data() + (data.height - y - 1) * row_size, data.pixels.data() + y * row_size, row_size);
     }
@@ -67,19 +95,19 @@ std::unique_ptr<CompressedImageBuffer> compress_thumbnail_jpg(const ThumbnailDat
     }
 
     std::vector<unsigned char> compressed_data(data.pixels.size());
-    unsigned char* compressed_data_ptr = compressed_data.data();
-    unsigned long compressed_data_size = data.pixels.size();
+    unsigned char*             compressed_data_ptr  = compressed_data.data();
+    unsigned long              compressed_data_size = data.pixels.size();
 
-    jpeg_error_mgr err;
+    jpeg_error_mgr       err;
     jpeg_compress_struct info;
     info.err = jpeg_std_error(&err);
     jpeg_create_compress(&info);
     jpeg_mem_dest(&info, &compressed_data_ptr, &compressed_data_size);
 
-    info.image_width = data.width;
-    info.image_height = data.height;
+    info.image_width      = data.width;
+    info.image_height     = data.height;
     info.input_components = 4;
-    info.in_color_space = JCS_EXT_RGBA;
+    info.in_color_space   = JCS_EXT_RGBA;
 
     jpeg_set_defaults(&info);
     jpeg_set_quality(&info, 85, TRUE);
@@ -89,16 +117,18 @@ std::unique_ptr<CompressedImageBuffer> compress_thumbnail_jpg(const ThumbnailDat
     jpeg_finish_compress(&info);
     jpeg_destroy_compress(&info);
 
-    // FIXME -> Add error checking
+    // [HAZARD] libjpeg errors currently flow through jpeg_std_error defaults and there is no
+    // longjmp-safe recovery wrapper here. A failed encode can therefore terminate control flow in
+    // a C-library-specific way instead of returning a typed error to the caller.
 
-    auto out = std::make_unique<CompressedJPG>();
+    auto out  = std::make_unique<CompressedJPG>();
     out->data = malloc(compressed_data_size);
     out->size = size_t(compressed_data_size);
-    ::memcpy(out->data, (const void*)compressed_data.data(), out->size);
+    ::memcpy(out->data, (const void*) compressed_data.data(), out->size);
     return out;
 }
 
-std::unique_ptr<CompressedImageBuffer> compress_thumbnail_qoi(const ThumbnailData &data)
+std::unique_ptr<CompressedImageBuffer> compress_thumbnail_qoi(const ThumbnailData& data)
 {
     qoi_desc desc;
     desc.width      = data.width;
@@ -106,41 +136,46 @@ std::unique_ptr<CompressedImageBuffer> compress_thumbnail_qoi(const ThumbnailDat
     desc.channels   = 4;
     desc.colorspace = QOI_SRGB;
 
+    // [INTENT] QOI shares the same vertical reorientation as JPG so all preview formats describe
+    // the same image even though the encoder itself only sees a raw pixel buffer.
     // Take vector of RGBA pixels and flip the image vertically
     std::vector<uint8_t> rgba_pixels(data.pixels.size() * 4);
-    size_t row_size = data.width * 4;
-    for (size_t y = 0; y < data.height; ++ y)
+    size_t               row_size = data.width * 4;
+    for (size_t y = 0; y < data.height; ++y)
         memcpy(rgba_pixels.data() + (data.height - y - 1) * row_size, data.pixels.data() + y * row_size, row_size);
 
     auto out = std::make_unique<CompressedQOI>();
     int  size;
-    out->data = qoi_encode((const void*)rgba_pixels.data(), &desc, &size);
+    out->data = qoi_encode((const void*) rgba_pixels.data(), &desc, &size);
     out->size = size;
     return out;
 }
 
 int ColPic_EncodeStr(unsigned short* fromcolor16, int picw, int pich, unsigned char* outputdata, int outputmaxtsize, int colorsmax);
 
-std::unique_ptr<CompressedImageBuffer> compress_thumbnail_colpic(const ThumbnailData &data)
+std::unique_ptr<CompressedImageBuffer> compress_thumbnail_colpic(const ThumbnailData& data)
 {
     const int MAX_SIZE = 512;
-    int width = int(data.width);
-    int height = int(data.height);
+    int       width    = int(data.width);
+    int       height   = int(data.height);
 
+    // [INTENT] Qidi/ColPic previews have a tight firmware-side size ceiling, so Orca rescales the
+    // logical thumbnail dimensions before quantization instead of emitting an oversized payload
+    // that the printer would reject or truncate.
     // Orca: cap data size to MAX_SIZE while maintaining aspect ratio
     if (width > MAX_SIZE || height > MAX_SIZE) {
         double aspectRatio = static_cast<double>(width) / height;
         if (aspectRatio > 1.0) {
-            width = MAX_SIZE;
+            width  = MAX_SIZE;
             height = static_cast<int>(MAX_SIZE / aspectRatio);
         } else {
             height = MAX_SIZE;
-            width = static_cast<int>(MAX_SIZE * aspectRatio);
+            width  = static_cast<int>(MAX_SIZE * aspectRatio);
         }
     }
 
     std::vector<unsigned short> color16_buf(width * height);
-    std::vector<unsigned char> output_buf(height * width * 10);
+    std::vector<unsigned char>  output_buf(height * width * 10);
 
     std::vector<uint8_t> rgba_pixels(data.pixels.size() * 4);
     size_t               row_size = width * 4;
@@ -163,7 +198,10 @@ std::unique_ptr<CompressedImageBuffer> compress_thumbnail_colpic(const Thumbnail
                 g = 51 >> 2;
                 b = 72 >> 3;
             }
-            rgb             = (r << 11) | (g << 5) | b;
+            // [INTENT] ColPic stores a printer-friendly RGB565 palette stream. Fully transparent
+            // pixels are replaced with the dark preview background expected by that ecosystem so
+            // "empty" areas do not quantize to bright artifacts after alpha is discarded.
+            rgb                 = (r << 11) | (g << 5) | b;
             color16_buf[time--] = rgb;
         }
     }
@@ -177,11 +215,13 @@ std::unique_ptr<CompressedImageBuffer> compress_thumbnail_colpic(const Thumbnail
     return out;
 }
 
-std::unique_ptr<CompressedImageBuffer> compress_thumbnail_btt_tft(const ThumbnailData &data) {
-
+std::unique_ptr<CompressedImageBuffer> compress_thumbnail_btt_tft(const ThumbnailData& data)
+{
+    // [INTENT] BTT TFT displays do not parse base64 comment blocks. They expect one semicolon-
+    // prefixed row per scanline containing right-justified RGB565 hex words plus CRLF endings.
     // Take vector of RGBA pixels and flip the image vertically
     std::vector<unsigned char> rgba_pixels(data.pixels.size());
-    const unsigned int row_size = data.width * 4;
+    const unsigned int         row_size = data.width * 4;
     for (unsigned int y = 0; y < data.height; ++y) {
         ::memcpy(rgba_pixels.data() + (data.height - y - 1) * row_size, data.pixels.data() + y * row_size, row_size);
     }
@@ -195,12 +235,15 @@ std::unique_ptr<CompressedImageBuffer> compress_thumbnail_btt_tft(const Thumbnai
     out->data = malloc(out->size);
 
     std::stringstream out_data;
-    typedef struct {unsigned char r, g, b, a;} pixel;
+    typedef struct
+    {
+        unsigned char r, g, b, a;
+    } pixel;
     pixel px;
     for (unsigned int ypos = 0; ypos < data.height; ypos++) {
         std::stringstream line;
         line << ";";
-        for (unsigned int xpos = 0; xpos < row_size; xpos+=4) {
+        for (unsigned int xpos = 0; xpos < row_size; xpos += 4) {
             px.r = rgba_pixels[ypos * row_size + xpos];
             px.g = rgba_pixels[ypos * row_size + xpos + 1];
             px.b = rgba_pixels[ypos * row_size + xpos + 2];
@@ -214,10 +257,12 @@ std::unique_ptr<CompressedImageBuffer> compress_thumbnail_btt_tft(const Thumbnai
             // convert the RGB values to RGB565 hex that is right justified (same algorithm BTT firmware uses)
             auto color_565 = rjust(get_hex(((rv >> 3) << 11) | ((gv >> 2) << 5) | (bv >> 3)), 4, '0');
 
-            //BTT original converter specifies these values should be '0000'
+            // [HAZARD] These magic color substitutions intentionally mirror BTT's own converter.
+            // They are firmware-compatibility quirks, not mathematically derived palette fixes.
+            // BTT original converter specifies these values should be '0000'
             if (color_565 == "0020" || color_565 == "0841" || color_565 == "0861")
                 color_565 = "0000";
-            //add the color to the line
+            // add the color to the line
             line << color_565;
         }
         // output line and end line (\r\n is important. BTT firmware requires it)
@@ -228,13 +273,15 @@ std::unique_ptr<CompressedImageBuffer> compress_thumbnail_btt_tft(const Thumbnai
     return out;
 }
 
-std::string get_hex(const unsigned int input) {
+std::string get_hex(const unsigned int input)
+{
     std::stringstream stream;
     stream << std::hex << input;
     return stream.str();
 }
 
-std::string rjust(std::string input, unsigned int width, char fill_char) {
+std::string rjust(std::string input, unsigned int width, char fill_char)
+{
     std::stringstream stream;
     stream.fill(fill_char);
     stream.width(width);
@@ -242,20 +289,18 @@ std::string rjust(std::string input, unsigned int width, char fill_char) {
     return stream.str();
 }
 
-std::unique_ptr<CompressedImageBuffer> compress_thumbnail(const ThumbnailData &data, GCodeThumbnailsFormat format)
+std::unique_ptr<CompressedImageBuffer> compress_thumbnail(const ThumbnailData& data, GCodeThumbnailsFormat format)
 {
+    // [COUPLING] The dispatcher assumes GCodeThumbnailsFormat is the single source of truth for
+    // both config parsing and writer behavior. New formats therefore require synchronized changes
+    // in PrintConfig enum registration, validation, and this switch.
     switch (format) {
     case GCodeThumbnailsFormat::PNG:
-    default:
-        return compress_thumbnail_png(data);
-    case GCodeThumbnailsFormat::JPG:
-        return compress_thumbnail_jpg(data);
-    case GCodeThumbnailsFormat::QOI:
-        return compress_thumbnail_qoi(data);
-    case GCodeThumbnailsFormat::BTT_TFT:
-        return compress_thumbnail_btt_tft(data);
-    case GCodeThumbnailsFormat::ColPic:
-        return compress_thumbnail_colpic(data);
+    default: return compress_thumbnail_png(data);
+    case GCodeThumbnailsFormat::JPG: return compress_thumbnail_jpg(data);
+    case GCodeThumbnailsFormat::QOI: return compress_thumbnail_qoi(data);
+    case GCodeThumbnailsFormat::BTT_TFT: return compress_thumbnail_btt_tft(data);
+    case GCodeThumbnailsFormat::ColPic: return compress_thumbnail_colpic(data);
     }
 }
 
@@ -343,6 +388,8 @@ static void ADList0(unsigned short val, U16HEAD* listu16, int* listqty, int maxq
 static int Byte8bitEncode(
     unsigned short* fromcolor16, unsigned short* listu16, int listqty, int dotsqty, unsigned char* outputdata, int decMaxBytesize)
 {
+    // [INTENT] Inner RLE encoder for ColPic. It maps each RGB565 pixel to a palette index, then
+    // emits short repeat runs in a compact bytecode tuned for the printer's preview decoder.
     unsigned char tid, sid;
     int           dots     = 0;
     int           srcindex = 0;
@@ -403,6 +450,9 @@ IL_END:
 
 static int ColPicEncode(unsigned short* fromcolor16, int picw, int pich, unsigned char* outputdata, int outputmaxtsize, int colorsmax)
 {
+    // [INTENT] Build a bounded RGB565 palette ordered by frequency, merge rare colors into their
+    // nearest survivors, then serialize the result plus the RLE stream into the ColPic container.
+    // This is effectively a custom thumbnail-specific quantizer, not a generic image codec.
     U16HEAD      l0;
     int          cha0, cha1, cha2, fid, minval;
     ColPicHead3* Head0 = nullptr;
@@ -474,6 +524,9 @@ static int ColPicEncode(unsigned short* fromcolor16, int picw, int pich, unsigne
 
 int ColPic_EncodeStr(unsigned short* fromcolor16, int picw, int pich, unsigned char* outputdata, int outputmaxtsize, int colorsmax)
 {
+    // [INTENT] Final ColPic transport step: convert the binary container into a printable 4/3
+    // ASCII expansion using the firmware's custom 48-based alphabet so the payload can live in
+    // comment text instead of a binary sidecar file.
     int           qty      = 0;
     int           temp     = 0;
     int           strindex = 0;
@@ -527,24 +580,27 @@ int ColPic_EncodeStr(unsigned short* fromcolor16, int picw, int pich, unsigned c
     outputdata[qty] = 0;
     return qty;
 }
-std::pair<GCodeThumbnailDefinitionsList, ThumbnailErrors> make_and_check_thumbnail_list(const std::string& thumbnails_string, const std::string_view def_ext /*= "PNG"sv*/)
+std::pair<GCodeThumbnailDefinitionsList, ThumbnailErrors> make_and_check_thumbnail_list(const std::string&     thumbnails_string,
+                                                                                        const std::string_view def_ext /*= "PNG"sv*/)
 {
     if (thumbnails_string.empty())
         return {};
 
     std::istringstream is(thumbnails_string);
-    std::string point_str;
+    std::string        point_str;
 
     ThumbnailErrors errors;
 
-    // generate thumbnails data to process it
+    // [INTENT] Parse the user-facing "XxY/EXT,..." config string into an ordered list of
+    // thumbnail requests while accumulating non-fatal validation errors for UI/reporting.
+    // Invalid entries do not abort parsing outright so one typo does not suppress every preview.
 
     GCodeThumbnailDefinitionsList thumbnails_list;
     while (std::getline(is, point_str, ',')) {
-        Vec2d point(Vec2d::Zero());
+        Vec2d                 point(Vec2d::Zero());
         GCodeThumbnailsFormat format;
-        std::istringstream iss(point_str);
-        std::string coord_str;
+        std::istringstream    iss(point_str);
+        std::string           coord_str;
         if (std::getline(iss, coord_str, 'x') && !coord_str.empty()) {
             std::istringstream(coord_str) >> point(0);
             if (std::getline(iss, coord_str, '/') && !coord_str.empty()) {
@@ -557,6 +613,9 @@ std::pair<GCodeThumbnailDefinitionsList, ThumbnailErrors> make_and_check_thumbna
                     if (ext_str.empty())
                         ext_str = def_ext.empty() ? "PNG"sv : def_ext;
 
+                    // [STATE] Unknown extensions are downgraded to PNG instead of rejected. The
+                    // error bit preserves that the input was malformed while still producing a
+                    // preview block for downstream consumers.
                     // check validity of extention
                     boost::to_upper(ext_str);
                     if (!ConfigOptionEnum<GCodeThumbnailsFormat>::from_string(ext_str, format)) {
@@ -565,8 +624,7 @@ std::pair<GCodeThumbnailDefinitionsList, ThumbnailErrors> make_and_check_thumbna
                     }
 
                     thumbnails_list.emplace_back(std::make_pair(format, point));
-                }
-                else
+                } else
                     errors = enum_bitmask(errors | ThumbnailError::OutOfRange);
                 continue;
             }
@@ -579,8 +637,9 @@ std::pair<GCodeThumbnailDefinitionsList, ThumbnailErrors> make_and_check_thumbna
 
 std::pair<GCodeThumbnailDefinitionsList, ThumbnailErrors> make_and_check_thumbnail_list(const ConfigBase& config)
 {
-    // ??? Unit tests or command line slicing may not define "thumbnails" or "thumbnails_format".
-    // ??? If "thumbnails_format" is not defined, export to PNG.
+    // [HAZARD] Thumbnail export is optional in headless/unit-test contexts. Missing config keys
+    // are treated as "no thumbnails requested" rather than a schema error, so ports should keep
+    // this path permissive to avoid breaking CLI slicing configurations.
 
     // generate thumbnails data to process it
 
@@ -595,7 +654,8 @@ std::string get_error_string(const ThumbnailErrors& errors)
     std::string error_str;
 
     if (errors.has(ThumbnailError::InvalidVal))
-        error_str += "\n - " + Slic3r::format("Invalid input format. Expected vector of dimensions in the following format: \"%1%\"", "XxY/EXT, XxY/EXT, ...");
+        error_str += "\n - " + Slic3r::format("Invalid input format. Expected vector of dimensions in the following format: \"%1%\"",
+                                              "XxY/EXT, XxY/EXT, ...");
     if (errors.has(ThumbnailError::OutOfRange))
         error_str += "\n - Input value is out of range";
     if (errors.has(ThumbnailError::InvalidExt))

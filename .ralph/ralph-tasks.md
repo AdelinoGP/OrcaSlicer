@@ -580,7 +580,7 @@ GCodeWriter.cpp (T186) annotations before starting any task here.)
              equivalent — translation agents need full documentation.
              Commit: `annotate: ExtrusionProcessor (T4030)`
 
-- [ ] T4031  annotate: src/libslic3r/GCode/ThumbnailData.cpp
+- [x] T4031  annotate: src/libslic3r/GCode/ThumbnailData.cpp
                      + src/libslic3r/GCode/ThumbnailData.hpp
                      + src/libslic3r/GCode/Thumbnails.cpp
                      + src/libslic3r/GCode/Thumbnails.hpp
