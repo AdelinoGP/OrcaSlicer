@@ -9,6 +9,9 @@ class MutablePriorityQueue
 {
 public:
 	static_assert(std::is_trivially_copyable<T>::value, "Template argument T must be a trivially copiable type in class template MutablePriorityQueue");
+	// [INTENT] Mutable heap supports O(log n) push/pop/remove while exposing stable external indices.
+	// [COUPLING] IndexSetter must mirror swaps into caller-visible state for correctness.
+	// [HAZARD] If item priorities change without update(idx), heap ordering silently becomes stale.
 
 	// It is recommended to use make_mutable_priority_queue() for construction.
 	MutablePriorityQueue(IndexSetter &&index_setter, LessPredicate &&less_predicate) :
@@ -63,6 +66,7 @@ inline void MutablePriorityQueue<T, LessPredicate, IndexSetter, ResetIndexWhenRe
 	if (ResetIndexWhenRemoved)
 #endif /* NDEBUG */
 	{
+		// [STATE] clear() invalidates external queue indices before releasing internal storage.
 		for (size_t idx = 0; idx < m_heap.size(); ++ idx)
 			// Mark as removed from the queue.
 			m_index_setter(m_heap[idx], std::numeric_limits<size_t>::max());
@@ -125,6 +129,7 @@ inline void MutablePriorityQueue<T, LessPredicate, IndexSetter, ResetIndexWhenRe
 		m_heap.pop_back();
 		return;
 	}
+	// [MEMORY] remove() relies on cheap by-value move/copy of trivially copyable T entries.
 	m_heap[idx] = m_heap.back();
 	m_index_setter(m_heap[idx], idx);
 	m_heap.pop_back();
@@ -203,6 +208,8 @@ template <std::size_t blocking>
 struct SkipHeapAddressing
 {
 public:
+	// [INTENT] Address mapper for heap-of-miniheaps layout to improve cache locality.
+	// [HAZARD] Arithmetic assumes power-of-two block size and padding slots.
 	static const constexpr std::size_t block_size = blocking;
 	static const constexpr std::size_t block_mask = block_size - 1;
 	static_assert((block_size & block_mask) == 0U, "block size must be 2^n for some integer n");
@@ -258,6 +265,7 @@ class MutableSkipHeapPriorityQueue
 public:
 	static_assert(std::is_trivially_copyable<T>::value, "Template argument T must be a trivially copiable type in class template MutableSkipHeapPriorityQueue");
 	using address = SkipHeapAddressing<blocking>;
+	// [COUPLING] Exposed indices are physical array positions (including skip-heap structure constraints).
 
 	// It is recommended to use make_miniheap_mutable_priority_queue() for construction.
 	MutableSkipHeapPriorityQueue(IndexSetter &&index_setter, LessPredicate &&less_predicate) :

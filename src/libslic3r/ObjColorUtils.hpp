@@ -13,6 +13,7 @@ public:
     QuantKMeans(int alpha_thres = 10) : m_alpha_thres(alpha_thres) {}
     void apply(cv::Mat &ori_image, cv::Mat &new_image, int num_cluster, int color_space)
     {
+        // [INTENT] Quantize texture colors to a compact palette for OBJ/material workflows.
         cv::Mat image;
         convert_color_space(ori_image, image, color_space);
         cv::Mat flatten_image = flatten(image);
@@ -22,6 +23,7 @@ public:
     }
     void apply_aplha(cv::Mat &ori_image, cv::Mat &new_image, int num_cluster, int color_space)
     {
+        // [INTENT] Alpha-aware quantization preserves transparent texels and clusters only visible pixels.
         // cout << " *** DoAlpha *** " << endl;
         cv::Mat flatten_image8UC3 = flatten_alpha(ori_image);
         cv::Mat image8UC3;
@@ -35,6 +37,7 @@ public:
     }
     void apply(cv::Mat &flatten_image, int num_cluster, int color_space)
     {
+        // [STATE] m_flatten_labels and m_centers8UC3 are persistent outputs consumed by replacement passes.
         cv::Mat centers32FC3;
         num_cluster = fmin(flatten_image.rows, num_cluster);
         kmeans(flatten_image, num_cluster, this->m_flatten_labels, cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT, 300, 0.5), 3, cv::KMEANS_PP_CENTERS,
@@ -63,6 +66,7 @@ public:
                int                                max_cluster = 15,
                int                                color_space = 2)
     {
+        // [HAZARD] Auto-K search is O(K*N*I); max_cluster bounds runtime on large textures.
         cv::Mat image8UC3;
         convert_color_space(flatten_image8UC3, image8UC3, color_space);
 
@@ -170,6 +174,7 @@ public:
 
     void replace_centers(cv::Mat &ori_image, cv::Mat &new_image)
     {
+        // [COUPLING] Pixel rewrite relies on flatten() row-major index mapping matching label order.
         for (int i = 0; i < ori_image.rows; i++) {
             for (int j = 0; j < ori_image.cols; j++) {
                 int       idx                 = this->m_flatten_labels.at<int>(i * ori_image.cols + j, 0);
@@ -180,6 +185,7 @@ public:
     }
     void repalce_centers_aplha(cv::Mat &ori_image, cv::Mat &new_image)
     {
+        // [STATE] cnt advances only for non-transparent pixels to stay aligned with flatten_alpha().
         int       cnt = 0;
         int       idx;
         cv::Vec3b center;
@@ -199,6 +205,7 @@ public:
 
     void convert_color_space(const cv::Mat &ori_image, cv::Mat &image, int color_space, bool reverse = false)
     {
+        // [COUPLING] Integer color_space mode values must stay synchronized with GUI/config callers.
         switch (color_space) {
         case 0: image = ori_image; break;
         case 1:

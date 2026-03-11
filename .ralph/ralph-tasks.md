@@ -851,7 +851,7 @@ implements.)
               + src/libslic3r/MultiPoint.hpp
              Commit: `annotate: src/libslic3r files (T4060n)`
 
-- [ ] T4060o  annotate: src/libslic3r/MutablePolygon.hpp
+- [x] T4060o  annotate: src/libslic3r/MutablePolygon.hpp
               + src/libslic3r/MutablePriorityQueue.hpp
               + src/libslic3r/NormalUtils.hpp
               + src/libslic3r/NSVGUtils.hpp

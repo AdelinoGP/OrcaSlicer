@@ -17,6 +17,7 @@ namespace Slic3r {
 /// </summary>
 struct NSVGLineParams
 {
+    // [INTENT] Parameters governing SVG curve tessellation into slicer-compatible polygonal paths.
     // Smaller will divide curve to more lines
     // NOTE: Value is in image scale
     double tesselation_tolerance = 10.f;
@@ -24,10 +25,12 @@ struct NSVGLineParams
     // Maximal depth of recursion for conversion curve to lines
     int max_level = 10;
 
+    // [COUPLING] scale bridges float SVG coordinates to fixed-point Slic3r::Point units.
     // Multiplicator of point coors
     // NOTE: Every point coor from image(float) is multiplied by scale and rounded to integer --> Slic3r::Point
     double scale = 1. / SCALING_FACTOR;
 
+    // [HAZARD] Y-axis inversion must match the consumer coordinate frame to avoid mirrored geometry.
     // Flag wether y is negative, when true than y coor is multiplied by -1
     bool is_y_negative = true;
 
@@ -61,12 +64,14 @@ Polygons to_polygons(const NSVGimage &image, const NSVGLineParams &param);
 
 void bounds(const NSVGimage &image, Vec2f &min, Vec2f &max);
 
+// [MEMORY] unique_ptr transfer makes SVG text buffer ownership explicit at parser call sites.
 // read text data from file
 std::unique_ptr<std::string> read_from_disk(const std::string &path);
 
 using NSVGimage_ptr = std::unique_ptr<NSVGimage, void (*)(NSVGimage*)>;
 NSVGimage_ptr nsvgParseFromFile(const std::string &svg_file_path, const char *units = "mm", float dpi = 96.0f);
 NSVGimage_ptr nsvgParse(const std::string& file_data, const char *units = "mm", float dpi = 96.0f);
+// [MEMORY] NSVGimage_ptr wraps C allocations with a custom deleter to keep parser lifetimes RAII-safe.
 NSVGimage *init_image(EmbossShape::SvgFile &svg_file);
 
 /// <summary>

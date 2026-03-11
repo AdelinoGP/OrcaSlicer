@@ -11,6 +11,8 @@ namespace Slic3r {
 // All elements are allocated in a single std::vector<>, thus integer indices are used for
 // referencing the previous and next element and inside iterators to survive reallocation
 // of the vector.
+// [INTENT] Linked-list edits with contiguous backing storage balance mutation cost and cache locality.
+// [HAZARD] end() is inclusive (last valid point), not an STL one-past-the-end sentinel.
 class MutablePolygon
 {
 public:
@@ -64,6 +66,7 @@ public:
     };
 
     // Iterator range for maintaining a range of unprocessed items, see smooth_outward().
+    // [STATE] Range endpoints mutate as nodes are removed, so begin/end are not stable snapshots.
     class range
     {
     public:
@@ -194,6 +197,7 @@ private:
         IndexType next;
     };
     std::vector<LinkedPoint>    m_data;
+    // [MEMORY] Removed nodes are recycled through m_head_free to avoid repeated allocations during simplification.
     // Number of points in the linked list.
     IndexType                   m_size { 0 };
     IndexType                   m_head { IndexType(-1) };
@@ -223,6 +227,7 @@ private:
         assert(m_size > 0);
         assert(m_head != -1);
         LinkedPoint &lp = this->at(i);
+        // [STATE] remove() rewires both active ring links and the free-list chain.
         IndexType prev = lp.prev;
         IndexType next = lp.next;
         lp.next = m_head_free;
@@ -241,6 +246,7 @@ private:
 
     IndexType insert(const IndexType i, const Point pt) {
         assert(i >= 0);
+        // [INTENT] Insert-before preserves traversal contracts used by polygon cleanup passes.
         IndexType n;
         IndexType j = this->at(i).prev;
         if (m_head_free == -1) {
@@ -311,6 +317,7 @@ void remove_duplicates(MutablePolygon &polygon, double eps);
 void remove_duplicates(MutablePolygon& polygon, coord_t scaled_eps, const double max_angle);
 inline ExPolygons remove_duplicates(ExPolygons expolygons, coord_t scaled_eps, double max_angle)
 {
+    // [COUPLING] In-place conversion couples MutablePolygon editing semantics with ExPolygon contour/hole ownership.
     MutablePolygon mp;
     for (ExPolygon& expolygon : expolygons) {
         mp.assign(expolygon.contour, expolygon.contour.size() * 2);

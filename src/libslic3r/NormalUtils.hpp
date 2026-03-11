@@ -29,6 +29,8 @@ public:
     /// <param name="indices">index into vertices</param>
     /// <param name="vertices">vector of vertices</param>
     /// <returns>normal to triangle(normalized to size 1)</returns>
+    // [INTENT] Per-face normal from triangle winding feeds downstream shading/orientation logic.
+    // [HAZARD] Degenerate triangles may produce near-zero vectors that callers must handle.
     static Normal create_triangle_normal(
         const stl_triangle_vertex_indices &indices,
         const std::vector<stl_vertex> &    vertices);
@@ -46,6 +48,8 @@ public:
     /// <param name="its">Triangle indices and vertices</param>
     /// <param name="type">Type of calculation normals</param>
     /// <returns>Normal for each vertex</returns>
+    // [INTENT] Strategy-dispatched vertex normal generation balances smooth shading and edge preservation.
+    // [COUPLING] API is tied to indexed_triangle_set/stl_vertex mesh containers used by Model/TriangleMesh.
     static Normals create_normals(
         const indexed_triangle_set &its,
         VertexNormalType type = VertexNormalType::NelsonMaxWeighted);
@@ -60,6 +64,7 @@ public:
     /// <param name="indice">address to vertices</param>
     /// <param name="vertices">vertices data</param>
     /// <returns>Angle [in radian]</returns>
+    // [INTENT] Corner-angle helper for weighted averaging modes.
     static float indice_angle(int                            i,
                               const Vec3i32 &                indice,
                               const std::vector<stl_vertex> &vertices);
