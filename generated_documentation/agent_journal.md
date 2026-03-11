@@ -1,9 +1,9 @@
 # Agent Journal — OrcaSlicer Codebase Analysis
 
 ## CURRENT STATUS
-Last session: 93
-Active task: T4020 — complete
-Next action: Begin T4021 by annotating the Arachne half-edge graph types.
+Last session: 94
+Active task: T4021 — complete
+Next action: Begin T4022 by annotating the Arachne spatial utility files.
 Unresolved [UNCLEAR] tags: 12 — all remaining source tags are marked `[UNCLEAR → ESCALATED]` after Session 86 T300 triage
 Files remaining (Phase 1): 287 files outside explicit skip buckets still need human coverage audit
 Files completed (Phase 1): 314 unique source files tracked by 314 annotate task entries
@@ -574,3 +574,26 @@ Total escalated tags: **12**
   - `src/libslic3r/ExtrusionEntity.hpp`
 
 **Completed tasks this session:** T4020
+
+---
+
+## Session 94
+
+**Active task:** T4021 — annotate `src/libslic3r/Arachne/utils/HalfEdgeGraph.hpp` + `src/libslic3r/Arachne/utils/HalfEdge.hpp` + `src/libslic3r/Arachne/utils/HalfEdgeNode.hpp`
+
+- Files processed: `src/libslic3r/Arachne/utils/HalfEdgeGraph.hpp`, `src/libslic3r/Arachne/utils/HalfEdge.hpp`, `src/libslic3r/Arachne/utils/HalfEdgeNode.hpp`, `generated_documentation/agent_journal.md`, `.ralph/ralph-tasks.md`
+- Key discoveries:
+  - The generic Arachne half-edge layer is intentionally tiny: graph ownership lives in `std::list` arenas, while adjacency is recovered entirely through raw pointer links and the `twin->next` fan-walk convention.
+  - `incident_edge` is the only node-side adjacency anchor; if it drifts during rewiring, whole node fans become unreachable even though the underlying edges still exist.
+  - These templates are the address-stability contract underneath `SkeletalTrapezoidationGraph`, so any future port that swaps out `std::list` must also redesign topology identity.
+- Decisions made:
+  - Added only semantic comments and invariant notes because the files are small template containers; the real algorithmic detail already lives in `SkeletalTrapezoidationGraph.cpp`.
+  - Focused the annotations on ownership, traversal, and mutation hazards since those are the parts a translation agent could easily get wrong from the sparse original declarations.
+- Open questions:
+  - None newly introduced; existing `[UNCLEAR -> ESCALATED]` items remain unchanged.
+- Cross-references:
+  - `src/libslic3r/Arachne/SkeletalTrapezoidationGraph.hpp`
+  - `src/libslic3r/Arachne/SkeletalTrapezoidationGraph.cpp`
+  - `src/libslic3r/Arachne/SkeletalTrapezoidation.cpp`
+
+**Completed tasks this session:** T4021

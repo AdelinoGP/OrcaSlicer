@@ -523,7 +523,7 @@ any task here — it is the public interface that contextualizes all of these.)
              referenced throughout the .hpp.
              Commit: `annotate: Arachne output types + STrap header (T4020)`
 
-- [ ] T4021  annotate: src/libslic3r/Arachne/utils/HalfEdgeGraph.hpp
+- [x] T4021  annotate: src/libslic3r/Arachne/utils/HalfEdgeGraph.hpp
                      + src/libslic3r/Arachne/utils/HalfEdge.hpp
                      + src/libslic3r/Arachne/utils/HalfEdgeNode.hpp
              Context: Half-edge data structure used by SkeletalTrapezoidation
