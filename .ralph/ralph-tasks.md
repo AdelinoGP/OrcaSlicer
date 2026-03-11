@@ -900,14 +900,14 @@ implements.)
               + src/libslic3r/Triangulation.hpp
              Commit: `annotate: src/libslic3r files (T4060u)`
 
-- [ ] T4060v  annotate: src/libslic3r/TryCatchSignal.hpp
+- [x] T4060v  annotate: src/libslic3r/TryCatchSignal.hpp
               + src/libslic3r/TryCatchSignalSEH.hpp
               + src/libslic3r/Utils.hpp
               + src/libslic3r/VariableWidth.hpp
               + src/libslic3r/Zipper.hpp
              Commit: `annotate: src/libslic3r files (T4060v)`
 
-- [ ] T4060w  annotate: src/libslic3r/Shape/TextShape.cpp
+- [x] T4060w  annotate: src/libslic3r/Shape/TextShape.cpp
               + src/libslic3r/Shape/TextShape.hpp
              Commit: `annotate: src/libslic3r/Shape files (T4060w)`
 
