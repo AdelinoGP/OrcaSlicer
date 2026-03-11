@@ -1,3 +1,20 @@
+// [INTENT] Import 2D SVG artwork by approximating its Bezier paths, offsetting strokes into closed polygons,
+// then extruding the resulting profiles into shallow OCCT solids that Orca can tessellate into TriangleMesh.
+//
+// Pipeline:
+//   1. NanoSVG parses the XML/path grammar into cubic Bezier segments
+//   2. Each curve is sampled into line segments at fixed precision
+//   3. Open strokes are widened with Clipper offsetting; filled shapes remain closed loops
+//   4. OCCT builds wires/faces and extrudes them along +Z into a prism
+//   5. OCCT triangulation is copied into admesh's `stl_file`, then into `TriangleMesh`
+//
+// [COUPLING] Heavy dependence on NanoSVG for parsing, Clipper for stroke widening, and OCCT for solid
+//            construction/tessellation. This is closer to a CAD import bridge than a lightweight SVG reader.
+// [HAZARD] Curves are approximated with a fixed 10-sample subdivision per cubic segment, so import fidelity
+//          depends on source curvature and scale. Translators should treat this as a heuristic, not a guarantee.
+// [HAZARD] Imported geometry is always given a fixed 10 mm extrusion depth, which is an Orca-specific UI/import
+//          convention rather than something inherent to SVG.
+
 #include "libslic3r/ClipperUtils.hpp"
 #include "../libslic3r.h"
 #include "../Model.hpp"
@@ -29,15 +46,15 @@ const double STEP_TRANS_ANGLE_RES   = 1;
 
 struct Element_Info
 {
-    std::string name;
+    std::string  name;
     unsigned int color;
     TopoDS_Shape shape;
 };
 
-bool is_same_points(gp_Pnt pt1, gp_Pnt pt2) {
-    return abs(pt1.X() - pt2.X()) < 0.001
-        && abs(pt1.Y() - pt2.Y()) < 0.001
-        && abs(pt1.Z() - pt2.Z()) < 0.001;
+bool is_same_points(gp_Pnt pt1, gp_Pnt pt2)
+{
+    // [INTENT] Local geometric epsilon so adjacent sampled Bezier points do not create zero-length OCCT edges.
+    return abs(pt1.X() - pt2.X()) < 0.001 && abs(pt1.Y() - pt2.Y()) < 0.001 && abs(pt1.Z() - pt2.Z()) < 0.001;
 }
 
 struct Point_2D
@@ -57,6 +74,8 @@ void interp_v2_v2v2(float r[2], const float a[2], const float b[2], const float 
 
 void interp_v2_v2v2v2v2_cubic(float p[2], const float v1[2], const float v2[2], const float v3[2], const float v4[2], const float u)
 {
+    // [INTENT] De Casteljau evaluation of one cubic Bezier sample. SVG import prefers this explicit form over
+    // polynomial coefficients because it is numerically stable and easy to mirror from Blender/NanoSVG code.
     float q0[2], q1[2], q2[2], r0[2], r1[2];
 
     interp_v2_v2v2(q0, v1, v2, u);
@@ -69,21 +88,22 @@ void interp_v2_v2v2v2v2_cubic(float p[2], const float v1[2], const float v2[2], 
     interp_v2_v2v2(p, r0, r1, u);
 }
 
-bool is_two_lines_interaction(gp_Pnt pL1, gp_Pnt pL2, gp_Pnt pR1, gp_Pnt pR2) {
+bool is_two_lines_interaction(gp_Pnt pL1, gp_Pnt pL2, gp_Pnt pR1, gp_Pnt pR2)
+{
     Vec3d point1(pL1.X(), pL1.Y(), 0);
     Vec3d point2(pL2.X(), pL2.Y(), 0);
     Vec3d point3(pR1.X(), pR1.Y(), 0);
     Vec3d point4(pR2.X(), pR2.Y(), 0);
-  
+
     Vec3d line1 = point2 - point1;
     Vec3d line2 = point4 - point3;
 
     Vec3d line_pos1 = point1 - point3;
     Vec3d line_pos2 = point2 - point3;
-    
+
     Vec3d line_pos3 = point3 - point1;
     Vec3d line_pos4 = point4 - point1;
-    
+
     Vec3d cross_1 = line2.cross(line_pos1);
     Vec3d cross_2 = line2.cross(line_pos2);
 
@@ -94,10 +114,12 @@ bool is_two_lines_interaction(gp_Pnt pL1, gp_Pnt pL2, gp_Pnt pR1, gp_Pnt pR2) {
 }
 
 bool is_profile_self_interaction(std::vector<std::pair<gp_Pnt, gp_Pnt>> profile_line_points)
-{ 
+{
+    // [INTENT] Cheap O(n^2) self-intersection screen to warn about invalid outlines before OCCT face creation.
     for (int i = 0; i < profile_line_points.size(); ++i) {
         for (int j = i + 2; j < profile_line_points.size(); ++j)
-            if (is_two_lines_interaction(profile_line_points[i].first, profile_line_points[i].second, profile_line_points[j].first, profile_line_points[j].second))
+            if (is_two_lines_interaction(profile_line_points[i].first, profile_line_points[i].second, profile_line_points[j].first,
+                                         profile_line_points[j].second))
                 return true;
     }
 
@@ -108,13 +130,15 @@ double get_profile_area(std::vector<std::pair<gp_Pnt, gp_Pnt>> profile_line_poin
 {
     double min_x = 0;
     for (auto line_points : profile_line_points) {
-        if (line_points.first.X() < min_x) min_x = line_points.first.X();
+        if (line_points.first.X() < min_x)
+            min_x = line_points.first.X();
     }
 
     double area = 0;
     for (auto line_points : profile_line_points) {
         bool flag = true;
-        if (line_points.second.Y() < line_points.first.Y()) flag = false;
+        if (line_points.second.Y() < line_points.first.Y())
+            flag = false;
 
         area += (line_points.second.X() + line_points.first.X() - 2 * min_x) * (line_points.second.Y() - line_points.first.Y()) / 2;
     }
@@ -122,10 +146,12 @@ double get_profile_area(std::vector<std::pair<gp_Pnt, gp_Pnt>> profile_line_poin
     return abs(area);
 }
 
-bool get_svg_profile(const char *path, std::vector<Element_Info> &element_infos, std::string& message)
+bool get_svg_profile(const char* path, std::vector<Element_Info>& element_infos, std::string& message)
 {
-    NSVGimage *svg_data = nullptr;
-    svg_data            = nsvgParseFromFile(path, "mm", 96.0f);
+    NSVGimage* svg_data = nullptr;
+    // [INTENT] Parse SVG coordinates into millimeters immediately so later OCCT and slicer code can stay in
+    // its native unit system.
+    svg_data = nsvgParseFromFile(path, "mm", 96.0f);
     if (svg_data == nullptr) {
         message = "import svg failed: could not open svg.";
         return false;
@@ -136,24 +162,26 @@ bool get_svg_profile(const char *path, std::vector<Element_Info> &element_infos,
     }
 
     int name_index = 1;
-    for (NSVGshape *shape = svg_data->shapes; shape; shape = shape->next) {
-        char *      id     = shape->id;
+    for (NSVGshape* shape = svg_data->shapes; shape; shape = shape->next) {
+        char* id = shape->id;
 
-        int interpolation_precision = 10;  // Number of interpolation points
-        float step = 1.0f / float(interpolation_precision - 1);
+        int   interpolation_precision = 10; // Number of interpolation points
+        float step                    = 1.0f / float(interpolation_precision - 1);
 
         // get the path point
-        std::vector<std::vector<std::vector<Point_2D>>> all_path_points;  // paths<profiles<curves<points>>>
-        for (NSVGpath *path = shape->paths; path; path = path->next) {
+        std::vector<std::vector<std::vector<Point_2D>>> all_path_points; // paths<profiles<curves<points>>>
+        for (NSVGpath* path = shape->paths; path; path = path->next) {
             std::vector<std::vector<Point_2D>> profile_points;
-            int index = 0;
+            int                                index = 0;
             for (int i = 0; i < path->npts - 1; i += 3) {
-                float *            p = &path->pts[i * 2];
-                float              a = 0.0f;
-                std::vector<Point_2D> curve_points;  // points on a curve
+                float*                p = &path->pts[i * 2];
+                float                 a = 0.0f;
+                std::vector<Point_2D> curve_points; // points on a curve
                 for (int v = 0; v < interpolation_precision; v++) {
                     float pt[2];
 
+                    // [INTENT] Convert each cubic curve to a polyline because the downstream Clipper + OCCT path
+                    // building code only operates on straight segments.
                     // get interpolation points of Bezier curve
                     interp_v2_v2v2v2v2_cubic(pt, &p[0], &p[2], &p[4], &p[6], a);
 
@@ -162,7 +190,7 @@ bool get_svg_profile(const char *path, std::vector<Element_Info> &element_infos,
                     a += step;
                 }
 
-                profile_points.push_back(curve_points);   
+                profile_points.push_back(curve_points);
 
                 // keep the adjacent curves end-to-end
                 if (profile_points.size() > 1) {
@@ -176,6 +204,7 @@ bool get_svg_profile(const char *path, std::vector<Element_Info> &element_infos,
                 all_path_points.push_back(profile_points);
         }
 
+        // [INTENT] Sanitize sampled curves into edge chains that OCCT can accept as wires.
         // remove duplicate points and ensure the profile is closed
         std::vector<std::vector<std::pair<gp_Pnt, gp_Pnt>>> path_line_points;
         for (auto profile_points : all_path_points) {
@@ -197,7 +226,7 @@ bool get_svg_profile(const char *path, std::vector<Element_Info> &element_infos,
             // keep the start and end points of profile connected
             if (shape->fill.gradient != nullptr)
                 profile_line_points.back().second = profile_line_points[0].first;
-            
+
             if (is_profile_self_interaction(profile_line_points))
                 BOOST_LOG_TRIVIAL(warning) << "the profile is self interaction.";
 
@@ -205,17 +234,20 @@ bool get_svg_profile(const char *path, std::vector<Element_Info> &element_infos,
         }
 
         if (shape->fill.gradient == nullptr) {
-            double scale_size = 1e6;
+            double                                              scale_size = 1e6;
             std::vector<std::vector<std::pair<gp_Pnt, gp_Pnt>>> new_path_line_points;
-            float stroke_width = shape->strokeWidth * scale_size;
-            Polygons polygons;
-            bool close_polygon = false;
+            float                                               stroke_width = shape->strokeWidth * scale_size;
+            Polygons                                            polygons;
+            bool                                                close_polygon = false;
+            // [INTENT] Treat stroke-only SVG paths as centerlines and widen them into printable area polygons via
+            // Clipper offsetting. Filled shapes skip this because their contour already encloses area.
             for (int i = 0; i < path_line_points.size(); ++i) {
                 ClipperLib::Path pt_path;
-                for (auto line_point : path_line_points[i]) { 
+                for (auto line_point : path_line_points[i]) {
                     pt_path.push_back(ClipperLib::IntPoint(line_point.first.X() * scale_size, line_point.first.Y() * scale_size));
                 }
-                pt_path.push_back(ClipperLib::IntPoint(path_line_points[i].back().second.X() * scale_size, path_line_points[i].back().second.Y() * scale_size));
+                pt_path.push_back(ClipperLib::IntPoint(path_line_points[i].back().second.X() * scale_size,
+                                                       path_line_points[i].back().second.Y() * scale_size));
 
                 ClipperLib::Paths         out_paths;
                 ClipperLib::ClipperOffset co;
@@ -254,9 +286,11 @@ bool get_svg_profile(const char *path, std::vector<Element_Info> &element_infos,
             path_line_points = new_path_line_points;
         }
 
+        // [INTENT] OCCT requires a face with one outer wire and optional inner wires. The largest-area loop is
+        // assumed to be the exterior boundary; smaller loops become holes.
         // generate all profile curves
         std::vector<TopoDS_Wire> wires;
-        int index = 0;
+        int                      index    = 0;
         double                   max_area = 0;
         for (int i = 0; i < path_line_points.size(); ++i) {
             BRepBuilderAPI_MakeWire wire_build;
@@ -264,11 +298,11 @@ bool get_svg_profile(const char *path, std::vector<Element_Info> &element_infos,
                 TopoDS_Edge edge_build = BRepBuilderAPI_MakeEdge(point_item.first, point_item.second);
                 wire_build.Add(edge_build);
             }
-            TopoDS_Wire wire = wire_build.Wire();
-            double profile_area = get_profile_area(path_line_points[i]);
+            TopoDS_Wire wire         = wire_build.Wire();
+            double      profile_area = get_profile_area(path_line_points[i]);
             if (profile_area > max_area) {
                 max_area = profile_area;
-                index = i;
+                index    = i;
             }
             wires.emplace_back(wire);
         }
@@ -276,7 +310,9 @@ bool get_svg_profile(const char *path, std::vector<Element_Info> &element_infos,
         if (wires.empty())
             continue;
 
-        gp_Vec      dir(0, 0, 10);
+        // [INTENT] Extrude the 2D profile into a shallow prism so Orca can reuse the standard solid tessellation
+        // import path instead of adding a dedicated 2.5D SVG mesh generator.
+        gp_Vec                  dir(0, 0, 10);
         BRepBuilderAPI_MakeFace face_make(wires[index]);
         for (int i = 0; i < wires.size(); ++i) {
             if (index == i)
@@ -284,7 +320,7 @@ bool get_svg_profile(const char *path, std::vector<Element_Info> &element_infos,
             face_make.Add(wires[i]);
         }
 
-        TopoDS_Face face = face_make.Face();
+        TopoDS_Face  face          = face_make.Face();
         TopoDS_Shape element_shape = BRepPrimAPI_MakePrism(face, dir, false, false).Shape();
 
         Element_Info element_info;
@@ -300,7 +336,7 @@ bool get_svg_profile(const char *path, std::vector<Element_Info> &element_infos,
     return true;
 }
 
-bool load_svg(const char *path, Model *model, std::string &message)
+bool load_svg(const char* path, Model* model, std::string& message)
 {
     std::vector<Element_Info> namedSolids;
     if (!get_svg_profile(path, namedSolids, message))
@@ -308,8 +344,10 @@ bool load_svg(const char *path, Model *model, std::string &message)
 
     std::vector<stl_file> stl;
     stl.resize(namedSolids.size());
-    // todo: zhimin, Can be accelerated in parallel with tbb 
-    for (size_t i = 0 ; i < namedSolids.size(); i++) {
+    // [CONCURRENCY] This tessellation loop is currently serial even though each extruded element is independent.
+    // A future TBB port would need separate `stl_file` destinations per element to stay race-free.
+    // todo: zhimin, Can be accelerated in parallel with tbb
+    for (size_t i = 0; i < namedSolids.size(); i++) {
         BRepMesh_IncrementalMesh mesh(namedSolids[i].shape, STEP_TRANS_CHORD_ERROR, false, STEP_TRANS_ANGLE_RES, true);
         // BBS: calculate total number of the nodes and triangles
         int aNbNodes     = 0;
@@ -336,11 +374,13 @@ bool load_svg(const char *path, Model *model, std::string &message)
         points.reserve(aNbNodes);
         // BBS: count faces missing triangulation
         Standard_Integer aNbFacesNoTri = 0;
+        // [INTENT] Flatten OCCT's per-face triangulations into one admesh `stl_file`, preserving face orientation
+        // so Orca's later signed-volume checks see a coherent shell.
         // BBS: fill temporary triangulation
         Standard_Integer aNodeOffset    = 0;
         Standard_Integer aTriangleOffet = 0;
         for (TopExp_Explorer anExpSF(namedSolids[i].shape, TopAbs_FACE); anExpSF.More(); anExpSF.Next()) {
-            const TopoDS_Shape &aFace = anExpSF.Current();
+            const TopoDS_Shape& aFace = anExpSF.Current();
             TopLoc_Location     aLoc;
             Handle(Poly_Triangulation) aTriangulation = BRep_Tool::Triangulation(TopoDS::Face(aFace), aLoc);
             if (aTriangulation.IsNull()) {
@@ -361,7 +401,8 @@ bool load_svg(const char *path, Model *model, std::string &message)
                 Poly_Triangle aTri = aTriangulation->Triangle(aTriIter);
 
                 aTri.Get(anId[0], anId[1], anId[2]);
-                if (anOrientation == TopAbs_REVERSED) std::swap(anId[1], anId[2]);
+                if (anOrientation == TopAbs_REVERSED)
+                    std::swap(anId[1], anId[2]);
                 // BBS: save triangles facets
                 stl_facet facet;
                 facet.vertex[0] = points[anId[0] + aNodeOffset - 1].cast<float>();
@@ -381,16 +422,17 @@ bool load_svg(const char *path, Model *model, std::string &message)
         }
     }
 
-    ModelObject *new_object = model->add_object();
+    ModelObject* new_object = model->add_object();
     // new_object->name ?
     new_object->input_file = path;
-    auto stage_unit3 = stl.size() / LOAD_STEP_STAGE_UNIT_NUM + 1;
+    auto stage_unit3       = stl.size() / LOAD_STEP_STAGE_UNIT_NUM + 1;
     for (size_t i = 0; i < stl.size(); i++) {
         // BBS: maybe mesh is empty from step file. Don't add
         if (stl[i].stats.number_of_facets > 0) {
             TriangleMesh triangle_mesh;
             triangle_mesh.from_stl(stl[i]);
-            ModelVolume *new_volume       = new_object->add_volume(std::move(triangle_mesh));
+            // [STATE] One SVG shape becomes one ModelVolume; colour/name metadata stays attached at volume level.
+            ModelVolume* new_volume       = new_object->add_volume(std::move(triangle_mesh));
             new_volume->name              = namedSolids[i].name;
             new_volume->source.input_file = path;
             new_volume->source.object_idx = (int) model->objects.size() - 1;

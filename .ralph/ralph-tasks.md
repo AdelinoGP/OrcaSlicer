@@ -481,7 +481,7 @@ its header to understand the data contract.)
              archive structure and which SLA-specific data fields they write.
              Commit: `annotate: SL1/SLA format I/O (T4016)`
 
-- [ ] T4017  annotate: src/libslic3r/Format/DRC.cpp
+- [x] T4017  annotate: src/libslic3r/Format/DRC.cpp
                      + src/libslic3r/Format/DRC.hpp
                      + src/libslic3r/format.hpp
                      + src/libslic3r/Format/ModelIO.hpp

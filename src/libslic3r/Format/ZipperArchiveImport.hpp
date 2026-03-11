@@ -11,6 +11,8 @@
 
 namespace Slic3r {
 
+// [INTENT] In-memory copy of one non-INI archive member.
+// [MEMORY] `buf` owns the decompressed bytes; callers may move these buffers out but must not assume any mmap.
 // Buffer for arbitraryfiles inside a zipper archive.
 struct EntryBuffer
 {
@@ -18,6 +20,8 @@ struct EntryBuffer
     std::string          fname;
 };
 
+// [INTENT] Normalized archive view consumed by higher-level importers.
+// `profile` and `config` are parsed metadata trees; everything else lands in `entries` for format-specific handling.
 // Structure holding the data read from a zipper archive.
 struct ZipperArchive
 {
@@ -26,10 +30,11 @@ struct ZipperArchive
 };
 
 // Names of the files containing metadata inside the archive.
-const constexpr char *CONFIG_FNAME  = "config.ini";
-const constexpr char *PROFILE_FNAME = "prusaslicer.ini";
+const constexpr char* CONFIG_FNAME  = "config.ini";
+const constexpr char* PROFILE_FNAME = "prusaslicer.ini";
 
-// Read an archive that was written using the Zipper class.
+// [INTENT] Read an archive that was written using the `Zipper` helper.
+// [HAZARD] `includes` / `excludes` use substring matching on lowercased filenames, not glob or exact equality.
 // The includes parameter is a set of file name substrings that the entries
 // must contain to be included in ZipperArchive.
 // The excludes parameter may contain substrings that filenames must not
@@ -37,17 +42,18 @@ const constexpr char *PROFILE_FNAME = "prusaslicer.ini";
 // Every file in the archive is read into ZipperArchive::entries
 // except the files CONFIG_FNAME, and PROFILE_FNAME which are read into
 // ZipperArchive::config and ZipperArchive::profile structures.
-ZipperArchive read_zipper_archive(const std::string &zipfname,
-                                  const std::vector<std::string> &includes,
-                                  const std::vector<std::string> &excludes);
+ZipperArchive read_zipper_archive(const std::string&              zipfname,
+                                  const std::vector<std::string>& includes,
+                                  const std::vector<std::string>& excludes);
 
+// [INTENT] Recover the most usable `DynamicPrintConfig` from archive metadata, falling back to caller-supplied
+// defaults when older / damaged archives omit the full profile.
 // Extract the print profile form the archive into 'out'.
 // Returns a profile that has correct parameters to use for model reconstruction
 // even if the needed parameters were not fully found in the archive's metadata.
 // The inout argument shall be a usable fallback profile if the archive
 // has totally corrupted metadata.
-std::pair<DynamicPrintConfig, ConfigSubstitutions> extract_profile(
-    const ZipperArchive &arch, DynamicPrintConfig &inout);
+std::pair<DynamicPrintConfig, ConfigSubstitutions> extract_profile(const ZipperArchive& arch, DynamicPrintConfig& inout);
 
 } // namespace Slic3r
 
