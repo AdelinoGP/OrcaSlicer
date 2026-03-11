@@ -2,7 +2,7 @@
 Last updated: 2026-03-11T10:14:00Z
 
 ## Legend
-- [ ] PENDING   — not started
+- [x] PENDING   — not started
 - [/] ACTIVE    — in progress (only ONE task should be ACTIVE at a time)
 - [x] DONE      — complete and committed
 - [!] BLOCKED   — cannot proceed without resolution (add reason inline)
