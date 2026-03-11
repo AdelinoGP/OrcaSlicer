@@ -774,7 +774,7 @@ implements.)
               + src/libslic3r/Channel.hpp
              Commit: `annotate: src/libslic3r files (T4060c)`
 
-- [ ] T4060d  annotate: src/libslic3r/Clipper2Utils.hpp
+- [x] T4060d  annotate: src/libslic3r/Clipper2Utils.hpp
               + src/libslic3r/Clipper2ZUtils.hpp
               + src/libslic3r/clipper.cpp
               + src/libslic3r/clipper.hpp
