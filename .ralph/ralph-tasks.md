@@ -545,7 +545,7 @@ any task here — it is the public interface that contextualizes all of these.)
              feature slice.
              Commit: `annotate: Arachne spatial utils (T4022)`
 
-- [ ] T4023  annotate: src/libslic3r/Arachne/utils/linearAlg2D.hpp
+- [x] T4023  annotate: src/libslic3r/Arachne/utils/linearAlg2D.hpp
                      + src/libslic3r/Arachne/utils/PolygonsPointIndex.hpp
                      + src/libslic3r/Arachne/utils/PolygonsSegmentIndex.hpp
              Context: Remaining Arachne utility files not covered by T164–T184
