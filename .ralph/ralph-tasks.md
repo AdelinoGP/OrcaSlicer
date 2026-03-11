@@ -760,7 +760,7 @@ implements.)
               + src/dev-utils/StackWalker.h
              Commit: `annotate: src/dev-utils files (T4060a)`
 
-- [ ] T4060b  annotate: src/libslic3r/AnyPtr.hpp
+- [x] T4060b  annotate: src/libslic3r/AnyPtr.hpp
               + src/libslic3r/AppConfig.hpp
               + src/libslic3r/AStar.hpp
               + src/libslic3r/BlacklistedLibraryCheck.hpp

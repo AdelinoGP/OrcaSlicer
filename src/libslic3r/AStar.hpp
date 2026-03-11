@@ -8,6 +8,10 @@
 
 namespace Slic3r { namespace astar {
 
+// [INTENT] Generic A* implementation parameterized by a tracer object so path
+// search can be reused across geometry, travel planning, and grid-like domains.
+// [COUPLING] TracerTraits_ defines the adapter contract each domain must satisfy.
+
 // Borrowed from C++20
 template<class T> using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
@@ -21,21 +25,21 @@ template<class T> struct TracerTraits_
 
     // Call fn for every new node reachable from node 'src'. fn should have the
     // candidate node as its only argument.
-    template<class Fn> static void foreach_reachable(const T &tracer, const Node &src, Fn &&fn) { tracer.foreach_reachable(src, fn); }
+    template<class Fn> static void foreach_reachable(const T& tracer, const Node& src, Fn&& fn) { tracer.foreach_reachable(src, fn); }
 
     // Get the distance from node 'a' to node 'b'. This is sometimes referred
     // to as the g value of a node in AStar context.
-    static float distance(const T &tracer, const Node &a, const Node &b) { return tracer.distance(a, b); }
+    static float distance(const T& tracer, const Node& a, const Node& b) { return tracer.distance(a, b); }
 
     // Get the estimated distance heuristic from node 'n' to the destination.
     // This is referred to as the h value in AStar context.
     // If node 'n' is the goal, this function should return a negative value.
     // Note that this heuristic should be admissible (never bigger than the real
     // cost) in order for Astar to work.
-    static float goal_heuristic(const T &tracer, const Node &n) { return tracer.goal_heuristic(n); }
+    static float goal_heuristic(const T& tracer, const Node& n) { return tracer.goal_heuristic(n); }
 
     // Return a unique identifier (hash) for node 'n'.
-    static size_t unique_id(const T &tracer, const Node &n) { return tracer.unique_id(n); }
+    static size_t unique_id(const T& tracer, const Node& n) { return tracer.unique_id(n); }
 };
 
 // Helper definition to get the node type of a tracer
@@ -72,7 +76,7 @@ template<class Tracer> struct QNode // Queue node. Keeps track of scores g, and 
 // goal_heuristic() method should return a negative value if a node is a
 // destination node.
 template<class Tracer, class It, class NodeMap = std::unordered_map<size_t, QNode<Tracer>>>
-bool search_route(const Tracer &tracer, const TracerNodeT<Tracer> &source, It out, NodeMap &&cached_nodes = {})
+bool search_route(const Tracer& tracer, const TracerNodeT<Tracer>& source, It out, NodeMap&& cached_nodes = {})
 {
     using Node         = TracerNodeT<Tracer>;
     using QNode        = QNode<Tracer>;
@@ -80,11 +84,14 @@ bool search_route(const Tracer &tracer, const TracerNodeT<Tracer> &source, It ou
 
     struct LessPred
     { // Comparison functor needed by the priority queue
-        NodeMap &m;
+        NodeMap& m;
         bool     operator()(size_t node_a, size_t node_b) { return m[node_a].f() < m[node_b].f(); }
     };
 
-    auto qopen = make_mutable_priority_queue<size_t, true>([&cached_nodes](size_t el, size_t qidx) { cached_nodes[el].queue_id = qidx; }, LessPred{cached_nodes});
+    // [STATE] cached_nodes stores open+closed set, g/h scores, and parent chain.
+    // queue_id marks whether a node is open (in heap) or closed/unqueued.
+    auto qopen = make_mutable_priority_queue<size_t, true>([&cached_nodes](size_t el, size_t qidx) { cached_nodes[el].queue_id = qidx; },
+                                                           LessPred{cached_nodes});
 
     QNode  initial{source, /*parent = */ Unassigned, /*g = */ 0.f};
     size_t source_id        = TracerTraits::unique_id(tracer, source);
@@ -96,13 +103,14 @@ bool search_route(const Tracer &tracer, const TracerNodeT<Tracer> &source, It ou
     while (goal_id == Unassigned && !qopen.empty()) {
         size_t q_id = qopen.top();
         qopen.pop();
-        QNode &q = cached_nodes[q_id];
+        QNode& q = cached_nodes[q_id];
 
         // This should absolutely be initialized in the cache already
         assert(!std::isinf(q.g));
 
-        TracerTraits::foreach_reachable(tracer, q.node, [&](const Node &succ_nd) {
-            if (goal_id != Unassigned) return true;
+        TracerTraits::foreach_reachable(tracer, q.node, [&](const Node& succ_nd) {
+            if (goal_id != Unassigned)
+                return true;
 
             float  h       = TracerTraits::goal_heuristic(tracer, succ_nd);
             float  dst     = TracerTraits::distance(tracer, q.node, succ_nd);
@@ -114,9 +122,11 @@ bool search_route(const Tracer &tracer, const TracerNodeT<Tracer> &source, It ou
                 cached_nodes[succ_id] = qsucc_nd;
             } else {
                 // If succ_id is not in cache, it gets created with g = infinity
-                QNode &prev_nd = cached_nodes[succ_id];
+                QNode& prev_nd = cached_nodes[succ_id];
 
                 if (qsucc_nd.g < prev_nd.g) {
+                    // [INTENT] Standard A* relaxation step: improve route to successor
+                    // and reschedule in open set if needed.
                     // new route is better, apply it:
 
                     // Save the old queue id, it would be lost after the next line
@@ -139,7 +149,7 @@ bool search_route(const Tracer &tracer, const TracerNodeT<Tracer> &source, It ou
 
     // Write the output, do not reverse. Clients can do so if they need to.
     if (goal_id != Unassigned) {
-        const QNode *q = &cached_nodes[goal_id];
+        const QNode* q = &cached_nodes[goal_id];
         while (q->parent != Unassigned) {
             assert(!std::isinf(q->g)); // Uninitialized nodes are NOT allowed
 
@@ -149,6 +159,9 @@ bool search_route(const Tracer &tracer, const TracerNodeT<Tracer> &source, It ou
         }
     }
 
+    // [CONCURRENCY] Function is thread-safe if tracer is const-thread-safe and
+    // cached_nodes is not shared externally; all mutation is local to this call.
+    // [HAZARD] unique_id collisions break correctness silently by merging states.
     return goal_id != Unassigned;
 }
 

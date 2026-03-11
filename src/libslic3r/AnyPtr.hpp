@@ -7,6 +7,12 @@
 
 namespace Slic3r {
 
+// [INTENT] AnyPtr unifies APIs that may receive owning or non-owning pointers
+// without forcing immediate normalization to shared_ptr.
+// [COUPLING] This wrapper is used at module boundaries where callers have mixed
+// ownership models (raw, unique, shared, weak).
+// [HAZARD] Dereference operators intentionally skip null checks for performance
+// and legacy API parity, so misuse fails as UB in release builds.
 // A general purpose pointer holder that can hold any type of smart pointer
 // or raw pointer which can own or not own any object they point to.
 // In case a raw pointer is stored, it is not destructed so ownership is
@@ -16,16 +22,18 @@ namespace Slic3r {
 //
 // This is a movable only object due to the fact that it can possibly hold
 // a unique_ptr which a non-copy.
-template<class T>
-class AnyPtr {
+template<class T> class AnyPtr
+{
     enum { RawPtr, UPtr, ShPtr, WkPtr };
 
+    // [STATE] Variant discriminant encodes ownership semantics at runtime.
+    // [MEMORY] RawPtr is borrowing only; UPtr/ShPtr own; WkPtr is observing.
     boost::variant<T*, std::unique_ptr<T>, std::shared_ptr<T>, std::weak_ptr<T>> ptr;
 
-    template<class Self> static T *get_ptr(Self &&s)
+    template<class Self> static T* get_ptr(Self&& s)
     {
         switch (s.ptr.which()) {
-        case RawPtr: return boost::get<T *>(s.ptr);
+        case RawPtr: return boost::get<T*>(s.ptr);
         case UPtr: return boost::get<std::unique_ptr<T>>(s.ptr).get();
         case ShPtr: return boost::get<std::shared_ptr<T>>(s.ptr).get();
         case WkPtr: {
@@ -38,9 +46,7 @@ class AnyPtr {
     }
 
 public:
-    template<class TT = T, class = std::enable_if_t<std::is_convertible_v<TT, T>>>
-    AnyPtr(TT *p = nullptr) : ptr{p}
-    {}
+    template<class TT = T, class = std::enable_if_t<std::is_convertible_v<TT, T>>> AnyPtr(TT* p = nullptr) : ptr{p} {}
     template<class TT, class = std::enable_if_t<std::is_convertible_v<TT, T>>>
     AnyPtr(std::unique_ptr<TT> p) : ptr{std::unique_ptr<T>(std::move(p))}
     {}
@@ -53,37 +59,56 @@ public:
 
     ~AnyPtr() = default;
 
-    AnyPtr(AnyPtr &&other) noexcept : ptr{std::move(other.ptr)} {}
-    AnyPtr(const AnyPtr &other) = delete;
+    // [MEMORY] Copy is disabled because variant may hold unique_ptr.
+    AnyPtr(AnyPtr&& other) noexcept : ptr{std::move(other.ptr)} {}
+    AnyPtr(const AnyPtr& other) = delete;
 
-    AnyPtr &operator=(AnyPtr &&other) noexcept { ptr = std::move(other.ptr); return *this; }
-    AnyPtr &operator=(const AnyPtr &other) = delete;
+    AnyPtr& operator=(AnyPtr&& other) noexcept
+    {
+        ptr = std::move(other.ptr);
+        return *this;
+    }
+    AnyPtr& operator=(const AnyPtr& other) = delete;
 
-    template<class TT, class = std::enable_if_t<std::is_convertible_v<TT, T>>>
-    AnyPtr &operator=(TT *p) { ptr = p; return *this; }
+    template<class TT, class = std::enable_if_t<std::is_convertible_v<TT, T>>> AnyPtr& operator=(TT* p)
+    {
+        ptr = p;
+        return *this;
+    }
 
-    template<class TT, class = std::enable_if_t<std::is_convertible_v<TT, T>>>
-    AnyPtr &operator=(std::unique_ptr<TT> p) { ptr = std::move(p); return *this; }
+    template<class TT, class = std::enable_if_t<std::is_convertible_v<TT, T>>> AnyPtr& operator=(std::unique_ptr<TT> p)
+    {
+        ptr = std::move(p);
+        return *this;
+    }
 
-    template<class TT, class = std::enable_if_t<std::is_convertible_v<TT, T>>>
-    AnyPtr &operator=(std::shared_ptr<TT> p) { ptr = p; return *this; }
+    template<class TT, class = std::enable_if_t<std::is_convertible_v<TT, T>>> AnyPtr& operator=(std::shared_ptr<TT> p)
+    {
+        ptr = p;
+        return *this;
+    }
 
-    template<class TT, class = std::enable_if_t<std::is_convertible_v<TT, T>>>
-    AnyPtr &operator=(std::weak_ptr<TT> p) { ptr = std::move(p); return *this; }
+    template<class TT, class = std::enable_if_t<std::is_convertible_v<TT, T>>> AnyPtr& operator=(std::weak_ptr<TT> p)
+    {
+        ptr = std::move(p);
+        return *this;
+    }
 
-    const T &operator*() const { return *get_ptr(*this); }
-    T &operator*() { return *get_ptr(*this); }
+    const T& operator*() const { return *get_ptr(*this); }
+    T&       operator*() { return *get_ptr(*this); }
 
-    T *operator->() { return get_ptr(*this); }
-    const T *operator->() const { return get_ptr(*this); }
+    T*       operator->() { return get_ptr(*this); }
+    const T* operator->() const { return get_ptr(*this); }
 
-    T *get() { return get_ptr(*this); }
-    const T *get() const { return get_ptr(*this); }
+    T*       get() { return get_ptr(*this); }
+    const T* get() const { return get_ptr(*this); }
 
     operator bool() const
     {
+        // [STATE] Weak pointer liveness is sampled at call time via lock().
+        // Expired weak refs evaluate false and dereference to nullptr.
         switch (ptr.which()) {
-        case RawPtr: return bool(boost::get<T *>(ptr));
+        case RawPtr: return bool(boost::get<T*>(ptr));
         case UPtr: return bool(boost::get<std::unique_ptr<T>>(ptr));
         case ShPtr: return bool(boost::get<std::shared_ptr<T>>(ptr));
         case WkPtr: {
@@ -104,8 +129,7 @@ public:
         switch (ptr.which()) {
         case ShPtr: ret = boost::get<std::shared_ptr<T>>(ptr); break;
         case WkPtr: ret = boost::get<std::weak_ptr<T>>(ptr).lock(); break;
-        default:
-            ;
+        default:;
         }
 
         return ret;
@@ -114,15 +138,14 @@ public:
     // If the underlying pointer is unique, convert to shared pointer
     void convert_unique_to_shared()
     {
+        // [MEMORY] Ownership promotion is one-way: unique_ptr payload moves into
+        // shared_ptr control block; previous unique ownership is consumed.
         if (ptr.which() == UPtr)
             ptr = std::shared_ptr<T>{std::move(boost::get<std::unique_ptr<T>>(ptr))};
     }
 
     // Returns true if the data is owned by this AnyPtr instance
-    bool is_owned() const noexcept
-    {
-        return ptr.which() == UPtr || ptr.which() == ShPtr;
-    }
+    bool is_owned() const noexcept { return ptr.which() == UPtr || ptr.which() == ShPtr; }
 };
 
 } // namespace Slic3r
