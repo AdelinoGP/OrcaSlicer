@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer Analysis Agent
-Last updated: 2026-03-11T09:25:00Z
+Last updated: 2026-03-11T10:14:00Z
 
 ## Legend
 - [ ] PENDING   — not started
@@ -726,7 +726,7 @@ implements.)
              mesh/raycast structures to GUI tooling.
              Commit: `annotate: slic3r/Utils model geometry helpers (T4055)`
 
-- [ ] T4056  annotate: src/slic3r/Utils/InstanceID.cpp
+- [x] T4056  annotate: src/slic3r/Utils/InstanceID.cpp
              + src/slic3r/Utils/UndoRedo.cpp
              + src/slic3r/Utils/UndoRedo.hpp
              Context: Undo/config identity plumbing. These files couple the GUI

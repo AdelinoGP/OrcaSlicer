@@ -31,6 +31,8 @@ constexpr const char* LEGACY_KEY = "iid";
 
 std::mutex& cache_mutex()
 {
+    // [CONCURRENCY] The module keeps one process-global machine id cache; all callers serialize access here because
+    // updater, cloud, and telemetry code may request the id from different threads.
     static std::mutex mtx;
     return mtx;
 }
@@ -43,12 +45,16 @@ std::string& cached_iid()
 
 bool& cache_ready()
 {
+    // [STATE] This flag separates "not loaded yet" from a legitimate cached value so `ensure()` only performs the
+    // config / filesystem lookup once per process lifetime.
     static bool ready = false;
     return ready;
 }
 
 std::optional<std::string> normalize_uuid(std::string value)
 {
+    // [INTENT] Normalize persisted ids to one canonical lowercase UUID form so every storage backend converges on the
+    // same token and malformed legacy values are rejected before they leak back into runtime state.
     boost::algorithm::trim(value);
     boost::algorithm::to_lower(value);
     if (value.size() != 36)
@@ -59,6 +65,8 @@ std::optional<std::string> normalize_uuid(std::string value)
             return std::nullopt;
         return value;
     } catch (...) {
+        // [HAZARD] Validation depends on Boost UUID parsing throwing on bad input; a port must preserve the same
+        // "ignore invalid persisted id and regenerate" fallback even if its parser reports errors differently.
         return std::nullopt;
     }
 }
@@ -81,6 +89,8 @@ std::optional<std::string> read_config_value(AppConfig& config)
 
 void write_config_value(AppConfig& config, const std::string& value)
 {
+    // [COUPLING] Migration stays coupled to both `updater_iid` and the legacy `iid` key because older updater builds
+    // still read the old name; ports need to keep both until every consumer is migrated.
     config.set(CONFIG_KEY, value);
     if (config.get(LEGACY_KEY) != value)
         config.set(LEGACY_KEY, value);
@@ -96,6 +106,8 @@ void prune_config_value(AppConfig& config)
 
 boost::filesystem::path storage_path()
 {
+    // [COUPLING] Machine-id persistence is rooted in OrcaSlicer's `data_dir()` policy, so this helper inherits the
+    // application's platform-specific roaming-data location instead of using a standalone secure store.
     const std::string& base_dir = Slic3r::data_dir();
     if (base_dir.empty())
         return {};
@@ -136,6 +148,8 @@ bool write_storage_file(const std::string& value)
     if (ec)
         return false;
 
+    // [HAZARD] Persistence is a truncate-and-rewrite file update with no atomic rename, so a crash can briefly drop the
+    // machine id and force regeneration on the next startup.
     boost::nowide::ofstream file(path.string(), std::ios::trunc);
     if (!file)
         return false;
@@ -167,12 +181,16 @@ std::string generate_uuid()
 std::string ensure(AppConfig& config)
 {
     std::lock_guard<std::mutex> lock(cache_mutex());
+    // [STATE] `ensure()` is the only mutating entrypoint: it lazily resolves the id from secure storage or AppConfig,
+    // repairs legacy config state, and memoizes the answer for the rest of the process.
     if (cache_ready())
         return cached_iid();
 
     if (auto secure = read_secure()) {
         cached_iid() = *secure;
         cache_ready() = true;
+        // [INTENT] The dedicated storage file wins over config values so every subsystem converges on one stable id even
+        // when the config still contains an outdated copy from earlier releases.
         prune_config_value(config);
         return cached_iid();
     }

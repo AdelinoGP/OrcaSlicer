@@ -27,6 +27,8 @@ namespace GUI {
 namespace UndoRedo {
 
 enum class SnapshotType : unsigned char {
+	// [INTENT] Snapshot kinds distinguish user-visible project mutations from transient UI navigation so undo/redo and
+	// dirty-state checks can skip selection-only churn while keeping gizmo substack boundaries intact.
 	// Some action modifying project state, outside any EnteringGizmo / LeavingGizmo interval.
 	Action,
 	// Some action modifying project state, inside some EnteringGizmo / LeavingGizmo interval.
@@ -52,6 +54,8 @@ enum class SnapshotType : unsigned char {
 // which may be handy sometimes.
 struct SnapshotData
 {
+	// [STATE] These flags mirror lightweight UI/runtime state outside the serialized model tree so callers can inspect
+	// or restore sidebar / layer-editing context without inflating every snapshot payload.
 	SnapshotType        snapshot_type;
 	PrinterTechnology 	printer_technology { ptUnknown };
 	// Bitmap of Flags (see the Flags enum).
@@ -78,6 +82,8 @@ struct Snapshot
 	size_t 				timestamp;
 	size_t 				model_id;
 	SnapshotData  		snapshot_data;
+	// [COUPLING] `model_id` is an UndoRedo history key, not a standalone model identifier; interpreting a snapshot record
+	// requires the side tables maintained by `StackImpl` in `UndoRedo.cpp`.
 
 	bool		operator< (const Snapshot &rhs) const { return this->timestamp < rhs.timestamp; }
 	bool		operator==(const Snapshot &rhs) const { return this->timestamp == rhs.timestamp; }
@@ -104,6 +110,8 @@ inline bool snapshot_modifies_project(const Snapshot &snapshot)
 
 // Excerpt of Slic3r::GUI::Selection for serialization onto the Undo / Redo stack.
 struct Selection : public Slic3r::ObjectBase {
+	// [COUPLING] Selection is persisted as `(geometry_id, instance_id)` pairs instead of GUI pointers, so restoration is
+	// tightly coupled to ModelVolume identity stability and the scene rebuild that follows deserialization.
 	void clear() { mode = 0; volumes_and_instances.clear(); }
 	unsigned char							mode = 0;
 	std::vector<std::pair<size_t, size_t>>	volumes_and_instances;
@@ -115,6 +123,8 @@ class StackImpl;
 class Stack
 {
 public:
+	// [INTENT] `Stack` is a facade over a binary snapshot journal of model, selection, gizmo, and plate state while the
+	// pimpl hides the object-history deduplication machinery needed to make those snapshots affordable.
 	// Stack needs to be initialized. An empty stack is not valid, there must be a "New Project" status stored at the beginning.
 	// The first "New Project" snapshot shall not be removed.
 	Stack();
@@ -150,6 +160,8 @@ public:
 
 	// Roll back the time. If time_to_load is SIZE_MAX, the previous snapshot is activated.
 	// Undoing an action may need to take a snapshot of the current application state, so that redo to the current state is possible.
+	// [STATE] Undo mutates the passed model, gizmo manager, and plate list in place; the stack owns historical bytes, but
+	// callers own the live objects and must refresh any derived GUI after restoration.
     bool undo(Slic3r::Model& model, const Slic3r::GUI::Selection& selection, Slic3r::GUI::GLGizmosManager& gizmos, Slic3r::GUI::PartPlateList& plate_list, const SnapshotData &snapshot_data, size_t time_to_load = SIZE_MAX);
 
 	// Jump forward in time. If time_to_load is SIZE_MAX, the next snapshot is activated.
@@ -184,6 +196,8 @@ public:
 
 private:
 	friend class StackImpl;
+	// [MEMORY] The heavy archive state lives entirely behind the pimpl because `StackImpl` depends on cereal, model
+	// internals, and GUI types; destroying `Stack` releases the whole in-memory history in one step.
 	std::unique_ptr<StackImpl> 	pimpl;
 };
 
