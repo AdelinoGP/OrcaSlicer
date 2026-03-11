@@ -753,7 +753,7 @@ implements.)
 
 ### Remaining Unregistered Files — All Other Directories
 
-- [ ] T4060a  annotate: src/dev-utils/BaseException.cpp
+- [x] T4060a  annotate: src/dev-utils/BaseException.cpp
               + src/dev-utils/BaseException.h
               + src/dev-utils/OrcaSlicer_profile_validator.cpp
               + src/dev-utils/StackWalker.cpp
