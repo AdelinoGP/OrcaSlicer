@@ -1,6 +1,16 @@
-//Copyright (c) 2016 Scott Lenser
-//Copyright (c) 2018 Ultimaker B.V.
-//CuraEngine is released under the terms of the AGPLv3 or higher.
+// Copyright (c) 2016 Scott Lenser
+// Copyright (c) 2018 Ultimaker B.V.
+// CuraEngine is released under the terms of the AGPLv3 or higher.
+
+// [INTENT] SparseGrid is the shared spatial indexing primitive for Arachne utilities. It maps
+// occupied square cells to stored elements so callers can turn geometric proximity queries into a
+// small set of bucket scans instead of repeated all-to-all distance tests.
+// [MEMORY] Elements are copied into an `unordered_multimap` keyed by grid cell. Multi-cell objects
+// therefore appear multiple times by design; callers trade memory duplication for faster lookup.
+// [COUPLING] The class inherits traversal math from SquareGrid and is specialized by
+// SparsePointGrid / SparseLineGrid for the actual insertion policy.
+// [HAZARD] `getNearby()` may return false positives from neighboring cells outside the exact query
+// radius. Every caller that needs exact geometry must still do a final distance check.
 
 #ifndef UTILS_SPARSE_GRID_H
 #define UTILS_SPARSE_GRID_H
@@ -15,7 +25,7 @@
 namespace Slic3r::Arachne {
 
 /*! \brief Sparse grid which can locate spatially nearby elements efficiently.
- * 
+ *
  * \note This is an abstract template class which doesn't have any functions to insert elements.
  * \see SparsePointGrid
  *
@@ -28,7 +38,7 @@ public:
 
     using GridPoint    = SquareGrid::GridPoint;
     using grid_coord_t = SquareGrid::grid_coord_t;
-    using GridMap       = std::unordered_multimap<GridPoint, Elem, PointHash>;
+    using GridMap      = std::unordered_multimap<GridPoint, Elem, PointHash>;
 
     using iterator       = typename GridMap::iterator;
     using const_iterator = typename GridMap::const_iterator;
@@ -40,10 +50,10 @@ public:
      * \param[in] elem_reserve Number of elements to research space for.
      * \param[in] max_load_factor Maximum average load factor before rehashing.
      */
-    SparseGrid(coord_t cell_size, size_t elem_reserve=0U, float max_load_factor=1.0f);
+    SparseGrid(coord_t cell_size, size_t elem_reserve = 0U, float max_load_factor = 1.0f);
 
-    iterator begin() { return m_grid.begin(); }
-    iterator end() { return m_grid.end(); }
+    iterator       begin() { return m_grid.begin(); }
+    iterator       end() { return m_grid.end(); }
     const_iterator begin() const { return m_grid.begin(); }
     const_iterator end() const { return m_grid.end(); }
 
@@ -62,7 +72,7 @@ public:
      * \param[in] radius The search radius.
      * \return Vector of elements found
      */
-    std::vector<Elem> getNearby(const Point &query_pt, coord_t radius) const;
+    std::vector<Elem> getNearby(const Point& query_pt, coord_t radius) const;
 
     /*! \brief Process elements from cells that might contain sought after points.
      *
@@ -77,7 +87,7 @@ public:
      *    called for each element in the cell. Processing stops if function returns false.
      * \return Whether we need to continue processing after this function
      */
-    bool processNearby(const Point &query_pt, coord_t radius, const std::function<bool(const ElemT &)> &process_func) const;
+    bool processNearby(const Point& query_pt, coord_t radius, const std::function<bool(const ElemT&)>& process_func) const;
 
 protected:
     /*! \brief Process elements from the cell indicated by \p grid_pt.
@@ -87,7 +97,7 @@ protected:
      *    called for each element in the cell. Processing stops if function returns false.
      * \return Whether we need to continue processing a next cell.
      */
-    bool processFromCell(const GridPoint &grid_pt, const std::function<bool(const Elem &)> &process_func) const;
+    bool processFromCell(const GridPoint& grid_pt, const std::function<bool(const Elem&)>& process_func) const;
 
     /*! \brief Map from grid locations (GridPoint) to elements (Elem). */
     GridMap m_grid;
@@ -95,13 +105,17 @@ protected:
 
 template<class ElemT> SparseGrid<ElemT>::SparseGrid(coord_t cell_size, size_t elem_reserve, float max_load_factor) : SquareGrid(cell_size)
 {
+    // [MEMORY] Load factor and reserve are configured up front because these grids are typically
+    // built once per algorithm pass and then queried heavily; avoiding rehashing keeps pointer and
+    // bucket iteration costs predictable.
     // Must be before the reserve call.
     m_grid.max_load_factor(max_load_factor);
     if (elem_reserve != 0U)
         m_grid.reserve(elem_reserve);
 }
 
-template<class ElemT> bool SparseGrid<ElemT>::processFromCell(const GridPoint &grid_pt, const std::function<bool(const Elem &)> &process_func) const
+template<class ElemT>
+bool SparseGrid<ElemT>::processFromCell(const GridPoint& grid_pt, const std::function<bool(const Elem&)>& process_func) const
 {
     auto grid_range = m_grid.equal_range(grid_pt);
     for (auto iter = grid_range.first; iter != grid_range.second; ++iter)
@@ -111,15 +125,19 @@ template<class ElemT> bool SparseGrid<ElemT>::processFromCell(const GridPoint &g
 }
 
 template<class ElemT>
-bool SparseGrid<ElemT>::processNearby(const Point &query_pt, coord_t radius, const std::function<bool(const Elem &)> &process_func) const
+bool SparseGrid<ElemT>::processNearby(const Point& query_pt, coord_t radius, const std::function<bool(const Elem&)>& process_func) const
 {
-    return SquareGrid::processNearby(query_pt, radius, [&process_func, this](const GridPoint &grid_pt) { return processFromCell(grid_pt, process_func); });
+    // [COUPLING] SquareGrid decides which cells intersect the search square; SparseGrid only adds
+    // the second stage that iterates the elements stored inside each selected cell.
+    return SquareGrid::processNearby(query_pt, radius,
+                                     [&process_func, this](const GridPoint& grid_pt) { return processFromCell(grid_pt, process_func); });
 }
 
-template<class ElemT> std::vector<typename SparseGrid<ElemT>::Elem> SparseGrid<ElemT>::getNearby(const Point &query_pt, coord_t radius) const
+template<class ElemT>
+std::vector<typename SparseGrid<ElemT>::Elem> SparseGrid<ElemT>::getNearby(const Point& query_pt, coord_t radius) const
 {
-    std::vector<Elem>                       ret;
-    const std::function<bool(const Elem &)> process_func = [&ret](const Elem &elem) {
+    std::vector<Elem>                      ret;
+    const std::function<bool(const Elem&)> process_func = [&ret](const Elem& elem) {
         ret.push_back(elem);
         return true;
     };

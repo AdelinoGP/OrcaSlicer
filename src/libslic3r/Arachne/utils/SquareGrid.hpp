@@ -1,5 +1,14 @@
-//Copyright (c) 2021 Ultimaker B.V.
-//CuraEngine is released under the terms of the AGPLv3 or higher.
+// Copyright (c) 2021 Ultimaker B.V.
+// CuraEngine is released under the terms of the AGPLv3 or higher.
+
+// [INTENT] SquareGrid centralizes the integer grid math used by Arachne's sparse indices. It does
+// not store geometry itself; it only converts world coordinates into bucket coordinates and walks
+// the set of cells touched by a search box or segment.
+// [COUPLING] SparseGrid, SparsePointGrid, and SparseLineGrid all assume the same coordinate mapping
+// and line-cell traversal semantics defined here.
+// [HAZARD] The grid uses integer truncation instead of mathematical floor for negative values,
+// making the zero cell effectively twice as wide. The callers tolerate this for speed, but a port
+// that "fixes" the mapping can change bucket occupancy and thereby alter stitching decisions.
 
 #ifndef UTILS_SQUARE_GRID_H
 #define UTILS_SQUARE_GRID_H
@@ -38,7 +47,7 @@ public:
      */
     coord_t getCellSize() const;
 
-    using GridPoint = Point;
+    using GridPoint    = Point;
     using grid_coord_t = coord_t;
 
     /*! \brief Process cells along a line indicated by \p line.
@@ -48,7 +57,7 @@ public:
      * for each cell. Processing stops if function returns false.
      * \return Whether we need to continue processing after this function.
      */
-    bool processLineCells(const std::pair<Point, Point> line, const std::function<bool (GridPoint)>& process_cell_func);
+    bool processLineCells(const std::pair<Point, Point> line, const std::function<bool(GridPoint)>& process_cell_func);
 
     /*! \brief Process cells along a line indicated by \p line.
      *
@@ -57,7 +66,7 @@ public:
      * for each cell. Processing stops if function returns false.
      * \return Whether we need to continue processing after this function.
      */
-    bool processLineCells(const std::pair<Point, Point> line, const std::function<bool (GridPoint)>& process_cell_func) const;
+    bool processLineCells(const std::pair<Point, Point> line, const std::function<bool(GridPoint)>& process_cell_func) const;
 
     /*! \brief Process cells that might contain sought after points.
      *
@@ -71,19 +80,19 @@ public:
      * ``false``.
      * \return Whether we need to continue processing after this function.
      */
-    bool processNearby(const Point &query_pt, coord_t radius, const std::function<bool(const GridPoint &)> &process_func) const;
+    bool processNearby(const Point& query_pt, coord_t radius, const std::function<bool(const GridPoint&)>& process_func) const;
 
     /*! \brief Compute the grid coordinates of a point.
      * \param point The actual location.
      * \return The grid coordinates that correspond to \p point.
      */
-    GridPoint toGridPoint(const Vec2i64 &point) const;
+    GridPoint toGridPoint(const Vec2i64& point) const;
 
     /*! \brief Compute the grid coordinate of a real space coordinate.
      * \param coord The actual location.
      * \return The grid coordinate that corresponds to \p coord.
      */
-    grid_coord_t toGridCoord(const int64_t &coord) const;
+    grid_coord_t toGridCoord(const int64_t& coord) const;
 
     /*! \brief Compute the lowest coord in a grid cell.
      * The lowest point is the point in the grid cell closest to the origin.
@@ -91,10 +100,12 @@ public:
      * \param grid_coord The grid coordinate.
      * \return The print space coordinate that corresponds to \p grid_coord.
      */
-    coord_t toLowerCoord(const grid_coord_t &grid_coord) const;
+    coord_t toLowerCoord(const grid_coord_t& grid_coord) const;
 
 protected:
     /*! \brief The cell (square) size. */
+    // [STATE] Immutable spatial resolution for this helper. Every lookup approximation quality and
+    // bucket count depends on this one value chosen by higher-level Arachne code.
     coord_t cell_size;
 
     /*!
@@ -110,4 +121,4 @@ protected:
 
 } // namespace Slic3r::Arachne
 
-#endif //UTILS_SQUARE_GRID_H
+#endif // UTILS_SQUARE_GRID_H

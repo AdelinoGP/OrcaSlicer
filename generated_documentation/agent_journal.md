@@ -1,9 +1,9 @@
 # Agent Journal — OrcaSlicer Codebase Analysis
 
 ## CURRENT STATUS
-Last session: 94
-Active task: T4021 — complete
-Next action: Begin T4022 by annotating the Arachne spatial utility files.
+Last session: 95
+Active task: T4022 — complete
+Next action: Begin T4023 by annotating the remaining Arachne math and polygon index helpers.
 Unresolved [UNCLEAR] tags: 12 — all remaining source tags are marked `[UNCLEAR → ESCALATED]` after Session 86 T300 triage
 Files remaining (Phase 1): 287 files outside explicit skip buckets still need human coverage audit
 Files completed (Phase 1): 314 unique source files tracked by 314 annotate task entries
@@ -597,3 +597,27 @@ Total escalated tags: **12**
   - `src/libslic3r/Arachne/SkeletalTrapezoidation.cpp`
 
 **Completed tasks this session:** T4021
+
+---
+
+## Session 95
+
+**Active task:** T4022 — annotate `src/libslic3r/Arachne/utils/PolylineStitcher.cpp` + `src/libslic3r/Arachne/utils/PolylineStitcher.hpp` + `src/libslic3r/Arachne/utils/SparseGrid.hpp` + `src/libslic3r/Arachne/utils/SparseLineGrid.hpp` + `src/libslic3r/Arachne/utils/SparsePointGrid.hpp` + `src/libslic3r/Arachne/utils/SquareGrid.cpp` + `src/libslic3r/Arachne/utils/SquareGrid.hpp`
+
+- Files processed: `src/libslic3r/Arachne/utils/PolylineStitcher.cpp`, `src/libslic3r/Arachne/utils/PolylineStitcher.hpp`, `src/libslic3r/Arachne/utils/SparseGrid.hpp`, `src/libslic3r/Arachne/utils/SparseLineGrid.hpp`, `src/libslic3r/Arachne/utils/SparsePointGrid.hpp`, `src/libslic3r/Arachne/utils/SquareGrid.cpp`, `src/libslic3r/Arachne/utils/SquareGrid.hpp`, `generated_documentation/agent_journal.md`, `.ralph/ralph-tasks.md`
+- Key discoveries:
+  - `PolylineStitcher` is the policy-driven endpoint merge pass that turns fragmented Arachne wall outputs into either continuous open lines or closed contours, with odd/even wall parity deciding what may reverse or connect.
+  - The sparse grid stack is deliberately approximate: `SquareGrid` enumerates a square search region and a "fat" line raster, while `SparseGrid` callers still perform exact distance checks on returned candidates.
+  - The negative-coordinate truncation behavior in `SquareGrid::toGridCoord()` is intentional and part of the algorithm's lookup behavior, not a bug to silently normalize away in a port.
+- Decisions made:
+  - Focused comments on stitching policy, spatial approximation, and orientation hazards because those contracts are not obvious from the templated utility code itself.
+  - Kept the annotations inside the existing helpers instead of adding new docs because T4022 is strictly an inline source-annotation task.
+- Open questions:
+  - None newly introduced; existing `[UNCLEAR -> ESCALATED]` items remain unchanged.
+- Cross-references:
+  - `src/libslic3r/Arachne/WallToolPaths.cpp`
+  - `src/libslic3r/Arachne/utils/ExtrusionLine.hpp`
+  - `src/libslic3r/Arachne/utils/PolygonsPointIndex.hpp`
+  - `src/libslic3r/Arachne/SkeletalTrapezoidation.cpp`
+
+**Completed tasks this session:** T4022

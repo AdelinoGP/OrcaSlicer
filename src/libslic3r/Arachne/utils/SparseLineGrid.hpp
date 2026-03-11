@@ -1,6 +1,13 @@
-//Copyright (c) 2018 Ultimaker B.V.
-//CuraEngine is released under the terms of the AGPLv3 or higher.
+// Copyright (c) 2018 Ultimaker B.V.
+// CuraEngine is released under the terms of the AGPLv3 or higher.
 
+// [INTENT] SparseLineGrid indexes segments by every grid cell touched by the segment's rasterized
+// footprint. This lets Arachne ask "which wall fragments could intersect this area?" without
+// rebuilding a heavier tree structure.
+// [MEMORY] A single element is inserted into many buckets when it spans many cells, so memory cost
+// grows with line length rather than element count alone.
+// [HAZARD] The line-to-cell traversal intentionally marks a slightly fat path (see SquareGrid.cpp),
+// which improves robustness but means query results are approximate and may contain extra segments.
 
 #ifndef UTILS_SPARSE_LINE_GRID_H
 #define UTILS_SPARSE_LINE_GRID_H
@@ -38,7 +45,7 @@ public:
      *
      * \param[in] elem The element to be inserted.
      */
-    void insert(const Elem &elem);
+    void insert(const Elem& elem);
 
 protected:
     using GridPoint = typename SparseGrid<ElemT>::GridPoint;
@@ -49,22 +56,28 @@ protected:
 
 template<class ElemT, class Locator>
 SparseLineGrid<ElemT, Locator>::SparseLineGrid(coord_t cell_size, size_t elem_reserve, float max_load_factor)
-    : SparseGrid<ElemT>(cell_size, elem_reserve, max_load_factor) {}
+    : SparseGrid<ElemT>(cell_size, elem_reserve, max_load_factor)
+{}
 
-template<class ElemT, class Locator> void SparseLineGrid<ElemT, Locator>::insert(const Elem &elem)
+template<class ElemT, class Locator> void SparseLineGrid<ElemT, Locator>::insert(const Elem& elem)
 {
     const std::pair<Point, Point> line = m_locator(elem);
     using GridMap                      = std::unordered_multimap<GridPoint, Elem, PointHash>;
+    // [HAZARD] This lambda+bind indirection exists only to access the protected parent hash map.
+    // A port can replace it with a direct helper, but it must preserve the rule that every crossed
+    // cell receives the same element copy.
     // below is a workaround for the fact that lambda functions cannot access private or protected members
     // first we define a lambda which works on any GridMap and then we bind it to the actual protected GridMap of the parent class
-    std::function<bool(GridMap *, const GridPoint)> process_cell_func_ = [&elem](GridMap *m_grid, const GridPoint grid_loc) {
+    std::function<bool(GridMap*, const GridPoint)> process_cell_func_ = [&elem](GridMap* m_grid, const GridPoint grid_loc) {
         m_grid->emplace(grid_loc, elem);
         return true;
     };
     using namespace std::placeholders; // for _1, _2, _3...
-    GridMap                             *m_grid = &(this->m_grid);
+    GridMap*                             m_grid = &(this->m_grid);
     std::function<bool(const GridPoint)> process_cell_func(std::bind(process_cell_func_, m_grid, _1));
 
+    // [COUPLING] `processLineCells()` comes from SquareGrid and encapsulates the row-by-row raster
+    // walk that decides which discrete cells the segment occupies.
     SparseGrid<ElemT>::processLineCells(line, process_cell_func);
 }
 

@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer Analysis Agent
-Last updated: 2026-03-10T01:42:00Z
+Last updated: 2026-03-11T00:30:03Z
 
 ## Legend
 - [ ] PENDING   — not started
@@ -532,7 +532,7 @@ any task here — it is the public interface that contextualizes all of these.)
              — it inherits or wraps these.
              Commit: `annotate: Arachne half-edge graph types (T4021)`
 
-- [ ] T4022  annotate: src/libslic3r/Arachne/utils/PolylineStitcher.cpp
+- [x] T4022  annotate: src/libslic3r/Arachne/utils/PolylineStitcher.cpp
                      + src/libslic3r/Arachne/utils/PolylineStitcher.hpp
                      + src/libslic3r/Arachne/utils/SparseGrid.hpp
                      + src/libslic3r/Arachne/utils/SparseLineGrid.hpp

@@ -2,6 +2,10 @@
 // Copyright (c) 2020 Ultimaker B.V.
 // CuraEngine is released under the terms of the AGPLv3 or higher.
 
+// [INTENT] SparsePointGrid is the simplest SparseGrid specialization: it drops each element into
+// exactly one bucket derived from a single representative point. PolylineStitcher uses it to index
+// endpoints, where point membership is exact and cheap.
+
 #ifndef UTILS_SPARSE_POINT_GRID_H
 #define UTILS_SPARSE_POINT_GRID_H
 
@@ -37,7 +41,7 @@ public:
      *
      * \param[in] elem The element to be inserted.
      */
-    void insert(const Elem &elem);
+    void insert(const Elem& elem);
 
 protected:
     using GridPoint = typename SparseGrid<ElemT>::GridPoint;
@@ -47,14 +51,17 @@ protected:
 };
 
 template<class ElemT, class Locator>
-SparsePointGrid<ElemT, Locator>::SparsePointGrid(coord_t cell_size, size_t elem_reserve, float max_load_factor) : SparseGrid<ElemT>(cell_size, elem_reserve, max_load_factor) {}
+SparsePointGrid<ElemT, Locator>::SparsePointGrid(coord_t cell_size, size_t elem_reserve, float max_load_factor)
+    : SparseGrid<ElemT>(cell_size, elem_reserve, max_load_factor)
+{}
 
-template<class ElemT, class Locator>
-void SparsePointGrid<ElemT, Locator>::insert(const Elem &elem)
+template<class ElemT, class Locator> void SparsePointGrid<ElemT, Locator>::insert(const Elem& elem)
 {
     Point     loc      = m_locator(elem);
     GridPoint grid_loc = SparseGrid<ElemT>::toGridPoint(loc.template cast<int64_t>());
 
+    // [STATE] Point elements occupy one canonical cell only, so nearby searches rely on querying a
+    // square of neighboring cells rather than duplicating each point into overlap buckets.
     SparseGrid<ElemT>::m_grid.emplace(grid_loc, elem);
 }
 
