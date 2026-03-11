@@ -35,8 +35,14 @@
 //          types defined only in the dead block.  This means the types exist in the binary but
 //          the algorithm that produces them is never called.
 //
-// [UNCLEAR → ESCALATED] This file currently compiles only the malformation estimators, and local code does not show whether the larger block-commented support-point logic was intentionally disabled.
-//           or an accidental check-in.  No TODO, FIXME, or issue reference accompanies the comment.
+// [UNCLEAR → RESOLVED] The block-commented support-point algorithm was intentionally disabled.
+//   Evidence: (1) no caller of full_search() or gather_issues() exists anywhere in the codebase
+//   (confirmed by grep — the declarations in the header are unreferenced); (2) OrcaSlicer uses
+//   its own support generation pipeline (SupportCommon.cpp, TreeSupport3D.cpp) instead of
+//   PrusaSlicer's torque-analysis approach; (3) the code was preserved as a block comment rather
+//   than deleted, indicating a deliberate keep-for-reference decision rather than an accident;
+//   (4) SupportSpotsGenerator.hpp already marks full_search and gather_issues as "[DISABLED]".
+//   The malformation estimators (the only live code) remain active for curl-height visualization.
 
 #include "SupportSpotsGenerator.hpp"
 
