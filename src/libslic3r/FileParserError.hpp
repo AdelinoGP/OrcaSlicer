@@ -10,6 +10,7 @@
 namespace Slic3r {
 
 // Generic file parser error, mostly copied from boost::property_tree::file_parser_error
+// [COUPLING] Shared exception surface between parser modules and upper-level config/model loaders.
 class file_parser_error: public Slic3r::RuntimeError
 {
 public:
@@ -23,6 +24,7 @@ public:
     // generated dtor
     ~file_parser_error() throw() {}
 
+    // [INTENT] Exposes raw fields so callers can present localized errors without reparsing what().
     // Get error message (without line and file - use what() to get full message)
     std::string message() const { return m_message; }
     // Get error filename
@@ -35,6 +37,7 @@ private:
     std::string     m_filename;
     unsigned long   m_line;
 
+    // [HAZARD] String format is consumed by existing logs/tests; keep compatibility when porting.
     // Format error message to be returned by Slic3r::RuntimeError::what()
     static std::string format_what(const std::string &msg, const std::string &file, unsigned long l)
     {

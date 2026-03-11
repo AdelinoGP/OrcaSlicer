@@ -8,6 +8,7 @@
 
 namespace FlushPredict
 {
+    // [INTENT] Compact RGB payload used for lookup and distance-based flush estimation.
     struct RGBColor
     {
         unsigned char r{ 0 };
@@ -17,6 +18,7 @@ namespace FlushPredict
         RGBColor() = default;
     };
 
+    // [INTENT] Perceptual LAB color representation used by DeltaE-based similarity checks.
     struct LABColor
     {
         double l{ 0 };
@@ -42,9 +44,12 @@ class GenericFlushPredictor
     using RGB = FlushPredict::RGBColor;
 public:
     explicit GenericFlushPredictor(const int dataset_value);
+    // [COUPLING] Thin API wrapper consumed by FlushVolCalculator and toolchange planning logic.
     bool predict(const RGB& from, const RGB& to, float& flush);
     int get_min_flush_volume();
 private:
+    // [MEMORY] Raw pointer ownership is defined in the .cpp; translators should make lifetime explicit.
+    // [HAZARD] Porting to managed runtimes must preserve deterministic teardown of predictor resources.
     FlushVolPredictor* predictor{ nullptr };
 };
 

@@ -12,6 +12,7 @@ namespace Slic3r
 {
     namespace FilamentGroupUtils
     {
+        // [INTENT] Keep filament identity deterministic for AMS grouping and conflict resolution.
         struct Color
         {
             unsigned char r = 0;
@@ -27,12 +28,14 @@ namespace Slic3r
         };
 
 
+        // [STATE] Normalized per-filament properties extracted from DynamicPrintConfig.
         struct FilamentInfo {
             Color color;
             std::string type;
             bool is_support;
         };
 
+        // [COUPLING] Extends logical filament data with machine routing details.
         struct MachineFilamentInfo: public FilamentInfo {
             int extruder_id;
             bool is_extended;
@@ -40,6 +43,7 @@ namespace Slic3r
         };
 
 
+        // [HAZARD] Callers must catch this and convert planner errors into user-facing validation messages.
         class FilamentGroupException: public std::exception {
         public:
             enum ErrorCode {
@@ -65,6 +69,7 @@ namespace Slic3r
             }
         };
 
+        // [INTENT] Computes AMS capacity limits used as hard bounds by grouping search.
         std::vector<int> calc_max_group_size(const std::vector<std::map<int, int>>& ams_counts,bool ignore_ext_filament);
 
         std::vector<std::vector<MachineFilamentInfo>> build_machine_filaments(const std::vector<std::vector<DynamicPrintConfig>>& filament_configs, const std::vector<std::map<int, int>>& ams_counts, bool ignore_ext_filament);

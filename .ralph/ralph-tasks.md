@@ -809,7 +809,7 @@ implements.)
               + src/libslic3r/FilamentGroup.hpp
              Commit: `annotate: src/libslic3r files (T4060h)`
 
-- [ ] T4060i  annotate: src/libslic3r/FilamentGroupUtils.hpp
+- [x] T4060i  annotate: src/libslic3r/FilamentGroupUtils.hpp
               + src/libslic3r/FileParserError.hpp
               + src/libslic3r/FlushVolCalc.hpp
               + src/libslic3r/FlushVolPredictor.hpp

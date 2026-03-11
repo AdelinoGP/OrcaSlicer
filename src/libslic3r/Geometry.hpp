@@ -16,6 +16,7 @@ namespace Slic3r {
 namespace Geometry {
 
 // Generic result of an orientation predicate.
+// [INTENT] Core winding primitive reused by polygon validation and clipping logic.
 enum Orientation
 {
     ORIENTATION_CCW = 1,
@@ -33,6 +34,7 @@ enum Orientation
 static inline Orientation orient(const Point &a, const Point &b, const Point &c) {
     //static_assert(sizeof(coord_t) * 2 == sizeof(int64_t), "orient works with 32 bit coordinates");
     // BOOST_STATIC_ASSERT(sizeof(coord_t) == sizeof(int64_t));
+    // [HAZARD] Mixed integer/double fallback path can produce edge-case differences across platforms.
     if (a.x() <= 0xffffffff && b.x() <= 0xffffffff && c.x() <= 0xffffffff &&
         a.y() <= 0xffffffff && b.y() <= 0xffffffff && c.y() <= 0xffffffff) {
         int64_t u = int64_t(b(0)) * int64_t(c(1)) - int64_t(b(1)) * int64_t(c(0));
@@ -124,6 +126,7 @@ inline bool segments_intersect(
 	const Slic3r::Point &ip1, const Slic3r::Point &ip2, 
 	const Slic3r::Point &jp1, const Slic3r::Point &jp2)
 {    
+    // [INTENT] Fast boolean intersection test for topology decisions where intersection point is not needed.
     //assert(ip1 != ip2);
     //assert(jp1 != jp2);
 
@@ -215,6 +218,7 @@ inline bool liang_barsky_line_clipping_interval(
     const BoundingBoxBase<Eigen::Matrix<T, 2, 1, Eigen::DontAlign>> &bbox,
     std::pair<double, double>                                       &out_interval)
 {
+    // [INTENT] Parametric clipping keeps segment ordering and avoids repeated per-edge intersection solves.
     double t0 = 0.0;
     double t1 = 1.0;
     // Traverse through left, right, bottom, top edges.
@@ -402,6 +406,7 @@ void rotation_from_two_vectors(Vec3d from, Vec3d to, Vec3d &rotation_axis, doubl
 
 class Transformation
 {
+    // [STATE] Mutable affine transform state shared by placement, slicing prep, and serialization.
     Transform3d m_matrix{ Transform3d::Identity() };
 
 public:
@@ -477,6 +482,7 @@ public:
 
     // BBS: backup use this compare
     friend bool operator==(Transformation const& l, Transformation const& r) {
+        // [HAZARD] Approximate float equality is convenient, but can hide accumulated transform drift.
         return l.m_matrix.isApprox(r.m_matrix);
     }
 
@@ -487,6 +493,7 @@ public:
 
 private:
 	friend class cereal::access;
+    // [COUPLING] Serialization hooks are part of Undo/Redo and project persistence compatibility.
     template<class Archive> void serialize(Archive& ar) { ar(m_matrix); }
     explicit Transformation(int) {}
     template <class Archive> static void load_and_construct(Archive& ar, cereal::construct<Transformation>& construct)
@@ -511,6 +518,7 @@ struct TransformationSVD
     bool skew{ false };
 
     explicit TransformationSVD(const Transformation& trafo) : TransformationSVD(trafo.get_matrix()) {}
+    // [INTENT] Decomposes affine transforms into mirror/scale/rotation/skew components for downstream checks.
     explicit TransformationSVD(const Transform3d& trafo);
 
     Eigen::DiagonalMatrix<double, 3, 3> mirror_matrix() const { return Eigen::DiagonalMatrix<double, 3, 3>(this->mirror ? -1. : 1., 1., 1.); }

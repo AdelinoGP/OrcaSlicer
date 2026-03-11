@@ -8,6 +8,7 @@
 
 namespace Slic3r {
 
+// [STATE] Global policy defaults used when per-profile flush values are missing.
 extern const int g_min_flush_volume_from_support;
 extern const int g_flush_volume_to_support;
 extern const int g_max_flush_volume;
@@ -15,6 +16,7 @@ extern const int g_max_flush_volume;
 class FlushVolCalculator
 {
 public:
+    // [INTENT] Encapsulates color-transition flush estimation for toolchange planning.
     FlushVolCalculator(int min, int max, int flush_dataset, float multiplier = 1.0f);
     ~FlushVolCalculator()
     {
@@ -26,6 +28,7 @@ public:
     int calc_flush_vol_rgb(unsigned char src_r,unsigned char src_g,unsigned char src_b,
         unsigned char dst_r, unsigned char dst_g, unsigned char dst_b);
 
+    // [COUPLING] Depends on FlushVolPredictor datasets and applies PrintConfig-derived bounds.
     bool get_flush_vol_from_data(unsigned char src_r, unsigned char src_g, unsigned char src_b,
         unsigned char dst_r, unsigned char dst_g, unsigned char dst_b, float& flush);
 
