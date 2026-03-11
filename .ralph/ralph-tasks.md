@@ -802,7 +802,7 @@ implements.)
               + src/libslic3r/ExPolygonsIndex.hpp
              Commit: `annotate: src/libslic3r files (T4060g)`
 
-- [ ] T4060h  annotate: src/libslic3r/Extruder.cpp
+- [x] T4060h  annotate: src/libslic3r/Extruder.cpp
               + src/libslic3r/Extruder.hpp
               + src/libslic3r/ExtrusionSimulator.hpp
               + src/libslic3r/FaceDetector.hpp
