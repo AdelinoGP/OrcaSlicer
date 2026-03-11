@@ -10,6 +10,7 @@ namespace Slic3r {
 /// </summary>
 struct ExPolygonsIndex
 {
+    // [INTENT] Compact address tuple used to map global graph indices back to source ExPolygons topology.
     // index of ExPolygons
     uint32_t expolygons_index;
 
@@ -21,8 +22,8 @@ struct ExPolygonsIndex
     // index of point in polygon
     uint32_t point_index;
 
-    bool is_contour() const { return polygon_index == 0; }
-    bool is_hole() const { return polygon_index != 0; }
+    bool     is_contour() const { return polygon_index == 0; }
+    bool     is_hole() const { return polygon_index != 0; }
     uint32_t hole_index() const { return polygon_index - 1; }
 };
 
@@ -30,30 +31,33 @@ struct ExPolygonsIndex
 /// Keep conversion from ExPolygonsIndex to Index and vice versa
 /// ExPolygonsIndex .. contour(or hole) point from ExPolygons
 /// Index           .. continous number
-/// 
-/// index is used to address lines and points as result from function 
+///
+/// index is used to address lines and points as result from function
 /// Slic3r::to_lines, Slic3r::to_points
 /// </summary>
 class ExPolygonsIndices
 {
+    // [STATE] Prefix offsets cache the flattening layout once so repeated cvt() calls stay O(1).
     std::vector<std::vector<uint32_t>> m_offsets;
     // for check range of index
     uint32_t m_count; // count of points
 public:
-    ExPolygonsIndices(const ExPolygons &shapes);
+    ExPolygonsIndices(const ExPolygons& shapes);
 
     /// <summary>
     /// Convert to one index number
     /// </summary>
     /// <param name="id">Compose of adress into expolygons</param>
     /// <returns>Index</returns>
-    uint32_t cvt(const ExPolygonsIndex &id) const;
+    // [COUPLING] This conversion contract is shared with algorithms that consume to_lines()/to_points() output.
+    uint32_t cvt(const ExPolygonsIndex& id) const;
 
     /// <summary>
     /// Separate to multi index
     /// </summary>
     /// <param name="index">adress into expolygons</param>
     /// <returns></returns>
+    // [HAZARD] Uses uint32_t indexing; extremely large aggregates can overflow flattened indices.
     ExPolygonsIndex cvt(uint32_t index) const;
 
     /// <summary>
@@ -61,7 +65,7 @@ public:
     /// </summary>
     /// <param name="id">Identify point in expolygon</param>
     /// <returns>True when id is last point in polygon otherwise false</returns>
-    bool is_last_point(const ExPolygonsIndex &id) const;
+    bool is_last_point(const ExPolygonsIndex& id) const;
 
     /// <summary>
     /// Count of points in expolygons

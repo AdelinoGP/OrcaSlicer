@@ -795,7 +795,7 @@ implements.)
               + src/libslic3r/EmbossShape.hpp
              Commit: `annotate: src/libslic3r files (T4060f)`
 
-- [ ] T4060g  annotate: src/libslic3r/enum_bitmask.hpp
+- [x] T4060g  annotate: src/libslic3r/enum_bitmask.hpp
               + src/libslic3r/Exception.hpp
               + src/libslic3r/ExPolygonCollection.hpp
               + src/libslic3r/ExPolygonSerialize.hpp
