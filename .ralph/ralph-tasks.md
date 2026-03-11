@@ -872,7 +872,7 @@ implements.)
               + src/libslic3r/ProjectTask.hpp
              Commit: `annotate: src/libslic3r files (T4060q)`
 
-- [ ] T4060r  annotate: src/libslic3r/QuadricEdgeCollapse.hpp
+- [x] T4060r  annotate: src/libslic3r/QuadricEdgeCollapse.hpp
               + src/libslic3r/Semver.hpp
               + src/libslic3r/ShortEdgeCollapse.hpp
               + src/libslic3r/SlicesToTriangleMesh.hpp

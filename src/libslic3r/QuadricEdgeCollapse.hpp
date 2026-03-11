@@ -18,11 +18,15 @@ namespace Slic3r {
 /// Output: Last used ErrorValue to collapse edge</param>
 /// <param name="throw_on_cancel">Could stop process of calculation.</param>
 /// <param name="statusfn">Give a feed back to user about progress. Values 1 - 100</param>
-void its_quadric_edge_collapse(
-    indexed_triangle_set &    its,
-    uint32_t                  triangle_count  = 0,
-    float *                   max_error       = nullptr,
-    std::function<void(void)> throw_on_cancel = nullptr,
-    std::function<void(int)>  statusfn        = nullptr);
+// [INTENT] Apply Garland-Heckbert quadric error metrics to aggressively reduce triangle count
+// while preserving geometric features better than uniform edge-length collapse.
+// [STATE] Mutates `its` in place; callers should treat the input mesh as consumed/rewritten.
+// [COUPLING] Operates directly on indexed_triangle_set, coupling decimation to TriangleMesh data layout.
+// [HAZARD] Accepting nullable `max_error` as both input and output makes call contracts implicit.
+void its_quadric_edge_collapse(indexed_triangle_set&     its,
+                               uint32_t                  triangle_count  = 0,
+                               float*                    max_error       = nullptr,
+                               std::function<void(void)> throw_on_cancel = nullptr,
+                               std::function<void(int)>  statusfn        = nullptr);
 
 } // namespace Slic3r
