@@ -6,6 +6,9 @@
 // all concrete Fill* strategy headers) are transitively pulled in.
 // This header also defines the lightweight `Filler` aggregate used as the
 // public-facing handle when creating infill fills from outside the module.
+// [COUPLING] Includes `PrintConfig.hpp` and `FillBase.hpp`, so any module that includes this
+//            header inherits the full infill/config dependency graph rather than a lightweight
+//            forward-declared handle.
 
 #include <memory.h>
 #include <float.h>
@@ -46,6 +49,9 @@ class LayerRegion;
 //   fill   — heap-allocated polymorphic Fill strategy; nullptr until assigned.
 //   params — value-type FillParams struct (spacing, density, angle, etc.).
 // Caller is responsible for populating both before use.
+// [CONCURRENCY] No internal locking. The aggregate is intended to be built, configured, and
+//               consumed on a single thread. Copying or sharing one `Filler` across worker
+//               threads would race on the mutable `fill` object it owns.
 //
 // An interface class to Perl, aggregating an instance of a Fill and a FillData.
 class Filler

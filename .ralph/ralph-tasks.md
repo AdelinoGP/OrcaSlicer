@@ -629,7 +629,7 @@ implements.)
              extracted per layer.
              Commit: `annotate: TPMS infill patterns (T4040)`
 
-- [ ] T4041  annotate: src/libslic3r/Fill/FillAdaptive.hpp
+- [x] T4041  annotate: src/libslic3r/Fill/FillAdaptive.hpp
                      + src/libslic3r/Fill/FillConcentricInternal.cpp
                      + src/libslic3r/Fill/FillConcentricInternal.hpp
                      + src/libslic3r/Fill/Fill.hpp

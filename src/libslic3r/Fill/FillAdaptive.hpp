@@ -13,6 +13,9 @@
 // [MEMORY]   OctreePtr = std::unique_ptr<Octree, OctreeDeleter>. Octree definition is opaque
 //            here (forward-declared) to avoid exposing boost::object_pool in the header.
 //            OctreeDeleter provides the custom delete through FillAdaptive.cpp.
+// [STATE]    This header itself has no mutable globals, but the declared helpers are part of the
+//            PrintObject preparation pipeline: spacing is computed first, then the octree is built,
+//            then each per-layer FillAdaptive::Filler borrows the finished tree through Fill::adapt_fill_octree.
 //
 // Adaptive cubic infill was inspired by the work of @mboerwinkle
 // as implemented for Cura.
@@ -106,6 +109,9 @@ FillAdaptive::OctreePtr build_octree(
 // [COUPLING] no_sort() returns false: G-code exporter may reorder lines. A FIXME notes this
 //            could be suboptimal for anchor lines. is_self_crossing() returns true because
 //            the three infill directions produce a self-intersecting cross-hatch pattern.
+// [HAZARD] The class relies on inherited Fill state (`spacing`, `z`, `layer_id`, `adapt_fill_octree`)
+//          being populated externally before _fill_surface_single() runs. Construction alone does
+//          not yield a usable filler object.
 class Filler : public Slic3r::Fill
 {
 public:
