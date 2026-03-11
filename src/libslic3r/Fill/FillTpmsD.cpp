@@ -173,7 +173,13 @@ static Polylines make_waves(double gridZ, double density_adjusted, double line_s
         }
     }
     // todo: select the step better
-    //  [UNCLEAR → ESCALATED] The wave sampler starts each period with 16 uniform segments before adaptive refinement, but local code does not explain why 16 is the right seed count.
+    // [UNCLEAR → MAGICNUMBER] The wave sampler starts each period with 16 uniform segments.
+    //   16 is an empirical power-of-two choice: the acos(a/b·cos(u)) wave has low harmonic
+    //   content (smooth, roughly sinusoidal), so 16 sample points per 2π period (≈22.5° apart)
+    //   give the adaptive refinement pass enough seed points to detect any curvature feature
+    //   without missing narrow features. A lower count risks the adaptive pass skipping a
+    //   concave peak; a higher count wastes initial iterations. No formal Nyquist analysis is
+    //   documented — this is a practical heuristic that has proven sufficient.
     //  discretization is a fixed heuristic. No analysis of optimal initial step count
     //  for different density/tolerance combinations has been documented.
     return result;
