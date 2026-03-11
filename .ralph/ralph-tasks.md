@@ -886,7 +886,7 @@ implements.)
               + src/libslic3r/Tesselate.cpp
              Commit: `annotate: src/libslic3r files (T4060s)`
 
-- [ ] T4060t  annotate: src/libslic3r/Tesselate.hpp
+- [x] T4060t  annotate: src/libslic3r/Tesselate.hpp
               + src/libslic3r/TextConfiguration.hpp
               + src/libslic3r/Thread.hpp
               + src/libslic3r/Time.hpp
