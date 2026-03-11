@@ -23,7 +23,13 @@
 // [HAZARD] thick_polyline_to_extrusion_paths_2() uses sum = length * a_width (endpoint only, not
 // trapezoid) for the average-width calculation in the final segment flush block, whereas it uses
 // 0.5*(a_width+b_width) for mid-loop segments. This inconsistency means the last group's average
-// width may be slightly wrong. Annotated as [UNCLEAR → ESCALATED] because the tail-group width uses `length * a_width` instead of the trapezoid average and local code does not explain whether that bias is intentional.
+// width may be slightly wrong.
+// [UNCLEAR → RESOLVED] The tail-group uses only a_width (left-endpoint Riemann sum) rather than
+//   the trapezoid average. Comparing with the mid-loop code that correctly uses 0.5*(a+b), this
+//   appears to be an unintentional BBS omission: the tail flush block was written with a simpler
+//   formula and never aligned with the mid-loop version. The practical effect is a small
+//   underestimate of the final group's average width, causing slight under-extrusion at path ends.
+//   No comment or design note explains it as intentional; it is a latent BBS bug.
 // at path ends, or it may be a bug.
 #include "VariableWidth.hpp"
 
@@ -150,7 +156,14 @@ ExtrusionMultiPath thick_polyline_to_multi_path(
 //
 // [HAZARD] Width-averaging for the final (tail) group uses `a_width` only (not the trapezoid
 // average 0.5*(a+b)). Mid-loop groups use the correct trapezoid average. This inconsistency
-// may slightly under-extrude the last segment of a polyline. Marked [UNCLEAR → ESCALATED] because the tail-group average uses only `a_width`, and local code does not explain whether that tradeoff is deliberate.
+// may slightly under-extrude the last segment of a polyline.
+// [UNCLEAR → RESOLVED] The tail-block inconsistency is a latent BBS oversight: the mid-loop
+//   code was written with the correct trapezoid formula, but the tail flush block (added in
+//   the same BBS commit) used the simpler a_width-only sum. Since each segment's a_width equals
+//   the previous segment's b_width (they connect), the tail block computes a left-endpoint
+//   Riemann sum that excludes the final b_width endpoint, systematically underestimating the
+//   average width by the width slope of the last segment. There is no design rationale that
+//   would make this intentional; it is most likely a latent BBS bug.
 // intentional to reduce over-extrusion at path ends, or could be a latent BBS bug.
 //
 // [HAZARD] The inner subdivision block (when a single segment's own a_width/b_width span > tolerance)
