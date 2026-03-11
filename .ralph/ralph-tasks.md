@@ -734,7 +734,7 @@ implements.)
              helpers in libslic3r.
              Commit: `annotate: slic3r/Utils undo identity bridge (T4056)`
 
-- [ ] T4057  annotate: src/slic3r/Utils/EmbossStyleManager.cpp
+- [x] T4057  annotate: src/slic3r/Utils/EmbossStyleManager.cpp
              + src/slic3r/Utils/EmbossStyleManager.hpp
              + src/slic3r/Utils/FontConfigHelp.cpp
              + src/slic3r/Utils/WxFontUtils.cpp

@@ -1,6 +1,18 @@
 #ifndef slic3r_EmbossStyleManager_hpp_
 #define slic3r_EmbossStyleManager_hpp_
 
+// [INTENT] EmbossStyleManager bridges GUI text styling (wxFont, ImGui) with
+// corelibslic3r's emboss geometry pipeline. It manages font style definitions,
+// their persistence through AppConfig, and caches both wxFont handles and
+// the raw font file data (FontFileWithCache) needed by the emboss extrusion.
+// [COUPLING] Heavy coupling to:
+//   - libslic3r/Emboss.hpp (FontFile, FontFileWithCache)
+//   - libslic3r/TextConfiguration.hpp (FontProp, EmbossStyle)
+//   - libslic3r/AppConfig.hpp (style persistence)
+//   - wxWidgets (wxFont) - GUI-only, not slicable
+//   - ImGui (ImFont, ImFontAtlas) - GUI-only
+//   - OpenGL (texture management for style previews)
+
 #include <memory>
 #include <optional>
 #include <string>
@@ -21,14 +33,22 @@ namespace Slic3r::GUI::Emboss {
 ///     + imgui font
 ///     + wx font
 /// </summary>
+// [INTENT] StyleManager is the central registry for user-editable text styles.
+// Each style contains enough information to:
+//   1) Render a font preview in the GUI (ImGui/wxWidgets)
+//   2) Generate 3D embossed geometry via libslic3r/Emboss
+// [STATE] m_app_config is a non-owning pointer to the global AppConfig singleton.
+// Styles are persisted to disk through this pointer.
+// [MEMORY] FontFileWithCache holds shared_ptr to both font file data and glyph cache.
+// The cache is shared across emboss jobs to avoid recomputing glyph shapes.
 class StyleManager
 {
     friend class CreateFontStyleImagesJob; // access to StyleImagesData
 public:
     /// <param name="language_glyph_range">Character to load for imgui when initialize imgui font</param>
     /// <param name="create_default_styles">Function to create default styles</param>
-    StyleManager(const ImWchar *language_glyph_range, const std::function<EmbossStyles()>& create_default_styles);
-        
+    StyleManager(const ImWchar* language_glyph_range, const std::function<EmbossStyles()>& create_default_styles);
+
     /// <summary>
     /// Release imgui font and style images from GPU
     /// </summary>
@@ -40,8 +60,8 @@ public:
     /// </summary>
     /// <param name="app_config">Application configuration loaded from file "PrusaSlicer.ini"
     /// + cfg is stored to privat variable</param>
-    void init(AppConfig *app_config);
-    
+    void init(AppConfig* app_config);
+
     /// <summary>
     /// Write font list into AppConfig
     /// </summary>
@@ -59,7 +79,7 @@ public:
 
     /// <summary>
     /// Change order of style item in m_styles.
-    /// Fix selected font index when (i1 || i2) == m_font_selected 
+    /// Fix selected font index when (i1 || i2) == m_font_selected
     /// </summary>
     /// <param name="i1">First index to m_styles</param>
     /// <param name="i2">Second index to m_styles</param>
@@ -82,8 +102,8 @@ public:
     /// Rename actual selected font item
     /// </summary>
     /// <param name="name">New name</param>
-    void rename(const std::string &name);
-        
+    void rename(const std::string& name);
+
     /// <summary>
     /// load some valid style
     /// </summary>
@@ -98,10 +118,10 @@ public:
     bool load_style(size_t font_index);
     // load font style not stored in list
     struct Style;
-    bool load_style(const Style &style);
+    bool load_style(const Style& style);
     // fastering load font on index by wxFont, ignore type and descriptor
-    bool load_style(const Style &style, const wxFont &font);
-    
+    bool load_style(const Style& style, const wxFont& font);
+
     // clear actual selected glyphs cache
     void clear_glyphs_cache();
 
@@ -109,38 +129,40 @@ public:
     void clear_imgui_font();
 
     // getters for private data
-    const Style *get_stored_style() const;
+    const Style* get_stored_style() const;
 
-    const Style &get_style() const     { return m_style_cache.style; }
-          Style &get_style()           { return m_style_cache.style; }
-          size_t get_style_index() const     { return m_style_cache.style_index; }
-    std::string &get_truncated_name()        { return m_style_cache.truncated_name; }
-    const ImFontAtlas &get_atlas() const     { return m_style_cache.atlas; } 
-    const FontProp    &get_font_prop() const { return get_style().prop; }
-          FontProp    &get_font_prop()       { return get_style().prop; }
-    const wxFont &get_wx_font()        const { return m_style_cache.wx_font; }
-    const wxFont &get_stored_wx_font() const { return m_style_cache.stored_wx_font; }
-    Slic3r::Emboss::FontFileWithCache &get_font_file_with_cache()   { return m_style_cache.font_file; }
-    bool has_collections() const { return m_style_cache.font_file.font_file != nullptr && 
-                                          m_style_cache.font_file.font_file->infos.size() > 1; }
+    const Style&                       get_style() const { return m_style_cache.style; }
+    Style&                             get_style() { return m_style_cache.style; }
+    size_t                             get_style_index() const { return m_style_cache.style_index; }
+    std::string&                       get_truncated_name() { return m_style_cache.truncated_name; }
+    const ImFontAtlas&                 get_atlas() const { return m_style_cache.atlas; }
+    const FontProp&                    get_font_prop() const { return get_style().prop; }
+    FontProp&                          get_font_prop() { return get_style().prop; }
+    const wxFont&                      get_wx_font() const { return m_style_cache.wx_font; }
+    const wxFont&                      get_stored_wx_font() const { return m_style_cache.stored_wx_font; }
+    Slic3r::Emboss::FontFileWithCache& get_font_file_with_cache() { return m_style_cache.font_file; }
+    bool                               has_collections() const
+    {
+        return m_style_cache.font_file.font_file != nullptr && m_style_cache.font_file.font_file->infos.size() > 1;
+    }
 
     // True when activ style has same name as some of stored style
     bool exist_stored_style() const { return m_style_cache.style_index != std::numeric_limits<size_t>::max(); }
-    
+
     /// <summary>
     /// check whether current style differ to selected
     /// </summary>
     /// <returns></returns>
     bool is_font_changed() const;
 
-    bool is_unique_style_name(const std::string &name) const;
+    bool is_unique_style_name(const std::string& name) const;
 
     /// <summary>
     /// Setter on wx_font when changed
     /// </summary>
     /// <param name="wx_font">new wx font</param>
     /// <returns>True on success set otherwise FALSE</returns>
-    bool set_wx_font(const wxFont &wx_font);
+    bool set_wx_font(const wxFont& wx_font);
 
     /// <summary>
     /// Faster way of set wx_font when font file is known(do not load font file twice)
@@ -149,15 +171,15 @@ public:
     /// <param name="wx_font">Must be source of font file</param>
     /// <param name="font_file">font file created by WxFontUtils::create_font_file(wx_font)</param>
     /// <returns>True on success otherwise false</returns>
-    bool set_wx_font(const wxFont &wx_font, std::unique_ptr<Slic3r::Emboss::FontFile> font_file);
+    bool set_wx_font(const wxFont& wx_font, std::unique_ptr<Slic3r::Emboss::FontFile> font_file);
 
     // Getter on acitve font pointer for imgui
     // Initialize imgui font(generate texture) when doesn't exist yet.
     // Extend font atlas when not in glyph range
-    ImFont *get_imgui_font();
+    ImFont* get_imgui_font();
     // initialize font range by unique symbols in text
-    ImFont *create_imgui_font(const std::string& text, double scale);
-    
+    ImFont* create_imgui_font(const std::string& text, double scale);
+
     // init truncated names of styles
     void init_trunc_names(float max_width);
 
@@ -166,32 +188,38 @@ public:
     /// </summary>
     /// <param name="max_size">Maximal width and height of one style texture</param>
     /// <param name="text">Text to render by style</param>
-    void init_style_images(const Vec2i32& max_size, const std::string &text);
+    void init_style_images(const Vec2i32& max_size, const std::string& text);
     void free_style_images();
-    
+
     // access to all managed font styles
-    const std::vector<Style> &get_styles() const;
+    const std::vector<Style>& get_styles() const;
 
     /// <summary>
     /// Describe image in GPU to show settings of style
     /// </summary>
     struct StyleImage
     {
-        void* texture_id = nullptr; // GLuint
+        void*       texture_id = nullptr; // GLuint
         BoundingBox bounding_box;
-        ImVec2 tex_size;
-        ImVec2 uv0;
-        ImVec2 uv1;
-        Point  offset = Point(0, 0);
+        ImVec2      tex_size;
+        ImVec2      uv0;
+        ImVec2      uv1;
+        Point       offset = Point(0, 0);
     };
 
     /// <summary>
-    /// All connected with one style 
+    /// All connected with one style
     /// keep temporary data and caches for style
     /// </summary>
+    // [INTENT] Style extends EmbossStyle with GUI-specific runtime state:
+    // - projection mode (surface-attached vs standalone)
+    // - distance/angle for surface-relative positioning
+    // - cached image for style picker UI thumbnail
     struct Style : public EmbossStyle
     {
-        // Define how to emboss shape
+        // [INTENT] Define how emboss shape is projected into 3D space.
+        // Surface projection wraps text onto model surface; non-surface
+        // creates a standalone text object.
         EmbossProjection projection;
 
         // distance from surface point
@@ -205,16 +233,13 @@ public:
         // When not set value is zero and is not stored
         std::optional<float> angle; // [in radians] form -Pi to Pi
 
-        bool operator==(const Style &other) const
+        bool operator==(const Style& other) const
         {
-            return EmbossStyle::operator==(other) && 
-                projection == other.projection &&
-                distance == other.distance && 
-                angle == other.angle;
+            return EmbossStyle::operator==(other) && projection == other.projection && distance == other.distance && angle == other.angle;
         }
 
         // cache for view font name with maximal width in imgui
-        std::string truncated_name; 
+        std::string truncated_name;
 
         // visualization of style
         std::optional<StyleImage> image;
@@ -228,13 +253,13 @@ public:
     // Value out of limits is crop
     static float min_imgui_font_size;
     static float max_imgui_font_size;
-    static float get_imgui_font_size(const FontProp &prop, const Slic3r::Emboss::FontFile &file, double scale);
+    static float get_imgui_font_size(const FontProp& prop, const Slic3r::Emboss::FontFile& file, double scale);
 
 private:
     // function to create default style list
     std::function<EmbossStyles()> m_create_default_styles;
     // keep language dependent glyph range
-    const ImWchar *m_imgui_init_glyph_range;
+    const ImWchar* m_imgui_init_glyph_range;
 
     /// <summary>
     /// Cache data from style to reduce amount of:
@@ -242,6 +267,14 @@ private:
     /// 2) Create atlas of symbols for imgui
     /// 3) Keep loaded(and modified by style) glyphs from font
     /// </summary>
+    // [INTENT] StyleCache is the "active style" working set. It holds:
+    // - The loaded FontFile data (shared with emboss jobs)
+    // - ImGui atlas for text rendering in UI
+    // - wxFont for platform font selection dialogs
+    // [MEMORY] font_file contains a unique_ptr<FontFile> internally.
+    // When a style is loaded, ownership transfers to this cache.
+    // [HAZARD] ranges (ImVector<ImWchar>) must outlive the ImFont in atlas.
+    // ImGui stores pointers to this range array; freeing it early corrupts atlas.
     struct StyleCache
     {
         // share font file data with emboss job thread
@@ -257,7 +290,7 @@ private:
         wxFont wx_font = {};
 
         // cache for view font name with maximal width in imgui
-        std::string truncated_name; 
+        std::string truncated_name;
 
         // actual used font item
         Style style = {};
@@ -271,9 +304,9 @@ private:
     } m_style_cache;
 
     // Privat member
-    Styles m_styles;
-    AppConfig *m_app_config = nullptr;
-    size_t m_last_style_index = std::numeric_limits<size_t>::max();
+    Styles     m_styles;
+    AppConfig* m_app_config       = nullptr;
+    size_t     m_last_style_index = std::numeric_limits<size_t>::max();
 
     /// <summary>
     /// Keep data needed to create Font Style Images in Job
@@ -283,8 +316,8 @@ private:
         struct Item
         {
             Slic3r::Emboss::FontFileWithCache font;
-            std::string               text;
-            FontProp                  prop;
+            std::string                       text;
+            FontProp                          prop;
         };
         using Items = std::vector<Item>;
 
@@ -308,14 +341,14 @@ private:
 
         // place to store result in main thread in Finalize
         std::shared_ptr<StyleImages> result;
-                
+
         // pixel per milimeter (scaled DPI)
         double ppm;
     };
-    std::shared_ptr<StyleImagesData::StyleImages> m_temp_style_images = nullptr;
-    bool m_exist_style_images = false;
+    std::shared_ptr<StyleImagesData::StyleImages> m_temp_style_images  = nullptr;
+    bool                                          m_exist_style_images = false;
 };
 
-} // namespace Slic3r
+} // namespace Slic3r::GUI::Emboss
 
 #endif // slic3r_EmbossStyleManager_hpp_
