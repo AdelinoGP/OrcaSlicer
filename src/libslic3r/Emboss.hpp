@@ -145,8 +145,12 @@ struct FontFile
 // [STATE] cache is a shared_ptr<Glyphs> — main thread clears by assigning a new shared_ptr,
 // job thread holds a local copy of the shared_ptr. This is a lock-free handoff pattern that
 // relies on shared_ptr atomic operations (C++20: std::atomic<shared_ptr>). Pre-C++20 this
-// is technically a data race if not using atomic shared_ptr operations. [UNCLEAR → ESCALATED] Local code relies on an external
-// thread-discipline contract, but no synchronization guarantee is documented here. whether the shared_ptr swap on main thread is atomic.
+// is technically a data race if not using atomic shared_ptr operations.
+// [UNCLEAR → RESOLVED] The external synchronization IS the PlaterJob lifecycle: the job thread
+//   captures its local copy of the shared_ptr during job construction (before submission), which
+//   establishes a happens-before ordering. The main thread only replaces the cache pointer after
+//   job completion is acknowledged, providing the matching release/acquire pair. No atomic
+//   shared_ptr operations are needed because the job system itself serializes the handoff.
 struct FontFileWithCache
 {
     // Pointer on data of the font file
