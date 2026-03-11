@@ -1,9 +1,9 @@
 # Agent Journal — OrcaSlicer Codebase Analysis
 
 ## CURRENT STATUS
-Last session: 97
-Active task: T4053 — complete
-Next action: Begin T4054 by annotating `src/slic3r/Utils/MoonrakerPrinterAgent.cpp`, `src/slic3r/Utils/PresetUpdater.cpp`, `src/slic3r/Utils/QidiPrinterAgent.cpp`, and `src/slic3r/Utils/SnapmakerPrinterAgent.cpp`.
+Last session: 98
+Active task: T4055 — complete
+Next action: Begin T4056 by annotating `src/slic3r/Utils/InstanceID.cpp`, `src/slic3r/Utils/UndoRedo.cpp`, and `src/slic3r/Utils/UndoRedo.hpp`.
 Unresolved [UNCLEAR] tags: 12 — all remaining source tags are marked `[UNCLEAR → ESCALATED]` after Session 86 T300 triage
 Files remaining (Phase 1): 287 files outside explicit skip buckets still need human coverage audit
 Files completed (Phase 1): 314 unique source files tracked by 314 annotate task entries
@@ -672,3 +672,27 @@ Total escalated tags: **12**
   - `src/slic3r/Utils/PrintHost.hpp`
 
 **Completed tasks this session:** T4053
+
+---
+
+## Session 98
+
+**Active task:** T4055 — annotate `src/slic3r/Utils/CalibUtils.cpp`, `src/slic3r/Utils/CalibUtils.hpp`, and `src/slic3r/Utils/RaycastManager.hpp`
+
+- Files processed: `src/slic3r/Utils/CalibUtils.cpp`, `src/slic3r/Utils/CalibUtils.hpp`, `src/slic3r/Utils/RaycastManager.hpp`, `generated_documentation/agent_journal.md`, `.ralph/ralph-tasks.md`
+- Key discoveries:
+  - `CalibUtils` is not just validation glue; it reconstructs a mini plater pipeline that loads template models, mutates print config, slices through `Print`, renders a thumbnail, and serializes temporary BBL 3MF archives for upload.
+  - The calibration path is intentionally single-flight: global temp filenames and the process-wide `print_worker` mean every calibration export and upload overwrites the previous transient job artifacts.
+  - `RaycastManager` is the geometry/GUI seam for interactive tools: it caches one `AABBMesh` per `ModelVolume`, fans that mesh out across instance transforms, and exposes both forward-ray and nearest-surface queries to higher-level gizmos.
+- Decisions made:
+  - Focused annotations on ownership, cache state, and pipeline boundaries instead of every calibration mode branch, because the refactoring risk in this bucket comes from hidden global state and deep coupling to plater internals.
+  - Treated `RaycastManager.hpp` as a public contract file and documented the cache invariants there, since downstream GUI tools consume the header without needing the full implementation open.
+- Open questions:
+  - None newly introduced; existing `[UNCLEAR -> ESCALATED]` items remain unchanged.
+- Cross-references:
+  - `src/libslic3r/calib.hpp`
+  - `src/libslic3r/CutUtils.hpp`
+  - `src/slic3r/Utils/RaycastManager.cpp`
+  - `src/slic3r/GUI/SurfaceDrag.cpp`
+
+**Completed tasks this session:** T4055

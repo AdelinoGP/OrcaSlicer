@@ -14,17 +14,26 @@ namespace Slic3r::GUI{
 /// Cast rays from camera to scene
 /// Used for find hit point on model volume under mouse cursor
 /// </summary>
+// [INTENT] `RaycastManager` is the GUI-facing adapter from editable `ModelObject` / `ModelInstance`
+// state into reusable `AABBMesh` acceleration structures so tools can do hit-testing without touching
+// the full slicer pipeline.
+// [COUPLING] The type sits directly on libslic3r geometry (`AABBMesh`, `Transform3d`, `ModelVolume`) but
+// is consumed by GUI gizmos, emboss tools, and surface dragging, so any extraction must preserve this seam.
 class RaycastManager
 {
 // Public structures used by RaycastManager
 public: 
 
     //                   ModelVolume.id
+    // [MEMORY] Each entry owns one heap-allocated `AABBMesh`; meshes are cached by volume id and reused across
+    // many picks so the GUI does not rebuild BVHs on every mouse move.
     using Mesh = std::pair<size_t, std::unique_ptr<AABBMesh> >;
     using Meshes = std::vector<Mesh>;
     
     // Key for transformation consist of unique volume and instance id ... ObjectId()
     //                 ModelInstance, ModelVolume
+    // [STATE] Transform entries are the mutable half of the cache: one mesh may fan out to multiple instance
+    // transforms, so selection tools must keep geometry ownership and per-instance placement separate.
     using TrKey = std::pair<size_t, size_t>;
     using TrItem = std::pair<TrKey, Transform3d>;
     using TrItems = std::vector<TrItem>;
@@ -47,6 +56,8 @@ public:
     // TODO: it is more general object move outside of this class
     template<typename T> 
     struct SurfacePoint {
+        // [HAZARD] `Eigen::DontAlign` avoids the aligned-allocation requirements that would otherwise leak into
+        // STL containers and GUI value passing, but a port has to preserve the expectation of plain-value storage.
         using Vec3 = Eigen::Matrix<T, 3, 1, Eigen::DontAlign>;
         Vec3 position = Vec3::Zero();
         Vec3 normal   = Vec3::UnitZ();
@@ -86,6 +97,8 @@ public:
     /// <param name="object">Model representation</param>
     /// <param name="skip">Condifiton for skip actualization</param>
     /// <param name="meshes">Speed up for already created AABBtrees</param>
+    // [STATE] `actualize()` is destructive cache synchronization: it deletes removed volume meshes / transforms,
+    // updates live transforms, and may steal prebuilt BVHs from `meshes` for faster tool startup.
     void actualize(const ModelObject &object, const ISkip *skip = nullptr, Meshes *meshes = nullptr);
     void actualize(const ModelInstance &instance, const ISkip *skip = nullptr, Meshes* meshes = nullptr);
 
@@ -116,6 +129,8 @@ public:
     /// <param name="skip">Define which caster will be skipped, null mean no skip</param>
     /// <returns>Position on surface, normal direction in world coorinate
     /// + key, to know hitted instance and volume</returns>
+    // [INTENT] `first_hit()` follows the screen ray direction only, which is what painting / emboss placement
+    // needs when it wants the visually front-most surface under the cursor.
     std::optional<Hit> first_hit(const Vec3d &point, const Vec3d &direction, const ISkip *skip = nullptr) const;
 
     /// <summary>
@@ -126,6 +141,8 @@ public:
     /// <param name="direction">Direction of ray, orientation doesn't matter, both are used</param>
     /// <param name="skip">Define which caster will be skipped, null mean no skip</param>
     /// <returns>Position on surface, normal direction and transformation key, which define hitted object instance</returns>
+    // [INTENT] `closest_hit()` treats the query as an infinite line rather than a forward-only ray so drag tools can
+    // reproject points even when the cursor starts inside geometry or slightly past the target surface.
     std::optional<Hit> closest_hit(const Vec3d &point, const Vec3d &direction, const ISkip *skip = nullptr) const;
 
     /// <summary>
@@ -134,6 +151,8 @@ public:
     /// <param name="point">Point</param>
     /// <param name="skip">Define which caster will be skipped, null mean no skip</param>
     /// <returns></returns>
+    // [INTENT] `closest()` is the fallback geometric snap: it ignores ray direction and asks each cached mesh for the
+    // nearest surface point, which keeps move/drag tools usable when direct projection misses.
     std::optional<ClosePoint> closest(const Vec3d &point, const ISkip *skip = nullptr) const;
 
     /// <summary>
@@ -141,6 +160,8 @@ public:
     /// </summary>
     /// <param name="tr_key">Define transformation</param>
     /// <returns>Transformation for key</returns>
+    // [COUPLING] Callers recover the winning world transform by opaque `(instance, volume)` ids instead of keeping raw
+    // object pointers, which avoids dangling GUI references when the model graph mutates.
     Transform3d get_transformation(const TrKey &tr_key) const;
 };
 
@@ -151,6 +172,8 @@ class GLCanvas3D;
 /// <param name="canvas">contain Scene raycasters</param>
 /// <param name="condition">Limit for scene casters</param>
 /// <returns>Meshes</returns>
+// [COUPLING] This helper clones GUI scene raycasters back into libslic3r `AABBMesh` form so transient tools can reuse
+// the canvas's already-built acceleration data without reaching into OpenGL-only types afterward.
 RaycastManager::Meshes create_meshes(GLCanvas3D &canvas, const RaycastManager::AllowVolumes &condition);
 
 struct Camera;

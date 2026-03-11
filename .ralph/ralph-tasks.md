@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer Analysis Agent
-Last updated: 2026-03-11T07:24:00Z
+Last updated: 2026-03-11T09:25:00Z
 
 ## Legend
 - [ ] PENDING   — not started
@@ -718,7 +718,7 @@ implements.)
              printer preset state rather than direct model or geometry types.
              Commit: `annotate: slic3r/Utils preset-driven agents (T4054)`
 
-- [ ] T4055  annotate: src/slic3r/Utils/CalibUtils.cpp
+- [x] T4055  annotate: src/slic3r/Utils/CalibUtils.cpp
              + src/slic3r/Utils/CalibUtils.hpp
              + src/slic3r/Utils/RaycastManager.hpp
              Context: Model and geometry touching utilities. CalibUtils reaches

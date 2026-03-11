@@ -16,6 +16,13 @@ extern const double MAX_PA_K_VALUE;
 class CalibInfo
 {
 public:
+    // [STATE] This is the UI-to-slicing handoff record for one calibration lane: it mixes the chosen
+    // preset snapshots, resolved AMS slot, runtime progress sink, and the `Calib_Params` sweep that will
+    // later be baked into a temporary 3MF plus print job.
+    // [MEMORY] Presets are borrowed as raw pointers from the live preset bundle rather than owned here,
+    // so callers must ensure the presets outlive any calibration job built from this struct.
+    // [COUPLING] The struct bridges GUI device state (`MachineObject`, AMS, progress bars) with
+    // libslic3r configuration and model generation, which makes calibration setup span both layers.
     int                                index = -1;
     int                                extruder_id = 0;
     int                                ams_id = 0;
@@ -38,6 +45,10 @@ class CalibUtils
 {
 public:
     CalibUtils(){};
+    // [STATE] `print_worker` is a process-wide singleton slot for the currently queued calibration print.
+    // Starting a new calibration replaces the previous worker rather than keeping per-job ownership local.
+    // [MEMORY] The worker is heap-owned through `unique_ptr`, but its lifetime is detached from the calling
+    // dialog or wizard; cancellation / completion has to cooperate with the global GUI job machinery.
     static std::unique_ptr<Worker> print_worker;
 
     static CalibMode get_calib_mode_by_name(const std::string name, int &cali_stage);
@@ -85,6 +96,11 @@ public:
     static bool check_printable_status_before_cali(const MachineObject *obj, const std::vector<CalibInfo> &cali_infos, wxString &error_message);
 
 private:
+    // [INTENT] This helper is the calibration pipeline's real core: center or offset the model, run a full
+    // slice through `Print`, render the preview thumbnail, and serialize two temporary Bambu-style 3MF files
+    // that `send_to_print()` uploads.
+    // [COUPLING] Despite living in `slic3r/Utils`, it depends on `Model`, `Print`, `PartPlateList`,
+    // thumbnail rendering, and BBL 3MF persistence, so it is effectively a mini plater/export pipeline.
     static bool process_and_store_3mf(Model* model, const DynamicPrintConfig& full_config, const Calib_Params& params, wxString& error_message);
     static void send_to_print(const CalibInfo &calib_info, wxString& error_message, int flow_ratio_mode = 0); // 0: none  1: coarse  2: fine
     static void send_to_print(const std::vector<CalibInfo> &calib_infos, wxString &error_message, int flow_ratio_mode = 0); // 0: none  1: coarse  2: fine

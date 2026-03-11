@@ -28,6 +28,10 @@ const double MAX_PA_K_VALUE = 2.0;
 
 std::unique_ptr<Worker> CalibUtils::print_worker;
 wxString wxstr_temp_dir = fs::path(fs::temp_directory_path() / "calib").wstring();
+// [STATE] Calibration exports always reuse this process-global temp directory and fixed filenames, so each new run
+// overwrites the previous transient 3MF / G-code bundle instead of keeping per-job isolation.
+// [HAZARD] The hardcoded filenames make the pipeline effectively single-flight; concurrent calibration exports would
+// race on the same temp artifacts even before they contend on `CalibUtils::print_worker`.
 static const std::string temp_dir = wxstr_temp_dir.utf8_string();
 static const std::string temp_gcode_path = temp_dir + "/temp.gcode";
 static const std::string path            = temp_dir + "/test.3mf";
@@ -53,6 +57,10 @@ std::vector<std::string> not_support_auto_pa_cali_filaments = {
 
 void get_default_k_n_value(const std::string &filament_id, float &k, float &n)
 {
+    // [INTENT] This is the vendor fallback table for PA coefficients when a filament has no explicit calibration
+    // history yet; TPU families get higher defaults because the printer-side auto-tuning starts from a softer baseline.
+    // [HAZARD] Filament identity is keyed by opaque vendor ids (`GFU01`, `GFG00`, ...), so ports need the same catalog
+    // mapping or a more explicit material metadata source.
     if (filament_id.compare("GFU01") == 0) {
         /* TPU 95A */
         k = 0.25;
@@ -278,6 +286,10 @@ static bool check_nozzle_diameter_and_type(const DynamicPrintConfig &full_config
 
 static void init_multi_extruder_params_for_cali(DynamicPrintConfig& config, const CalibInfo& calib_info)
 {
+    // [STATE] Calibration jobs force the combined config into a synthetic single-purpose routing state: nozzle-volume
+    // types are rewritten, filament maps are collapsed onto the selected extruder, and automatic mapping is disabled.
+    // [COUPLING] This relies on Orca's multi-extruder option schema (`physical_extruder_map`, `filament_map`,
+    // `nozzle_volume_type`) matching the GUI's device model exactly.
     int extruder_count = 1;
     auto nozzle_diameters_opt = dynamic_cast<const ConfigOptionFloats*>(config.option("nozzle_diameter"));
     if (nozzle_diameters_opt != nullptr) {
@@ -422,6 +434,12 @@ bool CalibUtils::validate_input_flow_ratio(wxString flow_ratio, float* output_va
 
 static void cut_model(Model &model, double z, ModelObjectCutAttributes attributes)
 {
+    // [INTENT] Tower-style calibrations shorten a stock template model by slicing it with the same plane-cut utility
+    // used elsewhere in Orca, instead of maintaining a separate STL for every parameter range.
+    // [MEMORY] `perform_with_plane()` returns freshly allocated `ModelObject*` instances; ownership is transferred back
+    // into `Model::add_object()` after the original object is deleted.
+    // [COUPLING] Calibration geometry edits therefore depend on the full `CutUtils` / `ModelObjectCutAttributes`
+    // pipeline, not a lightweight mesh-only trim helper.
     size_t obj_idx = 0;
     size_t instance_idx = 0;
     if (!attributes.has(ModelObjectCutAttribute::KeepUpper) && !attributes.has(ModelObjectCutAttribute::KeepLower))
@@ -444,6 +462,8 @@ static void cut_model(Model &model, double z, ModelObjectCutAttributes attribute
 
 static void read_model_from_file(const std::string& input_file, Model& model)
 {
+    // [COUPLING] Calibration templates are loaded through the normal project importer, so `.3mf`, `.drc`, and `.stl`
+    // assets all arrive as full `Model` graphs with project presets and plate metadata instead of bare meshes.
     LoadStrategy              strategy = LoadStrategy::LoadModel;
     ConfigSubstitutionContext config_substitutions{ForwardCompatibilitySubstitutionRule::Enable};
     int                       plate_to_slice = 0;
@@ -651,6 +671,8 @@ bool CalibUtils::calib_flowrate(int pass, const CalibInfo &calib_info, wxString 
     if (pass != 1 && pass != 2)
         return false;
 
+    // [INTENT] Flow-rate calibration starts from canned template projects and then mutates object configs in-place so
+    // every specimen encodes a slightly different flow multiplier while still being sliced by the ordinary FFF engine.
     Model       model;
     std::string input_file;
     if (pass == 1)
@@ -789,6 +811,9 @@ void CalibUtils::calib_pa_pattern(const CalibInfo &calib_info, Model& model)
     full_config.apply(filament_config);
     full_config.apply(printer_config);
 
+    // [INTENT] Pattern PA calibration bypasses normal geometry generation: `CalibPressureAdvancePattern` synthesizes
+    // custom G-code markers and stores the generator on `Model` so later export can serialize both the pattern and its
+    // metadata into the temporary BBL 3MF.
     Vec3d plate_origin(0, 0, 0);
     auto *object = model.objects[0];
     CalibPressureAdvancePattern pa_pattern(calib_info.params, full_config, true, *object, plate_origin);
@@ -806,6 +831,11 @@ void CalibUtils::calib_pa_pattern(const CalibInfo &calib_info, Model& model)
 
 void CalibUtils::set_for_auto_pa_model_and_config(const std::vector<CalibInfo> &calib_infos, DynamicPrintConfig &full_config, Model &model)
 {
+    // [INTENT] Auto PA turns a multi-object template into a one-job-many-filaments experiment: objects are reassigned to
+    // synthetic filament ids, inactive specimens are hidden, and the flush matrix is rebuilt so the printer can swap
+    // among the selected colors / nozzles during one calibration print.
+    // [COUPLING] This helper reaches into preset composition, object-level extruder tags, and flush-volume math, making
+    // it one of the tightest calibration couplings to Orca's multi-material print model.
     DynamicPrintConfig print_config    = calib_infos[0].print_prest->config;
 
     float nozzle_diameter = full_config.option<ConfigOptionFloats>("nozzle_diameter")->get_at(0);
@@ -1540,6 +1570,10 @@ bool CalibUtils::check_printable_status_before_cali(const MachineObject* obj, co
 
 bool CalibUtils::process_and_store_3mf(Model *model, const DynamicPrintConfig &full_config, const Calib_Params &params, wxString &error_message)
 {
+    // [INTENT] This routine replays a stripped-down plater pipeline for calibration assets: position the model onto a
+    // synthetic plate, run `Print::process()`, export G-code, render the thumbnail, and persist a printer-ready BBL 3MF.
+    // [COUPLING] It depends on GUI plate management and rendering (`PartPlateList`, `GLCanvas3D`, shaders) in addition
+    // to libslic3r slicing, so calibration export is not a pure headless core operation.
     Pointfs bedfs         = make_counter_clockwise(full_config.opt<ConfigOptionPoints>("printable_area")->values);
     std::vector<Pointfs> extruder_areas = full_config.option<ConfigOptionPointsGroups>("extruder_printable_area")->values;
     std::vector<double> extruder_heights = full_config.option<ConfigOptionFloatsNullable>("extruder_printable_height")->values;
@@ -1600,6 +1634,8 @@ bool CalibUtils::process_and_store_3mf(Model *model, const DynamicPrintConfig &f
     DynamicPrintConfig new_print_config = full_config;
     print->apply(*model, new_print_config);
 
+    // [HAZARD] The calibration path assumes the retrieved `PrintBase` is always an FFF `Print`; if a future plate type
+    // or printer technology reaches this function, the unchecked `dynamic_cast` result would become null-dereference land.
     Print *fff_print = dynamic_cast<Print *>(print);
     fff_print->set_calib_params(params);
     fff_print->is_BBL_printer() = true;
@@ -1644,6 +1680,8 @@ bool CalibUtils::process_and_store_3mf(Model *model, const DynamicPrintConfig &f
         filament_info.type          = full_config.opt_string("filament_type", 0);
     }
 
+    // [COUPLING] Thumbnail generation clones enough of the plater's GL scene to render a preview into the saved 3MF,
+    // which means calibration export still needs a functioning OpenGL thumbnail backend even though the output is only a job file.
     //draw thumbnails
     {
         GLVolumeCollection glvolume_collection;
@@ -1711,6 +1749,8 @@ bool CalibUtils::process_and_store_3mf(Model *model, const DynamicPrintConfig &f
 
     store_params.strategy = SaveStrategy::Silence | SaveStrategy::WithGcode | SaveStrategy::SplitModel | SaveStrategy::SkipModel;
 
+    // [STATE] Two sibling archives are emitted on every run: one printer-facing package with G-code and one config-sidecar
+    // package used by the job-preparation/upload flow.
     bool success = Slic3r::store_bbs_3mf(store_params);
 
     store_params.strategy = SaveStrategy::Silence | SaveStrategy::SplitModel | SaveStrategy::WithSliceInfo | SaveStrategy::SkipAuxiliary;
@@ -1781,8 +1821,12 @@ void CalibUtils::send_to_print(const CalibInfo &calib_info, wxString &error_mess
         }
     }
 
+    // [STATE] Dispatching a calibration print replaces the global worker slot, so only one calibration upload can be in
+    // flight from the GUI at a time.
     print_worker = std::make_unique<PlaterWorker<BoostThreadWorker>>(wxGetApp().plater(), std::move(process_bar), "calib_worker");
 
+    // [COUPLING] The final handoff goes through the same `PrintJob` uploader used by ordinary plater prints; calibration
+    // mode is expressed entirely by metadata and by the temporary 3MF contents assembled earlier.
     auto print_job              = std::make_unique<PrintJob>(dev_id);
     print_job->m_dev_ip         = obj_->get_dev_ip();
     print_job->m_ftp_folder     = obj_->get_ftp_folder();
@@ -1887,6 +1931,8 @@ void CalibUtils::send_to_print(const std::vector<CalibInfo> &calib_infos, wxStri
         }
     }
 
+    // [STATE] Multi-filament auto-calibration shares the same singleton worker slot as single-calibration jobs, so the
+    // GUI intentionally serializes all upload attempts regardless of how many extruders participate.
     print_worker = std::make_unique<PlaterWorker<BoostThreadWorker>>(wxGetApp().plater(), std::move(process_bar), "calib_worker");
 
     auto print_job                = std::make_shared<PrintJob>(dev_id);
