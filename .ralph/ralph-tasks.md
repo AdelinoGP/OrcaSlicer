@@ -865,7 +865,7 @@ implements.)
               + src/libslic3r/PNGReadWrite.hpp
              Commit: `annotate: src/libslic3r files (T4060p)`
 
-- [ ] T4060q  annotate: src/libslic3r/PolygonTrimmer.hpp
+- [x] T4060q  annotate: src/libslic3r/PolygonTrimmer.hpp
               + src/libslic3r/PresetBundle.hpp
               + src/libslic3r/PrincipalComponents2D.hpp
               + src/libslic3r/PrintConfigConstants.hpp
