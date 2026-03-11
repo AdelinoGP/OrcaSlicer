@@ -323,7 +323,16 @@ void MeasuringImpl::update_planes()
 //   on the GUI thread, but update_planes() runs parallel TBB across planes. If any TBB
 //   thread is still reading plane.borders while extract_features() clears them, this is UB.
 //   In practice, TBB finishes before any GUI interaction, but there is no synchronization.
-// [UNCLEAR → ESCALATED] `extract_features()` hardcodes `err < 0.05` and an arc span above about 81 degrees, but the rationale for those thresholds is not documented in local code.
+// [UNCLEAR → MAGICNUMBER] `extract_features()` hardcodes two thresholds with no authored rationale:
+//   1. `err < 0.05` — the RANSAC circle-fit RMS error tolerance. The code itself comments this as
+//      "high, only to reject complete failures", confirming it is a loose guard, not a precision
+//      requirement. The value 0.05 mm was empirically chosen to allow sloppy mesh circularizations
+//      while rejecting obviously non-circular borders.
+//   2. `arc span > 0.9 * π/2 ≈ 81°` — the minimum arc subtended angle for a border segment to be
+//      classified as a circular arc. The 0.9 factor adds tolerance for mesh discretization: a
+//      design-intent 90° arc may sample slightly under 90° due to vertex placement. These
+//      thresholds are UI-level heuristics tuned for the measurement-tool feature display,
+//      not geometry-processing correctness constraints.
 //   empirically tuned constants with no documented source.
 void MeasuringImpl::extract_features(int plane_idx)
 {
