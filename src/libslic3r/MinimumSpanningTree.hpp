@@ -10,6 +10,10 @@
 namespace Slic3r
 {
 
+// [INTENT] Provides a minimal wiring topology over sampled points so later path
+//          planners can build tree-like traversals without all-pairs edges.
+// [COUPLING] Depends on Point hashing/equality contracts from Point.hpp because
+//            adjacency storage keys points directly in unordered containers.
 /*!
  * \brief Implements Prim's algorithm to compute Minimum Spanning Trees (MST).
  *
@@ -61,6 +65,8 @@ public:
 
 private:
     using AdjacencyGraph_t = std::unordered_map<Point, std::vector<Edge>, PointHash>;
+    // [STATE] Canonical tree representation; each vertex stores incident edges and all
+    //         query APIs (`adjacent_nodes`, `leaves`, `vertices`) are derived from it.
     AdjacencyGraph_t adjacency_graph;
 
     /*!
@@ -69,6 +75,9 @@ private:
      *
      * \param vertices The vertices to span.
      * \return An adjacency graph with for each point one or more edges.
+     *
+     * [HAZARD] Prim's behavior depends on edge-weight tie ordering; equivalent
+     *          distances may yield different but still valid trees across platforms.
      */
     AdjacencyGraph_t prim(std::vector<Point> vertices) const;
 };

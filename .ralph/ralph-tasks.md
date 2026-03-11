@@ -837,7 +837,7 @@ implements.)
               + src/libslic3r/Measure.hpp
              Commit: `annotate: src/libslic3r files (T4060l)`
 
-- [ ] T4060m  annotate: src/libslic3r/MeasureUtils.hpp
+- [x] T4060m  annotate: src/libslic3r/MeasureUtils.hpp
               + src/libslic3r/MeshSplitImpl.hpp
               + src/libslic3r/MinAreaBoundingBox.hpp
               + src/libslic3r/MinimumSpanningTree.hpp

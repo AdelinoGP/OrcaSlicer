@@ -51,6 +51,7 @@ struct NeighborVisitor {
     template<typename Visitor>
     void visit(Visitor visitor)
     {
+        // [INTENT] DFS over face-neighbor graph extracts one connected component per call.
         // find the next unvisited facet and push the index
         auto facet = std::find(m_visited.begin() + m_seed, m_visited.end(), false);
         m_seed = facet - m_visited.begin();
@@ -82,6 +83,8 @@ struct NeighborVisitor {
 
 private:
     // If initialized with &&neighbor_index, take the ownership of the data.
+    // [MEMORY] Either borrows NeighborIndex by reference or stores an owned copy;
+    //          this avoids dangling references when temporary indices are passed.
     const NeighborIndex          m_neighbor_index_data;
 
     std::vector<char>            m_visited;
@@ -166,6 +169,8 @@ void its_split(const Its &m, OutputIt out_it)
                 auto vi = face(v);
 
                 if (vidx_conv[vi].part_id != part_id) {
+                    // [STATE] part-local remap table keeps original vertex ids stable while
+                    //         assigning compact indices for each split component output mesh.
                     vidx_conv[vi] = {part_id, mesh.vertices.size()};
                     mesh.vertices.emplace_back(its.vertices[size_t(vi)]);
                 }
@@ -199,6 +204,8 @@ bool its_is_splittable(const Its &m)
     // Traverse the 1st patch fully.
     visitor.visit([&has_some](size_t idx) { has_some = true; return true; });
     if (has_some)
+        // [INTENT] Early-stop second traversal after first hit to answer the binary
+        //          "more than one connected patch" query in near O(size(first_patch)).
         // Just check whether there is any face of the 2nd patch.
         visitor.visit([&has_some2](size_t idx) { has_some2 = true; return false; });
     return has_some && has_some2;
@@ -268,6 +275,10 @@ std::vector<Vec3i32> create_face_neighbors_index(ExPolicy &&ex, const indexed_tr
                 }
             }
         }, execution::max_concurrency(ex));
+    // [CONCURRENCY] Parallel face scan writes paired adjacency slots exactly once by
+    //               ordering on other_face > face_idx, preventing cross-thread overwrite.
+    // [HAZARD] This assumes manifold-like opposite edge orientation; duplicated or highly
+    //          non-manifold facets can remain marked as open boundaries.
 
     return neighbors;
 }

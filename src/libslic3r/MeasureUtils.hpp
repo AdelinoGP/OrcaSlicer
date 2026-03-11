@@ -6,6 +6,10 @@
 namespace Slic3r {
 namespace Measure {
 
+// [INTENT] Lightweight polynomial container used by Measure.cpp's analytic geometry
+//          solvers, primarily circle-circle and edge-circle intersection math.
+// [COUPLING] Kept header-only so measurement kernels can inline evaluations without
+//            adding a separate translation unit dependency.
 // Utility class used to calculate distance circle-circle
 // Adaptation of code found in:
 // https://github.com/davideberly/GeometricTools/blob/master/GTE/Mathematics/Polynomial1.h
@@ -20,6 +24,8 @@ public:
         // values.size() > 0.
         m_coefficient.resize(values.size());
         std::copy(values.begin(), values.end(), m_coefficient.begin());
+        // [STATE] Normalizes representation after construction so downstream arithmetic
+        //         can assume trailing coefficients are never redundant zeros.
         EliminateLeadingZeros();
     }
 
@@ -77,6 +83,8 @@ public:
     // function returns zero.
     double operator()(double t) const
     {
+        // [INTENT] Horner evaluation minimizes temporary powers and keeps numeric error
+        //          lower than naive polynomial expansion for high-degree terms.
         int32_t i = static_cast<int32_t>(m_coefficient.size());
         double result = m_coefficient[--i];
         for (--i; i >= 0; --i) {
@@ -102,6 +110,8 @@ inline Polynomial1 operator * (const Polynomial1& p0, const Polynomial1& p1)
             result[i0 + i1] += p0[i0] * p1[i1];
         }
     }
+    // [HAZARD] Straight double accumulation is order-sensitive; extreme coefficient
+    //          scales may amplify cancellation and produce root drift.
     return result;
 }
 
@@ -177,6 +187,8 @@ inline Polynomial1 operator * (double scalar, const Polynomial1& p)
 // Adaptation of code found in:
 // https://github.com/davideberly/GeometricTools/blob/master/GTE/Mathematics/RootsPolynomial.h
 
+// [INTENT] Root bracketing + recursive derivative root discovery for robustly finding
+//          all real roots in bounded intervals without closed-form special cases.
 class RootsPolynomial
 {
 public:
@@ -205,6 +217,8 @@ public:
                 }
                 const double bound = one + maxValue;
 
+                // [INTENT] Cauchy bound turns an unbounded real-root search into a finite
+                //          interval so recursive isolation can terminate deterministically.
                 return FindRecursive(degree, c, -bound, bound, maxIterations, roots);
             }
             else if (degree == 0)
@@ -267,6 +281,8 @@ public:
                 break;
         }
 
+        // [HAZARD] Success means "a bracketed root estimate was produced", not strict
+        //          convergence to machine epsilon; callers should tolerate residual error.
         return true;
     }
 
@@ -354,6 +370,8 @@ public:
 // zero.  The index addition i+1 is computed modulo N.
 inline Vec3d get_orthogonal(const Vec3d& v, bool unitLength)
 {
+    // [INTENT] Pick the dominant component pair to avoid near-zero subtraction and
+    //          generate a numerically stable perpendicular basis vector.
     double cmax = std::fabs(v[0]);
     int32_t imax = 0;
     for (int32_t i = 1; i < 3; ++i) {
@@ -373,6 +391,8 @@ inline Vec3d get_orthogonal(const Vec3d& v, bool unitLength)
     result[inext] = -v[imax];
     if (unitLength) {
         const double sqrDistance = result[imax] * result[imax] + result[inext] * result[inext];
+        // [HAZARD] Caller must avoid zero-length inputs; a null vector reaches division by
+        //          zero here when unitLength is requested.
         const double invLength = 1.0 / std::sqrt(sqrDistance);
         result[imax] *= invLength;
         result[inext] *= invLength;
