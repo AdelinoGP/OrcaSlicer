@@ -11,8 +11,20 @@
 
 namespace Slic3r {
 
+// [INTENT] Provide lightweight debug / diagnostics serialization for core
+// geometry containers so algorithm traces can dump polygons and point sets
+// without introducing a dedicated logging abstraction.
+// [COUPLING] Overloads bind directly to core geometry types (Point, Polygon,
+// ExPolygon), so callers across libslic3r can stream these types with the
+// standard iostream API.
+// [HAZARD] Several loops iterate by value (copying Point/Polygon instances),
+// which is acceptable for debug output but can be expensive if used in hot
+// paths or accidentally compiled into high-frequency logging.
+
 inline std::ostream& operator<<(std::ostream& os, const Points& pts)
 {
+    // [INTENT] Prefix with container size to make downstream log parsing robust
+    // when multiple point arrays are concatenated into one stream.
     os << "[" << pts.size() << "]:";
     for (Point p : pts)
         os << " (" << p << ")";
@@ -42,6 +54,8 @@ inline std::ostream& operator<<(std::ostream& os, const Polygons& polys)
 
 inline std::ostream& operator<<(std::ostream& os, const ExPolygon& epoly)
 {
+    // [INTENT] Emit contour and holes separately because many slicer bugs
+    // involve incorrect contour-hole relationships rather than raw vertices.
     os << "ExPolygon:\n";
     os << "  contour: " << epoly.contour;
     os << "  holes: " << epoly.holes;

@@ -1,6 +1,16 @@
 #ifndef _prusaslicer_technologies_h_
 #define _prusaslicer_technologies_h_
 
+// [INTENT] Centralize compile-time feature toggles used for developer-facing
+// diagnostics and incremental feature rollouts. Keeping flags in one header
+// makes behavior differences explicit across build configurations.
+// [COUPLING] These macros are consumed from multiple GUI/runtime units via
+// preprocessor conditionals, so renaming/removing a flag can silently alter
+// compiled control flow in distant modules.
+// [HAZARD] Preprocessor flags create configuration-dependent binaries where
+// dead code in one build may be active in another; translation should model
+// these as explicit runtime capability switches when possible.
+
 //=============
 // debug techs
 //=============

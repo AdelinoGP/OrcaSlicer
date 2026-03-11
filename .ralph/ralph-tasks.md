@@ -879,7 +879,7 @@ implements.)
               + src/libslic3r/SlicingAdaptive.hpp
              Commit: `annotate: src/libslic3r files (T4060r)`
 
-- [ ] T4060s  annotate: src/libslic3r/StreamUtils.hpp
+- [x] T4060s  annotate: src/libslic3r/StreamUtils.hpp
               + src/libslic3r/SurfaceMesh.hpp
               + src/libslic3r/SVG.hpp
               + src/libslic3r/Technologies.hpp

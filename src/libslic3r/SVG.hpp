@@ -13,6 +13,13 @@ namespace Slic3r {
 class SVG
 {
 public:
+    // [INTENT] SVG is a geometry-debug sink used by slicing modules to emit
+    // inspectable 2D traces (contours, infill lines, surfaces) independent of
+    // GUI rendering pipelines.
+    // [MEMORY] Lifetime is managed manually with raw FILE*; Close() and the
+    // destructor must run to flush and release the handle.
+    // [COUPLING] Accepts many core geometry containers directly, coupling this
+    // helper to Polygon/Surface/Clipper representations across libslic3r.
     bool arrows;
     std::string fill, stroke;
     Point origin;
@@ -32,6 +39,8 @@ public:
     SVG(const std::string &filename, const BoundingBox &bbox, const coord_t bbox_offset = scale_(1.), bool flipY = true) : 
         arrows(false), fill("grey"), stroke("black"), filename(filename), origin(bbox.min - Point(bbox_offset, bbox_offset)), flipY(flipY)
         { open(filename, bbox, bbox_offset, flipY); }
+    // [HAZARD] Destructor performs file I/O during object teardown; if caller
+    // abandons partially initialized objects, output may be truncated.
     ~SVG() { if (f != NULL) Close(); }
 
     bool open(const char* filename);
@@ -172,6 +181,8 @@ public:
         { export_expolygons(path.c_str(), expolygons_with_attributes); }
 
 private:
+    // [INTENT] Keep all draw APIs on the same unit transform from internal
+    // scaled coordinates to SVG canvas units.
     static float    to_svg_coord(float x) throw() { return unscale<float>(x) * 10.f; }
     static float    to_svg_x(float x) throw() { return to_svg_coord(x); }
     float           to_svg_y(float x) const throw() { return flipY ? this->height - to_svg_coord(x) : to_svg_coord(x); }

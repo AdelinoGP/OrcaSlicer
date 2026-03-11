@@ -10,6 +10,8 @@
 // tessellation errors are silently swallowed.  A port should log or assert.
 // [CONCURRENCY] Thread-safe only if each call site creates its own
 // GluTessWrapper; the wrapper is never shared.
+// [COUPLING] Hard dependency on GLU tessellation callback API and pointer-based
+// vertex handoff conventions from glu-libtess.
 #include "Tesselate.hpp"
 
 #include "ExPolygon.hpp"
@@ -44,6 +46,8 @@ public:
                 num_coords += poly.points.size();
             coords.reserve(num_coords * 3);
         }
+        // [STATE] GLU callbacks mutate this wrapper's members (primitive mode,
+        // temporary vertices, and output buffer) through polygonData pointer.
         gluTessBeginPolygon(m_tesselator, (void*) this);
         gluTessBeginContour(m_tesselator);
         for (const Point& pt : expoly.contour.points) {
@@ -146,6 +150,8 @@ private:
             memcpy(m_pt1, ptr, sizeof(GLdouble) * 3);
         } else {
             bool flip = m_flipped;
+            // [INTENT] GLU emits strip/fan streams; normalize to independent
+            // triangles expected by downstream mesh/rendering code.
             if (m_primitive_type == GL_TRIANGLE_STRIP && m_num_points == 4) {
                 flip         = !flip;
                 m_num_points = 2;
@@ -173,6 +179,8 @@ private:
 
     void tessCombine(const GLdouble newVertex[3], const GLdouble* neighborVertex[4], const GLfloat neighborWeight[4], GLdouble** outData)
     {
+        // [MEMORY] GLU requires the combined vertex pointer to remain valid
+        // after callback returns; deque storage preserves pointer stability.
         m_intersection_points.emplace_back(newVertex[0], newVertex[1], m_z);
         *outData = m_intersection_points.back().data();
     }

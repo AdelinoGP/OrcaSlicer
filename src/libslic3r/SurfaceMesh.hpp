@@ -26,6 +26,9 @@ public:
     bool operator==(const Halfedge_index& rhs) const { return m_face == rhs.m_face && m_side == rhs.m_side; }
 
 private:
+    // [INTENT] Compact halfedge identity as (face index, local side) so
+    // topology traversals can be derived from triangle adjacency without
+    // allocating a separate mutable half-edge storage.
     Halfedge_index(int face_idx, unsigned char side_idx) : m_face(Face_index(face_idx)), m_side(side_idx) {}
 
     Face_index m_face;
@@ -40,7 +43,10 @@ class Vertex_index {
 public:
     Vertex_index() : m_face(Face_index(-1)), m_vertex_idx(0) {}
     bool is_invalid() const { return int(m_face) < 0; }
-    bool operator==(const Vertex_index& rhs) const = delete; // Use SurfaceMesh::is_same_vertex.
+    // [HAZARD] Vertex equality is not lexical on (face, corner): the same
+    // geometric vertex can appear under multiple corners, so callers must use
+    // SurfaceMesh::is_same_vertex() to compare canonical vertex ids.
+    bool operator==(const Vertex_index& rhs) const = delete; // Use SurfaceMesh::is_same_vertex().
 
 private:
     Vertex_index(int face_idx, unsigned char vertex_idx) : m_face(Face_index(face_idx)), m_vertex_idx(vertex_idx) {}
@@ -53,6 +59,10 @@ private:
 
 class SurfaceMesh {
 public:
+    // [INTENT] Read-only half-edge facade over indexed_triangle_set for mesh
+    // neighborhood walks used by geometry/topology checks.
+    // [COUPLING] Depends on indexed_triangle_set layout and
+    // its_face_neighbors_par() neighbor ordering from TriangleMesh utilities.
     explicit SurfaceMesh(const indexed_triangle_set& its)
     : m_its(its),
       m_face_neighbors(its_face_neighbors_par(its))
@@ -78,6 +88,8 @@ public:
         if (h_candidate.is_invalid())
             return Halfedge_index(); // invalid
 
+        // [INTENT] Neighbor face id only gives candidate triangle; scan its 3
+        // directed sides to find the edge with reversed orientation.
         for (int i=0; i<3; ++i) {
             if (is_same_vertex(source(h_candidate), target(h))) {
                 // Meshes in PrusaSlicer should be fixed enough for the following not to happen.
@@ -117,9 +129,8 @@ public:
 
     size_t degree(Vertex_index v) const
     {
-        // In case the mesh is broken badly, the loop might end up to be infinite,
-        // never getting back to the first halfedge. Remember list of all half-edges
-        // and trip if any is encountered for the second time.
+        // [HAZARD] Corrupted/non-manifold neighbor rings can loop forever;
+        // detect repeated halfedges and return 0 as invalid-topology sentinel.
         Halfedge_index h_first = halfedge(v);
         boost::container::small_vector<Halfedge_index, 10> he_visited;
         Halfedge_index h = next_around_target(h_first);
@@ -154,6 +165,8 @@ public:
 
 
 private:
+    // [MEMORY] Holds a const reference to external indexed_triangle_set;
+    // caller must keep mesh storage alive for SurfaceMesh lifetime.
     const std::vector<Vec3i32> m_face_neighbors;
     const indexed_triangle_set& m_its;
 };
