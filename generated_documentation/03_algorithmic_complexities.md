@@ -2,7 +2,7 @@
 
 ## 1. Core Slicing Algorithm
 
-**Files:** [`TriangleMeshSlicer.cpp`](../src/libslic3r/TriangleMeshSlicer.cpp), [`TriangleMeshSlicer.hpp`](../src/libslic3r/TriangleMeshSlicer.hpp)
+**Files:** [`slice_mesh`](../src/libslic3r/TriangleMeshSlicer.hpp#L60-L72), [`slice_mesh_ex`](../src/libslic3r/TriangleMeshSlicer.hpp#L72-L94)
 
 ### Overview
 
@@ -60,7 +60,7 @@ After per-layer `Polygons` are produced by `slice_mesh()`, `slice_mesh_ex()` app
 
 ## 2b. Model Loading in Detail
 
-**Primary dispatch:** [`Model::read_from_file`](../src/libslic3r/Model.cpp#L353) selects the loader mostly by extension and normalizes every successful import into the same `Model -> ModelObject -> ModelVolume -> TriangleMesh` scene graph.
+**Primary dispatch:** [`Model::read_from_file`](../src/libslic3r/Model.cpp#L317-L317) selects the loader mostly by extension and normalizes every successful import into the same `Model -> ModelObject -> ModelVolume -> TriangleMesh` scene graph.
 
 ### Pipeline classes
 
@@ -72,7 +72,7 @@ After per-layer `Polygons` are produced by `slice_mesh()`, `slice_mesh_ex()` app
 
 ### What admesh repair actually guarantees
 
-The STL conversion path is defined in [`TriangleMesh::trianglemesh_repair_on_import`](../src/libslic3r/TriangleMesh.cpp#L100) and reused by any importer that ends in `TriangleMesh::from_stl()`.
+The STL conversion path is defined in [`TriangleMesh::trianglemesh_repair_on_import`](../src/libslic3r/TriangleMesh.cpp#L120-L120) and reused by any importer that ends in `TriangleMesh::from_stl()`.
 
 - Exact shared-edge matching: `stl_check_facets_exact()` welds bitwise-identical triangle edges first.
 - Nearby-edge stitching: `stl_check_facets_nearby()` retries with a tolerance derived from shortest edge and bounding diameter.
@@ -86,16 +86,16 @@ This means "pre-admesh repair" differs sharply by parser: STL/STEP/SVG/ModelIO c
 
 | Parser | Produces `indexed_triangle_set` directly? | Intermediate representation before final mesh | Mesh quality guarantees before admesh repair |
 |---|---|---|---|
-| [`STL.cpp`](../src/libslic3r/Format/STL.cpp#L39) | No | `TriangleMesh::ReadSTLFile()` reads binary/ASCII STL into admesh `stl_file`, then `TriangleMesh::from_stl()` converts to ITS | Strongest normalization path: edge matching, nearby welding, unconnected-face removal, normal fix, signed-volume flip, but no hole fill |
-| [`OBJ.cpp`](../src/libslic3r/Format/OBJ.cpp#L58) | Yes | `ObjParser` token stream -> direct ITS assembly -> `TriangleMesh(std::move(its))` | Rejects faces with fewer than 3 or more than 4 vertices; quads are fan-triangulated; only global negative-volume winding is corrected |
-| [`AMF.cpp`](../src/libslic3r/Format/AMF.cpp#L675) | Yes | SAX parser builds shared object vertex table, then each `<volume>` is compacted into its own ITS | Validates face indices, compacts referenced vertex span, and flips the whole ITS if signed volume is negative; no edge welding or manifold repair |
-| [`3mf.cpp`](../src/libslic3r/Format/3mf.cpp#L447) | Yes | ZIP + streaming XML -> one geometry buffer per object -> sidecar triangle ranges split geometry back into per-volume ITS blocks in [`_generate_volumes`](../src/libslic3r/Format/3mf.cpp#L2168) | Validates triangle/vertex index ranges, preserves stored mesh-repair stats metadata, and flips whole-volume winding if negative; geometry itself is not re-repaired on import |
-| [`bbs_3mf.cpp`](../src/libslic3r/Format/bbs_3mf.cpp#L4798) | Yes | Same core 3MF geometry idea, but with Bambu sidecars, split object files, shared-mesh references, and per-volume extension metadata | Similar to base 3MF: validates indices, reconstructs per-volume ITS blocks, reapplies stored mesh stats/extensions, flips negative-volume meshes, but does not run admesh repair unless a later tool explicitly does so |
-| [`STEP.cpp`](../src/libslic3r/Format/STEP.cpp#L528) | No | OCCT B-Rep document -> `BRepMesh_IncrementalMesh` tessellation -> copied into admesh `stl_file` -> `TriangleMesh::from_stl()` | Tessellation quality is controlled by OCCT linear/angular deflection; after tessellation it inherits the STL/admesh repair guarantees |
-| [`svg.cpp`](../src/libslic3r/Format/svg.cpp#L1) | No | NanoSVG paths -> sampled polylines -> Clipper stroke offsets -> OCCT prism extrusion -> admesh `stl_file` -> `TriangleMesh::from_stl()` | Guarantees only sampled/extruded approximation before repair; fidelity depends on Bezier sampling and fixed extrusion depth, then admesh cleans topology like STL |
-| [`DRC.cpp`](../src/libslic3r/Format/DRC.cpp#L45) | Yes | Draco decoder -> direct ITS reconstruction from decoded position/face arrays | Verifies geometry kind is triangular mesh and remaps Draco point IDs back to position indices; only global winding is normalized |
-| [`SL1.cpp`](../src/libslic3r/Format/SL1.cpp#L344) | Yes, but only after raster reconstruction | ZIP archive -> PNG decode -> marching squares -> `ExPolygons` -> [`slices_to_mesh()`](../src/libslic3r/Format/SL1.cpp#L396) -> ITS | Guarantees a contour-lofted shell consistent with archived slice rasters; geometry is intentionally lossy and bounded by raster resolution/window smoothing |
-| [`ModelIO.hpp`](../src/libslic3r/Format/ModelIO.hpp#L4) | No | Apple-only foreign format -> temporary STL file -> normal STL loader | No format-native guarantee at all; the fallback intentionally inherits STL parsing + admesh repair semantics |
+| [`load_stl`](../src/libslic3r/Format/STL.cpp#L39-L39) | No | `TriangleMesh::ReadSTLFile()` reads binary/ASCII STL into admesh `stl_file`, then `TriangleMesh::from_stl()` converts to ITS | Strongest normalization path: edge matching, nearby welding, unconnected-face removal, normal fix, signed-volume flip, but no hole fill |
+| [`load_obj`](../src/libslic3r/Format/OBJ.cpp#L58-L58) | Yes | `ObjParser` token stream -> direct ITS assembly -> `TriangleMesh(std::move(its))` | Rejects faces with fewer than 3 or more than 4 vertices; quads are fan-triangulated; only global negative-volume winding is corrected |
+| [`load_amf`](../src/libslic3r/Format/AMF.cpp#L1196-L1210) | Yes | SAX parser builds shared object vertex table, then each `<volume>` is compacted into its own ITS | Validates face indices, compacts referenced vertex span, and flips the whole ITS if signed volume is negative; no edge welding or manifold repair |
+| [`_3MF_Importer::_generate_volumes`](../src/libslic3r/Format/3mf.cpp#L2168-L2168) | Yes | ZIP + streaming XML -> one geometry buffer per object -> sidecar triangle ranges split geometry back into per-volume ITS blocks in [`_3MF_Importer::_generate_volumes`](../src/libslic3r/Format/3mf.cpp#L2168-L2168) | Validates triangle/vertex index ranges, preserves stored mesh-repair stats metadata, and flips whole-volume winding if negative; geometry itself is not re-repaired on import |
+| [`_BBS_3MF_Importer::_generate_volumes_new`](../src/libslic3r/Format/bbs_3mf.cpp#L4798-L4798) | Yes | Same core 3MF geometry idea, but with Bambu sidecars, split object files, shared-mesh references, and per-volume extension metadata | Similar to base 3MF: validates indices, reconstructs per-volume ITS blocks, reapplies stored mesh stats/extensions, flips negative-volume meshes, but does not run admesh repair unless a later tool explicitly does so |
+| [`BRepMesh_IncrementalMesh`](../src/libslic3r/Format/STEP.cpp#L565-L565) | No | OCCT B-Rep document -> `BRepMesh_IncrementalMesh` tessellation -> copied into admesh `stl_file` -> `TriangleMesh::from_stl()` | Tessellation quality is controlled by OCCT linear/angular deflection; after tessellation it inherits the STL/admesh repair guarantees |
+| [`load_svg`](../src/libslic3r/Format/svg.cpp#L339-L342) | No | NanoSVG paths -> sampled polylines -> Clipper stroke offsets -> OCCT prism extrusion -> admesh `stl_file` -> `TriangleMesh::from_stl()` | Guarantees only sampled/extruded approximation before repair; fidelity depends on Bezier sampling and fixed extrusion depth, then admesh cleans topology like STL |
+| [`load_drc`](../src/libslic3r/Format/DRC.cpp#L45-L45) | Yes | Draco decoder -> direct ITS reconstruction from decoded position/face arrays | Verifies geometry kind is triangular mesh and remaps Draco point IDs back to position indices; only global winding is normalized |
+| [`slices_to_mesh`](../src/libslic3r/SlicesToTriangleMesh.cpp#L122-L129) | Yes, but only after raster reconstruction | ZIP archive -> PNG decode -> marching squares -> `ExPolygons` -> [`slices_to_mesh`](../src/libslic3r/SlicesToTriangleMesh.cpp#L122-L129) -> ITS | Guarantees a contour-lofted shell consistent with archived slice rasters; geometry is intentionally lossy and bounded by raster resolution/window smoothing |
+| [`make_temp_stl_with_modelio`](../src/libslic3r/Format/ModelIO.hpp#L14-L14) | No | Apple-only foreign format -> temporary STL file -> normal STL loader | No format-native guarantee at all; the fallback intentionally inherits STL parsing + admesh repair semantics |
 
 ### Practical translation takeaway
 
@@ -107,7 +107,7 @@ This means "pre-admesh repair" differs sharply by parser: STL/STEP/SVG/ModelIO c
 
 ## 2. Perimeter Generation
 
-**Files:** [`PerimeterGenerator.cpp`](../src/libslic3r/PerimeterGenerator.cpp), [`WallToolPaths.cpp`](../src/libslic3r/Arachne/WallToolPaths.cpp#L553), [`SkeletalTrapezoidation.cpp`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L604)
+**Files:** [`PerimeterGenerator::process_classic`](../src/libslic3r/PerimeterGenerator.cpp#L1487-L1487), [`WallToolPaths::generate`](../src/libslic3r/Arachne/WallToolPaths.cpp#L553-L553), [`SkeletalTrapezoidation::generateToolpaths`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L604-L604)
 
 ### Classic Perimeter Generator
 
@@ -123,12 +123,12 @@ This means "pre-admesh repair" differs sharply by parser: STL/STEP/SVG/ModelIO c
 
 ### Arachne Variable-Width Generator
 
-- **Entry point:** [`WallToolPaths::generate()`](../src/libslic3r/Arachne/WallToolPaths.cpp#L553) preprocesses the polygon, builds the beading-strategy decorator chain via [`BeadingStrategyFactory::makeStrategy()`](../src/libslic3r/Arachne/BeadingStrategy/BeadingStrategyFactory.cpp#L50), and then hands the cleaned outline to [`SkeletalTrapezoidation::generateToolpaths()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L604).
-- **Medial axis / straight skeleton:** [`SkeletalTrapezoidation::constructFromPolygons()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.hpp#L312) builds a Boost Voronoi diagram over polygon segments, discretizes parabolic point-segment arcs into linear pieces, and transfers the result into a half-edge graph backed by [`HalfEdgeGraph`](../src/libslic3r/Arachne/utils/HalfEdgeGraph.hpp#L27). The working graph mixes true skeleton edges with rib edges that connect the skeleton back to the original boundary.
-- **Central-edge detection:** [`SkeletalTrapezoidation::updateIsCentral()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L672) classifies which half-edges belong to the usable medial axis by comparing edge length against change in distance-to-boundary. This is the actual "straight skeleton" filter: equidistant and slowly changing regions remain central; ribs and near-boundary artifacts are filtered away.
+- **Entry point:** [`WallToolPaths::generate`](../src/libslic3r/Arachne/WallToolPaths.cpp#L553-L553) preprocesses the polygon, builds the beading-strategy decorator chain via [`BeadingStrategyFactory::makeStrategy`](../src/libslic3r/Arachne/BeadingStrategy/BeadingStrategyFactory.cpp#L50-L50), and then hands the cleaned outline to [`SkeletalTrapezoidation::generateToolpaths`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L604-L604).
+- **Medial axis / straight skeleton:** [`SkeletalTrapezoidation::constructFromPolygons`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L431-L431) builds a Boost Voronoi diagram over polygon segments, discretizes parabolic point-segment arcs into linear pieces, and transfers the result into a half-edge graph backed by [`HalfEdgeGraph`](../src/libslic3r/Arachne/utils/HalfEdgeGraph.hpp#L27-L27). The working graph mixes true skeleton edges with rib edges that connect the skeleton back to the original boundary.
+- **Central-edge detection:** [`SkeletalTrapezoidation::updateIsCentral`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L672-L672) classifies which half-edges belong to the usable medial axis by comparing edge length against change in distance-to-boundary. This is the actual "straight skeleton" filter: equidistant and slowly changing regions remain central; ribs and near-boundary artifacts are filtered away.
 - **Beading strategy dispatch:** The decorator chain decides how many walls fit at each local thickness `2R` and how the leftover width is distributed. `DistributedBeadingStrategy` computes the base split, `RedistributeBeadingStrategy` protects outer-vs-inner wall roles, `WideningBeadingStrategy` optionally expands thin features, `OuterWallInsetBeadingStrategy` applies Orca's outer-wall offset, and `LimitedBeadingStrategy` caps bead count and injects the 0-width sentinel contour.
-- **Variable-width assignment:** [`SkeletalTrapezoidation::generateSegments()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L1666) computes or interpolates per-node beadings, propagates them upward and downward through the skeleton, emits per-edge junction samples, and connects those samples into [`ExtrusionLine`](../src/libslic3r/Arachne/utils/ExtrusionLine.hpp#L52) polylines built from [`ExtrusionJunction`](../src/libslic3r/Arachne/utils/ExtrusionJunction.hpp#L29). Each junction carries its own local width, so one wall can smoothly narrow or widen along its length.
-- **Post-processing and stitching:** [`WallToolPaths::stitchToolPaths()`](../src/libslic3r/Arachne/WallToolPaths.cpp#L716) uses [`PolylineStitcher`](../src/libslic3r/Arachne/utils/PolylineStitcher.hpp#L38) plus sparse-grid helpers ([`SparseGrid`](../src/libslic3r/Arachne/utils/SparseGrid.hpp#L34), [`SquareGrid`](../src/libslic3r/Arachne/utils/SquareGrid.hpp#L37), [`PolygonsPointIndex`](../src/libslic3r/Arachne/utils/PolygonsPointIndex.hpp#L158), [`PolygonsSegmentIndex`](../src/libslic3r/Arachne/utils/PolygonsSegmentIndex.hpp#L27)) to merge fragmented wall fragments back into printable loops and open centerlines.
+- **Variable-width assignment:** [`SkeletalTrapezoidation::generateSegments`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L1666-L1666) computes or interpolates per-node beadings, propagates them upward and downward through the skeleton, emits per-edge junction samples, and connects those samples into [`ExtrusionLine`](../src/libslic3r/Arachne/utils/ExtrusionLine.hpp#L52-L52) polylines built from [`ExtrusionJunction`](../src/libslic3r/Arachne/utils/ExtrusionJunction.hpp#L29-L29). Each junction carries its own local width, so one wall can smoothly narrow or widen along its length.
+- **Post-processing and stitching:** [`WallToolPaths::stitchToolPaths`](../src/libslic3r/Arachne/WallToolPaths.cpp#L716-L716) uses [`PolylineStitcher`](../src/libslic3r/Arachne/utils/PolylineStitcher.hpp#L38-L38) plus sparse-grid helpers ([`SparseGrid`](../src/libslic3r/Arachne/utils/SparseGrid.hpp#L34-L34), [`SquareGrid`](../src/libslic3r/Arachne/utils/SquareGrid.hpp#L37-L37), [`PolygonsPointIndex`](../src/libslic3r/Arachne/utils/PolygonsPointIndex.hpp#L158-L158), [`PolygonsSegmentIndex`](../src/libslic3r/Arachne/utils/PolygonsSegmentIndex.hpp#L27-L27)) to merge fragmented wall fragments back into printable loops and open centerlines.
 - **When it wins over classic perimeters:** Arachne pays extra `O(V log V)` setup cost to preserve thin features and gradual wall-count transitions that the classic repeated-offset generator would collapse or quantize.
 
 **For full algorithm details see Section 15 — Arachne: Straight Skeleton and Variable-Width Perimeters.**
@@ -141,7 +141,7 @@ This means "pre-admesh repair" differs sharply by parser: STL/STEP/SVG/ModelIO c
 
 ### Factory Pattern
 
-`Fill::Create(InfillPattern)` in [`Fill.cpp`](../src/libslic3r/Fill/Fill.cpp) returns a `FillBase*` subclass based on config enum.
+`Fill::Create(InfillPattern)` in [`Fill::Create`](../src/libslic3r/Fill/Fill.cpp#L21-L21) returns a `FillBase*` subclass based on config enum.
 
 ### Common Infill Patterns
 
@@ -175,22 +175,22 @@ This means "pre-admesh repair" differs sharply by parser: STL/STEP/SVG/ModelIO c
 - Minimizes material while ensuring no interior point is unsupported for top surface
 
 #### TPMS Infill (`FillTpmsD`, `FillTpmsFK`)
-- Both patterns generate a full-plane TPMS cross-section first, then run the same finishing stages: optional `-45°` pattern rotation, multiline widening, polygon clipping, short-fragment pruning, and infill connection ([`FillTpmsD::_fill_surface_single()`](../src/libslic3r/Fill/FillTpmsD.cpp#L196), [`FillTpmsFK::_fill_surface_single()`](../src/libslic3r/Fill/FillTpmsFK.cpp#L213)).
+- Both patterns generate a full-plane TPMS cross-section first, then run the same finishing stages: optional `-45°` pattern rotation, multiline widening, polygon clipping, short-fragment pruning, and infill connection ([`FillTpmsD::_fill_surface_single`](../src/libslic3r/Fill/FillTpmsD.cpp#L196-L196), [`FillTpmsFK::_fill_surface_single`](../src/libslic3r/Fill/FillTpmsFK.cpp#L213-L213)).
 
 ##### TPMS D / Schwartz Diamond (`FillTpmsD`)
 
-- **Implicit surface:** `sin(x)sin(y)sin(z) - cos(x)cos(y)cos(z) = 0` ([`FillTpmsD.hpp`](../src/libslic3r/Fill/FillTpmsD.hpp#L1), [`FillTpmsD.cpp`](../src/libslic3r/Fill/FillTpmsD.cpp#L37)).
-- **Analytic cross-section extraction:** the implementation rewrites the surface into `a*cos(u) = b*cos(v)` with `u = x - y`, `v = x + y`, `a = sin(z) - cos(z)`, and `b = sin(z) + cos(z)`. For a fixed layer `z`, it solves one branch explicitly as `v = acos((a / b) * cos(u))`; if `|a| > |b|`, it swaps `u` and `v` first so the `acos` argument stays in `[-1, 1]` ([`FillTpmsD.cpp`](../src/libslic3r/Fill/FillTpmsD.cpp#L39)).
-- **Adaptive sampling algorithm:** `make_waves()` seeds one `2pi` period with 16 uniform segments, evaluates the true midpoint on every chord, and inserts a midpoint whenever the deviation exceeds `min(line_spacing / 2, PatternTolerance) / scaleFactor`. This repeats until every segment satisfies the chord-error bound, then the single-period wave is tiled across the bounding box and mirrored into `+v` and `-v` branches ([`FillTpmsD.cpp`](../src/libslic3r/Fill/FillTpmsD.cpp#L114)).
-- **Density mapping:** requested density is converted into spatial frequency through `DensityAdjust = 2.1`, so denser infill means a smaller effective TPMS cell size rather than tighter 2D hatch spacing ([`FillTpmsD.hpp`](../src/libslic3r/Fill/FillTpmsD.hpp#L66), [`FillTpmsD.cpp`](../src/libslic3r/Fill/FillTpmsD.cpp#L209)).
+- **Implicit surface:** `sin(x)sin(y)sin(z) - cos(x)cos(y)cos(z) = 0` ([`FillTpmsD::DensityAdjust`](../src/libslic3r/Fill/FillTpmsD.hpp#L73-L73), [`make_waves`](../src/libslic3r/Fill/FillTpmsD.cpp#L60-L60)).
+- **Analytic cross-section extraction:** the implementation rewrites the surface into `a*cos(u) = b*cos(v)` with `u = x - y`, `v = x + y`, `a = sin(z) - cos(z)`, and `b = sin(z) + cos(z)`. For a fixed layer `z`, it solves one branch explicitly as `v = acos((a / b) * cos(u))`; if `|a| > |b|`, it swaps `u` and `v` first so the `acos` argument stays in `[-1, 1]` ([`make_waves`](../src/libslic3r/Fill/FillTpmsD.cpp#L60-L60)).
+- **Adaptive sampling algorithm:** `make_waves()` seeds one `2pi` period with 16 uniform segments, evaluates the true midpoint on every chord, and inserts a midpoint whenever the deviation exceeds `min(line_spacing / 2, PatternTolerance) / scaleFactor`. This repeats until every segment satisfies the chord-error bound, then the single-period wave is tiled across the bounding box and mirrored into `+v` and `-v` branches ([`make_waves`](../src/libslic3r/Fill/FillTpmsD.cpp#L60-L60)).
+- **Density mapping:** requested density is converted into spatial frequency through `DensityAdjust = 2.1`, so denser infill means a smaller effective TPMS cell size rather than tighter 2D hatch spacing ([`FillTpmsD::DensityAdjust`](../src/libslic3r/Fill/FillTpmsD.hpp#L73-L73), [`FillTpmsD::_fill_surface_single`](../src/libslic3r/Fill/FillTpmsD.cpp#L196-L215)).
 - **Complexity:** approximately `O(P + R x S)` per region, where `P` is the number of tiled wave periods, `R` is the number of `vShift` bands crossing the bounding box, and `S` is the refined sample count per period. Because refinement is curvature-driven, high-density or high-curvature layers cost more than flat layers, but the work still scales with covered area rather than triangle count.
 
 ##### TPMS FK / Fischer-Koch S (`FillTpmsFK`)
 
-- **Implicit surface:** `cos(2x)sin(y)cos(z) + cos(2y)sin(z)cos(x) + cos(2z)sin(x)cos(y) = 0` ([`FillTpmsFK.hpp`](../src/libslic3r/Fill/FillTpmsFK.hpp#L1), [`FillTpmsFK.cpp`](../src/libslic3r/Fill/FillTpmsFK.cpp#L7)).
-- **Cross-section extraction method:** unlike TPMS D, FK is not converted into an explicit wave equation. OrcaSlicer builds a sampled scalar field over an expanded bounding box, evaluates the implicit field at the current layer height, and extracts the zero-isocontour with Marching Squares ([`ScalarField`](../src/libslic3r/Fill/FillTpmsFK.cpp#L38), [`get_polylines()`](../src/libslic3r/Fill/FillTpmsFK.cpp#L143)).
-- **Sampling grid:** the field uses a coarse marching cell size of `0.40 mm` and a raster accuracy of `0.004 mm`; Marching Squares runs with TBB parallelism, returns closed rings, and simplifies them with `SCALED_SPARSE_INFILL_RESOLUTION` before clipping ([`FillTpmsFK.cpp`](../src/libslic3r/Fill/FillTpmsFK.cpp#L51), [`FillTpmsFK.cpp`](../src/libslic3r/Fill/FillTpmsFK.cpp#L166), [`FillTpmsFK.cpp`](../src/libslic3r/Fill/FillTpmsFK.cpp#L251)).
-- **Density mapping:** the FK period is `vari_T = 4.18 * spacing * multiline / density_factor`, with `density_factor = min(0.9, params.density)`. So density changes the 3D field period directly, and the implementation intentionally caps effective density at 90% to avoid a degenerate field near solid fill ([`FillTpmsFK.cpp`](../src/libslic3r/Fill/FillTpmsFK.cpp#L225)).
+- **Implicit surface:** `cos(2x)sin(y)cos(z) + cos(2y)sin(z)cos(x) + cos(2z)sin(x)cos(y) = 0` ([`marchsq::ScalarField`](../src/libslic3r/Fill/FillTpmsFK.cpp#L49-L71), [`FillTpmsFK::_fill_surface_single`](../src/libslic3r/Fill/FillTpmsFK.cpp#L213-L256)).
+- **Cross-section extraction method:** unlike TPMS D, FK is not converted into an explicit wave equation. OrcaSlicer builds a sampled scalar field over an expanded bounding box, evaluates the implicit field at the current layer height, and extracts the zero-isocontour with Marching Squares ([`marchsq::ScalarField`](../src/libslic3r/Fill/FillTpmsFK.cpp#L49-L71), [`marchsq::get_polylines`](../src/libslic3r/Fill/FillTpmsFK.cpp#L164-L164)).
+- **Sampling grid:** the field uses a coarse marching cell size of `0.40 mm` and a raster accuracy of `0.004 mm`; Marching Squares runs with TBB parallelism, returns closed rings, and simplifies them with `SCALED_SPARSE_INFILL_RESOLUTION` before clipping ([`marchsq::ScalarField`](../src/libslic3r/Fill/FillTpmsFK.cpp#L49-L71), [`marchsq::get_polylines`](../src/libslic3r/Fill/FillTpmsFK.cpp#L164-L164), [`FillTpmsFK::_fill_surface_single`](../src/libslic3r/Fill/FillTpmsFK.cpp#L251-L256)).
+- **Density mapping:** the FK period is `vari_T = 4.18 * spacing * multiline / density_factor`, with `density_factor = min(0.9, params.density)`. So density changes the 3D field period directly, and the implementation intentionally caps effective density at 90% to avoid a degenerate field near solid fill ([`FillTpmsFK::_fill_surface_single`](../src/libslic3r/Fill/FillTpmsFK.cpp#L239-L239)).
 - **Complexity:** approximately `O(G + C)` per region, where `G` is the number of sampled grid cells in the expanded bounding box and `C` is the total contour length emitted by Marching Squares. In practice this is more predictable than TPMS D because cost is dominated by raster area, not adaptive subdivision.
 
 ##### Practical Difference Between The Two TPMS Paths
@@ -210,7 +210,7 @@ This means "pre-admesh repair" differs sharply by parser: STL/STEP/SVG/ModelIO c
 
 ## 4. Bridge and Overhang Detection
 
-**File:** [`BridgeDetector.cpp`](../src/libslic3r/BridgeDetector.cpp)
+**File:** [`BridgeDetector::detect_angle`](../src/libslic3r/BridgeDetector.cpp#L150-L150)
 
 ### Algorithm
 
@@ -242,7 +242,7 @@ A newer BBS addition: estimates which extrusions will curl upward due to cooling
 
 ### Traditional Support Pipeline Detail (Session 5)
 
-**File:** [`src/libslic3r/Support/SupportMaterial.cpp`](../src/libslic3r/Support/SupportMaterial.cpp)
+**File:** [`PrintObjectSupportMaterial::generate`](../src/libslic3r/Support/SupportMaterial.cpp#L457-L457)
 
 #### `generate()` — 11-Step Serial Orchestration
 
@@ -356,7 +356,7 @@ A Bambu Lab addition implementing tree-like organic support structures:
 
 ## 7. G-Code Generation
 
-**Files:** [`GCode.cpp`](../src/libslic3r/GCode.cpp), [`GCodeWriter.cpp`](../src/libslic3r/GCodeWriter.cpp)
+**Files:** [`GCode::do_export`](../src/libslic3r/GCode.cpp#L2104-L2104), [`GCodeWriter::extrude_to_xy`](../src/libslic3r/GCodeWriter.cpp#L931-L931)
 
 ### Emission Strategy
 
@@ -393,7 +393,7 @@ Converts sequences of short line segments to arc commands (`G2`/`G3`) where the 
 
 ## 7. SeamPlacer Algorithm (Sessions 3 Details)
 
-**File:** [`src/libslic3r/GCode/SeamPlacer.cpp`](../src/libslic3r/GCode/SeamPlacer.cpp)
+**File:** [`SeamPlacer::align_seam_points`](../src/libslic3r/GCode/SeamPlacer.cpp#L1458-L1458)
 
 ### Visibility Scoring
 
@@ -426,8 +426,8 @@ The combined function strongly biases seam placement toward concave features (th
 
 ## 9. TreeSupport Pipeline Algorithm (Session 6 Details)
 
-**File:** [`src/libslic3r/Support/TreeSupport.cpp`](../src/libslic3r/Support/TreeSupport.cpp)
-**Header:** [`src/libslic3r/Support/TreeSupport.hpp`](../src/libslic3r/Support/TreeSupport.hpp)
+**File:** [`TreeSupport::generate`](../src/libslic3r/Support/TreeSupport.cpp#L1810-L1810)
+**Header:** [`TreeSupport`](../src/libslic3r/Support/TreeSupport.hpp#L543-L543)
 
 ### Pipeline Overview
 
@@ -541,7 +541,7 @@ else:
 
 ## 8. WipeTower2 Planning Algorithm (Session 4 Details)
 
-**File:** [`src/libslic3r/GCode/WipeTower2.cpp`](../src/libslic3r/GCode/WipeTower2.cpp)
+**File:** [`WipeTower2::generate`](../src/libslic3r/GCode/WipeTower2.cpp#L2475-L2475)
 
 ### Two-Phase Architecture
 
@@ -666,7 +666,7 @@ The cross-section normal at waypoints is the bisector direction: `(v1 + v2).norm
 
 ## 8. Overhang Extra Perimeters (PerimeterGenerator.cpp)
 
-**Files:** [`PerimeterGenerator.cpp`](../src/libslic3r/PerimeterGenerator.cpp)
+**Files:** [`PerimeterGenerator::process_classic`](../src/libslic3r/PerimeterGenerator.cpp#L1487-L1487)
 
 ### paths_touch()
 
@@ -730,7 +730,7 @@ For a typical island with 8 walls and 20 extrusion segments this is manageable. 
 
 ## Section 9 — PrintObject.cpp Algorithmic Complexities
 
-**Files:** [`PrintObject.cpp`](../src/libslic3r/PrintObject.cpp)
+**Files:** [`project_triangles_to_slabs`](../src/libslic3r/PrintObject.cpp#L4478-L4478)
 
 ### project_triangles_to_slabs()
 
@@ -976,7 +976,7 @@ JPS is an optimized A* variant for uniform-cost grids:
 
 ## Section 13 — Arc Fitting: Segment-to-Arc Conversion (ArcFitter.cpp)
 
-**File:** [`src/libslic3r/ArcFitter.cpp`](../src/libslic3r/ArcFitter.cpp), [`src/libslic3r/ArcFitter.hpp`](../src/libslic3r/ArcFitter.hpp)
+**File:** [`ArcFitter::do_arc_fitting`](../src/libslic3r/ArcFitter.cpp#L29-L29), [`ArcFitter::do_arc_fitting_and_simplify`](../src/libslic3r/ArcFitter.hpp#L84-L84)
 
 ### Overview
 
@@ -1038,7 +1038,7 @@ A two-pass pipeline combining arc fitting with Douglas-Peucker simplification:
 
 ## Section 14 — Multi-Material Segmentation by Painting (MultiMaterialSegmentation.cpp)
 
-**File:** [`src/libslic3r/MultiMaterialSegmentation.cpp`](../src/libslic3r/MultiMaterialSegmentation.cpp)
+**File:** [`multi_material_segmentation_by_painting`](../src/libslic3r/MultiMaterialSegmentation.cpp#L2490-L2490)
 
 ### Overview
 
@@ -1123,7 +1123,7 @@ segmented_regions[layer_idx][extruder_idx] = ExPolygons
 
 ## Section 15 — Arachne: Straight Skeleton and Variable-Width Perimeters
 
-**Files:** [`src/libslic3r/Arachne/WallToolPaths.cpp`](../src/libslic3r/Arachne/WallToolPaths.cpp), [`src/libslic3r/Arachne/SkeletalTrapezoidation.cpp`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp)
+**Files:** [`WallToolPaths::generate`](../src/libslic3r/Arachne/WallToolPaths.cpp#L553-L553), [`SkeletalTrapezoidation::generateToolpaths`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L604-L604)
 
 ### Overview
 
@@ -1133,9 +1133,9 @@ The Arachne algorithm was developed by Kuipers et al. (TU Delft / Ultimaker) and
 
 The implementation in OrcaSlicer is not a single black-box function. It is a pipeline with three reusable layers:
 
-- Geometry transfer and graph storage: [`HalfEdgeGraph`](../src/libslic3r/Arachne/utils/HalfEdgeGraph.hpp#L27) plus [`SkeletalTrapezoidationGraph`](../src/libslic3r/Arachne/SkeletalTrapezoidationGraph.hpp#L78)
-- Width-bearing output types: [`ExtrusionJunction`](../src/libslic3r/Arachne/utils/ExtrusionJunction.hpp#L29) and [`ExtrusionLine`](../src/libslic3r/Arachne/utils/ExtrusionLine.hpp#L52)
-- Spatial/post-processing utilities: [`PolylineStitcher`](../src/libslic3r/Arachne/utils/PolylineStitcher.hpp#L38), [`SparseGrid`](../src/libslic3r/Arachne/utils/SparseGrid.hpp#L34), [`SquareGrid`](../src/libslic3r/Arachne/utils/SquareGrid.hpp#L37), [`PolygonsPointIndex`](../src/libslic3r/Arachne/utils/PolygonsPointIndex.hpp#L158), and [`PolygonsSegmentIndex`](../src/libslic3r/Arachne/utils/PolygonsSegmentIndex.hpp#L27)
+- Geometry transfer and graph storage: [`HalfEdgeGraph`](../src/libslic3r/Arachne/utils/HalfEdgeGraph.hpp#L27-L27) plus [`SkeletalTrapezoidationGraph`](../src/libslic3r/Arachne/SkeletalTrapezoidationGraph.hpp#L78-L78)
+- Width-bearing output types: [`ExtrusionJunction`](../src/libslic3r/Arachne/utils/ExtrusionJunction.hpp#L29-L29) and [`ExtrusionLine`](../src/libslic3r/Arachne/utils/ExtrusionLine.hpp#L52-L52)
+- Spatial/post-processing utilities: [`PolylineStitcher`](../src/libslic3r/Arachne/utils/PolylineStitcher.hpp#L38-L38), [`SparseGrid`](../src/libslic3r/Arachne/utils/SparseGrid.hpp#L34-L34), [`SquareGrid`](../src/libslic3r/Arachne/utils/SquareGrid.hpp#L37-L37), [`PolygonsPointIndex`](../src/libslic3r/Arachne/utils/PolygonsPointIndex.hpp#L158-L158), and [`PolygonsSegmentIndex`](../src/libslic3r/Arachne/utils/PolygonsSegmentIndex.hpp#L27-L27)
 
 Translation agents should preserve these as separate concerns even if the target language does not keep the exact class layout.
 
@@ -1145,7 +1145,7 @@ Translation agents should preserve these as separate concerns even if the target
 2. Compute the minimum bead count and wall-width constraints from `BeadingStrategyFactory` based on configured `min_bead_width`, `min_feature_size`, `wall_transition_angle`, and `inward_distributed_beads`.
 3. Call `SkeletalTrapezoidation::generateToolpaths()` on the processed polygon.
 
-The real preprocessing sequence in [`WallToolPaths::generate()`](../src/libslic3r/Arachne/WallToolPaths.cpp#L553) is heavier than the three-step summary above:
+The real preprocessing sequence in [`WallToolPaths::generate`](../src/libslic3r/Arachne/WallToolPaths.cpp#L553-L553) is heavier than the three-step summary above:
 
 1. Triple offset `(-e, +2e, -e)` snaps tiny gaps and self-touching spikes.
 2. Simplify, self-intersection repair, degenerate-vertex removal, and near-colinear cleanup run in sequence.
@@ -1155,7 +1155,7 @@ This means Arachne never sees the raw slice polygon. It sees a mesh-fixed versio
 
 ### Phase 1.5 — Beading Strategy Construction
 
-[`BeadingStrategyFactory::makeStrategy()`](../src/libslic3r/Arachne/BeadingStrategy/BeadingStrategyFactory.cpp#L50) builds the width-policy chain once per island:
+[`BeadingStrategyFactory::makeStrategy`](../src/libslic3r/Arachne/BeadingStrategy/BeadingStrategyFactory.cpp#L50-L50) builds the width-policy chain once per island:
 
 1. `DistributedBeadingStrategy` decides the nominal bead count and baseline per-bead widths from local thickness.
 2. `RedistributeBeadingStrategy` preserves outer-wall quality by biasing excess or missing width toward less visible inner beads.
@@ -1170,24 +1170,24 @@ This dispatch layer is why "Arachne" is not one algorithm but a geometry engine 
 The straight skeleton is computed indirectly using the Voronoi diagram of the polygon edges:
 
 1. **Voronoi construction:** `boost::polygon::construct_voronoi()` is run over the polygon segments. Point-segment cells represent corner-to-wall interactions; point-point cells represent corner-to-corner interactions.
-2. **Edge transfer:** [`transferEdge()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.hpp#L355) copies only the Voronoi arcs that lie inside the polygon into the half-edge graph. Straight edges stay straight; parabolic edges are discretized into short linear segments so the rest of the pipeline can stay piecewise-linear.
+2. **Edge transfer:** [`SkeletalTrapezoidation::transferEdge`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L157-L157) copies only the Voronoi arcs that lie inside the polygon into the half-edge graph. Straight edges stay straight; parabolic edges are discretized into short linear segments so the rest of the pipeline can stay piecewise-linear.
 3. **Rib insertion:** Every skeleton segment gets companion rib edges back to the source boundary. The output is therefore a trapezoidation/decomposition of the polygon interior, not just a naked centerline graph.
-4. **Central-edge marking:** [`updateIsCentral()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L672) marks which half-edges are part of the true medial axis. The test compares geometric slope in radius-space (`dR / dD`) against the configured transition angle, so sharp corners naturally produce short non-central ribs while broad valleys remain central.
+4. **Central-edge marking:** [`SkeletalTrapezoidation::updateIsCentral`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L672-L672) marks which half-edges are part of the true medial axis. The test compares geometric slope in radius-space (`dR / dD`) against the configured transition angle, so sharp corners naturally produce short non-central ribs while broad valleys remain central.
 5. **Central cleanup:** `filterCentral()` removes tiny whiskers; `filterOuterCentral()` can optionally demote outermost central edges so sharp tips loop instead of ending as a single strand.
 6. **Local bead counts:** `updateBeadCount()` queries the composed beading strategy with the local diameter `2 * distance_to_boundary`. Each central node now knows how many walls should fit at that thickness.
 7. **Non-central fill:** `filterNoncentralRegions()` extends bead counts across ribs and narrow peninsulas so each trapezoid side has a coherent target wall count.
-8. **Transition placement:** [`generateTransitioningRibs()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L881) and [`generateAllTransitionEnds()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L1218) insert explicit transition markers wherever the optimal bead count changes along an edge.
+8. **Transition placement:** [`SkeletalTrapezoidation::generateTransitioningRibs`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L881-L881) and [`SkeletalTrapezoidation::generateAllTransitionEnds`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L1218-L1218) insert explicit transition markers wherever the optimal bead count changes along an edge.
 
 The crucial mental model is: Arachne does not directly offset the polygon by a fixed spacing. It first converts the interior into a graph whose scalar field is "local printable thickness," then extracts equal-bead contours from that field.
 
 ### Phase 3 — Toolpath Extraction
 
-1. **Beading propagation:** [`generateSegments()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L1666) first stores concrete `Beading` objects at nodes with known counts, then propagates them upward to unresolved maxima and downward across non-central edges. This produces a continuous local wall-width plan across the graph even where no direct `compute()` result existed.
+1. **Beading propagation:** [`SkeletalTrapezoidation::generateSegments`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L1666-L1666) first stores concrete `Beading` objects at nodes with known counts, then propagates them upward to unresolved maxima and downward across non-central edges. This produces a continuous local wall-width plan across the graph even where no direct `compute()` result existed.
 2. **Transition interpolation:** Nodes introduced on transition ribs may hold blended beadings rather than an exact discrete wall count. This is how Arachne changes from, for example, 3 walls to 2 walls without an abrupt step.
 3. **Junction generation:** Each graph edge is sampled into `ExtrusionJunction` points whose fields are `(x, y, local_width, perimeter_index)`. Conceptually, each junction is one point on one isocontour of the local-thickness field.
-4. **Line assembly:** [`connectJunctions()`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L2254) walks each trapezoid/quad, pairs the junction lists on its two sides, and emits segments into `VariableWidthLines`. Those lines are stored as `ExtrusionLine` polylines, one inset band at a time.
-5. **Post-stitching:** [`WallToolPaths::stitchToolPaths()`](../src/libslic3r/Arachne/WallToolPaths.cpp#L716) merges fragmented lines with `PolylineStitcher`. Then `removeSmallLines()`, `separateOutInnerContour()`, and `simplifyToolPaths()` convert the raw skeleton output into printable perimeter loops plus the zero-width inner contour marker.
-6. **Print-pipeline handoff:** [`WallToolPaths::getToolPaths()`](../src/libslic3r/Arachne/WallToolPaths.cpp#L877) lazily caches the result, and `PerimeterGenerator` later orders these lines alongside other extrusion roles.
+4. **Line assembly:** [`SkeletalTrapezoidation::connectJunctions`](../src/libslic3r/Arachne/SkeletalTrapezoidation.cpp#L2254-L2254) walks each trapezoid/quad, pairs the junction lists on its two sides, and emits segments into `VariableWidthLines`. Those lines are stored as `ExtrusionLine` polylines, one inset band at a time.
+5. **Post-stitching:** [`WallToolPaths::stitchToolPaths`](../src/libslic3r/Arachne/WallToolPaths.cpp#L716-L716) merges fragmented lines with `PolylineStitcher`. Then `removeSmallLines()`, `separateOutInnerContour()`, and `simplifyToolPaths()` convert the raw skeleton output into printable perimeter loops plus the zero-width inner contour marker.
+6. **Print-pipeline handoff:** [`WallToolPaths::getToolPaths`](../src/libslic3r/Arachne/WallToolPaths.cpp#L877-L877) lazily caches the result, and `PerimeterGenerator` later orders these lines alongside other extrusion roles.
 
 ### Output Contract
 

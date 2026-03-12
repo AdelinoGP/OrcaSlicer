@@ -314,10 +314,10 @@ H1190 · [HIGH/P1] · `name_tbb_thread_pool_threads_set_locale()` static bool in
 ## 1. Raw-Pointer Ownership Chains
 
 **Location:**
-- [`Print.hpp:175`](../src/libslic3r/Print.hpp#L175) — `typedef std::vector<Layer*> LayerPtrs`
-- [`Print.hpp:182`](../src/libslic3r/Print.hpp#L182) — `typedef std::vector<SupportLayer*> SupportLayerPtrs`
-- [`Model.hpp:182-185`](../src/libslic3r/Model.hpp#L182-L185) — `ModelMaterialMap`, `ModelObjectPtrs`, `ModelVolumePtrs`, `ModelInstancePtrs`
-- [`ExtrusionEntity.hpp:167`](../src/libslic3r/ExtrusionEntity.hpp#L167) — `typedef std::vector<ExtrusionEntity*> ExtrusionEntitiesPtr`
+- [`LayerPtrs`](../src/libslic3r/Layer.hpp#L40-L40) — `typedef std::vector<Layer*> LayerPtrs`
+- [`SupportLayerPtrs`](../src/libslic3r/Print.hpp#L182-L182) — `typedef std::vector<SupportLayer*> SupportLayerPtrs`
+- [`ModelMaterialMap`](../src/libslic3r/Model.hpp#L182-L185) — `ModelMaterialMap`, `ModelObjectPtrs`, `ModelVolumePtrs`, `ModelInstancePtrs`
+- [`ExtrusionEntitiesPtr`](../src/libslic3r/ExtrusionEntity.hpp#L167-L167) — `typedef std::vector<ExtrusionEntity*> ExtrusionEntitiesPtr`
 
 **Hazard:** Raw pointer vectors establish ownership by convention, not by type. The owner (e.g., `PrintObject` for `LayerPtrs`) must manually call `delete` in its destructor. Any early return, exception, or refactoring that creates a second owner causes either double-free or leak. There is no type-level enforcement.
 
@@ -332,7 +332,7 @@ H1190 · [HIGH/P1] · `name_tbb_thread_pool_threads_set_locale()` static bool in
 ## 2. Dual Coordinate System
 
 **Location:**
-- [`Point.hpp:71`](../src/libslic3r/Point.hpp#L71) — `using PointsAllocator = tbb::scalable_allocator<BaseType>`
+- [`PointsAllocator`](../src/libslic3r/Point.hpp#L71-L71) — `using PointsAllocator = tbb::scalable_allocator<BaseType>`
 - `libslic3r.h` — defines `SCALING_FACTOR = 1e-6` and `scale_()` / `unscale()` macros
 - `TriangleMesh.hpp` — 3-D coordinates in `float` mm (Eigen `Vec3f`)
 - `Polygon.hpp` — 2-D coordinates in `coord_t` = `int32_t` scaled integers (1 unit = 1e-6 mm)
@@ -350,11 +350,11 @@ H1190 · [HIGH/P1] · `name_tbb_thread_pool_threads_set_locale()` static bool in
 ## 3. TBB Parallelism Model
 
 **Location:**
-- [`pchheader.hpp:103-105`](../src/libslic3r/pchheader.hpp#L103) — global TBB includes
-- [`TriangleMeshSlicer.cpp:590`](../src/libslic3r/TriangleMeshSlicer.cpp#L590) — `tbb::parallel_for` over triangles
-- [`TreeSupport.cpp:899`](../src/libslic3r/Support/TreeSupport.cpp#L899) — `tbb::parallel_for` over layers
-- [`TreeSupport3D.cpp:2569`](../src/libslic3r/Support/TreeSupport3D.cpp#L2569) — nested `tbb::parallel_for`
-- [`TreeModelVolumes.cpp:360`](../src/libslic3r/Support/TreeModelVolumes.cpp#L360) — `tbb::task_group` for concurrent avoidance + wall restriction passes
+- [`tbb::parallel_for`](../src/libslic3r/pchheader.hpp#L103-L105) — global TBB includes
+- [`tbb::parallel_for`](../src/libslic3r/TriangleMeshSlicer.cpp#L590-L590) — `tbb::parallel_for` over triangles
+- [`tbb::parallel_for`](../src/libslic3r/Support/TreeSupport.cpp#L899-L899) — `tbb::parallel_for` over layers
+- [`tbb::parallel_for`](../src/libslic3r/Support/TreeSupport3D.cpp#L2569-L2569) — nested `tbb::parallel_for`
+- [`tbb::task_group`](../src/libslic3r/Support/TreeModelVolumes.cpp#L360-L360) — `tbb::task_group` for concurrent avoidance + wall restriction passes
 
 **Hazard:** TBB's task-stealing scheduler is deeply embedded. At least 386 uses of `tbb::parallel_for` / `tbb::parallel_for_each` / `tbb::task_group` exist in `.cpp` files alone. The scheduler assigns work dynamically; algorithms assume TBB grain sizes and partitioning strategies are tuned for the problem size. Nested parallelism (parallel_for inside parallel_for) is intentional and common.
 
@@ -373,9 +373,9 @@ H1190 · [HIGH/P1] · `name_tbb_thread_pool_threads_set_locale()` static bool in
 ## 4. Virtual Dispatch & Clone Pattern
 
 **Location:**
-- [`ExtrusionEntity.hpp:115-167`](../src/libslic3r/ExtrusionEntity.hpp#L115-L167) — abstract base with pure virtual `clone()` and `clone_move()`
+- [`ExtrusionEntity::clone`](../src/libslic3r/ExtrusionEntity.hpp#L115-L167) — abstract base with pure virtual `clone()` and `clone_move()`
 - Concrete classes: `ExtrusionPath`, `ExtrusionMultiPath`, `ExtrusionLoop`, `ExtrusionPathSloped`, `ExtrusionPathOriented`, `ExtrusionLoopSloped`
-- [`Model.hpp:187-227`](../src/libslic3r/Model.hpp#L187-L227) — `OBJECTBASE_DERIVED_COPY_MOVE_CLONE` macro generating `new_copy`, `new_clone`, `assign_copy`, `assign_clone`
+- [`OBJECTBASE_DERIVED_COPY_MOVE_CLONE`](../src/libslic3r/Model.hpp#L187-L227) — `OBJECTBASE_DERIVED_COPY_MOVE_CLONE` macro generating `new_copy`, `new_clone`, `assign_copy`, `assign_clone`
 
 **Hazard:** The virtual `clone()` / `clone_move()` methods allocate heap objects and return raw pointers. The caller is responsible for ownership. The `OBJECTBASE_DERIVED_COPY_MOVE_CLONE` macro distinguishes between "copy with same ID" (for internal `Print::apply()` deep copies) and "clone with new ID" (for user-visible duplication). Confusing the two produces ObjectID aliasing bugs that corrupt undo/redo history and incremental slicing.
 
@@ -388,9 +388,9 @@ H1190 · [HIGH/P1] · `name_tbb_thread_pool_threads_set_locale()` static bool in
 ## 5. Implicit Polygon Closure Convention
 
 **Location:**
-- [`Polygon.hpp`](../src/libslic3r/Polygon.hpp) — `struct Polygon { Points points; }` — last point is **not** repeated
-- [`Polyline.hpp`](../src/libslic3r/Polyline.hpp) — `struct Polyline { Points points; }` — open by definition
-- [`ExtrusionEntity.hpp:772-780`](../src/libslic3r/ExtrusionEntity.hpp#L772-L780) — `extrusion_entities_append_loops` manually appends `points.front()` to close: `path.polyline.points.push_back(path.polyline.points.front())`
+- [`Polygon::points`](../src/libslic3r/Polygon.hpp#L244-L244) — `struct Polygon { Points points; }` — last point is **not** repeated
+- [`Polyline`](../src/libslic3r/Polyline.hpp#L44-L44) — `struct Polyline { Points points; }` — open by definition
+- [`extrusion_entities_append_loops`](../src/libslic3r/ExtrusionEntity.hpp#L772-L780) — `extrusion_entities_append_loops` manually appends `points.front()` to close: `path.polyline.points.push_back(path.polyline.points.front())`
 
 **Hazard:** `Polygon` is implicitly closed — iteration over its `N` points must assume an `N+1`th closing edge from `points.back()` to `points.front()`. This is inconsistent with `ExtrusionLoop`, whose embedded `ExtrusionPath` polylines explicitly carry the repeated closing point. Algorithms that iterate polygon edges must use `Polygon::lines()` (which synthesizes the closing edge) rather than directly iterating `.points` pairwise.
 
@@ -422,8 +422,8 @@ This is the **opposite** of some other polygon libraries (e.g., PostGIS / OGC wh
 ## 7. Shared Mutable State in Background Processing
 
 **Location:**
-- [`PrintBase.hpp:96-180`](../src/libslic3r/PrintBase.hpp#L96-L180) — `PrintStateBase` with `StateWithTimeStamp`, `StateWithWarnings`
-- [`PrintBase.hpp:239-320`](../src/libslic3r/PrintBase.hpp#L239-L320) — `set_started()`, `set_done()`, `invalidate()` all take `std::mutex &mtx`
+- [`PrintStateBase`](../src/libslic3r/PrintBase.hpp#L109-L180) — `PrintStateBase` with `StateWithTimeStamp`, `StateWithWarnings`
+- [`PrintStateBase::set_started`](../src/libslic3r/PrintBase.hpp#L239-L271), [`PrintStateBase::set_done`](../src/libslic3r/PrintBase.hpp#L273-L296), [`PrintStateBase::invalidate`](../src/libslic3r/PrintBase.hpp#L298-L319) — all take `std::mutex &mtx` or participate in the shared-state transition protocol
 - `Print.hpp` — `m_state_mutex` guards all step state transitions
 - Background worker thread (OrcaSlicer.cpp) calls `Print::process()` while UI thread calls `Print::apply()` with new config
 
@@ -443,7 +443,7 @@ Missing a `throw_if_canceled()` call in a long-running algorithm means the UI ha
 ## 8. g_last_timestamp Global (Unsynchronized)
 
 **Location:**
-- [`PrintBase.hpp:180`](../src/libslic3r/PrintBase.hpp#L180) — `static size_t g_last_timestamp`
+- [`PrintStateBase::g_last_timestamp`](../src/libslic3r/PrintBase.hpp#L180-L180) — `static size_t g_last_timestamp`
 - Comment: *"if multiple Print or SLAPrint instances are executed in parallel, modification of g_last_timestamp is not synchronized!"*
 
 **Hazard:** This is a documented, acknowledged race condition. Multiple `Print` instances running in parallel will race on `g_last_timestamp`, potentially producing duplicate or out-of-order timestamps, which could corrupt the incremental invalidation logic.
@@ -525,7 +525,7 @@ In practice OrcaSlicer limits the build volume, but this is not enforced at the 
 ## 13. TBB Scalable Allocator on Points
 
 **Location:**
-- [`Point.hpp:71`](../src/libslic3r/Point.hpp#L71) — `using PointsAllocator = tbb::scalable_allocator<BaseType>`
+- [`PointsAllocator`](../src/libslic3r/Point.hpp#L71-L71) — `using PointsAllocator = tbb::scalable_allocator<BaseType>`
 - `Points` type alias uses this allocator globally
 
 **Hazard:** `Points` (the fundamental polygon vertex array) uses TBB's scalable allocator instead of `std::allocator`. This provides significant performance benefits in multi-threaded contexts (thread-local allocation pools, reduced lock contention). However, it creates a dependency on TBB at the type level, not just the algorithm level. Any code that creates a `Points` value implicitly requires TBB to be initialized.
@@ -539,7 +539,7 @@ In practice OrcaSlicer limits the build volume, but this is not enforced at the 
 ## 14. Exception-as-Cancellation Protocol
 
 **Location:**
-- [`PrintBase.hpp:90-94`](../src/libslic3r/PrintBase.hpp#L90-L94) — `class CanceledException : public std::exception`
+- [`CanceledException`](../src/libslic3r/PrintBase.hpp#L90-L94) — `class CanceledException : public std::exception`
 - Throughout `TriangleMeshSlicer.cpp`, `TreeSupport.cpp`, `GCode.cpp` — `throw_on_cancel()` lambda calls
 - TBB grain boundaries — each `tbb::parallel_for` lambda checks cancellation
 
@@ -572,7 +572,7 @@ In practice OrcaSlicer limits the build volume, but this is not enforced at the 
 ## 16. ExtrusionEntitiesPtr — Manual Heap Ownership
 
 **Location:**
-- [`ExtrusionEntity.hpp:167`](../src/libslic3r/ExtrusionEntity.hpp#L167) — `typedef std::vector<ExtrusionEntity*> ExtrusionEntitiesPtr`
+- [`ExtrusionEntitiesPtr`](../src/libslic3r/ExtrusionEntity.hpp#L167-L167) — `typedef std::vector<ExtrusionEntity*> ExtrusionEntitiesPtr`
 - `ExtrusionEntityCollection.hpp` — owns an `ExtrusionEntitiesPtr entities` member
 - `ExtrusionEntityCollection.cpp` — destructor manually deletes all pointers
 - `extrusion_entities_append_paths` family — allocate `new ExtrusionPath(...)` and push raw pointer
@@ -593,7 +593,7 @@ Any code that copies an `ExtrusionEntityCollection` by value will produce a shal
 ## 17. PrintObjectRegions Reference Counting
 
 **Location:**
-- [`Print.hpp:298-299`](../src/libslic3r/Print.hpp#L298-L299) — `PrintObjectRegions` with manual `ref_cnt_inc()` / `ref_cnt_dec()` (where `ref_cnt_dec()` calls `delete this`)
+- [`PrintObjectRegions::ref_cnt_inc`](../src/libslic3r/Print.hpp#L298-L298), [`PrintObjectRegions::ref_cnt_dec`](../src/libslic3r/Print.hpp#L299-L299) — manual reference counting on `PrintObjectRegions` (where `ref_cnt_dec()` calls `delete this`)
 
 **Hazard:** `PrintObjectRegions` uses manual reference counting with a `delete this` pattern when the count reaches zero. The ref count can only be modified by the main thread (per comment), so it is not atomic. This is correct only as long as the invariant holds. If the object is ever shared across threads (e.g., during `Print::apply()` parallelism), the non-atomic refcount is a data race.
 
@@ -658,9 +658,9 @@ Any translation that emits absolute commands unconditionally will produce valid 
 ## 21. Plate / Multi-Instance Shift Arithmetic
 
 **Location:**
-- [`Print.hpp:199`](../src/libslic3r/Print.hpp#L199) — `PrintInstance::shift` — world coordinate shift
-- [`Print.hpp:210`](../src/libslic3r/Print.hpp#L210) — comment: *"instance_shift is too large because of multi-plate, apply without plate offset"*
-- `PrintInstance::shift_without_plate_offset()` — compensates for BBL multi-plate coordinate system
+- [`PrintInstance::shift`](../src/libslic3r/Print.hpp#L199-L199) — world coordinate shift
+- [`PrintInstance::shift_without_plate_offset`](../src/libslic3r/Print.hpp#L210-L211) — compensates for BBL multi-plate coordinate system
+- Comment: *"instance_shift is too large because of multi-plate, apply without plate offset"*
 
 **Hazard:** OrcaSlicer (Bambu fork) has a multi-plate system where each build plate has an offset. `PrintInstance::shift` includes the plate offset; `shift_without_plate_offset()` does not. Different G-code generation paths use one or the other, and using the wrong one silently shifts all geometry by the plate offset (up to hundreds of mm for plate 2+).
 
