@@ -1,3 +1,5 @@
+| File | Classification | Reason |
+|------|---------------|--------|
 | `src/dev-utils/encoding-check.cpp` | SKIP_TRIVIAL | PCH or tiny validation stub with no core slicer domain logic. |
 | `src/libslic3r/pchheader.hpp` | SKIP_TRIVIAL | PCH or tiny validation stub with no core slicer domain logic. |
 | `src/libvgcode/glad/include/glad/gles2.h` | SKIP_GUI | GUI/libvgcode path excluded from the core slicer annotation pass. |
@@ -664,3 +666,58 @@
 | `src/slic3r/GUI/wxMediaCtrl2.h` | SKIP_GUI | GUI/libvgcode path excluded from the core slicer annotation pass. |
 | `src/slic3r/pchheader.cpp` | SKIP_TRIVIAL | PCH or tiny validation stub with no core slicer domain logic. |
 | `src/slic3r/pchheader.hpp` | SKIP_TRIVIAL | PCH or tiny validation stub with no core slicer domain logic. |
+| src/slic3r/Utils/ASCIIFolding.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/ASCIIFolding.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/AstroBox.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/BBLCloudServiceAgent.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/BBLCloudServiceAgent.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/BBLPrinterAgent.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/BBLPrinterAgent.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/Bonjour.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/Bonjour.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/ColorSpaceConvert.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/ColorSpaceConvert.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/Duet.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/ESP3D.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/FileHelp.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/FileHelp.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/FileTransferUtils.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/FileTransferUtils.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/FixModelByWin10.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/FixModelByWin10.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/FlashAir.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/FontConfigHelp.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/HexFile.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/HexFile.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/Http.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/IPrinterAgent.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/InstanceID.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/MKS.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/MacDarkMode.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/MacDarkMode.mm | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/MoonrakerPrinterAgent.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/NetworkAgentFactory.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/OrcaCloudServiceAgent.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/OrcaPrinterAgent.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/OrcaPrinterAgent.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/PresetUpdater.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/Process.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/Profile.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/ProfileDescription.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/QidiPrinterAgent.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/RaycastManager.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/Repetier.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/RetinaHelper.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/RetinaHelperImpl.hmm | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/RetinaHelperImpl.mm | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/Serial.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/SerialMessage.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/SerialMessageType.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/SimplyPrint.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/SnapmakerPrinterAgent.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/TCPConsole.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/TCPConsole.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/WebSocketClient.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/json_diff.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/minilzo_extension.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
+| src/slic3r/Utils/minilzo_extension.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |

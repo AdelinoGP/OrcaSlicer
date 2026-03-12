@@ -11,7 +11,7 @@
 |--------|-------|
 | Total source files in `src/` | 1264 |
 | Annotated files (Phase 1 + Phase 4) | 357 tasks |
-| Explicitly skipped files | 55 |
+| Explicitly skipped files | 907 |
 | Unresolved files | 0 |
 
 **Note:** The 55 skipped files are all `src/slic3r/Utils/*` files classified as SKIP_GUI in the Phase 4 Skip Registry — they have no libslic3r core includes and are GUI/printer UI adapters only. The unresolved count is 0 because all core libslic3r files have been annotated and all non-core files have been explicitly classified.
