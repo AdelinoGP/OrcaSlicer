@@ -241,7 +241,10 @@ Print::export_gcode()
     → PrintObject per ModelObject-instance, layers computed
           │
           ▼
-[Slicing] — TriangleMeshSlicer.cpp (slice_mesh_ex)
+[Mesh Segmentation] — clips triangles at sub-facet paint stroke boundaries
+          │
+          ▼
+[Slicing] — TriangleMeshSlicer (slice_mesh_ex)
     → per-layer ExPolygons (2D polygons with holes)
           │
           ▼
@@ -255,6 +258,12 @@ Print::export_gcode()
           ▼
 [Support Generation] — Support/SupportMaterial.cpp | Support/TreeSupport.cpp
     → SupportLayer[] with ExtrusionEntityCollections
+          │
+          ▼
+[Support Post-Processing] — support surface ironing
+          │
+          ▼
+[Layer Finalization] — wipe tower, skirt/brim (cross-layer, sequential)
           │
           ▼
 [G-Code Export] — GCode.cpp orchestrates → GCodeWriter.cpp emits text
