@@ -1,11 +1,11 @@
 # Agent Journal — OrcaSlicer Codebase Analysis
 
 ## CURRENT STATUS
-Last session: 99
-Active task: T005 — Orientation for Test Contract Documentation
-Next action: Commit orientation, begin Phase 1 (libslic3r suite)
+Last session: 104
+Active task: T105 — document test_mutable_polygon.cpp
+Next action: Read test_mutable_polygon.cpp and document contracts
 Unresolved [UNCLEAR] tags: 0
-Files remaining (Phase 4): 0
+Files remaining (Phase 1): 17 (T105-T121)
 Open questions: None
 
 ---
@@ -289,7 +289,7 @@ Arachne/CuraEngine/PrusaSlicer lineage via comments, related pseudocode docs, an
 
 **Key test patterns identified:**
 - Direct function testing via TEST_CASE
-- BDD-style SCENARIO/GIVEN/WHEN/THEN tests
+- BDD-style SCENARIO/GIVEN/WHEN/WHEN tests
 - Section-based parameterized tests
 - Multiple disabled benchmark blocks (#if 0)
 
@@ -300,3 +300,36 @@ Arachne/CuraEngine/PrusaSlicer lineage via comments, related pseudocode docs, an
 - Exact integer comparisons for geometry predicates
 
 **Completed tasks this session:** T103
+
+---
+
+## Session 104
+
+**Active task:** T104 — document tests/libslic3r/test_polygon.cpp
+
+**Scope:**
+- File: tests/libslic3r/test_polygon.cpp
+- Source under test: src/libslic3r/Polygon.cpp
+- Fixture data: None (all inline data)
+- Test executable: libslic3r_tests
+
+**Key test patterns identified:**
+- BDD-style SCENARIO/GIVEN/WHEN/THEN structure
+- Two main SCENARIO blocks plus one standalone TEST_CASE
+- All inline test data, no external fixtures
+- Uses integer geometry exclusively (scaled coordinates)
+
+**Methods tested:**
+- `is_valid()`, `area()`, `centroid()`, `contains()`
+- `lines()`, `split_at_first_point()`, `split_at_index()`, `split_at_vertex()`
+- `is_counter_clockwise()`, `make_counter_clockwise()`, `first_point()`
+- `triangulate_convex()`, `intersection()`
+- Free function `remove_collinear()`
+
+**Numeric characteristics:**
+- **No epsilon tolerance** - all exact integer/float comparisons
+- `area()` returns signed values (CCW = positive, CW = negative)
+- Scaled coordinates via `Point::new_scale()` with SCALING_FACTOR
+- All assertions use exact equality (`==`)
+
+**Completed tasks this session:** T104

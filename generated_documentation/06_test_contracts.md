@@ -157,3 +157,31 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **SCALED_EPSILON** = EPSILON / SCALING_FACTOR is used for scaled coordinate systems.
 - All polygon/line operations use integer coord_t internally; floating-point only in circle fitting and distance calculations.
 - `is_approx()` functions use absolute difference comparison with EPSILON.
+
+### test_polygon.cpp
+
+**Source under test:** `src/libslic3r/Polygon.cpp`
+
+**Fixture / test data:** none (all inline data)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Converted Perl tests - ccw_square | `[Polygon]` | **Square corner point validation**: A square with points (100,100), (200,100), (200,200), (100,200) in CCW order must be valid via `is_valid()`.<br><br>**Signed area calculation**: CCW square area must equal 10000 (100×100). CW square area must equal -10000 (negative). Area is signed based on winding order.<br><br>**Centroid calculation**: Both CCW and CW squares must return centroid at (150, 150).<br><br>**Point containment**: Both CCW and CW squares must contain point (150, 150).<br><br>**Conversion to lines**: CCW square must convert to exactly 4 Line segments: (100,100)-(200,100), (200,100)-(200,200), (200,200)-(100,200), (100,200)-(100,100).<br><br>**Split operations**: All split methods must return Polyline with 5 points (start + 3 corners + back to start):<br>- `split_at_first_point()`: starts at index 0<br>- `split_at_index(2)`: starts at index 2<br>- `split_at_vertex(ccw_square[2])`: starts at specific vertex<br><br>**Winding order detection**: `is_counter_clockwise()` returns true for CCW, false for CW.<br><br>**Winding order modification**: `make_counter_clockwise()` must convert CW to CCW. Calling twice on CW (making CCW, then again) must still return CCW (idempotent for already-CCW).<br><br>**First point reference**: `first_point()` must return reference to `points.front()`, not a copy. |
+| Converted Perl tests - Triangulating hexagon | `[Polygon]` | **Convex triangulation**: A regular hexagon (6 vertices, center at origin, radius 100) triangulated must produce exactly 4 triangles. All triangles must be CCW (no clockwise triangles found). Uses `triangulate_convex()` method. |
+| Converted Perl tests - General triangle intersection | `[Polygon]` | **Line-polygon intersection**: Triangle with vertices (50000000,100000000), (300000000,102000000), (50000000,104000000) must intersect line from (175992032,102000000) to (47983964,102000000). Intersection must return true and point must be exactly (50000000,102000000). Tests `Polygon::intersection()` method with output pointer parameter. |
+| Centroid of Trapezoid must be inside | `[Polygon][Utils]` | **Centroid containment for irregular shapes**: Trapezoid with vertices (4702134,1124765853), (-4702134,1124765853), (-9404268,1049531706), (9404268,1049531706) must have its centroid contained within the polygon. Uses `contains()` method. All calculations use exact integer geometry. |
+| Remove collinear points from Polygon - Leading/trailing collinear points | `[Polygon]` | **Collinear point removal**: Polygon with points that form a "circle" shape with multiple collinear sequences must have leading and trailing collinear points removed. Input: 14 points with collinear sequences at beginning (3 points), middle (2 points), end (3 points).<br><br>**Result validation**:<br>- Leading collinear points removed: resulting polygon's first point must equal (20,0) scaled<br>- Trailing collinear points removed: resulting polygon's last point must equal (-20,0) scaled<br>- Total points preserved: exactly 7 points remaining (non-collinear vertices only)<br><br>Uses free function `remove_collinear()` which operates in-place on polygon. All coordinate calculations use scaled integer geometry (`Point::new_scale()`). |
+| Remove collinear points from Polygon - Number of remaining points | `[Polygon]` | **Point count preservation**: After collinear removal, final polygon must have exactly 7 points. This validates that only truly collinear points (those lying exactly on line segments) are removed, while corners are preserved. |
+
+**Special notes:**
+- All polygon operations use **integer coord_t** internally (scaled coordinates)
+- No tolerance values used - exact arithmetic throughout
+- `area()` returns signed value: positive for CCW, negative for CW
+- `contains()` uses exact geometry predicates (no epsilon)
+- `triangulate_convex()` assumes input is convex - behavior undefined for non-convex
+- `remove_collinear()` is a free function, not a method
+- All test coordinates use `Point::new_scale()` which applies SCALING_FACTOR (typically 0.00001)
+- No floating-point comparisons in test assertions
+

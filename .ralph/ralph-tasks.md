@@ -34,7 +34,7 @@ Last updated: 2026-03-11T00:00:00Z
             Source under test: src/libslic3r/Geometry.cpp + Geometry/
             Commit: `docs: test_geometry.cpp contracts (T103)`
 
-- [ ] T104  document: tests/libslic3r/test_polygon.cpp
+- [x] T104  document: tests/libslic3r/test_polygon.cpp
             Source under test: src/libslic3r/Polygon.cpp
             Commit: `docs: test_polygon.cpp contracts (T104)`
 
