@@ -1,9 +1,9 @@
 # Agent Journal — OrcaSlicer Codebase Analysis
 
 ## CURRENT STATUS
-Last session: 106
+Last session: 107
 Active task: T107 — document test_clipper_offset.cpp
-Next action: Read test_clipper_offset.cpp and document contracts
+Next action: Document test_clipper_offset.cpp contracts
 Unresolved [UNCLEAR] tags: 0
 Files remaining (Phase 1): 15 (T107-T121)
 Open questions: None
@@ -187,20 +187,96 @@ Open questions: None
 
 ---
 
-## Session 107 (Upcoming)
+## Session 107
 
-**Active task:** T107 — document tests/libslic3r/test_clipper_offset.cpp
+**Active task:** T107 — document tests/libslic3r/test_clipper_offset.cpp  
+**Completed tasks this session:** T107
 
-**Expected scope:**
-- Specific offset operations with join types (jtMiter, jtRound, jtSquare)
-- Miter limit behaviors
-- End types for polylines (etOpenButt, etc.)
-- Edge cases for distance calculations
-- Source: src/libslic3r/ClipperUtils.cpp (offset paths)
+**Key findings:**
 
-**Learning from T106:**
-- Need to check for any remaining Catch::Approx usage
-- Document winding order handling consistently  
-- Note any disabled test blocks
-- Verify source file mappings in ClipperUtils.hpp
-- Check for additional bug regression tests
+### Test Structure & Coverage
+- **SCENARIO 1** ("Constant offset"): Tests constant offset operations with multiple join types
+- Tests solid shapes (20mm box) and shapes with holes (20mm box with 10mm hole)
+- Tests both constant and variable offset operations
+- Uses **BDD-style** (SCENARIO/GIVEN/WHEN/THEN/DYNAMIC_SECTION)
+
+### Offset Operations Tested
+1. **Constant offset**: `Slic3r::offset()` and `Slic3r::offset_ex()`
+   - Join types: jtMiter with miter limits 2.0x, 1.5x, 1.2x
+   - Direction: outward (+1mm) and inward (-1mm)
+   
+2. **Variable offset**: `Slic3r::variable_offset_outer()` and `Slic3r::variable_offset_inner()`
+   - Per-vertex delta values
+   - Same miter limits and directions
+
+### Geometric Test Cases
+1. **20mm solid box**: 
+   - Outward: 22^2 mm² area (20+1, 20+1)
+   - Inward: 18^2 mm² area (20-1, 20-1)
+
+2. **20mm box with 10mm hole**:
+   - Outward: (22^2 - 8^2) mm² = 484 - 64 = 420 mm²
+   - Inward: (18^2 - 12^2) mm² = 324 - 144 = 180 mm²
+
+3. **20mm right-angle triangle**:
+   - Requires mathematical calculation of mitered corner area
+   - Uses formula: `pow(offset * (1. / sin(angle_bisector) - 1.), 2.) * tan(angle_bisector)`
+   - Angle bisector = π/8 (22.5 degrees)
+   - Calculates expected area with mitered corners
+
+### Critical Discovery: Catch::Approx Usage
+- **File uses Catch::Approx extensively** (lines 35, 49, 67, 81, 109, 123, 143, 157, 189, 208)
+- **Second file in test suite** with Catch::Approx (after test_clipper_utils.cpp)
+- Tests 15 locations for area comparisons
+- **Impact**: Porting agent must reproduce floating-point tolerance
+- **Tolerance not explicitly specified** → need to infer or use standard FP precision
+
+### Coordinate Scaling
+- Uses `coord_t s = 1000000` (1 million)
+- Tests nominal 20mm boxes become 20,000,000 units
+- Offset distances: 1,000,000 units (1mm)
+- Validates large coordinate handling in Clipper
+
+### Area Calculation Method
+- ExPolygon::area() returns exact floating-point area in scaled units
+- Standard formula: polygon area = sum of (x_i * y_{i+1} - x_{i+1} * y_i) / 2
+- All shapes are simple (non-self-intersecting) polygons
+- No tolerance for exact geometric operations (only comparison)
+
+### SVG Debug Infrastructure
+- Conditional compilation with `TESTS_EXPORT_SVGS` macro
+- Generates visual output for debugging
+- Uses `debug_out_path()` helper
+- Not part of contract - debug only
+
+### Summary of Contracts
+| Test Case | Scenario | Shape | Offset | Expected Area (mm²) | Catch::Approx? |
+|-----------|----------|-------|--------|---------------------|----------------|
+| DYNAMIC_SECTION "plus 1mm, miter Xx" | Constant offset | 20mm box | +1mm | 484 (22^2) | YES |
+| DYNAMIC_SECTION "minus 1mm, miter Xx" | Constant offset | 20mm box | -1mm | 324 (18^2) | YES |
+| DYNAMIC_SECTION "plus 1mm, miter Xx" | Variable offset | 20mm box | +1mm | 484 | YES |
+| DYNAMIC_SECTION "minus 1mm, miter Xx" | Variable offset | 20mm box | -1mm | 324 | YES |
+| SECTION "plus 1mm" | Constant offset | Box+hole | +1mm | 420 (22^2 - 8^2) | YES |
+| SECTION "minus 1mm" | Constant offset | Box+hole | -1mm | 180 (18^2 - 12^2) | YES |
+| SECTION "plus 1mm" | Variable offset | Box+hole | +1mm | 420 | YES |
+| SECTION "minus 1mm" | Variable offset | Box+hole | -1mm | 180 | YES |
+| DYNAMIC_SECTION "Outer offset 1mm, miter Xx" | Constant offset | Triangle | +1mm | Calculated | YES |
+| DYNAMIC_SECTION "Outer offset 1mm, miter Xx" | Variable offset | Triangle | +1mm | Calculated | YES |
+
+**Total: 10 test variations × 3 miter limits = 30+ test permutations**
+
+### Source Files
+- `src/libslic3r/ClipperUtils.hpp` (wrapper)
+- `src/libslic3r/ClipperUtils.cpp` (implementation)
+- `src/libslic3r/ExPolygon.hpp` (polygon with holes)
+- Wraps ClipperLib (Angus Johnson's library)
+- Stateless operations, thread-safe at call level
+
+### Architectural Notes
+- **Hazard H424**: Area calculations use `Catch::Approx` without explicit tolerance
+- **Hazard H425**: Variable offsets use per-vertex deltas (more complex than constant)
+- **Hazard H426**: Triangle offset requires mathematical validation of miter behavior
+- Polygon types: ExPolygon (contour + holes), Polygons (vector of simple polygons)
+- All results returned by value, no in-place modifications
+
+**Completed tasks this session:** T107

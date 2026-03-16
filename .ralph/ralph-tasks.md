@@ -46,7 +46,7 @@ Last updated: 2026-03-11T00:00:00Z
             Source under test: src/libslic3r/ClipperUtils.cpp
             Commit: `docs: test_clipper_utils.cpp contracts (T106)`
 
-- [ ] T107  document: tests/libslic3r/test_clipper_offset.cpp
+- [x] T107  document: tests/libslic3r/test_clipper_offset.cpp
             Source under test: src/libslic3r/ClipperUtils.cpp (offset path)
             Commit: `docs: test_clipper_offset.cpp contracts (T107)`
 
