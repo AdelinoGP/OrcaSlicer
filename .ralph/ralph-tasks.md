@@ -70,7 +70,7 @@ Last updated: 2026-03-11T00:00:00Z
             Source under test: src/libslic3r/PlaceholderParser.cpp
             Commit: `docs: test_placeholder_parser.cpp contracts (T112)`
 
-- [ ] T113  document: tests/libslic3r/test_3mf.cpp
+- [x] T113  document: tests/libslic3r/test_3mf.cpp
             Source under test: src/libslic3r/Format/3mf.cpp + bbs_3mf.cpp
             Fixture data: tests/data/test_3mf/
             Commit: `docs: test_3mf.cpp contracts (T113)`

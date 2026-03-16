@@ -395,4 +395,23 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 | Placeholder parser scripting | `[PlaceholderParser]` | **Scripting features**: <br> 1. **Nested config options**: Supports legacy `[nozzle_temperature[foo]]` and modern `{nozzle_temperature[foo]}` syntax. <br> 2. **Math expressions**: Supports basic arithmetic (`2*3`, `2*3/6`), floating-point arithmetic (`2.*3/12`), modulo (`10%2.5`), and functions (`min`, `max`, `int`, `round`, `digits`, `zdigits`, `interpolate_table`). <br> 3. **Floating-point tolerance**: **[CRITICAL]** Uses `Catch::Approx` for floating-point comparisons (lines 38-40, 44, 47-48, 65-67, 71-72, 76-78). Porting agent must reproduce tolerance. Exact tolerance values not specified in source - standard floating-point precision applies. <br> 4. **Line width substitutions**: Tests `coFloatOrPercent` substitutions for `line_width`, `min_width_top_surface`, `small_perimeter_speed`, `infill_anchor`. <br> 5. **Exception handling**: `scarf_joint_speed` set to percent must throw exception when referenced (no context for percent resolution). <br> 6. **Boolean expression parser**: Supports equality, inequality, regex matching (`=~`), logical operators (`and`, `or`, `not`, `&&`, `||`), comparison operators (`<`, `>`, `<=`, `>=`), and ternary operators (`? :`). |
 | Placeholder parser variables | `[PlaceholderParser]` | **Variable management**: <br> 1. **Local/global variables**: Supports creation of int, string, and bool variables via `local` and `global` keywords. <br> 2. **Variable overwriting**: Variables can be reassigned after creation. <br> 3. **Variable redefinition**: `local` keyword can redefine existing variables. <br> 4. **Array initialization**: Supports `repeat()` function and initializer lists for creating arrays. <br> 5. **Array access**: Supports index-based access to array elements (e.g., `myint[5]`). <br> 6. **Vector operations**: `size()` and `empty()` functions work correctly on vectors. <br> 7. **Conditional logic**: `if`/`else`/`endif` blocks support variable creation within scopes. |
 
+### test_3mf.cpp
+
+**Source under test:** `src/libslic3r/Format/3mf.cpp` + `src/libslic3r/Format/bbs_3mf.cpp`
+
+**Fixture / test data:** `tests/data/test_3mf/`
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Reading 3mf file | `[3mf]` | **Unicode path support**: 3MF files with non-ASCII characters in path (e.g., "Geräte/") and filename (e.g., "Büchse.3mf") must load successfully via `load_3mf()` and return true. |
+| Export+Import geometry to/from 3mf file cycle | `[3mf]` | **Geometry transformation preservation**: When a model with specific transformations (offset, rotation, scaling, mirroring) on both volumes and instances is saved to 3MF and reloaded, the vertex coordinates must match the original within **Eigen's default tolerance** (typically 1e-9). <br><br>**Contract**: The `isApprox()` method on `Eigen::Vector3d` is used for comparison. Porting agent must ensure vertex coordinate comparison uses equivalent tolerance (absolute or relative difference < 1e-9). |
+| 2D convex hull of sinking object | `[3mf][.]` | **[DISABLED — not built; do not port until re-enabled]** Testing 2D convex hull calculation on a transformed object. The test is disabled (marked with `[.]`). The expected result points are provided but the test logic contains `CHECK` instead of `REQUIRE` for coordinate comparison, and the logic seems inverted (`> 1` check). This test likely fails or is under development. |
+
+**Special notes:**
+- **[DISABLED]** `2D convex hull of sinking object` test is suppressed with `[.]` tag and is not built.
+- **Eigen usage**: Uses Eigen library for matrix transformations and quaternion string conversion.
+- **Fixture data**: Requires `tests/data/test_3mf/Prusa.stl` and `tests/data/test_3mf/Geräte/Büchse.3mf`. |
+
 

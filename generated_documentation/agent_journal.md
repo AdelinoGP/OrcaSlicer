@@ -371,3 +371,20 @@ Open questions: None
 - **Source**: `src/libslic3r/PlaceholderParser.cpp`
 
 **Published commit:** `docs: test_placeholder_parser.cpp contracts (T112)`
+
+---
+
+## Session 113
+
+**Active task:** T113 — document tests/libslic3r/test_3mf.cpp
+
+**Completed tasks this session:** T113
+
+**Key findings:**
+- **Unicode path support**: 3MF files with non-ASCII characters in path/filename must load successfully.
+- **Geometry transformation preservation**: Vertex coordinates must match original within Eigen's default tolerance (1e-9) after save/load cycle.
+- **Disabled test**: `2D convex hull of sinking object` is disabled (`[.]` tag) and likely under development.
+- **Fixture data**: Requires `tests/data/test_3mf/Prusa.stl` and `tests/data/test_3mf/Geräte/Büchse.3mf`.
+- **Source**: `src/libslic3r/Format/3mf.cpp` + `src/libslic3r/Format/bbs_3mf.cpp`
+
+**Published commit:** `docs: test_3mf.cpp contracts (T113)`
