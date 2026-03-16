@@ -621,5 +621,27 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **TestMesh enumeration**: Defines 19 predefined test meshes (cubes, spheres, bridges, etc.) for consistent test data.
 - **No Catch::Approx**: No floating-point comparisons in fixture builder functions. |
 
+### test_flow.cpp
+
+**Source under test:** `src/libslic3r/Flow.cpp`
+
+**Fixture / test data:** Uses `test_data.hpp` for mesh generation and print initialization.
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Extrusion width specifics | `[Flow][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **First layer width**: When `first_layer_extrusion_width` is set to 2mm, first layer extrusion uses this width for all extrusions on the first layer. <br> **Upper layer behavior**: First layer width does not apply to upper layers. <br> **Tolerance**: Uses `Catch::Approx` with margin 0.01 for Z-coordinate comparison. |
+| Bridge flow specifics | `[Flow]` | **Bridge flow ratio**: Tests that bridge flow ratio settings (0.5, 1.0, 2.0) produce expected output flow. <br> **Fixed extrusion width**: Tests bridge flow with fixed extrusion width of 0.4mm. <br> **[DISABLED]** Test bodies are empty (placeholder for future implementation). |
+| Flow: Flow math for non-bridges | `[Flow]` | **External perimeter spacing**: External perimeter flow spacing is fixed to 1.125 × nozzle_diameter - layer_height × (1.0 - PI/4.0). <br> **Internal perimeter spacing**: Internal perimeter flow spacing is fixed to 1.125 × nozzle_diameter - layer_height × (1.0 - PI/4.0). <br> **Supplied width spacing**: For supplied width, spacing is width.value - layer_height × (1.0 - PI/4.0). <br> **Min/max width**: For nozzle diameter 0.25mm, max/min width is set to 1.125 × nozzle_diameter. <br> **[DISABLED]** Edge case test for spacing = 0 (lines 138-152) is commented out. <br> **Tolerance**: All comparisons use `Catch::Approx`. |
+| Flow: Flow math for bridges | `[Flow]` | **Bridge width**: Bridge width equals nozzle diameter. <br> **Bridge spacing**: Bridge spacing equals nozzle diameter + BRIDGE_EXTRA_SPACING. <br> **Tolerance**: All comparisons use `Catch::Approx`. |
+
+**Special notes:**
+- **Catch::Approx usage**: Extensive use of `Catch::Approx` for floating-point comparisons (lines 42, 52, 104, 109, 113, 115, 126, 133, 164, 167). Porting agent must reproduce tolerance (default Catch2 Approx tolerance).
+- **Disabled tests**: Several tests are disabled (`[.]` tag or `#if 0`).
+- **Flow calculations**: Tests validate mathematical formulas for extrusion width, spacing, and flow ratios.
+- **Bridge flow**: Tests bridge-specific flow calculations with extra spacing. |
+
+
 
 
