@@ -720,6 +720,25 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Skirt and brim**: Tests validate skirt and brim loop counts based on configuration.
 - **Solid surface handling**: Tests validate that changing solid layer counts doesn't corrupt surface types. |
 
+### test_printobject.cpp
+
+**Source under test:** `src/libslic3r/PrintObject.cpp`
+
+**Fixture / test data:** Uses `test_data.hpp` for mesh generation and print initialization.
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| PrintObject: object layer heights | `[PrintObject][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **2mm layer height (nozzle 3mm)**: 20mm cube with 2mm layer height and 3mm nozzle produces 10 layers, each exactly 2mm above the previous Z. <br> **10mm layer height (nozzle 11mm)**: 20mm cube with 10mm layer height and 11mm nozzle produces 3 layers: first at 2mm, second at 12mm. <br> **15mm layer height (nozzle 16mm)**: 20mm cube with 15mm layer height and 16mm nozzle produces 2 layers: first at 2mm, second at 17mm. <br> **[DISABLED]** 15mm layer height with 5mm nozzle test is commented out (lines 69-87). |
+
+**Special notes:**
+- **Catch::Approx usage**: All floating-point comparisons use `Catch::Approx` (lines 28, 45, 48, 63, 66). Porting agent must reproduce tolerance (default Catch2 Approx tolerance).
+- **Disabled tests**: All tests are marked with `[.]` tag, and one test case is commented out with `#if 0`.
+- **Layer height generation**: Tests validate that layer heights are correctly calculated based on nozzle diameter and configured layer height.
+- **Z-coordinate precision**: Tests verify exact Z-coordinates for each layer. |
+
+
 
 
 
