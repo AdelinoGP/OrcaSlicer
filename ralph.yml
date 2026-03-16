@@ -1,0 +1,11 @@
+cli:
+  backend: opencode
+event_loop:
+  prompt_file: PROMPT.md
+  completion_promise: RALPH_TASK_COMPLETE
+  max_iterations: 200
+  max_runtime: 28800
+  verbose: true
+RObot:
+  enabled: true
+  timeout_seconds: 120

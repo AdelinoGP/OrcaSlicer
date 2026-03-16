@@ -1,0 +1,21 @@
+# Memories
+
+## Patterns
+
+### mem-1773637307-3ea2
+> Voronoi offset operations require careful handling of distance parameters and polygon counts
+<!-- tags: voronoi, offset, polygons | created: 2026-03-16 -->
+
+### mem-1773637302-2f9e
+> Voronoi tests use Boost Polygon library with specific issue tickets (#12067, #12707, #12903, #12139)
+<!-- tags: voronoi, boost, issues | created: 2026-03-16 -->
+
+## Decisions
+
+## Fixes
+
+### mem-1773637309-e58b
+> Missing Voronoi vertices can be repaired via rotation-based mechanism with angles π/6, π/5, π/7, π/11
+<!-- tags: voronoi, repair, rotation | created: 2026-03-16 -->
+
+## Context
