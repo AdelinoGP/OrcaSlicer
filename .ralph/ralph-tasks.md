@@ -75,7 +75,7 @@ Last updated: 2026-03-11T00:00:00Z
             Fixture data: tests/data/test_3mf/
             Commit: `docs: test_3mf.cpp contracts (T113)`
 
-- [ ] T114  document: tests/libslic3r/test_meshboolean.cpp
+- [x] T114  document: tests/libslic3r/test_meshboolean.cpp
             Source under test: src/libslic3r/MeshBoolean.cpp
             Commit: `docs: test_meshboolean.cpp contracts (T114)`
 

@@ -388,3 +388,20 @@ Open questions: None
 - **Source**: `src/libslic3r/Format/3mf.cpp` + `src/libslic3r/Format/bbs_3mf.cpp`
 
 **Published commit:** `docs: test_3mf.cpp contracts (T113)`
+
+---
+
+## Session 114
+
+**Active task:** T114 — document tests/libslic3r/test_meshboolean.cpp
+
+**Completed tasks this session:** T114
+
+**Key findings:**
+- **CGAL conversion round-trip**: Vertex and index counts must be preserved exactly.
+- **Volume preservation**: Volume comparison uses `Catch::Approx` (tolerance unspecified).
+- **Self-intersection check**: CGAL mesh and converted TriangleMesh must not self-intersect.
+- **Catch::Approx usage**: Line 22 uses `Catch::Approx` for volume comparison.
+- **Source**: `src/libslic3r/MeshBoolean.cpp`
+
+**Published commit:** `docs: test_meshboolean.cpp contracts (T114)`

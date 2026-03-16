@@ -414,4 +414,21 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Eigen usage**: Uses Eigen library for matrix transformations and quaternion string conversion.
 - **Fixture data**: Requires `tests/data/test_3mf/Prusa.stl` and `tests/data/test_3mf/Geräte/Büchse.3mf`. |
 
+### test_meshboolean.cpp
+
+**Source under test:** `src/libslic3r/MeshBoolean.cpp`
+
+**Fixture / test data:** `tests/data/` (sphere generation via `make_sphere`)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| CGAL and TriangleMesh conversions | `[MeshBoolean]` | **CGAL conversion round-trip**: Converting a TriangleMesh to CGAL format and back must preserve vertex and index counts exactly. <br><br>**Volume preservation**: The volume of the converted mesh must match the original volume within **floating-point tolerance** (uses `Catch::Approx`). Porting agent must reproduce tolerance. Exact tolerance value not specified in source - standard floating-point precision applies. <br><br>**Self-intersection check**: The CGAL mesh and converted TriangleMesh must not self-intersect. |
+
+**Special notes:**
+- **Catch::Approx usage**: Line 22 uses `Catch::Approx` for volume comparison. Porting agent must provide floating-point tolerance.
+- **CGAL dependency**: Uses CGAL library for mesh boolean operations.
+- **Sphere generation**: Uses `make_sphere(1.)` to create test geometry. |
+
 
