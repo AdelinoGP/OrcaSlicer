@@ -112,7 +112,7 @@ Last updated: 2026-03-11T00:00:00Z
 
 ## Phase 2 — fff_print Suite
 
-- [ ] T201  document: tests/fff_print/test_data.cpp + test_data.hpp
+- [~] T201  document: tests/fff_print/test_data.cpp + test_data.hpp
             Role: shared fixture builder — special format (fixture table, not test table)
             Commit: `docs: test_data fixture inventory (T201)`
 

@@ -578,4 +578,48 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 
 ## Suite: fff_print/
 
+### test_data.cpp + test_data.hpp
+
+**Source under test:** `src/libslic3r/` (various modules)
+
+**Fixture / test data:** Shared fixture builder providing test meshes, models, and print initialization functions.
+
+**Role:** Shared fixture builder.
+
+**Fixtures provided:**
+
+| Function | What it creates | Used by |
+|---|---|---|
+| `mesh(TestMesh m)` | TriangleMesh from predefined test mesh enum (e.g., `cube_20x20x20`, `sphere_50mm`, `bridge`) | All tests requiring specific test meshes |
+| `mesh(TestMesh m, Vec3d translate, Vec3d scale)` | Translated and scaled TriangleMesh from test mesh enum | Tests requiring positioned/scaled meshes |
+| `mesh(TestMesh m, Vec3d translate, double scale)` | Translated and uniformly scaled TriangleMesh | Tests requiring positioned/scaled meshes |
+| `model(const std::string& model_name, TriangleMesh&& _mesh)` | Slic3r::Model with one object containing the mesh | Tests requiring Model objects |
+| `init_print(std::vector<TriangleMesh>&&, Print&, Model&, const DynamicPrintConfig&, bool)` | Initializes Print with meshes, config, and arrangement | Tests requiring print initialization |
+| `init_print(std::initializer_list<TestMesh>, Print&, Model&, const DynamicPrintConfig&, bool)` | Initializes Print with test mesh enums | Tests requiring print initialization |
+| `init_print(std::initializer_list<TriangleMesh>, Print&, Model&, const DynamicPrintConfig&, bool)` | Initializes Print with triangle meshes | Tests requiring print initialization |
+| `init_print(std::initializer_list<TestMesh>, Print&, Model&, std::initializer_list<ConfigBase::SetDeserializeItem>, bool)` | Initializes Print with test meshes and config items | Tests requiring print initialization |
+| `init_print(std::initializer_list<TriangleMesh>, Print&, Model&, std::initializer_list<ConfigBase::SetDeserializeItem>, bool)` | Initializes Print with meshes and config items | Tests requiring print initialization |
+| `init_and_process_print(std::initializer_list<TestMesh>, Print&, const DynamicPrintConfig&, bool)` | Initializes and processes print with test meshes | Tests requiring full print pipeline |
+| `init_and_process_print(std::initializer_list<TriangleMesh>, Print&, const DynamicPrintConfig&, bool)` | Initializes and processes print with meshes | Tests requiring full print pipeline |
+| `init_and_process_print(std::initializer_list<TestMesh>, Print&, std::initializer_list<ConfigBase::SetDeserializeItem>, bool)` | Initializes and processes print with test meshes and config items | Tests requiring full print pipeline |
+| `init_and_process_print(std::initializer_list<TriangleMesh>, Print&, std::initializer_list<ConfigBase::SetDeserializeItem>, bool)` | Initializes and processes print with meshes and config items | Tests requiring full print pipeline |
+| `gcode(Print& print)` | Generates G-code string from Print object | Tests requiring G-code output |
+| `slice(std::initializer_list<TestMesh>, const DynamicPrintConfig&, bool)` | Slices test meshes and returns G-code string | Tests requiring G-code output |
+| `slice(std::initializer_list<TriangleMesh>, const DynamicPrintConfig&, bool)` | Slices meshes and returns G-code string | Tests requiring G-code output |
+| `slice(std::initializer_list<TestMesh>, std::initializer_list<ConfigBase::SetDeserializeItem>, bool)` | Slices test meshes with config items and returns G-code string | Tests requiring G-code output |
+| `slice(std::initializer_list<TriangleMesh>, std::initializer_list<ConfigBase::SetDeserializeItem>, bool)` | Slices meshes with config items and returns G-code string | Tests requiring G-code output |
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| init_print functionality | `[test_data][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **Single mesh initialization**: `init_print()` with one mesh creates one print object. <br> **Process safety**: `print.process()` does not throw exceptions. <br> **G-code output**: `gcode()` produces non-empty output. |
+
+**Special notes:**
+- **[DISABLED]** The only test case in this file is disabled (`[.]` tag) and not built by default.
+- **Fixture builder**: This file provides shared utilities for other tests, not domain-specific logic.
+- **TestMesh enumeration**: Defines 19 predefined test meshes (cubes, spheres, bridges, etc.) for consistent test data.
+- **No Catch::Approx**: No floating-point comparisons in fixture builder functions. |
+
+
 
