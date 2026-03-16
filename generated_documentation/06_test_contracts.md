@@ -330,3 +330,27 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - `src/libslic3r/Geometry/VoronoiUtils.hpp` - Voronoi utility functions
 - `src/libslic3r/Geometry/VoronoiVisualUtils.hpp` - Visualization utilities
 
+
+### test_elephant_foot_compensation.cpp
+
+**Source under test:** `src/libslic3r/ElephantFootCompensation.cpp`
+
+**Fixture / test data:** Defined in test file (spirograph\_gear\_1mm, box\_with\_hole\_close\_to\_wall, thin\_ring, vase\_with\_fins, contour\_with\_hole)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Elephant foot compensation (Contour with hole) | `[ElephantFoot]` | Compensating a contour with a hole results in a polygon with strictly smaller area and valid orientation (CCW contour, CW holes). |
+| Elephant foot compensation (Tiny contour) | `[ElephantFoot]` | Compensating a tiny contour (dimensions near zero or below threshold) results in no change (identity). |
+| Elephant foot compensation (Large box) | `[ElephantFoot]` | Compensating a large solid box results in a polygon with strictly smaller area and valid orientation. |
+| Elephant foot compensation (Thin ring) | `[ElephantFoot]` | Compensating a thin ring (GH issue #2085) results in a polygon with strictly smaller area and valid orientation. |
+| Elephant foot compensation (Rectangle with narrow part, Partial) | `[ElephantFoot]` | Partially compensating a rectangle with a narrow protrusion results in a polygon with strictly smaller area and valid orientation. |
+| Elephant foot compensation (Rectangle with narrow part, Full) | `[ElephantFoot]` | Fully compensating a rectangle with a narrow protrusion results in a polygon with strictly smaller area and valid orientation. |
+| Elephant foot compensation (Box with hole close to wall) | `[ElephantFoot]` | Compensating a box with a hole close to the wall (GH issue #2998) results in a polygon with strictly smaller area and valid orientation. |
+| Elephant foot compensation (Spirograph wheel, Partial) | `[ElephantFoot]` | Partially compensating a spirograph wheel results in a polygon with strictly smaller area and valid orientation. |
+| Elephant foot compensation (Spirograph wheel, Full) | `[ElephantFoot]` | Fully compensating a spirograph wheel results in a polygon with strictly smaller area and valid orientation. |
+| Elephant foot compensation (Spirograph wheel, Brutal) | `[ElephantFoot]` | Brutally compensating a spirograph wheel (large offset) results in a polygon with strictly smaller area and valid orientation. |
+| Elephant foot compensation (Vase with fins) | `[ElephantFoot]` | Compensating a vase with fins results in a polygon with strictly smaller area and valid orientation. |
+| [DISABLED] Varying inner offset | `[ElephantFoot]` | `[DISABLED — not built; do not port until re-enabled]` Tests varying inner offset operations using `mittered_offset_path_scaled_points` with `SCALED_EPSILON` simplification. |
+
