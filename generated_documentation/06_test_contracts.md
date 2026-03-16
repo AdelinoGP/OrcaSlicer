@@ -499,4 +499,23 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Large dataset testing**: Tests include 36,000 and 50,000 element scenarios for performance validation.
 - **Reference implementation**: Based on https://raw.githubusercontent.com/rollbear/prio_queue/master/self_test.cpp (Boost Software License). |
 
+### test_timeutils.cpp
+
+**Source under test:** `src/libslic3r/Time.cpp`
+
+**Fixture / test data:** none (inline time values)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| ISO8601Z | `[Timeutils]` | **ISO 8601 UTC format**: `time2str()` and `str2time()` round-trip conversion preserves exact `time_t` value for UTC timezone. <br> **Invalid string handling**: `str2time()` returns `time_t(-1)` for invalid input strings. <br> **Specific date parsing**: `parse_iso_utc_timestamp("20190710T085000Z")` must produce the same timestamp as `iso_utc_timestamp()`. |
+| Slic3r_UTC_Time_Format | `[Timeutils]` | **G-code format**: `time2str()` and `str2time()` round-trip conversion preserves exact `time_t` value for gcode format. <br> **UTC timestamp format**: `utc_timestamp()` must produce the exact string "2019-07-10 at 08:50:00 UTC" for the given timestamp. <br> **Invalid string handling**: `str2time()` returns `time_t(-1)` for invalid input strings. |
+
+**Special notes:**
+- **Exact comparisons**: All tests use `REQUIRE` for exact `time_t` and string comparisons (no floating-point tolerances).
+- **Time zones**: Tests cover both local and UTC time zones.
+- **Multiple formats**: Tests ISO 8601 UTC and Slic3r gcode time formats.
+- **Error handling**: Invalid strings must return `time_t(-1)`. |
+
 

@@ -91,7 +91,7 @@ Last updated: 2026-03-11T00:00:00Z
             Source under test: src/libslic3r/MutablePriorityQueue.hpp
             Commit: `docs: test_mutable_priority_queue.cpp contracts (T117)`
 
-- [ ] T118  document: tests/libslic3r/test_timeutils.cpp
+- [~] T118  document: tests/libslic3r/test_timeutils.cpp
             Source under test: src/libslic3r/Time.cpp
             Commit: `docs: test_timeutils.cpp contracts (T118)`
 

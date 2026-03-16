@@ -81,6 +81,7 @@ Document the test suite for TDD-guided refactoring.
   - Read and analyzed the test file.
   - Appended documentation to `generated_documentation/06_test_contracts.md`.
   - Updated `ralph-tasks.md` and `agent_journal.md`.
+  - Committed documentation and task updates.
 
 ### Key Findings (T117)
 - Tests mutable priority queue with skip addressing, basic ops, rescheduling, and complex scenarios.
@@ -90,5 +91,26 @@ Document the test suite for TDD-guided refactoring.
 - Reference implementation from external Boost-licensed code.
 
 ### Next Steps
+- T119: `test_aabbindirect.cpp`
+- Continue documenting remaining test files in Phase 1 (libslic3r suite).
+- After Phase 1, move to Phase 2 (fff_print), etc.
+- Finalize with T600: complete test contracts documentation.
+
+## Iteration 5: T118
+
+### Completed Work
 - T118: `test_timeutils.cpp`
+  - Read and analyzed the test file.
+  - Appended documentation to `generated_documentation/06_test_contracts.md`.
+  - Updated `ralph-tasks.md` and `agent_journal.md`.
+
+### Key Findings (T118)
+- Tests time formatting and parsing (ISO 8601 UTC, gcode format).
+- Exact comparisons (no floating-point tolerances).
+- Time zone handling (local and UTC).
+- Invalid string handling returns `time_t(-1)`.
+- Source: `src/libslic3r/Time.cpp`.
+
+### Next Steps
+- T119: `test_aabbindirect.cpp`
 - Continue documenting remaining test files in Phase 1 (libslic3r suite).
