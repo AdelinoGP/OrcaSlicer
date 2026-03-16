@@ -765,6 +765,24 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Conditional tests**: Performance tests require special build flags (`TEST_PERFORMANCE`, `BUILD_PROFILE`).
 - **SCALING_FACTOR**: Area calculations use `SCALING_FACTOR` constant for coordinate scaling. |
 
+### test_gcode.cpp
+
+**Source under test:** `src/libslic3r/GCode.cpp`
+
+**Fixture / test data:** none (inline GCode object creation)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Origin manipulation | `[GCode]` | **Set origin**: Setting origin to (10, 0) updates `gcodegen.origin()` to (10, 0). <br> **Set origin and translate**: Setting origin to (10, 0) then adding (5, 5) updates origin to (15, 5). |
+
+**Special notes:**
+- **Exact comparisons**: All tests use exact `Vec2d` comparisons (no floating-point tolerances).
+- **Simple tests**: Only tests basic origin manipulation in `GCode` class.
+- **No Catch::Approx**: No floating-point comparisons used. |
+
+
 
 
 

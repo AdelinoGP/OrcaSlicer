@@ -144,9 +144,9 @@ Last updated: 2026-03-11T00:00:00Z
              Source under test: src/libslic3r/TriangleMesh.cpp
              Commit: `docs: test_trianglemesh.cpp contracts (T208)`
 
-- [ ] T209  document: tests/fff_print/test_gcode.cpp
-            Source under test: src/libslic3r/GCode.cpp
-            Commit: `docs: test_gcode.cpp contracts (T209)`
+- [~] T209  document: tests/fff_print/test_gcode.cpp
+             Source under test: src/libslic3r/GCode.cpp
+             Commit: `docs: test_gcode.cpp contracts (T209)`
 
 - [ ] T210  document: tests/fff_print/test_gcodewriter.cpp
             Source under test: src/libslic3r/GCodeWriter.cpp
