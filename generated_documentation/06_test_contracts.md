@@ -912,6 +912,29 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Drain hole geometry**: Tests validate raycasting through cylindrical drain holes in hollowed mesh.
 - **Mesh operations**: Tests use `sla::IndexedMesh` and `sla::DrainHole` classes. |
 
+### sla_supptgen_tests.cpp
+
+**Source under test:** `src/libslic3r/SLA/SupportPointGenerator.cpp`
+
+**Fixture / test data:** Uses `tests/data/` (model generation via `make_pyramid`, `make_cube`, `make_prism`)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Overhanging point should be supported | `[SupGen]` | **Support point generation**: Pyramid mesh generates support points for overhang. <br> **Distance validation**: At least one support point is within 1mm of overhang edge. |
+| Overhanging horizontal surface should be supported | `[SupGen]` | **Horizontal surface support**: Cube mesh generates sufficient support points for horizontal surface. <br> **Force balance**: Total support force exceeds tear pressure requirement. <br> **Minimal distance**: Support points satisfy minimal distance constraint. |
+| Overhanging edge should be supported | `[SupGen]` | **Edge support**: Prism mesh generates support points along overhanging edge. <br> **Edge coverage**: Support points within 1mm of edge provide sufficient force. <br> **Minimal distance tolerance**: Minimal distance constraint satisfied within 10% tolerance. |
+| Hollowed cube should be supported from the inside | `[SupGen][Hollowed]` | **Internal support**: Hollowed cube generates support points inside cavity. <br> **Bottom point removal**: Bottom points are removed (within EPSILON of bottom). |
+| Two parallel plates should be supported | `[SupGen][Hollowed]` | **Multi-level support**: Two parallel plates generate support points for both levels. <br> **Bottom point removal**: Bottom points are removed from lower plate. |
+
+**Special notes:**
+- **No Catch::Approx**: Uses exact comparisons and `EPSILON` tolerance (no `Catch::Approx`).
+- **Mesh generation**: Tests generate primitive meshes (cube, pyramid, prism) programmatically.
+- **Support point validation**: Tests validate support point distribution, force balance, and minimal distance.
+- **Bottom point removal**: Tests validate removal of points too close to build plate. |
+
+
 
 
 
