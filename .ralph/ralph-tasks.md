@@ -54,7 +54,7 @@ Last updated: 2026-03-11T00:00:00Z
             Source under test: src/libslic3r/Geometry/Voronoi.cpp
             Commit: `docs: test_voronoi.cpp contracts (T108)`
 
-- [ ] T109  document: tests/libslic3r/test_elephant_foot_compensation.cpp
+- [~] T109  document: tests/libslic3r/test_elephant_foot_compensation.cpp
             Source under test: src/libslic3r/ElephantFootCompensation.cpp
             Commit: `docs: test_elephant_foot_compensation.cpp contracts (T109)`
 

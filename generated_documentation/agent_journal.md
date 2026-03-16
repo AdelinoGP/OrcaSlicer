@@ -3,7 +3,7 @@
 ## CURRENT STATUS
 Last session: 108
 Active task: T109 — document test_elephant_foot_compensation.cpp
-Next action: Start T109
+Next action: Documenting T109
 Unresolved [UNCLEAR] tags: 0
 Files remaining (Phase 1): 13 (T109-T121)
 Open questions: None
