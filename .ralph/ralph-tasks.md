@@ -169,9 +169,9 @@ Last updated: 2026-03-11T00:00:00Z
 
 ## Phase 3 — sla_print Suite
 
-- [ ] T301  document: tests/sla_print/sla_print_tests.cpp
-            Source under test: src/libslic3r/SLAPrint.cpp + SLAPrintSteps.cpp
-            Commit: `docs: sla_print_tests.cpp contracts (T301)`
+- [~] T301  document: tests/sla_print/sla_print_tests.cpp
+             Source under test: src/libslic3r/SLAPrint.cpp + SLAPrintSteps.cpp
+             Commit: `docs: sla_print_tests.cpp contracts (T301)`
 
 - [ ] T302  document: tests/sla_print/sla_raycast_tests.cpp
             Source under test: src/libslic3r/SLA/IndexedMesh.cpp + AABBMesh.cpp

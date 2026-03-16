@@ -859,6 +859,41 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Support layer validation**: Tests validate support layer heights and contact distances.
 - **No Catch::Approx**: Uses direct floating-point comparisons with `EPSILON`. |
 
+## Suite: sla_print/
+
+### sla_print_tests.cpp
+
+**Source under test:** `src/libslic3r/SLAPrint.cpp` + `src/libslic3r/SLAPrintSteps.cpp`
+
+**Fixture / test data:** Uses `tests/data/` (model files: `20mm_cube.obj`, `V.obj`, `frog_legs.obj`, etc.)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Pillar pairhash should be unique | `[SLASupportGeneration]` | **Pairhash uniqueness**: `test_pairhash()` validates that pairhash template generates unique hashes for various type combinations. |
+| Support point generator should be deterministic if seeded | `[SLASupportGeneration], [SLAPointGen]` | **Deterministic generation**: Support point generator produces identical output when seeded with same value. <br> **Point count**: Generator produces non-zero number of support points. <br> **Checksum validation**: Generated points produce consistent checksum across multiple runs. |
+| Flat pad geometry is valid | `[SLASupportGeneration]` | **Flat pad generation**: Pad geometry is valid for test objects without wings (`wall_height_mm = 0`). |
+| WingedPadGeometryIsValid | `[SLASupportGeneration]` | **Winged pad generation**: Pad geometry with wings (`wall_height_mm = 1`) is valid for test objects. |
+| FlatPadAroundObjectIsValid | `[SLASupportGeneration]` | **Flat pad around object**: Pad geometry embedding object is valid without wings. |
+| WingedPadAroundObjectIsValid | `[SLASupportGeneration]` | **Winged pad around object**: Pad geometry embedding object with wings is valid. |
+| ElevatedSupportGeometryIsValid | `[SLASupportGeneration]` | **Elevated support generation**: Support tree geometry with object elevation is valid. |
+| FloorSupportGeometryIsValid | `[SLASupportGeneration]` | **Floor support generation**: Support tree geometry without elevation is valid. |
+| ElevatedSupportsDoNotPierceModel | `[SLASupportGeneration]` | **No collision (elevated)**: Elevated supports do not intersect the model geometry. |
+| FloorSupportsDoNotPierceModel | `[SLASupportGeneration]` | **No collision (floor)**: Floor supports do not intersect the model geometry. |
+| InitializedRasterShouldBeNONEmpty | `[SLARasterOutput]` | **Raster initialization**: Raster object is initialized with correct resolution and pixel dimensions. <br> **Tolerance**: Uses `Catch::Approx` for pixel dimension comparisons. |
+| MirroringShouldBeCorrect | `[SLARasterOutput]` | **Raster transformations**: Raster mirroring and orientation transformations are correct. |
+| RasterizedPolygonAreaShouldMatch | `[SLARasterOutput]` | **Raster area accuracy**: Rasterized polygon area matches expected area within predicted error tolerance. |
+| halfcone test | `[halfcone]` | **Halfcone mesh generation**: DiffBridge mesh generation produces valid geometry (exports to OBJ). |
+| Test concurrency | (none) | **Concurrency correctness**: Parallel accumulation produces same result as sequential accumulation. <br> **Tolerance**: Uses `Catch::Approx` for floating-point comparison. |
+
+**Special notes:**
+- **Catch::Approx usage**: Used on lines 168, 169, 243 for pixel dimensions and concurrency results.
+- **Test data files**: Uses model files from `tests/data/` (20mm_cube.obj, V.obj, frog_legs.obj, etc.).
+- **SLA-specific**: Tests validate SLA support generation, pad geometry, and raster output.
+- **No disabled tests**: All tests in this file are enabled (no `[.]` tag). |
+
+
 
 
 
