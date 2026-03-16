@@ -171,6 +171,6 @@ Document the test suite for TDD-guided refactoring.
 
 ### Next Steps
 - Phase 1 (libslic3r) is complete.
-- Phase 2 (fff_print) started with T201, T202.
-- Move to T203 (`test_fill.cpp`).
+- Phase 2 (fff_print) started with T201, T202, T203.
+- Move to T204 (`test_extrusion_entity.cpp`).
 - Finalize with T600: complete test contracts documentation.

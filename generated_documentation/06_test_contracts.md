@@ -642,6 +642,27 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Flow calculations**: Tests validate mathematical formulas for extrusion width, spacing, and flow ratios.
 - **Bridge flow**: Tests bridge-specific flow calculations with extra spacing. |
 
+### test_fill.cpp
+
+**Source under test:** `src/libslic3r/Fill/`
+
+**Fixture / test data:** Uses `test_data.hpp` for mesh generation and print initialization.
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Fill: Pattern Path Length | `[Fill]` | **Rectilinear fill**: Rectilinear fill of a square produces one continuous path with expected length (above scale(3*100 + 2*50) + scaled_epsilon). <br> **Diamond with endpoints on grid**: Rectilinear fill of a diamond shape produces one continuous path. <br> **Square with hole**: Rectilinear fill of a square with a hole produces 1-3 continuous paths that do not cross the hole. <br> **Regression: Missing infill segments**: Rectilinear fill of a specific polygon produces one continuous path with expected length. <br> **Rotated square**: Rectilinear fill of a rotated square produces one continuous path for 0° and 45° rotations. <br> **[DISABLED]** `adjusted solid distance` test (lines 20-27) is commented out. |
+| Solid surface fill | `[Fill]` | **Solid surface filling**: Various solid surfaces are fully filled by rectilinear infill. <br> **Multiple sizes**: Solid surface fill works for different polygon sizes and scales. <br> **Different angles**: Solid surface fill works for different fill angles (0°, 45°, 90°). <br> **[DISABLED]** Precision-sensitive test (lines 142-159) is commented out due to Mac VM issues. |
+
+**Special notes:**
+- **SCALED_EPSILON usage**: Uses `SCALED_EPSILON` for length comparisons (lines 56, 118).
+- **Disabled tests**: Several tests are disabled (`#if 0` blocks).
+- **Fill patterns**: Tests rectilinear infill pattern generation and path length calculations.
+- **Solid surface filling**: Tests that solid surfaces are completely filled without gaps.
+- **Polygon operations**: Uses Clipper operations (`diff_pl`, `offset`) to verify infill boundaries. |
+
+
 
 
 
