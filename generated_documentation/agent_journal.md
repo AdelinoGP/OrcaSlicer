@@ -462,9 +462,26 @@ Open questions: None
 ---
 
 ## CURRENT STATUS
-Last session: 401
-Active task: T401 — document libnest2d_tests_main.cpp
-Next action: Start T401
+Last session: 501
+Active task: T600 — Final commit
+Next action: Start T600
 Unresolved [UNCLEAR] tags: 0
-Files remaining (Phase 4): 1 (T401)
+Files remaining (Phase 6): 1 (T600)
 Open questions: None
+
+---
+
+## Session 501
+
+**Active task:** T501 — document tests/slic3rutils/slic3rutils_tests_main.cpp
+
+**Completed tasks this session:** T501
+
+**Key findings:**
+- **HTTP tests**: Tests verify SSL certificate validation and authentication mechanisms.
+- **Network-dependent**: All tests require external network access to github.com and httpbingo.org.
+- **Disabled tests**: All tests are marked with `[NotWorking]` tag and disabled by default.
+- **No floating-point comparisons**: Uses exact integer comparisons (HTTP status codes).
+- **Source**: `src/slic3r/Utils/Http.hpp` (HTTP client wrapper).
+
+**Published commit:** `docs: slic3rutils contracts (T501)`

@@ -185,18 +185,18 @@ Last updated: 2026-03-11T00:00:00Z
 
 ## Phase 4 — libnest2d Suite
 
-- [ ] T401  document: tests/libnest2d/libnest2d_tests_main.cpp
-            Source under test: deps_src/libnest2d/ (2D bin-packing)
-            Fixture: tests/libnest2d/printer_parts.cpp
-            Commit: `docs: libnest2d contracts (T401)`
+- [x] T401  document: tests/libnest2d/libnest2d_tests_main.cpp
+             Source under test: deps_src/libnest2d/ (2D bin-packing)
+             Fixture: tests/libnest2d/printer_parts.cpp
+             Commit: `docs: libnest2d contracts (T401)`
 
 ---
 
 ## Phase 5 — slic3rutils Suite
 
-- [ ] T501  document: tests/slic3rutils/slic3rutils_tests_main.cpp
-            Source under test: src/libslic3r/ utility functions
-            Commit: `docs: slic3rutils contracts (T501)`
+- [x] T501  document: tests/slic3rutils/slic3rutils_tests_main.cpp
+             Source under test: src/libslic3r/ utility functions
+             Commit: `docs: slic3rutils contracts (T501)`
 
 ---
 

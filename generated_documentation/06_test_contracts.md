@@ -934,6 +934,67 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Support point validation**: Tests validate support point distribution, force balance, and minimal distance.
 - **Bottom point removal**: Tests validate removal of points too close to build plate. |
 
+## Suite: libnest2d/
+
+### libnest2d_tests_main.cpp
+
+**Source under test:** `deps_src/libnest2d/` (2D bin-packing)
+
+**Fixture / test data:** `tests/libnest2d/printer_parts.cpp` (PRINTER_PART_POLYGONS, STEGOSAUR_POLYGONS)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Angles | `[Geometry]` | **Angle conversion**: Degrees and Radians conversions are accurate. <br> **Segment angle**: Segment angles to X-axis are within expected ranges. <br> **Tolerance**: Uses `Catch::Approx` for angle comparisons. |
+| ItemCreationAndDestruction | `[Nesting]` | **Item creation**: Item can be created from vertex list. <br> **Item copy**: Copied item retains vertex count. <br> **Item assignment**: Assignment and clearing work correctly. |
+| boundingCircle | `[Geometry]` | **Bounding circle calculation**: Bounding circle center and radius are correct for simple polygons. <br> **Translation**: Bounding circle updates correctly when polygon is translated. <br> **Real-world parts**: Bounding circle radius is finite for printer parts. <br> **Tolerance**: Uses `Catch::Approx` for radius comparisons. |
+| Distance | `[Geometry]` | **Point distance**: Distance calculations are accurate. <br> **Horizontal/vertical distance**: Distance to segment calculations are correct. <br> **Tolerance**: Uses `Catch::Approx` for floating-point comparisons. |
+| Area | `[Geometry]` | **Rectangle area**: Area calculation is accurate. <br> **Polygon area**: Polygon area is positive. <br> **Tolerance**: Uses `Catch::Approx` for area comparisons. |
+| IsPointInsidePolygon | `[Geometry]` | **Point inside**: Points inside rectangle are detected. <br> **Point outside**: Points outside rectangle are detected. |
+| LeftAndDownPolygon | `[Geometry]` | **Left polygon**: Left polygon generation matches control data. <br> **Down polygon**: Down polygon generation matches control data. |
+| ArrangeRectanglesTight | `[Nesting][NotWorking][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **Single bin arrangement**: All rectangles fit in one bin. <br> **No intersections**: Rectangles do not intersect or contain each other. |
+| ArrangeRectanglesLoose | `[Nesting][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **Single bin arrangement with spacing**: All rectangles fit in one bin with minimum object distance. <br> **No intersections**: Rectangles do not intersect or contain each other. |
+| BottomLeftStressTest | `[Geometry][NotWorking][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **Stress test**: Bottom-left placer handles consecutive pairs of printer parts without intersection. |
+| convexHull | `[Geometry]` | **Convex hull**: Convex hull of printer part polygon has same vertex count as input. |
+| PrusaPartsShouldFitIntoTwoBins | `[Nesting][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **Bin count**: Prusa parts fit into at most 2 bins. <br> **Area validation**: Merged pile area matches sum of component areas (no overlap). <br> **Tolerance**: Uses `Catch::Approx` for area comparison. |
+| EmptyItemShouldBeUntouched | `[Nesting]` | **Empty items**: Empty items and zero-area items are not processed (bin count = 0). |
+| LargeItemShouldBeUntouched | `[Nesting]` | **Large items**: Items larger than bin are not processed (bin count = 0). |
+| Items can be preloaded | `[Nesting][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **Fixed item**: Preloaded fixed item remains at bin center. <br> **Movable item**: Movable item is placed elsewhere in bin. <br> **Free bins**: Fixed item in bin 1 does not affect bin 0 placement. |
+| nfpConvexConvex | `[Geometry]` | **NFP validation**: No-fit polygon for convex shapes is valid and touching. |
+| pointOnPolygonContour | `[Geometry]` | **Contour points**: Points on polygon contour are correctly computed. |
+| mergePileWithPolygon | `[Geometry]` | **Polygon merging**: Merging multiple rectangles produces single polygon with correct area. <br> **Tolerance**: Uses `Catch::Approx` for area comparison. |
+| MinAreaBBWithRotatingCalipers | `[Geometry]` | **Min area bounding box**: Rotating calipers algorithm produces bounding box area within 500e6 tolerance of reference. |
+| Test for bed center distance optimization | `[Nesting][NestKernels][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **Single bin**: All items fit in one bin. <br> **Area validation**: Merged pile area matches expected area. <br> **Tolerance**: Uses `Catch::Approx` for area comparison. |
+| Test for biggest bounding box area | `[Nesting][NestKernels][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **Single bin**: All items fit in one bin. <br> **Stairway arrangement**: Pile contains N separate polygons. <br> **Bounding box area**: Bounding box area equals N × N × W × W. |
+
+**Special notes:**
+- **Catch::Approx usage**: Extensive use for floating-point comparisons (angle, distance, area, radius).
+- **Disabled tests**: Several tests are disabled (`[.]` tag) or marked as not working (`[NotWorking]`).
+- **2D bin packing**: Tests validate libnest2d library for 2D nesting and bin packing.
+- **Real-world fixtures**: Uses printer part polygons from `printer_parts.cpp` for realistic testing. |
+
+## Suite: slic3rutils/
+
+### slic3rutils_tests_main.cpp
+
+**Source under test:** `src/slic3r/Utils/Http.hpp`
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Check SSL certificates paths | `[Http][NotWorking]` | **[DISABLED]** This test is marked with `[NotWorking]` tag and is not built by default. <br> **SSL certificate validation**: HTTPS requests to github.com must succeed and return HTTP status 200. |
+| Http digest authentication | `[Http][NotWorking]` | **[DISABLED]** This test is marked with `[NotWorking]` tag and is not built by default. <br> **Digest authentication**: HTTP digest authentication must succeed and return HTTP status 200. |
+| Http basic authentication | `[Http][NotWorking]` | **[DISABLED]** This test is marked with `[NotWorking]` tag and is not built by default. <br> **Basic authentication**: HTTP basic authentication must succeed and return HTTP status 200. |
+
+**Special notes:**
+- **Network-dependent**: All tests require network access and external services (github.com, httpbingo.org).
+- **Disabled tests**: All tests are marked with `[NotWorking]` tag and are disabled by default.
+- **No floating-point comparisons**: All tests use exact integer comparisons (no `Catch::Approx`).
+- **Error handling**: Tests verify error callback and completion callback are invoked correctly. |
+
+
 
 
 
