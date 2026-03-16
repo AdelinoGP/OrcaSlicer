@@ -42,7 +42,7 @@ Last updated: 2026-03-11T00:00:00Z
             Source under test: src/libslic3r/MutablePolygon.cpp
             Commit: `docs: test_mutable_polygon.cpp contracts (T105)`
 
-^- [x] T106  document: tests/libslic3r/test_clipper_utils.cpp
+- [x] T106  document: tests/libslic3r/test_clipper_utils.cpp
             Source under test: src/libslic3r/ClipperUtils.cpp
             Commit: `docs: test_clipper_utils.cpp contracts (T106)`
 
@@ -50,7 +50,7 @@ Last updated: 2026-03-11T00:00:00Z
             Source under test: src/libslic3r/ClipperUtils.cpp (offset path)
             Commit: `docs: test_clipper_offset.cpp contracts (T107)`
 
-- [ ] T108  document: tests/libslic3r/test_voronoi.cpp
+- [x] T108  document: tests/libslic3r/test_voronoi.cpp
             Source under test: src/libslic3r/Geometry/Voronoi.cpp
             Commit: `docs: test_voronoi.cpp contracts (T108)`
 

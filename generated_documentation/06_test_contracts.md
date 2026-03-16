@@ -282,5 +282,51 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 5. Validate large coordinate handling (20M units) to prevent overflow
 6. For triangle: implement exact trigonometric calculation for expected area formula
 
+### test_voronoi.cpp
 
+**Source under test:** `src/libslic3r/Geometry/Voronoi.cpp` + `src/libslic3r/Geometry/VoronoiOffset.hpp`
+
+**Fixture / test data:** none (all inline data, uses programmatic polygon generation)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Voronoi missing edges - points 12067 | `[Voronoi]` | **Boost Voronoi library issue #12067**: Given 6 specific points forming a hexagon-like shape, constructing a Voronoi diagram must not produce missing edges. The Boost Voronoi builder must successfully generate edges for all input points without crashes or incomplete diagrams. |
+| Voronoi missing edges - Alessandro gapfill 12707 | `[Voronoi]` | **Boost Voronoi library issue #12707**: Given multiple sets of line segments (lines0, lines1, lines2, lines3, lines4) forming a complex polygon, constructing a Voronoi diagram must not produce missing edges. The Boost Voronoi builder must successfully generate edges for all input segments. Also verifies that `intersecting_edges({poly}).empty()` returns true (no self-intersections). |
+| Voronoi weirdness | `[Voronoi]` | **Complex polygon handling**: Given multiple complex polygons (poly2, poly5, poly7, poly) with large coordinates and non-standard shapes, constructing a Voronoi diagram must not produce missing edges. The Boost Voronoi builder must handle large coordinate ranges (up to 35M units) and complex polygon geometries. Verifies `intersecting_edges({poly}).empty()` returns true. |
+| Voronoi division by zero 12903 | `[Voronoi]` | **Division by zero recovery**: Given 12 points with potential division-by-zero issues in floating-point calculations, constructing a Voronoi diagram must handle the issue gracefully. The Boost Voronoi library must recover from division-by-zero by using extended precision (interval of validity). No missing edges should be produced. |
+| Voronoi NaN coordinates 12139 | `[Voronoi][.][!mayfail]` | **NaN coordinate handling**: Given lines with NaN coordinates (invalid input), constructing a Voronoi diagram must handle NaN coordinates gracefully. This test is suppressed (marked with `[.]` and `[!mayfail]`) because the input contains self-intersections that are expected to fail. **[DISABLED]** Test is suppressed and not built. |
+| Voronoi offset | `[VoronoiOffset]` | **Voronoi offset operations**: Given a polygon with a hole, constructing a Voronoi diagram and applying offset operations at various distances must produce correct output polygon counts. For offset distances: scale_(0.2), scale_(0.4), scale_(0.5), scale_(0.505), scale_(0.51), scale_(0.52), scale_(0.53), scale_(0.54), scale_(0.55), the number of outer polygons must match expected values (1 outer polygon for most distances, 1 outer for distance 0.55). The number of inner polygons must match expected values (1-2 inner polygons depending on distance). |
+| Voronoi offset 2 | `[VoronoiOffset]` | **Voronoi offset with multiple polygons**: Given 2 polygons (one with 8 vertices, one with 8 vertices), constructing a Voronoi diagram and applying offset operations must produce correct output polygon counts. For offset distances: scale_(0.2), scale_(0.4), scale_(0.45), scale_(0.48), scale_(0.5), scale_(0.505), scale_(0.7), scale_(0.8), the number of outer polygons must be 2 for most distances (1 for distance 0.8). The number of inner polygons must match expected values (2-4 inner polygons depending on distance). |
+| Voronoi offset 3 | `[VoronoiOffset]` | **Voronoi offset with complex polygons**: Given 2 complex polygons (one with 12 vertices, one with 12 vertices), constructing a Voronoi diagram and applying offset operations must produce correct output polygon counts. For offset distances: scale_(0.2) through scale_(1.01), the number of outer polygons must be 2 for most distances (1 for distances 0.99, 1.0, 1.01). The number of inner polygons must match expected values (2-6 inner polygons depending on distance). |
+| Voronoi offset with edge collapse | `[VoronoiOffset4]` | **Voronoi offset with edge collapse**: Given a complex polygon with multiple holes (outer contour + 2 holes), constructing a Voronoi diagram and applying offset operations must produce correct output polygon counts. For offset distances: scale_(0.2) through scale_(1.01), the number of outer polygons must be 2 for most distances (1 for distance 0.99). The number of inner polygons must match expected values (2-3 inner polygons depending on distance). |
+| Voronoi offset 5 | `[VoronoiOffset5]` | **Voronoi offset with large coordinates**: Given a polygon with large coordinates (extracted from medallion_printable_fixed-teeth.stl), constructing a Voronoi diagram and applying offset operations at distances scale_(2.8), scale_(2.9), scale_(3.0) must produce correct output polygon counts (1 outer, 1 inner for all distances). This test specifically addresses an assert failure in `first_circle_segment_intersection_parameter` for offset distances >= 2.9. |
+| Voronoi skeleton | `[VoronoiSkeleton]` | **Skeleton edge extraction**: Given 2 polygons (one with 8 vertices, one with 8 vertices), constructing a Voronoi diagram and annotating inside/outside must produce skeleton edges. The `skeleton_edges_rough()` function must return a non-empty vector of skeleton edges when given a threshold angle of π/12 (30 degrees). |
+| Voronoi missing vertex 1 | `[VoronoiMissingVertex1]` | **Missing vertex detection (single polygon)**: Given a polygon with a point on an edge (dividing the edge into two parts), constructing a Voronoi diagram must handle the missing vertex case. The polygon area must be positive and have no intersecting edges. The Voronoi diagram construction must succeed (no assert failures). |
+| Voronoi missing vertex 2 | `[VoronoiMissingVertex2]` | **Missing vertex detection (contour + hole)**: Given a polygon with a contour and a hole, where one edge is divided by a point, constructing a Voronoi diagram must handle the missing vertex case. The combined polygon area must be positive and have no intersecting edges. The Voronoi diagram construction must succeed (no assert failures). |
+| Voronoi missing vertex 3 | `[VoronoiMissingVertex3]` | **Missing vertex detection (two polygons)**: Given 2 polygons where one edge is divided by a point, constructing a Voronoi diagram must handle the missing vertex case. The combined polygon area must be positive and have no intersecting edges. The Voronoi diagram construction must succeed (no assert failures). |
+| Duplicate Voronoi vertices | `[Voronoi]` | **Duplicate vertex detection**: Given a polygon with potential duplicate Voronoi vertices, constructing a Voronoi diagram must handle duplicate vertices gracefully. The polygon area must be positive and have no intersecting edges. The Voronoi diagram construction must succeed (no assert failures). The test includes a lambda function `has_duplicate_vertices` to detect duplicates (commented out in assertions). |
+| Intersecting Voronoi edges | `[Voronoi]` | **Edge intersection detection**: Given a polygon with potential intersecting Voronoi edges, constructing a Voronoi diagram must handle edge intersections gracefully. The polygon area must be positive and have no intersecting edges. The Voronoi diagram construction must succeed (no assert failures). The test includes a lambda function `has_intersecting_edges` to detect intersections (commented out in assertions). |
+
+**Special notes:**
+- **[DISABLED]** `Voronoi NaN coordinates 12139` test is suppressed with `[.][!mayfail]` tags and is not built.
+- **[DEBUG]** Several tests use `VORONOI_DEBUG_OUT` macro for SVG visualization (not part of contract).
+- **Boost Voronoi library**: Tests use Boost Polygon Voronoi library for diagram construction.
+- **Rotation-based repair**: Voronoi diagram construction includes rotation-based repair mechanism for degenerate cases (angles: π/6, π/5, π/7, π/11).
+- **Large coordinates**: Multiple tests use coordinates up to 35M units to verify handling of large coordinate ranges.
+- **Missing vertex repair**: Tests verify that missing Voronoi vertices can be detected and repaired via rotation.
+
+**Hazard identification:**
+- **H431**: Boost Voronoi library may produce missing edges for certain input configurations (tests verify workarounds).
+- **H432**: Division by zero may occur in floating-point calculations (recovered via extended precision in Boost library).
+- **H433**: NaN coordinates in input may produce invalid Voronoi diagrams (test suppressed, input contains self-intersections).
+- **H434**: Missing Voronoi vertices may require rotation-based repair (multiple angles tested in repair mechanism).
+
+**Source files:**
+- `src/libslic3r/Geometry/Voronoi.cpp` - Voronoi diagram implementation with repair mechanisms
+- `src/libslic3r/Geometry/Voronoi.hpp` - Voronoi diagram interface
+- `src/libslic3r/Geometry/VoronoiOffset.hpp` - Offset operations
+- `src/libslic3r/Geometry/VoronoiUtils.hpp` - Voronoi utility functions
+- `src/libslic3r/Geometry/VoronoiVisualUtils.hpp` - Visualization utilities
 
