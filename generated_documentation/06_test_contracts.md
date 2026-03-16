@@ -93,3 +93,30 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 | TEST_CASE name | Tags | What it contractually guarantees |
 |---|---|---|
 | Reading an STL file (SCENARIO) | `[stl]` | **Unicode path support**: STL files with non-ASCII characters in path (e.g., "Geräte/") and filename (e.g., "20mmbox-čřšřěá.stl") must load successfully via `Slic3r::load_stl()` and return true.<br><br>**ASCII format support**: ASCII STL files must load regardless of line endings:<br>- LF line endings (Unix): file "ASCII/20mmbox-LF.stl" loads successfully<br>- CRLF line endings (Windows): file "ASCII/20mmbox-CRLF.stl" loads successfully<br><br>**Nonstandard file tolerance**: ASCII STL files with invalid data (text after ending tags, invalid normals like infinities) must still load successfully from file "ASCII/20mmbox-nonstandard.stl".<br><br>**Mesh size validation**: All loaded meshes must have a bounding box size of approximately (20, 20, 20) units. The tolerance is **absolute epsilon of 1e-4** (EPSILON) for each component (X, Y, Z). Implemented via `is_approx(result_size, Vec3d(20, 20, 20))` which checks `|result - expected| < epsilon` for all three dimensions.<br><br>**[DISABLED]** *CR line endings*: ASCII STL files with only CR (old Mac) line endings are NOT supported. This is intentionally disabled via `#if 0` block. Do not port until re-enabled. |
+
+### test_indexed_triangle_set.cpp
+
+**Source under test:** `src/libslic3r/TriangleMesh.cpp`
+
+**Fixture / test data:** `tests/data/frog_legs.obj`, `tests/data/simplification.obj`
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Split empty mesh | `[its_split][its]` | **Empty input handling**: Calling `its_split()` on a default-constructed (empty) `indexed_triangle_set` must return an empty `std::vector<indexed_triangle_set>` with size 0. |
+| Split simple mesh consisting of one part | `[its_split][its]` | **Single part preservation**: Splitting a watertight cube (created by `its_make_cube(10., 10., 10.)`) must return exactly one part. The returned part must have identical index count and vertex count to the input cube. |
+| Split two non-watertight mesh | `[its_split][its]` | **Non-watertight component separation**: A merged set of two overlapping cubes (with each cube missing one triangle) must split into exactly 2 parts. Both parts must have same index count and vertex count. Each part's index/vertex counts must match the original cube2 indices/vertices size. |
+| Split non-manifold mesh | `[its_split][its]` | **Non-manifold topology handling**: Two cubes offset such that their vertices are merged (`its_merge_vertices()`) must split into exactly 2 parts. Both parts must have identical index/vertex counts matching the offset cube. |
+| Split two watertight meshes | `[its_split][its]` | **Watertight component separation**: Two non-overlapping spheres must split into exactly 2 parts. Both parts must have the same number of triangles and vertices. Each part must match the original sphere's index/vertex sizes. |
+| Reduce one edge by Quadric Edge Collapse | `[its]` | **Single edge collapse**: A tetrahedron with 5 vertices and 6 triangles must, after quadric edge collapse with target of 5 triangles, have exactly 4 triangles and 4 vertices. The 3 original triangles (indices 0-2) remain unchanged. Vertex 2 (new) must be positioned between the old vertex 2 and removed vertex 4 in all x,y,z coordinates (verified by: `min(v2, v4) < v_new < max(v2, v4)` for each dimension). The simplified mesh must remain geometrically similar to original within `max_average_distance=0.014` and `max_distance=0.75` using AABB-tree point distance measurements. |
+| Simplify mesh by Quadric edge collapse to 5% | `[its]` | **Aggressive simplification**: The frog_legs.obj model must be simplified to ≤5% of original triangle count. The mesh must not become empty. The volume difference between original and simplified must be less than **33.0** units (absolute tolerance). The simplified mesh must be geometrically similar to original within `max_average_distance=0.043` and `max_distance=0.32`. |
+| Simplify trouble case | `[its]` | **Invalid triangle prevention**: The simplification.obj model, when simplified, must NOT contain triangles with duplicate vertices (where any two of three indices are equal). This is a regression test for a specific mesh corruption bug. |
+| Simplified cube should not be empty. | `[its]` | **Non-empty result**: A cube mesh must NOT become empty after quadric edge collapse, even with target count of 0 (allow maximal simplification). |
+
+**Special notes:**
+- **[DISABLED]** `create_random_generator()` function marked unused by clang compiler
+- **[DEBUG]** `debug_write_obj()` helper writes intermediate results only in debug builds (`#ifndef NDEBUG`)
+- Custom tolerance configuration `CompareConfig` is used instead of generic EPSILON values
+- Two disabled code blocks exist to avoid compiler warnings for unused functions
+- External model files required: `frog_legs.obj` and `simplification.obj`

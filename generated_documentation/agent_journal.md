@@ -218,3 +218,51 @@ Arachne/CuraEngine/PrusaSlicer lineage via comments, related pseudocode docs, an
 **Decision recorded:** Writing contracts in API-consumer terms, noting disabled test explicitly.
 
 **Completed tasks this session:** T101
+
+---
+
+## Session 102
+
+**Active task:** T102 — document tests/libslic3r/test_indexed_triangle_set.cpp
+
+**Scope:**
+- File: tests/libslic3r/test_indexed_triangle_set.cpp
+- Source under test: src/libslic3r/TriangleMesh.cpp (indexed_triangle_set functions)
+- Fixture data: tests/data/ (frog_legs.obj, simplification.obj via load_model)
+- Test executable: libslic3r_tests
+
+**Test file analysis:**
+- 12 TEST_CASE blocks total
+- Multiple custom helper functions inside test file
+- Two disabled code blocks using #if 0
+- Uses both REQUIRE and CHECK assertions
+- Loads external 3D models for testing (frog_legs.obj, simplification.obj)
+- Custom tolerance configuration struct (CompareConfig with max_distance and max_average_distance)
+
+**Key functions tested:**
+1. `its_split()` - splits indexed triangle sets into connected components
+2. `its_quadric_edge_collapse()` - mesh simplification
+3. `its_volume()` - volume calculation
+4. `is_similar()` - mesh comparison via AABB tree distance checks
+
+**Numeric tolerances discovered:**
+- Float comparisons: exact equality or `fabs() < 33.0` for volume
+- CompareConfig defaults: max_distance=3.0, max_average_distance=2.0
+- In edge collapse test: max_average_distance=0.014, max_distance=0.75
+- In 5% simplification: max_average_distance=0.043, max_distance=0.32
+- Row comparison tolerance: `is_between` checks (v < v4 && v > v2) || (v > v4 && v < v2)
+
+**[DISABLED] sections:**
+- 15: `create_random_generator()` function (unused, clang complains)
+- 71-73: Uses `its_write_obj()` for debug output (wrapped in `#ifndef NDEBUG`)
+
+**Confidence notes:**
+- `is_similar()` uses AABB tree queries with float distance computations
+- `its_quadric_edge_collapse()` has target count parameter
+- Volume difference tolerance of 33.0 is a magic number from test
+- Check uses `fabs(original_volume - volume) < 33.`
+- Test data requires specific models from tests/data/
+
+**Decision:** Document each TEST_CASE with its contract, noting custom tolerance struct usage and external fixture dependencies.
+
+**Completed tasks this session:** T102

@@ -26,7 +26,7 @@ Last updated: 2026-03-11T00:00:00Z
             Source under test: src/libslic3r/Format/STL.cpp
             Commit: `docs: test_stl.cpp contracts (T101)`
 
-- [ ] T102  document: tests/libslic3r/test_indexed_triangle_set.cpp
+- [x] T102  document: tests/libslic3r/test_indexed_triangle_set.cpp
             Source under test: src/libslic3r/TriangleMesh.cpp
             Commit: `docs: test_indexed_triangle_set.cpp contracts (T102)`
 
