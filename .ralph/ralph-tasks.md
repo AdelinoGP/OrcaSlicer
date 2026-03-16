@@ -161,9 +161,9 @@ Last updated: 2026-03-11T00:00:00Z
              Source under test: src/libslic3r/Brim.cpp
              Commit: `docs: test_skirt_brim.cpp contracts (T212)`
 
-- [ ] T213  document: tests/fff_print/test_support_material.cpp
-            Source under test: src/libslic3r/Support/SupportMaterial.cpp
-            Commit: `docs: test_support_material.cpp contracts (T213)`
+- [~] T213  document: tests/fff_print/test_support_material.cpp
+             Source under test: src/libslic3r/Support/SupportMaterial.cpp
+             Commit: `docs: test_support_material.cpp contracts (T213)`
 
 ---
 

@@ -840,6 +840,26 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Brim map**: Tests validate brim entities count using `print.get_brimMap()`.
 - **Multiple extruders**: Tests validate brim generation with multiple extruders. |
 
+### test_support_material.cpp
+
+**Source under test:** `src/libslic3r/Support/SupportMaterial.cpp`
+
+**Fixture / test data:** Uses `test_data.hpp` for mesh generation and print initialization.
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| SupportMaterial: Three raft layers created | `[SupportMaterial][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **Raft layer count**: Enabling support material with 3 raft layers produces exactly 3 support layers. |
+| SupportMaterial: support_layers_z and contact_distance | `[SupportMaterial][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **First layer height**: First support layer height matches `first_layer_height` configuration. <br> **Layer height bounds**: Support layers satisfy minimum and maximum layer height constraints. <br> **No null/negative layers**: All support layers have positive height. <br> **No excessive layer thickness**: No support layer exceeds nozzle diameter. |
+
+**Special notes:**
+- **EPSILON tolerance**: Uses `EPSILON` for floating-point comparisons (lines 41, 43).
+- **Disabled tests**: All test cases are marked with `[.]` tag or commented out with `#if 0`.
+- **Support layer validation**: Tests validate support layer heights and contact distances.
+- **No Catch::Approx**: Uses direct floating-point comparisons with `EPSILON`. |
+
+
 
 
 
