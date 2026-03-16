@@ -431,4 +431,32 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **CGAL dependency**: Uses CGAL library for mesh boolean operations.
 - **Sphere generation**: Uses `make_sphere(1.)` to create test geometry. |
 
+### test_marchingsquares.cpp
+
+**Source under test:** `src/libslic3r/MarchingSquares.cpp` + `src/libslic3r/SLA/RasterToPolygons.cpp`
+
+**Fixture / test data:** none (all inline data, programmatic raster generation)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Empty raster should result in empty polygons | `[MarchingSquares]` | **Empty input handling**: An empty raster must produce an empty `ExPolygons` vector (size 0). |
+| Marching squares directions | `[MarchingSquares]` | **Direction step logic**: Marching squares algorithm direction steps must produce correct coordinate changes: <br> - `left`: (0, -1) <br> - `down`: (1, -1) <br> - `right`: (1, 0) <br> - `up`: (0, 0) <br> - Steps with magnitude 7 and negative magnitude -3 must also work correctly. |
+| Fully covered raster should result in a rectangle | `[MarchingSquares]` | **Full coverage extraction**: A fully covered 4x4 raster must extract a single rectangle polygon. Tests with both full accuracy (1x1 pixel window) and half accuracy (2x2 pixel window). |
+| 4x4 raster with one ring | `[MarchingSquares]` | **Ring extraction**: A 4x4 raster with one ring shape must extract the correct polygon structure. |
+| 10x10 raster with two rings | `[MarchingSquares]` | **Ambiguous case handling**: Two overlapping rings in a 10x10 raster produce ambiguous marching squares cases. The algorithm must handle these gracefully (test uses `strict=false` to skip exact polygon count checks). |
+| Square with hole in the middle | `[MarchingSquares]` | **Hole preservation**: A square with a hole must be correctly extracted with hole preserved. Tests multiple raster configurations: <br> - Proportional, landscape, portrait rasters <br> - Different pixel sizes (1x1 mm, 2x2 mm, 0.5x0.5 mm) <br> - Full and half accuracy windows <br><br>**Area tolerance**: Uses `WithinRel(reference_area, pixel_len * 0.05) \|\| WithinAbs(reference_area, pixel_area)` for raster area validation. Porting agent must reproduce these tolerances. |
+| Circle with hole in the middle | `[MarchingSquares]` | **Circular hole extraction**: A circle with a hole must be correctly extracted. |
+| Recreate object from rasters | `[SL1Import]` | **Round-trip reconstruction**: Loading a mesh, slicing it into layers, rasterizing each layer, and extracting polygons back must preserve geometry within tolerance. <br> **Tolerance**: `diff <= 0.1 * layer_area \|\| diff < scaled<double>(1.) * scaled<double>(1.)`. Porting agent must reproduce this tolerance. |
+| Benchmark gyroid cube period 10.0mm | `[MarchingSquares]` | **Performance baseline**: Gyroid infill generation must complete within reasonable time (benchmark test). No specific tolerance, just performance validation. |
+| Benchmark gyroid cube period 5.0mm | `[MarchingSquares]` | **Performance baseline**: Gyroid infill generation with smaller period must complete within reasonable time. |
+
+**Special notes:**
+- **Allowed matchers**: Uses `WithinRel` and `WithinAbs` (Catch2 matchers) for floating-point comparisons - **allowed** per CLAUDE.md.
+- **No Catch::Approx**: This file does NOT use `Catch::Approx`.
+- **SVG/PNG export**: Tests generate debug SVG and PNG files in debug builds (`#ifndef NDEBUG`).
+- **Performance tests**: Benchmark tests use `BENCHMARK` macro (Catch2 v2.9.0+).
+- **Gyroid generation**: Uses marching squares algorithm for gyroid infill extraction with configurable period, frequency, and window size. |
+
 

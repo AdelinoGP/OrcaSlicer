@@ -405,3 +405,21 @@ Open questions: None
 - **Source**: `src/libslic3r/MeshBoolean.cpp`
 
 **Published commit:** `docs: test_meshboolean.cpp contracts (T114)`
+
+---
+
+## Session 115
+
+**Active task:** T115 — document tests/libslic3r/test_marchingsquares.cpp
+
+**Completed tasks this session:** T115
+
+**Key findings:**
+- **Marching squares algorithm**: Tests cover direction steps, full/half accuracy extraction, hole preservation, and ambiguous case handling.
+- **Allowed matchers**: Uses `WithinRel` and `WithinAbs` (allowed per CLAUDE.md).
+- **No Catch::Approx**: This file does NOT use `Catch::Approx`.
+- **Tolerance specifications**: Raster area validation uses `WithinRel(reference_area, pixel_len * 0.05) || WithinAbs(reference_area, pixel_area)`.
+- **Performance tests**: Benchmark tests for gyroid infill generation.
+- **Source**: `src/libslic3r/MarchingSquares.cpp` + `src/libslic3r/SLA/RasterToPolygons.cpp`
+
+**Published commit:** `docs: test_marchingsquares.cpp contracts (T115)`

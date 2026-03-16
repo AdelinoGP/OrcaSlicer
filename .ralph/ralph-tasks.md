@@ -79,7 +79,7 @@ Last updated: 2026-03-11T00:00:00Z
             Source under test: src/libslic3r/MeshBoolean.cpp
             Commit: `docs: test_meshboolean.cpp contracts (T114)`
 
-- [ ] T115  document: tests/libslic3r/test_marchingsquares.cpp
+- [x] T115  document: tests/libslic3r/test_marchingsquares.cpp
             Source under test: src/libslic3r/ (marching squares / raster ops)
             Commit: `docs: test_marchingsquares.cpp contracts (T115)`
 
