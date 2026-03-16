@@ -782,6 +782,26 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Simple tests**: Only tests basic origin manipulation in `GCode` class.
 - **No Catch::Approx**: No floating-point comparisons used. |
 
+### test_gcodewriter.cpp
+
+**Source under test:** `src/libslic3r/GCodeWriter.cpp`
+
+**Fixture / test data:** `tests/data/fff_print_tests/test_gcodewriter/config_lift_unlift.ini`
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| lift() is not ignored after unlift() at normal values of Z | `[GCodeWriter][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **Lift after unlift**: Calling `lazy_lift()` after `unlift()` at the same Z height produces G-code (non-empty string). <br> **No redundant moves**: Moving to the same Z height after lift produces no additional G-code (empty string). <br> **Multiple Z values**: Test validates behavior at Z=203, Z=500003, and Z=10.3. |
+| set_speed emits values with fixed-point output | `[GCodeWriter]` | **Speed formatting**: `set_speed()` outputs G-code with correct fixed-point precision: <br> - 99999.123 → "G1 F99999.123\n" <br> - 1.0 → "G1 F1\n" <br> - 203.200022 → "G1 F203.2\n" <br> - 203.200522 → "G1 F203.201\n" |
+
+**Special notes:**
+- **String comparison**: Uses `Catch::Matchers::Equals` for exact string comparison (no floating-point tolerances).
+- **Disabled test**: First test case is marked with `[.]` tag and not built by default.
+- **Config file**: First test loads configuration from `config_lift_unlift.ini`.
+- **Fixed-point output**: Tests verify that speed values are formatted with appropriate precision. |
+
+
 
 
 
