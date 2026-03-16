@@ -462,9 +462,9 @@ Open questions: None
 ---
 
 ## CURRENT STATUS
-Last session: 210
-Active task: T210 — document test_gcodewriter.cpp
-Next action: Start T210
+Last session: 211
+Active task: T211 — document test_printgcode.cpp
+Next action: Start T211
 Unresolved [UNCLEAR] tags: 0
-Files remaining (Phase 2): 4 (T210-T213)
+Files remaining (Phase 2): 3 (T211-T213)
 Open questions: None

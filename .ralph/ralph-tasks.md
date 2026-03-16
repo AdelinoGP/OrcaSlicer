@@ -148,7 +148,7 @@ Last updated: 2026-03-11T00:00:00Z
              Source under test: src/libslic3r/GCode.cpp
              Commit: `docs: test_gcode.cpp contracts (T209)`
 
-- [~] T210  document: tests/fff_print/test_gcodewriter.cpp
+- [x] T210  document: tests/fff_print/test_gcodewriter.cpp
              Source under test: src/libslic3r/GCodeWriter.cpp
              Fixture data: tests/data/fff_print_tests/test_gcodewriter/
              Commit: `docs: test_gcodewriter.cpp contracts (T210)`
