@@ -62,7 +62,7 @@ Last updated: 2026-03-11T00:00:00Z
             Source under test: src/libslic3r/Config.cpp
             Commit: `docs: test_config.cpp contracts (T110)`
 
-- [ ] T111  document: tests/libslic3r/test_appconfig.cpp
+- [x] T111  document: tests/libslic3r/test_appconfig.cpp
             Source under test: src/libslic3r/AppConfig.cpp
             Commit: `docs: test_appconfig.cpp contracts (T111)`
 

@@ -370,3 +370,16 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 | DynamicPrintConfig serialization | `[Config]` | **Binary serialization round-trip**: A `DynamicPrintConfig` object serialized to binary and deserialized must be equal to the original (using `==` operator). |
 | [DISABLED] DynamicPrintConfig JSON serialization | `[Config]` | `[DISABLED — not built; do not port until re-enabled]` Tests JSON serialization of `DynamicPrintConfig` (commented out in source). |
 
+### test_appconfig.cpp
+
+**Source under test:** `src/libslic3r/AppConfig.cpp`
+
+**Fixture / test data:** none (all inline data)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| AppConfig network version helpers | `[AppConfig]` | **Skipped versions management**: <br> 1. **Empty state**: Initially, `get_skipped_network_versions()` must return an empty list. <br> 2. **Add and check**: After adding version "02.01.01.52", `is_network_version_skipped("02.01.01.52")` must return true, and `is_network_version_skipped("02.03.00.62")` must return false. <br> 3. **Multiple versions**: Adding multiple versions ("02.01.01.52", "02.00.02.50") must result in `get_skipped_network_versions().size() == 2` and both must be recognized as skipped. <br> 4. **Clear**: Calling `clear_skipped_network_versions()` must remove all versions, so `is_network_version_skipped("02.01.01.52")` returns false. <br> 5. **Idempotency**: Adding the same version twice must result in a single entry (size 1). |
+
+

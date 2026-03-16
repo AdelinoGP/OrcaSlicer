@@ -338,3 +338,19 @@ Open questions: None
 - `src/libslic3r/Config.cpp` - Config implementation
 - `src/libslic3r/PrintConfig.hpp` - Print config definitions
 - `tests/data/test_config/new_from_ini.ini` - Test fixture for INI loading
+
+---
+
+## Session 111
+
+**Active task:** T111 — document tests/libslic3r/test_appconfig.cpp
+
+**Completed tasks this session:** T111
+
+**Key findings:**
+- **Network version helpers**: AppConfig manages skipped network versions with add, check, clear, and idempotency operations.
+- **Simple string list management**: Uses vector of strings for version tracking.
+- **No floating-point operations**: All tests use exact string comparisons and size checks.
+- **Source**: `src/libslic3r/AppConfig.cpp`
+
+**Published commit:** `docs: test_appconfig.cpp contracts (T111)`
