@@ -462,9 +462,9 @@ Open questions: None
 ---
 
 ## CURRENT STATUS
-Last session: 211
-Active task: T211 — document test_printgcode.cpp
-Next action: Start T211
+Last session: 212
+Active task: T212 — document test_skirt_brim.cpp
+Next action: Start T212
 Unresolved [UNCLEAR] tags: 0
-Files remaining (Phase 2): 3 (T211-T213)
+Files remaining (Phase 2): 2 (T212-T213)
 Open questions: None

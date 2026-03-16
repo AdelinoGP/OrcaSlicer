@@ -153,7 +153,7 @@ Last updated: 2026-03-11T00:00:00Z
              Fixture data: tests/data/fff_print_tests/test_gcodewriter/
              Commit: `docs: test_gcodewriter.cpp contracts (T210)`
 
-- [~] T211  document: tests/fff_print/test_printgcode.cpp
+- [x] T211  document: tests/fff_print/test_printgcode.cpp
              Source under test: src/libslic3r/GCode.cpp (full print→gcode pipeline)
              Commit: `docs: test_printgcode.cpp contracts (T211)`
 
