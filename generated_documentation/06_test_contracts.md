@@ -820,6 +820,27 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **GCodeReader**: Uses `GCodeReader` to parse G-code and validate Z heights.
 - **Multiple objects**: Tests validate behavior with multiple objects and `complete_objects` mode. |
 
+### test_skirt_brim.cpp
+
+**Source under test:** `src/libslic3r/Brim.cpp`
+
+**Fixture / test data:** Uses `test_data.hpp` for mesh generation and print initialization.
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Skirt height is honored | `[Skirt][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **Single object**: Skirt is generated on exactly `skirt_height` layers (5 layers). <br> **Multiple objects**: Skirt is generated on exactly `skirt_height` layers for multiple objects. <br> **Tolerance**: Uses `Catch::Approx` for speed comparison (line 56). |
+| Original Slic3r Skirt/Brim tests | `[SkirtBrim][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **Brim generation**: Brim is generated when `brim_width` is set to 5mm. <br> **Skirt smaller than brim**: G-code is generated when skirt area is smaller than brim. <br> **Skirt height 0**: G-code is generated when `skirt_height` is 0 but `skirts` > 0. <br> **Brim line count**: 2 brim lines are generated when `brim_width` is 1mm and `first_layer_extrusion_width` is 0.5mm. <br> **Overhang with brim**: G-code is generated for object with overhang support and brim. <br> **Large minimum skirt length**: G-code generation doesn't crash with large `min_skirt_length`. <br> **[DISABLED]** Several test cases are commented out with `#if 0` (brim extruder selection, brim ears). |
+
+**Special notes:**
+- **Catch::Approx usage**: Uses `Catch::Approx` for floating-point comparisons (lines 56, 92, 93, 240, 245, 252, 253).
+- **Disabled tests**: All test cases are marked with `[.]` tag and not built by default.
+- **GCodeReader**: Uses `GCodeReader` to parse G-code and validate skirt/brim generation.
+- **Brim map**: Tests validate brim entities count using `print.get_brimMap()`.
+- **Multiple extruders**: Tests validate brim generation with multiple extruders. |
+
+
 
 
 
