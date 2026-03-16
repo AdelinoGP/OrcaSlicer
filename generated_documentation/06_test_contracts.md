@@ -801,6 +801,26 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Config file**: First test loads configuration from `config_lift_unlift.ini`.
 - **Fixed-point output**: Tests verify that speed values are formatted with appropriate precision. |
 
+### test_printgcode.cpp
+
+**Source under test:** `src/libslic3r/GCode.cpp` (full print→gcode pipeline)
+
+**Fixture / test data:** Uses `test_data.hpp` for mesh generation and print initialization.
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| PrintGCode basic functionality | `[PrintGCode][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **G-code generation**: Print generates non-empty G-code output. <br> **Version info**: G-code contains Slic3R_VERSION string. <br> **Extrusion statistics**: G-code contains extrusion width comments for perimeters, infill, solid infill, and top infill. <br> **Cooling markers**: G-code does not contain consumed cooling markers (`;_EXTRUDE_SET_SPEED`). <br> **G-code preamble**: G-code contains `G21 ; set units to millimeters`. <br> **Config options**: G-code contains comments for first_layer_temperature, layer_height, fill_density. <br> **Infill, perimeters, skirt**: G-code contains infill, perimeters, and skirt extrusions (validated via regex). <br> **Final Z height**: Final Z height is 20.0mm (uses `Catch::Approx`). <br> **Complete objects**: Two objects printed with `complete_objects=true` produce between-object G-code. <br> **Z height reset**: Z height resets on object change (validated via GCodeReader). <br> **Shorter object first**: Shorter object is printed before taller object. <br> **Support material**: Support material and raft are emitted when enabled. <br> **First layer extrusion width**: Separate first layer extrusion width is reflected in G-code comments. <br> **Cooling**: Fan disable G-code (`M107`) is emitted when cooling enabled. <br> **Layer variables**: `layer_num` and `layer_z` variables are processed in end G-code. <br> **Current extruder**: `current_extruder` variable is processed in start G-code. <br> **Layer index**: Layer index from z=0 is correct for multiple objects. |
+
+**Special notes:**
+- **Catch::Approx usage**: Uses `Catch::Approx` for Z-height comparisons (lines 92, 134, 270, 277).
+- **Regex matching**: Uses Boost regex to validate presence of infill, perimeters, and skirt extrusions.
+- **Disabled tests**: All test cases are marked with `[.]` tag and not built by default.
+- **GCodeReader**: Uses `GCodeReader` to parse G-code and validate Z heights.
+- **Multiple objects**: Tests validate behavior with multiple objects and `complete_objects` mode. |
+
+
 
 
 
