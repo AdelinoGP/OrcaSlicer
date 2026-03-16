@@ -177,7 +177,7 @@ Last updated: 2026-03-11T00:00:00Z
              Source under test: src/libslic3r/SLA/IndexedMesh.cpp + src/libslic3r/SLA/AABBMesh.cpp
              Commit: `docs: sla_raycast_tests.cpp contracts (T302)`
 
-- [~] T303  document: tests/sla_print/sla_supptgen_tests.cpp
+- [x] T303  document: tests/sla_print/sla_supptgen_tests.cpp
              Source under test: src/libslic3r/SLA/SupportPointGenerator.cpp
              Commit: `docs: sla_supptgen_tests.cpp contracts (T303)`
 
