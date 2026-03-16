@@ -464,7 +464,7 @@ Open questions: None
 ## CURRENT STATUS
 Last session: 121
 Active task: T121 — document test_bambu_networking.cpp
-Next action: Start T121
+Next action: Complete T121
 Unresolved [UNCLEAR] tags: 0
 Files remaining (Phase 1): 1 (T121)
 Open questions: None

@@ -104,7 +104,7 @@ Last updated: 2026-03-11T00:00:00Z
              Note: OpenVDB-conditional — only built when TARGET OpenVDB::openvdb present
              Commit: `docs: test_hollowing.cpp contracts (T120)`
 
-- [~] T121  document: tests/libslic3r/test_bambu_networking.cpp
+- [x] T121  document: tests/libslic3r/test_bambu_networking.cpp
              Source under test: src/slic3r/Utils/ networking layer
              Commit: `docs: test_bambu_networking.cpp contracts (T121)`
 
