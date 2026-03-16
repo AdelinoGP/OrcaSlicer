@@ -11,11 +11,11 @@ Last updated: 2026-03-11T00:00:00Z
 
 ## Phase 0 — Orientation
 
-- [ ] T001  Read ralph-tasks.md and identify resume point
-- [ ] T002  Read tests/CLAUDE.md (Catch2 safety rules)
-- [ ] T003  Read CMakeLists.txt for all 5 in-scope suites
-- [ ] T004  Read tests/test_utils.hpp
-- [ ] T005  Update agent_journal.md living status block
+- [x] T001  Read ralph-tasks.md and identify resume point
+- [x] T002  Read tests/CLAUDE.md (Catch2 safety rules)
+- [x] T003  Read CMakeLists.txt for all 5 in-scope suites
+- [x] T004  Read tests/test_utils.hpp
+- [~] T005  Update agent_journal.md living status block
 - [ ] T006  Orientation commit: `orient: test-contract pass — orientation complete`
 
 ---

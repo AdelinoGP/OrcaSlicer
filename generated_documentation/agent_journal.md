@@ -2,11 +2,45 @@
 
 ## CURRENT STATUS
 Last session: 99
-Active task: UNCLEAR tag resolution pass — complete
-Next action: Awaiting human review.
+Active task: T005 — Orientation for Test Contract Documentation
+Next action: Commit orientation, begin Phase 1 (libslic3r suite)
 Unresolved [UNCLEAR] tags: 0
 Files remaining (Phase 4): 0
 Open questions: None
+
+---
+
+## Session 100 — Test Contract Documentation Orientation
+
+**Active task:** T005 — Update living status block for test contract documentation
+
+**Objective:** Prepare OrcaSlicer test suite as TDD contract for refactoring agent
+
+**Scope identified:**
+- **Total test suites:** 5
+- **Total test files:** 39 active files
+- **Total tasks:** 65 (Phases 0-6)
+  - Phase 0 (Orientation): T001-T006
+  - Phase 1 (libslic3r): T101-T121 (21 files)
+  - Phase 2 (fff_print): T201-T213 (13 files)
+  - Phase 3 (sla_print): T301-T303 (3 files)
+  - Phase 4 (libnest2d): T401 (1 file)
+  - Phase 5 (slic3rutils): T501 (1 file)
+  - Phase 6 (Finalization): T600
+
+**Build & Run Reference:**
+- Output file: `generated_documentation/06_test_contracts.md`
+- Catch2 version: v2 (deprecated: Approx, use WithinAbs/WithinRel/WithinULP)
+- Test execution: `./tests --order rand --warn NoAssertions`
+
+**Catch2 Safety Rules Applied:**
+- ✓ Express increments in loops use DYNAMIC_SECTION
+- ✓ Thread-unsafe assertions: collect results on main thread
+- ✓ Floating-point: NEVER use Approx → use matchers
+- ✓ Expression decomposition: avoid binary operators in assertions
+- ✓ Test ordering: --order rand --warn NoAssertions required
+
+**Completed tasks this session:** T001-T004, T005
 
 Open questions (from Session 1 — status as of Session 86):
 - **Q1 RESOLVED** — `slice_mesh` does NOT use the admesh adjacency table. `its_face_neighbors_par()` is called at
