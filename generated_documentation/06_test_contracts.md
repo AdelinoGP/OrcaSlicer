@@ -459,4 +459,22 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Performance tests**: Benchmark tests use `BENCHMARK` macro (Catch2 v2.9.0+).
 - **Gyroid generation**: Uses marching squares algorithm for gyroid infill extraction with configurable period, frequency, and window size. |
 
+### test_optimizers.cpp
+
+**Source under test:** `src/libslic3r/Optimize/`
+
+**Fixture / test data:** none (inline functions)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Test brute force optimzer for basic 1D and 2D functions | `[Opt]` | **1D optimization (sin)**: The bruteforce optimizer must find the minimum (-1.0) and maximum (1.0) of `sin(phi)` within `[0, 2*PI]`. <br> **Tolerance**: Absolute error < 1e-2 OR relative error < 1e-4. <br><br> **2D optimization (sphere)**: The bruteforce optimizer must minimize `x^2 + y^2 + 1.0` to a score of 1.0 within bounds `[-1, 1]`. <br> **Tolerance**: Absolute error < 1e-2 OR relative error < 1e-4. |
+
+**Special notes:**
+- **Custom tolerance function**: Uses `check_opt_result()` which checks `abs_diff < abs_err || rel_diff < rel_err`. Porting agent must reproduce these specific tolerance values (1e-2 absolute, 1e-4 relative).
+- **No Catch::Approx**: Uses custom tolerance logic instead of Catch2 matchers.
+- **Optimizer interface**: Tests `Slic3r::opt::Optimizer` with `AlgBruteForce` algorithm.
+- **Functional testing**: Tests optimization of simple mathematical functions (sin, sphere) to verify optimizer correctness. |
+
 

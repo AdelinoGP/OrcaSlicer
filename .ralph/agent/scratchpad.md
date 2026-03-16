@@ -1,20 +1,75 @@
-# Scratchpad for T108: test_voronoi.cpp
+# Scratchpad
 
-## Completed Work
-- Documented `test_voronoi.cpp` with all test cases
-- Updated `06_test_contracts.md` with Voronoi test contracts
-- Updated `agent_journal.md` with session 108 details
-- Committed changes with message "docs: test_voronoi.cpp contracts (T108)"
+## Iteration 1: T109
 
-## Key Findings
-- Boost Voronoi library issues covered: #12067, #12707, #12903, #12139
-- Extensive Voronoi offset operations tested with multiple configurations
-- Missing vertex detection and repair via rotation mechanism
-- Skeleton extraction and duplicate vertex detection
+### Objective
+Document the test suite for TDD-guided refactoring.
 
-## Next Task
-- T109: test_elephant_foot_compensation.cpp
+### Completed Work
+- Oriented the project: read `ralph-tasks.md`, `tests/CLAUDE.md`, CMakeLists for all suites, `tests/test_utils.hpp`.
+- Updated `agent_journal.md` status block.
+- Committed orientation: `orient: test-contract pass — orientation complete`.
+- Started T109: `test_elephant_foot_compensation.cpp`.
+- Read and analyzed the test file.
+- Appended documentation to `generated_documentation/06_test_contracts.md`.
+- Committed documentation: `docs: test_elephant_foot_compensation.cpp contracts (T109)`.
+- Updated `ralph-tasks.md` and `agent_journal.md`.
+- Committed task completion: `docs: complete T109, move to T110`.
 
-## Notes
-- [DISABLED] NaN coordinates test (marked as . [!mayfail])
-- Rotation-based repair mechanism uses angles: π/6, π/5, π/7, π/11
+### Key Findings (T109)
+- `test_elephant_foot_compensation.cpp` tests the `elephant_foot_compensation` function.
+- Tests verify that compensated polygons have strictly smaller area and valid orientation (CCW contour, CW holes).
+- Several test cases with specific geometries (hole, tiny contour, large box, thin ring, etc.).
+- One disabled test case (`#if 0`) for varying inner offset using `SCALED_EPSILON`.
+- No explicit floating-point tolerances used in assertions (exact double comparison).
+- Fixture data defined inline in the test file.
+
+### Next Steps
+- T110: `test_config.cpp`
+- Continue documenting remaining test files in Phase 1 (libslic3r suite).
+- After Phase 1, move to Phase 2 (fff_print suite), etc.
+- Finalize with T600: complete test contracts documentation.
+
+### Notes
+- Runtime tasks system: `ralph tools task` commands work, but `ralph-tasks.md` is the authoritative registry.
+- Task IDs in `ralph-tasks.md` (T109, T110, ...) are for human readability; runtime tasks have UUID-like IDs.
+- For this iteration, I used `ralph tools task add` and `close` to track the task, but the main registry is `ralph-tasks.md`.
+
+## Iteration 2 (continued): T111-T115
+
+### Completed Work
+- T111: `test_appconfig.cpp` - No Catch::Approx usage. Documented network version helpers.
+- T112: `test_placeholder_parser.cpp` - **CRITICAL**: Uses `Catch::Approx` for floating-point comparisons. Documented scripting features and variable management.
+- T113: `test_3mf.cpp` - Uses Eigen `isApprox()` (allowed). Documented Unicode path support and geometry transformation preservation.
+- T114: `test_meshboolean.cpp` - **CRITICAL**: Uses `Catch::Approx` for volume comparison. Documented CGAL conversion round-trip.
+- T115: `test_marchingsquares.cpp` - Uses `WithinRel`/`WithinAbs` (allowed). No `Catch::Approx`. Documented marching squares algorithm and tolerance specifications.
+
+### Key Findings
+- Several files use `Catch::Approx`: `test_placeholder_parser.cpp`, `test_meshboolean.cpp`, `test_clipper_utils.cpp`, `test_clipper_offset.cpp`.
+- Porting agent must reproduce floating-point tolerances for these files.
+- Other files use allowed matchers (`WithinRel`, `WithinAbs`) or exact integer geometry.
+
+### Next Steps
+- Continue with T117 (`test_mutable_priority_queue.cpp`).
+- After Phase 1 (libslic3r), move to Phase 2 (fff_print), etc.
+- Finalize with T600: complete test contracts documentation.
+
+## Iteration 3: T116
+
+### Completed Work
+- T116: `test_optimizers.cpp`
+  - Read and analyzed the test file.
+  - Appended documentation to `generated_documentation/06_test_contracts.md`.
+  - Committed documentation: `docs: test_optimizers.cpp contracts (T116)`.
+  - Updated `ralph-tasks.md` and `agent_journal.md`.
+
+### Key Findings (T116)
+- Tests basic optimization functions (sin, sphere) using `BruteforceOptimizer`.
+- Uses custom tolerance function `check_opt_result()` with absolute error < 1e-2 and relative error < 1e-4.
+- No `Catch::Approx` usage (custom tolerance logic).
+- Source: `src/libslic3r/Optimize/`.
+- Simple functional tests for optimizer correctness.
+
+### Next Steps
+- T117: `test_mutable_priority_queue.cpp`
+- Continue documenting remaining test files in Phase 1 (libslic3r suite).

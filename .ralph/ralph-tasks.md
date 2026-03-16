@@ -83,7 +83,7 @@ Last updated: 2026-03-11T00:00:00Z
             Source under test: src/libslic3r/ (marching squares / raster ops)
             Commit: `docs: test_marchingsquares.cpp contracts (T115)`
 
-- [ ] T116  document: tests/libslic3r/test_optimizers.cpp
+- [x] T116  document: tests/libslic3r/test_optimizers.cpp
             Source under test: src/libslic3r/Optimize/
             Commit: `docs: test_optimizers.cpp contracts (T116)`
 

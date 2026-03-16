@@ -1,11 +1,11 @@
 # Agent Journal — OrcaSlicer Codebase Analysis
 
 ## CURRENT STATUS
-Last session: 110
-Active task: T111 — document test_appconfig.cpp
-Next action: Start T111
+Last session: 115
+Active task: T116 — document test_optimizers.cpp
+Next action: Start T116
 Unresolved [UNCLEAR] tags: 0
-Files remaining (Phase 1): 11 (T111-T121)
+Files remaining (Phase 1): 6 (T116-T121)
 Open questions: None
 
 ---
@@ -423,3 +423,29 @@ Open questions: None
 - **Source**: `src/libslic3r/MarchingSquares.cpp` + `src/libslic3r/SLA/RasterToPolygons.cpp`
 
 **Published commit:** `docs: test_marchingsquares.cpp contracts (T115)`
+
+---
+
+## Session 116
+
+**Active task:** T116 — document tests/libslic3r/test_optimizers.cpp
+
+**Completed tasks this session:** T116
+
+**Key findings:**
+- **Basic optimization tests**: Tests `BruteforceOptimizer` on 1D (sin) and 2D (sphere) functions.
+- **Custom tolerance logic**: Uses `check_opt_result()` with absolute error < 1e-2 and relative error < 1e-4 (no Catch::Approx).
+- **Source**: `src/libslic3r/Optimize/`.
+- **Functional verification**: Simple mathematical function optimization to verify optimizer correctness.
+
+**Published commit:** `docs: test_optimizers.cpp contracts (T116)`
+
+---
+
+## CURRENT STATUS
+Last session: 116
+Active task: T117 — document test_mutable_priority_queue.cpp
+Next action: Start T117
+Unresolved [UNCLEAR] tags: 0
+Files remaining (Phase 1): 5 (T117-T121)
+Open questions: None
