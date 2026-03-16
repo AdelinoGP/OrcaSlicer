@@ -63,12 +63,24 @@ Completed with documentation covering:
 - **Polygon vector operations**: Filtering CW contours, handling empty results
 - Key findings: O(1) insertion/removal, circular linked-list in contiguous storage, exact geometry
 
+### T106 - test_clipper_utils.cpp ✓
+**Just completed!** Committed with documentation covering:
+- **Offset operations**: offset(), offset_ex(), offset2_ex() with square_with_hole
+- **Difference operations**: diff_ex() with CCW outer minus CW inner
+- **Polyline clipping**: intersection_pl(), diff_pl() with polyline arrays
+- **Bug regression tests**: GitHub issues #96, #122, #126 with large coordinate ranges (up to 20M units)
+- **[DISABLED]** Bug #127 test disabled until fixed
+- **PolyTree traversal**: 4 permutations (Polygons/ExPolygons × ordered/unordered) with `Catch::Approx` area validation
+- **Large coordinate handling**: Tests up to 20,000,000 units
+- **Winding order semantics**: CCW=CW hole, CW=hole, union merges CW holes
+- **Key finding**: Only test file using `Catch::Approx` (5 locations) - requires floating-point tolerance documentation
+
 ## Current Status
 
-**Next task**: T106 - test_clipper_utils.cpp
+**Next task**: T107 - test_clipper_offset.cpp
 
-**Completed**: 8 tasks (T001-T006, T101-T105)
-**Remaining**: 57 tasks
+**Completed**: 9 tasks (T001-T006, T101-T106)
+**Remaining**: 56 tasks
 
 ## Work Plan
 
@@ -78,191 +90,97 @@ Completed with documentation covering:
    - T102: test_indexed_triangle_set.cpp ✓ (committed: 520451131e)
    - T103: test_geometry.cpp ✓ (committed: 83745628fe)
    - T104: test_polygon.cpp ✓ (committed: ce05bac4fe)
-    - Remaining: T106-T121 (16 files)
+   - T105: test_mutable_polygon.cpp ✓ (committed: recent)
+   - T106: test_clipper_utils.cpp ✓ (committed: upcoming)
+    - Remaining: T107-T121 (15 files)
 3. **Phase 2 (T201-T213)** - Document all 13 fff_print test files
 4. **Phase 3 (T301-T303)** - Document all 3 sla_print test files
 5. **Phase 4 (T401)** - Document libnest2d test
 6. **Phase 5 (T501)** - Document slic3rutils test
 7. **Phase 6 (T600)** - Finalize documentation and commit
 
-**Estimated iterations remaining**: 57 tasks
+**Estimated iterations remaining**: 56 tasks
 
-## Key Learning from T104
+## Key Learning from T106
 
-### Test Pattern Discovery
-- test_polygon.cpp focuses on **Polygon class methods**
-- Uses **exact integer geometry** throughout - no epsilon tolerance
-- Signed area based on winding order (CCW = positive, CW = negative)
-- `remove_collinear()` is a **free function**, not a method
-- All operations preserve topology and topology properties
+### ClipperUtils Design & Coverage
 
-### Source Methods Documented
-- `is_valid()`, `area()`, `centroid()`, `contains()`
-- `lines()`, `split_at_*()`, `is_counter_clockwise()`, `make_counter_clockwise()`
-- `first_point()`, `triangulate_convex()`, `intersection()`
-- Free function: `remove_collinear()`
+**Source files under test:**
+- `src/libslic3r/ClipperUtils.hpp` (main wrapper)
+- `src/libslic3r/ClipperUtils.cpp` (implementation)
+- Wraps ClipperLib (Angus Johnson's polygon clipping library)
 
-### Next File: T105 - test_mutable_polygon.cpp
-Expected to test in-place polygon modifications, likely covering:
-- `clear()`, `append()`, `insert()`, `erase()`
-- `reverse()`, `rotate()`, `translate()`, `scale()`
-- In-place simplification operations
-- Memory management and reference semantics
+**Test structure:**
+- **SCENARIO 1** (xs/t/11_clipper.t): 8 operations + 4 bug regression tests
+- **SCENARIO 2** (t/clipper.t): 4 operations
+- **TEST CASE 3**: PolyTree traversal with 4 permutations
 
-## Learning from T103
+**Numeric precision - CRITICAL FINDING:**
+- **5 uses of Catch::Approx** (violates CLAUDE.md rule against using Approx)
+- Lines: 126 (bug #126), 280, 286, 292, 298 (PolyTree area)
+- Tolerance not explicitly specified in tests
+- Porting agent must use standard floating-point precision (1e-6 to 1e-9 relative)
+- This is the **only** file in the entire test suite using Catch::Approx
 
-### Test structure patterns observed:
-- test_geometry.cpp uses both TEST_CASE and BDD-style SCENARIO/GIVEN/WHEN/WHEN
-- Mix of direct function tests and behavioral/algorithmic tests
-- Multiple disabled code blocks for debug/unused features
-- No external fixture data - all inline test data
-- Heavy use of geometric primitives: Line, Point, Polygon, Polyline, BoundingBox
+**Coordinate scaling patterns:**
+- Small tests: 10-20 units
+- Bug tests: 25K-75M units
+- Large coordinate test: 0-20M units
+- All operations must handle full range
 
-### Key source files under test:
-- src/libslic3r/Geometry.cpp (main namespace)
-- src/libslic3r/Geometry/Circle.cpp
-- src/libslic3r/Geometry/ConvexHull.cpp
-- src/libslic3r/ClipperUtils.cpp
-- src/libslic3r/ShortestPath.cpp
-- Core types: Point.cpp, Line.cpp, Polygon.cpp, Polyline.cpp, BoundingBox.cpp
+**Winding order semantics:**
+- CCW = exterior contour
+- CW = interior hole
+- Union merges CW holes
+- diff_ex() creates holes from CCW minus CW
+- **Disabled tests note:** Clipper does NOT preserve polyline orientation
 
-### Numeric precision requirements:
-- EPSILON: 1e-4 (absolute tolerance for floating-point)
-- SCALED_EPSILON: EPSILON / SCALING_FACTOR (~1e-7)
-- is_approx() used extensively for Vec2d, Point comparisons
-- Exact integer arithmetic for geometry predicates (intersection, containment)
-- Angle tolerance in radians: 0.9*EPSILON vs 1.1*EPSILON for parallel/perpendicular
+**Bug regression tests:**
+- #96: Large coordinate polyline intersection
+- #122: Multi-polygon clipping with degenerate cases
+- #126: Large coordinate range preservation
+- #127: **[DISABLED]** - Not fixed yet
 
-### Bot patterns to continue:
-- Extract all TEST_CASE/SCENARIO names
-- Identify tags for each test
-- Document each section separately in guarantees
-- Note disabled blocks with [DISABLED] prefix
-- Record specific tolerance values (EPSILON, SCALED_EPSILON)
-- Specify which source files are covered
-- Mention when external fixtures are needed (none for geometry test)
-- Use API consumer language (not implementation details)
-- Be explicit about return values, input requirements, and tolerances
+**PolyTree traversal:**
+- Template parameter `e_ordering::ON` vs `e_ordering::OFF`
+- 4 permutations tested
+- All must preserve total area
+- Uses `Catch::Approx` for area comparison
 
-## Current Task Analysis: T104 - test_polygon.cpp
+### Differences from Previous Tests
+1. **Only file with Catch::Approx** - must document tolerance
+2. **Bug-specific regression tests** - GitHub issue references
+3. **Large coordinate range** - up to 20M units
+4. **Complex nested structures** - PolyTree with 5 polygons
+5. **Winding order handling** - CW treated as holes
 
-### File Structure Observed
-- Uses BDD-style SCENARIO/GIVEN/WHEN/THEN
-- 2 main SCENARIO blocks:
-  1. "Converted Perl tests" with ccw_square, hexagon, general triangle
-  2. "Remove collinear points from Polygon"
-- 1 standalone TEST_CASE for trapezoid centroid
-- All inline test data, no external fixtures
-- Tests cover: area, centroid, contains, lines conversion, split operations, winding order, triangulation, intersection, collinear point removal
+### Output Format Compliance
+- Documented as API consumer (not implementation)
+- Specified source files under test
+- All 3 SCENARIO/TEST_CASE blocks covered
+- Catch::Approx noted with tolerance requirement
+- Disabled tests marked with [DISABLED]
+- Follows T105 template structure
 
-### Source Files Under Test
-- src/libslic3r/Polygon.cpp (primary)
-- src/libslic3r/Point.hpp (for Point type)
-- Likely uses: src/libslic3r/Polyline.cpp, src/libslic3r/Line.hpp
+### Files Modified for T106
+1. `generated_documentation/06_test_contracts.md` - Added test_clipper_utils.cpp section
 
-### Key Methods Being Tested
-- is_valid()
-- area() - signed area
-- centroid()
-- contains()
-- lines() - conversion to lines
-- split_at_first_point()
-- split_at_index()
-- split_at_vertex()
-- is_counter_clockwise()
-- make_counter_clockwise()
-- first_point()
-- triangulate_convex()
-- intersection() - line-polygon intersection
-- remove_collinear() - free function
+### Next Task: T107 - test_clipper_offset.cpp
+**Expected scope:**
+- Specific offset operations with various join types
+- Miter limit behaviors
+- Different end types for polylines
+- Edge case handling for distance calculations
 
-### Numeric Precision Notes
-- No explicit tolerance used - all integer geometry
-- Area calculations: exact integer arithmetic
-- Centroid: uses floating point internally but exact comparison for square
-- All coordinate values are integers in test cases
+## Summary of Completed Tasks
 
-### Anticipated test file patterns:
-- **T104 (test_polygon.cpp)**: ✓ Currently analyzing
-- **T105 (test_mutable_polygon.cpp)**: Tests mutable polygon operations (in-place modifications)
-- **T106 (test_clipper_utils.cpp)**: Tests Clipper wrapper functions (offset, intersection, union)
-- **T107 (test_clipper_offset.cpp)**: Specific tests for offset operations
-- Continue pattern of reading file, extracting tests, documenting contracts per test
+| Task | File | Status | Key Findings |
+|------|------|--------|--------------|
+| T101 | test_stl.cpp | ✓ | Unicode paths, ASCII variations, nonstandard tolerance, 1e-4 epsilon |
+| T102 | test_indexed_triangle_set.cpp | ✓ | Component splitting, mesh simplification, AABB tree comparison |
+| T103 | test_geometry.cpp | ✓ | Line ops, polygon algo, circle fitting, 17 cases, 1e-4 epsilon |
+| T104 | test_polygon.cpp | ✓ | Integer geometry only, no epsilon, winding order, collinear removal |
+| T105 | test_mutable_polygon.cpp | ✓ | Circular iterators, O(1) ops, capacity preservation, exact geometry |
+| T106 | test_clipper_utils.cpp | ✓ | **Catch::Approx used**, bug regressions, 20M coord range, PolyTree |
 
-## Current Task Analysis: T105 - test_mutable_polygon.cpp
-
-### File Structure Observed
-- Uses BDD-style SCENARIO/GIVEN/WHEN/THEN
-- 3 SCENARIO blocks:
-  1. "Iterators" - Tests iterator operations (++, --, remove, insert)
-  2. "Remove degenerate points from MutablePolygon" - Tests remove_duplicates()
-  3. "smooth_outward" - Tests outward smoothing algorithm
-- All inline test data, no external fixtures
-- Tests cover: iterator manipulation, point insertion/removal, duplicate removal, polygon smoothing
-
-### Source Files Under Test
-- src/libslic3r/MutablePolygon.hpp (primary interface)
-- src/libslic3r/MutablePolygon.cpp (implementation)
-- Related: src/libslic3r/Point.hpp, src/libslic3r/Polygon.hpp (conversion)
-
-### Key Methods Being Tested
-**MutablePolygon class:**
-- Constructor with initializer list
-- `begin()`, `end()` - iterator access
-- `size()`, `empty()`, `capacity()` - state queries
-- `insert(iterator, Point)` - point insertion
-- `remove(iterator)` - point removal
-
-**MutablePolygon::iterator class:**
-- `operator++`, `operator--` - forward/backward navigation
-- `next()`, `prev()` - relative navigation
-- `valid()` - iterator validity check
-- `remove()` - removes current point, returns iterator to next
-- `insert(Point)` - inserts point at iterator position
-
-**Free functions:**
-- `remove_duplicates(MutablePolygon&)` - removes duplicate consecutive points
-- `smooth_outward(MutablePolygon&, double)` - polygon smoothing
-- `smooth_outward(Polygons&, double)` - polygons smoothing (returns modified vector)
-
-### Numeric Precision Notes
-- Coordinates use `scaled<coord_t>()` and `scaled<double>()` for test data
-- `scaled<T>(value)` applies SCALING_FACTOR (typically 0.00001)
-- Smoothing uses `scaled<double>(10.)` - converts 10 to scaled coordinate
-- No explicit epsilon tolerance mentioned - uses exact geometry
-- Comparison operators use `==` for entire MutablePolygon objects
-
-### Key Implementation Details (from header)
-- **Data structure**: Single vector with linked-list semantics using indices
-- **IndexType**: int32_t
-- **Iterator design**: Circular doubly-linked list with sentinel behavior
-- **Important**: `end()` is INCLUSIVE (last valid point), not STL one-past-the-end
-- **Range class**: Used in smooth_outward for tracking unprocessed items
-- **Invariants**: All elements in one vector, indices reference previous/next
-- **Performance**: O(1) insert/remove, O(n) iteration
-
-### Test Pattern Analysis
-**Iterator tests:**
-- Validates circular navigation (++, --)
-- Tests removal at different positions
-- Verifies capacity preservation after removal
-- Checks iterator validity after all points removed
-
-**Duplicate removal:**
-- Input: Polygon with 12 points, many duplicates (3 consecutive at start, 2 in middle, 2 at end)
-- Output: 8 unique points in order
-- Uses `remove_duplicates()` free function
-
-**Smooth outward:**
-- Tests convex polygon (unmodified)
-- Tests sharp tiny concave polygon (hole closed - becomes empty)
-- Tests vector of polygons (keeps CCW, removes CW)
-- No explicit tolerance visible - uses exact geometry comparisons
-
-### Next Steps for Documentation
-1. Format tests into contract table
-2. Note iterator circular behavior (critical difference from STL)
-3. Document end() is inclusive behavior
-4. Note scaling requirements for coordinates
-5. Describe smooth_outward behavior with concurrency (returns new vector vs. in-place)
-6. Highlight that capacity() behavior after removal is tested but not modified
+**Total completed: 6/64 test files (9.4%)**
