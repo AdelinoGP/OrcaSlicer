@@ -576,4 +576,6 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Static vs discovered**: Tests both static version info and discovered version info conversion.
 - **Source file**: `src/slic3r/Utils/bambu_networking.hpp`. |
 
+## Suite: fff_print/
+
 
