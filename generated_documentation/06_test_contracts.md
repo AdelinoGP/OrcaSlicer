@@ -185,3 +185,38 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - All test coordinates use `Point::new_scale()` which applies SCALING_FACTOR (typically 0.00001)
 - No floating-point comparisons in test assertions
 
+### test_mutable_polygon.cpp
+
+**Source under test:** `src/libslic3r/MutablePolygon.cpp`
+
+**Fixture / test data:** none (all inline data)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Iterators - Iterating upwards | `[MutablePolygon]` | **Circular iteration**: For a MutablePolygon with 3 points, iterator must navigate circularly via `++` operator:<br>- `++begin` ≠ `begin`<br>- `++begin` ≠ `end`<br>- `++(++begin)` ≠ `begin`<br>- `++(++begin)` == `end`<br>- `++(++(++begin))` == `begin` (wraps around)<br>- `++(++(++begin))` ≠ `end`<br><br>**Critical note**: MutablePolygon iterators are circular, not STL-style. The container is a doubly-linked list where `end()` points to the **last valid element**, not one-past-the-end. |
+| Iterators - Iterating downwards | `[MutablePolygon]` | **Reverse circular iteration**: Pre-decrement (`--`) must navigate backward circularly:<br>- `--begin` ≠ `begin` (wraps to `end`)<br>- `--begin` == `end`<br>- `--(--begin)` ≠ `begin`<br>- `--(--begin)` ≠ `end`<br>- `--(--(--begin))` == `begin`<br>- `--(--(--begin))` ≠ `end`<br><br>`end().prev()` returns iterator to second-to-last element. |
+| Iterators - Deleting 1st point | `[MutablePolygon]` | **Point removal at head**: Removing the first point via `begin().remove()` must:<br>- Reduce size from 3 to 2<br>- Return iterator equal to the original second point (`it_2nd`)<br>- Make returned iterator equal to new `begin()`<br><br>**Iterator validity**: Returned iterator remains valid after removal and points to the next element. |
+| Iterators - Deleting 2nd point | `[MutablePolygon]` | **Point removal at middle**: Removing the second point must:<br>- Reduce size from 3 to 2<br>- Leave `begin()` unchanged<br>- Return iterator that equals the **removed point's own iterator** (from `.remove()` call)<br>- `it_1st == p.begin()` still holds<br><br>**Behavior note**: `it.remove()` returns iterator pointing to the element that followed the removed element, but since we removed the middle element and stored it as `it_2nd`, the comparison `it_2nd.remove() == it_2nd` holds because of circular list mechanics. |
+| Iterators - Deleting two points | `[MutablePolygon]` | **Sequential removal**: Chaining `.remove()` calls reduces size to 1:<br>- `p.begin().remove().remove()` yields size 1<br>- Single-element polygon has `begin().next() == begin()`<br>- Single-element polygon has `begin().prev() == begin()` |
+| Iterators - Deleting all points | `[MutablePolygon]` | **Complete removal**: Removing all 3 points must:<br>- Result in size 0 and `empty() == true`<br>- Make `begin()` invalid (`!begin().valid()`)<br>- Make the returned final iterator invalid (`!it.valid()`)<br><br>**Iterator invalidation**: After last point removal, any iterators to the polygon become invalid. |
+| Iterators - Inserting a point at the beginning | `[MutablePolygon]` | **Insert at head**: `insert(begin(), {3, 4})` must:<br>- Add point to front of circular list<br>- Result in sequence: `[ {3,4}, {0,0}, {0,1}, {1,0} ]`<br>- Use `==` operator for validation (tests entire polygon content) |
+| Iterators - Inserting a point at the 2nd position | `[MutablePolygon]` | **Insert at middle**: `insert(++begin(), {3, 4})` must:<br>- Insert between first and second point<br>- Result in sequence: `[ {0,0}, {3,4}, {0,1}, {1,0} ]`<br><br>**Increment behavior**: `++begin()` advances to second element, insertion occurs before that position. |
+| Iterators - Inserting a point after a point was removed | `[MutablePolygon]` | **Capacity preservation**: Initial capacity is 3. After:<br>1. Removing 1st point: capacity remains 3, content becomes `[{0,1}, {1,0}]`<br>2. Inserting at head: content becomes `[{0,1}, {1,0}, {5,6}]`, capacity **still 3** (no reallocation)<br><br>**Memory behavior**: Capacity is not reduced by removal; insertion reuses freed slots. This is a linked-list within vector design. |
+| Remove degenerate points from MutablePolygon - Duplicate points are removed | `[MutablePolygon]` | **Duplicate removal**: Input polygon with 12 points containing duplicate sequences must be reduced to 8 unique points:<br>- Remove 3 consecutive `{0,100}` → keep 1<br>- Remove 2 consecutive `{180,200}` → keep 1<br>- Preserve order of first occurrence<br><br>Result: `[{0,0}, {0,100}, {0,150}, {0,200}, {200,200}, {180,200}, {180,20}, {180,0}]`<br><br>Uses free function `remove_duplicates(MutablePolygon&)`. |
+| smooth_outward - Convex polygon | `[MutablePolygon]` | **Convex preservation**: A CCW triangle must remain unmodified when `smooth_outward()` is applied with `scaled<double>(10.)` clip distance.<br><br>**Input**: `{ {0,0}, scaled(10.), 0 }, { 0, scaled(10.) } }`<br>**Output**: Identical (unmodified) |
+| smooth_outward - Sharp tiny concave polygon (hole) | `[MutablePolygon]` | **Hole elimination**: A small CCW triangle with a tiny CW "hole" (concave indentation) must become empty.<br><br>**Input**: `{ {0,0}, {0, scaled(5.) }, { scaled(10.), 0 } }` (3 points, 2nd point creates concavity)<br>**Output**: `empty() == true`<br><br>The algorithm clips the polygon inward by scaled 10 units, collapsing the shape. |
+| smooth_outward - Two polygons | `[MutablePolygon]` | **Polygon vector processing**: Input: vector of 2 polygons (1 CCW, 1 CW). After `smooth_outward()`:<br>- CCW contour remains unchanged (size 3)<br>- CW contour is removed (becomes empty, filtered out)<br>- Result: vector with only 1 polygon `{ {0,0}, scaled(10.), 0 }, { 0, scaled(10.) } }`<br><br>**Orientation sensitivity**: CCW contours preserved; CW contours removed. Uses `smooth_outward(Polygons&, coord_t)` free function. |
+
+**Special notes:**
+- All iterator operations are circular (STL incompatible behavior)
+- `end()` points to last valid element, not one-past-the-end
+- Internal structure: singly-linked list within contiguous vector using indices
+- `capacity()` persists across removals (memory efficiency design)
+- `operator==` compares entire polygon content (all point coordinates)
+- Coordinates use `scaled<T>()` with SCALING_FACTOR (typically 0.00001)
+- `smooth_outward()` uses scaled clip distance parameter
+- `remove_duplicates()` has multiple overloads with different epsilon/angle parameters
+- All operations use exact geometry with no epsilon tolerance
+

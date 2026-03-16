@@ -42,7 +42,7 @@ Committed with documentation covering:
 - 17 test cases documented
 
 ### T104 - test_polygon.cpp ✓
-**Just completed!** Committed with documentation covering:
+Completed with documentation covering:
 - Square validation (area, centroid, contains, lines)
 - Winding order detection (`is_counter_clockwise()`) and modification (`make_counter_clockwise()`)
 - Split operations (split_at_first_point, split_at_index, split_at_vertex)
@@ -52,12 +52,23 @@ Committed with documentation covering:
 - Collinear point removal (`remove_collinear()`)
 - Key finding: All operations use **integer geometry with no epsilon tolerance**
 
+### T105 - test_mutable_polygon.cpp ✓
+**Just completed!** Committed with documentation covering:
+- **Circular iterator design** (STL-incompatible: end() = last valid point, not one-past-end)
+- **Iterator operations**: ++, --, next(), prev(), remove(), insert()
+- **Memory management**: Capacity preservation, index-based linking, vector-backed storage
+- **Point manipulation**: Sequential removal, head/middle insertion, complete removal
+- **Duplicate removal**: `remove_duplicates()` free function
+- **Outward smoothing**: `smooth_outward()` with CCW preservation and CW removal
+- **Polygon vector operations**: Filtering CW contours, handling empty results
+- Key findings: O(1) insertion/removal, circular linked-list in contiguous storage, exact geometry
+
 ## Current Status
 
-**Next task**: T105 - test_mutable_polygon.cpp
+**Next task**: T106 - test_clipper_utils.cpp
 
-**Completed**: 7 tasks (T001-T006, T101-T104)
-**Remaining**: 58 tasks
+**Completed**: 8 tasks (T001-T006, T101-T105)
+**Remaining**: 57 tasks
 
 ## Work Plan
 
@@ -67,14 +78,14 @@ Committed with documentation covering:
    - T102: test_indexed_triangle_set.cpp ✓ (committed: 520451131e)
    - T103: test_geometry.cpp ✓ (committed: 83745628fe)
    - T104: test_polygon.cpp ✓ (committed: ce05bac4fe)
-   - Remaining: T105-T121 (17 files)
+    - Remaining: T106-T121 (16 files)
 3. **Phase 2 (T201-T213)** - Document all 13 fff_print test files
 4. **Phase 3 (T301-T303)** - Document all 3 sla_print test files
 5. **Phase 4 (T401)** - Document libnest2d test
 6. **Phase 5 (T501)** - Document slic3rutils test
 7. **Phase 6 (T600)** - Finalize documentation and commit
 
-**Estimated iterations remaining**: 58 tasks
+**Estimated iterations remaining**: 57 tasks
 
 ## Key Learning from T104
 
@@ -177,3 +188,81 @@ Expected to test in-place polygon modifications, likely covering:
 - **T106 (test_clipper_utils.cpp)**: Tests Clipper wrapper functions (offset, intersection, union)
 - **T107 (test_clipper_offset.cpp)**: Specific tests for offset operations
 - Continue pattern of reading file, extracting tests, documenting contracts per test
+
+## Current Task Analysis: T105 - test_mutable_polygon.cpp
+
+### File Structure Observed
+- Uses BDD-style SCENARIO/GIVEN/WHEN/THEN
+- 3 SCENARIO blocks:
+  1. "Iterators" - Tests iterator operations (++, --, remove, insert)
+  2. "Remove degenerate points from MutablePolygon" - Tests remove_duplicates()
+  3. "smooth_outward" - Tests outward smoothing algorithm
+- All inline test data, no external fixtures
+- Tests cover: iterator manipulation, point insertion/removal, duplicate removal, polygon smoothing
+
+### Source Files Under Test
+- src/libslic3r/MutablePolygon.hpp (primary interface)
+- src/libslic3r/MutablePolygon.cpp (implementation)
+- Related: src/libslic3r/Point.hpp, src/libslic3r/Polygon.hpp (conversion)
+
+### Key Methods Being Tested
+**MutablePolygon class:**
+- Constructor with initializer list
+- `begin()`, `end()` - iterator access
+- `size()`, `empty()`, `capacity()` - state queries
+- `insert(iterator, Point)` - point insertion
+- `remove(iterator)` - point removal
+
+**MutablePolygon::iterator class:**
+- `operator++`, `operator--` - forward/backward navigation
+- `next()`, `prev()` - relative navigation
+- `valid()` - iterator validity check
+- `remove()` - removes current point, returns iterator to next
+- `insert(Point)` - inserts point at iterator position
+
+**Free functions:**
+- `remove_duplicates(MutablePolygon&)` - removes duplicate consecutive points
+- `smooth_outward(MutablePolygon&, double)` - polygon smoothing
+- `smooth_outward(Polygons&, double)` - polygons smoothing (returns modified vector)
+
+### Numeric Precision Notes
+- Coordinates use `scaled<coord_t>()` and `scaled<double>()` for test data
+- `scaled<T>(value)` applies SCALING_FACTOR (typically 0.00001)
+- Smoothing uses `scaled<double>(10.)` - converts 10 to scaled coordinate
+- No explicit epsilon tolerance mentioned - uses exact geometry
+- Comparison operators use `==` for entire MutablePolygon objects
+
+### Key Implementation Details (from header)
+- **Data structure**: Single vector with linked-list semantics using indices
+- **IndexType**: int32_t
+- **Iterator design**: Circular doubly-linked list with sentinel behavior
+- **Important**: `end()` is INCLUSIVE (last valid point), not STL one-past-the-end
+- **Range class**: Used in smooth_outward for tracking unprocessed items
+- **Invariants**: All elements in one vector, indices reference previous/next
+- **Performance**: O(1) insert/remove, O(n) iteration
+
+### Test Pattern Analysis
+**Iterator tests:**
+- Validates circular navigation (++, --)
+- Tests removal at different positions
+- Verifies capacity preservation after removal
+- Checks iterator validity after all points removed
+
+**Duplicate removal:**
+- Input: Polygon with 12 points, many duplicates (3 consecutive at start, 2 in middle, 2 at end)
+- Output: 8 unique points in order
+- Uses `remove_duplicates()` free function
+
+**Smooth outward:**
+- Tests convex polygon (unmodified)
+- Tests sharp tiny concave polygon (hole closed - becomes empty)
+- Tests vector of polygons (keeps CCW, removes CW)
+- No explicit tolerance visible - uses exact geometry comparisons
+
+### Next Steps for Documentation
+1. Format tests into contract table
+2. Note iterator circular behavior (critical difference from STL)
+3. Document end() is inclusive behavior
+4. Note scaling requirements for coordinates
+5. Describe smooth_outward behavior with concurrency (returns new vector vs. in-place)
+6. Highlight that capacity() behavior after removal is tested but not modified

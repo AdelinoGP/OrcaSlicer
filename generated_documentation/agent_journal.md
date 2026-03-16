@@ -1,11 +1,11 @@
 # Agent Journal — OrcaSlicer Codebase Analysis
 
 ## CURRENT STATUS
-Last session: 104
-Active task: T105 — document test_mutable_polygon.cpp
-Next action: Read test_mutable_polygon.cpp and document contracts
+Last session: 105
+Active task: T106 — document test_clipper_utils.cpp
+Next action: Read test_clipper_utils.cpp and document contracts
 Unresolved [UNCLEAR] tags: 0
-Files remaining (Phase 1): 17 (T105-T121)
+Files remaining (Phase 1): 16 (T106-T121)
 Open questions: None
 
 ---
@@ -333,3 +333,75 @@ Arachne/CuraEngine/PrusaSlicer lineage via comments, related pseudocode docs, an
 - All assertions use exact equality (`==`)
 
 **Completed tasks this session:** T104
+
+---
+
+## Session 105
+
+**Active task:** T105 — document tests/libslic3r/test_mutable_polygon.cpp
+
+**Scope:**
+- File: tests/libslic3r/test_mutable_polygon.cpp
+- Source under test: src/libslic3r/MutablePolygon.cpp
+- Fixture data: None (all inline data)
+- Test executable: libslic3r_tests
+
+**Key test patterns identified:**
+- BDD-style SCENARIO/GIVEN/WHEN/THEN structure
+- 3 SCENARIO blocks: Iterator operations, Duplicate removal, Outward smoothing
+- All inline test data, no external fixtures
+- Tests in-place polygon mutations and iterator manipulation
+
+**Methods tested:**
+
+**MutablePolygon class:**
+- Constructor (initializer list, iterator range)
+- `begin()`, `end()` - iterator access (critical: circular, STL-incompatible)
+- `size()`, `empty()`, `capacity()` - state queries
+- `insert(iterator, Point)` - point insertion
+- `remove(iterator)` - point removal
+- `assign()` - range assignment
+- `polygon()` - conversion to Polygon
+
+**MutablePolygon::iterator class:**
+- `operator++`, `operator--` - circular navigation
+- `next()`, `prev()` - relative navigation
+- `valid()` - validity check
+- `remove()` - removes current element, returns iterator to next
+- `insert(Point)` - inserts at iterator position
+
+**Free functions:**
+- `remove_duplicates(MutablePolygon&)` - removes duplicate consecutive points
+- `smooth_outward(MutablePolygon&, coord_t)` - polygon smoothing
+- `smooth_outward(Polygons&, coord_t)` - vector smoothing (returns filtered vector)
+- `smooth_outward(ExPolygons&, coord_t)` - expolygon smoothing
+
+**Key architectural discoveries:**
+
+**Circular iterator design (critical):**
+- MutablePolygon implements circular doubly-linked list in contiguous storage
+- `end()` points to LAST VALID element (not one-past-end like STL)
+- `++` on `end()` wraps to `begin()`
+- `--` on `begin()` wraps to `end()`
+- All iterators remain valid until element removal
+- After last element removal, iterators become invalid
+
+**Memory management:**
+- Internal `std::vector<LinkedPoint>` with index-based linking
+- Indices use int32_t
+- Capacity persists across removals (reuses freed slots)
+- O(1) insertion/removal
+- O(n) iteration
+
+**Geometry operations:**
+- `smooth_outward()` clips inward by scaled distance
+- CCW contours preserved, CW contours removed
+- Holes smaller than clip distance become empty
+- All exact geometry comparisons (no epsilon)
+
+**Numeric characteristics:**
+- Uses `scaled<coord_t>(value)` and `scaled<double>(value)` for test data
+- No explicit epsilon tolerance - exact arithmetic throughout
+- `scaled<double>(10.)` converts 10 units to scaled coordinate (typically 10 * 100000)
+
+**Completed tasks this session:** T105
