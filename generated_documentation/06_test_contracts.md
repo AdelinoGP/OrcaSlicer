@@ -555,4 +555,25 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **No floating-point assertions**: The test only performs mesh operations and file output without numeric assertions.
 - **Source files**: `src/libslic3r/SLA/Hollowing.cpp` (hollowing algorithm) and `src/libslic3r/SLA/OpenVDBUtils.cpp` (OpenVDB integration). |
 
+### test_bambu_networking.cpp
+
+**Source under test:** `src/slic3r/Utils/bambu_networking.hpp`
+
+**Fixture / test data:** none (inline version strings)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| extract_base_version | `[BambuNetworking]` | **Version without suffix**: Returns the full version string unchanged (e.g., "02.03.00.62"). <br> **Version with suffix**: Returns only the base version, stripping the suffix after the dash (e.g., "02.03.00.62-mod" → "02.03.00.62"). <br> **Empty string**: Returns empty string. <br> **Suffix only**: Returns empty string for input "-mod". |
+| extract_suffix | `[BambuNetworking]` | **Version without suffix**: Returns empty string. <br> **Version with suffix**: Returns suffix without the leading dash (e.g., "02.03.00.62-mod" → "mod"). <br> **Multiple dashes**: Returns everything after the first dash (e.g., "02.03.00.62-test-build" → "test-build"). <br> **Empty string**: Returns empty string. <br> **Suffix only**: Returns suffix without leading dash (e.g., "-mod" → "mod"). |
+| NetworkLibraryVersionInfo::from_static | `[BambuNetworking]` | **Static version conversion**: Converts static version info to `NetworkLibraryVersionInfo` with correct fields (version, base_version, suffix, display_name, url_override, is_latest, warning, is_discovered). <br> **Warning handling**: Preserves warning message from static version. <br> **URL override**: Preserves URL override from static version. |
+| NetworkLibraryVersionInfo::from_discovered | `[BambuNetworking]` | **Discovered version conversion**: Creates `NetworkLibraryVersionInfo` from discovered version strings with correct fields. <br> **Suffix extraction**: Correctly extracts suffix from version string. <br> **Discovered flag**: Sets `is_discovered` to true. |
+
+**Special notes:**
+- **Exact string comparisons**: All tests use `REQUIRE` for exact string comparisons (no floating-point tolerances).
+- **Version parsing**: Tests version string parsing for Bambu networking library management.
+- **Static vs discovered**: Tests both static version info and discovered version info conversion.
+- **Source file**: `src/slic3r/Utils/bambu_networking.hpp`. |
+
 

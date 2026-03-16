@@ -143,6 +143,7 @@ Document the test suite for TDD-guided refactoring.
   - Read and analyzed the test file.
   - Appended documentation to `generated_documentation/06_test_contracts.md`.
   - Updated `ralph-tasks.md` and `agent_journal.md`.
+  - Committed documentation and task updates.
 
 ### Key Findings (T120)
 - Tests hollowing of overlapping spheres using OpenVDB.
@@ -153,3 +154,22 @@ Document the test suite for TDD-guided refactoring.
 ### Next Steps
 - T121: `test_bambu_networking.cpp`
 - Continue documenting remaining test files in Phase 1 (libslic3r suite).
+
+## Iteration 8: T121
+
+### Completed Work
+- T121: `test_bambu_networking.cpp`
+  - Read and analyzed the test file.
+  - Appended documentation to `generated_documentation/06_test_contracts.md`.
+  - Updated `ralph-tasks.md` and `agent_journal.md`.
+
+### Key Findings (T121)
+- Tests version string parsing for Bambu networking library management.
+- Exact string comparisons (no floating-point tolerances).
+- Tests `extract_base_version()`, `extract_suffix()`, and `NetworkLibraryVersionInfo` conversion.
+- Source: `src/slic3r/Utils/bambu_networking.hpp`.
+
+### Next Steps
+- Phase 1 (libslic3r) is complete.
+- Move to Phase 2 (fff_print suite).
+- Finalize with T600: complete test contracts documentation.
