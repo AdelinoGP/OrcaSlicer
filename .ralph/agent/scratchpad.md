@@ -73,3 +73,22 @@ Document the test suite for TDD-guided refactoring.
 ### Next Steps
 - T117: `test_mutable_priority_queue.cpp`
 - Continue documenting remaining test files in Phase 1 (libslic3r suite).
+
+## Iteration 4: T117
+
+### Completed Work
+- T117: `test_mutable_priority_queue.cpp`
+  - Read and analyzed the test file.
+  - Appended documentation to `generated_documentation/06_test_contracts.md`.
+  - Updated `ralph-tasks.md` and `agent_journal.md`.
+
+### Key Findings (T117)
+- Tests mutable priority queue with skip addressing, basic ops, rescheduling, and complex scenarios.
+- No floating-point comparisons (exact integer/floating-point checks).
+- Large dataset tests (36,000 and 50,000 elements).
+- Source: `src/libslic3r/MutablePriorityQueue.hpp`.
+- Reference implementation from external Boost-licensed code.
+
+### Next Steps
+- T118: `test_timeutils.cpp`
+- Continue documenting remaining test files in Phase 1 (libslic3r suite).

@@ -477,4 +477,26 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Optimizer interface**: Tests `Slic3r::opt::Optimizer` with `AlgBruteForce` algorithm.
 - **Functional testing**: Tests optimization of simple mathematical functions (sin, sphere) to verify optimizer correctness. |
 
+### test_mutable_priority_queue.cpp
+
+**Source under test:** `src/libslic3r/MutablePriorityQueue.hpp`
+
+**Fixture / test data:** none (inline functions and random number generation)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Skip addressing | `[MutableSkipHeapPriorityQueue]` | **Block root detection**: `SkipHeapAddressing<8>::is_block_root()` correctly identifies block root indices (1, 9, 17, 73, ...). <br> **Block leaf detection**: `SkipHeapAddressing<8>::is_block_leaf()` correctly identifies block leaf indices (4, 5, 6, 7, 28, 29, 30, 255, ...). <br> **Child/parent navigation**: `child_of()` and `parent_of()` correctly compute hierarchical relationships for indices. |
+| Mutable priority queue - basic tests | `[MutableSkipHeapPriorityQueue]` | **Empty queue**: Default constructed queue is empty with size 0. <br> **Insertion**: Queue becomes non-empty after inserting one element. <br> **Top element**: Queue with one element has that element on top. <br> **Pop behavior**: Popping the only element makes queue empty. <br> **Sorted insertion**: Elements inserted in sorted order maintain sorted order when popped. <br> **Random insertion**: 36,000 randomly inserted elements are popped in sorted order. |
+| Mutable priority queue - reshedule first | `[MutableSkipHeapPriorityQueue]` | **Reschedule top with highest priority**: Updating the top element to a value that remains highest priority leaves order unchanged. <br> **Reschedule to mid-range**: Updating the top element to a mid-range value moves it to the correct position. <br> **Reschedule to last**: Updating the top element to the last priority moves it to the correct position. <br> **Reschedule 2-element queue**: Updating top of 2 elements to last priority changes top to the second element. <br> **Reschedule 3-element queue**: Updating top to mid-range values correctly reorders the queue. <br> **Random reschedule consistency**: Rescheduling top elements produces same result as pop/push operations. |
+| Mutable priority queue - first pop | `[MutableSkipHeapPriorityQueue]` | **Large queue behavior**: Queue with 50,000 elements maintains valid internal indices after first pop. |
+| Mutable priority queue complex | `[MutableSkipHeapPriorityQueue]` | **Complex operations**: Queue supports push, pop, remove, and update operations on 5,000 elements with random values. <br> **Index validity**: Internal indices remain valid (less than 3x count) throughout complex operations. <br> **Element consistency**: Retrieved elements match expected IDs throughout operations. |
+
+**Special notes:**
+- **No floating-point comparisons**: All tests use integer or exact floating-point comparisons (no `Catch::Approx`).
+- **Random number generation**: Tests use `std::mt19937` and `std::uniform_int_distribution` for reproducible randomness.
+- **Large dataset testing**: Tests include 36,000 and 50,000 element scenarios for performance validation.
+- **Reference implementation**: Based on https://raw.githubusercontent.com/rollbear/prio_queue/master/self_test.cpp (Boost Software License). |
+
 
