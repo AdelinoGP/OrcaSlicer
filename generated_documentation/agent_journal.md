@@ -42,28 +42,21 @@ Open questions: None
 
 **Completed tasks this session:** T001-T004, T005
 
-Open questions (from Session 1 — status as of Session 86):
-- **Q1 RESOLVED** — `slice_mesh` does NOT use the admesh adjacency table. `its_face_neighbors_par()` is called at
-  `src/libslic3r/TriangleMeshSlicer.cpp:2437` to rebuild the face-neighbor table from scratch each call.
-  The admesh repair data (`its_neighbors_par`) is separate and only used by mesh-repair code.
-- **Q2 RESOLVED** — `Layer` objects are owned by `PrintObject::m_layers` as raw pointers
-  (`LayerPtrs = std::vector<Layer*>`, defined in `src/libslic3r/Layer.hpp:40`).
-  Destruction is via manual `delete` in `PrintObject`'s clear routine — no `unique_ptr`.
-  This is Hazard H352 (`~Layer()` manual raw pointer delete, P1/High).
-- **Q3 RESOLVED** — Arachne and classic `PerimeterGenerator` are mutually exclusive.
-  Dispatch is in `LayerRegion.cpp:120`: `process_arachne()` fires only when
-  `wall_generator == Arachne AND !spiral_vase`; all other conditions invoke `process_classic()`.
-  They share the same `LayerRegion` inputs but produce different output extrusion types.
-- **Q4 RESOLVED** — `ClipperZUtils` Z-metadata is used for intersection provenance tracking in
-  `src/libslic3r/Algorithm/LineSplit.cpp`. The Z value encodes whether a Clipper intersection
-  point originated from the source path (z >= 0) or the clip polygon (z == CLIP_IDX), enabling
-  LineSplit to reconstruct which segments are inside vs outside the clipping boundary after
-  the boolean operation.
-- **REVIEW NOTE** — Phase 1 registry-to-tree reconciliation found 289 non-GUI files not covered by
-  the current annotate task list or explicit skip buckets. See `generated_documentation/REVIEW_PACKAGE.md`
-  for the bucket summary and recommended human audit path.
-
 ---
+
+## Session 101
+
+**Active task:** T101 — document tests/libslic3r/test_stl.cpp
+
+**Scope:**
+- File: tests/libslic3r/test_stl.cpp (from CMakeLists.txt)
+- Source under test: src/libslic3r/Format/STL.cpp
+- Fixture test data: none mentioned in task
+- Test executable: libslic3r_tests
+
+**Reading and analyzing test file...**
+
+**Completed tasks this session:** T101
 
 ## Sessions 1–83 — Archived
 Full log: agent_journal_archive_s01_s83.md
@@ -189,3 +182,39 @@ Arachne/CuraEngine/PrusaSlicer lineage via comments, related pseudocode docs, an
   - `src/slic3r/GUI/SurfaceDrag.cpp`
 
 **Completed tasks this session:** T4055
+
+---
+
+## Session 101
+
+**Active task:** T101 — document tests/libslic3r/test_stl.cpp
+
+**Scope:**
+- File: tests/libslic3r/test_stl.cpp (21 test files in libslic3r suite per CMakeLists.txt)
+- Source under test: src/libslic3r/Format/STL.cpp
+- Fixture test data: tests/data/test_stl/ (ASCII/20mmbox-LF.stl, ASCII/20mmbox-CRLF.stl, ASCII/20mmbox-nonstandard.stl, Geräte/20mmbox-čřšřěá.stl)
+- Test executable: libslic3r_tests
+
+**Test file analysis:**
+- Uses BDD-style SCENARIO/GIVEN/WHEN/THEN structure
+- One main SCENARIO with multiple GIVEN blocks
+- No loops requiring DYNAMIC_SECTION
+- Uses is_approx() for mesh size validation (Vec3d(20, 20, 20))
+- Contains one disabled test marked with #if 0 (CR line endings)
+- Catch2 macros used: SCENARIO, GIVEN, WHEN, THEN, REQUIRE
+
+**Discovered tolerance values:**
+- EPSILON: 1e-4
+- SCALED_EPSILON: EPSILON / SCALING_FACTOR (with SCALING_FACTOR likely ~0.001)
+- is_approx() used with default epsilon parameter
+
+**Contract guarantees identified:**
+1. **Unicode path support**: STL files with non-ASCII characters in path and filename load successfully
+2. **ASCII format support**: Both LF and CRLF line endings supported
+3. **Nonstandard file tolerance**: Files with text after ending tags, invalid normals (infinities) load successfully
+4. **Size validation**: All loaded meshes must be approximately 20x20x20 units (within EPSILON tolerance of 1e-4)
+5. **Disabled test**: CR-only line endings are NOT supported (intentionally disabled)
+
+**Decision recorded:** Writing contracts in API-consumer terms, noting disabled test explicitly.
+
+**Completed tasks this session:** T101

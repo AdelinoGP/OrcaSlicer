@@ -15,14 +15,14 @@ Last updated: 2026-03-11T00:00:00Z
 - [x] T002  Read tests/CLAUDE.md (Catch2 safety rules)
 - [x] T003  Read CMakeLists.txt for all 5 in-scope suites
 - [x] T004  Read tests/test_utils.hpp
-- [~] T005  Update agent_journal.md living status block
-- [ ] T006  Orientation commit: `orient: test-contract pass — orientation complete`
+- [x] T005  Update agent_journal.md living status block
+- [x] T006  Orientation commit: `orient: test-contract pass — orientation complete`
 
 ---
 
 ## Phase 1 — libslic3r Suite
 
-- [ ] T101  document: tests/libslic3r/test_stl.cpp
+- [x] T101  document: tests/libslic3r/test_stl.cpp
             Source under test: src/libslic3r/Format/STL.cpp
             Commit: `docs: test_stl.cpp contracts (T101)`
 
