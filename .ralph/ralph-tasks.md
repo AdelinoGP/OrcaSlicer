@@ -202,7 +202,7 @@ Last updated: 2026-03-11T00:00:00Z
 
 ## Phase 6 — Finalization
 
-- [~] T600  Final commit: update agent_journal.md status block, write
+- [x] T600  Final commit: update agent_journal.md status block, write
             06_test_contracts.md header sections (Purpose, Build & Run Reference,
             Catch2 Safety Rules), commit all.
             Commit: `docs: complete test contracts — 06_test_contracts.md (T600)`

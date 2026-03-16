@@ -479,11 +479,11 @@ Open questions: None
 ---
 
 ## CURRENT STATUS
-Last session: 501
-Active task: T600 — Final commit
-Next action: Start T600
+Last session: 600
+Active task: COMPLETED
+Next action: None
 Unresolved [UNCLEAR] tags: 0
-Files remaining (Phase 6): 1 (T600)
+Files remaining: 0
 Open questions: None
 
 ---
@@ -502,3 +502,23 @@ Open questions: None
 - **Source**: `src/slic3r/Utils/Http.hpp` (HTTP client wrapper).
 
 **Published commit:** `docs: libnest2d and slic3rutils contracts (T401, T501)`
+
+---
+
+## Session 600
+
+**Active task:** T600 — Final commit
+
+**Completed tasks this session:** T600
+
+**Key findings:**
+- **Document structure**: The test contracts document is complete with all required sections:
+  - **Purpose**: Language-independent test contracts for refactoring agent
+  - **Build & Run Reference**: CMake build commands and test execution patterns
+  - **Catch2 Safety Rules**: Critical rules for floating-point, thread safety, section naming
+  - **Suite documentation**: All 5 test suites documented (libslic3r, fff_print, sla_print, libnest2d, slic3rutils)
+- **Catch::Approx usage**: Documented all instances where `Catch::Approx` is used (violation of CLAUDE.md but required for existing tests)
+- **Disabled tests**: All disabled tests marked with `[DISABLED]` note
+- **Tolerance specifications**: Documented EPSILON = 1e-4 for geometry comparisons
+
+**Published commit:** `docs: complete test contracts — 06_test_contracts.md (T600)`
