@@ -120,7 +120,7 @@ Last updated: 2026-03-11T00:00:00Z
              Source under test: src/libslic3r/Flow.cpp
              Commit: `docs: test_flow.cpp contracts (T202)`
 
-- [~] T203  document: tests/fff_print/test_fill.cpp
+- [x] T203  document: tests/fff_print/test_fill.cpp
              Source under test: src/libslic3r/Fill/
              Commit: `docs: test_fill.cpp contracts (T203)`
 
