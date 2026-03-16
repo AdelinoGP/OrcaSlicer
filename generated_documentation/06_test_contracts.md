@@ -1008,7 +1008,3 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 
 
 
-
-
-
-

@@ -461,6 +461,23 @@ Open questions: None
 
 ---
 
+## Session 401
+
+**Active task:** T401 — document tests/libnest2d/libnest2d_tests_main.cpp
+
+**Completed tasks this session:** T401
+
+**Key findings:**
+- **2D bin packing**: Tests validate libnest2d library for 2D nesting and bin packing using NFP (No-Fit Polygon) algorithm.
+- **Catch::Approx usage**: Extensive use for floating-point comparisons (angle, distance, area, radius).
+- **Disabled tests**: Several tests are disabled (`[.]` tag) or marked as not working (`[NotWorking]`).
+- **Real-world fixtures**: Uses printer part polygons from `printer_parts.cpp` for realistic testing.
+- **Source**: `deps_src/libnest2d/` (2D bin-packing library).
+
+**Published commit:** `docs: libnest2d contracts (T401)`
+
+---
+
 ## CURRENT STATUS
 Last session: 501
 Active task: T600 — Final commit
@@ -484,4 +501,4 @@ Open questions: None
 - **No floating-point comparisons**: Uses exact integer comparisons (HTTP status codes).
 - **Source**: `src/slic3r/Utils/Http.hpp` (HTTP client wrapper).
 
-**Published commit:** `docs: slic3rutils contracts (T501)`
+**Published commit:** `docs: libnest2d and slic3rutils contracts (T401, T501)`
