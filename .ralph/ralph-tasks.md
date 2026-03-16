@@ -30,7 +30,7 @@ Last updated: 2026-03-11T00:00:00Z
             Source under test: src/libslic3r/TriangleMesh.cpp
             Commit: `docs: test_indexed_triangle_set.cpp contracts (T102)`
 
-- [ ] T103  document: tests/libslic3r/test_geometry.cpp
+- [x] T103  document: tests/libslic3r/test_geometry.cpp
             Source under test: src/libslic3r/Geometry.cpp + Geometry/
             Commit: `docs: test_geometry.cpp contracts (T103)`
 

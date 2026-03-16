@@ -120,3 +120,40 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - Custom tolerance configuration `CompareConfig` is used instead of generic EPSILON values
 - Two disabled code blocks exist to avoid compiler warnings for unused functions
 - External model files required: `frog_legs.obj` and `simplification.obj`
+
+### test_geometry.cpp
+
+**Source under test:** `src/libslic3r/Geometry.cpp` + `src/libslic3r/Geometry/*.cpp` + core geometric types
+
+**Fixture / test data:** none (all inline data)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Line::parallel_to | `[Geometry]` | **Parallel line detection**: Two lines are parallel if they share the same direction (or opposite). With epsilon angle tolerance of **EPSILON (1e-4)** radians, lines rotated by up to 0.9*EPSILON from each other are considered parallel. Lines rotated by 1.1*EPSILON are not parallel. **Critical note**: Lines shorter than 100 units rotated by EPSILON may not be rotated at all due to numerical precision (scalar rounding prevents measurable change). The check is transitive across translations. |
+| Line::perpendicular_to | `[Geometry]` | **Perpendicular line detection**: Lines are perpendicular if their direction vectors have dot product of 0. With epsilon angle tolerance of **EPSILON** radians, perpendicularity is preserved within ±0.9*EPSILON. The check has same numerical precision limitations as parallel_to for very short lines. Transitive under translation. |
+| Polygon::contains works properly | `[Geometry]` | **Point-in-polygon test**: A specific test polygon (10 vertices from GH #1950 regression) must correctly contain a test point. This is a regression test for Windows-specific bug. No explicit tolerance - uses exact integer geometry comparison. |
+| Intersections of line segments | `[Geometry]` | **Line-line intersection**: Two line segments must return correct intersection point. Integer coordinates intersect exactly. Scaled coordinates (divided by 0.00001) must still register intersection success. The method returns boolean success status AND writes to output pointer parameter. |
+| polygon_is_convex works | `[Geometry]` | **Convexity detection**: Square with CCW winding must be identified as convex; CW winding square must be identified as NOT convex (due to winding order). Concave polygon (L-shape with indent) must be identified as NOT convex. Uses polygon_is_convex() function. |
+| Creating a polyline generates the obvious lines | `[Geometry]` | **Polyline construction**: Converting 3 collinear points to Polyline must create exactly 2 Line segments: (0,0)-(10,0) and (10,0)-(20,0). Uses lines() method. |
+| Splitting a Polygon generates a polyline correctly | `[Geometry]` | **Polygon splitting**: Splitting triangle at vertex index 1 must produce polyline with 4 points: starting at index 1, going to index 2, then index 0, then back to index 1 (closing the loop). Tests split_at_index() method. |
+| Bounding boxes are scaled appropriately | `[Geometry]` | **BoundingBox scaling**: Scaling a bounding box by factor 2 must multiply both min and max points' coordinates by 2. Bounding box min(0,1), max(10,2) becomes (0,2), (40,4). Tests BoundingBox::scale() method. |
+| Offsetting a line generates a polygon correctly | `[Geometry]` | **Polyline offsetting**: Line segment from (10,10)-(20,10) offset by 5 units must equal polygon with 4 vertices forming a 10x10 rectangle. Uses offset() function with absolute offset distance. No epsilon tolerance. |
+| Circle Fit, TaubinFit with Newton's method | `[Geometry]` | **Circle center fitting**: Given sample points forming half-circles with known centers, the Taubin-Newton circle fit algorithm must return center within **EPSILON (1e-4)** of expected. Tests with different input ranges (full array, first 4 points, middle 4 points). Works for Vec2d and Point types. `is_approx()` used for validation. |
+| smallest_enclosing_circle_welzl | `[Geometry]` | **Minimum enclosing circle**: Must find smallest circle enclosing all test points. Returns radius inflated by **SCALED_EPSILON** to ensure all points are inside. After removing 2.1*SCALED_EPSILON from radius, exactly 3 points must lie on or near boundary. Uses SCALED_EPSILON (EPSILON / SCALING_FACTOR) for containment checks. |
+| Path chaining | `[Geometry]` | **Point ordering optimization**: For 8 grid-aligned points, chain_points() must produce path with total length ≤26 units per segment (no diagonals). For gyroid infill endpoints, chained polylines must have connection length < 85,206,000 units. For loop pieces with specified start point, all pieces must connect without gaps (back() == front()). |
+| Line distances | `[Geometry]` | **Distance to line**: Points on line segment (endpoints and interior) must have distance 0. Points off line must have exact Manhattan or Euclidean distances as specified (10, 30). Tests Line::distance_to() method with exact integer geometry. |
+| Polygon convex/concave detection with angle thresholds | `[Geometry]` | **Convex/concave vertex classification**: Square has 4 convex vertices CCW, 4 concave CW (winding-dependent). Thresholds affect classification: > 90° (4/3 π): all vertices invisible; < 60° (π/3): 4 convex visible; = 90° (π/2): all invisible. Default (no threshold): 4 convex CCW, 4 concave CW. Tests convex_points() and concave_points() with optional angle parameter in radians. |
+| Triangle Simplification does not result in less than 3 points | `[Geometry]` | **Minimum point preservation**: Simplifying a triangle polygon with 3 vertices using tolerance 250000 must return polygon with at least 3 points. Uses simplify() method with aggressive tolerance. |
+| Ported from xs/t/14_geometry.t | `[Geometry]` | **Convex hull and utilities**: Convex hull of 5 points (including interior) must have 4 points. arrange() must place 4 items with 20x20 size and 5 spacing. directions_parallel() must correctly identify parallel vectors within angular tolerance. |
+| Convex polygon intersection tests | `[Rotcalip]` | **Convex polygon intersection detection**: Multiple test cases using Rotating Calipers algorithm. Disjoint squares (translated apart) → must return false. Overlapping squares → must return true. Touching edges → false. Touching vertex → false. Exact overlap → true. All tests use scaled coordinates (divided by SCALING_FACTOR). Each test case uses Geometry::convex_polygons_intersect(A, B) and compares with Clipper intersection result. |
+| Convex polygon intersection test prusa polygons | `[Rotcalip]` | **Rotating Calipers vs Clipper validation**: Self-intersection of printer part polygons must work (same polygon intersects itself). All pairs of printer parts must produce identical results between Rotating Calipers and Clipper intersection. First test validates disjoint separations, second test validates overlapping configurations. Uses PRINTER_PART_POLYGONS from printer_parts.hpp. |
+
+**Special notes:**
+- **[DISABLED]** Lines 14-15, 998-998: Random generator function and benchmark infrastructure commented out with `//` and `#if 0`.
+- **[DISABLED]** Lines 477: SVG debug output for failing test (only in failing case, wrapped in if statement).
+- **EPSILON** is the base tolerance (1e-4) for floating-point comparisons in geometry.
+- **SCALED_EPSILON** = EPSILON / SCALING_FACTOR is used for scaled coordinate systems.
+- All polygon/line operations use integer coord_t internally; floating-point only in circle fitting and distance calculations.
+- `is_approx()` functions use absolute difference comparison with EPSILON.
