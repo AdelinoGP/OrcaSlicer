@@ -87,7 +87,7 @@ Last updated: 2026-03-11T00:00:00Z
             Source under test: src/libslic3r/Optimize/
             Commit: `docs: test_optimizers.cpp contracts (T116)`
 
-- [~] T117  document: tests/libslic3r/test_mutable_priority_queue.cpp
+- [x] T117  document: tests/libslic3r/test_mutable_priority_queue.cpp
             Source under test: src/libslic3r/MutablePriorityQueue.hpp
             Commit: `docs: test_mutable_priority_queue.cpp contracts (T117)`
 

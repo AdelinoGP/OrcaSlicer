@@ -442,10 +442,29 @@ Open questions: None
 
 ---
 
+## Session 117
+
+**Active task:** T117 — document tests/libslic3r/test_mutable_priority_queue.cpp
+
+**Completed tasks this session:** T117
+
+**Key findings:**
+- **Skip addressing**: Tests block root/leaf detection and hierarchical navigation for `SkipHeapAddressing<8>`.
+- **Basic queue operations**: Tests empty queue, insertion, top element, pop behavior, sorted insertion, and random insertion (36,000 elements).
+- **Rescheduling tests**: Tests rescheduling top element to highest/mid/last priority, and consistency with pop/push operations.
+- **Complex operations**: Tests push, pop, remove, and update on 5,000 elements with random values.
+- **No floating-point comparisons**: All tests use integer or exact floating-point comparisons (no `Catch::Approx`).
+- **Source**: `src/libslic3r/MutablePriorityQueue.hpp`.
+- **Reference implementation**: Based on external Boost-licensed code.
+
+**Published commit:** `docs: test_mutable_priority_queue.cpp contracts (T117)`
+
+---
+
 ## CURRENT STATUS
 Last session: 117
-Active task: T117 — document test_mutable_priority_queue.cpp
-Next action: Start T117
+Active task: T118 — document test_timeutils.cpp
+Next action: Start T118
 Unresolved [UNCLEAR] tags: 0
-Files remaining (Phase 1): 5 (T117-T121)
+Files remaining (Phase 1): 4 (T118-T121)
 Open questions: None
