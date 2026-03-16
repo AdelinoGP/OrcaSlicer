@@ -462,9 +462,9 @@ Open questions: None
 ---
 
 ## CURRENT STATUS
-Last session: 213
-Active task: T213 — document test_support_material.cpp
-Next action: Start T213
+Last session: 301
+Active task: T301 — document sla_print_tests.cpp
+Next action: Start T301
 Unresolved [UNCLEAR] tags: 0
-Files remaining (Phase 2): 1 (T213)
+Files remaining (Phase 3): 3 (T301-T303)
 Open questions: None
