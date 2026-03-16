@@ -38,7 +38,7 @@ Last updated: 2026-03-11T00:00:00Z
             Source under test: src/libslic3r/Polygon.cpp
             Commit: `docs: test_polygon.cpp contracts (T104)`
 
-- [ ] T105  document: tests/libslic3r/test_mutable_polygon.cpp
+- [x] T105  document: tests/libslic3r/test_mutable_polygon.cpp
             Source under test: src/libslic3r/MutablePolygon.cpp
             Commit: `docs: test_mutable_polygon.cpp contracts (T105)`
 
