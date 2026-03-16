@@ -462,9 +462,9 @@ Open questions: None
 ---
 
 ## CURRENT STATUS
-Last session: 119
-Active task: T119 — document test_aabbindirect.cpp
-Next action: Start T119
+Last session: 120
+Active task: T120 — document test_hollowing.cpp
+Next action: Start T120
 Unresolved [UNCLEAR] tags: 0
-Files remaining (Phase 1): 3 (T119-T121)
+Files remaining (Phase 1): 2 (T120-T121)
 Open questions: None

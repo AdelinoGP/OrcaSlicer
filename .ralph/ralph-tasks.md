@@ -95,7 +95,7 @@ Last updated: 2026-03-11T00:00:00Z
             Source under test: src/libslic3r/Time.cpp
             Commit: `docs: test_timeutils.cpp contracts (T118)`
 
-- [~] T119  document: tests/libslic3r/test_aabbindirect.cpp
+- [x] T119  document: tests/libslic3r/test_aabbindirect.cpp
             Source under test: src/libslic3r/AABBTreeIndirect.hpp
             Commit: `docs: test_aabbindirect.cpp contracts (T119)`
 
