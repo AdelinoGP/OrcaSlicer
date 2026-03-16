@@ -132,9 +132,9 @@ Last updated: 2026-03-11T00:00:00Z
              Source under test: src/libslic3r/Model.cpp
              Commit: `docs: test_model.cpp contracts (T205)`
 
-- [ ] T206  document: tests/fff_print/test_print.cpp
-            Source under test: src/libslic3r/Print.cpp
-            Commit: `docs: test_print.cpp contracts (T206)`
+- [~] T206  document: tests/fff_print/test_print.cpp
+             Source under test: src/libslic3r/Print.cpp
+             Commit: `docs: test_print.cpp contracts (T206)`
 
 - [ ] T207  document: tests/fff_print/test_printobject.cpp
             Source under test: src/libslic3r/PrintObject.cpp

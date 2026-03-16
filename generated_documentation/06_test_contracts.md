@@ -698,6 +698,29 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Print pipeline**: Tests full print pipeline including arrangement, extruder assignment, G-code export.
 - **File operations**: Uses Boost filesystem for temporary file creation and cleanup. |
 
+### test_print.cpp
+
+**Source under test:** `src/libslic3r/Print.cpp`
+
+**Fixture / test data:** Uses `test_data.hpp` for mesh generation and print initialization.
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| PrintObject: Perimeter generation | `[PrintObject][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **Layer count**: 20mm cube with 0.25mm layer height produces 66 layers. <br> **Perimeter islands**: Every layer has exactly 1 island of perimeters in region 0. <br> **Perimeter paths**: Every layer has exactly 3 paths in its perimeters list. |
+| Print: Skirt generation | `[Print][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **Skirt loops**: Setting skirts to 2 loops produces exactly 2 loops in the skirt extrusion collection. |
+| Print: Changing number of solid surfaces does not cause all surfaces to become internal | `[Print][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **Solid top layers**: Changing `top_solid_layers` from 2 to 3 correctly updates the number of solid top layers. <br> **Solid bottom layers**: Solid bottom layers remain unchanged when top solid layers are modified. |
+| Print: Brim generation | `[Print][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **Brim width**: 3mm brim produces exactly 3 loops. <br> **Brim width**: 6mm brim produces exactly 6 loops. <br> **Brim with extrusion width**: 6mm brim with 0.5mm extrusion width produces 14 loops. |
+
+**Special notes:**
+- **All tests disabled**: Every test case in this file is marked with `[.]` tag and not built by default.
+- **Integer comparisons**: All assertions use exact integer comparisons (no floating-point tolerances).
+- **Layer counting**: Tests validate layer count and perimeter structure for 20mm cube.
+- **Skirt and brim**: Tests validate skirt and brim loop counts based on configuration.
+- **Solid surface handling**: Tests validate that changing solid layer counts doesn't corrupt surface types. |
+
+
 
 
 
