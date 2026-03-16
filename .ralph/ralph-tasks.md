@@ -58,7 +58,7 @@ Last updated: 2026-03-11T00:00:00Z
             Source under test: src/libslic3r/ElephantFootCompensation.cpp
             Commit: `docs: test_elephant_foot_compensation.cpp contracts (T109)`
 
-- [ ] T110  document: tests/libslic3r/test_config.cpp
+- [x] T110  document: tests/libslic3r/test_config.cpp
             Source under test: src/libslic3r/Config.cpp
             Commit: `docs: test_config.cpp contracts (T110)`
 

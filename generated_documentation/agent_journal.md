@@ -1,11 +1,11 @@
 # Agent Journal — OrcaSlicer Codebase Analysis
 
 ## CURRENT STATUS
-Last session: 109
-Active task: T110 — document test_config.cpp
-Next action: Start T110
+Last session: 110
+Active task: T111 — document test_appconfig.cpp
+Next action: Start T111
 Unresolved [UNCLEAR] tags: 0
-Files remaining (Phase 1): 12 (T110-T121)
+Files remaining (Phase 1): 11 (T111-T121)
 Open questions: None
 
 ---
@@ -316,3 +316,25 @@ Open questions: None
 - **H432**: Division by zero may occur in floating-point calculations (recovered via extended precision)
 - **H433**: NaN coordinates in input may produce invalid Voronoi diagrams (test suppressed)
 - **H434**: Missing Voronoi vertices may require rotation-based repair (multiple angles tested)
+
+---
+
+## Session 110
+
+**Active task:** T110 — document tests/libslic3r/test_config.cpp
+
+**Completed tasks this session:** T110
+
+**Key findings:**
+- **Config validation**: Tests verify that invalid values (negative integers, invalid percentages) are rejected by `validate()`.
+- **Type conversion**: Tests verify that config options can be set via different interfaces (int, double, string) with appropriate type checking.
+- **Exception handling**: Tests verify that `BadOptionTypeException`, `BadOptionValueException`, and `UnknownOptionException` are thrown for invalid operations.
+- **Default values**: Tests verify that unset options return default constants.
+- **INI loading**: Tests verify that config can be loaded from INI files.
+- **Serialization**: Tests verify that `DynamicPrintConfig` can be serialized to binary and deserialized without data loss.
+- **[DISABLED]** JSON serialization test is commented out.
+
+**Source files:**
+- `src/libslic3r/Config.cpp` - Config implementation
+- `src/libslic3r/PrintConfig.hpp` - Print config definitions
+- `tests/data/test_config/new_from_ini.ini` - Test fixture for INI loading
