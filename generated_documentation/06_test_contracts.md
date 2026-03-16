@@ -382,4 +382,17 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 |---|---|---|
 | AppConfig network version helpers | `[AppConfig]` | **Skipped versions management**: <br> 1. **Empty state**: Initially, `get_skipped_network_versions()` must return an empty list. <br> 2. **Add and check**: After adding version "02.01.01.52", `is_network_version_skipped("02.01.01.52")` must return true, and `is_network_version_skipped("02.03.00.62")` must return false. <br> 3. **Multiple versions**: Adding multiple versions ("02.01.01.52", "02.00.02.50") must result in `get_skipped_network_versions().size() == 2` and both must be recognized as skipped. <br> 4. **Clear**: Calling `clear_skipped_network_versions()` must remove all versions, so `is_network_version_skipped("02.01.01.52")` returns false. <br> 5. **Idempotency**: Adding the same version twice must result in a single entry (size 1). |
 
+### test_placeholder_parser.cpp
+
+**Source under test:** `src/libslic3r/PlaceholderParser.cpp`
+
+**Fixture / test data:** none (all inline data)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Placeholder parser scripting | `[PlaceholderParser]` | **Scripting features**: <br> 1. **Nested config options**: Supports legacy `[nozzle_temperature[foo]]` and modern `{nozzle_temperature[foo]}` syntax. <br> 2. **Math expressions**: Supports basic arithmetic (`2*3`, `2*3/6`), floating-point arithmetic (`2.*3/12`), modulo (`10%2.5`), and functions (`min`, `max`, `int`, `round`, `digits`, `zdigits`, `interpolate_table`). <br> 3. **Floating-point tolerance**: **[CRITICAL]** Uses `Catch::Approx` for floating-point comparisons (lines 38-40, 44, 47-48, 65-67, 71-72, 76-78). Porting agent must reproduce tolerance. Exact tolerance values not specified in source - standard floating-point precision applies. <br> 4. **Line width substitutions**: Tests `coFloatOrPercent` substitutions for `line_width`, `min_width_top_surface`, `small_perimeter_speed`, `infill_anchor`. <br> 5. **Exception handling**: `scarf_joint_speed` set to percent must throw exception when referenced (no context for percent resolution). <br> 6. **Boolean expression parser**: Supports equality, inequality, regex matching (`=~`), logical operators (`and`, `or`, `not`, `&&`, `||`), comparison operators (`<`, `>`, `<=`, `>=`), and ternary operators (`? :`). |
+| Placeholder parser variables | `[PlaceholderParser]` | **Variable management**: <br> 1. **Local/global variables**: Supports creation of int, string, and bool variables via `local` and `global` keywords. <br> 2. **Variable overwriting**: Variables can be reassigned after creation. <br> 3. **Variable redefinition**: `local` keyword can redefine existing variables. <br> 4. **Array initialization**: Supports `repeat()` function and initializer lists for creating arrays. <br> 5. **Array access**: Supports index-based access to array elements (e.g., `myint[5]`). <br> 6. **Vector operations**: `size()` and `empty()` functions work correctly on vectors. <br> 7. **Conditional logic**: `if`/`else`/`endif` blocks support variable creation within scopes. |
+
 

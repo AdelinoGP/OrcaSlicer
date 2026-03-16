@@ -354,3 +354,20 @@ Open questions: None
 - **Source**: `src/libslic3r/AppConfig.cpp`
 
 **Published commit:** `docs: test_appconfig.cpp contracts (T111)`
+
+---
+
+## Session 112
+
+**Active task:** T112 — document tests/libslic3r/test_placeholder_parser.cpp
+
+**Completed tasks this session:** T112
+
+**Key findings:**
+- **Scripting features**: Placeholder parser supports nested config options, math expressions, floating-point arithmetic, line width substitutions, and boolean expression parsing.
+- **Critical Catch::Approx usage**: Multiple floating-point comparisons use `Catch::Approx` (lines 38-40, 44, 47-48, 65-67, 71-72, 76-78). Porting agent must reproduce tolerance.
+- **Variable management**: Supports local/global variables, array initialization, vector operations, and conditional logic.
+- **Exception handling**: `scarf_joint_speed` set to percent throws exception when referenced.
+- **Source**: `src/libslic3r/PlaceholderParser.cpp`
+
+**Published commit:** `docs: test_placeholder_parser.cpp contracts (T112)`

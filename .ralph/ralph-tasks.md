@@ -66,7 +66,7 @@ Last updated: 2026-03-11T00:00:00Z
             Source under test: src/libslic3r/AppConfig.cpp
             Commit: `docs: test_appconfig.cpp contracts (T111)`
 
-- [ ] T112  document: tests/libslic3r/test_placeholder_parser.cpp
+- [x] T112  document: tests/libslic3r/test_placeholder_parser.cpp
             Source under test: src/libslic3r/PlaceholderParser.cpp
             Commit: `docs: test_placeholder_parser.cpp contracts (T112)`
 
