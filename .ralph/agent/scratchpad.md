@@ -123,6 +123,7 @@ Document the test suite for TDD-guided refactoring.
   - Read and analyzed the test file.
   - Appended documentation to `generated_documentation/06_test_contracts.md`.
   - Updated `ralph-tasks.md` and `agent_journal.md`.
+  - Committed documentation and task updates.
 
 ### Key Findings (T119)
 - Tests AABB tree building, ray casting, and closest point queries.
@@ -132,5 +133,23 @@ Document the test suite for TDD-guided refactoring.
 
 ### Next Steps
 - T120: `test_hollowing.cpp` (conditional on OpenVDB)
+- T121: `test_bambu_networking.cpp`
+- Continue documenting remaining test files in Phase 1 (libslic3r suite).
+
+## Iteration 7: T120
+
+### Completed Work
+- T120: `test_hollowing.cpp`
+  - Read and analyzed the test file.
+  - Appended documentation to `generated_documentation/06_test_contracts.md`.
+  - Updated `ralph-tasks.md` and `agent_journal.md`.
+
+### Key Findings (T120)
+- Tests hollowing of overlapping spheres using OpenVDB.
+- Conditional compilation (requires OpenVDB).
+- No numeric assertions (only mesh operations and file output).
+- Source: `src/libslic3r/SLA/Hollowing.cpp` + `src/libslic3r/SLA/OpenVDBUtils.cpp`.
+
+### Next Steps
 - T121: `test_bambu_networking.cpp`
 - Continue documenting remaining test files in Phase 1 (libslic3r suite).

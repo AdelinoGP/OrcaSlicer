@@ -99,10 +99,10 @@ Last updated: 2026-03-11T00:00:00Z
             Source under test: src/libslic3r/AABBTreeIndirect.hpp
             Commit: `docs: test_aabbindirect.cpp contracts (T119)`
 
-- [ ] T120  document: tests/libslic3r/test_hollowing.cpp
-            Source under test: src/libslic3r/SLA/Hollowing.cpp + OpenVDBUtils.cpp
-            Note: OpenVDB-conditional — only built when TARGET OpenVDB::openvdb present
-            Commit: `docs: test_hollowing.cpp contracts (T120)`
+- [~] T120  document: tests/libslic3r/test_hollowing.cpp
+             Source under test: src/libslic3r/SLA/Hollowing.cpp + OpenVDBUtils.cpp
+             Note: OpenVDB-conditional — only built when TARGET OpenVDB::openvdb present
+             Commit: `docs: test_hollowing.cpp contracts (T120)`
 
 - [ ] T121  document: tests/libslic3r/test_bambu_networking.cpp
             Source under test: src/slic3r/Utils/ networking layer

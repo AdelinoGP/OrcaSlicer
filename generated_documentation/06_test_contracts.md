@@ -537,4 +537,22 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Closest point queries**: Tests `squared_distance_to_indexed_triangle_set()` for distance and closest point computation.
 - **AABB tree structure**: Uses `AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set()` for tree construction. |
 
+### test_hollowing.cpp
+
+**Source under test:** `src/libslic3r/SLA/Hollowing.cpp` + `src/libslic3r/SLA/OpenVDBUtils.cpp`
+
+**Fixture / test data:** none (inline sphere generation)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Hollow two overlapping spheres | (none) | **Mesh hollowing**: Two overlapping spheres (radius 10) can be hollowed using `sla::hollow_mesh()`. <br> **Flag application**: `hfRemoveInsideTriangles` flag removes interior triangles from the hollowed mesh. <br> **Output generation**: Hollowed mesh is written to `twospheres.obj` file. |
+
+**Special notes:**
+- **OpenVDB dependency**: This test is only built when `TARGET OpenVDB::openvdb` is present in CMake.
+- **Conditional compilation**: Porting environment must provide an equivalent volumetric SDF library (OpenVDB or alternative).
+- **No floating-point assertions**: The test only performs mesh operations and file output without numeric assertions.
+- **Source files**: `src/libslic3r/SLA/Hollowing.cpp` (hollowing algorithm) and `src/libslic3r/SLA/OpenVDBUtils.cpp` (OpenVDB integration). |
+
 
