@@ -893,6 +893,26 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **SLA-specific**: Tests validate SLA support generation, pad geometry, and raster output.
 - **No disabled tests**: All tests in this file are enabled (no `[.]` tag). |
 
+### sla_raycast_tests.cpp
+
+**Source under test:** `src/libslic3r/SLA/IndexedMesh.cpp` + `src/libslic3r/SLA/AABBMesh.cpp`
+
+**Fixture / test data:** Uses `tests/data/` (model file: `20mm_cube.obj`)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Raycaster - find intersections of a line and cylinder | (none) | **Hole raycaster**: Drain hole raycaster correctly finds intersections between a line and a cylindrical hole. <br> **Entry/exit distances**: Entry and exit distances are calculated with tolerance 0.001f. |
+| Raycaster with loaded drillholes | `[sla_raycast]` | **[CONDITIONAL]** Requires `SLIC3R_HOLE_RAYCASTER` define. <br> **Ray hit distance**: Ray from cube center hits interior wall at expected distance (min thickness). <br> **Hole side hit**: Ray from hole center hits hole side at radius distance. <br> **Back side hit**: Ray from outside hits back side of cube interior. <br> **Downward ray**: Ray downward through hole cylinder hits expected distance. <br> **Support collision**: Support tree generation with drain holes does not collide with model. <br> **Tolerance**: Uses `Catch::Approx` for all distance comparisons. |
+
+**Special notes:**
+- **Catch::Approx usage**: Used for all distance comparisons (lines 23, 24, 73, 79, 84, 91).
+- **Conditional compilation**: Second test requires `SLIC3R_HOLE_RAYCASTER` define.
+- **Drain hole geometry**: Tests validate raycasting through cylindrical drain holes in hollowed mesh.
+- **Mesh operations**: Tests use `sla::IndexedMesh` and `sla::DrainHole` classes. |
+
+
 
 
 

@@ -172,6 +172,6 @@ Document the test suite for TDD-guided refactoring.
 ### Next Steps
 - Phase 1 (libslic3r) is complete.
 - Phase 2 (fff_print) is complete.
-- Phase 3 (sla_print) started with T301.
-- Move to T302 (`sla_raycast_tests.cpp`).
+- Phase 3 (sla_print) started with T301, T302.
+- Move to T303 (`sla_supptgen_tests.cpp`).
 - Finalize with T600: complete test contracts documentation.
