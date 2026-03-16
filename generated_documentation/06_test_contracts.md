@@ -738,6 +738,34 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Layer height generation**: Tests validate that layer heights are correctly calculated based on nozzle diameter and configured layer height.
 - **Z-coordinate precision**: Tests verify exact Z-coordinates for each layer. |
 
+### test_trianglemesh.cpp
+
+**Source under test:** `src/libslic3r/TriangleMesh.cpp`
+
+**Fixture / test data:** none (inline mesh generation via `make_cube`, `make_cylinder`, `make_sphere`)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| TriangleMesh: Basic mesh statistics | (none) | **Volume calculation**: 20mm cube volume is 8000mm³ (within 1e-2 tolerance). <br> **Vertex array matches input**: Mesh vertices match input vertex array exactly. <br> **Facet array matches input**: Mesh facets match input facet array exactly. <br> **Facet count**: Facet count matches input array size. <br> **Center calculation**: Cube center is at (10, 10, 10). <br> **Size calculation**: Cube size is (20, 20, 20). |
+| TriangleMesh: Transformation functions affect mesh as expected | (none) | **Uniform scaling**: 200% uniform scaling produces 40x40x40 cube (volume 64000). <br> **X-axis scaling**: 200% X scaling doubles volume and sets X coordinate to 40. <br> **X-axis scaling 25%**: 25% X scaling reduces volume to 25% and sets X coordinate to 5. <br> **Rotation**: 45° Z-rotation sets X size to sqrt(2)*20. <br> **Translation**: Translation moves vertices correctly. <br> **Align to origin**: Aligning to origin sets first vertex to (0,0,0). |
+| TriangleMesh: slice behavior | (none) | **Cube slicing**: Slicing 20mm cube at various Z heights produces one polygon per layer with correct area (400 / SCALING_FACTOR²). <br> **Irregular shape slicing**: Slicing irregular shape produces polygons with positive area. <br> **Transformed mesh slicing**: Mirrored mesh slices correctly at negative Z heights. |
+| make_xxx functions produce meshes | (none) | **make_cube**: Cube has one vertex at (0,0,0), volume 8000, 12 facets. <br> **make_cylinder**: Cylinder has vertices at (0,0,0) and (0,0,10), correct vertex/facet counts, volume ~3141.59. <br> **make_sphere**: Sphere has vertices at (0,0,-10) and (0,0,10), volume ~4188.79. |
+| TriangleMesh: split functionality | (none) | **Single mesh split**: Splitting a single mesh produces one output mesh with same bounding box. <br> **Merged mesh split**: Merging two cubes and splitting produces two output meshes. |
+| TriangleMesh: Mesh merge functions | (none) | **Mesh merge**: Merging two cubes doubles facet count. |
+| TriangleMeshSlicer: Cut behavior | (none) | **Cut at bottom**: Cutting at Z=0 produces upper mesh with all facets, lower mesh with no facets. <br> **Cut at center**: Cutting at Z=10 produces upper and lower meshes each with 20 facets (2+12+6). |
+| Regression test for issue #4486 | `[Performance]` | **[DISABLED]** Requires `TEST_PERFORMANCE` define. Tests that slicing 100,000 facet mesh completes within 120 seconds. |
+| Profile test for issue #4486 | `[Performance]` | **[DISABLED]** Requires `BUILD_PROFILE` define. Tests that slicing 10,000 facet mesh completes successfully. |
+
+**Special notes:**
+- **Exact comparisons**: Most tests use exact integer or floating-point comparisons (no `Catch::Approx`).
+- **Volume tolerances**: Some volume tests use absolute tolerance (1e-2 or 1).
+- **is_approx usage**: Sphere vertex tests use `is_approx()` for floating-point comparison.
+- **Conditional tests**: Performance tests require special build flags (`TEST_PERFORMANCE`, `BUILD_PROFILE`).
+- **SCALING_FACTOR**: Area calculations use `SCALING_FACTOR` constant for coordinate scaling. |
+
+
 
 
 
