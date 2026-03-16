@@ -662,6 +662,25 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Solid surface filling**: Tests that solid surfaces are completely filled without gaps.
 - **Polygon operations**: Uses Clipper operations (`diff_pl`, `offset`) to verify infill boundaries. |
 
+### test_extrusion_entity.cpp
+
+**Source under test:** `src/libslic3r/ExtrusionEntity.cpp`
+
+**Fixture / test data:** none (inline random path generation)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| ExtrusionEntityCollection: Polygon flattening | `[ExtrusionEntity]` | **Flatten with default options**: Flattening an `ExtrusionEntityCollection` with `preserve_order=false` produces an output collection containing no child collections. <br> **Flatten with preservation**: Flattening with `preserve_order=true` preserves the order of elements and produces an output collection containing exactly one child collection (the one marked `no_sort`). <br> **Order preservation**: The ordered child collection contains the same sequence of extrusion paths as the original `no_sort` collection, matching first and last points for each path. |
+
+**Special notes:**
+- **No Catch::Approx**: All comparisons are exact (point equality, size checks).
+- **Random seed**: Uses `srand(0xDEADBEEF)` for reproducible random path generation.
+- **Collection flattening**: Tests `ExtrusionEntityCollection::flatten()` with and without order preservation.
+- **No sorting**: Tests handling of `no_sort` flag in child collections. |
+
+
 
 
 

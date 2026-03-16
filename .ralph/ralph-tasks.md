@@ -124,9 +124,9 @@ Last updated: 2026-03-11T00:00:00Z
              Source under test: src/libslic3r/Fill/
              Commit: `docs: test_fill.cpp contracts (T203)`
 
-- [ ] T204  document: tests/fff_print/test_extrusion_entity.cpp
-            Source under test: src/libslic3r/ExtrusionEntity.cpp
-            Commit: `docs: test_extrusion_entity.cpp contracts (T204)`
+- [~] T204  document: tests/fff_print/test_extrusion_entity.cpp
+             Source under test: src/libslic3r/ExtrusionEntity.cpp
+             Commit: `docs: test_extrusion_entity.cpp contracts (T204)`
 
 - [ ] T205  document: tests/fff_print/test_model.cpp
             Source under test: src/libslic3r/Model.cpp
