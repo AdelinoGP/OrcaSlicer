@@ -680,6 +680,25 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Collection flattening**: Tests `ExtrusionEntityCollection::flatten()` with and without order preservation.
 - **No sorting**: Tests handling of `no_sort` flag in child collections. |
 
+### test_model.cpp
+
+**Source under test:** `src/libslic3r/Model.cpp`
+
+**Fixture / test data:** none (inline mesh generation via `make_cube`)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Model construction | `[Model][.]` | **[DISABLED]** This test is marked with `[.]` tag and is not built by default. <br> **Model object addition**: Adding a model object increases the model object list size to 1. <br> **Model volume addition**: Adding a volume to a model object increases the volume list size to 1. <br> **Volume type**: Model volumes are marked as model parts. <br> **Mesh equivalence**: The mesh vertices in the model volume match the input mesh vertices (within EPSILON tolerance). <br> **Print generation**: Print process completes successfully and exports G-code to a temporary file. <br> **G-code file**: Temporary G-code file exists, is a regular file, and has non-zero size. |
+
+**Special notes:**
+- **EPSILON tolerance**: Mesh vertex comparison uses `EPSILON` (line 41) - exact tolerance value not specified in source.
+- **Disabled test**: Test is marked with `[.]` tag and not built by default.
+- **Print pipeline**: Tests full print pipeline including arrangement, extruder assignment, G-code export.
+- **File operations**: Uses Boost filesystem for temporary file creation and cleanup. |
+
+
 
 
 
