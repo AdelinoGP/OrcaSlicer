@@ -462,9 +462,9 @@ Open questions: None
 ---
 
 ## CURRENT STATUS
-Last session: 212
-Active task: T212 — document test_skirt_brim.cpp
-Next action: Start T212
+Last session: 213
+Active task: T213 — document test_support_material.cpp
+Next action: Start T213
 Unresolved [UNCLEAR] tags: 0
-Files remaining (Phase 2): 2 (T212-T213)
+Files remaining (Phase 2): 1 (T213)
 Open questions: None
