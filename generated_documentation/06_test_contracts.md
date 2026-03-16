@@ -518,4 +518,23 @@ cd build && ./tests/libslic3r/libslic3r_tests --order rand --warn NoAssertions -
 - **Multiple formats**: Tests ISO 8601 UTC and Slic3r gcode time formats.
 - **Error handling**: Invalid strings must return `time_t(-1)`. |
 
+### test_aabbindirect.cpp
+
+**Source under test:** `src/libslic3r/AABBTreeIndirect.hpp`
+
+**Fixture / test data:** none (inline cube generation via `make_cube`)
+
+**Tests:**
+
+| TEST_CASE name | Tags | What it contractually guarantees |
+|---|---|---|
+| Building a tree over a box, ray caster and closest query | `[AABBIndirect]` | **Tree building**: AABB tree built over a 1x1x1 cube must be non-empty. <br> **Single ray intersection**: Ray from (0.5, 0.5, -5) in direction (0, 0, 1) must intersect the cube at distance 5.0. <br> **Multiple ray intersections**: Ray from (0.3, 0.5, -5) in direction (0, 0, 1) must intersect the cube at two points with distances 5.0 and 6.0. <br> **Squared distance to set**: Point (0.3, 0.5, -5) must have squared distance 25.0 to the cube, with closest point (0.3, 0.5, 0.0). <br> **Squared distance from outside**: Point (0.3, 0.5, 5) must have squared distance 16.0 to the cube, with closest point (0.3, 0.5, 1.0). |
+
+**Special notes:**
+- **Catch::Approx usage**: All floating-point comparisons use `Catch::Approx` (lines 25, 36, 37, 46, 47, 48, 49, 56, 57, 58, 59). Porting agent must reproduce tolerance (default Catch2 Approx tolerance).
+- **Cube geometry**: Uses `make_cube(1., 1., 1.)` to generate test mesh.
+- **Ray casting**: Tests `intersect_ray_first_hit()` and `intersect_ray_all_hits()` functions.
+- **Closest point queries**: Tests `squared_distance_to_indexed_triangle_set()` for distance and closest point computation.
+- **AABB tree structure**: Uses `AABBTreeIndirect::build_aabb_tree_over_indexed_triangle_set()` for tree construction. |
+
 
