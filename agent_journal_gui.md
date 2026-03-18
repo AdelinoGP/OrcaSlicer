@@ -330,7 +330,7 @@ Phase 0 orientation is now complete. All tasks executed and documented successfu
 - **Key findings**: `Plater` is the central hub for model management and 3D rendering. `Sidebar` handles settings. Both use PIMPL (`struct priv`) to hide wxWidgets complexity, which is a major porting hazard.
 - **Verification excerpt**: `// [PORTING_HAZARD:P2] The 'priv' struct likely contains many wxWidgets objects and event handlers that need decomposition into Unity components.`
 - **Unity porting hazards identified**: 2
-- **Git commit**: (pending)
+- **Git commit**: 617436cdc7
 
 ### Loop Checkpoint — Tasks T101–T120
 - Files processed this batch: 1
