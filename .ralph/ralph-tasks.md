@@ -16,8 +16,8 @@ Last updated: 2026-03-17T23:40:00Z
 - [x] P0-T005 Application class identification
 - [x] P0-T006 Main window class identification
 - [x] P0-T007 Create output directories
-- [~] P0-T008 Initialize task registry
-- [ ] P0-T009 Commit orientation complete
+- [x] P0-T008 Initialize task registry
+- [x] P0-T009 Commit orientation complete
 
 ## Phase 1 — Annotation
 (To be populated from P0-T003 manifest)
