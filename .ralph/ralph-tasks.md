@@ -11,7 +11,7 @@ Last updated: 2026-03-17T23:40:00Z
 ## Phase 0 — Orientation
 - [x] P0-T001 Repository state verification
 - [x] P0-T002 Create working branch
-- [!] P0-T003 GUI directory census
+- [x] P0-T003 GUI directory census
 - [x] P0-T004 Entry point trace
 - [x] P0-T005 Application class identification
 - [x] P0-T006 Main window class identification
