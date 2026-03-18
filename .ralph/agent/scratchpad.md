@@ -1,57 +1,63 @@
 # GUI Analysis Agent Scratchpad
 
-## Current State
+## Iteration Context
 
-Fresh iteration starting Phase 0 orientation tasks.
+**Objective:** Analyze wxWidgets + OpenGL GUI layer for Unity port preparation
+**Phase:** Phase 1 — File-by-File Annotation
+**Manifest Total:** 719 files
+**Current Task:** preparing Phase 1 task population
 
-## Tasks Status
+## Understanding
 
-- P0-T001: DONE - Repository state verification
-- P0-T002: DONE - Working branch created (`agent/gui-analysis`)
-- P0-T003: DONE - GUI directory census (719 files documented)
-- P0-T004: DONE - Entry point traced to `GUI_App::OnInit()`
-- P0-T005: DONE - Application class identification (GUI_App documented)
-- P0-T006: DONE - Main window class identification (MainFrame documented)
-- P0-T007: DONE - Create output directories
-- P0-T008: DONE - Initialize task registry
-- P0-T009: ACTIVE - Commit orientation complete
+Phase 0 is complete. All orientation tasks (P0-T001 through P0-T009) have been completed and committed. The manifest contains 719 files across:
+- src/slic3r/GUI/: ~581 files
+- src/libvgcode/: ~40 files  
+- src/slic3r/Utils/: ~98 files
 
-## Phase 0 Completion Gate Checklist
+## Current Status
 
-- [ ] All P0-T001 through P0-T009 tasks marked [x] DONE
-- [ ] Each task has a corresponding evidence block in agent_journal_gui.md
-- [ ] agent_journal_gui.md exists and has ≥50 lines of orientation findings
-- [ ] The git commit for P0-T009 is visible in git log
-- [ ] Total file count from P0-T003 is recorded as P0-T003 MANIFEST TOTAL
+Phase 0 is complete (9/9 tasks DONE). P0-T003 MANIFEST TOTAL: 719 files.
 
-## Next Steps
+## Next Steps (RESUMING)
 
-1. Investigate why P0-T003 (GUI Directory Census) is blocked
-2. Complete pending Phase 0 tasks in order
-3. Pass Phase 0 completion gate before proceeding to Phase 1
+1. Populate Phase 1 section of ralph-tasks.md with 719 annotation tasks (T101 through T819)
+2. Start with T101 - annotate the first file in priority order
+3. Follow annotation protocol:
+   - Mark ACTIVE before opening file
+   - Read entire file
+   - Inject comments ([INTENT], [STATE], [EVENT], [THREAD], [OPENGL], [UNITY], [PORTING_HAZARD], [UNCLEAR])
+   - Write completion evidence block in journal
+   - Commit immediately after each file
+   - Mark DONE in tasks
+   - Write Loop Checkpoint every 10 files
 
-## P0-T007 COMPLETE - Create output directories
+## Progress
+- Annotated: 0
+- SKIP_TRIVIAL: 0
+- SKIP_VENDORED: 0
+- Total accounted for: 0
+- Remaining: 719
 
-Completed task to create required output directories:
-- Created `generated_documentation/gui/` for Phase 2 documentation files
-- Created `.ralph/` if not already existing (found it already existed with agent/ subdirectory)
-- Directories verified with `ls -la` commands
-- Completion evidence added to agent_journal_gui.md and committed as `orient(gui): create output directories for GUI analysis`
+## Loop Completion Guard
 
-## P0-T008 COMPLETE - Initialize task registry
+The annotation loop MUST continue until:
+```bash
+(annotated_count + skip_trivial_count + skip_vendored_count) == 719
+```
 
-Completed task to create the Ralph task registry:
-- Created `.ralph/ralph-tasks.md` with header, legend, and Phase 0 task list
-- Populated Phase 0 tasks based on scratchpad progress state
-- Marked P0-T001 through P0-T007 as [x] DONE
-- Marked P0-T003 as [!] BLOCKED
-- Marked P0-T008 as [~] ACTIVE during creation
-- Left P0-T009 [ ] PENDING
-- Reserved sections for Phase 1, Phase 2, and Phase 3 tasks
-- Completion evidence added to agent_journal_gui.md and committed as `orient(gui): initialize task registry for GUI analysis`
+No early exit is permitted. Loop status must be CONTINUING at every checkpoint until remaining == 0.
 
-## Phase 0 Progress Update
 
-- COMPLETED: P0-T001, P0-T002, P0-T004, P0-T005, P0-T006, P0-T007, P0-T008 (7 of 9)
-- BLOCKED: P0-T003 (GUI directory census) - needs investigation
-- PENDING: P0-T009 (Commit orientation complete) - blocked by P0-T003
+## Phase 1 Task Population Complete
+
+Action taken: Populated Phase 1 section of ralph-tasks.md with 719 annotation tasks (T101-T819).
+
+All tasks are marked PENDING and listed in priority order:
+- Priority 0 (lifecycle): GUI_App, MainFrame, Plater, wxMediaCtrl2, PlaterWorker.hpp
+- Priority 1 (viewport): GLCanvas3D, 3DScene, Gizmos, Camera, OpenGL utilities
+- Priority 2 (config): Tab, Field, Options, Config, Preset classes
+- Priority 3 (dialogs): Dialog, Popup, Wizard, Panel classes
+- Priority 4 (utils): Utils/ and Jobs/ directories
+- Priority 5-6 (other): Remaining GUI and libvgcode files
+
+Next iteration: Begin annotation loop with T101 (src/slic3r/GUI/GUI_App.cpp).

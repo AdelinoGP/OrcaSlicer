@@ -210,3 +210,24 @@ MainFrame
 - Task count to populate: 719 tasks (one per manifest file)
 - Loop Completion Guard equation must hold before Phase 1 complete:
   `(annotated_count + skip_trivial_count + skip_vendored_count) == 719`
+
+---
+
+## Phase 1 Task Population COMPLETE
+
+- Deliverable: Phase 1 section of ralph-tasks.md populated with 719 tasks
+- Tasks created: T101 through T819 (719 total)
+- Task format: `[ ] T<NNN> annotate: <filepath>`
+- Priority order applied:
+  - Priority 0: Lifecycle (GUI_App, MainFrame, Plater, wxMediaCtrl2)
+  - Priority 1: Viewport (GLCanvas3D, 3DScene, Gizmos, Camera, OpenGL utilities)
+  - Priority 2: Configuration (Tab, Field, Options, Config, Preset)
+  - Priority 3: Dialogs (Dialog, Popup, Wizard, Panel classes)
+  - Priority 4: Utilities (Utils/ and Jobs/ directories)
+  - Priority 5: Other GUI files
+  - Priority 6: libvgcode files
+- Verification excerpt: Task T101: `annotate: src/slic3r/GUI/GUI_App.cpp` through T819: `annotate: src/slic3r/Utils/WxFontUtils.hpp`
+- Git: committed as 25c6f91cdd orient(gui): populate Phase 1 with 719 annotation tasks
+- Lines added: 722 new task lines to ralph-tasks.md
+
+**Ready to begin Phase 1 annotation loop with T101.**
