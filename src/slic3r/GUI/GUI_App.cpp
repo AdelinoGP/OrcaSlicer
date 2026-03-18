@@ -1229,6 +1229,10 @@ static std::string decode(std::string const& extra, std::string const& path = {}
     return Slic3r::decode_path(path.c_str());
 }
 
+// [INTENT] Download a plugin from the network - handles HTTP requests and file downloading
+// [THREAD] Runs on UI thread, spawns network operations
+// [EVENT] Uses Http callbacks for completion and error handling
+// [UNITY] Replace with UnityWebRequest for HTTP operations
 int GUI_App::download_plugin(std::string name, std::string package_name, InstallProgressFn pro_fn, WasCancelledFn cancel_fn)
 {
     int         result = 0;
@@ -1401,6 +1405,10 @@ int GUI_App::download_plugin(std::string name, std::string package_name, Install
     return result;
 }
 
+// [INTENT] Install a downloaded plugin - handles unzip and file system operations
+// [THREAD] Runs on UI thread, performs file I/O operations
+// [EVENT] Uses progress callbacks for installation status
+// [UNITY] Replace with Unity's AssetBundle loading system
 int GUI_App::install_plugin(std::string name, std::string package_name, InstallProgressFn pro_fn, WasCancelledFn cancel_fn)
 {
     bool        cancel           = false;
