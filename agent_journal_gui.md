@@ -338,7 +338,7 @@ Phase 0 orientation is now complete. All tasks executed and documented successfu
 - **Key findings**: Implementation of the Sidebar widgets and layout. Heavy use of PIMPL (Sidebar::priv) to encapsulate UI state. Identified hazards in manual DPI scaling and PIMPL abstraction.
 - **Verification excerpt**: `// [PORTING_HAZARD:P2] The Sidebar::priv (PIMPL) pattern encapsulates nearly all UI logic and widget pointers.`
 - **Unity porting hazards identified**: 2
-- **Git commit**: <pending>
+- **Git commit**: ad99ce1680
 
 ### Loop Checkpoint — Tasks T101–T121-part1
 - Files processed this batch: 1
