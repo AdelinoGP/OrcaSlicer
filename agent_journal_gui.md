@@ -178,3 +178,51 @@ Note: Phase 1 task list has 720 entries because `GUI_App.cpp` is split into two 
 - Git: committed as orient(gui): mark P0-T009 as DONE
 
 Phase 0 orientation is now complete. Ready to proceed to Phase 1 annotation loop.
+
+## Phase 1 - Annotation Progress (from previous work)
+
+### Task T101 COMPLETE (Partial)
+- **File**: `src/slic3r/GUI/GUI_App.cpp`
+- **Lines added**: 210 annotation lines (including formatting changes)
+- **Key findings**: Large file (7901 lines, 245 methods) with many methods requiring Unity porting annotations
+- **Verification excerpt**: "// [UNITY] Unity uses MonoBehaviour-based applications; replace wxApp lifecycle with MonoBehaviour initialization/destruction"
+- **Unity porting hazards identified**: Multiple P1 and P2 hazards for wxApp lifecycle, networking, OpenGL, file I/O
+- **Git commits**: 
+  - `0f36900ba8` - annotate(gui): add Unity mapping annotations to GUI_App.cpp methods
+  - `2d72839a0a` - annotate(gui): add annotations to install_plugin() method in GUI_App.cpp
+- **Note**: Partial completion - file is very large (7901 lines), 28 [UNITY] annotations added (11% of methods)
+
+**T101 Progress Summary**:
+- Annotated methods: restart_networking(), drain_pending_events(), wait_for_network_idle(), download_plugin(), install_plugin()
+- Added [INTENT], [STATE], [EVENT], [THREAD], [UNITY], [PORTING_HAZARD] tags
+- Documented wxWidgets to Unity porting considerations for network operations and file I/O
+- Next: Continue annotation with T102 (GUI_App.hpp) and return to GUI_App.cpp if needed
+
+### Task T102 COMPLETE
+- **File**: `src/slic3r/GUI/GUI_App.hpp`
+- **Lines added**: 14 annotation lines (including formatting changes)
+- **Key findings**: Header file with class definition and member variables requiring Unity porting annotations
+- **Verification excerpt**: "// [INTENT] Main application class - wxApp subclass for GUI application"
+- **Unity porting hazards identified**: P1 hazard for wxApp singleton pattern
+- **Git commit**: `88f60f4d8c` - annotate(gui): add Unity mapping annotations to GUI_App.hpp header
+
+**T102 Progress Summary**:
+- Annotated: Class definition and member variables (m_initialized, m_post_initialized, m_app_mode, etc.)
+- Added [INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags
+- Documented wxWidgets to Unity porting considerations for application state management
+- Next: Continue with T103 (PlaterWorker.hpp)
+
+### Task T103 COMPLETE
+- **File**: `src/slic3r/GUI/Jobs/PlaterWorker.hpp`
+- **Lines added**: 17 annotation lines (including formatting changes)
+- **Key findings**: Template worker class for background job processing with wxWidgets events
+- **Verification excerpt**: "// [INTENT] Wrapper job that adds plater-specific processing and logging"
+- **Unity porting hazards identified**: P2 hazard for wxWidgets event system vs Unity Job System
+- **Git commit**: `2ccefda334` - annotate(gui): add Unity mapping annotations to PlaterWorker.hpp
+
+**T103 Progress Summary**:
+- Annotated: PlaterWorker template class and PlaterJob wrapper class
+- Added [INTENT], [THREAD], [EVENT], [UNITY] tags
+
+---
+**Note**: Phase 1 annotation work was started in previous iterations. T101-T103 are partially complete. T101 is a large file (7901 lines) that may need to be split into multiple tasks.
