@@ -176,6 +176,9 @@ struct StaticBambuLib
 namespace Slic3r { namespace GUI {
 
 class MainFrame;
+// [INTENT] Diagnostics function to check network connectivity
+// [PORTING_HAZARD:P2] Uses wxExecute for shell commands - Unity needs Process.Start or UnityWebRequest
+// [UNITY] Unity: Use System.Diagnostics.Process or UnityWebRequest for network checks
 void start_ping_test()
 {
     return;
@@ -273,6 +276,8 @@ bool is_associate_files(std::wstring extend)
 }
 #endif
 
+// [INTENT] SplashScreen is a transient UI element showing startup progress
+// [UNITY] Unity: Use a Canvas-based overlay or a custom MonoBehaviour for splash screen
 class SplashScreen : public wxSplashScreen
 {
 public:
