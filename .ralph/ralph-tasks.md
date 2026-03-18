@@ -105,7 +105,7 @@
 - [x] **T121-part3**: `src/slic3r/GUI/Plater.cpp` (4001-6000)
 - [x] **T121-part4**: `src/slic3r/GUI/Plater.cpp` (6000-8000)
 - [x] **T121-part5**: `src/slic3r/GUI/Plater.cpp` (8000-10000)
-- [ ] **T121-part6**: `src/slic3r/GUI/Plater.cpp` (10000-12000)
+- [x] **T121-part6**: `src/slic3r/GUI/Plater.cpp` (10000-12000)
 - [ ] **T121-part7**: `src/slic3r/GUI/Plater.cpp` (12000-14000)
 - [ ] **T121-part8**: `src/slic3r/GUI/Plater.cpp` (14000-16000)
 - [ ] **T121-part9**: `src/slic3r/GUI/Plater.cpp` (16000-18178)
