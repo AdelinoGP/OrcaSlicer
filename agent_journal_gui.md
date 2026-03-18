@@ -20,7 +20,7 @@
 | P0-T006 | ✅ COMPLETE | MainFrame class analyzed | `main_window_class.md` |
 | P0-T007 | ✅ COMPLETE | Directories created | `generated_documentation/gui/`, `.ralph/` |
 | P0-T008 | ✅ COMPLETE | Task registry initialized | `.ralph/ralph-tasks.md` |
-| P0-T009 | ✅ COMPLETE | Ready for git commit | - |
+| P0-T009 | ✅ COMPLETE | Commit: `82129db832 orient(gui): complete Phase 0 orientation` | - |
 
 ---
 
