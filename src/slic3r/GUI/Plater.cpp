@@ -223,6 +223,7 @@ wxDEFINE_EVENT(EVT_NOTICE_FULL_SCREEN_CHANGED, IntEvent);
 #define PRINTER_PANEL_RADIUS (6)                // ORCA
 #define BTN_SYNC_SIZE (wxSize(FromDIP(96), FromDIP(98)))
 
+// [INTENT] Formats diameter to string with 2 decimal places, ensuring precision for 0.25/0.15 nozzles.
 static string get_diameter_string(float diameter)
 {
     std::ostringstream stream; // ORCA ensure 0.25 returned as 0.25. previous code returned as 0.2 because of std::setprecision(1)
@@ -236,12 +237,14 @@ static string get_diameter_string(float diameter)
     return s;
 }
 
+// [INTENT] Validation for filenames to avoid OS-specific illegal characters.
 bool Plater::has_illegal_filename_characters(const wxString& wxs_name)
 {
     std::string name = into_u8(wxs_name);
     return has_illegal_filename_characters(name);
 }
 
+// [INTENT] Overload for std::string filename validation.
 bool Plater::has_illegal_filename_characters(const std::string& name)
 {
     const char* illegal_characters = "<>:/\\|?*\"";
@@ -252,6 +255,8 @@ bool Plater::has_illegal_filename_characters(const std::string& name)
     return false;
 }
 
+// [INTENT] Displays a modal error dialog for illegal characters.
+// [UNITY] Use Unity's EditorUtility.DisplayDialog or a custom UI popup.
 void Plater::show_illegal_characters_warning(wxWindow* parent)
 {
     show_error(parent, _L("Invalid name, the following characters are not allowed:") + " <>:/\\|?*\"");
@@ -300,6 +305,8 @@ private:
     std::vector<std::pair<wxStaticText*, wxStaticText*>> info_vec;
 };
 
+// [INTENT] Constructor for Slicing Results summary panel.
+// [UNITY] Initializes SlicingSummaryUI with default labels.
 SlicedInfo::SlicedInfo(wxWindow* parent) : wxStaticBoxSizer(new wxStaticBox(parent, wxID_ANY, _L("Sliced Info")), wxVERTICAL)
 {
     GetStaticBox()->SetFont(wxGetApp().bold_font());
@@ -334,6 +341,8 @@ SlicedInfo::SlicedInfo(wxWindow* parent) : wxStaticBoxSizer(new wxStaticBox(pare
     this->Show(false);
 }
 
+// [INTENT] Updates a specific slicing metric (filament, cost, time) and shows/hides if valid.
+// [UNITY] Map to SlicingSummaryUI.UpdateMetric(SlicingMetricIdx, value).
 void SlicedInfo::SetTextAndShow(SlicedInfoIdx idx, const wxString& text, const wxString& new_label /*=""*/)
 {
     const bool show = text != "N/A";
@@ -384,10 +393,14 @@ struct ExtruderGroup : StaticGroup
         }
     }
 
+    // [INTENT] Updates AMS tray visualization. [UNITY] Map to ExtruderPanel.UpdateAMSTrays().
     void update_ams();
 
+    // [INTENT] Synchronizes AMS state from MachineObject. [UNITY] Part of DeviceStateSync service.
     void sync_ams(MachineObject const* obj, std::vector<DevAms*> const& ams4, std::vector<DevAms*> const& ams1);
 
+    // [INTENT] Handles manual DPI rescaling for custom widgets.
+    // [PORTING_HAZARD:P2] Manual rescaling required for each panel. Unity UI Toolkit handles this via 'match width/height'.
     void Rescale()
     {
         if (btn_edit)
@@ -1026,6 +1039,8 @@ ExtruderGroup::ExtruderGroup(wxWindow* parent, int index, wxString const& title)
         label_flow->SetMinSize({FromDIP(80), -1});
     auto combo_flow = new ComboBox(this, wxID_ANY, wxString(""), wxDefaultPosition, wxDefaultSize, 0, nullptr, wxCB_READONLY);
     combo_flow->GetDropDown().SetUseContentWidth(true);
+    // [INTENT] Updates nozzle flow type on printer tab.
+    // [EVENT] Triggers MachineSyncStatus update on ComboBox change.
     combo_flow->Bind(wxEVT_COMBOBOX, [this, index, combo_flow](wxCommandEvent& evt) {
         auto printer_tab = dynamic_cast<TabPrinter*>(wxGetApp().get_tab(Preset::TYPE_PRINTER));
         printer_tab->set_extruder_volume_type(index, NozzleVolumeType(intptr_t(combo_flow->GetClientData(evt.GetInt()))));
@@ -1047,6 +1062,7 @@ ExtruderGroup::ExtruderGroup(wxWindow* parent, int index, wxString const& title)
         btn_edit->SetBackgroundColour(*wxWHITE);
 #endif
         btn_edit->Hide();
+        // [EVENT] Opens AMS configuration popup. [UNITY] Open AMSCountPopup view.
         btn_edit->Bind(wxEVT_COMMAND_BUTTON_CLICKED, [this, index](auto& evt) {
             PopupWindow* window = new AMSCountPopupWindow(this, index);
             auto         size   = GetSize();
@@ -1059,6 +1075,7 @@ ExtruderGroup::ExtruderGroup(wxWindow* parent, int index, wxString const& title)
         auto hovered = std::make_shared<wxWindow*>();
         for (wxWindow* w :
              std::initializer_list<wxWindow*>{this, label_diameter, combo_diameter, label_flow, combo_flow, btn_edit, label_ams}) {
+            // [EVENT] Hover effects for AMS edit button.
             w->Bind(wxEVT_ENTER_WINDOW, [w, hovered, this](wxMouseEvent& evt) {
                 *hovered = w;
                 btn_edit->SetBitmap_("edit");
@@ -1227,6 +1244,8 @@ void ExtruderGroup::sync_ams(MachineObject const* obj, std::vector<DevAms*> cons
         update_ams();
 }
 
+// [INTENT] Switches printer diameter and handles incompatible preset warnings.
+// [UNITY] Use PrinterPresetManager.SwitchDiameter().
 bool Sidebar::priv::switch_diameter(bool single)
 {
     wxString diameter;
@@ -1277,6 +1296,8 @@ bool Sidebar::priv::switch_diameter(bool single)
     return wxGetApp().get_tab(Preset::TYPE_PRINTER)->select_preset(preset->name);
 }
 
+// [INTENT] Primary synchronization logic for extruder settings from the connected physical machine.
+// [UNITY] Part of MachineStatusSync service.
 bool Sidebar::priv::sync_extruder_list(bool& only_external_material)
 {
     MachineObject* obj          = wxGetApp().getDeviceManager()->get_selected_machine();
@@ -1400,6 +1421,8 @@ bool Sidebar::priv::sync_extruder_list(bool& only_external_material)
     return true;
 }
 
+// [INTENT] Updates UI badges and sync icons based on current machine connection state.
+// [UNITY] Use a reactive state binding or a dedicated SyncStatusPanel controller.
 void Sidebar::priv::update_sync_status(const MachineObject* obj)
 {
     StateColor not_synced_colour(std::pair<wxColour, int>(wxColour("#009688"), StateColor::Normal));
@@ -1585,8 +1608,11 @@ void Sidebar::update_sync_ams_btn_enable(wxUpdateUIEvent& e)
 
 // [INTENT] Constructor for the Sidebar. Initializes nested panels and complex layout.
 // [UNITY] Map to InspectorPanel Awake/Start.
+// [INTENT] Sidebar constructor. Orchestrates the layout of printer, filament, and slicing settings panels.
+// [UNITY] Map to InspectorPanel MonoBehaviour.
 Sidebar::Sidebar(Plater* parent) : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxSize(42 * wxGetApp().em_unit(), -1)), p(new priv(parent))
 {
+    // [EVENT] Registration of dynamic lists for filament selection dropdowns.
     Choice::register_dynamic_list("support_filament", &dynamic_filament_list);
     Choice::register_dynamic_list("support_interface_filament", &dynamic_filament_list);
     Choice::register_dynamic_list("wall_filament", &dynamic_filament_list_1_based);
@@ -1646,6 +1672,7 @@ Sidebar::Sidebar(Plater* parent) : wxPanel(parent, wxID_ANY, wxDefaultPosition, 
         // ORCA use connect button on titlebar
         p->m_printer_connect = new ScalableButton(p->m_panel_printer_title, wxID_ANY, "monitor_signal_strong");
         p->m_printer_connect->SetToolTip(_L("Connection"));
+        // [EVENT] Opens Physical Printer Dialog.
         p->m_printer_connect->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) {
             PhysicalPrinterDialog dlg(this->GetParent());
             dlg.ShowModal();
@@ -1654,9 +1681,11 @@ Sidebar::Sidebar(Plater* parent) : wxPanel(parent, wxID_ANY, wxDefaultPosition, 
         // ORCA use sync button on titlebar
         p->m_printer_bbl_sync = new ScalableButton(p->m_panel_printer_title, wxID_ANY, "printer_sync_not");
         p->m_printer_bbl_sync->SetToolTip(_L("Synchronize nozzle information and the number of AMS"));
+        // [EVENT] Triggers synchronization of printer/AMS info.
         p->m_printer_bbl_sync->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) { deal_btn_sync(); });
 
         p->m_printer_setting = new ScalableButton(p->m_panel_printer_title, wxID_ANY, "settings");
+        // [EVENT] Opens Printer Wizard.
         p->m_printer_setting->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) {
             // p->editing_filament = -1;
             // wxGetApp().params_dialog()->Popup();
@@ -1688,6 +1717,7 @@ Sidebar::Sidebar(Plater* parent) : wxPanel(parent, wxID_ANY, wxDefaultPosition, 
 
         // add printer title
         scrolled_sizer->Add(p->m_panel_printer_title, 0, wxEXPAND | wxALL, 0);
+        // [EVENT] Toggles visibility of printer content panel.
         p->m_panel_printer_title->Bind(wxEVT_LEFT_UP, [this](auto& e) {
             p->m_panel_printer_content->Show(!p->m_panel_printer_content->IsShown());
             m_scrolled_sizer->Layout();
