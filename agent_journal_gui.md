@@ -156,6 +156,7 @@ Task registry initialization findings:
 
 Census findings:
 - Total files found: 719
+- P0-T003 MANIFEST TOTAL: 719 files
 - First 10 files in manifest:
   1. src/libvgcode/include/ColorPrint.hpp
   2. src/libvgcode/include/ColorRange.hpp
@@ -167,3 +168,5 @@ Census findings:
   8. src/libvgcode/src/Bitset.hpp
   9. src/libvgcode/src/CogMarker.cpp
   10. src/libvgcode/src/CogMarker.hpp
+
+Note: Phase 1 task list has 720 entries because `GUI_App.cpp` is split into two tasks (T101 and T101-part2). This is acceptable for the annotation loop.

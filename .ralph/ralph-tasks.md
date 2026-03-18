@@ -17,7 +17,7 @@ Last updated: 2026-03-18T03:00:00Z
 - [x] P0-T006 Main window class identification
 - [x] P0-T007 Create output directories
 - [x] P0-T008 Initialize task registry
-- [x] P0-T009 Commit orientation complete
+- [ ] P0-T009 Commit orientation complete
 
 ## Phase 1 — Annotation
 - [x] T101 annotate: src/slic3r/GUI/GUI_App.cpp (part 1: lines 1-3256, on_init_inner)
