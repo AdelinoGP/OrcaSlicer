@@ -7,9 +7,8 @@
 - Git log confirms `38d147d781` (MainFrame.hpp) and `8eb1b812ec` (Journal update) are complete.
 
 ## Next Task
-- `T111: annotate src/slic3r/GUI/MainFrame.cpp`.
-- This file is large (~4300 lines), so it will be split into Part 1 (1-2000) and Part 2 (2000-end).
-- This is part of Group 2: Window Management.
+- `T111-part2: annotate src/slic3r/GUI/MainFrame.cpp (2000-4000)`.
+- This continues Group 2: Window Management.
 
 ## Analysis Notes (T111)
 - `MainFrame.cpp` contains the implementation of the main window.
