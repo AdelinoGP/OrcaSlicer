@@ -130,3 +130,20 @@ Output directories creation findings:
 - Directories verified: generated_documentation/gui exists and .ralph exists
 - The .ralph directory already contained agent/ subdirectory with scratchpad.md and other Ralph runtime state files
 - generated_documentation/gui/ is now ready for Phase 2 documentation output files (T201-T208)
+**Task P0-T008 COMPLETE**
+- Deliverable: .ralph/ralph-tasks.md created
+- Lines added: 26 substantive lines including header, legend, and Phase 0 task list
+- Verification excerpt: "# Ralph Task Registry — OrcaSlicer GUI Analysis Agent"
+- Git: pending commit for task registry initialization
+
+Task registry initialization findings:
+- File created: .ralph/ralph-tasks.md
+- Registry structure includes: header with timestamp, legend for task states, and sections for all 4 phases
+- Phase 0 tasks populated based on current progress from scratchpad:
+  - P0-T001 through P0-T007 marked [x] DONE
+  - P0-T003 marked [!] BLOCKED (GUI directory census)
+  - P0-T008 marked [~] ACTIVE during creation
+  - P0-T009 marked [ ] PENDING
+- Phase 1 reserved for task population after P0-T003 manifest is completed
+- Phase 2 reserved for documentation tasks (T201-T208)
+- Phase 3 reserved for audit and review tasks (T301-T304)
