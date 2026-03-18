@@ -7,3 +7,63 @@
 - Verification excerpt: "// [UNITY] Use a MonoBehaviour attached to a GameObject that manages the 3D Editor workspace."
 - Unity porting hazards identified: 3
 - Git: committed as annotate(gui): annotate Plater.cpp (12000-14000) with Unity porting information
+
+---
+## Phase 0 — Orientation Findings (2026-03-18)
+
+### P0-T001: Repository State Verification
+- Branch: `agent/gui-analysis`
+- Status: Modified: `.ralph/agent/handoff.md`, `.ralph/current-events`, `.ralph/current-loop-id`, `.ralph/history.jsonl`, `.ralph/loop.lock`.
+- Untracked: `.ralph/events-20260318-233835.jsonl`.
+- Git status confirms working on `agent/gui-analysis`.
+
+### P0-T002: Create Working Branch
+- Branch `agent/gui-analysis` created and checked out.
+
+### P0-T003: GUI Directory Census
+- Total files found: 719.
+- Manifest stored in `/tmp/gui_file_manifest.txt`.
+- Census breakdown: 581 in `src/slic3r/GUI`, 40 in `src/libvgcode`, 98 in `src/slic3r/Utils`.
+
+### P0-T004: Entry Point Trace
+- `main()` (in `src/OrcaSlicer.cpp`)
+- `Slic3r::GUI::GUI_Run()` (in `src/slic3r/GUI/GUI_Init.cpp`)
+- `wxEntry` (starts wxWidgets application)
+- `GUI_App::OnInit()` (in `src/slic3r/GUI/GUI_App.cpp`)
+
+### P0-T005: Application Class Identification
+- Class: `Slic3r::GUI::GUI_App`
+- Location: `src/slic3r/GUI/GUI_App.hpp/cpp`
+- Key Members:
+  - `OpenGLManager m_opengl_mgr`
+  - `ImGuiWrapper` `m_imgui`
+  - `PrintHostJobQueue` `m_printhost_job_queue`
+  - `DeviceManager* m_device_manager`
+  - `NetworkAgent* m_agent`
+- `OnInit()` sequence:
+  - Calls `on_init_inner()`
+  - Sets up `wxBoostLog`
+  - Initializes `Label::initSysFont()`
+  - Calls `wxInitAllImageHandlers()`
+
+### P0-T006: Main Window Class Identification
+- Class: `Slic3r::GUI::MainFrame`
+- Location: `src/slic3r/GUI/MainFrame.hpp`
+- Key Child Widgets:
+  - `m_tabpanel` (`Notebook`) - Manages main app tabs
+  - `m_menubar` (`wxMenuBar`) - App menu
+  - `m_plater` (`Plater`) - Main 3D Editor/Preview
+  - `m_monitor` (`MonitorPanel`) - Printer monitor
+  - `m_webview` (`WebViewPanel`) - WebView integration
+  - `m_param_panel` (`ParamsPanel`) - Right-hand side settings
+
+### P0-T007: Create Output Directories
+- Directories created: `generated_documentation/gui`, `.ralph`.
+
+### P0-T008: Initialize Task Registry
+- Registry initialized: `.ralph/ralph-tasks.md`.
+
+### P0-T009: Commit Orientation Complete
+- Phase 0 Orientation complete.
+
+**P0-T003 MANIFEST TOTAL: 719 files**
