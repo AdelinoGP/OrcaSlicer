@@ -3255,6 +3255,9 @@ please delete installed plugin and try again!");
     return true;
 }
 
+// [INTENT] Copy network plugin files from cache to plugins directory
+// [THREAD] Runs on UI thread
+// [UNITY] Replace with Unity's AssetBundle loading or streaming assets
 void GUI_App::copy_network_if_available()
 {
     if (app_config->get("update_network_plugin") != "true")
@@ -3365,6 +3368,10 @@ void GUI_App::copy_network_if_available()
     app_config->set("update_network_plugin", "false");
 }
 
+// [INTENT] Initialize network agent and load networking plugin
+// [THREAD] Runs on UI thread, may spawn network operations
+// [UNITY] Replace with UnityWebRequest or custom C# networking layer
+// [PORTING_HAZARD:P1] Network agent initialization is complex - requires custom C# implementation
 bool GUI_App::on_init_network(bool try_backup)
 {
     auto should_load_networking_plugin = app_config->get_bool("installed_networking");
