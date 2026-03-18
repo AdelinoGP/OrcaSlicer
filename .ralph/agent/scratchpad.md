@@ -1,235 +1,31 @@
-# Scratchpad
+# GUI Analysis Agent Scratchpad
 
-## Iteration 1: T109
+## Current State
 
-### Objective
-Document the test suite for TDD-guided refactoring.
+Fresh iteration starting Phase 0 orientation tasks.
 
-### Completed Work
-- Oriented the project: read `ralph-tasks.md`, `tests/CLAUDE.md`, CMakeLists for all suites, `tests/test_utils.hpp`.
-- Updated `agent_journal.md` status block.
-- Committed orientation: `orient: test-contract pass - orientation complete`.
-- Started T109: `test_elephant_foot_compensation.cpp`.
-- Read and analyzed the test file.
-- Appended documentation to `generated_documentation/06_test_contracts.md`.
-- Committed documentation: `docs: test_elephant_foot_compensation.cpp contracts (T109)`.
-- Updated `ralph-tasks.md` and `agent_journal.md`.
-- Committed task completion: `docs: complete T109, move to T110`.
+## Tasks Status
 
-### Key Findings (T109)
-- `test_elephant_foot_compensation.cpp` tests the `elephant_foot_compensation` function.
-- Tests verify that compensated polygons have strictly smaller area and valid orientation (CCW contour, CW holes).
-- Several test cases with specific geometries (hole, tiny contour, large box, thin ring, etc.).
-- One disabled test case (`#if 0`) for varying inner offset using `SCALED_EPSILON`.
-- No explicit floating-point tolerances used in assertions (exact double comparison).
-- Fixture data defined inline in the test file.
+- P0-T001: DONE - Repository state verification
+- P0-T002: DONE - Working branch created (`agent/gui-analysis`)
+- P0-T003: BLOCKED - GUI directory census (need to investigate why)
+- P0-T004: DONE - Entry point traced to `GUI_App::OnInit()`
+- P0-T005: PENDING - Application class identification
+- P0-T006: PENDING - Main window class identification
+- P0-T007: PENDING - Create output directories
+- P0-T008: PENDING - Initialize task registry (ralph-tasks.md was deleted, needs recreation)
+- P0-T009: PENDING - Commit orientation complete
 
-### Next Steps
-- T110: `test_config.cpp`
-- Continue documenting remaining test files in Phase 1 (libslic3r suite).
-- After Phase 1, move to Phase 2 (fff_print suite), etc.
-- Finalize with T600: complete test contracts documentation.
+## Phase 0 Completion Gate Checklist
 
-### Notes
-- Runtime tasks system: `ralph tools task` commands work, but `ralph-tasks.md` is the authoritative registry.
-- Task IDs in `ralph-tasks.md` (T109, T110, ...) are for human readability; runtime tasks have UUID-like IDs.
-- For this iteration, I used `ralph tools task add` and `close` to track the task, but the main registry is `ralph-tasks.md`.
+- [ ] All P0-T001 through P0-T009 tasks marked [x] DONE
+- [ ] Each task has a corresponding evidence block in agent_journal_gui.md
+- [ ] agent_journal_gui.md exists and has ≥50 lines of orientation findings
+- [ ] The git commit for P0-T009 is visible in git log
+- [ ] Total file count from P0-T003 is recorded as P0-T003 MANIFEST TOTAL
 
-## Iteration 2 (continued): T111-T115
+## Next Steps
 
-### Completed Work
-- T111: `test_appconfig.cpp` - No Catch::Approx usage. Documented network version helpers.
-- T112: `test_placeholder_parser.cpp` - **CRITICAL**: Uses `Catch::Approx` for floating-point comparisons. Documented scripting features and variable management.
-- T113: `test_3mf.cpp` - Uses Eigen `isApprox()` (allowed). Documented Unicode path support and geometry transformation preservation.
-- T114: `test_meshboolean.cpp` - **CRITICAL**: Uses `Catch::Approx` for volume comparison. Documented CGAL conversion round-trip.
-- T115: `test_marchingsquares.cpp` - Uses `WithinRel`/`WithinAbs` (allowed). No `Catch::Approx`. Documented marching squares algorithm and tolerance specifications.
-
-### Key Findings
-- Several files use `Catch::Approx`: `test_placeholder_parser.cpp`, `test_meshboolean.cpp`, `test_clipper_utils.cpp`, `test_clipper_offset.cpp`.
-- Porting agent must reproduce floating-point tolerances for these files.
-- Other files use allowed matchers (`WithinRel`, `WithinAbs`) or exact integer geometry.
-
-### Next Steps
-- Continue with T117 (`test_mutable_priority_queue.cpp`).
-- After Phase 1 (libslic3r), move to Phase 2 (fff_print), etc.
-- Finalize with T600: complete test contracts documentation.
-
-## Iteration 3: T116
-
-### Completed Work
-- T116: `test_optimizers.cpp`
-  - Read and analyzed the test file.
-  - Appended documentation to `generated_documentation/06_test_contracts.md`.
-  - Committed documentation: `docs: test_optimizers.cpp contracts (T116)`.
-  - Updated `ralph-tasks.md` and `agent_journal.md`.
-
-### Key Findings (T116)
-- Tests basic optimization functions (sin, sphere) using `BruteforceOptimizer`.
-- Uses custom tolerance function `check_opt_result()` with absolute error < 1e-2 and relative error < 1e-4.
-- No `Catch::Approx` usage (custom tolerance logic).
-- Source: `src/libslic3r/Optimize/`.
-- Simple functional tests for optimizer correctness.
-
-### Next Steps
-- T117: `test_mutable_priority_queue.cpp`
-- Continue documenting remaining test files in Phase 1 (libslic3r suite).
-
-## Iteration 4: T117
-
-### Completed Work
-- T117: `test_mutable_priority_queue.cpp`
-  - Read and analyzed the test file.
-  - Appended documentation to `generated_documentation/06_test_contracts.md`.
-  - Updated `ralph-tasks.md` and `agent_journal.md`.
-  - Committed documentation and task updates.
-
-### Key Findings (T117)
-- Tests mutable priority queue with skip addressing, basic ops, rescheduling, and complex scenarios.
-- No floating-point comparisons (exact integer/floating-point checks).
-- Large dataset tests (36,000 and 50,000 elements).
-- Source: `src/libslic3r/MutablePriorityQueue.hpp`.
-- Reference implementation from external Boost-licensed code.
-
-### Next Steps
-- T119: `test_aabbindirect.cpp`
-- Continue documenting remaining test files in Phase 1 (libslic3r suite).
-- After Phase 1, move to Phase 2 (fff_print), etc.
-- Finalize with T600: complete test contracts documentation.
-
-## Iteration 5: T118
-
-### Completed Work
-- T118: `test_timeutils.cpp`
-  - Read and analyzed the test file.
-  - Appended documentation to `generated_documentation/06_test_contracts.md`.
-  - Updated `ralph-tasks.md` and `agent_journal.md`.
-  - Committed documentation and task updates.
-
-### Key Findings (T118)
-- Tests time formatting and parsing (ISO 8601 UTC, gcode format).
-- Exact comparisons (no floating-point tolerances).
-- Time zone handling (local and UTC).
-- Invalid string handling returns `time_t(-1)`.
-- Source: `src/libslic3r/Time.cpp`.
-
-### Next Steps
-- T119: `test_aabbindirect.cpp`
-- Continue documenting remaining test files in Phase 1 (libslic3r suite).
-
-## Iteration 6: T119
-
-### Completed Work
-- T119: `test_aabbindirect.cpp`
-  - Read and analyzed the test file.
-  - Appended documentation to `generated_documentation/06_test_contracts.md`.
-  - Updated `ralph-tasks.md` and `agent_journal.md`.
-  - Committed documentation and task updates.
-
-### Key Findings (T119)
-- Tests AABB tree building, ray casting, and closest point queries.
-- Uses `Catch::Approx` for floating-point comparisons (tolerance not specified).
-- Source: `src/libslic3r/AABBTreeIndirect.hpp`.
-- Tests specific distances and closest points for a 1x1x1 cube.
-
-### Next Steps
-- T120: `test_hollowing.cpp` (conditional on OpenVDB)
-- T121: `test_bambu_networking.cpp`
-- Continue documenting remaining test files in Phase 1 (libslic3r suite).
-
-## Iteration 7: T120
-
-### Completed Work
-- T120: `test_hollowing.cpp`
-  - Read and analyzed the test file.
-  - Appended documentation to `generated_documentation/06_test_contracts.md`.
-  - Updated `ralph-tasks.md` and `agent_journal.md`.
-  - Committed documentation and task updates.
-
-### Key Findings (T120)
-- Tests hollowing of overlapping spheres using OpenVDB.
-- Conditional compilation (requires OpenVDB).
-- No numeric assertions (only mesh operations and file output).
-- Source: `src/libslic3r/SLA/Hollowing.cpp` + `src/libslic3r/SLA/OpenVDBUtils.cpp`.
-
-### Next Steps
-- T121: `test_bambu_networking.cpp`
-- Continue documenting remaining test files in Phase 1 (libslic3r suite).
-
-## Iteration 8: T121
-
-### Completed Work
-- T121: `test_bambu_networking.cpp`
-  - Read and analyzed the test file.
-  - Appended documentation to `generated_documentation/06_test_contracts.md`.
-  - Updated `ralph-tasks.md` and `agent_journal.md`.
-
-### Key Findings (T121)
-- Tests version string parsing for Bambu networking library management.
-- Exact string comparisons (no floating-point tolerances).
-- Tests `extract_base_version()`, `extract_suffix()`, and `NetworkLibraryVersionInfo` conversion.
-- Source: `src/slic3r/Utils/bambu_networking.hpp`.
-
-### Next Steps
-- Phase 1 (libslic3r) is complete.
-- Phase 2 (fff_print) is complete.
-- Phase 3 (sla_print) complete with T301, T302, T303.
-- Move to Phase 4 (libnest2d suite).
-- Finalize with T600: complete test contracts documentation.
-
-## Iteration 9: GUI analysis bootstrap
-
-### Objective
-Prepare the repository for the wxWidgets/OpenGL GUI-to-Unity analysis pass.
-
-### Completed Work
-- Checked the runtime task queue and found no ready tasks for the new objective.
-- Created stable Phase 0 runtime tasks P0-T001 through P0-T009 for the orientation sequence.
-- Started P0-T001 and captured the current branch and dirty worktree state for the GUI analysis journal.
-
-### Notes
-- The repo is still on `agent/analysis` with unrelated modifications from the prior objective, so new work must avoid reverting or restaging that existing state.
-- This objective now uses `agent_journal_gui.md` for evidence and will keep `.ralph/agent/scratchpad.md` as an append-only reasoning log across iterations.
-- Current iteration scope stays atomic: finish P0-T001, commit the repository-state evidence, then hand off branch creation to the next iteration.
-
-### Outcome
-- Completed P0-T001 with commit `9581dd365f` (`orient(gui): record repository state baseline`).
-- Verified `agent_journal_gui.md` is clean in `git status` after the commit while unrelated worktree changes remain untouched.
-- Hit a transient `git add` failure caused by an `index.lock` message; recorded it as fix memory `mem-1773799068-f3c8` before retrying successfully.
-
-## Iteration 10: P0-T002
-
-### Objective
-Create the dedicated GUI-analysis working branch required by Phase 0 without disturbing the existing dirty worktree.
-
-### Completed Work
-- Started runtime task `task-1773798957-17d5` for P0-T002.
-- Confirmed `agent/gui-analysis` did not yet exist and that the current branch was still `agent/analysis` before the switch.
-- Created the new branch with `git checkout -b agent/gui-analysis`.
-- Appended branch-creation evidence to `agent_journal_gui.md`.
-
-### Notes
-- Git carried forward the unrelated modified, deleted, and untracked files onto the new branch, which is the safest behavior for preserving prior work while continuing the GUI analysis objective.
-- This iteration should commit only the journal and scratchpad updates tied to the branch-creation evidence.
-
-### Next Steps
-- P0-T003: build the GUI manifest and record the manifest total for the Loop Completion Guard denominator.
-
-## Iteration 11: P0-T004
-
-### Objective
-Trace the GUI startup path from the shared binary entry point to `GUI_App::OnInit()` and record evidence for downstream Unity-porting analysis.
-
-### Completed Work
-- Started runtime task `task-1773798957-2abb` for P0-T004.
-- Read `src/OrcaSlicer.cpp`, `src/slic3r/GUI/GUI_Init.cpp`, and the `GUI_App::OnInit()` wrapper in `src/slic3r/GUI/GUI_App.cpp`.
-- Confirmed the GUI branch is selected inside `CLI::run()` only when no CLI actions were requested and `downward_check` is false.
-- Recorded the exact bootstrap chain in `agent_journal_gui.md`, including the `GUI_Run()` handoff and `wxEntry(...)` transition into `wxApp::CallOnInit()`.
-
-### Key Findings
-- The shared executable always enters `main()`/`CLI::run()` first; GUI mode is not a separate binary.
-- `Slic3r::GUI::GUI_Run()` constructs `GUI_App`, registers it as the wx singleton, and then hands control to `wxEntry(...)`.
-- `GUI_App::OnInit()` is intentionally thin; the substantive startup sequence lives in `on_init_inner()`, which is the next logical orientation target alongside the application-class task.
-
-### Next Steps
-- P0-T005: document `GUI_App` state and the first five `on_init_inner()` startup operations.
-- P0-T006: identify the main frame / plater hierarchy created during GUI startup.
+1. Investigate why P0-T003 (GUI Directory Census) is blocked
+2. Complete pending Phase 0 tasks in order
+3. Pass Phase 0 completion gate before proceeding to Phase 1

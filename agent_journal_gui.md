@@ -39,3 +39,40 @@ Entry point trace findings:
 - wx bootstrap setup: `src/slic3r/GUI/GUI_Init.cpp:44` allocates `GUI_App`, `src/slic3r/GUI/GUI_Init.cpp:55` registers it with `GUI::GUI_App::SetInstance(gui)`, and `src/slic3r/GUI/GUI_Init.cpp:64` or `src/slic3r/GUI/GUI_Init.cpp:66` enters `wxEntry(...)`.
 - Call chain: `main()` -> `CLI::run()` -> `Slic3r::GUI::GUI_Run(params)` -> `wxEntry(...)` -> `wxApp::CallOnInit()` -> `GUI_App::OnInit()`.
 - `GUI_App::OnInit()` at `src/slic3r/GUI/GUI_App.cpp:2571` is a thin exception-guard wrapper that immediately delegates the real startup work to `on_init_inner()`.
+
+**Task P0-T005 COMPLETE**
+- Deliverable: agent_journal_gui.md (documentation entry added)
+- Lines added: 30 substantive lines documenting application class
+- Verification excerpt: "**Class name: GUI_App** and **Location:** src/slic3r/GUI/GUI_App.hpp:224"
+- Git: pending commit for application class identification
+
+Application class identification findings:
+
+**Class name: GUI_App**
+**File location:** src/slic3r/GUI/GUI_App.hpp:224
+
+**Key member variables:**
+- m_initialized, m_post_initialized: Application state flags
+- m_app_mode: EAppMode enum (Editor vs GCodeViewer)
+- m_color_label_modified, m_color_label_sys, m_color_label_default, m_color_window_default, m_color_highlight_label_default, m_color_hovered_btn_label, m_color_default_btn_label, m_color_highlight_default, m_color_selected_btn_bg: 8 UI color members for theming
+- m_small_font, m_bold_font, m_normal_font, m_code_font, m_link_font: 5 font members
+- m_wxLocale: Localization object
+- m_opengl_mgr: OpenGL manager for canvas rendering
+- m_removable_drive_manager, m_imgui, m_printhost_job_queue: 3 platform managers
+- m_other_instance_message_handler, m_single_instance_checker: Single instance enforcement
+- m_device_manager, m_user_manager, m_task_manager, m_agent: 4 BBL ecosystem managers
+- login_dlg: Login dialog reference
+- version_info, privacy_version_info: Version tracking objects
+- hms_query: HMS query object
+- m_filament_color_code_query: Filament color code query
+- m_sync_update_thread, m_user_sync_token: User synchronization state
+- m_is_dark_mode: Dark mode flag
+- m_http_server: Embedded HTTP server for web integration
+
+**OnInit() sequence (first 5 operations):**
+1. wxLog::SetActiveTarget(new wxBoostLog()) - Set custom logging target
+2. Label::initSysFont() - Initialize system font
+3. wxInitAllImageHandlers() - Initialize image handlers
+4. g_object_set for GTK menu images (platform-specific)
+5. wxGetApp().Bind(wxEVT_QUERY_END_SESSION) - Bind session end event
+
