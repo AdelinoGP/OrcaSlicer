@@ -2694,16 +2694,25 @@ std::string get_system_info()
     return out.str();
 }
 
+// [INTENT] Main initialization function - sets up logging, fonts, image handlers, and binds events
+// [THREAD] Runs on main UI thread
+// [UNITY] Replace with MonoBehaviour.Start() or [RuntimeInitializeOnLoadMethod]
+// [PORTING_HAZARD:P1] This is the core initialization sequence - must be mapped to Unity's initialization order
 bool GUI_App::on_init_inner()
 {
+    // [INTENT] Set up custom logging target for Boost.Log integration
+    // [UNITY] Replace with Unity's Debug.Log or custom logger
     wxLog::SetActiveTarget(new wxBoostLog());
 #if BBL_RELEASE_TO_PUBLIC
     wxLog::SetLogLevel(wxLOG_Message);
 #endif
 
+    // [INTENT] Initialize system fonts for UI rendering
+    // [UNITY] Replace with Unity's Font/TextMeshPro initialization
     ::Label::initSysFont();
 
-    // Set initialization of image handlers before any UI actions - See GH issue #7469
+    // [INTENT] Set initialization of image handlers before any UI actions - See GH issue #7469
+    // [UNITY] Replace with Unity's texture loading (Resources.Load, AssetBundle.LoadAsset)
     wxInitAllImageHandlers();
 #ifdef NDEBUG
     wxImage::SetDefaultLoadFlags(0); // ignore waring in release build
@@ -2718,6 +2727,8 @@ bool GUI_App::on_init_inner()
     // https://docs.gtk.org/gtk3/class.Settings.html
     // see also https://docs.wxwidgets.org/3.0/classwx_menu_item.html#a2b5d6bcb820b992b1e4709facbf6d4fb
     // TODO: Find workaround for GTK4
+    // [INTENT] Platform-specific GTK menu icon setup
+    // [UNITY] Remove - Unity handles platform-specific UI rendering
 #if defined(__WXGTK20__) || defined(__WXGTK3__)
     g_object_set(gtk_settings_get_default(), "gtk-menu-images", TRUE, NULL);
 #endif
@@ -2725,6 +2736,8 @@ bool GUI_App::on_init_inner()
 #if defined(__WXGTK20__) || defined(__WXGTK3__)
     // Suppress harmless GTK critical warnings from the GTK3/wxWidgets interaction.
     // These include widget allocation on hidden widgets and events on unrealized widgets.
+    // [INTENT] Suppress GTK warnings for cleaner logs
+    // [UNITY] Remove - Unity doesn't have GTK warnings
     g_log_set_handler(
         "Gtk", G_LOG_LEVEL_CRITICAL,
         [](const gchar* log_domain, GLogLevelFlags log_level, const gchar* message, gpointer user_data) {
@@ -2736,10 +2749,14 @@ bool GUI_App::on_init_inner()
 #endif
 
 #ifdef WIN32
-    // BBS set crash log folder
+    // [INTENT] Set crash log folder for Windows exception handling
+    // [UNITY] Replace with Unity's crash reporting or custom exception handling
     CBaseException::set_log_folder(data_dir());
 #endif
 
+    // [INTENT] Bind session end event for graceful shutdown on system shutdown/logout
+    // [EVENT] wxEVT_QUERY_END_SESSION - triggered when OS is shutting down
+    // [UNITY] Replace with Application.quitting or MonoBehaviour.OnApplicationQuit
     wxGetApp().Bind(wxEVT_QUERY_END_SESSION, [this](auto& e) {
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << "received wxEVT_QUERY_END_SESSION";
         if (mainframe) {
@@ -2755,7 +2772,8 @@ bool GUI_App::on_init_inner()
             d->EndModal(wxID_ABORT);
     });
 
-    // Verify resources path
+    // [INTENT] Verify resources path exists before proceeding
+    // [UNITY] Replace with Resources.Load or AssetBundle validation
     const wxString resources_dir = from_u8(Slic3r::resources_dir());
     wxCHECK_MSG(wxDirExists(resources_dir), false,
                 wxString::Format(_L("Resources path does not exist or is not a directory: %s"), resources_dir));
@@ -2769,11 +2787,14 @@ bool GUI_App::on_init_inner()
 
     BOOST_LOG_TRIVIAL(info) << get_system_info();
 
-    // initialize label colors and fonts
+    // [INTENT] Initialize label colors and fonts for UI theming
+    // [UNITY] Replace with Unity's UI Toolkit theme system or uGUI color scheme
     init_label_colours();
     init_fonts();
     wxGetApp().Update_dark_mode_flag();
 
+    // [INTENT] Detect ARM64 architecture on Windows for plugin compatibility
+    // [UNITY] Remove - Unity handles architecture detection automatically
 #if defined(__WINDOWS__)
     HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
     m_is_arm64        = false;
@@ -2805,6 +2826,8 @@ bool GUI_App::on_init_inner()
     //    wxSystemOptions::SetOption("msw.notebook.themed-background", 0);
 
     //     Slic3r::debugf "wxWidgets version %s, Wx version %s\n", wxVERSION_STRING, wxVERSION;
+    // [INTENT] Initialize TLS/SSL for secure HTTP connections
+    // [UNITY] Replace with UnityWebRequest's HTTPS handling (automatic)
     if (is_editor()) {
         std::string msg            = Slic3r::Http::tls_global_init();
         std::string ssl_cert_store = app_config->get("tls_accepted_cert_store_location");
@@ -2825,6 +2848,8 @@ bool GUI_App::on_init_inner()
     // !!! Initialization of UI settings as a language, application color mode, fonts... have to be done before first UI action.
     // Like here, before the show InfoDialog in check_older_app_config()
 
+    // [INTENT] Load language/localization settings
+    // [UNITY] Replace with Unity's Localization system or custom i18n
     // If load_language() fails, the application closes.
     load_language(wxString(), true);
 #ifdef _MSW_DARK_MODE
@@ -2878,6 +2903,8 @@ bool GUI_App::on_init_inner()
         app_config->set("version", SLIC3R_VERSION);
     }
 
+    // [INTENT] Show splash screen during startup
+    // [UNITY] Replace with Unity's Canvas-based splash screen or loading screen
     SplashScreen* scrn = nullptr;
     if (app_config->get("show_splash_screen") == "true") {
         // make a bitmap with dark grey banner on the left side
@@ -2899,6 +2926,9 @@ bool GUI_App::on_init_inner()
         scrn->SetText(_L("Loading configuration") + dots);
     }
 
+    // [INTENT] Load system presets and printer configurations
+    // [STATE] preset_bundle holds all preset data
+    // [UNITY] Replace with ScriptableObject-based preset system
     BOOST_LOG_TRIVIAL(info) << "loading systen presets...";
     preset_bundle = new PresetBundle();
 
@@ -3007,6 +3037,9 @@ bool GUI_App::on_init_inner()
 
     preset_bundle->backup_user_folder();
 
+    // [INTENT] Bind custom events for machine list updates, user login, privacy checks, and IP dialog
+    // [EVENT] Custom wxWidgets events bound to GUI_App methods
+    // [UNITY] Replace with UnityEvent or C# delegate callbacks
     Bind(EVT_UPDATE_MACHINE_LIST, &GUI_App::on_update_machine_list, this);
     Bind(EVT_USER_LOGIN, &GUI_App::on_user_login, this);
     Bind(EVT_USER_LOGIN_HANDLE, &GUI_App::on_user_login_handle, this);
@@ -3018,7 +3051,9 @@ bool GUI_App::on_init_inner()
     std::map<std::string, std::string> extra_headers = get_extra_header();
     Slic3r::Http::set_extra_headers(extra_headers);
 
-    // Orca: select network plugin version based on configured version string
+    // [INTENT] Select network plugin version based on configured version string
+    // [THREAD] Network initialization runs on UI thread
+    // [UNITY] Replace with UnityWebRequest or custom C# networking layer
     std::string configured_version   = app_config->get_network_plugin_version();
     NetworkAgent::use_legacy_network = (configured_version == BAMBU_NETWORK_AGENT_VERSION_LEGACY);
     BOOST_LOG_TRIVIAL(info) << "Network plugin mode: "
@@ -3072,6 +3107,9 @@ please delete installed plugin and try again!");
     // Let the libslic3r know the callback, which will translate messages on demand.
     Slic3r::I18N::set_translate_callback(libslic3r_translate_callback);
 
+    // [INTENT] Create the main application window
+    // [STATE] mainframe holds the main window reference
+    // [UNITY] Replace with Unity's Canvas/UI Toolkit main window or scene
     BOOST_LOG_TRIVIAL(info) << "create the main window";
     mainframe = new MainFrame();
     // hide settings tabs after first Layout
@@ -3108,6 +3146,8 @@ please delete installed plugin and try again!");
 #ifdef __WINDOWS__
     mainframe->topbar()->SaveNormalRect();
 #endif
+    // [INTENT] Show the main window
+    // [UNITY] Replace with Unity's GameObject.SetActive(true) or Canvas.Render()
     mainframe->Show(true);
     BOOST_LOG_TRIVIAL(info) << "main frame firstly shown";
 
@@ -3139,8 +3179,14 @@ please delete installed plugin and try again!");
     other_instance_message_handler()->bring_instance_forward();
 #endif //__APPLE__
 
+    // [INTENT] Bind HTTP error event for network error handling
+    // [EVENT] Custom HTTP error event
+    // [UNITY] Replace with UnityWebRequest error callbacks
     Bind(EVT_HTTP_ERROR, &GUI_App::on_http_error, this);
 
+    // [INTENT] Bind idle event for background tasks and subscriptions
+    // [EVENT] wxEVT_IDLE - triggered when the application is idle
+    // [UNITY] Replace with Unity's Update() or Coroutine system
     Bind(wxEVT_IDLE, [this](wxIdleEvent& event) {
         bool curr_studio_active = this->is_studio_active();
         if (m_studio_active != curr_studio_active) {
@@ -3174,6 +3220,8 @@ please delete installed plugin and try again!");
         // #ifdef __linux__
         //         if (!m_post_initialized && m_opengl_initialized) {
         // #else
+        // [INTENT] Post-initialization sequence - called after idle event
+        // [UNITY] Replace with Unity's Start() or coroutine-based initialization
         if (!m_post_initialized && !m_adding_script_handler) {
             // #endif
             m_post_initialized = true;
@@ -3189,6 +3237,9 @@ please delete installed plugin and try again!");
             app_config->save();
     });
 
+    // [INTENT] Mark application as fully initialized
+    // [STATE] m_initialized flag controls application readiness
+    // [UNITY] Replace with MonoBehaviour initialization state
     m_initialized = true;
 
     flush_logs();
