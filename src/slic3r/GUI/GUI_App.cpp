@@ -6001,11 +6001,13 @@ void GUI_App::start_sync_user_preset(bool with_progress_dlg)
     }
 
     // [THREAD] Background thread loop for preset synchronization.
+    // [UNITY] Use Unity's Job System or Task.Run with main-thread synchronization for UI notifications.
     m_sync_update_thread = Slic3r::create_thread([this, progressFn, cancelFn, finishFn, t = std::weak_ptr<int>(m_user_sync_token)] {
         // get setting list, update setting list
         std::string version = preset_bundle->get_vendor_profile_version(PresetBundle::ORCA_DEFAULT_BUNDLE).to_string();
         if (!m_agent)
             return;
+        // [EVENT] Network request for cloud presets.
         int ret = m_agent->get_setting_list2(
             version,
             [this](auto info) {
@@ -7137,6 +7139,7 @@ bool GUI_App::OnExceptionInMainLoop()
 // This callback is called from wxEntry()->wxApp::CallOnInit()->NSApplication run
 // that is, before GUI_App::OnInit(), so we have a chance to switch GUI_App
 // to a G-code viewer.
+// [UNITY] Use Unity's OnOpenFiles equivalent or handle command line args for file opening.
 void GUI_App::OSXStoreOpenFiles(const wxArrayString& fileNames)
 {
     // BBS: remove GCodeViewer as seperate APP logic
@@ -7313,6 +7316,8 @@ void GUI_App::open_mall_page_dialog()
     wxLaunchDefaultBrowser(link_url);
 }
 
+// [INTENT] Web/Publish page interaction.
+// [UNITY] Use Application.OpenURL to launch the default browser with a ticketed model page.
 void GUI_App::open_publish_page_dialog()
 {
     std::string host_url;
@@ -7647,6 +7652,9 @@ void GUI_App::gcode_thumbnails_debug()
 }
 #endif // ENABLE_THUMBNAIL_GENERATOR_DEBUG
 
+// [INTENT] Persistent window state management.
+// [STATE] Store window metrics (rect, maximized state) in application config.
+// [UNITY] Use PlayerPrefs or a custom JSON config file to store window/view state.
 void GUI_App::window_pos_save(wxTopLevelWindow* window, const std::string& name)
 {
     if (name.empty()) {
@@ -7861,6 +7869,8 @@ static bool del_win_registry(HKEY hkeyHive, const wchar_t* pszVar, const wchar_t
 
 #endif // __WXMSW__
 
+// [PORTING_HAZARD:P2] Native Windows Registry access for file associations.
+// [UNITY] Use a cross-platform approach or native plugins for OS-level file associations.
 void GUI_App::associate_files(std::wstring extend)
 {
 #ifdef WIN32
