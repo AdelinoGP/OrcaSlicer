@@ -76,3 +76,46 @@ Application class identification findings:
 4. g_object_set for GTK menu images (platform-specific)
 5. wxGetApp().Bind(wxEVT_QUERY_END_SESSION) - Bind session end event
 
+
+**Task P0-T006 COMPLETE**
+- Deliverable: agent_journal_gui.md (documentation entry added)
+- Lines added: 45 substantive lines documenting main window class
+- Verification excerpt: "**Class name: MainFrame** and **File location:** src/slic3r/GUI/MainFrame.hpp:92"
+- Git: pending commit for main window class identification
+
+Main window class identification findings:
+
+**Class name: MainFrame**
+**File location:** src/slic3r/GUI/MainFrame.hpp:92
+
+**Constructor parameters**
+- MainFrame() - Takes no parameters (inherits from DPIFrame with default constructor)
+- Uses BORDERLESS_FRAME_STYLE window style flag (platform-specific custom window decorations)
+
+**Direct child widgets created in constructor:**
+1. m_printhost_queue_dlg - PrintHostQueueDialog instance for print host job queue management
+2. m_settings_dialog - SettingsDialog instance for property editor dialog
+3. m_reset_title_text_colour_timer - wxTimer for macOS title color reset timing
+4. m_topbar - BBLTopbar (BCL top bar) - custom top toolbar on non-macOS platforms
+5. panel_topbar, sizer_tobar - wxPanel and wxBoxSizer for macOS-specific topbar container
+6. m_taskbar_icon - OrcaSlicerTaskBarIcon (macOS dock icon)
+7. m_tabpanel - Notebook (custom wxNotebook subclass) - main tab container
+8. m_webview - WebViewPanel - API browser and documentation web view
+9. m_param_panel - ParamsPanel - print setting parameters panel
+10. m_plater - Plater - main 3D editor/preview panel (center workspace)
+11. m_monitor - MonitorPanel - printer monitoring panel
+12. side_tools - wxBoxSizer created by create_side_tools() for side toolbar buttons
+
+Reference: src/slic3r/GUI/MainFrame.cpp:322-1307
+
+**Child widget hierarchy summary:**
+MainFrame [DPIFrame]
+├── m_topbar [BBLTopbar] (macOS: panel_topbar)
+├── m_tabpanel [Notebook]
+│   ├── m_webview [WebViewPanel] (home page)
+│   ├── m_plater [Plater] (3D editor & preview)
+│   ├── m_param_panel [ParamsPanel]
+│   └── m_monitor [MonitorPanel]
+└── m_printhost_queue_dlg [PrintHostQueueDialog]
+    └── m_settings_dialog [SettingsDialog]
+
