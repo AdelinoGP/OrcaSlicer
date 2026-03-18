@@ -93,7 +93,7 @@
 **Group 2: Window Management (High)**
 - [x] **T110**: `src/slic3r/GUI/MainFrame.hpp`
 - [x] **T111-part1**: `src/slic3r/GUI/MainFrame.cpp` (1-2000)
-- [ ] **T111-part2**: `src/slic3r/GUI/MainFrame.cpp` (2000-4000)
+- [x] **T111-part2**: `src/slic3r/GUI/MainFrame.cpp` (2000-4000)
 - [ ] **T111-part3**: `src/slic3r/GUI/MainFrame.cpp` (4000-4307)
   - *Subset methods:* Constructor, init_tabpanel(), init_menubar()
 - [ ] **T112**: Notebook/Tab system classes
