@@ -20,38 +20,21 @@
 
 ## Next Steps (for next iteration)
 - Phase 0 orientation COMPLETE
-- Start Phase 1 annotation loop with T104 (MainFrame.cpp)
-- Process first 10 files (T104-T113)
+- Continue Phase 1 annotation loop
+- Next task: T110 (MainFrame.hpp) or T111 (MainFrame.cpp) depending on task registry
+- Process 10 files per iteration
 - Write Loop Checkpoint after 10 files
 - Update Loop Completion Guard equation: annotated + skip_trivial + skip_vendored = 719
 
 ## Current Status
 - Phase 0: COMPLETE (all tasks done, evidence recorded)
-- Phase 1: Started (T101-T103 done, T104 pending)
-- Files annotated: 3 (GUI_App.cpp, GUI_App.hpp, PlaterWorker.hpp)
-- Files remaining: 716 (719 total - 3 annotated)
-
-## Phase 0 Summary
-- Repository: agent/gui-analysis branch
-- Manifest: 719 files total
-- All P0 tasks completed with evidence
-- Ready for Phase 1 annotation loop
-
-## Next Iteration
-- Start with T104 (MainFrame.cpp)
-- Process 10 files per iteration
-- Write Loop Checkpoint every 10 files
-- Maintain Loop Completion Guard equation
-
-## Phase 0 Status
-- All P0 tasks marked DONE
-- All evidence blocks added to journal
-- Manifest total: 719 files
-- Ready for Phase 1
+- Phase 1: Started (T103 done, T101/T102 partially done)
+- Files annotated: 4 (GUI_App.cpp, GUI_App.hpp, GUI_Init.cpp, GUI_Init.hpp)
+- Files remaining: 715 (719 total - 4 annotated)
 
 ## Phase 1 Status
 - T101 (GUI_App.cpp): Partially complete (55 UNITY annotations, 7972 lines)
 - T101-part2: Marked DONE in task list
-- T102 (GUI_App.hpp): Complete
-- T103 (PlaterWorker.hpp): Complete
-- Next: Continue annotation loop starting from T104 (MainFrame.cpp)
+- T102 (GUI_App.hpp): Partially complete
+- T103 (GUI_Init.cpp & .hpp): Complete (annotated entry point)
+- Next: Continue annotation loop starting from T110 (MainFrame.hpp)
