@@ -16,7 +16,7 @@
 
 #include "GUI_Utils.hpp"
 #include "Event.hpp"
-//BBS: GUI refactor
+// BBS: GUI refactor
 #include "ParamsPanel.hpp"
 #include "Monitor.hpp"
 #include "Auxiliary.hpp"
@@ -26,7 +26,6 @@
 #include "Widgets/SideButton.hpp"
 #include "Widgets/SideMenuPopup.hpp"
 #include "FilamentGroupPopup.hpp"
-
 
 #include <boost/property_tree/ptree_fwd.hpp>
 
@@ -42,10 +41,7 @@ class Notebook;
 class wxBookCtrlBase;
 class wxProgressDialog;
 
-namespace Slic3r {
-
-namespace GUI
-{
+namespace Slic3r { namespace GUI {
 
 class Tab;
 class PrintHostQueueDialog;
@@ -53,16 +49,10 @@ class Plater;
 class MainFrame;
 class ParamsDialog;
 
-enum QuickSlice
-{
-    qsUndef = 0,
-    qsReslice = 1,
-    qsSaveAs = 2,
-    qsExportSVG = 4,
-    qsExportPNG = 8
-};
+enum QuickSlice { qsUndef = 0, qsReslice = 1, qsSaveAs = 2, qsExportSVG = 4, qsExportPNG = 8 };
 
-struct PresetTab {
+struct PresetTab
+{
     std::string       name;
     Tab*              panel;
     PrinterTechnology technology;
@@ -72,50 +62,56 @@ struct PresetTab {
 // SettingsDialog
 // ----------------------------------------------------------------------------
 
-class SettingsDialog : public DPIDialog//DPIDialog
+class SettingsDialog : public DPIDialog // DPIDialog
 {
-    //wxNotebook* m_tabpanel { nullptr };
-    Notebook* m_tabpanel{ nullptr };
-    MainFrame*      m_main_frame { nullptr };
-    wxMenuBar*      m_menubar{ nullptr };
+    // wxNotebook* m_tabpanel { nullptr };
+    Notebook*  m_tabpanel{nullptr};
+    MainFrame* m_main_frame{nullptr};
+    wxMenuBar* m_menubar{nullptr};
+
 public:
     SettingsDialog(MainFrame* mainframe);
     ~SettingsDialog() = default;
-    //void set_tabpanel(wxNotebook* tabpanel) { m_tabpanel = tabpanel; }
-    void set_tabpanel(Notebook* tabpanel) { m_tabpanel = tabpanel; }
+    // void set_tabpanel(wxNotebook* tabpanel) { m_tabpanel = tabpanel; }
+    void       set_tabpanel(Notebook* tabpanel) { m_tabpanel = tabpanel; }
     wxMenuBar* menubar() { return m_menubar; }
 
 protected:
     void on_dpi_changed(const wxRect& suggested_rect) override;
 };
 
+// [INTENT] The primary application window class, managing the main layout, menubar, and top-level UI components.
+// [UNITY] Maps to a MainUIController MonoBehaviour that manages various UI Panels (Home, Editor, Preview, Monitor, etc.) using Unity UI
+// Toolkit or uGUI.
 class MainFrame : public DPIFrame
 {
 #ifdef __APPLE__
-    bool     m_mac_fullscreen{false};
+    bool m_mac_fullscreen{false};
 #endif
-    bool     m_loaded {false};
-    wxTimer* m_reset_title_text_colour_timer{ nullptr };
+    bool     m_loaded{false};
+    wxTimer* m_reset_title_text_colour_timer{nullptr};
 
-    wxString    m_qs_last_input_file = wxEmptyString;
-    wxString    m_qs_last_output_file = wxEmptyString;
-    wxString    m_last_config = wxEmptyString;
+    wxString m_qs_last_input_file  = wxEmptyString;
+    wxString m_qs_last_output_file = wxEmptyString;
+    wxString m_last_config         = wxEmptyString;
 
-    wxMenuBar*  m_menubar{ nullptr };
-    //wxMenu* publishMenu{ nullptr };
-    wxMenu *    m_calib_menu{nullptr};
-    bool        enable_multi_machine{ false };
+    // [STATE] Main application menu bar. [UNITY] Maps to a Top Menu controller.
+    wxMenuBar* m_menubar{nullptr};
+    // [STATE] Calibration menu.
+    wxMenu* m_calib_menu{nullptr};
+    bool    enable_multi_machine{false};
 
 #if 0
     wxMenuItem* m_menu_item_repeat { nullptr }; // doesn't used now
 #endif
-    wxMenuItem* m_menu_item_reslice_now { nullptr };
-    wxSizer*    m_main_sizer{ nullptr };
+    wxMenuItem* m_menu_item_reslice_now{nullptr};
+    // [STATE] Root sizer for layout. [UNITY] Maps to a root Canvas/VisualElement.
+    wxSizer* m_main_sizer{nullptr};
 
-    size_t      m_last_selected_tab;
+    size_t m_last_selected_tab;
 
-    std::string     get_base_name(const wxString &full_name, const char *extension = nullptr) const;
-    std::string     get_dir_name(const wxString &full_name) const;
+    std::string get_base_name(const wxString& full_name, const char* extension = nullptr) const;
+    std::string get_dir_name(const wxString& full_name) const;
 
     void on_presets_changed(SimpleEvent&);
     void on_value_changed(wxCommandEvent&);
@@ -130,8 +126,8 @@ class MainFrame : public DPIFrame
     bool can_export_all_gcode() const;
     bool can_print_3mf() const;
     bool can_send_gcode() const;
-    //bool can_export_gcode_sd() const;
-    //bool can_eject() const;
+    // bool can_export_gcode_sd() const;
+    // bool can_eject() const;
     bool can_slice() const;
     bool can_change_view() const;
     bool can_select() const;
@@ -146,12 +142,11 @@ class MainFrame : public DPIFrame
     wxBoxSizer* create_side_tools();
 
     // MenuBar items changeable in respect to printer technology
-    enum MenuItems
-    {                   //   FFF                  SLA
-        miExport = 0,   // Export G-code        Export
-        miSend,         // Send G-code          Send to print
-        miMaterialTab,  // Filament Settings    Material Settings
-        miPrinterTab,   // Different bitmap for Printer Settings
+    enum MenuItems {   //   FFF                  SLA
+        miExport = 0,  // Export G-code        Export
+        miSend,        // Send G-code          Send to print
+        miMaterialTab, // Filament Settings    Material Settings
+        miPrinterTab,  // Different bitmap for Printer Settings
     };
 
     // vector of a MenuBar items changeable in respect to printer technology
@@ -162,43 +157,42 @@ class MainFrame : public DPIFrame
         FileHistory(int max) : wxFileHistory(max) {}
         std::wstring GetThumbnailUrl(int index) const;
 
-        virtual void AddFileToHistory(const wxString &file);
+        virtual void AddFileToHistory(const wxString& file);
         virtual void RemoveFileFromHistory(size_t i);
-        size_t FindFileInHistory(const wxString &file);
+        size_t       FindFileInHistory(const wxString& file);
 
         void LoadThumbnails();
 
         void SetMaxFiles(int max);
+
     private:
         std::deque<std::string> m_thumbnails;
-        bool m_load_called = false;
+        bool                    m_load_called = false;
     };
 
     FileHistory m_recent_projects;
 
-    enum class ESettingsLayout
-    {
-        //BBS GUI refactor: remove unused layout
+    enum class ESettingsLayout {
+        // BBS GUI refactor: remove unused layout
         Unknown,
         Old,
-        //New,
-        //Dlg,
+        // New,
+        // Dlg,
         GCodeViewer
     };
 
-    ESettingsLayout m_layout{ ESettingsLayout::Unknown };
+    ESettingsLayout m_layout{ESettingsLayout::Unknown};
 
-    enum SliceSelectType
-    {
-        eSliceAll = 0,
+    enum SliceSelectType {
+        eSliceAll   = 0,
         eSlicePlate = 1,
     };
 
-    //jump to editor under preview only mode
+    // jump to editor under preview only mode
     bool preview_only_to_editor = false;
 
 protected:
-    virtual void on_dpi_changed(const wxRect &suggested_rect) override;
+    virtual void on_dpi_changed(const wxRect& suggested_rect) override;
     virtual void on_sys_color_changed() override;
 
 #ifdef __WIN32__
@@ -211,28 +205,26 @@ public:
 #ifdef __APPLE__
     bool get_mac_full_screen() { return m_mac_fullscreen; }
 #endif
-    //BBS GUI refactor
-    enum TabPosition
-    {
-        tpHome          = 0,
-        tp3DEditor      = 1,
-        tpPreview       = 2,
-        tpMonitor       = 3,
-        tpMultiDevice   = 4,
-        tpProject       = 5,
-        tpCalibration   = 6,
-        tpAuxiliary     = 7,
-        toDebugTool     = 8,
+    // BBS GUI refactor
+    enum TabPosition {
+        tpHome        = 0,
+        tp3DEditor    = 1,
+        tpPreview     = 2,
+        tpMonitor     = 3,
+        tpMultiDevice = 4,
+        tpProject     = 5,
+        tpCalibration = 6,
+        tpAuxiliary   = 7,
+        toDebugTool   = 8,
     };
 
-    //BBS: add slice&&print status update logic
-    enum SlicePrintEventType
-    {
+    // BBS: add slice&&print status update logic
+    enum SlicePrintEventType {
         eEventObjectUpdate = 0,
-        eEventPlateUpdate = 1,
-        eEventParamUpdate = 2,
-        eEventSliceUpdate = 3,
-        eEventPrintUpdate = 4
+        eEventPlateUpdate  = 1,
+        eEventParamUpdate  = 2,
+        eEventSliceUpdate  = 3,
+        eEventPrintUpdate  = 4
     };
 
     // BBS GUI refactor
@@ -251,10 +243,10 @@ public:
 
     void update_layout();
 
-	// Called when closing the application and when switching the application language.
-	void 		shutdown();
+    // Called when closing the application and when switching the application language.
+    void shutdown();
 
-    Plater*     plater() { return m_plater; }
+    Plater* plater() { return m_plater; }
 
     // BBS
     BBLTopbar* topbar() { return m_topbar; }
@@ -262,154 +254,157 @@ public:
     // for cali to update tab when save new preset
     void update_filament_tab_ui();
 
-    void        update_title();
-    void        set_max_recent_count(int max);
+    void update_title();
+    void set_max_recent_count(int max);
 
-    void        show_publish_button(bool show);
+    void show_publish_button(bool show);
 
-	void        update_title_colour_after_set_title();
-    void        show_option(bool show);
-    void        init_tabpanel();
-    void        create_preset_tabs();
-    //BBS: GUI refactor
-    void        add_created_tab(Tab* panel, const std::string& bmp_name = "");
-    bool        is_active_and_shown_tab(wxPanel* panel);
+    void update_title_colour_after_set_title();
+    void show_option(bool show);
+    void init_tabpanel();
+    void create_preset_tabs();
+    // BBS: GUI refactor
+    void add_created_tab(Tab* panel, const std::string& bmp_name = "");
+    bool is_active_and_shown_tab(wxPanel* panel);
 
     // Register Win32 RawInput callbacks (3DConnexion) and removable media insert / remove callbacks.
     // Called from wxEVT_ACTIVATE, as wxEVT_CREATE was not reliable (bug in wxWidgets?).
-    void        register_win32_callbacks();
-    void        init_menubar_as_editor();
-    void        init_menubar_as_gcodeviewer();
-    void        update_menubar();
+    void register_win32_callbacks();
+    void init_menubar_as_editor();
+    void init_menubar_as_gcodeviewer();
+    void update_menubar();
     // Open item in menu by menu and item name (in actual language)
-    void        open_menubar_item(const wxString& menu_name,const wxString& item_name);
+    void open_menubar_item(const wxString& menu_name, const wxString& item_name);
 #ifdef _WIN32
-    void        show_tabs_menu(bool show);
+    void show_tabs_menu(bool show);
 #endif
-    //BBS
-    void        show_log_window();
+    // BBS
+    void show_log_window();
 
-    void        update_ui_from_settings();
-    //BBS
-    void        show_sync_dialog();
-    void        update_side_preset_ui();
-    void        on_select_default_preset(SimpleEvent& evt);
+    void update_ui_from_settings();
+    // BBS
+    void show_sync_dialog();
+    void update_side_preset_ui();
+    void on_select_default_preset(SimpleEvent& evt);
 
-    bool        is_loaded() const { return m_loaded; }
-    bool        is_last_input_file() const  { return !m_qs_last_input_file.IsEmpty(); }
-    //BBS GUI refactor: remove unused layout new/dlg
-    //bool        is_dlg_layout() const { return m_layout == ESettingsLayout::Dlg; }
+    bool is_loaded() const { return m_loaded; }
+    bool is_last_input_file() const { return !m_qs_last_input_file.IsEmpty(); }
+    // BBS GUI refactor: remove unused layout new/dlg
+    // bool        is_dlg_layout() const { return m_layout == ESettingsLayout::Dlg; }
 
-    void        reslice_now();
-    void        export_config();
+    void reslice_now();
+    void export_config();
     // Query user for the config file and open it.
-    void        load_config_file();
+    void load_config_file();
     // Open a config file. Return true if loaded.
-    bool        load_config_file(const std::string &path);
+    bool load_config_file(const std::string& path);
 
-    //BBS: export current config bundle as BBL default reference
-    //void        export_current_configbundle();
-    //BBS: export all the system preset configs to seperate files
-    //void        export_system_configs();
-    //void        export_configbundle(bool export_physical_printers = false);
-    //void        load_configbundle(wxString file = wxEmptyString);
-    void        load_config(const DynamicPrintConfig& config);
-    //BBS: jump to monitor
-    void        jump_to_monitor(std::string dev_id = "");
-    void        jump_to_multipage();
-    //BBS: hint when jump to 3Deditor under preview only mode
-    bool        preview_only_hint();
+    // BBS: export current config bundle as BBL default reference
+    // void        export_current_configbundle();
+    // BBS: export all the system preset configs to seperate files
+    // void        export_system_configs();
+    // void        export_configbundle(bool export_physical_printers = false);
+    // void        load_configbundle(wxString file = wxEmptyString);
+    void load_config(const DynamicPrintConfig& config);
+    // BBS: jump to monitor
+    void jump_to_monitor(std::string dev_id = "");
+    void jump_to_multipage();
+    // BBS: hint when jump to 3Deditor under preview only mode
+    bool preview_only_hint();
     // Select tab in m_tabpanel
     // When tab == -1, will be selected last selected tab
-    //BBS: GUI refactor
-    void        select_tab(wxPanel* panel);
-    void        select_tab(size_t tab = size_t(-1));
-    void        request_select_tab(TabPosition pos);
-    int         get_calibration_curr_tab();
-    void        select_view(const std::string& direction);
+    // BBS: GUI refactor
+    void select_tab(wxPanel* panel);
+    void select_tab(size_t tab = size_t(-1));
+    void request_select_tab(TabPosition pos);
+    int  get_calibration_curr_tab();
+    void select_view(const std::string& direction);
     // Propagate changed configuration from the Tab to the Plater and save changes to the AppConfig
-    void        on_config_changed(DynamicPrintConfig* cfg) const ;
-    void        set_print_button_to_default(PrintSelectType select_type);
+    void on_config_changed(DynamicPrintConfig* cfg) const;
+    void set_print_button_to_default(PrintSelectType select_type);
 
     bool can_save() const;
     bool can_save_as() const;
-    //BBS
+    // BBS
     bool can_upload() const;
     void save_project();
     bool save_project_as(const wxString& filename = wxString());
 
-    void        add_to_recent_projects(const wxString& filename);
-    void        get_recent_projects(boost::property_tree::wptree &tree, int images);
-    void        open_recent_project(size_t file_id, wxString const & filename);
-    void        remove_recent_project(size_t file_id, wxString const &filename);
+    void add_to_recent_projects(const wxString& filename);
+    void get_recent_projects(boost::property_tree::wptree& tree, int images);
+    void open_recent_project(size_t file_id, wxString const& filename);
+    void remove_recent_project(size_t file_id, wxString const& filename);
 
-    void        technology_changed();
+    void technology_changed();
 
-
-    //BBS
-    void        load_url(wxString url);
-    void        load_printer_url(wxString url, wxString apikey = "");
-    void        load_printer_url();
-    bool        is_printer_view() const;
-    void        refresh_plugin_tips();
+    // BBS
+    void load_url(wxString url);
+    void load_printer_url(wxString url, wxString apikey = "");
+    void load_printer_url();
+    bool is_printer_view() const;
+    void refresh_plugin_tips();
     void RunScript(wxString js);
 
-    //SoftFever
+    // SoftFever
     void show_device(bool bBBLPrinter);
 
-    PA_Calibration_Dlg* m_pa_calib_dlg{ nullptr };
-    Temp_Calibration_Dlg* m_temp_calib_dlg{ nullptr };
-    MaxVolumetricSpeed_Test_Dlg* m_vol_test_dlg { nullptr };
-    VFA_Test_Dlg* m_vfa_test_dlg { nullptr };
-    Retraction_Test_Dlg* m_retraction_calib_dlg{ nullptr };
-    Input_Shaping_Freq_Test_Dlg* m_IS_freq_calib_dlg{ nullptr };
-    Input_Shaping_Damp_Test_Dlg* m_IS_damp_calib_dlg{ nullptr };
-    Cornering_Test_Dlg* m_cornering_calib_dlg{ nullptr };
+    PA_Calibration_Dlg*          m_pa_calib_dlg{nullptr};
+    Temp_Calibration_Dlg*        m_temp_calib_dlg{nullptr};
+    MaxVolumetricSpeed_Test_Dlg* m_vol_test_dlg{nullptr};
+    VFA_Test_Dlg*                m_vfa_test_dlg{nullptr};
+    Retraction_Test_Dlg*         m_retraction_calib_dlg{nullptr};
+    Input_Shaping_Freq_Test_Dlg* m_IS_freq_calib_dlg{nullptr};
+    Input_Shaping_Damp_Test_Dlg* m_IS_damp_calib_dlg{nullptr};
+    Cornering_Test_Dlg*          m_cornering_calib_dlg{nullptr};
 
     // BBS. Replace title bar and menu bar with top bar.
-    BBLTopbar*            m_topbar{ nullptr };
+    BBLTopbar*            m_topbar{nullptr};
     PrintHostQueueDialog* printhost_queue_dlg() { return m_printhost_queue_dlg; }
-    Plater*               m_plater { nullptr };
-    //BBS: GUI refactor
-    MonitorPanel*         m_monitor{ nullptr };
+    // [STATE] The plater (editor/preview) window. [UNITY] Maps to the main workspace panel.
+    Plater* m_plater{nullptr};
+    // BBS: GUI refactor
+    // [STATE] Printer monitor panel. [UNITY] Maps to the Monitor panel.
+    MonitorPanel* m_monitor{nullptr};
 
-    //AuxiliaryPanel*       m_auxiliary{ nullptr };
-    MultiMachinePage*     m_multi_machine{ nullptr };
-    ProjectPanel*         m_project{ nullptr };
+    // AuxiliaryPanel*       m_auxiliary{ nullptr };
+    MultiMachinePage* m_multi_machine{nullptr};
+    ProjectPanel*     m_project{nullptr};
 
-    CalibrationPanel*     m_calibration{ nullptr };
-    WebViewPanel*         m_webview { nullptr };
-    PrinterWebView*       m_printer_view{nullptr};
-    wxLogWindow*          m_log_window { nullptr };
+    CalibrationPanel* m_calibration{nullptr};
+    // [STATE] Home/WebView panel. [UNITY] Maps to a WebView-based or UI Toolkit panel.
+    WebViewPanel*   m_webview{nullptr};
+    PrinterWebView* m_printer_view{nullptr};
+    wxLogWindow*    m_log_window{nullptr};
     // BBS
-    //wxBookCtrlBase*       m_tabpanel { nullptr };
-    Notebook*             m_tabpanel{ nullptr };
-    wxBoxSizer*           m_side_tools{ nullptr };
-    ParamsPanel*          m_param_panel{ nullptr };
-    ParamsDialog*         m_param_dialog{ nullptr };
-    //BBS
+    // wxBookCtrlBase*       m_tabpanel { nullptr };
+    // [STATE] Notebook manager for main tabs. [UNITY] Maps to a Page/Tab controller.
+    Notebook*   m_tabpanel{nullptr};
+    wxBoxSizer* m_side_tools{nullptr};
+    // [STATE] Right-side parameters/settings panel. [UNITY] Maps to a sidebar UI Panel.
+    ParamsPanel*  m_param_panel{nullptr};
+    ParamsDialog* m_param_dialog{nullptr};
+    // BBS
     SettingsDialog        m_settings_dialog;
     DiffPresetDialog      diff_dialog;
-    wxWindow*             m_plater_page{ nullptr };
+    wxWindow*             m_plater_page{nullptr};
     PrintHostQueueDialog* m_printhost_queue_dlg;
 
-    
-    mutable int m_print_select{ ePrintAll };
-    mutable int m_slice_select{ eSliceAll };
+    mutable int m_print_select{ePrintAll};
+    mutable int m_slice_select{eSliceAll};
     // Button* m_publish_btn{ nullptr };
-    SideButton* m_slice_btn{ nullptr };
-    SideButton* m_slice_option_btn{ nullptr };
-    SideButton* m_print_btn{ nullptr };
-    SideButton* m_print_option_btn{ nullptr };
+    SideButton* m_slice_btn{nullptr};
+    SideButton* m_slice_option_btn{nullptr};
+    SideButton* m_print_btn{nullptr};
+    SideButton* m_print_option_btn{nullptr};
 
-    SidePopup*  m_slice_option_pop_up{ nullptr };
+    SidePopup* m_slice_option_pop_up{nullptr};
 
-    FilamentGroupPopup* m_filament_group_popup{ nullptr };
-    mutable bool          m_slice_enable{ true };
-    mutable bool          m_print_enable{ true };
-    bool get_enable_slice_status();
-    bool get_enable_print_status();
-    //BBS
+    FilamentGroupPopup* m_filament_group_popup{nullptr};
+    mutable bool        m_slice_enable{true};
+    mutable bool        m_print_enable{true};
+    bool                get_enable_slice_status();
+    bool                get_enable_print_status();
+    // BBS
     void update_side_button_style();
     void update_slice_print_status(SlicePrintEventType event, bool can_slice = true, bool can_print = true);
 
@@ -418,10 +413,11 @@ public:
 #endif // __APPLE__
 
 #ifdef _WIN32
-    void*				m_hDeviceNotify { nullptr };
-    uint32_t  			m_ulSHChangeNotifyRegister { 0 };
-	static constexpr int WM_USER_MEDIACHANGED { 0x7FFF }; // WM_USER from 0x0400 to 0x7FFF, picking the last one to not interfere with wxWidgets allocation
-#endif // _WIN32
+    void*                m_hDeviceNotify{nullptr};
+    uint32_t             m_ulSHChangeNotifyRegister{0};
+    static constexpr int WM_USER_MEDIACHANGED{
+        0x7FFF}; // WM_USER from 0x0400 to 0x7FFF, picking the last one to not interfere with wxWidgets allocation
+#endif           // _WIN32
 
 #ifdef __WXGTK__
     class GtkResizeBorderHandler;
@@ -429,6 +425,8 @@ public:
 #endif // __WXGTK__
 };
 
+// [EVENT] Custom wxWidgets events for network/app state.
+// [UNITY] Replace with C# delegates, UnityEvents, or a centralized EventBus (ScriptableObject-based).
 wxDECLARE_EVENT(EVT_HTTP_ERROR, wxCommandEvent);
 wxDECLARE_EVENT(EVT_USER_LOGIN, wxCommandEvent);
 wxDECLARE_EVENT(EVT_USER_LOGIN_HANDLE, wxCommandEvent);
@@ -438,9 +436,6 @@ wxDECLARE_EVENT(EVT_SHOW_IP_DIALOG, wxCommandEvent);
 wxDECLARE_EVENT(EVT_UPDATE_MACHINE_LIST, wxCommandEvent);
 wxDECLARE_EVENT(EVT_UPDATE_PRESET_CB, SimpleEvent);
 
-
-
-} // GUI
-} //Slic3r
+}} // namespace Slic3r::GUI
 
 #endif // slic3r_MainFrame_hpp_
