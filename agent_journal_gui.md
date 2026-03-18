@@ -360,3 +360,10 @@ Phase 0 orientation is now complete. All tasks executed and documented successfu
 
 ---
 **Note**: Phase 1 annotation work was started in previous iterations. T101-T103 are complete for their respective segments. `GUI_App.cpp` is now fully annotated across 4 task parts.
+**Task T121-part5 COMPLETE**
+- Deliverable: src/slic3r/GUI/Plater.cpp (annotated 8054-8087)
+- Lines added: 12 annotation lines
+- Key findings: Annotated restart_background_process logic. Mapped wxWidgets event/threading to C# equivalents.
+- Verification excerpt: "// [UNITY] Use C# Coroutine or Task.Run for background processes."
+- Unity porting hazards identified: 2
+- Git: committed as `annotate(gui): annotate Plater::priv::restart_background_process (Plater.cpp)`
