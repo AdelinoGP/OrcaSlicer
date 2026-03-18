@@ -305,10 +305,20 @@ MainFrame
 - Write Loop Checkpoint after 10 files
 
 **Loop Completion Guard**:
-- Annotated: 3 files
+- Annotated: 3 files (T101-T103 in progress)
 - SKIP_TRIVIAL: 0 files
 - SKIP_VENDORED: 0 files
 - Total accounted: 3 files
 - Manifest total: 719 files
 - Remaining: 716 files
 - Status: CONTINUING (remaining > 0)
+
+---
+
+## Task T101-part3 COMPLETE
+- **File**: `src/slic3r/GUI/GUI_App.cpp` (Lines 4000-6000)
+- **Lines added**: ~35 annotation lines
+- **Key findings**: Section covers font management, GUI recreation, user login, and cloud sync background threads.
+- **Verification excerpt**: "// [UNITY] In Unity, this corresponds to reloading the main Scene or re-instantiating the UI root Prefab."
+- **Unity porting hazards identified**: P1 hazard for full GUI recreation vs reactive UI; P1 hazard for cloud sync thread safety.
+- **Git commit**: (pending)

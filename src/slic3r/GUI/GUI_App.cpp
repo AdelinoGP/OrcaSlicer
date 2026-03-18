@@ -4011,6 +4011,8 @@ void GUI_App::UpdateDVCDarkUI(wxDataViewCtrl* dvc, bool highlited /* = false*/)
 void GUI_App::UpdateAllStaticTextDarkUI(wxWindow* parent)
 {
 #ifdef __WINDOWS__
+    // [UNITY] Use UI Toolkit .uss classes or ScriptableObject-based themes for dark mode.
+    // [PORTING_HAZARD:P2] Manual recursive color updates are an anti-pattern in Unity; use style overrides.
     wxGetApp().UpdateDarkUI(parent);
 
     auto children = parent->GetChildren();
@@ -4021,6 +4023,9 @@ void GUI_App::UpdateAllStaticTextDarkUI(wxWindow* parent)
 #endif
 }
 
+// [INTENT] Initialize application fonts using wxWidgets font system.
+// [UNITY] Unity uses TextMeshPro (TMP) or UI Toolkit. Fonts are assets (SDF).
+// [PORTING_HAZARD:P2] Scaling logic must be mapped to Unity's Canvas Scaler or UI Toolkit scaling.
 void GUI_App::init_fonts()
 {
     // BBS: modify font
@@ -4178,6 +4183,9 @@ void GUI_App::check_printer_presets()
 void switch_window_pools();
 void release_window_pools();
 
+// [INTENT] Rebuild the entire main frame and UI tree.
+// [UNITY] In Unity, this corresponds to reloading the main Scene or re-instantiating the UI root Prefab.
+// [PORTING_HAZARD:P1] Full destruction/recreation is expensive. Unity's UI Toolkit supports reactive style changes without full tree rebuild.
 void GUI_App::recreate_GUI(const wxString& msg_name)
 {
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << "recreate_GUI enter";
@@ -4250,6 +4258,7 @@ void GUI_App::system_info()
 
 void GUI_App::keyboard_shortcuts()
 {
+    // [UNITY] Display a Prefab-based modal dialog.
     KBShortcutsDialog dlg;
     dlg.ShowModal();
 }
@@ -4431,6 +4440,8 @@ void GUI_App::persist_window_geometry(wxTopLevelWindow* window, bool default_max
     }
 }
 
+// [INTENT] Open native file dialog to select 3MF project files.
+// [UNITY] Requires native plugin (e.g., UnityStandaloneFileBrowser) for desktop platforms.
 void GUI_App::load_project(wxWindow* parent, wxString& input_file) const
 {
     input_file.Clear();
@@ -4572,10 +4583,12 @@ void GUI_App::request_user_login(int online_login)
     wxQueueEvent(this, evt);
 }
 
+// [INTENT] Handle user logout, clearing state and user-specific presets.
+// [STATE] Managed in m_agent and app_config.
 void GUI_App::request_user_logout()
 {
     if (m_agent && m_agent->is_user_login()) {
-        // Update data first before showing dialogs
+        // [UNITY] Clear authentication tokens and local cloud-synced cache.
         m_agent->user_logout(true);
         m_agent->set_user_selected_machine("");
         /* delete old user settings */
@@ -4606,6 +4619,8 @@ int GUI_App::request_user_unbind(std::string dev_id)
     return result;
 }
 
+// [INTENT] Bridge for receiving and routing commands from an embedded webview (JS -> C++).
+// [UNITY] Bridge for UniWebView or Vuplex message handlers.
 std::string GUI_App::handle_web_request(std::string cmd)
 {
     try {
@@ -4847,6 +4862,8 @@ void GUI_App::handle_http_error(unsigned int status, std::string body)
     wxQueueEvent(this, evt);
 }
 
+// [EVENT] Handle HTTP error events asynchronously.
+// [UNITY] C# event or Task-based error handling.
 void GUI_App::on_http_error(wxCommandEvent& evt)
 {
     int status = evt.GetInt();
@@ -5333,6 +5350,9 @@ void maybe_attach_updater_signature(Http& http, const std::string& canonical_que
 
 } // namespace
 
+// [INTENT] Check for new software versions via HTTP GET.
+// [THREAD] Executes asynchronously via Http callback.
+// [UNITY] Use UnityWebRequest.
 void GUI_App::check_new_version_sf(bool show_tips, int by_user)
 {
     AppConfig* app_config        = wxGetApp().app_config;
@@ -5473,6 +5493,8 @@ void GUI_App::check_new_version_sf(bool show_tips, int by_user)
 }
 
 // return true if handled
+// [INTENT] Handle network-level messages from the printer/cloud agent.
+// [UNITY] Map to a notification system or status bar updates. Modal dialogs should be managed via UIManager.
 bool GUI_App::process_network_msg(std::string dev_id, std::string msg)
 {
     if (dev_id.empty()) {
@@ -5604,6 +5626,8 @@ void GUI_App::set_skip_version(bool skip)
     }
 }
 
+// [EVENT] Bindings for Privacy Policy dialog buttons.
+// [UNITY] Use UnityEvent or C# delegates in the UI controller.
 void GUI_App::show_check_privacy_dlg(wxCommandEvent& evt)
 {
     int                 online_login = evt.GetInt();
@@ -5799,6 +5823,8 @@ void GUI_App::remove_user_presets()
     }
 }
 
+// [INTENT] Synchronize a single preset with the cloud agent.
+// [THREAD] Called from the background sync thread.
 void GUI_App::sync_preset(Preset* preset)
 {
     int          result    = -1;
@@ -5927,6 +5953,10 @@ void GUI_App::sync_preset(Preset* preset)
     }
 }
 
+// [INTENT] Start the background process for cloud preset synchronization.
+// [THREAD] Creates a background thread (m_sync_update_thread) for long-running I/O.
+// [UNITY] Use C# async/await (Task.Run). Ensure all UI calls (ProgressDialog) are routed back to the Main Thread.
+// [PORTING_HAZARD:P1] Concurrent access to preset_bundle during sync.
 void GUI_App::start_sync_user_preset(bool with_progress_dlg)
 {
     if (app_config->get_stealth_mode())
@@ -5970,6 +6000,7 @@ void GUI_App::start_sync_user_preset(bool with_progress_dlg)
         cancelFn = [this]() { return is_closing(); };
     }
 
+    // [THREAD] Background thread loop for preset synchronization.
     m_sync_update_thread = Slic3r::create_thread([this, progressFn, cancelFn, finishFn, t = std::weak_ptr<int>(m_user_sync_token)] {
         // get setting list, update setting list
         std::string version = preset_bundle->get_vendor_profile_version(PresetBundle::ORCA_DEFAULT_BUNDLE).to_string();

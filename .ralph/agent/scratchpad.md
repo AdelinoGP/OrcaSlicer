@@ -1,40 +1,26 @@
-# Scratchpad for GUI Analysis
-
-## Current Understanding
-- Branch: `agent/gui-analysis` (already exists)
-- Repository has uncommitted changes from previous work
-- Phase 0 orientation is in progress
-
-## Plan
-1. Complete Phase 0 orientation (P0-T001 through P0-T009)
-2. Move to Phase 1 annotation loop
-3. Process every file in the manifest (719 files)
-4. Create Phase 2 documentation
-5. Perform Phase 3 audit
-
-## Learning
-- Manifest has 719 files
-- Phase 1 task list has 720 entries (GUI_App.cpp split into 2 tasks)
-- Loop Completion Guard equation: annotated + skip_trivial + skip_vendored = 719
-- Need to check this equation every 10 files and at completion gate
-
-## Next Steps (for next iteration)
-- Phase 0 orientation COMPLETE
-- Continue Phase 1 annotation loop
-- Next task: T110 (MainFrame.hpp) or T111 (MainFrame.cpp) depending on task registry
-- Process 10 files per iteration
-- Write Loop Checkpoint after 10 files
-- Update Loop Completion Guard equation: annotated + skip_trivial + skip_vendored = 719
+# Ralph Scratchpad — OrcaSlicer GUI Analysis Agent
 
 ## Current Status
-- Phase 0: COMPLETE (all tasks done, evidence recorded)
-- Phase 1: Started (T103 done, T101/T102 partially done)
-- Files annotated: 4 (GUI_App.cpp, GUI_App.hpp, GUI_Init.cpp, GUI_Init.hpp)
-- Files remaining: 715 (719 total - 4 annotated)
+- Phase 0 orientation is documented as complete in `agent_journal_gui.md` and `.ralph/ralph-tasks.md`, though some Ralph-level tasks (`P0-Txxx`) remain open in the CLI.
+- I'm proceeding to Phase 1: Annotation Loop.
+- Task T101 (GUI_App.cpp) is partially annotated. Part 1 and Part 2 (up to line 4000) are done and committed.
+- I'm picking `T101-part3: annotate src/slic3r/GUI/GUI_App.cpp (4000-6000)`.
 
-## Phase 1 Status
-- T101 (GUI_App.cpp): Partially complete (55 UNITY annotations, 7972 lines)
-- T101-part2: Marked DONE in task list
-- T102 (GUI_App.hpp): Partially complete
-- T103 (GUI_Init.cpp & .hpp): Complete (annotated entry point)
-- Next: Continue annotation loop starting from T110 (MainFrame.hpp)
+## Plan for T101-part3
+1. Start task `task-1773853215-8790`.
+2. Read `src/slic3r/GUI/GUI_App.cpp` from line 4000 to 6000.
+3. Inject annotations according to the protocol:
+   - `[INTENT]` for methods
+   - `[UNITY]` for wxWidgets equivalents (UI Toolkit, MonoBehaviour, etc.)
+   - `[EVENT]` for Bind() calls
+   - `[THREAD]` for threading boundaries
+   - `[PORTING_HAZARD]` for tricky patterns
+4. Update `agent_journal_gui.md` with completion evidence.
+5. Commit changes to `GUI_App.cpp` and `agent_journal_gui.md`.
+6. Update `ralph-tasks.md` to mark this part as DONE.
+7. Close Ralph task.
+
+## Analysis Notes (GUI_App.cpp 4000-6000)
+- I'll expect to see methods related to application lifecycle, configuration management, and possibly the `on_init_inner` logic if it's in this section.
+- I'll look for `wxCommandEvent` handlers and `Bind()` calls.
+- I'll note any Unity-specific hazards related to configuration state management (ScriptableObjects or PlayerPrefs).
