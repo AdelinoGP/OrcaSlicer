@@ -17,15 +17,16 @@
 #include <boost/nowide/convert.hpp>
 
 #if __APPLE__
-    #include <signal.h>
+#include <signal.h>
 #endif // __APPLE__
 
-namespace Slic3r {
-namespace GUI {
+namespace Slic3r { namespace GUI {
 
-const std::vector<std::pair<int, int>> OpenGLVersions::core    = { {3,2}, {3,3}, {4,0}, {4,1}, {4,2}, {4,3}, {4,4}, {4,5}, {4,6} };
+const std::vector<std::pair<int, int>> OpenGLVersions::core = {{3, 2}, {3, 3}, {4, 0}, {4, 1}, {4, 2}, {4, 3}, {4, 4}, {4, 5}, {4, 6}};
 
-int GUI_Run(GUI_InitParams &params)
+// [INTENT] Entry point for GUI mode, initializes wxWidgets application and enters main loop
+// [UNITY] Replace with Unity's SceneManager.LoadScene or custom bootstrap sequence
+int GUI_Run(GUI_InitParams& params)
 {
 #if __APPLE__
     // On OSX, we use boost::process::spawn() to launch new instances of PrusaSlicer from another PrusaSlicer.
@@ -38,42 +39,46 @@ int GUI_Run(GUI_InitParams &params)
     signal(SIGCHLD, SIG_DFL);
 #endif // __APPLE__
 
-    //BBS: remove the try-catch and let exception goto above
+    // BBS: remove the try-catch and let exception goto above
     try {
-        //GUI::GUI_App* gui = new GUI::GUI_App(params.start_as_gcodeviewer ? GUI::GUI_App::EAppMode::GCodeViewer : GUI::GUI_App::EAppMode::Editor);
+        // GUI::GUI_App* gui = new GUI::GUI_App(params.start_as_gcodeviewer ? GUI::GUI_App::EAppMode::GCodeViewer : GUI::GUI_App::EAppMode::Editor);
         GUI::GUI_App* gui = new GUI::GUI_App();
-        //if (gui->get_app_mode() != GUI::GUI_App::EAppMode::GCodeViewer) {
-            // G-code viewer is currently not performing instance check, a new G-code viewer is started every time.
-            bool gui_single_instance_setting = gui->app_config->get("app", "single_instance") == "true";
-            if (Slic3r::instance_check(params.argc, params.argv, gui_single_instance_setting)) {
-                //TODO: do we have delete gui and other stuff?
-                return -1;
-            }
+        // if (gui->get_app_mode() != GUI::GUI_App::EAppMode::GCodeViewer) {
+        //  G-code viewer is currently not performing instance check, a new G-code viewer is started every time.
+        bool gui_single_instance_setting = gui->app_config->get("app", "single_instance") == "true";
+        if (Slic3r::instance_check(params.argc, params.argv, gui_single_instance_setting)) {
+            // TODO: do we have delete gui and other stuff?
+            return -1;
+        }
         //}
 
-//      gui->autosave = m_config.opt_string("autosave");
+        //      gui->autosave = m_config.opt_string("autosave");
         GUI::GUI_App::SetInstance(gui);
         gui->init_params = &params;
 
         if (params.argc > 1) {
             // STUDIO-273 wxWidgets report error when opening some files with specific names
             // wxWidgets does not handle parameters, so intercept parameters here, only keep the app name
-            int                 argc = 1;
-            std::vector<char *> argv;
+            int                argc = 1;
+            std::vector<char*> argv;
             argv.push_back(params.argv[0]);
+            // [EVENT] Starts wxWidgets event loop (main application loop)
+            // [UNITY] Replace with Unity's main loop or coroutines
             return wxEntry(argc, argv.data());
         } else {
+            // [EVENT] Starts wxWidgets event loop (main application loop)
+            // [UNITY] Replace with Unity's main loop or coroutines
             return wxEntry(params.argc, params.argv);
         }
-    } catch (const Slic3r::Exception &ex) {
+    } catch (const Slic3r::Exception& ex) {
         BOOST_LOG_TRIVIAL(error) << ex.what() << std::endl;
         wxMessageBox(boost::nowide::widen(ex.what()), _L("Orca Slicer GUI initialization failed"), wxICON_STOP);
-    } catch (const std::exception &ex) {
+    } catch (const std::exception& ex) {
         BOOST_LOG_TRIVIAL(error) << ex.what() << std::endl;
-        wxMessageBox(format_wxstr(_L("Fatal error, exception caught: %1%"), ex.what()), _L("Orca Slicer GUI initialization failed"), wxICON_STOP);
+        wxMessageBox(format_wxstr(_L("Fatal error, exception caught: %1%"), ex.what()), _L("Orca Slicer GUI initialization failed"),
+                     wxICON_STOP);
     }
     // error
     return 1;
 }
-}
-}
+}} // namespace Slic3r::GUI
