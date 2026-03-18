@@ -6,20 +6,12 @@
 - Plater.hpp (T120) is fully documented and committed (617436cdc7).
 - Cumulative annotated files: 8/719. (Note: GUI_App.cpp, MainFrame.cpp, and Plater.hpp are counted).
 
+## Status Update (T121-part2)
+- `T121-part2: annotate src/slic3r/GUI/Plater.cpp (2001-4000)` is COMPLETE and committed (4e95094851).
+- Annotated `Sidebar::msw_rescale`, `build_filament_ams_list`, and `sync_ams_list`.
+- Identified high-risk manual DPI scaling and complex hardware-to-UI sync logic.
+- Progress: 9/719.
+
 ## Next Task
-- `T121-part1: annotate src/slic3r/GUI/Plater.cpp (1-2000)`.
-- `Plater.cpp` is 18,178 lines. Splitting into ~9 parts (2000 lines each).
-
-## Analysis Notes (T121: Plater.cpp)
-- `Plater.cpp` is the implementation of the core 3D workspace.
-- Expect heavy wxWidgets event binding (`Bind()`), OpenGL context management, and model manipulation logic.
-- Key Unity Mapping:
-    - `Plater` implementation -> `SceneController` logic, `InputManager` for 3D interactions.
-    - Model selection/manipulation -> Unity's `Raycast` and `Selection` system.
-- Porting Hazard: High complexity in event propagation between the 3D scene and the sidebar.
-
-## Plan
-1. Update `ralph-tasks.md` to mark T120 DONE and split T121 into parts.
-2. Inject annotations into `src/slic3r/GUI/Plater.cpp` (lines 1-2000).
-3. Update `agent_journal_gui.md` with T121-part1 completion evidence.
-4. Commit and close T121-part1.
+- `T121-part3: annotate src/slic3r/GUI/Plater.cpp (4001-6000)`.
+- Focus on `Plater::priv` and event handlers for slicing/export.

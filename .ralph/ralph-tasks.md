@@ -101,8 +101,8 @@
 **Group 3: Core Workspace (Critical)**
 - [x] **T120**: `src/slic3r/GUI/Plater.hpp`
 - [x] **T121-part1**: `src/slic3r/GUI/Plater.cpp` (1-2000)
-- [ ] **T121-part2**: `src/slic3r/GUI/Plater.cpp` (2000-4000)
-- [ ] **T121-part3**: `src/slic3r/GUI/Plater.cpp` (4000-6000)
+- [x] **T121-part2**: `src/slic3r/GUI/Plater.cpp` (2001-4000)
+- [ ] **T121-part3**: `src/slic3r/GUI/Plater.cpp` (4001-6000)
 - [ ] **T121-part4**: `src/slic3r/GUI/Plater.cpp` (6000-8000)
 - [ ] **T121-part5**: `src/slic3r/GUI/Plater.cpp` (8000-10000)
 - [ ] **T121-part6**: `src/slic3r/GUI/Plater.cpp` (10000-12000)
