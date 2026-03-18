@@ -3,18 +3,19 @@
 ## Current Status
 - Phase 1: Annotation Loop in progress.
 - Task T101 (GUI_App.cpp) is fully annotated (parts 1-4) and committed (d158c0a5f0).
-- Task T102 (GUI_App.hpp) and T103 (GUI_Init.cpp/hpp or PlaterWorker.hpp depending on mapping) are documented as DONE and committed.
-- Git log confirms `d158c0a5f0` (GUI_App.cpp 6000-8070) is complete.
+- Task T102 (GUI_App.hpp), T103 (GUI_Init.cpp/hpp), and T110 (MainFrame.hpp) are documented as DONE and committed.
+- Git log confirms `38d147d781` (MainFrame.hpp) and `8eb1b812ec` (Journal update) are complete.
 
 ## Next Task
-- `T110: annotate src/slic3r/GUI/MainFrame.hpp`.
+- `T111: annotate src/slic3r/GUI/MainFrame.cpp`.
+- This file is large (~4300 lines), so it will be split into Part 1 (1-2000) and Part 2 (2000-end).
 - This is part of Group 2: Window Management.
 
-## Analysis Notes (T110)
-- `MainFrame` is the primary application window.
+## Analysis Notes (T111)
+- `MainFrame.cpp` contains the implementation of the main window.
 - I'll look for:
-  - wxFrame inheritance and Unity equivalent (MonoBehaviour on a Canvas or similar).
-  - Member variables holding UI state (side panels, tab managers).
-  - Event handlers for window events (close, resize, menu events).
-  - Initialization sequence for child widgets.
-- Key Unity mapping: `MainFrame` likely maps to a "MainWindowController" MonoBehaviour managing a set of UI Panels.
+  - Constructor and widget creation sequence.
+  - `init_tabpanel()`, `init_menubar()`, and other UI setup methods.
+  - Event binding (`Bind()` calls) for global app events.
+  - Logic for managing the primary panels: `Plater`, `Monitor`, `WebView`.
+- Key Unity mapping: Implementation of `MainUIController` managing `VisualElement` hierarchies or Prefab-based Panels.

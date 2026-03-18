@@ -344,3 +344,13 @@ MainFrame
 - **Git commit**: `38d147d781`
 
 ---
+
+**Task T111-part1 COMPLETE**
+- **File**: `src/slic3r/GUI/MainFrame.cpp` (Lines 1-2000)
+- **Lines added**: ~15 annotation lines
+- **Key findings**: Implementation of the main frame constructor, tab panel initialization, and global event bindings. Includes OS-specific window management logic for borderless frames (Win32 NCCALCSIZE, GTK resize filters).
+- **Verification excerpt**: `// [UNITY] Corresponds to the entry point for the MainUIController (MonoBehaviour.Start/Awake).`
+- **Unity porting hazards identified**: 2 (Low-level OS window message handling, complex tab parent-child relationships).
+- **Git commit**: (pending)
+
+---
