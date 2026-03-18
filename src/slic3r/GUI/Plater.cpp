@@ -10043,6 +10043,8 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent& evt)
     BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format("exit.");
 }
 
+// [INTENT] Handle completion of slicing process, update scene visibility.
+// [UNITY] Use UnityEvent or C# event to signal slicing finish, update rendering via SceneController.
 void Plater::priv::on_slicing_completed(wxCommandEvent& evt)
 {
     BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(": event_type %1%, string %2%") % evt.GetEventType() % evt.GetString();
@@ -10155,6 +10157,9 @@ bool Plater::priv::warnings_dialog()
 }
 
 // BBS: add project slice logic
+// [INTENT] Handle the completion of background slicing process, including error handling.
+// [THREAD] This is called via wxWidgets event queue from a worker thread.
+// [UNITY] Replace with C# async/await or UniTask to handle completion, update UI from main thread via dispatcher.
 void Plater::priv::on_process_completed(SlicingProcessCompletedEvent& evt)
 {
     BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(": enter, m_ignore_event %1%, status %2%") % m_ignore_event % evt.status();
