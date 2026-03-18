@@ -351,6 +351,6 @@ MainFrame
 - **Key findings**: Implementation of the main frame constructor, tab panel initialization, and global event bindings. Includes OS-specific window management logic for borderless frames (Win32 NCCALCSIZE, GTK resize filters).
 - **Verification excerpt**: `// [UNITY] Corresponds to the entry point for the MainUIController (MonoBehaviour.Start/Awake).`
 - **Unity porting hazards identified**: 2 (Low-level OS window message handling, complex tab parent-child relationships).
-- **Git commit**: (pending)
+- **Git commit**: `704efff114`
 
 ---
