@@ -348,9 +348,24 @@ Phase 0 orientation is now complete. All tasks executed and documented successfu
 - **Unity porting hazards identified**: 3 (Manual DPI, Hardware/UI tight coupling, Complex preset merge logic)
 - **Git commit**: (pending)
 
-### Loop Checkpoint — Tasks T101–T121-part2
+**Task T121-part3 COMPLETE**
+- **File**: `src/slic3r/GUI/Plater.cpp` (4001-6000)
+- **Lines added**: ~40 annotation lines
+- **Key findings**: Documented `Plater::priv` state and massive event binding list. Mapped `wxAuiManager` to UI Toolkit and `BackgroundSlicingProcess` to Unity Jobs. Identified P1 hazards in blocking `load_files` logic.
+- **Verification excerpt**: `// [INTENT] Documented Plater::priv state and massive event binding list`
+- **Git commit**: `f6e74fbb34`
+
+**Task T121-part4 COMPLETE**
+- **File**: `src/slic3r/GUI/Plater.cpp` (6001-8000)
+- **Lines added**: ~65 annotation lines
+- **Key findings**: Deeply integrated file loading (3MF, STEP, STL) with complex version/config handling. Core reslicing debounce logic via timers. Central synchronization point between UI state and background slicing process (`update_background_process`).
+- **Verification excerpt**: `// [INTENT] update_background_process - the heart of the slicing state machine synchronization between UI and background worker.`
+- **Unity porting hazards identified**: 2 (Interactive blocking dialogs during load, complex state machine sync)
+- **Git commit**: (pending)
+
+### Loop Checkpoint — Tasks T101–T121-part4
 - Files processed this batch: 1
-- Cumulative annotated: 9 (segments of Plater.cpp counted as one progress unit)
+- Cumulative annotated: 9
 - Cumulative SKIP_TRIVIAL: 0
 - Cumulative SKIP_VENDORED: 0
 - Total accounted for: 9
