@@ -18,11 +18,18 @@
 - Loop Completion Guard equation: annotated + skip_trivial + skip_vendored = 719
 - Need to check this equation every 10 files and at completion gate
 
-## Next Steps
+## Next Steps (for next iteration)
 - Phase 0 orientation COMPLETE
-- Start Phase 1 annotation loop
-- Process first 10 files (T101-T110)
+- Start Phase 1 annotation loop with T104 (MainFrame.cpp)
+- Process first 10 files (T104-T113)
 - Write Loop Checkpoint after 10 files
+- Update Loop Completion Guard equation: annotated + skip_trivial + skip_vendored = 719
+
+## Current Status
+- Phase 0: COMPLETE (all tasks done, evidence recorded)
+- Phase 1: Started (T101-T103 done, T104 pending)
+- Files annotated: 3 (GUI_App.cpp, GUI_App.hpp, PlaterWorker.hpp)
+- Files remaining: 716 (719 total - 3 annotated)
 
 ## Phase 0 Status
 - All P0 tasks marked DONE
