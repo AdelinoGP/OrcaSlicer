@@ -4032,6 +4032,8 @@ std::string& Sidebar::get_search_line() { return p->searcher.search_string(); }
 
 static std::map<std::string, std::string> printer_thumbnails = {};
 
+// [INTENT] Update printer thumbnail based on selected preset and model.
+// [UNITY] Map to a dynamic Image component update in the Inspector UI.
 void Sidebar::update_printer_thumbnail()
 {
     auto&       preset_bundle   = wxGetApp().preset_bundle;
@@ -4073,6 +4075,9 @@ void Sidebar::update_printer_thumbnail()
     }
 }
 
+// [INTENT] Calculate flushing volumes for multi-material changes (AMS/MMU).
+// [STATE] Updates project configuration and triggers background reslice.
+// [UNITY] Move this to a FilamentManager ScriptableObject/Service.
 void Sidebar::auto_calc_flushing_volumes(const int filament_idx, const int extruder_id)
 {
     std::vector<int> filament_indices;
@@ -4111,6 +4116,8 @@ void Sidebar::auto_calc_flushing_volumes(const int filament_idx, const int extru
     p->plater->update();
 }
 
+// [INTENT] Internal matrix calculation for purging volumes based on color transition.
+// [UNITY] Core domain logic - should be ported to a pure C# utility class.
 void Sidebar::auto_calc_flushing_volumes_internal(const int modify_id, const int extruder_id)
 {
     auto&               preset_bundle            = wxGetApp().preset_bundle;
@@ -4275,6 +4282,9 @@ public:
     }
 };
 
+// [INTENT] Structure representing the core state of the Plater (PIMPL).
+// [UNITY] This struct contains the state that will be moved into a SceneController MonoBehaviour.
+// [STATE] Holds the active model, print configurations, and background slicing process.
 // Plater / private
 struct Plater::priv
 {
@@ -4345,6 +4355,7 @@ struct Plater::priv
 
     ProjectDirtyStateManager dirty_state;
 
+    // [THREAD] The background process for slicing. In Unity, this maps to a BackgroundWorker or Job system.
     BackgroundSlicingProcess background_process;
     bool                     suppressed_backround_processing_update{false};
 
@@ -4355,6 +4366,7 @@ struct Plater::priv
     //
     // UIThreadWorker can be used as a replacement for BoostThreadWorker if
     // no additional worker threads are desired (useful for debugging or profiling)
+    // [UNITY] Use Unity Job System for heavy calculations.
     PlaterWorker<BoostThreadWorker> m_worker;
     SLAImportDialog*                m_sla_import_dlg;
 
@@ -4892,6 +4904,9 @@ bool PlaterDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString& fi
     return res;
 }
 
+// [INTENT] Initialize the Plater's private state, UI managers, and event bindings.
+// [UNITY] Corresponds to Awake/Start in SceneController.
+// [EVENT] Massive binding list maps wxWidgets events to internal methods.
 Plater::priv::priv(Plater* q, MainFrame* main_frame)
     : q(q)
     , main_frame(main_frame)
@@ -5428,6 +5443,9 @@ Plater::priv::~priv()
     main_frame->m_tabpanel->Unbind(wxEVT_NOTEBOOK_PAGE_CHANGING, &priv::on_tab_selection_changing, this);
 }
 
+// [INTENT] The primary update loop for the Plater. Handles UI refreshes and background process triggers.
+// [THREAD] UI thread only.
+// [UNITY] Use MonoBehaviour.Update() or a reactive state system to trigger view refreshes.
 void Plater::priv::update(unsigned int flags)
 {
     // the following line, when enabled, causes flickering on NVIDIA graphics cards
@@ -5790,6 +5808,10 @@ void read_binary_stl(const std::string& filename, std::string& model_id, std::st
     return;
 }
 
+// [INTENT] Main entry point for loading model files (3MF, STL, etc.) into the plater.
+// [UNITY] Map to an async loading system using UnityWebRequest or FileStream with background tasks.
+// [PORTING_HAZARD:P1] This method is massive and contains complex version-checking and 3MF archive logic.
+// [PORTING_HAZARD:P1] Uses a blocking ProgressDialog which must be replaced with a non-blocking Unity UI overlay.
 // BBS: backup & restore
 std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_files, LoadStrategy strategy, bool ask_multi)
 {
