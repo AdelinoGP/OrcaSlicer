@@ -4003,12 +4003,17 @@ bool Sidebar::show_object_list(bool show) const
     return true;
 }
 
-void Sidebar::finish_param_edit() { p->editing_filament = -1; }
+void Sidebar::finish_param_edit()
+{
+    // [STATE] Reset editing filament index.
+    p->editing_filament = -1;
+}
 
 std::vector<PlaterPresetComboBox*>& Sidebar::combos_filament() { return p->combos_filament; }
 
 void Sidebar::clear_combos_filament_badge()
 {
+    // [INTENT] Clear "synchronized with AMS" badge from all filament combos.
     auto& combos_filament = p->combos_filament;
     for (auto& c : combos_filament) { // clear flag
         c->ShowBadge(false);
@@ -4017,6 +4022,7 @@ void Sidebar::clear_combos_filament_badge()
 
 void Sidebar::udpate_combos_filament_badge()
 {
+    // [INTENT] Update the visibility of the "synchronized with AMS" badge based on current selection flag.
     auto& combos_filament = p->combos_filament;
     for (auto& c : combos_filament) {
         auto selection   = c->GetSelection();
@@ -4288,19 +4294,22 @@ public:
 // Plater / private
 struct Plater::priv
 {
-    // PIMPL back pointer ("Q-Pointer")
-    Plater*    q;
-    Sidebar*   sidebar;
+    // [STATE] PIMPL back pointer ("Q-Pointer")
+    Plater* q;
+    // [STATE] Reference to the Sidebar UI controller.
+    Sidebar* sidebar;
+    // [STATE] Reference to the main application frame.
     MainFrame* main_frame;
 
     MenuFactory menus;
 
+    // [STATE] Active dialog pointers. [UNITY] Replace with UI Toolkit Modals.
     SelectMachineDialog*  m_select_machine_dlg = nullptr;
     SendMultiMachinePage* m_send_multi_dlg     = nullptr;
     SendToPrinterDialog*  m_send_to_sdcard_dlg = nullptr;
     PublishDialog*        m_publish_dlg        = nullptr;
 
-    // Data
+    // [STATE] Core slicing and model data.
     Slic3r::DynamicPrintConfig*  config; // FIXME: leak?
     Slic3r::Print                fff_print;
     Slic3r::SLAPrint             sla_print;
@@ -4308,7 +4317,7 @@ struct Plater::priv
     PrinterTechnology            printer_technology = ptFFF;
     Slic3r::GCodeProcessorResult gcode_result;
 
-    // GUI elements
+    // [STATE] GUI Layout and Panel management. [UNITY] Replace with VisualElement tree.
     AuiMgr                m_aui_mgr;
     wxString              m_default_window_layout;
     wxPanel*              current_panel{nullptr};
@@ -4975,6 +4984,7 @@ Plater::priv::priv(Plater* q, MainFrame* main_frame)
     background_process.set_finished_event(EVT_PROCESS_COMPLETED);
     background_process.set_export_began_event(EVT_EXPORT_BEGAN);
     background_process.set_export_finished_event(EVT_EXPORT_FINISHED);
+    // [EVENT] Register background process events. [UNITY] Map to async Task/UnityEvent.
     this->q->Bind(EVT_SLICING_UPDATE, &priv::on_slicing_update, this);
     this->q->Bind(EVT_PUBLISH, &priv::on_action_publish, this);
     this->q->Bind(EVT_REPAIR_MODEL, &priv::on_repair_model, this);
@@ -4992,11 +5002,15 @@ Plater::priv::priv(Plater* q, MainFrame* main_frame)
     this->q->Bind(EVT_ADD_CUSTOM_FILAMENT, &priv::on_add_custom_filament, this);
     main_frame->m_tabpanel->Bind(wxEVT_NOTEBOOK_PAGE_CHANGING, &priv::on_tab_selection_changing, this);
 
+    // [INTENT] Panel initialization for Prepare (View3D), Preview, and Assemble views.
+    // [UNITY] Use ScreenManager to switch between these panels.
     auto* panel_3d = new wxPanel(q);
     view3D         = new View3D(panel_3d, bed, &model, config, &background_process);
     // BBS: use partplater's gcode
-    preview = new Preview(panel_3d, bed, &model, config, &background_process, partplate_list.get_current_slice_result(),
-                          [this]() { schedule_background_process(); });
+    preview = new Preview(panel_3d, bed, &model, config, &background_process, partplate_list.get_current_slice_result(), [this]() {
+        // [EVENT] Schedule reslice when preview parameters change.
+        schedule_background_process();
+    });
 
     assemble_view = new AssembleView(panel_3d, bed, &model, config, &background_process);
 
@@ -5090,7 +5104,8 @@ Plater::priv::priv(Plater* q, MainFrame* main_frame)
     wxGLCanvas* preview_canvas = preview->get_wxglcanvas();
 
     if (wxGetApp().is_editor()) {
-        // 3DScene events:
+        // [EVENT] 3DScene events (canvas-level selection, clicks, shortcuts).
+        // [UNITY] Map to PointerDown/Click events on the 3D Render Surface or Input Actions.
         view3D_canvas->Bind(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS, [this](SimpleEvent&) {
             delayed_error_message.clear();
             this->background_process_timer.Start(500, wxTIMER_ONE_SHOT);
@@ -5098,6 +5113,7 @@ Plater::priv::priv(Plater* q, MainFrame* main_frame)
         view3D_canvas->Bind(EVT_GLCANVAS_OBJECT_SELECT, &priv::on_object_select, this);
         view3D_canvas->Bind(EVT_GLCANVAS_RIGHT_CLICK, &priv::on_right_click, this);
         // BBS: add part plate related logic
+        // [EVENT] Plate selection and movement events.
         view3D_canvas->Bind(EVT_GLCANVAS_PLATE_RIGHT_CLICK, &priv::on_plate_right_click, this);
         view3D_canvas->Bind(EVT_GLCANVAS_REMOVE_OBJECT, [q](SimpleEvent&) { q->remove_selected(); });
         view3D_canvas->Bind(EVT_GLCANVAS_ARRANGE, [this](SimpleEvent& evt) {
@@ -5135,8 +5151,7 @@ Plater::priv::priv(Plater* q, MainFrame* main_frame)
         view3D_canvas->Bind(EVT_GLCANVAS_FORCE_UPDATE, [this](SimpleEvent&) { update(); });
         view3D_canvas->Bind(EVT_GLCANVAS_INSTANCE_ROTATED, [this](SimpleEvent&) { update(); });
         view3D_canvas->Bind(EVT_GLCANVAS_INSTANCE_SCALED, [this](SimpleEvent&) { update(); });
-        // BBS
-        // view3D_canvas->Bind(EVT_GLCANVAS_ENABLE_ACTION_BUTTONS, [this](Event<bool>& evt) { this->sidebar->enable_buttons(evt.data); });
+        // [EVENT] Slicing button status synchronization.
         view3D_canvas->Bind(EVT_GLCANVAS_ENABLE_ACTION_BUTTONS, [this](Event<bool>& evt) { on_slice_button_status(evt.data); });
         view3D_canvas->Bind(EVT_GLCANVAS_UPDATE_GEOMETRY, &priv::on_update_geometry, this);
         view3D_canvas->Bind(EVT_GLCANVAS_MOUSE_DRAGGING_STARTED, &priv::on_3dcanvas_mouse_dragging_started, this);
@@ -5155,7 +5170,8 @@ Plater::priv::priv(Plater* q, MainFrame* main_frame)
                             [this](HeightProfileSmoothEvent& evt) { this->view3D->get_canvas3d()->smooth_layer_height_profile(evt.data); });
         view3D_canvas->Bind(EVT_GLCANVAS_RELOAD_FROM_DISK, [this](SimpleEvent&) { this->reload_all_from_disk(); });
 
-        // 3DScene/Toolbar:
+        // [EVENT] GLToolbar events (Prepare/Assembly toolbars).
+        // [UNITY] Map to UI Toolkit Toolbuttons or a custom Toolbar system.
         view3D_canvas->Bind(EVT_GLTOOLBAR_ADD, &priv::on_action_add, this);
         view3D_canvas->Bind(EVT_GLTOOLBAR_DELETE, [q](SimpleEvent&) { q->remove_selected(); });
         view3D_canvas->Bind(EVT_GLTOOLBAR_DELETE_ALL, [this](SimpleEvent&) { delete_all_objects_from_model(); });
@@ -5257,6 +5273,8 @@ Plater::priv::priv(Plater* q, MainFrame* main_frame)
     }
 
     if (wxGetApp().is_editor()) {
+        // [EVENT] Slicing and export lifecycle events.
+        // [UNITY] Map to SlicingManager callbacks and FileExport callbacks.
         q->Bind(EVT_SLICING_COMPLETED, &priv::on_slicing_completed, this);
         q->Bind(EVT_PROCESS_COMPLETED, &priv::on_process_completed, this);
         q->Bind(EVT_EXPORT_BEGAN, &priv::on_export_began, this);
@@ -5283,10 +5301,10 @@ Plater::priv::priv(Plater* q, MainFrame* main_frame)
         q->Bind(EVT_PRINT_FINISHED, [q](wxCommandEvent& evt) { q->print_job_finished(evt); });
         q->Bind(EVT_SEND_CALIBRATION_FINISHED, [q](wxCommandEvent& evt) { q->send_calibration_job_finished(evt); });
         q->Bind(EVT_SEND_FINISHED, [q](wxCommandEvent& evt) { q->send_job_finished(evt); });
+        q->Bind(EVT_SEND_FINISHED, [q](wxCommandEvent& evt) { q->send_job_finished(evt); });
         q->Bind(EVT_PUBLISH_FINISHED, [q](wxCommandEvent& evt) { q->publish_job_finished(evt); });
         q->Bind(EVT_OPEN_PLATESETTINGSDIALOG, [q](wxCommandEvent& evt) { q->open_platesettings_dialog(evt); });
         q->Bind(EVT_OPEN_FILAMENT_MAP_SETTINGS_DIALOG, [q](wxCommandEvent& evt) { q->open_filament_map_setting_dialog(evt); });
-        // q->Bind(EVT_GLVIEWTOOLBAR_ASSEMBLE, [q](SimpleEvent&) { q->select_view_3D("Assemble"); });
     }
 
     // Drop target:
@@ -5810,16 +5828,18 @@ void read_binary_stl(const std::string& filename, std::string& model_id, std::st
 
 // [INTENT] Main entry point for loading model files (3MF, STL, etc.) into the plater.
 // [UNITY] Map to an async loading system using UnityWebRequest or FileStream with background tasks.
-// [PORTING_HAZARD:P1] This method is massive and contains complex version-checking and 3MF archive logic.
+// [PORTING_HAZARD:P1] This method is massive (~1000 LOC) and contains complex version-checking and 3MF archive logic.
 // [PORTING_HAZARD:P1] Uses a blocking ProgressDialog which must be replaced with a non-blocking Unity UI overlay.
+// [PORTING_HAZARD:P2] Extensive use of boost::filesystem which should be replaced with System.IO.
 // BBS: backup & restore
 std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_files, LoadStrategy strategy, bool ask_multi)
 {
     std::vector<size_t> empty_result;
-    bool                dlg_cont       = true;
-    bool                is_user_cancel = false;
-    bool                translate_old  = false;
-    int                 current_width = 0, current_depth = 0, current_height = 0, project_filament_count = 1;
+    // [STATE] Tracking user interaction state during load.
+    bool dlg_cont       = true;
+    bool is_user_cancel = false;
+    bool translate_old  = false;
+    int  current_width = 0, current_depth = 0, current_height = 0, project_filament_count = 1;
 
     if (input_files.empty())
         return std::vector<size_t>();
