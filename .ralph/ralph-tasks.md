@@ -94,16 +94,24 @@
 - [x] **T110**: `src/slic3r/GUI/MainFrame.hpp`
 - [x] **T111-part1**: `src/slic3r/GUI/MainFrame.cpp` (1-2000)
 - [x] **T111-part2**: `src/slic3r/GUI/MainFrame.cpp` (2000-4000)
-- [ ] **T111-part3**: `src/slic3r/GUI/MainFrame.cpp` (4000-4307)
+- [x] **T111-part3**: `src/slic3r/GUI/MainFrame.cpp` (4000-4572)
   - *Subset methods:* Constructor, init_tabpanel(), init_menubar()
 - [ ] **T112**: Notebook/Tab system classes
 
 **Group 3: Core Workspace (Critical)**
-- [ ] **T120**: `src/slic3r/GUI/Plater.hpp` & `.cpp`
-  - *Focus:* 3D editor, model management, user interactions
-- [ ] **T121**: `src/slic3r/GUI/GLCanvas3D.hpp` & `.cpp`
+- [x] **T120**: `src/slic3r/GUI/Plater.hpp`
+- [ ] **T121-part1**: `src/slic3r/GUI/Plater.cpp` (1-2000)
+- [ ] **T121-part2**: `src/slic3r/GUI/Plater.cpp` (2000-4000)
+- [ ] **T121-part3**: `src/slic3r/GUI/Plater.cpp` (4000-6000)
+- [ ] **T121-part4**: `src/slic3r/GUI/Plater.cpp` (6000-8000)
+- [ ] **T121-part5**: `src/slic3r/GUI/Plater.cpp` (8000-10000)
+- [ ] **T121-part6**: `src/slic3r/GUI/Plater.cpp` (10000-12000)
+- [ ] **T121-part7**: `src/slic3r/GUI/Plater.cpp` (12000-14000)
+- [ ] **T121-part8**: `src/slic3r/GUI/Plater.cpp` (14000-16000)
+- [ ] **T121-part9**: `src/slic3r/GUI/Plater.cpp` (16000-18178)
+- [ ] **T122**: `src/slic3r/GUI/GLCanvas3D.hpp` & `.cpp`
   - *Focus:* OpenGL rendering viewport
-- [ ] **T122**: `src/slic3r/GUI/3DScene.hpp" & `.cpp`
+- [ ] **T123**: `src/slic3r/GUI/3DScene.hpp" & `.cpp`
 
 
 **Group 4: Panels & Dialogs (Medium)**

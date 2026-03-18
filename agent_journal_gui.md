@@ -332,14 +332,22 @@ Phase 0 orientation is now complete. All tasks executed and documented successfu
 - **Unity porting hazards identified**: 2
 - **Git commit**: 617436cdc7
 
-### Loop Checkpoint — Tasks T101–T120
+**Task T121-part1 COMPLETE**
+- **File**: `src/slic3r/GUI/Plater.cpp` (1-2000)
+- **Lines added**: 18 comment lines
+- **Key findings**: Implementation of the Sidebar widgets and layout. Heavy use of PIMPL (Sidebar::priv) to encapsulate UI state. Identified hazards in manual DPI scaling and PIMPL abstraction.
+- **Verification excerpt**: `// [PORTING_HAZARD:P2] The Sidebar::priv (PIMPL) pattern encapsulates nearly all UI logic and widget pointers.`
+- **Unity porting hazards identified**: 2
+- **Git commit**: <pending>
+
+### Loop Checkpoint — Tasks T101–T121-part1
 - Files processed this batch: 1
-- Cumulative annotated: 8
+- Cumulative annotated: 9
 - Cumulative SKIP_TRIVIAL: 0
 - Cumulative SKIP_VENDORED: 0
-- Total accounted for: 8
+- Total accounted for: 9
 - Manifest total: 719
-- Remaining: 711
+- Remaining: 710
 - Loop status: CONTINUING
 
 ---
