@@ -213,3 +213,23 @@ Create the dedicated GUI-analysis working branch required by Phase 0 without dis
 
 ### Next Steps
 - P0-T003: build the GUI manifest and record the manifest total for the Loop Completion Guard denominator.
+
+## Iteration 11: P0-T004
+
+### Objective
+Trace the GUI startup path from the shared binary entry point to `GUI_App::OnInit()` and record evidence for downstream Unity-porting analysis.
+
+### Completed Work
+- Started runtime task `task-1773798957-2abb` for P0-T004.
+- Read `src/OrcaSlicer.cpp`, `src/slic3r/GUI/GUI_Init.cpp`, and the `GUI_App::OnInit()` wrapper in `src/slic3r/GUI/GUI_App.cpp`.
+- Confirmed the GUI branch is selected inside `CLI::run()` only when no CLI actions were requested and `downward_check` is false.
+- Recorded the exact bootstrap chain in `agent_journal_gui.md`, including the `GUI_Run()` handoff and `wxEntry(...)` transition into `wxApp::CallOnInit()`.
+
+### Key Findings
+- The shared executable always enters `main()`/`CLI::run()` first; GUI mode is not a separate binary.
+- `Slic3r::GUI::GUI_Run()` constructs `GUI_App`, registers it as the wx singleton, and then hands control to `wxEntry(...)`.
+- `GUI_App::OnInit()` is intentionally thin; the substantive startup sequence lives in `on_init_inner()`, which is the next logical orientation target alongside the application-class task.
+
+### Next Steps
+- P0-T005: document `GUI_App` state and the first five `on_init_inner()` startup operations.
+- P0-T006: identify the main frame / plater hierarchy created during GUI startup.
