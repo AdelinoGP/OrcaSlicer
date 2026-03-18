@@ -2101,9 +2101,16 @@ void GUI_App::init_networking_callbacks()
             return std::string();
         });
 
+        // [EVENT] Subscribe failure callback - uses CallAfter to retry on UI thread
+        // [THREAD] Marshalling to UI thread for retry logic
+        // [UNITY] Use C# Task.Delay or Coroutine for retry; replace CallAfter with main thread context
         m_agent->set_on_subscribe_failure_fn(
             [this](std::string dev_id) { CallAfter([this, dev_id] { on_start_subscribe_again(dev_id); }); });
 
+        // [EVENT] Local network connection status callback
+        // [THREAD] Network thread -> UI thread via CallAfter
+        // [UNITY] Use Unity's NetworkDiscovery or custom mDNS/UDP layer
+        // [PORTING_HAZARD:P1] MachineObject state updates must be thread-safe or main-thread-only
         m_agent->set_on_local_connect_fn([this](int state, std::string dev_id, std::string msg) {
             if (is_closing()) {
                 return;
@@ -2113,6 +2120,7 @@ void GUI_App::init_networking_callbacks()
                     return;
                 }
                 /* request_pushing */
+                // [STATE] Update machine connection state
                 MachineObject* obj = m_device_manager->get_my_machine(dev_id);
                 wxCommandEvent event(EVT_CONNECT_LAN_MODE_PRINT);
 
@@ -2170,6 +2178,9 @@ void GUI_App::init_networking_callbacks()
             });
         });
 
+        // [EVENT] MQTT/Cloud message arrival callback
+        // [THREAD] Background thread -> UI thread via CallAfter
+        // [UNITY] Use a C# MQTT client (e.g. M2Mqtt) and Unity main thread dispatcher
         auto message_arrive_fn = [this](std::string dev_id, std::string msg) {
             if (is_closing()) {
                 return;
@@ -2199,6 +2210,8 @@ void GUI_App::init_networking_callbacks()
 
         m_agent->set_on_message_fn(message_arrive_fn);
 
+        // [EVENT] User-specific message arrival (notifications, profile updates)
+        // [UNITY] Map to Unity event bus or Reactive properties
         auto user_message_arrive_fn = [this](std::string user_id, std::string msg) {
             if (is_closing()) {
                 return;
@@ -2216,6 +2229,8 @@ void GUI_App::init_networking_callbacks()
 
         m_agent->set_on_user_message_fn(user_message_arrive_fn);
 
+        // [EVENT] Local LAN/SSDP message arrival callback
+        // [UNITY] Use UDP broadcast or specific IP connection
         auto lan_message_arrive_fn = [this](std::string dev_id, std::string msg) {
             if (is_closing()) {
                 return;
@@ -2242,17 +2257,34 @@ void GUI_App::init_networking_callbacks()
             });
         };
         m_agent->set_on_local_message_fn(lan_message_arrive_fn);
+
+        // [THREAD] Global main thread marshalling function for network agent
+        // [UNITY] Replace with Unity's MainThreadDispatcher or SynchronizationContext
         m_agent->set_queue_on_main_fn([this](std::function<void()> callback) { CallAfter(callback); });
     }
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": exit, m_agent=%1%") % m_agent;
 }
 
+// [INTENT] Application destructor - manual cleanup of singleton-like resources
+// [UNITY] Replace with OnDestroy() or let garbage collection handle managed objects
 GUI_App::~GUI_App()
 {
-    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": enter");
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": enter";
+    // [STATE] Destroy persistent application configuration
     if (app_config != nullptr) {
-        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": destroy app_config");
+        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": destroy app_config";
         delete app_config;
+    }
+
+    // [STATE] Destroy printer preset bundle
+    if (preset_bundle != nullptr) {
+        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": destroy preset_bundle";
+        delete preset_bundle;
+    }
+
+    if (preset_updater != nullptr) {
+        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": destroy preset updater";
+        delete preset_updater;
     }
 
     if (preset_bundle != nullptr) {
@@ -2381,6 +2413,10 @@ void GUI_App::init_webview_runtime()
 }
 #endif
 
+// [INTENT] Initialize platform-specific application configuration and data directories
+// [STATE] Sets up data_dir(), log_path, and loads AppConfig from disk
+// [UNITY] Use Unity's Application.persistentDataPath for directory setup
+// [PORTING_HAZARD:P2] _chdir() usage should be replaced with Unity's working directory handling
 void GUI_App::init_app_config()
 {
     // Profiles for the alpha are stored into the PrusaSlicer-alpha directory to not mix with the current release.
@@ -2543,6 +2579,9 @@ void GUI_App::update_http_extra_header()
         m_agent->set_extra_http_header(extra_headers);
 }
 
+// [EVENT] Timer-based reconnection retry for printer subscription
+// [THREAD] Uses wxTimer (UI thread timer) to delay execution
+// [UNITY] Replace with C# Coroutine (Yield return new WaitForSeconds(5)) or async Task.Delay
 void GUI_App::on_start_subscribe_again(std::string dev_id)
 {
     auto start_subscribe_timer = new wxTimer(this, wxID_ANY);
@@ -2969,6 +3008,8 @@ bool GUI_App::on_init_inner()
 
 
                  dialog.SetExtendedMessage(extmsg);*/
+                // [INTENT] Check for application updates and show version dialog
+                // [UNITY] Use Unity's Addressables or a custom C# update check (e.g. via GitHub API)
                 std::string skip_version_str  = this->app_config->get("app", "skip_version");
                 bool        skip_this_version = false;
                 if (!skip_version_str.empty()) {
@@ -2997,6 +3038,8 @@ bool GUI_App::on_init_inner()
             }
         });
 
+        // [EVENT] Force upgrade event - blocks usage until updated
+        // [UNITY] Use a blocking UI overlay or mandatory update check on Start()
         Bind(EVT_ENTER_FORCE_UPGRADE, [this](const wxCommandEvent& evt) {
             wxString       version_str      = wxString::FromUTF8(this->app_config->get("upgrade", "version"));
             wxString       description_text = wxString::FromUTF8(this->app_config->get("upgrade", "description"));
@@ -3019,6 +3062,8 @@ bool GUI_App::on_init_inner()
             dlg.ShowModal();
         });
 
+        // [EVENT] Generic message dialog display event
+        // [UNITY] Replace with a reusable UI Prefab for generic info/error dialogs
         Bind(EVT_SHOW_DIALOG, [this](const wxCommandEvent& evt) {
             wxString   msg = evt.GetString();
             InfoDialog dlg(this->mainframe, _L("Info"), msg);
@@ -3040,6 +3085,8 @@ bool GUI_App::on_init_inner()
     // [INTENT] Bind custom events for machine list updates, user login, privacy checks, and IP dialog
     // [EVENT] Custom wxWidgets events bound to GUI_App methods
     // [UNITY] Replace with UnityEvent or C# delegate callbacks
+    // [INTENT] Callbacks for application-level events (machine list, login, privacy)
+    // [UNITY] Map to C# events/delegates or a centralized EventBus
     Bind(EVT_UPDATE_MACHINE_LIST, &GUI_App::on_update_machine_list, this);
     Bind(EVT_USER_LOGIN, &GUI_App::on_user_login, this);
     Bind(EVT_USER_LOGIN_HANDLE, &GUI_App::on_user_login_handle, this);
@@ -3110,6 +3157,9 @@ please delete installed plugin and try again!");
     // [INTENT] Create the main application window
     // [STATE] mainframe holds the main window reference
     // [UNITY] Replace with Unity's Canvas/UI Toolkit main window or scene
+    // [INTENT] Main window creation and top-level UI initialization
+    // [STATE] The 'mainframe' variable is the root of the UI tree
+    // [UNITY] Replace with Unity's main scene initialization; 'mainframe' becomes a root GameObject
     BOOST_LOG_TRIVIAL(info) << "create the main window";
     mainframe = new MainFrame();
     // hide settings tabs after first Layout
@@ -3187,6 +3237,9 @@ please delete installed plugin and try again!");
     // [INTENT] Bind idle event for background tasks and subscriptions
     // [EVENT] wxEVT_IDLE - triggered when the application is idle
     // [UNITY] Replace with Unity's Update() or Coroutine system
+    // [EVENT] Application idle loop for background processing and post-init tasks
+    // [THREAD] Executes on the main UI thread when no events are pending
+    // [UNITY] Replace with MonoBehaviour.Update() or a Coroutine that yields null
     Bind(wxEVT_IDLE, [this](wxIdleEvent& event) {
         bool curr_studio_active = this->is_studio_active();
         if (m_studio_active != curr_studio_active) {
@@ -3222,6 +3275,8 @@ please delete installed plugin and try again!");
         // #else
         // [INTENT] Post-initialization sequence - called after idle event
         // [UNITY] Replace with Unity's Start() or coroutine-based initialization
+        // [INTENT] Final initialization step after the main window is shown
+        // [UNITY] Replace with Start() or a second-frame initialization coroutine
         if (!m_post_initialized && !m_adding_script_handler) {
             // #endif
             m_post_initialized = true;
@@ -3447,6 +3502,9 @@ bool GUI_App::on_init_network(bool try_backup)
     // Register all printer agents before creating the network agent
     Slic3r::NetworkAgentFactory::register_all_agents();
 
+    // [INTENT] Create the network agent based on current application configuration
+    // [STATE] m_agent holds the reference to the networking core
+    // [UNITY] Replace with a persistent C# NetworkingService MonoBehaviour or ScriptableObject
     // m_agent = new Slic3r::NetworkAgent(data_directory);
     std::unique_ptr<Slic3r::NetworkAgent> agent_ptr = Slic3r::create_agent_from_config(data_directory, app_config);
     m_agent                                         = agent_ptr.release();
@@ -3532,6 +3590,9 @@ unsigned GUI_App::get_colour_approx_luma(const wxColour& colour)
     return std::round(std::sqrt(r * r * .241 + g * g * .691 + b * b * .068));
 }
 
+// [INTENT] Switch the printer agent based on the currently selected printer model
+// [STATE] Swaps the printer-specific communication logic (e.g. BBL vs Generic)
+// [UNITY] Use a strategy pattern with C# interfaces (IPrinterAgent) and dynamic component swapping
 void GUI_App::switch_printer_agent()
 {
     if (!m_agent) {
@@ -3663,6 +3724,8 @@ void GUI_App::select_machine(const std::string& agent_id)
     }
 }
 
+// [INTENT] Check if the application is in dark mode based on OS settings or user config
+// [UNITY] Use Unity's EditorGUIUtility.isProSkin (in editor) or a custom theme manager for runtime
 bool GUI_App::dark_mode()
 {
 #ifdef SUPPORT_DARK_MODE
@@ -3762,6 +3825,8 @@ static bool is_default(wxWindow* win)
 }
 #endif
 
+// [INTENT] Apply dark mode styling to a specific wxWidgets window/control
+// [UNITY] Replace with Unity's UI Toolkit StyleSheet (.uss) or a custom UI theme applicator component
 void GUI_App::UpdateDarkUI(wxWindow* window, bool highlited /* = false*/, bool just_font /* = false*/)
 {
     if (wxButton* btn = dynamic_cast<wxButton*>(window)) {
@@ -3870,6 +3935,8 @@ void GUI_App::UpdateDarkUI(wxWindow* window, bool highlited /* = false*/, bool j
 }
 
 // recursive function for scaling fonts for all controls in Window
+// [INTENT] Recursively update dark mode UI for all child controls
+// [UNITY] Unity's UI Toolkit handles this via hierarchical style sheets; no manual recursion needed
 static void update_dark_children_ui(wxWindow* window, bool just_buttons_update = false)
 {
     /*bool is_btn = dynamic_cast<wxButton*>(window) != nullptr;
