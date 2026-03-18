@@ -2,6 +2,10 @@
 
 ## Patterns
 
+### mem-1773803554-99cc
+> wxWidgets to Unity porting: Use [UNITY] tag with specific component names (e.g., MonoBehaviour, UnityWebRequest, Job System)
+<!-- tags: unity, porting, wxwidgets | created: 2026-03-18 -->
+
 ### mem-1773637307-3ea2
 > Voronoi offset operations require careful handling of distance parameters and polygon counts
 <!-- tags: voronoi, offset, polygons | created: 2026-03-16 -->
@@ -13,6 +17,10 @@
 ## Decisions
 
 ## Fixes
+
+### mem-1773799068-f3c8
+> failure: cmd=git add agent_journal_gui.md .ralph/agent/scratchpad.md && git diff --cached -- agent_journal_gui.md .ralph/agent/scratchpad.md, exit=128, error=Unable to create .git/index.lock because a lock file already exists, next=inspect whether the lock is stale before retrying git staging
+<!-- tags: git, error-handling, tooling | created: 2026-03-18 -->
 
 ### mem-1773637309-e58b
 > Missing Voronoi vertices can be repaired via rotation-based mechanism with angles π/6, π/5, π/7, π/11

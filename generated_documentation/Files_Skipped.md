@@ -2,6 +2,8 @@
 |------|---------------|--------|
 | `src/dev-utils/encoding-check.cpp` | SKIP_TRIVIAL | PCH or tiny validation stub with no core slicer domain logic. |
 | `src/libslic3r/pchheader.hpp` | SKIP_TRIVIAL | PCH or tiny validation stub with no core slicer domain logic. |
+| `src/slic3r/pchheader.cpp` | SKIP_TRIVIAL | PCH or tiny validation stub with no core slicer domain logic. |
+| `src/slic3r/pchheader.hpp` | SKIP_TRIVIAL | PCH or tiny validation stub with no core slicer domain logic. |
 | `src/libvgcode/glad/include/glad/gles2.h` | SKIP_GUI | GUI/libvgcode path excluded from the core slicer annotation pass. |
 | `src/libvgcode/glad/include/glad/gl.h` | SKIP_GUI | GUI/libvgcode path excluded from the core slicer annotation pass. |
 | `src/libvgcode/glad/include/KHR/khrplatform.h` | SKIP_GUI | GUI/libvgcode path excluded from the core slicer annotation pass. |
@@ -664,8 +666,6 @@
 | `src/slic3r/GUI/wxinit.h` | SKIP_GUI | GUI/libvgcode path excluded from the core slicer annotation pass. |
 | `src/slic3r/GUI/wxMediaCtrl2.cpp` | SKIP_GUI | GUI/libvgcode path excluded from the core slicer annotation pass. |
 | `src/slic3r/GUI/wxMediaCtrl2.h` | SKIP_GUI | GUI/libvgcode path excluded from the core slicer annotation pass. |
-| `src/slic3r/pchheader.cpp` | SKIP_TRIVIAL | PCH or tiny validation stub with no core slicer domain logic. |
-| `src/slic3r/pchheader.hpp` | SKIP_TRIVIAL | PCH or tiny validation stub with no core slicer domain logic. |
 | src/slic3r/Utils/ASCIIFolding.cpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
 | src/slic3r/Utils/ASCIIFolding.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |
 | src/slic3r/Utils/AstroBox.hpp | SKIP_GUI | No libslic3r core include in first 30 lines. |

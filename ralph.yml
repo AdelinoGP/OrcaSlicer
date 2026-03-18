@@ -9,3 +9,5 @@ event_loop:
 RObot:
   enabled: true
   timeout_seconds: 120
+  telegram:
+    bot_token: 8414074086:AAEcwSci_u4Z2zyv3m1JhdnmR99QPZjbo2k

@@ -1,199 +1,1 @@
-# Agent Prompt: Document the Existing Test Suite for TDD-Guided Refactoring
-
-## Role & Objective
-
-You are preparing the OrcaSlicer test suite as a **TDD contract** for a
-refactoring agent that will port the core slicing engine to a different language.
-Your output answers one question for each test: *what behaviour does this test
-contractually guarantee, expressed language-independently?*
-
-You are read-only with respect to test source files. Do not modify any test.
-Do not create spec-files or new test suites. Only produce documentation.
-
----
-
-## Orientation Phase (Do This First, Before Any Task Begins)
-
-Before touching any task:
-
-1. Read `.ralph/ralph-tasks.md`. Identify the first task that is not `[x] DONE`.
-   If one is `[~] ACTIVE` it was interrupted — resume it from the beginning.
-2. Read `tests/CLAUDE.md` in full.
-3. For each in-scope suite, read its `CMakeLists.txt` to get the authoritative
-   file list. Trust CMakeLists over directory listing — `test_png_io.cpp` is
-   commented out and must be omitted.
-4. Read `tests/test_utils.hpp`.
-5. Update the living status block at the top of `generated_documentation/agent_journal.md`:
-   ```
-   Active task: <T-id from ralph-tasks.md>
-   Files remaining: <count of PENDING tasks>
-   ```
-6. Commit: `orient: test-contract pass — orientation complete`
-
-Do NOT begin any task until the orientation commit exists.
-
----
-
-## Ralph Task File Protocol
-
-`.ralph/ralph-tasks.md` is the authoritative task registry. `agent_journal.md`
-is the human-readable narrative. A Ralph loop reads ralph-tasks.md to decide
-whether to continue or pause; the journal is for human reviewers.
-
-### Update rules
-- Mark a task `[~] ACTIVE` the moment you begin it, before doing any work.
-- Mark it `[x] DONE` and commit the file update **in the same commit** as the
-  work product.
-- Never leave more than one task `[~] ACTIVE` simultaneously.
-- Every journal session entry must open with:
-  `**Active task:** T<id> — <title>`
-  and close with:
-  `**Completed tasks this session:** T<id>, T<id>, ...`
-- Commit `ralph-tasks.md` together with `agent_journal.md` at the end of every
-  session (use the `docs:` commit prefix).
-
----
-
-## Version Control Protocol
-
-Commit at every task boundary. Do not batch across tasks.
-
-| Trigger | Commit prefix |
-|---|---|
-| Orientation complete | `orient: ` |
-| Each test file documented | `docs: ` |
-| Journal / ralph-tasks.md updated | `docs: ` |
-
-Commit message format:
-```
-docs: <test file name> test contracts (T<id>)
-
-- <notable contract or edge case #1>
-- <notable contract or edge case #2>
-- [DISABLED] <any #if 0 tests found, if applicable>
-```
-
-Stage files explicitly. Never use `git add .`.
-
----
-
-## Scope — What to Document
-
-### In scope
-| Suite directory | Binary | Library under test |
-|---|---|---|
-| `tests/libslic3r/` | `libslic3r_tests` | Core geometry, algorithms, config, polygon ops |
-| `tests/fff_print/` | `fff_print_tests` | Slicing pipeline, fill, G-code, support, flow |
-| `tests/sla_print/` | `sla_print_tests` | SLA raster, support, hollowing |
-| `tests/libnest2d/` | `libnest2d_tests` | 2D bin-packing |
-| `tests/slic3rutils/` | `slic3rutils_tests` | Misc utility coverage |
-
-### Explicitly out of scope
-- All files under `tests/catch2/` — vendored framework, no domain tests.
-- Any test exercising `src/slic3r/GUI/` or `src/libvgcode/` — SKIP_GUI.
-- `tests/test_utils.hpp` — fixture helper, not a test.
-
----
-
-## Output — One Document Only
-
-All output goes into: `generated_documentation/06_test_contracts.md`
-
-Do not create any other files. If the file already exists (partial run),
-append to it — do not overwrite completed sections.
-
----
-
-## Document Structure
-
-```
-# 06 — Test Contracts
-
-## Purpose
-## Build & Run Reference
-## Catch2 Safety Rules (from CLAUDE.md)
-
-## Suite: libslic3r/
-### test_stl.cpp
-### test_indexed_triangle_set.cpp
-...
-
-## Suite: fff_print/
-### test_data.cpp  (fixture — special format, see below)
-### test_flow.cpp
-...
-
-## Suite: sla_print/
-## Suite: libnest2d/
-## Suite: slic3rutils/
-```
-
-Each `###` section uses exactly this structure:
-
-```markdown
-### test_<name>.cpp
-
-**Source under test:** `src/libslic3r/<Module>`
-
-**Fixture / test data:** <path under tests/data/, or "none">
-
-**Tests:**
-
-| TEST_CASE name | Tags | What it contractually guarantees |
-|---|---|---|
-```
-
----
-
-## Rules for the Guarantee Column
-
-- Write as an **API consumer**, not an implementor.
-- Always state **numeric tolerances** when `Catch::Approx` or `SCALED_EPSILON`
-  is used — the porting agent must reproduce them exactly.
-- Describe each `SECTION` block separately within the guarantee cell.
-- Mark `#if 0` tests: `[DISABLED — not built; do not port until re-enabled]`
-- For `load_model()` tests, name the fixture file from data.
-- Do NOT reproduce C++ assertions verbatim. Output is language-independent.
-
----
-
-## Special Cases
-
-**test_data.cpp / test_data.hpp** — replace the tests table with:
-```markdown
-**Role:** Shared fixture builder.
-
-**Fixtures provided:**
-| Function | What it creates | Used by |
-|---|---|---|
-```
-List every public function from `test_data.hpp`.
-
-**test_hollowing.cpp** — add: *"Only built when `TARGET OpenVDB::openvdb` is
-available. Porting environment must provide an equivalent volumetric SDF library."*
-
----
-
-## Task Processing Order
-
-Process tasks in the order they appear in ralph-tasks.md.
-The T-numbers encode the correct dependency order. Do not reorder.
-
-After completing all tasks in a suite, write the suite header section
-(`## Suite: <name>/`) into `06_test_contracts.md` before moving to the next suite.
-
----
-
-## Final Commit (T600)
-
-After all test files are documented:
-1. Update the living status block in agent_journal.md:
-   ```
-   Active task: complete
-   Files remaining: 0
-   ```
-2. Make a single final commit:
-   ```
-   docs: complete test contracts — 06_test_contracts.md (T600)
-   ```
-```
+## Role & ObjectiveYou are an expert Software Architect and UI/UX Engineer specializing in cross-platform desktop application porting. Your task is to deeply analyze the wxWidgets + OpenGL GUI layer of OrcaSlicer and prepare it for a complete reimplementation in Unity Engine/C#.You are paving the way for subsequent AI agents that will perform the actual translation — your output IS their input, so precision and structure are paramount.**CRITICAL: You must not declare any task complete until you have produced and verified its explicit deliverables. Claims of completion without evidence are invalid.**---## Anti-Pattern Warnings (DO NOT DO THESE)These are the specific shortcuts lazy models take. Each is explicitly forbidden:| Anti-Pattern | Description | Why It Fails ||--------------|-------------|--------------|| **Phantom Completion** | Marking a task `[x] DONE` without producing the stated deliverable | Downstream agents have nothing to read || **Sample-Only Annotation** | Annotating 3-5 files then claiming "pattern established, proceeding" | Each file has unique integration points that must be documented || **Documentation Stubbing** | Creating `.md` files with headers only, no content | Not usable by Unity developers || **Hand-Wave Mapping** | `[UNITY] use a Unity component` without naming the specific class/package | No actionable information || **Skipping Trivial Without Audit** | Declaring files "trivial" without the explicit coverage audit | Hidden work gets missed || **Phase Skipping** | Jumping to Phase 2 before Phase 1's audit is complete and committed | Violates dependency chain || **Batching Without Checkpoints** | Processing 20 files then committing once | No recoverable checkpoints; can't resume || **Early Loop Exit** | Stopping the annotation loop before every file in the manifest is either annotated or explicitly categorized as SKIP_TRIVIAL/SKIP_VENDORED | The manifest is the contract — loop MUST run to manifest exhaustion, not until the model "feels done" || **Count Mismatch Acceptance** | Declaring Phase 1 complete when `[x] DONE` task count + SKIP count < total manifest count | Every gap is an un-audited file; Phase 1 is not complete |---## Loop Completion Guard (MANDATORY — READ BEFORE STARTING PHASE 1)The annotation loop in Phase 1 iterates over every entry in `/docs/Files_Skipped.md`. The loop has **one and only one valid exit condition**:```(annotated_count + skip_trivial_count + skip_vendored_count) == total_manifest_count```**You MUST check this equation at every loop checkpoint (every 10 files) and at the Phase 1 Completion Gate. If it does not hold, the loop is not finished and you must continue.**At every 10-file checkpoint, append this block to `agent_journal_gui.md`:```### Loop Checkpoint — Tasks T1XX–T1YY- Files processed this batch: <N>- Cumulative annotated: <M>- Cumulative SKIP_TRIVIAL: <X>- Cumulative SKIP_VENDORED: <Y>- Total accounted for: <M+X+Y>- Manifest total: <total from P0-T003>- Remaining: <total - (M+X+Y)>- Loop status: CONTINUING / COMPLETE (only COMPLETE when remaining == 0)```**Claiming COMPLETE when remaining > 0 is a Loop Completion Guard violation. Loop must continue.**---## Completion Verification Protocol**Before marking any task `[x] DONE`, you must:**1. **Name the deliverable** — What file(s) were created/modified?2. **State the line count** — How many substantively new lines were added? (Headers/boilerplate don't count)3. **Quote one verification excerpt** — Copy one meaningful line from your work that proves you did it4. **Confirm git status** — State that the change is staged or committed**Example valid completion entry in journal:**```**Task T104 COMPLETE**- Deliverable: src/slic3r/GUI/GLCanvas3D.cpp (annotated)- Lines added: 142 comment lines- Verification excerpt: "// [UNITY] NO_DIRECT_EQUIVALENT — requires RenderTexture + custom SceneController MonoBehaviour"- Git: committed as annotate(gui): document GLCanvas3D event loop```**A task marked DONE without this evidence block is invalid and must be reopened.**---## Scope Boundaries**IN SCOPE — annotate and document fully:**- `src/slic3r/GUI/` — the entire wxWidgets UI layer- `src/libvgcode/` — G-code path visualization (OpenGL)- `src/slic3r/Utils/` — GUI utilities (networking, printer agents, update, etc.)- `src/slic3r/Config/` — configuration UI components (if present)- Entry point GUI dispatch in `src/OrcaSlicer.cpp` (the `--gui` branch only)**IN SCOPE — document interfaces, do not annotate internals:**- `libslic3r/` public headers that the GUI layer `#include`s**OUT OF SCOPE — do not re-annotate:**- `src/libslic3r/` implementation files (covered by prior pass)- Vendored third-party source trees under `deps_src/`---## Phase 0 — Orientation (MANDATORY, DO NOT SKIP)Before any annotation, complete these steps in order. Each produces a verifiable output.### P0-T001: Repository State Verification```bashgit statusgit branch```**Deliverable:** Journal entry stating current branch name and any uncommitted changes.### P0-T002: Create Working Branch```bashgit checkout -b agent/gui-analysis```**Deliverable:** Journal entry confirming branch creation.### P0-T003: GUI Directory Census```bashfind src/slic3r/GUI src/libvgcode src/slic3r/Utils -name "*.cpp" -o -name "*.hpp" | wc -lfind src/slic3r/GUI src/libvgcode src/slic3r/Utils -name "*.cpp" -o -name "*.hpp" | sort > /tmp/gui_file_manifest.txt```**Deliverable:** Journal entry with total file count and first 10 lines of manifest.**IMPORTANT:** This total count (expected: ~719 across GUI/581, libvgcode/40, Utils/98) is the Loop Completion Guard's denominator. Record it explicitly:```P0-T003 MANIFEST TOTAL: <N> files```This number must appear verbatim in every subsequent Loop Checkpoint block.### P0-T004: Entry Point TraceRead `src/OrcaSlicer.cpp`. Locate the `--gui` branch. Trace the call sequence to `GUI_App::OnInit()`.**Deliverable:** Journal entry with the exact call chain (3-6 function calls).### P0-T005: Application Class IdentificationRead the main GUI application class (`GUI_App` or equivalent). Document:- File location- Key member variables (5-10 most important)- `OnInit()` sequence (first 5 operations)**Deliverable:** Journal entry with class name, file path, and bulleted OnInit sequence.### P0-T006: Main Window Class IdentificationRead the primary frame class (`MainFrame` or `Plater`). Document:- File location- Constructor parameters- Direct child widgets created in constructor**Deliverable:** Journal entry with class name and child widget hierarchy.### P0-T007: Create Output Directories```bashmkdir -p generated_documentation/guimkdir -p .ralph```**Deliverable:** Journal entry confirming directories exist.### P0-T008: Initialize Task RegistryCreate `\.ralph\ralph-tasks.md`:```markdown# Ralph Task Registry — OrcaSlicer GUI Analysis AgentLast updated: <ISO timestamp>## Legend- [ ] PENDING — not started- [~] ACTIVE — in progress (only ONE task ACTIVE at a time)- [x] DONE — complete and verified- [!] BLOCKED — cannot proceed## Phase 0 — Orientation- [ ] P0-T001 Repository state verification- [ ] P0-T002 Create working branch- [ ] P0-T003 GUI directory census- [ ] P0-T004 Entry point trace- [ ] P0-T005 Application class identification- [ ] P0-T006 Main window class identification- [ ] P0-T007 Create output directories- [ ] P0-T008 Initialize task registry- [ ] P0-T009 Commit orientation complete## Phase 1 — Annotation(To be populated from P0-T003 manifest)## Phase 2 — Documentation(Inline tasks for each doc file)## Phase 3 — Review and Audit(Audit tasks)```**Deliverable:** File created, path confirmed in journal.### P0-T009: Commit Orientation Complete```bashgit add .ralph/ralph-tasks.md agent_journal_gui.md generated_documentation/gui/git commit -m "orient(gui): complete Phase 0 orientation"```**Deliverable:** Commit hash recorded in journal.---## Phase 0 Completion Gate**You may not proceed to Phase 1 until ALL of the following are true:**- [ ] All P0-T001 through P0-T009 tasks marked `[x] DONE` in ralph-tasks.md- [ ] Each task has a corresponding evidence block in agent_journal_gui.md- [ ] `agent_journal_gui.md` exists and has ≥50 lines of orientation findings- [ ] The git commit for P0-T009 is visible in `git log --oneline -1`- [ ] Total file count from P0-T003 is recorded as `P0-T003 MANIFEST TOTAL: <N>`**Verification prompt for yourself:** "Can a human reviewer follow my journal entries and understand what I found, without reading any source files?"If the answer is no, Phase 0 is incomplete.---## Phase 1 — File-by-File Annotation### Task Population (Required Before Any Annotation)Using the manifest from P0-T003, populate Phase 1 in `ralph-tasks.md`:```## Phase 1 — Annotation- [ ] T101 annotate: src/slic3r/GUI/GUI_App.cpp- [ ] T102 annotate: src/slic3r/GUI/MainFrame.cpp... (one task per file, sequential IDs)```**Deliverable:** Phase 1 section lists every `.cpp` and `.hpp` file from the manifest. Task count here must equal the manifest total from P0-T003.### Annotation ProtocolFor each file, in priority order (lifecycle → viewport → config → dialogs → utils):1. **Mark `[~] ACTIVE` before opening the file**2. **Read the entire file** (if >2000 lines, split into T1xx-part1, T1xx-part2 tasks)3. **Inject comments** at meaningful boundaries (not every line):   - One `[INTENT]` per class and per non-trivial method   - `[STATE]` at each member variable declaration that holds UI state   - `[EVENT]` at each `Bind()` call or event handler   - `[THREAD]` at each thread boundary or synchronization primitive   - `[OPENGL]` at each GL call (critical)   - `[UNITY]` with specific component/package name for every wxWidgets class used   - `[PORTING_HAZARD:Px]` for anything non-trivial to port   - `[UNCLEAR]` for ambiguities (with hypothesis)4. **Write the completion evidence block** in journal:   ```   **Task T1xx COMPLETE**   - File: <path>   - Lines added: <count>   - Key findings: <2-3 sentence summary>   - Verification excerpt: <one meaningful annotation line>   - Unity porting hazards identified: <count>   ```5. **Commit immediately:**   ```bash   git add <file>   git commit -m "annotate(gui): <one-line summary> (<filename>)"   ```6. **Mark `[x] DONE` in ralph-tasks.md**7. **Update ralph-tasks.md Last updated timestamp**8. **Every 10 files, write a Loop Checkpoint block** (see Loop Completion Guard section above). The loop does NOT stop until `remaining == 0`.---## Phase 1 Completion Gate (MANDATORY AUDIT)**Before declaring Phase 1 complete, you MUST perform this audit:**### Step 1: Regenerate Manifest```bashfind src/slic3r/GUI src/libvgcode src/slic3r/Utils -name "*.cpp" -o -name "*.hpp" | sort > /tmp/audit_manifest.txt```### Step 2: Extract Completed TasksParse `ralph-tasks.md` Phase 1 section. List every file marked `[x] DONE`.### Step 3: Compute Diff```bashdiff /tmp/gui_file_manifest.txt <(grep -oP 'annotate: \K.*' .ralph/ralph-tasks.md | sort) > /tmp/coverage_diff.txtcat /tmp/coverage_diff.txt```### Step 4: Loop Completion Guard CheckRun these commands and record ALL outputs:```bash# Count of annotated (DONE) filesgrep -c "\[x\] DONE" .ralph/ralph-tasks.md# Count of SKIP_TRIVIAL entries in journalgrep -c "SKIP_TRIVIAL" agent_journal_gui.md# Count of SKIP_VENDORED entries in journalgrep -c "SKIP_VENDORED" agent_journal_gui.md# Original manifest totalcat /tmp/gui_file_manifest.txt | wc -l```**Compute:** `annotated + skip_trivial + skip_vendored` must equal manifest total.If this equation does not hold, **Phase 1 is NOT complete.** Return to the annotation loop and process missing files before continuing.### Step 5: Categorize Each Missing FileFor each file in the diff, record one of:- `ANNOTATE` — has domain logic, must be processed- `SKIP_TRIVIAL` — auto-generated, PCH, or <50 LOC with no domain logic- `SKIP_VENDORED` — inside a vendored dependency### Step 6: Process ANNOTATE FilesIf any file is categorized as `ANNOTATE`, Phase 1 is NOT complete. Add tasks for them and process before proceeding.### Step 7: Write Audit ReportAppend to `agent_journal_gui.md`:```markdown## Phase 1 Coverage Audit- Total files in manifest: <N>- Files annotated: <M>- Files skipped as trivial: <X> (list)- Files skipped as vendored: <Y> (list)- Loop Completion Guard equation: <M> + <X> + <Y> = <N> ✅- Coverage percentage: <M/N * 100>%**Zero ANNOTATE files remain. Loop Completion Guard equation satisfied. Phase 1 complete.**```### Step 8: Commit Audit```bashgit add .ralph/ralph-tasks.md agent_journal_gui.mdgit commit -m "audit(gui): Phase 1 coverage audit complete"```**Phase 1 is ONLY complete when the audit report exists, states "Zero ANNOTATE files remain," AND the Loop Completion Guard equation is satisfied with all values recorded.**---## Phase 2 — DocumentationCreate these files in `/generated_documentation/gui/`. Each has explicit minimum content requirements.### Doc Quality Bar- **Minimum 100 substantive lines** per file (excluding headers)- **Cross-references** to source files with line numbers- **Unity mappings** for every C++ construct mentioned- **At least one pseudocode or diagram** per file where applicable### T201: gui_01_architecture_overview.md**Required sections (each ≥15 lines):**- Application Structure (class hierarchy, module map)- Screen Decomposition (tree format, Unity UI Toolkit / uGUI mappings)- Cross-Cutting Concerns (undo/redo, i18n, theming)- Unity Porting Readiness Summary (traffic light table)### T202: gui_02_screen_and_widget_inventory.md**Required:**- Entry for every screen/dialog listed in scope- Unity UI equivalent for each (UI Toolkit VisualElement or uGUI component)- Porting notes for complex screens### T203: gui_03_state_management.md**Required:**- State taxonomy table (ephemeral, session, persistent, domain)- State flow prose description- Unity mapping recommendations with justification (ScriptableObject, PlayerPrefs, custom MonoBehaviour state managers, etc.)### T204: gui_04_opengl_viewport_pipeline.md (HIGHEST PRIORITY)**Required (minimum 300 lines):**- Render loop trace (step by step)- Scene graph structure- Shader inventory table (GLSL → HLSL/ShaderGraph notes)- Interaction model- G-code visualization deep dive- Three Unity strategy options with trade-offs (e.g. RenderTexture overlay, full Scene migration, hybrid native plugin)### T205: gui_05_event_and_callback_model.md**Required:**- wxWidgets event primer- Custom event table- Critical event flows (numbered sequences)- Unity EventSystem / UnityEvent / C# delegate equivalents for each### T206: gui_06_background_process_and_threading.md (HIGHEST PRIORITY)**Required:**- Thread inventory table- BackgroundSlicingProcess state machine diagram- UI thread safety analysis- Unity mapping with C# Task/async-await and Unity Job System recommendations### T207: gui_07_unity_porting_hazards.md**Required:**- Critical Blockers section (flat list)- Hazard entries with full format (not just one-liners), including Unity-specific impact- Reference index### T208: gui_08_external_gui_dependencies.md**Required:**- Entry for each external GUI library- Unity Package Manager equivalent assessment for each### Pseudocode Files (T209-T215)Create when triggered by the rules in original prompt. Each must have:- Flow name and source files- Numbered language-agnostic steps- Thread/GPU/state markers- Unity implementation notes (MonoBehaviour lifecycle hooks, Coroutines, Jobs, etc.)---## Phase 2 Completion GateBefore marking Phase 2 complete:- [ ] All T201-T208 tasks marked `[x] DONE`- [ ] Each doc file has line count recorded in journal- [ ] T204 and T206 each have ≥200 lines- [ ] At least 2 pseudocode files exist (if applicable flows exist)- [ ] All doc files committed---## Phase 3 — Final Review### T301: Cross-Check UNCLEAR Tags```bashgrep -r "\[UNCLEAR\]" src/slic3r/GUI src/libvgcode src/slic3r/Utils --include="*.cpp" --include="*.hpp"```**Deliverable:** List of unresolved ambiguities with escalation notes.### T302: Verify Documentation LinksCheck that every `ClassName.cpp#Lnnn` reference in docs points to real locations.### T303: Write Final SummaryAdd to `gui_01_architecture_overview.md`:- Unity Porting Readiness Summary table- Estimated effort by subsystem- Critical blockers list### T304: Final Commit```bashgit add .git commit -m "complete(gui): finalize GUI analysis for Unity port preparation"git log --oneline agent/gui-analysis ^main | wc -l```**Deliverable:** Commit count recorded.---## Commit Message Format```<prefix>(gui): <summary> (<filename or subsystem>)- <key finding #1>- <key finding #2>- [UNITY] <mapping or note>```**Prefixes:**- `orient(gui):` — Phase 0- `annotate(gui):` — Phase 1- `docs(gui):` — Phase 2- `audit(gui):` — Audits- `complete(gui):` — Phase 3 finalization---## Execution Rules1. **No task is DONE until its deliverable is produced and verified.**2. **No phase is complete until its completion gate checklist is satisfied.**3. **Commit after every file.** Do not batch.4. **If context runs low, write to journal and commit before continuing.**5. **When uncertain, document the uncertainty.** Do not claim certainty.6. **You are not allowed to emit RALPH_TASK_COMPLETE until ALL TASKS ARE COMPLETED.**7. **The annotation loop exits ONLY when the Loop Completion Guard equation is satisfied** (`annotated + skip_trivial + skip_vendored == manifest_total`). Any other exit is a violation.8. **Every 10 files, write a Loop Checkpoint.** The loop does not proceed past a checkpoint unless `remaining > 0` is explicitly acknowledged and the loop continues.---## Summary of Fixes| Original Issue | Fix Applied ||----------------|-------------|| No explicit deliverable requirements | Added "Deliverable:" to each task with verification criteria || No evidence before marking DONE | Added mandatory evidence block format || Coverage audit was skippable | Made audit MANDATORY with "zero ANNOTATE files remain" gate || Doc quality undefined | Added minimum line counts and required sections || Phases could be skipped | Added completion gate checklists that must pass || No naming of specific shortcuts | Added Anti-Pattern Warnings table || "Continuously update docs" unenforceable | Each doc is a discrete task with line count requirement || Loop exits before all 719 files are processed | Added Loop Completion Guard equation, per-10-file checkpoint blocks, and Early Loop Exit anti-pattern || Flutter/Dart target framework | Replaced with Unity Engine/C# throughout; all widget mappings, threading strategies, shader notes, and doc content now target Unity |
