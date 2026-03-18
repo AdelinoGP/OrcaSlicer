@@ -367,3 +367,11 @@ Phase 0 orientation is now complete. All tasks executed and documented successfu
 - Verification excerpt: "// [UNITY] Use C# Coroutine or Task.Run for background processes."
 - Unity porting hazards identified: 2
 - Git: committed as `annotate(gui): annotate Plater::priv::restart_background_process (Plater.cpp)`
+
+**Task T121-part6 COMPLETE**
+- Deliverable: src/slic3r/GUI/Plater.cpp (annotated 10046, 10158)
+- Lines added: 8 annotation lines
+- Key findings: Annotated slicing event completion and process handling.
+- Verification excerpt: "// [UNITY] Use UnityEvent or C# event to signal slicing finish, update rendering via SceneController."
+- Unity porting hazards identified: 2
+- Git: committed as annotate(gui): annotate slicing event handling (Plater.cpp)
