@@ -77,11 +77,10 @@
 ### Priority Groups
 
 **Group 1: Application Core (Critical - Start Here)**
-- [~] **T101**: `src/slic3r/GUI/GUI_App.cpp` - Resume from line ~2700 (on_init_inner continuation)
-  - *Progress:* Partial - 5 methods annotated (210 lines from prior work)
-  - *Remaining:* ~240 methods
-  - *Target:* Complete lifecycle, event systems, networking
-  - *Current Focus:* on_init_inner() continuation and method sequence
+- [x] **T101-part1**: `src/slic3r/GUI/GUI_App.cpp` (1-2000)
+- [x] **T101-part2**: `src/slic3r/GUI/GUI_App.cpp` (2000-4000)
+- [ ] **T101-part3**: `src/slic3r/GUI/GUI_App.cpp` (4000-6000)
+- [ ] **T101-part4**: `src/slic3r/GUI/GUI_App.cpp` (6000-7972)
 
 - [ ] **T102**: `src/slic3r/GUI/GUI_App.hpp` ✓ DONE (partial)
   
