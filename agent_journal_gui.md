@@ -170,3 +170,11 @@ Census findings:
   10. src/libvgcode/src/CogMarker.hpp
 
 Note: Phase 1 task list has 720 entries because `GUI_App.cpp` is split into two tasks (T101 and T101-part2). This is acceptable for the annotation loop.
+
+**Task P0-T009 COMPLETE**
+- Deliverable: Commit `0688e9bba9` with orientation work
+- Lines added: 1 (task status update)
+- Verification excerpt: "orient(gui): mark P0-T009 as DONE"
+- Git: committed as orient(gui): mark P0-T009 as DONE
+
+Phase 0 orientation is now complete. Ready to proceed to Phase 1 annotation loop.
