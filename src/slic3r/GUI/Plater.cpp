@@ -12111,21 +12111,22 @@ void Plater::priv::undo_redo_to(std::vector<UndoRedo::Snapshot>::const_iterator 
     update_title_dirty_status();
 }
 
+// [INTENT] Updates UI after an Undo/Redo operation, including OpenGL canvas, selection state, and sidebar.
+// [UNITY] Use a centralized StateManager (ScriptableObject) to track Undo/Redo state and trigger UI updates via events.
 void Plater::priv::update_after_undo_redo(const UndoRedo::Snapshot& snapshot, bool /* temp_snapshot_was_taken */)
 {
+    // [OPENGL] Canvas selection clear
+    // [UNITY] Use Unity's Selection system or a custom SelectionManager.
     get_current_canvas3D()->get_canvas_type() == GLCanvas3D::CanvasAssembleView ? assemble_view->get_canvas3d()->get_selection().clear() :
                                                                                   this->view3D->get_canvas3d()->get_selection().clear();
-    // Update volumes from the deserializd model, always stop / update the background processing (for both the SLA and FFF technologies).
+    // [THREAD] Background processing update
+    // [PORTING_HAZARD] UI thread safety - update() call must be main-thread compliant in Unity
     this->update((unsigned int) UpdateParams::FORCE_BACKGROUND_PROCESSING_UPDATE |
                  (unsigned int) UpdateParams::POSTPONE_VALIDATION_ERROR_MESSAGE);
-    // Release old snapshots if the memory allocated is excessive. This may remove the top most snapshot if jumping to the very first
-    // snapshot.
-    // if (temp_snapshot_was_taken)
-    // Release the old snapshots always, as it may have happened, that some of the triangle meshes got deserialized from the snapshot,
-    // while some triangle meshes may have gotten released from the scene or the background processing, therefore now being calculated
-    // into the Undo / Redo stack size.
+    // [STATE] Release least recently used snapshots to manage memory
     this->undo_redo_stack().release_least_recently_used();
-    // YS_FIXME update obj_list from the deserialized model (maybe store ObjectIDs into the tree?) (no selections at this point of time)
+
+    // [OPENGL] Restore selection state after undo/redo
     get_current_canvas3D()->get_canvas_type() == GLCanvas3D::CanvasAssembleView ?
         assemble_view->get_canvas3d()
             ->get_selection()
@@ -12135,33 +12136,29 @@ void Plater::priv::update_after_undo_redo(const UndoRedo::Snapshot& snapshot, bo
             ->get_selection()
             .set_deserialized(GUI::Selection::EMode(this->undo_redo_stack().selection_deserialized().mode),
                               this->undo_redo_stack().selection_deserialized().volumes_and_instances);
+
+    // [OPENGL] Update gizmos manager after undo/redo
     get_current_canvas3D()->get_canvas_type() == GLCanvas3D::CanvasAssembleView ?
         assemble_view->get_canvas3d()->get_gizmos_manager().update_after_undo_redo(snapshot) :
         this->view3D->get_canvas3d()->get_gizmos_manager().update_after_undo_redo(snapshot);
 
+    // [UNITY] Update object list UI (UI Toolkit/VisualElement)
     wxGetApp().obj_list()->update_after_undo_redo();
 
     if (wxGetApp().get_mode() == comSimple && model_has_advanced_features(this->model)) {
-        // If the user jumped to a snapshot that require user interface with advanced features, switch to the advanced mode without
-        // asking. There is a little risk of surprising the user, as he already must have had the advanced or advanced mode active for
-        // such a snapshot to be taken.
+        // [PORTING_HAZARD] Switching UI modes automatically
         Slic3r::GUI::wxGetApp().save_mode(comAdvanced);
         view3D->set_as_dirty();
     }
 
-    // this->update() above was called with POSTPONE_VALIDATION_ERROR_MESSAGE, so that if an error message was generated when updating
-    // the back end, it would not open immediately, but it would be saved to be show later. Let's do it now. We do not want to display
-    // the message box earlier, because on Windows & OSX the message box takes over the message queue pump, which in turn executes the
-    // rendering function before a full update after the Undo / Redo jump.
     this->show_delayed_error_message();
-
-    // FIXME what about the state of the manipulators?
-    // FIXME what about the focus? Cursor in the side panel?
 
     BOOST_LOG_TRIVIAL(info) << "Undo / Redo snapshot reloaded. Undo / Redo stack memory: "
                             << Slic3r::format_memsize_MB(this->undo_redo_stack().memsize()) << log_memory_info();
 }
 
+// [INTENT] Brings the OrcaSlicer window to the front.
+// [UNITY] Use Unity's `Window.Focus()` or native OS-specific APIs via a native plugin if necessary.
 void Plater::priv::bring_instance_forward() const
 {
 #ifdef __APPLE__
@@ -12191,6 +12188,7 @@ void Plater::priv::bring_instance_forward() const
 }
 
 // BBS: popup object table
+// [INTENT] Displays the Object Table Dialog for a specific object/volume.
 // [UNITY] Use UI Toolkit popup / context menu for object tables
 bool Plater::priv::PopupObjectTable(int object_id, int volume_id, const wxPoint& position)
 {
@@ -12223,6 +12221,8 @@ void Sidebar::set_btn_label(const ActionButtonType btn_type, const wxString& lab
 
 // Plater / Public
 
+// [INTENT] Constructs the Plater panel.
+// [UNITY] Use a MonoBehaviour attached to a GameObject that manages the 3D Editor workspace.
 Plater::Plater(wxWindow* parent, MainFrame* main_frame)
     : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxGetApp().get_min_size()), p(new priv(this, main_frame))
 {
@@ -12231,6 +12231,8 @@ Plater::Plater(wxWindow* parent, MainFrame* main_frame)
     m_only_gcode = false;
 }
 
+// [INTENT] Shows/hides the plater panel.
+// [UNITY] Toggle GameObject active state.
 bool Plater::Show(bool show)
 {
     if (wxGetApp().mainframe)
