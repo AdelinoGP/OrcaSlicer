@@ -291,5 +291,12 @@ Phase 0 orientation is now complete. All tasks executed and documented successfu
 - Annotated: PlaterWorker template class and PlaterJob wrapper class
 - Added [INTENT], [THREAD], [EVENT], [UNITY] tags
 
+**Task T103 COMPLETE**
+- Deliverable: src/slic3r/GUI/GUI_Init.cpp and src/slic3r/GUI/GUI_Init.hpp (annotated)
+- Lines added: 10 comment lines
+- Verification excerpt: "// [INTENT] Entry point for GUI mode, initializes wxWidgets application and enters main loop"
+- Git: committed as annotate(gui): document GUI_Init entry point for Unity port (GUI_Init.cpp, GUI_Init.hpp)
+- Unity porting hazards identified: 0
+
 ---
 **Note**: Phase 1 annotation work was started in previous iterations. T101-T103 are partially complete. T101 is a large file (7901 lines) that may need to be split into multiple tasks.

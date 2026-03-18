@@ -85,9 +85,10 @@
 
 - [ ] **T102**: `src/slic3r/GUI/GUI_App.hpp` ✓ DONE (partial)
   
-- [ ] **T103**: `src/slic3r/GUI/GUI_Init.cpp` & `.hpp`
+- [x] **T103**: `src/slic3r/GUI/GUI_Init.cpp` & `.hpp`
   - *Focus:* GUI_Run() bootstrap sequence
   - *Priority:* High - Entry point to Unity world
+  - *Evidence:* Annotated entry point with [INTENT], [UNITY], [EVENT] tags
 
 **Group 2: Window Management (High)**
 - [ ] **T110**: `src/slic3r/GUI/MainFrame.hpp`
