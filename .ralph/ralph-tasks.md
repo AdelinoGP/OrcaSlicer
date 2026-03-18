@@ -1,8 +1,8 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
 
-**Created:** 2026-03-18 (Updated for Phase 0 Completion)  
+**Created:** 2026-03-18 (Updated for Phase 1 Progress)  
 **Project:** OrcaSlicer Unity Port - GUI Architecture Analysis  
-**Agent Status:** Phase 0 🎯 COMPLETE → Phase 1 Ready  
+**Agent Status:** Phase 1 🎯 IN PROGRESS
 
 ---
 
@@ -45,7 +45,7 @@
 - [x] **P0-T005**: Application Class Identification (GUI_App) ✓  
   *Deliverable:* `generated_documentation/gui/gui_app_class.md`  
   *Files:* `src/slic3r/GUI/GUI_App.hpp`, `src/slic3r/GUI/GUI_App.cpp`  
-  *Members:* 10 documented (m_initialized, m_app_mode, m_opengl_mgr, m_device_manager, etc.)  
+  *Members:* 10 documented (m_initialized, m_post_initialized, m_app_mode, m_opengl_mgr, m_device_manager, etc.)  
   *OnInit Sequence:* 5 operations documented
 
 - [x] **P0-T006**: Main Window Class Identification (MainFrame) ✓  
@@ -68,7 +68,7 @@
 
 ---
 
-## PHASE 1: ANNOTATION LOOP - **READY TO START** 
+## PHASE 1: ANNOTATION LOOP - **IN PROGRESS** 
 
 **Objective:** Annotate all GUI source files with porting tags  
 **Scope:** 719+ files identified in Phase 0 census  
@@ -79,10 +79,10 @@
 **Group 1: Application Core (Critical - Start Here)**
 - [x] **T101-part1**: `src/slic3r/GUI/GUI_App.cpp` (1-2000)
 - [x] **T101-part2**: `src/slic3r/GUI/GUI_App.cpp` (2000-4000)
-- [x] **T101-part3**: `src/slic3r/GUI/GUI_App.cpp` (4000-6000)
-- [ ] **T101-part4**: `src/slic3r/GUI/GUI_App.cpp` (6000-7972)
+- [x] **T101-part3**: `src/slic3r/GUI/GUI_App.cpp" (4000-6000)
+- [x] **T101-part4**: `src/slic3r/GUI/GUI_App.cpp` (6000-8070)
 
-- [ ] **T102**: `src/slic3r/GUI/GUI_App.hpp` ✓ DONE (partial)
+- [x] **T102**: `src/slic3r/GUI/GUI_App.hpp`
   
 - [x] **T103**: `src/slic3r/GUI/GUI_Init.cpp` & `.hpp`
   - *Focus:* GUI_Run() bootstrap sequence
@@ -90,7 +90,7 @@
   - *Evidence:* Annotated entry point with [INTENT], [UNITY], [EVENT] tags
 
 **Group 2: Window Management (High)**
-- [ ] **T110**: `src/slic3r/GUI/MainFrame.hpp`
+- [x] **T110**: `src/slic3r/GUI/MainFrame.hpp`
 - [ ] **T111**: `src/slic3r/GUI/MainFrame.cpp`
   - *Subset methods:* Constructor, init_tabpanel(), init_menubar()
 - [ ] **T112**: Notebook/Tab system classes
@@ -100,7 +100,8 @@
   - *Focus:* 3D editor, model management, user interactions
 - [ ] **T121**: `src/slic3r/GUI/GLCanvas3D.hpp` & `.cpp`
   - *Focus:* OpenGL rendering viewport
-- [ ] **T122**: `src/slic3r/GUI/3DScene.hpp` & `.cpp`
+- [ ] **T122**: `src/slic3r/GUI/3DScene.hpp" & `.cpp`
+
 
 **Group 4: Panels & Dialogs (Medium)**
 - [ ] **T130**: MonitorPanel  

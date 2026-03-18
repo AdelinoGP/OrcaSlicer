@@ -321,4 +321,26 @@ MainFrame
 - **Key findings**: Section covers font management, GUI recreation, user login, and cloud sync background threads.
 - **Verification excerpt**: "// [UNITY] In Unity, this corresponds to reloading the main Scene or re-instantiating the UI root Prefab."
 - **Unity porting hazards identified**: P1 hazard for full GUI recreation vs reactive UI; P1 hazard for cloud sync thread safety.
-- **Git commit**: (pending)
+- **Git commit**: `011b705974`
+
+---
+
+## Task T101-part4 COMPLETE
+- **File**: `src/slic3r/GUI/GUI_App.cpp` (Lines 6000-8080)
+- **Lines added**: ~50 annotation lines
+- **Key findings**: Finalized application core lifecycle, cloud synchronization threads, and file association logic.
+- **Verification excerpt**: "// [UNITY] Use Unity's Job System or Task.Run with main-thread synchronization for UI notifications."
+- **Unity porting hazards identified**: P1 hazard for thread-safe UI updates and background sync lifecycle.
+- **Git commit**: `d158c0a5f0`
+
+---
+
+## Task T110 COMPLETE
+- **File**: src/slic3r/GUI/MainFrame.hpp
+- **Lines added**: ~15 annotation lines
+- **Key findings**: Primary frame class managing top-level layout and sub-panels (Plater, Monitor, WebView, etc.).
+- **Verification excerpt**: "// [UNITY] Maps to a MainUIController MonoBehaviour that manages various UI Panels"
+- **Unity porting hazards identified**: 1 (Win32/Apple callbacks in header)
+- **Git commit**: `38d147d781`
+
+---
