@@ -314,16 +314,32 @@ Phase 0 orientation is now complete. All tasks executed and documented successfu
 - Key findings: Implementation of button enable logic (get_enable_slice_status), theme switching, DPI handling, and the complex main menu bar construction.
 - Verification excerpt: "// [PORTING_HAZARD:P2] Rescaling is manually implemented for each panel."
 - Unity porting hazards identified: 1
-- Git: pending commit for MainFrame.cpp Part 2
+- Git: committed as `annotate(gui): document GUI_App menu and styling (MainFrame.cpp 2000-4000)`
 
-### Loop Checkpoint — Tasks T101–T111
-- Files processed this batch: 7
-- Cumulative annotated: 7
+**Task T111-part3 COMPLETE**
+- Deliverable: src/slic3r/GUI/MainFrame.cpp (4000-4572)
+- Lines added: ~35 annotation lines
+- Key findings: Finalized MainFrame.cpp; covered configuration loading, tab switching, camera view selection, and file history with parallel thumbnail loading.
+- Verification excerpt: `// [THREAD] Parallel loading of thumbnails for project files using TBB.`
+- Unity porting hazards identified: 1
+- Git: committed as `annotate(gui): finalize MainFrame.cpp (4000-4572) (MainFrame.cpp)`
+
+**Task T120 COMPLETE**
+- **File**: `src/slic3r/GUI/Plater.hpp`
+- **Lines added**: ~25 annotation lines
+- **Key findings**: `Plater` is the central hub for model management and 3D rendering. `Sidebar` handles settings. Both use PIMPL (`struct priv`) to hide wxWidgets complexity, which is a major porting hazard.
+- **Verification excerpt**: `// [PORTING_HAZARD:P2] The 'priv' struct likely contains many wxWidgets objects and event handlers that need decomposition into Unity components.`
+- **Unity porting hazards identified**: 2
+- **Git commit**: (pending)
+
+### Loop Checkpoint — Tasks T101–T120
+- Files processed this batch: 1
+- Cumulative annotated: 8
 - Cumulative SKIP_TRIVIAL: 0
 - Cumulative SKIP_VENDORED: 0
-- Total accounted for: 7
+- Total accounted for: 8
 - Manifest total: 719
-- Remaining: 712
+- Remaining: 711
 - Loop status: CONTINUING
 
 ---
