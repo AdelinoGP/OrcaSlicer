@@ -214,8 +214,8 @@ public:
     }
 };
 
-// [INTENT] Main application class - wxApp subclass for GUI application
-// [UNITY] Replace with MonoBehaviour-based application controller
+// [INTENT] Main application class managing wxWidgets lifecycle and UI orchestration
+// [UNITY] Replace wxApp with MonoBehaviour on persistent GameObject (ScriptableObject for state)
 // [PORTING_HAZARD:P1] wxApp is a singleton - Unity needs MonoBehaviour on a GameObject
 class GUI_App : public wxApp
 {
@@ -318,7 +318,11 @@ public:
     // try again when subscription fails
     void        on_start_subscribe_again(std::string dev_id);
     std::string get_local_models_path();
-    bool        OnInit() override;
+    // [INTENT] Initialize wxWidgets application and UI framework
+    // [UNITY] Replace with MonoBehaviour.Start() or custom initialization sequence
+    bool OnInit() override;
+    // [INTENT] Clean up application resources on exit
+    // [UNITY] Replace with MonoBehaviour.OnDestroy()
     int         OnExit() override;
     bool        initialized() const { return m_initialized; }
     inline bool is_enable_multi_machine() { return this->app_config && this->app_config->get("enable_multi_machine") == "true"; }

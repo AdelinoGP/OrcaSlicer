@@ -334,11 +334,11 @@ Phase 0 orientation is now complete. All tasks executed and documented successfu
 
 **Task T121-part1 COMPLETE**
 - **File**: `src/slic3r/GUI/Plater.cpp` (1-2000)
-- **Lines added**: 18 comment lines
-- **Key findings**: Implementation of the Sidebar widgets and layout. Heavy use of PIMPL (Sidebar::priv) to encapsulate UI state. Identified hazards in manual DPI scaling and PIMPL abstraction.
-- **Verification excerpt**: `// [PORTING_HAZARD:P2] The Sidebar::priv (PIMPL) pattern encapsulates nearly all UI logic and widget pointers.`
-- **Unity porting hazards identified**: 2
-- **Git commit**: ad99ce1680
+- **Lines added**: 30 annotation lines
+- **Key findings**: Detailed Sidebar and ExtruderGroup implementation. Extensive use of PIMPL and manual DPI scaling for custom BBL widgets. AMSTray synchronization logic via MachineObject state.
+- **Verification excerpt**: `// [INTENT] Primary synchronization logic for extruder settings from the connected physical machine.`
+- **Unity porting hazards identified**: 2 (PIMPL, Manual DPI)
+- **Git commit**: 182094513a
 
 ### Loop Checkpoint — Tasks T101–T121-part1
 - Files processed this batch: 1
