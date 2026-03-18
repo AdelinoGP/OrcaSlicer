@@ -21,7 +21,7 @@ Last updated: 2026-03-18T03:00:00Z
 
 ## Phase 1 — Annotation
 - [x] T101 annotate: src/slic3r/GUI/GUI_App.cpp (part 1: lines 1-3256, on_init_inner)
-- [ ] T101-part2 annotate: src/slic3r/GUI/GUI_App.cpp (part 2: lines 3257-7965, remaining functions)
+- [x] T101-part2 annotate: src/slic3r/GUI/GUI_App.cpp (part 2: lines 3257-7965, remaining functions)
 - [x] T102 annotate: src/slic3r/GUI/GUI_App.hpp
 - [x] T103 annotate: src/slic3r/GUI/Jobs/PlaterWorker.hpp
 - [ ] T104 annotate: src/slic3r/GUI/MainFrame.cpp
