@@ -19,6 +19,20 @@
 - Need to check this equation every 10 files and at completion gate
 
 ## Next Steps
-- Complete P0-T009 (Commit orientation complete)
-- Verify Phase 0 completion gate checklist
+- Phase 0 orientation COMPLETE
 - Start Phase 1 annotation loop
+- Process first 10 files (T101-T110)
+- Write Loop Checkpoint after 10 files
+
+## Phase 0 Status
+- All P0 tasks marked DONE
+- All evidence blocks added to journal
+- Manifest total: 719 files
+- Ready for Phase 1
+
+## Phase 1 Status
+- T101 (GUI_App.cpp): Partially complete (55 UNITY annotations, 7972 lines)
+- T101-part2: Marked DONE in task list
+- T102 (GUI_App.hpp): Complete
+- T103 (PlaterWorker.hpp): Complete
+- Next: Continue annotation loop starting from T104 (MainFrame.cpp)
