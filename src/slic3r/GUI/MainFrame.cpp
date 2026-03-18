@@ -3996,6 +3996,8 @@ wxDD_DIR_MUST_EXIST); wxString path; if (dlg.ShowModal() == wxID_OK) path = dlg.
 
 // Load a provied DynamicConfig into the Print / Filament / Printer tabs, thus modifying the active preset.
 // Also update the plater with the new presets.
+// [INTENT] update GUI when printer config changes.
+// [UNITY] Map to active UI state in MainUIController or PresetController.
 void MainFrame::load_config(const DynamicPrintConfig& config)
 {
     PrinterTechnology printer_technology     = wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology();
@@ -4055,6 +4057,8 @@ void MainFrame::select_tab(wxPanel* panel)
 }
 
 // BBS
+// [INTENT] Switch to the machine monitoring panel.
+// [UNITY] Map to MonitorController or panel switching logic.
 void MainFrame::jump_to_monitor(std::string dev_id)
 {
     if (!m_monitor)
@@ -4108,6 +4112,8 @@ void MainFrame::select_tab(size_t tab /* = size_t(-1)*/)
     select(false);
 }
 
+// [EVENT] Request a tab switch from another thread or component.
+// [UNITY] Map to event-driven panel switch.
 void MainFrame::request_select_tab(TabPosition pos)
 {
     wxCommandEvent* evt = new wxCommandEvent(EVT_SELECT_TAB);
@@ -4123,6 +4129,8 @@ int MainFrame::get_calibration_curr_tab()
 }
 
 // Set a camera direction, zoom to all objects.
+// [INTENT] Control camera direction in the 3D viewport.
+// [UNITY] Map to CameraController in the 3D scene.
 void MainFrame::select_view(const std::string& direction)
 {
     if (m_plater)
@@ -4207,6 +4215,8 @@ void MainFrame::set_print_button_to_default(PrintSelectType select_type)
     }
 }
 
+// [STATE] Update the list of recently opened project files.
+// [UNITY] Map to persistent storage (JSON or ScriptableObject).
 void MainFrame::add_to_recent_projects(const wxString& filename)
 {
     if (wxFileExists(filename)) {
@@ -4252,6 +4262,8 @@ void MainFrame::FileHistory::RemoveFileFromHistory(size_t i)
 
 size_t MainFrame::FileHistory::FindFileInHistory(const wxString& file) { return m_fileHistory.Index(file); }
 
+// [THREAD] Parallel loading of thumbnails for project files using TBB.
+// [UNITY] Use Unity Job System or C# async/Task.Run with coroutines.
 void MainFrame::FileHistory::LoadThumbnails()
 {
     tbb::parallel_for(tbb::blocked_range<size_t>(0, GetCount()), [this](tbb::blocked_range<size_t> range) {
@@ -4393,6 +4405,8 @@ void MainFrame::RunScript(wxString js)
         m_webview->RunScript(js);
 }
 
+// [INTENT] Update menu titles based on printer technology change.
+// [UNITY] Map to UI label updates in MainUIController.
 void MainFrame::technology_changed()
 {
     // update menu titles
@@ -4482,6 +4496,8 @@ std::string MainFrame::get_dir_name(const wxString& full_name) const
 // SettingsDialog
 // ----------------------------------------------------------------------------
 
+// [INTENT] Secondary window for application settings.
+// [UNITY] Map to a SettingsPanel in the main UI or a separate Canvas.
 SettingsDialog::SettingsDialog(MainFrame* mainframe)
     : DPIDialog(NULL,
                 wxID_ANY,
