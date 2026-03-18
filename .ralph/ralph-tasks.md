@@ -20,7 +20,7 @@ Last updated: 2026-03-18T03:00:00Z
 - [x] P0-T009 Commit orientation complete
 
 ## Phase 1 — Annotation
-- [x] T101 annotate: src/slic3r/GUI/GUI_App.cpp (partial - 202 annotation lines added)
+- [~] T101 annotate: src/slic3r/GUI/GUI_App.cpp (partial - 202 annotation lines added, ongoing)
 - [x] T102 annotate: src/slic3r/GUI/GUI_App.hpp
 - [x] T103 annotate: src/slic3r/GUI/Jobs/PlaterWorker.hpp
 - [ ] T104 annotate: src/slic3r/GUI/MainFrame.cpp
