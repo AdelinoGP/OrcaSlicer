@@ -8,7 +8,7 @@ Document the test suite for TDD-guided refactoring.
 ### Completed Work
 - Oriented the project: read `ralph-tasks.md`, `tests/CLAUDE.md`, CMakeLists for all suites, `tests/test_utils.hpp`.
 - Updated `agent_journal.md` status block.
-- Committed orientation: `orient: test-contract pass — orientation complete`.
+- Committed orientation: `orient: test-contract pass - orientation complete`.
 - Started T109: `test_elephant_foot_compensation.cpp`.
 - Read and analyzed the test file.
 - Appended documentation to `generated_documentation/06_test_contracts.md`.
@@ -175,3 +175,41 @@ Document the test suite for TDD-guided refactoring.
 - Phase 3 (sla_print) complete with T301, T302, T303.
 - Move to Phase 4 (libnest2d suite).
 - Finalize with T600: complete test contracts documentation.
+
+## Iteration 9: GUI analysis bootstrap
+
+### Objective
+Prepare the repository for the wxWidgets/OpenGL GUI-to-Unity analysis pass.
+
+### Completed Work
+- Checked the runtime task queue and found no ready tasks for the new objective.
+- Created stable Phase 0 runtime tasks P0-T001 through P0-T009 for the orientation sequence.
+- Started P0-T001 and captured the current branch and dirty worktree state for the GUI analysis journal.
+
+### Notes
+- The repo is still on `agent/analysis` with unrelated modifications from the prior objective, so new work must avoid reverting or restaging that existing state.
+- This objective now uses `agent_journal_gui.md` for evidence and will keep `.ralph/agent/scratchpad.md` as an append-only reasoning log across iterations.
+- Current iteration scope stays atomic: finish P0-T001, commit the repository-state evidence, then hand off branch creation to the next iteration.
+
+### Outcome
+- Completed P0-T001 with commit `9581dd365f` (`orient(gui): record repository state baseline`).
+- Verified `agent_journal_gui.md` is clean in `git status` after the commit while unrelated worktree changes remain untouched.
+- Hit a transient `git add` failure caused by an `index.lock` message; recorded it as fix memory `mem-1773799068-f3c8` before retrying successfully.
+
+## Iteration 10: P0-T002
+
+### Objective
+Create the dedicated GUI-analysis working branch required by Phase 0 without disturbing the existing dirty worktree.
+
+### Completed Work
+- Started runtime task `task-1773798957-17d5` for P0-T002.
+- Confirmed `agent/gui-analysis` did not yet exist and that the current branch was still `agent/analysis` before the switch.
+- Created the new branch with `git checkout -b agent/gui-analysis`.
+- Appended branch-creation evidence to `agent_journal_gui.md`.
+
+### Notes
+- Git carried forward the unrelated modified, deleted, and untracked files onto the new branch, which is the safest behavior for preserving prior work while continuing the GUI analysis objective.
+- This iteration should commit only the journal and scratchpad updates tied to the branch-creation evidence.
+
+### Next Steps
+- P0-T003: build the GUI manifest and record the manifest total for the Loop Completion Guard denominator.
