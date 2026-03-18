@@ -340,9 +340,17 @@ Phase 0 orientation is now complete. All tasks executed and documented successfu
 - **Unity porting hazards identified**: 2 (PIMPL, Manual DPI)
 - **Git commit**: 182094513a
 
-### Loop Checkpoint — Tasks T101–T121-part1
+**Task T121-part2 COMPLETE**
+- **File**: `src/slic3r/GUI/Plater.cpp` (2001-4000)
+- **Lines added**: ~60 annotation lines
+- **Key findings**: Implementation of `Sidebar::msw_rescale` (High-maintenance manual scaling), `build_filament_ams_list` (Hardware/UI mapping), and `sync_ams_list` (Complex preset synchronization). Search bar and object list integration.
+- **Verification excerpt**: `// [PORTING_HAZARD:P1] Manual DPI scaling logic for all sidebar components.`
+- **Unity porting hazards identified**: 3 (Manual DPI, Hardware/UI tight coupling, Complex preset merge logic)
+- **Git commit**: (pending)
+
+### Loop Checkpoint — Tasks T101–T121-part2
 - Files processed this batch: 1
-- Cumulative annotated: 9
+- Cumulative annotated: 9 (segments of Plater.cpp counted as one progress unit)
 - Cumulative SKIP_TRIVIAL: 0
 - Cumulative SKIP_VENDORED: 0
 - Total accounted for: 9

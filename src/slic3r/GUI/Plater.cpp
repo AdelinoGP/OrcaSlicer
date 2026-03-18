@@ -2004,6 +2004,7 @@ Sidebar::Sidebar(Plater* parent) : wxPanel(parent, wxID_ANY, wxDefaultPosition, 
         int bed_type_idx = bed_type_value - 1;
         p->combo_printer_bed->Select(bed_type_idx);
 
+        // [INTENT] Update project configuration with the selected bed type from UI.
         auto& project_config = wxGetApp().preset_bundle->project_config;
         /*const t_config_enum_values* keys_map = print_config_def.get("curr_bed_type")->enum_keys_map;
         BedType bed_type = btCount;
@@ -2043,9 +2044,12 @@ Sidebar::Sidebar(Plater* parent) : wxPanel(parent, wxID_ANY, wxDefaultPosition, 
         */
         p->timer_sync_printer->Bind(wxEVT_TIMER, [this](wxTimerEvent& e) { p->flush_printer_sync(); });
 
-        p->left_extruder     = new ExtruderGroup(p->m_panel_printer_content, 0, _L("Left Nozzle"));
-        p->right_extruder    = new ExtruderGroup(p->m_panel_printer_content, 1, _L("Right Nozzle"));
-        p->single_extruder   = new ExtruderGroup(p->m_panel_printer_content, -1, _L("Nozzle"));
+        p->left_extruder   = new ExtruderGroup(p->m_panel_printer_content, 0, _L("Left Nozzle"));
+        p->right_extruder  = new ExtruderGroup(p->m_panel_printer_content, 1, _L("Right Nozzle"));
+        p->single_extruder = new ExtruderGroup(p->m_panel_printer_content, -1, _L("Nozzle"));
+
+        // [EVENT] Diameter switching logic. Updates extruder group state.
+        // [UNITY] Use UI Toolkit data binding or uGUI events.
         auto switch_diameter = [this](wxCommandEvent& evt) {
             auto extruder            = dynamic_cast<ExtruderGroup*>(dynamic_cast<ComboBox*>(evt.GetEventObject())->GetParent());
             p->is_switching_diameter = true;
@@ -2066,9 +2070,14 @@ Sidebar::Sidebar(Plater* parent) : wxPanel(parent, wxID_ANY, wxDefaultPosition, 
     {
         // Orca: Sidebar - Filament titlebar UI
         // add filament title
+        // [INTENT] Sidebar Filament Titlebar UI implementation.
+        // Handles collapsing/expanding of filament content area.
         p->m_panel_filament_title = new StaticBox(p->scrolled, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL | wxBORDER_NONE);
         p->m_panel_filament_title->SetBackgroundColor(title_bg);
         p->m_panel_filament_title->SetBackgroundColor2(0xF1F1F1);
+
+        // [EVENT] Sidebar section collapse/expand toggle.
+        // [UNITY] Use VisualElement.style.display or Foldout component.
         p->m_panel_filament_title->Bind(wxEVT_LEFT_UP, [this](wxMouseEvent& e) {
             if (e.GetPosition().x > (p->m_flushing_volume_btn->IsShown() ?
                                          p->m_flushing_volume_btn->GetPosition().x :
@@ -2178,8 +2187,8 @@ Sidebar::Sidebar(Plater* parent) : wxPanel(parent, wxID_ANY, wxDefaultPosition, 
         // wxBoxSizer* bSizer_filament_content;
         // bSizer_filament_content = new wxBoxSizer( wxHORIZONTAL );
 
-        // Orca: Sidebar - Filament content UI: setup filament selection combos panel layout
-        // Creates a two-column grid layout for filament selection dropdowns within the scrollable panel
+        // [INTENT] Filament content UI: setup filament selection combos panel layout.
+        // [UNITY] Use a GridGroup or ScrollView with a 2-column layout.
         p->sizer_filaments = new wxBoxSizer(wxHORIZONTAL);
         p->sizer_filaments->Add(new wxBoxSizer(wxVERTICAL), 1, wxEXPAND);
         p->sizer_filaments->Add(new wxBoxSizer(wxVERTICAL), 1, wxEXPAND);
@@ -2187,6 +2196,7 @@ Sidebar::Sidebar(Plater* parent) : wxPanel(parent, wxID_ANY, wxDefaultPosition, 
         p->combos_filament.push_back(nullptr);
 
         /* first filament item */
+        // [INTENT] Initialize the first filament selection combo box.
         init_filament_combo(&p->combos_filament[0], 0);
 
         // bSizer_filament_content->Add(p->sizer_filaments, 1, wxALIGN_CENTER | wxALL);
@@ -2220,7 +2230,8 @@ Sidebar::Sidebar(Plater* parent) : wxPanel(parent, wxID_ANY, wxDefaultPosition, 
         // add project content
         p->sizer_params = new wxBoxSizer(wxVERTICAL);
 
-        // ORCA: Update search box to modern style
+        // [INTENT] Modern search bar for filtering plates, objects, and parts.
+        // [UNITY] Use TextField with search icon and placeholder text.
         p->m_search_bar = new StaticBox(p->scrolled);
         p->m_search_bar->SetCornerRadius(0);
         p->m_search_bar->SetBorderColor(wxColour("#CECECE"));
@@ -2235,6 +2246,8 @@ Sidebar::Sidebar(Plater* parent) : wxPanel(parent, wxID_ANY, wxDefaultPosition, 
         text_ctrl->SetFont(Label::Body_13);
         text_ctrl->SetSize(wxSize(-1, FromDIP(16))); // Centers text vertically
 
+        // [EVENT] Focus event to pop up search dialog.
+        // [UNITY] Use OnFocus event callback.
         text_ctrl->Bind(wxEVT_SET_FOCUS, [this](wxFocusEvent& e) {
             if (p->dia->IsShown()) {
                 e.Skip();
@@ -2841,8 +2854,12 @@ void Sidebar::change_top_border_for_mode_sizer(bool increase_border)
 #endif
 }
 
+// [PORTING_HAZARD:P1] Manual DPI scaling logic for all sidebar components.
+// [UNITY] Unity's UI Toolkit handles DPI scaling automatically via Panel Settings.
+// This function should be deprecated in favor of responsive layout groups.
 void Sidebar::msw_rescale()
 {
+    // [STATE] Update minimum sizes and corner radii based on current DPI (em_unit).
     SetMinSize(wxSize(42 * wxGetApp().em_unit(), -1));
     p->m_panel_printer_title->GetSizer()->SetMinSize(-1, 3 * wxGetApp().em_unit());
     p->m_panel_filament_title->GetSizer()->SetMinSize(-1, 3 * wxGetApp().em_unit());
@@ -2855,6 +2872,8 @@ void Sidebar::msw_rescale()
     p->panel_printer_preset->SetMinSize(FromDIP(PRINTER_PANEL_SIZE));
     p->panel_printer_preset->SetCornerRadius(FromDIP(PRINTER_PANEL_RADIUS));
     p->image_printer->SetSize(FromDIP(PRINTER_THUMBNAIL_SIZE));
+
+    // [INTENT] Update printer thumbnail bitmap with scaled version.
     update_printer_thumbnail();
     p->combo_printer->Rescale();
     p->combo_printer->SetMaxSize(wxSize(-1, FromDIP(30))); // limiting height makes badge visible
@@ -3295,13 +3314,18 @@ void Sidebar::on_bed_type_change(BedType bed_type)
  * @param obj The MachineObject representing the connected printer (nullable)
  * @return Map of tray indices to filament configurations
  */
+// [INTENT] Build a map of filament configurations from the connected printer's AMS.
+// [UNITY] Map MachineObject (data model) to UI state via C# events or Data Binding.
+// The MachineObject is updated by NetworkAgent (MQTT/LAN) in the background.
 std::map<int, DynamicPrintConfig> Sidebar::build_filament_ams_list(MachineObject* obj)
 {
+    // [STATE] Dictionary of tray indices to filament configurations.
     std::map<int, DynamicPrintConfig> filament_ams_list;
     if (!obj)
         return filament_ams_list;
 
-    // For pull-mode agents (e.g., HTTP REST API), refresh DevFilaSystem first
+    // [THREAD] Pull-mode synchronization for non-MQTT devices.
+    // [UNITY] Use async/await or Task for network fetching.
     auto* agent = wxGetApp().getDeviceManager()->get_agent();
     if (agent && agent->get_filament_sync_mode() == FilamentSyncMode::pull) {
         if (!agent->fetch_filament_info(obj->get_dev_id())) {
@@ -3309,6 +3333,7 @@ std::map<int, DynamicPrintConfig> Sidebar::build_filament_ams_list(MachineObject
         }
     }
 
+    // [INTENT] Lambda to convert hardware tray state into UI config object.
     auto build_tray_config = [](DevAmsTray const& tray, std::string const& name, std::string ams_id, std::string slot_id) {
         BOOST_LOG_TRIVIAL(info) << boost::format("build_filament_ams_list: name %1% setting_id %2% type %3% color %4%") % name %
                                        tray.setting_id % tray.m_fila_type % tray.color;
@@ -3463,6 +3488,9 @@ void Sidebar::load_ams_list(MachineObject* obj)
     p->combo_printer->update();
 }
 
+// [INTENT] Complex synchronization of AMS filaments with local project presets.
+// [PORTING_HAZARD:P1] This function contains nested logic for matching, merging, and UI badging.
+// [UNITY] Use a Service class for this logic, separate from the UI components.
 void Sidebar::sync_ams_list(bool is_from_big_sync_btn)
 {
     wxBusyCursor cursor;
@@ -3479,6 +3507,7 @@ void Sidebar::sync_ams_list(bool is_from_big_sync_btn)
                                                      _L("Sync printer information"));
         return;
     }
+    // [INTENT] Check if at least one tray has filament before showing dialog.
     bool exist_at_list_one_filament = false;
     for (auto& cur : list) {
         auto temp_config    = cur.second;
@@ -3489,6 +3518,9 @@ void Sidebar::sync_ams_list(bool is_from_big_sync_btn)
             break;
         }
     }
+
+    // [EVENT] Trigger Sync AMS Info dialog.
+    // [UNITY] Use a modal popup or a dedicated Unity scene/panel.
     if (!exist_at_list_one_filament) {
         if (!obj->is_filament_installed()) {
             p->plater->pop_warning_and_go_to_device_page("", Plater::PrinterWarningType::UNINSTALL_FILAMENT, _L("Sync printer information"));
