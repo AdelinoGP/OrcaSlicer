@@ -8003,6 +8003,7 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
                                     << boost::format(" %1%, post an EVT_PROCESS_COMPLETED to main, status %2%") % __LINE__ % evt.status();
             // [EVENT] wxQueueEvent to notify the main thread of process cancellation or completion. Unity port should use a task-completion
             // source or event-driven callback on the main thread.
+            // [UNITY] Use C# Event or `UnityEvent` with custom data class for process-related notifications.
             wxQueueEvent(q, evt.Clone());
         }
     }
@@ -8052,6 +8053,7 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
 
 // [INTENT] restart_background_process logic. Starts the background processing thread if the state is valid.
 // Restart background processing thread based on a bitmask of UpdateBackgroundProcessReturnState.
+// [UNITY] Use C# Coroutine or Task.Run for background processes.
 bool Plater::priv::restart_background_process(unsigned int state)
 {
     if (!m_worker.is_idle()) {
@@ -8507,6 +8509,8 @@ bool Plater::priv::restart_background_process(unsigned int state)
         return false;
     }
 
+    // [INTENT] export_gcode. Schedule G-code export to disk.
+    // [UNITY] Use `System.IO` for file operations and `Task` for background export.
     void Plater::priv::export_gcode(fs::path output_path, bool output_path_on_removable_media)
     {
         wxCHECK_RET(!(output_path.empty()), "export_gcode: output_path and upload_job empty");
@@ -11610,7 +11614,7 @@ void Plater::update_partplate()
         // Fixing always.
         return !obj_idxs.empty() || !vol_idxs.empty();
 #else  // FIX_THROUGH_NETFABB_ALWAYS
-        // Fixing only if the model is not manifold.
+       // Fixing only if the model is not manifold.
         if (vol_idxs.empty()) {
             for (auto obj_idx : obj_idxs)
                 if (model.objects[obj_idx]->get_repaired_errors_count() > 0)
