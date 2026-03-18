@@ -61,9 +61,10 @@
   *File:* `.ralph/ralph-tasks.md` (this template)
 
 - [x] **P0-T009**: Commit Orientation Complete  
-  *Evidence:* All files staged, awaiting git commit command execution
+  *Evidence:* Commit `0dd3c23268 orient(gui): complete Phase 0 orientation` verified ✓
 
-**Phase 0 Result:** Complete orientation foundation with detailed architecture documentation
+**Phase 0 Result:** Complete orientation foundation with detailed architecture documentation  
+**Status:** Ready for Phase 1 - Annotation Loop (starting with T101)
 
 ---
 
@@ -76,10 +77,11 @@
 ### Priority Groups
 
 **Group 1: Application Core (Critical - Start Here)**
-- [ ] **T101**: `src/slic3r/GUI/GUI_App.cpp` - Resume from line ~2700 (on_init_inner continuation)
-  - *Progress:* Partial - 5 methods annotated (210 lines)
+- [~] **T101**: `src/slic3r/GUI/GUI_App.cpp` - Resume from line ~2700 (on_init_inner continuation)
+  - *Progress:* Partial - 5 methods annotated (210 lines from prior work)
   - *Remaining:* ~240 methods
   - *Target:* Complete lifecycle, event systems, networking
+  - *Current Focus:* on_init_inner() continuation and method sequence
 
 - [ ] **T102**: `src/slic3r/GUI/GUI_App.hpp` ✓ DONE (partial)
   
