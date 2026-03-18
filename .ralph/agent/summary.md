@@ -1,8 +1,8 @@
 # Loop Summary
 
 **Status:** Completed successfully
-**Iterations:** 3
-**Duration:** 5m 27s
+**Iterations:** 1
+**Duration:** 1m 54s
 
 ## Tasks
 
@@ -14,4 +14,4 @@ _No events recorded._
 
 ## Final Commit
 
-3ffc4be23b: annotate(gui): add Unity porting annotations (Plater.cpp 12000-14000)
+25fe5e119b: annotate(gui): annotate Plater.cpp (12000-14000) with Unity porting information
