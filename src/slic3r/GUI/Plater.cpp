@@ -4032,6 +4032,8 @@ std::string& Sidebar::get_search_line() { return p->searcher.search_string(); }
 
 static std::map<std::string, std::string> printer_thumbnails = {};
 
+// [INTENT] Update printer thumbnail based on selected preset and model.
+// [UNITY] Map to a dynamic Image component update in the Inspector UI.
 void Sidebar::update_printer_thumbnail()
 {
     auto&       preset_bundle   = wxGetApp().preset_bundle;
@@ -4073,6 +4075,9 @@ void Sidebar::update_printer_thumbnail()
     }
 }
 
+// [INTENT] Calculate flushing volumes for multi-material changes (AMS/MMU).
+// [STATE] Updates project configuration and triggers background reslice.
+// [UNITY] Move this to a FilamentManager ScriptableObject/Service.
 void Sidebar::auto_calc_flushing_volumes(const int filament_idx, const int extruder_id)
 {
     std::vector<int> filament_indices;
@@ -4111,6 +4116,8 @@ void Sidebar::auto_calc_flushing_volumes(const int filament_idx, const int extru
     p->plater->update();
 }
 
+// [INTENT] Internal matrix calculation for purging volumes based on color transition.
+// [UNITY] Core domain logic - should be ported to a pure C# utility class.
 void Sidebar::auto_calc_flushing_volumes_internal(const int modify_id, const int extruder_id)
 {
     auto&               preset_bundle            = wxGetApp().preset_bundle;
@@ -4209,72 +4216,9 @@ void Sidebar::auto_calc_flushing_volumes_internal(const int modify_id, const int
                              extruder_nums);
 }
 
-void Sidebar::jump_to_object(ObjectDataViewModelNode* item) { p->jump_to_object(item); }
-
-void Sidebar::can_search() { p->can_search(); }
-
-class PlaterDropTarget : public wxFileDropTarget
-{
-public:
-    PlaterDropTarget(MainFrame& mainframe, Plater& plater) : m_mainframe(mainframe), m_plater(plater)
-    {
-        this->SetDefaultAction(wxDragCopy);
-    }
-
-    virtual bool OnDropFiles(wxCoord x, wxCoord y, const wxArrayString& filenames);
-
-private:
-    MainFrame& m_mainframe;
-    Plater&    m_plater;
-};
-
-namespace {
-bool emboss_svg(Plater& plater, const wxString& svg_file, const Vec2d& mouse_drop_position)
-{
-    std::string svg_file_str = into_u8(svg_file);
-    GLCanvas3D* canvas       = plater.canvas3D();
-    if (canvas == nullptr)
-        return false;
-    auto base_svg = canvas->get_gizmos_manager().get_gizmo(GLGizmosManager::Svg);
-    if (base_svg == nullptr)
-        return false;
-    GLGizmoSVG* svg = dynamic_cast<GLGizmoSVG*>(base_svg);
-    if (svg == nullptr)
-        return false;
-
-    // Refresh hover state to find surface point under mouse
-    wxMouseEvent evt(wxEVT_MOTION);
-    evt.SetPosition(wxPoint(mouse_drop_position.x(), mouse_drop_position.y()));
-    canvas->on_mouse(evt); // call render where is call GLCanvas3D::_picking_pass()
-
-    return svg->create_volume(svg_file_str, mouse_drop_position, ModelVolumeType::MODEL_PART);
-}
-} // namespace
-
-// State to manage showing after export notifications and device ejecting
-enum ExportingStatus { NOT_EXPORTING, EXPORTING_TO_REMOVABLE, EXPORTING_TO_LOCAL };
-
-// TODO: listen on dark ui change
-class FloatFrame : public wxAuiFloatingFrame
-{
-public:
-    FloatFrame(wxWindow* parent, wxAuiManager* ownerMgr, const wxAuiPaneInfo& pane) : wxAuiFloatingFrame(parent, ownerMgr, pane)
-    {
-        wxGetApp().UpdateFrameDarkUI(this);
-    }
-};
-
-class AuiMgr : public wxAuiManager
-{
-public:
-    AuiMgr() : wxAuiManager() {}
-
-    virtual wxAuiFloatingFrame* CreateFloatingFrame(wxWindow* parent, const wxAuiPaneInfo& p) override
-    {
-        return new FloatFrame(parent, this, p);
-    }
-};
-
+// [INTENT] Structure representing the core state of the Plater (PIMPL).
+// [UNITY] This struct contains the state that will be moved into a SceneController MonoBehaviour.
+// [STATE] Holds the active model, print configurations, and background slicing process.
 // Plater / private
 struct Plater::priv
 {
@@ -4345,6 +4289,7 @@ struct Plater::priv
 
     ProjectDirtyStateManager dirty_state;
 
+    // [THREAD] The background process for slicing. In Unity, this maps to a BackgroundWorker or Job system.
     BackgroundSlicingProcess background_process;
     bool                     suppressed_backround_processing_update{false};
 
@@ -4355,8 +4300,10 @@ struct Plater::priv
     //
     // UIThreadWorker can be used as a replacement for BoostThreadWorker if
     // no additional worker threads are desired (useful for debugging or profiling)
+    // [UNITY] Use Unity Job System for heavy calculations.
     PlaterWorker<BoostThreadWorker> m_worker;
-    SLAImportDialog*                m_sla_import_dlg;
+
+    SLAImportDialog* m_sla_import_dlg;
 
     int m_job_prepare_state;
 
@@ -4892,6 +4839,9 @@ bool PlaterDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString& fi
     return res;
 }
 
+// [INTENT] Initialize the Plater's private state, UI managers, and event bindings.
+// [UNITY] Corresponds to Awake/Start in SceneController.
+// [EVENT] Massive binding list maps wxWidgets events to internal methods.
 Plater::priv::priv(Plater* q, MainFrame* main_frame)
     : q(q)
     , main_frame(main_frame)
@@ -4924,6 +4874,7 @@ Plater::priv::priv(Plater* q, MainFrame* main_frame)
 {
     m_is_dark = wxGetApp().app_config->get("dark_color_mode") == "1";
 
+    // [UNITY] wxAuiManager maps to Unity's UI Toolkit docking/layout system.
     m_aui_mgr.SetManagedWindow(q);
     m_aui_mgr.SetDockSizeConstraint(1, 1);
     // m_aui_mgr.GetArtProvider()->SetMetric(wxAUI_DOCKART_PANE_BORDER_SIZE, 0);
@@ -4953,7 +4904,7 @@ Plater::priv::priv(Plater* q, MainFrame* main_frame)
     fff_print.set_status_callback(statuscb);
     sla_print.set_status_callback(statuscb); */
 
-    // BBS: to be checked. Not follow patch.
+    // [EVENT] Slicing and background process event bindings.
     background_process.set_thumbnail_cb(
         [this](const ThumbnailsParams& params) { return this->generate_thumbnails(params, Camera::EType::Ortho); });
     background_process.set_slicing_completed_event(EVT_SLICING_COMPLETED);
@@ -4977,6 +4928,7 @@ Plater::priv::priv(Plater* q, MainFrame* main_frame)
     this->q->Bind(EVT_ADD_CUSTOM_FILAMENT, &priv::on_add_custom_filament, this);
     main_frame->m_tabpanel->Bind(wxEVT_NOTEBOOK_PAGE_CHANGING, &priv::on_tab_selection_changing, this);
 
+    // [UNITY] 3D viewports (Prepare, Preview, Assemble) map to separate Unity Scenes or Camera/Layer setups.
     auto* panel_3d = new wxPanel(q);
     view3D         = new View3D(panel_3d, bed, &model, config, &background_process);
     // BBS: use partplater's gcode
@@ -5428,6 +5380,9 @@ Plater::priv::~priv()
     main_frame->m_tabpanel->Unbind(wxEVT_NOTEBOOK_PAGE_CHANGING, &priv::on_tab_selection_changing, this);
 }
 
+// [INTENT] The primary update loop for the Plater. Handles UI refreshes and background process triggers.
+// [THREAD] UI thread only.
+// [UNITY] Use MonoBehaviour.Update() or a reactive state system to trigger view refreshes.
 void Plater::priv::update(unsigned int flags)
 {
     // the following line, when enabled, causes flickering on NVIDIA graphics cards
@@ -5470,7 +5425,12 @@ void Plater::priv::update(unsigned int flags)
     update_sidebar();
 }
 
-void Plater::priv::select_view(const std::string& direction)
+// [INTENT] Main entry point for loading model files (3MF, STL, etc.) into the plater.
+// [UNITY] Map to an async loading system using UnityWebRequest or FileStream with background tasks.
+// [PORTING_HAZARD:P1] This method is massive and contains complex version-checking and 3MF archive logic.
+// [PORTING_HAZARD:P1] Uses a blocking ProgressDialog which must be replaced with a non-blocking Unity UI overlay.
+// BBS: backup & restore
+std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_files, LoadStrategy strategy, bool ask_multi)
 {
     if (current_panel == view3D) {
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << __LINE__ << "select view3D";
