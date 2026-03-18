@@ -16,5 +16,6 @@
     "question": "allow",
     "lsp": "allow",
     "external_directory": "allow"
-  }
+  },
+  "plugin": ["opencode-gemini-auth@latest"]
 }

@@ -2,6 +2,14 @@
 
 ## Patterns
 
+### mem-1773855069-f68b
+> MainFrame.cpp annotated: maps to MainUIController managing the main application panels (Prepare, Preview, Monitor, etc.). Includes complex configuration change propagation and parallel thumbnail loading.
+<!-- tags: gui, unity, mainframe, threading | created: 2026-03-18 -->
+
+### mem-1773854191-51bd
+> MainFrame.hpp annotated: Maps to MainUIController MonoBehaviour managing various UI Panels.
+<!-- tags: gui, unity, mainframe | created: 2026-03-18 -->
+
 ### mem-1773803554-99cc
 > wxWidgets to Unity porting: Use [UNITY] tag with specific component names (e.g., MonoBehaviour, UnityWebRequest, Job System)
 <!-- tags: unity, porting, wxwidgets | created: 2026-03-18 -->
