@@ -2114,6 +2114,8 @@ wxBoxSizer* MainFrame::create_side_tools()
     return sizer;
 }
 
+// [INTENT] Check if slicing is permitted based on current background process state and plater mode.
+// [UNITY] Map to SlicingController state check.
 bool MainFrame::get_enable_slice_status()
 {
     bool enable = true;
@@ -2153,6 +2155,8 @@ bool MainFrame::get_enable_slice_status()
     return enable;
 }
 
+// [INTENT] Check if printing/exporting is permitted based on current plate state and user selection.
+// [UNITY] Map to PrintController state check.
 bool MainFrame::get_enable_print_status()
 {
     bool enable = true;
@@ -2299,6 +2303,9 @@ void MainFrame::update_slice_print_status(SlicePrintEventType event, bool can_sl
         wxGetApp().plater()->update_title_dirty_status();
 }
 
+// [INTENT] Handle application-wide UI scaling based on DPI changes.
+// [UNITY] Map to CanvasScaler or UI Toolkit global scaling.
+// [PORTING_HAZARD:P2] Rescaling is manually implemented for each panel.
 void MainFrame::on_dpi_changed(const wxRect& suggested_rect)
 {
     wxGetApp().update_fonts(this);
@@ -2367,6 +2374,8 @@ void MainFrame::on_dpi_changed(const wxRect& suggested_rect)
     this->Maximize(is_maximized);
 }
 
+// [INTENT] Respond to system-level theme or color changes.
+// [UNITY] Use custom ThemeManager to switch Stylesheets or materials.
 void MainFrame::on_sys_color_changed()
 {
     wxBusyCursor wait;
@@ -2534,6 +2543,8 @@ static void add_common_view_menu_items(wxMenu* view_menu, MainFrame* mainFrame, 
         mainFrame);
 }
 
+// [INTENT] Primary entry point for constructing the complex main menu bar.
+// [UNITY] Map to a global UI Panel managing Dropdown menus for File, Edit, View etc.
 void MainFrame::init_menubar_as_editor()
 {
 #ifdef __APPLE__
@@ -4022,6 +4033,8 @@ void MainFrame::load_config(const DynamicPrintConfig& config)
 }
 
 // BBS: GUI refactor
+// [INTENT] Switch between primary application panels (Prepare, Preview, Monitor, etc.).
+// [UNITY] Map to active panel switching in MainUIController.
 void MainFrame::select_tab(wxPanel* panel)
 {
     if (!panel)

@@ -289,12 +289,42 @@ Phase 0 orientation is now complete. All tasks executed and documented successfu
 - Annotated: PlaterWorker template class and PlaterJob wrapper class
 - Added [INTENT], [THREAD], [EVENT], [UNITY] tags
 
-**Task T103 COMPLETE**
-- Deliverable: src/slic3r/GUI/GUI_Init.cpp and src/slic3r/GUI/GUI_Init.hpp (annotated)
-- Lines added: 10 comment lines
-- Verification excerpt: "// [INTENT] Entry point for GUI mode, initializes wxWidgets application and enters main loop"
-- Git: committed as annotate(gui): document GUI_Init entry point for Unity port (GUI_Init.cpp, GUI_Init.hpp)
-- Unity porting hazards identified: 0
+**Task T101-part4 COMPLETE**
+- Deliverable: `src/slic3r/GUI/GUI_App.cpp` (annotated 6000-8070)
+- Lines added: ~15 annotation lines
+- Key findings: Completes the GUI_App implementation analysis, covering cloud preset synchronization threads, language selection, application mode management, and platform-specific file associations.
+- Verification excerpt: `// [THREAD] Background thread loop for preset synchronization.` and `// [UNITY] Use Unity's Job System or Task.Run with main-thread synchronization for UI notifications.`
+- Unity porting hazards identified: 2 (Native Windows Registry access, complex background synchronization with UI updates)
+- Git: committed as `annotate(gui): complete GUI_App.cpp (6000-8070) (GUI_App.cpp)`
+
+**Cumulative Annotated Files (7/719):**
+1. src/slic3r/GUI/GUI_App.cpp
+2. src/slic3r/GUI/GUI_App.hpp
+3. src/slic3r/GUI/GUI_Init.cpp
+4. src/slic3r/GUI/GUI_Init.hpp
+5. src/slic3r/GUI/Jobs/PlaterWorker.hpp
+6. src/slic3r/GUI/MainFrame.hpp
+7. src/slic3r/GUI/MainFrame.cpp (Parts 1-2)
 
 ---
-**Note**: Phase 1 annotation work was started in previous iterations. T101-T103 are partially complete. T101 is a large file (7901 lines) that may need to be split into multiple tasks.
+
+**Task T111-part2 COMPLETE**
+- Deliverable: src/slic3r/GUI/MainFrame.cpp (lines 2000-4000)
+- Lines added: 18 annotation lines injected across 6 key functions.
+- Key findings: Implementation of button enable logic (get_enable_slice_status), theme switching, DPI handling, and the complex main menu bar construction.
+- Verification excerpt: "// [PORTING_HAZARD:P2] Rescaling is manually implemented for each panel."
+- Unity porting hazards identified: 1
+- Git: pending commit for MainFrame.cpp Part 2
+
+### Loop Checkpoint — Tasks T101–T111
+- Files processed this batch: 7
+- Cumulative annotated: 7
+- Cumulative SKIP_TRIVIAL: 0
+- Cumulative SKIP_VENDORED: 0
+- Total accounted for: 7
+- Manifest total: 719
+- Remaining: 712
+- Loop status: CONTINUING
+
+---
+**Note**: Phase 1 annotation work was started in previous iterations. T101-T103 are complete for their respective segments. `GUI_App.cpp` is now fully annotated across 4 task parts.
