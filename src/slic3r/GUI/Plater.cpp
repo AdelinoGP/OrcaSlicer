@@ -12007,6 +12007,7 @@ void Plater::priv::undo_redo_to(std::vector<UndoRedo::Snapshot>::const_iterator 
     bool new_selected_layer_on_sidebar     = (new_flags & UndoRedo::SnapshotData::SELECTED_LAYER_ON_SIDEBAR) != 0;
     bool new_selected_layerroot_on_sidebar = (new_flags & UndoRedo::SnapshotData::SELECTED_LAYERROOT_ON_SIDEBAR) != 0;
 
+    // [OPENGL] Gizmos management (SLA supports)
     if (this->view3D->get_canvas3d()->get_gizmos_manager().wants_reslice_supports_on_undo())
         top_snapshot_data.flags |= UndoRedo::SnapshotData::RECALCULATE_SLA_SUPPORTS;
 
@@ -12038,6 +12039,7 @@ void Plater::priv::undo_redo_to(std::vector<UndoRedo::Snapshot>::const_iterator 
                             (new_printer_technology == ptFFF) ? m_last_fff_printer_profile_name : m_last_sla_printer_profile_name);
             // FIXME Why are we reloading the whole preset bundle here? Please document. This is fishy and it is unnecessarily expensive.
             //  Anyways, don't report any config value substitutions, they have been already reported to the user at application start up.
+            // [UNITY] Preset loading should use a ScriptableObject-based configuration manager.
             wxGetApp().preset_bundle->load_presets(*app_config, ForwardCompatibilitySubstitutionRule::EnableSilent);
             // load_current_presets() calls Tab::load_current_preset() -> TabPrint::update() ->
             // Object_list::update_and_show_object_settings_item(), but the Object list still keeps pointer to the old Model. Avoid a
