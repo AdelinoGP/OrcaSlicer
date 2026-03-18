@@ -12008,6 +12008,7 @@ void Plater::priv::undo_redo_to(std::vector<UndoRedo::Snapshot>::const_iterator 
     bool new_selected_layerroot_on_sidebar = (new_flags & UndoRedo::SnapshotData::SELECTED_LAYERROOT_ON_SIDEBAR) != 0;
 
     // [OPENGL] Gizmos management (SLA supports)
+    // [PORTING_HAZARD] OpenGL Context Access
     if (this->view3D->get_canvas3d()->get_gizmos_manager().wants_reslice_supports_on_undo())
         top_snapshot_data.flags |= UndoRedo::SnapshotData::RECALCULATE_SLA_SUPPORTS;
 
@@ -12190,6 +12191,7 @@ void Plater::priv::bring_instance_forward() const
 }
 
 // BBS: popup object table
+// [UNITY] Use UI Toolkit popup / context menu for object tables
 bool Plater::priv::PopupObjectTable(int object_id, int volume_id, const wxPoint& position)
 {
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(" enter, create ObjectTableDialog");
