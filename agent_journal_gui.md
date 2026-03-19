@@ -277,3 +277,15 @@ SKIP_TRIVIAL: src/libvgcode/src/GCodeInputData.cpp
 - Verification excerpt: "// [UNITY] These GLSL shaders require conversion to URP HLSL / ShaderGraph."
 - Unity porting hazards identified: 1 (Shader syntax incompatibility)
 - Git: committed as annotate(gui): enhance shader annotations (ShadersES.hpp)
+**Task T141 COMPLETE**
+- Deliverable: src/slic3r/GUI/2DBed.cpp (annotated)
+- Lines added: 12 comment lines
+- Key findings: Class Bed_2D manages 2D visualization using wxWidgets wxDC (no OpenGL). It requires mapping to Unity UI Toolkit or custom MonoBehaviour with painting.
+- Verification excerpt: " // [INTENT] Class Bed_2D provides a 2D preview panel for bed visualization."
+- Unity porting hazards identified: 1 (wxDC drawing logic)
+**Task T142 COMPLETE**
+- Deliverable: src/slic3r/GUI/2DBed.hpp (annotated)
+- Lines added: 6 comment lines
+- Key findings: Class Bed_2D exposes UI state for the 2D preview.
+- Verification excerpt: "// [INTENT] Class Bed_2D provides a 2D preview panel."
+- Unity porting hazards identified: 0 (This is a header annotation)
