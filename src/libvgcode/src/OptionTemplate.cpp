@@ -10,17 +10,23 @@
 #include <algorithm>
 #include <cmath>
 
+// [INTENT] OptionTemplate manages GPU resources for a diamond-shaped marker.
+// [UNITY] Use a MonoBehaviour to manage procedural Mesh generation and rendering.
+//         The `init` method should be replaced with Mesh construction (SetVertices, SetNormals, SetIndices).
+//         `render` should call Graphics.DrawMeshInstanced for performance, mapping from `glDrawArraysInstanced`.
+
 namespace libvgcode {
 
 // Geometry:
 // diamond with 'resolution' sides, centered at (0.0, 0.0, 0.0)
 // height and width of the diamond are equal to 1.0
+// [UNITY] Reimplement as procedural mesh generation method.
 void OptionTemplate::init(uint8_t resolution)
 {
     if (m_top_vao_id != 0)
         return;
 
-    m_resolution = std::max<uint8_t>(resolution, 3);
+    m_resolution     = std::max<uint8_t>(resolution, 3);
     m_vertices_count = 2 + resolution;
     const float step = 2.0f * PI / float(m_resolution);
 
@@ -29,11 +35,11 @@ void OptionTemplate::init(uint8_t resolution)
     //
     std::vector<float> top_vertices;
     top_vertices.reserve(6 * m_vertices_count);
-    add_vertex({ 0.0f, 0.0f, 0.5f }, { 0.0f, 0.0f, 1.0f }, top_vertices);
+    add_vertex({0.0f, 0.0f, 0.5f}, {0.0f, 0.0f, 1.0f}, top_vertices);
     for (uint8_t i = 0; i <= m_resolution; ++i) {
-        const float ii = float(i) * step;
-        const Vec3 pos = { 0.5f * std::cos(ii), 0.5f * std::sin(ii), 0.0f };
-        const Vec3 norm = normalize(pos);
+        const float ii   = float(i) * step;
+        const Vec3  pos  = {0.5f * std::cos(ii), 0.5f * std::sin(ii), 0.0f};
+        const Vec3  norm = normalize(pos);
         add_vertex(pos, norm, top_vertices);
     }
 
@@ -42,20 +48,20 @@ void OptionTemplate::init(uint8_t resolution)
     //
     std::vector<float> bottom_vertices;
     bottom_vertices.reserve(6 * m_vertices_count);
-    add_vertex({ 0.0f, 0.0f, -0.5f }, { 0.0f, 0.0f, -1.0f }, bottom_vertices);
+    add_vertex({0.0f, 0.0f, -0.5f}, {0.0f, 0.0f, -1.0f}, bottom_vertices);
     for (uint8_t i = 0; i <= m_resolution; ++i) {
-        const float ii = -float(i) * step;
-        const Vec3 pos = { 0.5f * std::cos(ii), 0.5f * std::sin(ii), 0.0f };
-        const Vec3 norm = normalize(pos);
+        const float ii   = -float(i) * step;
+        const Vec3  pos  = {0.5f * std::cos(ii), 0.5f * std::sin(ii), 0.0f};
+        const Vec3  norm = normalize(pos);
         add_vertex(pos, norm, bottom_vertices);
     }
 
     m_size_in_bytes_gpu += top_vertices.size() * sizeof(float);
     m_size_in_bytes_gpu += bottom_vertices.size() * sizeof(float);
 
-    const size_t vertex_stride = 6 * sizeof(float);
+    const size_t vertex_stride   = 6 * sizeof(float);
     const size_t position_offset = 0;
-    const size_t normal_offset = 3 * sizeof(float);
+    const size_t normal_offset   = 3 * sizeof(float);
 
     int curr_vertex_array;
     glsafe(glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &curr_vertex_array));
@@ -68,9 +74,9 @@ void OptionTemplate::init(uint8_t resolution)
     glsafe(glBindBuffer(GL_ARRAY_BUFFER, m_top_vbo_id));
     glsafe(glBufferData(GL_ARRAY_BUFFER, top_vertices.size() * sizeof(float), top_vertices.data(), GL_STATIC_DRAW));
     glsafe(glEnableVertexAttribArray(0));
-    glsafe(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertex_stride, (const void*)position_offset));
+    glsafe(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertex_stride, (const void*) position_offset));
     glsafe(glEnableVertexAttribArray(1));
-    glsafe(glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, vertex_stride, (const void*)normal_offset));
+    glsafe(glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, vertex_stride, (const void*) normal_offset));
 
     glsafe(glGenVertexArrays(1, &m_bottom_vao_id));
     glsafe(glBindVertexArray(m_bottom_vao_id));
@@ -78,9 +84,9 @@ void OptionTemplate::init(uint8_t resolution)
     glsafe(glBindBuffer(GL_ARRAY_BUFFER, m_bottom_vbo_id));
     glsafe(glBufferData(GL_ARRAY_BUFFER, bottom_vertices.size() * sizeof(float), bottom_vertices.data(), GL_STATIC_DRAW));
     glsafe(glEnableVertexAttribArray(0));
-    glsafe(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertex_stride, (const void*)position_offset));
+    glsafe(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertex_stride, (const void*) position_offset));
     glsafe(glEnableVertexAttribArray(1));
-    glsafe(glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, vertex_stride, (const void*)normal_offset));
+    glsafe(glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, vertex_stride, (const void*) normal_offset));
 
     glsafe(glBindBuffer(GL_ARRAY_BUFFER, curr_array_buffer));
     glsafe(glBindVertexArray(curr_vertex_array));
