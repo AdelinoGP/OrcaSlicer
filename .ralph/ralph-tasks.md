@@ -48,11 +48,11 @@ Last updated: 2026-03-19T03:10:00Z
 - [x] T127 annotate: src/libvgcode/src/Settings.cpp
 - [x] T128 annotate: src/libvgcode/src/Settings.hpp (completed with T127)
 - [x] T129 annotate: src/libvgcode/src/ShadersES.hpp
-- [ ] T130 annotate: src/libvgcode/src/Shaders.hpp
-- [ ] T131 annotate: src/libvgcode/src/ToolMarker.cpp
-- [ ] T132 annotate: src/libvgcode/src/ToolMarker.hpp
-- [ ] T133 annotate: src/libvgcode/src/Types.cpp
-- [ ] T134 annotate: src/libvgcode/src/Utils.cpp
+- [x] T130 annotate: src/libvgcode/src/Shaders.hpp
+- [x] T131 annotate: src/libvgcode/src/ToolMarker.cpp
+- [x] T132 annotate: src/libvgcode/src/ToolMarker.hpp
+- [x] T133 annotate: src/libvgcode/src/Types.cpp
+- [x] T134 annotate: src/libvgcode/src/Utils.cpp
 - [ ] T135 annotate: src/libvgcode/src/Utils.hpp
 - [ ] T136 annotate: src/libvgcode/src/Viewer.cpp
 - [ ] T137 annotate: src/libvgcode/src/ViewerImpl.cpp
