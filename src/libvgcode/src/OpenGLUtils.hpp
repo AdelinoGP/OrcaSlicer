@@ -14,6 +14,10 @@
 
 #include <string>
 
+// [INTENT] OpenGLWrapper and OpenGL-specific macros (glsafe) for error handling.
+// [UNITY] Not required. Unity handles all OpenGL context management and shader abstraction automatically.
+//         This header and macro system should be removed entirely during porting.
+
 namespace libvgcode {
 #ifndef NDEBUG
 #define HAS_GLSAFE
@@ -22,10 +26,17 @@ namespace libvgcode {
 #ifdef HAS_GLSAFE
 extern void glAssertRecentCallImpl(const char* file_name, unsigned int line, const char* function_name);
 inline void glAssertRecentCall() { glAssertRecentCallImpl(__FILE__, __LINE__, __FUNCTION__); }
-#define glsafe(cmd) do { cmd; glAssertRecentCallImpl(__FILE__, __LINE__, __FUNCTION__); } while (false)
-#define glcheck() do { glAssertRecentCallImpl(__FILE__, __LINE__, __FUNCTION__); } while (false)
+#define glsafe(cmd) \
+    do { \
+        cmd; \
+        glAssertRecentCallImpl(__FILE__, __LINE__, __FUNCTION__); \
+    } while (false)
+#define glcheck() \
+    do { \
+        glAssertRecentCallImpl(__FILE__, __LINE__, __FUNCTION__); \
+    } while (false)
 #else
-inline void glAssertRecentCall() { }
+inline void glAssertRecentCall() {}
 #define glsafe(cmd) cmd
 #define glcheck()
 #endif // HAS_GLSAFE
