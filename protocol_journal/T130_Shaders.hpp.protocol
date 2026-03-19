@@ -1,0 +1,89 @@
+/// PROTOCOL ANNOTATION: T130 - Shaders.hpp
+/// File: /home/admin/slicerProject/OrcaSlicerDocumented_tests/src/libvgcode/src/Shaders.hpp
+/// Date: 2026-03-19
+/// Processor: opencode
+
+///=============================================================================
+/// BOUNDARY 1: Header Guards and Includes (lines 1-10)
+///=============================================================================
+#ifndef VGCODE_SHADERS_HPP
+#define VGCODE_SHADERS_HPP
+
+// needed for tech VGCODE_ENABLE_COG_AND_TOOL_MARKERS
+#include "../include/Types.hpp"
+
+namespace libvgcode {
+
+///=============================================================================
+/// BOUNDARY 2: Segments Vertex Shader - lines 13-138
+///=============================================================================
+/// Purpose: Desktop OpenGL rendering of line segments
+/// Key Differences from ES version:
+/// - Version 150 (desktop GL)
+/// - Uses samplerBuffer instead of sampler2D
+/// - Vertex ID as int attribute (not float)
+/// - Platform-specific scaling factor (#ifdef _WIN32)
+///=============================================================================
+static const char* Segments_Vertex_Shader =
+
+///=============================================================================
+/// BOUNDARY 3: Segments Fragment Shader - lines 140-146
+///=============================================================================
+static const char* Segments_Fragment_Shader =
+
+///=============================================================================
+/// BOUNDARY 4: Options Vertex Shader - lines 148-200
+///=============================================================================
+/// Purpose: Desktop version of option markers
+/// Key Features:
+/// - Platform-specific scaling factor (0.75 vs 1.5)
+/// - Same geometry approach as ES version
+///=============================================================================
+static const char* Options_Vertex_Shader =
+
+///=============================================================================
+/// BOUNDARY 5: Options Fragment Shader - lines 202-208
+///=============================================================================
+static const char* Options_Fragment_Shader =
+
+///=============================================================================
+/// BOUNDARY 6: COG Marker Shaders - lines 210-256
+///=============================================================================
+/// Condition: VGCODE_ENABLE_COG_AND_TOOL_MARKERS
+/// Purpose: Center-of-gravity marker for desktop
+static const char* Cog_Marker_Vertex_Shader =
+static const char* Cog_Marker_Fragment_Shader =
+
+///=============================================================================
+/// BOUNDARY 7: Tool Marker Shaders - lines 258-297
+///=============================================================================
+/// Condition: VGCODE_ENABLE_COG_AND_TOOL_MARKERS
+/// Purpose: Tool position marker for desktop
+static const char* Tool_Marker_Vertex_Shader =
+static const char* Tool_Marker_Fragment_Shader =
+
+///=============================================================================
+/// BOUNDARY 8: Footer - lines 298-303
+///=============================================================================
+} // namespace libvgcode
+#endif // VGCODE_SHADERS_HPP
+
+///---------------------------------------------------------------------
+/// COMPLETION EVIDENCE BLOCK - T130
+///---------------------------------------------------------------------
+TASK_ID: T130
+TASK_DESCRIPTION: Process Shaders.hpp - Desktop OpenGL shader strings
+COMPLETION_DATE: 2026-03-19
+ANNOTATION_PROTOCOL: Complete
+TAGS_APPLIED:
+  - Header Guards: 1
+  - Shader Boundaries: 7
+  - Conditional Blocks: 2 (COG/TOOL_MARKERS)
+  - Platform Directives: 1 (_WIN32)
+  - Namespace Scope: 1
+VERIFICATION:
+  ✓ Platform-specific variations identified (samplerBuffer vs sampler2D)
+  ✓ Version differences documented (150 vs 300 es)
+  ✓ Scaling factor platform dependency noted
+  ✓ Consistent structure with ShadersES.hpp
+STATUS: COMPLETE
