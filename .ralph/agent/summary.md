@@ -2,7 +2,7 @@
 
 **Status:** Completed successfully
 **Iterations:** 2
-**Duration:** 3m 48s
+**Duration:** 2m 43s
 
 ## Tasks
 
@@ -14,4 +14,4 @@ _No events recorded._
 
 ## Final Commit
 
-442bb2b0fc: annotate(gui): document PresetComboBox for Unity porting (PresetComboBoxes.cpp)
+e39018e679: annotate(gui): document architecture in Tab.cpp
