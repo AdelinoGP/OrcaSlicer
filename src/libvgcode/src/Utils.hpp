@@ -15,16 +15,19 @@
 
 namespace libvgcode {
 
-extern void add_vertex(const Vec3& position, const Vec3& normal, std::vector<float>& vertices);
-extern void add_triangle(uint16_t v1, uint16_t v2, uint16_t v3, std::vector<uint16_t>& indices);
-extern Vec3 normalize(const Vec3& v);
+// [INTENT] Utility functions for geometry processing and vector math.
+// [UNITY] Use Mathf or Vector3 static utility methods in Unity.
+
+extern void  add_vertex(const Vec3& position, const Vec3& normal, std::vector<float>& vertices);
+extern void  add_triangle(uint16_t v1, uint16_t v2, uint16_t v3, std::vector<uint16_t>& indices);
+extern Vec3  normalize(const Vec3& v);
 extern float dot(const Vec3& v1, const Vec3& v2);
 extern float length(const Vec3& v);
-extern bool operator == (const Vec3& v1, const Vec3& v2);
-extern bool operator != (const Vec3& v1, const Vec3& v2);
-extern Vec3 operator + (const Vec3& v1, const Vec3& v2);
-extern Vec3 operator - (const Vec3& v1, const Vec3& v2);
-extern Vec3 operator * (float f, const Vec3& v);
+extern bool  operator==(const Vec3& v1, const Vec3& v2);
+extern bool  operator!=(const Vec3& v1, const Vec3& v2);
+extern Vec3  operator+(const Vec3& v1, const Vec3& v2);
+extern Vec3  operator-(const Vec3& v1, const Vec3& v2);
+extern Vec3  operator*(float f, const Vec3& v);
 
 } // namespace libvgcode
 
