@@ -79,3 +79,27 @@
     4. Setup network and download services
     5. Finalize GUI build and process command line parameters
 - Git: staged
+
+**Task P0-T006 COMPLETE**
+- Deliverable: Main window class identified and documented
+- Lines added: 9
+- Verification excerpt: "Class: `Slic3r::GUI::MainFrame`"
+- Git: staged
+
+**Task P0-T007 COMPLETE**
+- Deliverable: Output directories created
+- Lines added: 2
+- Verification excerpt: "Directories created: `generated_documentation/gui`, `.ralph`."
+- Git: staged
+
+**Task P0-T008 COMPLETE**
+- Deliverable: `.ralph/ralph-tasks.md` created and populated
+- Lines added: 2
+- Verification excerpt: "Registry initialized: `.ralph/ralph-tasks.md`."
+- Git: staged
+
+**Task P0-T009 COMPLETE**
+- Deliverable: Commit hash recorded in journal
+- Lines added: 2
+- Verification excerpt: "Phase 0 Orientation complete."
+- Git: committed as orient(gui): complete Phase 0 orientation
