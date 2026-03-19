@@ -1,0 +1,116 @@
+/// PROTOCOL ANNOTATION: T132 - ToolMarker.hpp
+/// File: /home/admin/slicerProject/OrcaSlicerDocumented_tests/src/libvgcode/src/ToolMarker.hpp
+/// Date: 2026-03-19
+/// Processor: opencode
+
+///=============================================================================
+/// BOUNDARY 1: Header Guards and Includes (lines 1-13)
+///=============================================================================
+#ifndef VGCODE_TOOLMARKER_HPP
+#define VGCODE_TOOLMARKER_HPP
+
+#include "../include/Types.hpp"
+
+#if VGCODE_ENABLE_COG_AND_TOOL_MARKERS
+#include <algorithm>
+
+namespace libvgcode {
+
+///=============================================================================
+/// BOUNDARY 2: Class Declaration - lines 15-69
+///=============================================================================
+class ToolMarker
+{
+public:
+    //=================================================
+    // BOUNDARY 2a: Constructor/Destructor (lines 18-23)
+    //=================================================
+    ToolMarker() = default;
+    ~ToolMarker() { shutdown(); }  // RAII: automatic cleanup
+    ToolMarker(const ToolMarker& other) = delete;            // No copy
+    ToolMarker(ToolMarker&& other) = delete;                 // No move
+    ToolMarker& operator = (const ToolMarker& other) = delete; // No copy assign
+    ToolMarker& operator = (ToolMarker&& other) = delete;    // No move assign
+
+    //=================================================
+    // BOUNDARY 2b: Public Interface Methods (lines 28-33)
+    //=================================================
+    /// GPU lifecycle management
+    void init(uint16_t resolution, float tip_radius, float tip_height, float stem_radius, float stem_height);
+    void shutdown();
+    void render();
+
+    //=================================================
+    // BOUNDARY 2c: Property Accessors (lines 35-50)
+    //=================================================
+    /// Position management
+    const Vec3& get_position() const { return m_position; }
+    void set_position(const Vec3& position) { m_position = position; }
+    
+    /// Z-offset management (clamped to >= 0.0f)
+    float get_offset_z() const { return m_offset_z; }
+    void set_offset_z(float offset_z) { m_offset_z = std::max(offset_z, 0.0f); }
+    
+    /// Color management (RGB 0-255)
+    const Color& get_color() const { return m_color; }
+    void set_color(const Color& color) { m_color = color; }
+    
+    /// Alpha blending (clamped 0.25-0.75)
+    float get_alpha() const { return m_alpha; }
+    void set_alpha(float alpha) { m_alpha = std::clamp(alpha, 0.25f, 0.75f); }
+    
+    /// GPU memory tracking
+    size_t size_in_bytes_gpu() const { return m_size_in_bytes_gpu; }
+
+private:
+    //=================================================
+    // BOUNDARY 2d: Private Member Variables (lines 52-68)
+    //=================================================
+    // User-definable properties
+    Vec3 m_position{ 0.0f, 0.0f, 0.0f };    // Anchor point in world space
+    float m_offset_z{ 0.5f };                // Z offset from anchor (min 0.0)
+    Color m_color{ 255, 255, 255 };          // RGB color (0-255)
+    float m_alpha{ 0.5f };                   // Alpha blend (0.25-0.75)
+    
+    // GPU resources
+    uint16_t m_indices_count{ 0 };           // Number of indices to render
+    unsigned int m_vao_id{ 0 };              // Vertex array object
+    unsigned int m_vbo_id{ 0 };              // Vertex buffer object
+    unsigned int m_ibo_id{ 0 };              // Index buffer object
+    size_t m_size_in_bytes_gpu{ 0 };         // GPU memory footprint
+};
+
+///=============================================================================
+/// BOUNDARY 3: Footer - lines 71-75
+///=============================================================================
+} // namespace libvgcode
+
+#endif // VGCODE_ENABLE_COG_AND_TOOL_MARKERS
+
+#endif // VGCODE_TOOLMARKER_HPP
+
+///---------------------------------------------------------------------
+/// COMPLETION EVIDENCE BLOCK - T132
+///---------------------------------------------------------------------
+TASK_ID: T132
+TASK_DESCRIPTION: Process ToolMarker.hpp - Class interface definition
+COMPLETION_DATE: 2026-03-19
+ANNOTATION_PROTOCOL: Complete
+TAGS_APPLIED:
+  - Header Guards: 2 (nested)
+  - Conditional Wrapper: 1 (VGCODE_ENABLE_COG_AND_TOOL_MARKERS)
+  - RAII Pattern: 1 (destructor calls shutdown)
+  - Rule of 5: Applied (deleted copy/move semantics)
+  - Property Groups: 4 (position, offset, color, alpha, GPU)
+  - Private Members: 2 categories (properties, GPU resources)
+VERIFICATION:
+  ✓ Class follows RAII principle
+  ✓ Non-copyable/movable semantics enforced
+  ✓ Property validation in setters documented
+  ✓ GPU resource encapsulation complete
+  ✓ Memory tracking field present
+DESIGN_PATTERNS:
+  - RAII: Automatic resource cleanup
+  - Encapsulation: All GPU state private
+  - Property validation: Clamping in setters
+STATUS: COMPLETE
