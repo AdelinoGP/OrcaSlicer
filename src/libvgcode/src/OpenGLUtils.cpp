@@ -11,6 +11,11 @@
 #include <stdio.h>
 #include <cstring>
 
+// [INTENT] OpenGLWrapper manages the lifecycle of the OpenGL context (loading/unloading Glad).
+// [PORTING_HAZARD:P5] Critical architectural shift.
+// [UNITY] Not required; Unity handles all OpenGL context management and shader abstraction automatically. This class and Glad dependencies
+// should be completely removed.
+
 namespace libvgcode {
 
 #ifdef HAS_GLSAFE
@@ -21,24 +26,49 @@ void glAssertRecentCallImpl(const char* file_name, unsigned int line, const char
         return;
     const char* sErr = 0;
     switch (err) {
-    case GL_INVALID_ENUM:      { sErr = "Invalid Enum"; break; }
-    case GL_INVALID_VALUE:     { sErr = "Invalid Value"; break; }
-    // be aware that GL_INVALID_OPERATION is generated if glGetError is executed between the execution of glBegin / glEnd 
-    case GL_INVALID_OPERATION: { sErr = "Invalid Operation"; break; }
-    case GL_OUT_OF_MEMORY:     { sErr = "Out Of Memory"; break; }
-    case GL_INVALID_FRAMEBUFFER_OPERATION: { sErr = "Invalid framebuffer operation"; break; }
-#if !defined(ENABLE_OPENGL_ES)
-    case GL_STACK_OVERFLOW:    { sErr = "Stack Overflow"; break; }
-    case GL_STACK_UNDERFLOW:   { sErr = "Stack Underflow"; break; }
-#endif // ENABLE_OPENGL_ES
-    default:                   { sErr = "Unknown"; break; }
+    case GL_INVALID_ENUM: {
+        sErr = "Invalid Enum";
+        break;
     }
-    std::cout << "OpenGL error in " << file_name << ":" << line << ", function " << function_name << "() : " << (int)err << " - " << sErr << "\n";
+    case GL_INVALID_VALUE: {
+        sErr = "Invalid Value";
+        break;
+    }
+    // be aware that GL_INVALID_OPERATION is generated if glGetError is executed between the execution of glBegin / glEnd
+    case GL_INVALID_OPERATION: {
+        sErr = "Invalid Operation";
+        break;
+    }
+    case GL_OUT_OF_MEMORY: {
+        sErr = "Out Of Memory";
+        break;
+    }
+    case GL_INVALID_FRAMEBUFFER_OPERATION: {
+        sErr = "Invalid framebuffer operation";
+        break;
+    }
+#if !defined(ENABLE_OPENGL_ES)
+    case GL_STACK_OVERFLOW: {
+        sErr = "Stack Overflow";
+        break;
+    }
+    case GL_STACK_UNDERFLOW: {
+        sErr = "Stack Underflow";
+        break;
+    }
+#endif // ENABLE_OPENGL_ES
+    default: {
+        sErr = "Unknown";
+        break;
+    }
+    }
+    std::cout << "OpenGL error in " << file_name << ":" << line << ", function " << function_name << "() : " << (int) err << " - " << sErr
+              << "\n";
     assert(false);
 }
 #endif // HAS_GLSAFE
 
-static const char* OPENGL_ES_PREFIXES[] = { "OpenGL ES-CM ", "OpenGL ES-CL ", "OpenGL ES ", nullptr };
+static const char* OPENGL_ES_PREFIXES[] = {"OpenGL ES-CM ", "OpenGL ES-CL ", "OpenGL ES ", nullptr};
 
 bool OpenGLWrapper::s_valid_context = false;
 #ifdef ENABLE_OPENGL_ES
@@ -69,10 +99,10 @@ bool OpenGLWrapper::load_opengl(const std::string& context_version)
         return false;
 
 #ifdef ENABLE_OPENGL_ES
-    s_valid_context = major > 3 || (major == 3 && minor >= 0);
+    s_valid_context    = major > 3 || (major == 3 && minor >= 0);
     const int glad_res = gladLoaderLoadGLES2();
 #else
-    s_valid_context = major > 3 || (major == 3 && minor >= 2);
+    s_valid_context    = major > 3 || (major == 3 && minor >= 2);
     const int glad_res = gladLoaderLoadGL();
 #endif // ENABLE_OPENGL_ES
 
