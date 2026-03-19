@@ -13,3 +13,10 @@
 344: - Key findings: Annotated main UI dialog classes. These rely on `wxDialog` and `wxWebView` for visualization. Porting to Unity UI requires substantial refactoring, particularly the WebView component.
 345: - Verification excerpt: "// [INTENT] Main dialog for configuring wipe tower flushing volumes and patterns using a webview-based interface."
 346: - Git: committed as annotate(gui): annotate WipeTowerDialog.hpp (gui:T160)
+
+**Task T164 COMPLETE**
+- File: src/slic3r/GUI/GUI.hpp
+- Lines added: ~25 comment lines
+- Key findings: Annotated namespaces, utility functions, platform helpers, and string conversion tools.
+- Verification excerpt: "// [INTENT] Namespace providing global UI-related helper functions, platform-specific shortcuts, and string conversion utilities."
+- Unity porting hazards identified: 4 (P2 screensaver, P2 debugger, P1 shortcuts)
