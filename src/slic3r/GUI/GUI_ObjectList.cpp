@@ -74,6 +74,8 @@ static void take_snapshot(const std::string& snapshot_name)
 
 // [INTENT] Custom renderer to achieve platform-consistent styling for list items, including selection, focus, and tree expansion.
 // [UNITY] NO_DIRECT_EQUIVALENT — requires custom VisualElement subclass or IMGUI for drawing list items.
+// [INTENT] Custom renderer to achieve platform-consistent styling for list items, including selection, focus, and tree expansion.
+// [UNITY] NO_DIRECT_EQUIVALENT — requires custom VisualElement subclass or IMGUI for drawing list items.
 class wxRenderer : public wxDelegateRendererNative
 {
     // ...
@@ -93,6 +95,8 @@ class wxRenderer : public wxDelegateRendererNative
     }
 };
 
+// [INTENT] Main controller for the object list UI in the sidebar. Manages item hierarchy, selection, and editing.
+// [UNITY] Use a TreeView (UI Toolkit) with a custom controller/adapter pattern for hierarchy and data binding.
 // [INTENT] Main controller for the object list UI in the sidebar. Manages item hierarchy, selection, and editing.
 // [UNITY] Use a TreeView (UI Toolkit) with a custom controller/adapter pattern for hierarchy and data binding.
 ObjectList::ObjectList(wxWindow* parent)
@@ -348,6 +352,8 @@ void ObjectList::update_min_height()
     set_min_height();
 }
 
+// [INTENT] Sets up the list columns and data view model.
+// [UNITY] Use a TreeView (UI Toolkit) with a custom VisualElement factory for column rendering.
 // [INTENT] Sets up the list columns and data view model.
 // [UNITY] Use a TreeView (UI Toolkit) with a custom VisualElement factory for column rendering.
 void ObjectList::create_objects_ctrl()
@@ -1109,6 +1115,9 @@ void ObjectList::update_name_in_list(int obj_idx, int vol_idx) const
     m_objects_model->SetName(new_name, item);
 }
 
+// [INTENT] Handles selection changes in the list. Propagates selection to the 3D scene and updates other UI panels.
+// [UNITY] Use a TreeView (UI Toolkit) and subscribe to selection changes. Use custom events to notify other subsystems (SceneManager,
+// Toolbar, InfoSizer).
 // [INTENT] Handles selection changes in the list. Propagates selection to the 3D scene and updates other UI panels.
 // [UNITY] Use a TreeView (UI Toolkit) and subscribe to selection changes. Use custom events to notify other subsystems (SceneManager,
 // Toolbar, InfoSizer).
