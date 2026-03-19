@@ -15,10 +15,10 @@ class OptionTemplate
 public:
     OptionTemplate() = default;
     ~OptionTemplate() { shutdown(); }
-    OptionTemplate(const OptionTemplate& other) = delete;
-    OptionTemplate(OptionTemplate&& other) = delete;
-    OptionTemplate& operator = (const OptionTemplate& other) = delete;
-    OptionTemplate& operator = (OptionTemplate&& other) = delete;
+    OptionTemplate(const OptionTemplate& other)            = delete;
+    OptionTemplate(OptionTemplate&& other)                 = delete;
+    OptionTemplate& operator=(const OptionTemplate& other) = delete;
+    OptionTemplate& operator=(OptionTemplate&& other)      = delete;
 
     //
     // Initialize gpu buffers.
@@ -36,19 +36,17 @@ public:
     size_t size_in_bytes_gpu() const { return m_size_in_bytes_gpu; }
 
 private:
-    uint8_t m_resolution{ 0 };
-    uint8_t m_vertices_count{ 0 };
-    //
+    uint8_t m_resolution{0};
+    uint8_t m_vertices_count{0};
+    // [STATE]
     // gpu buffers ids.
-    //
-    unsigned int m_top_vao_id{ 0 };
-    unsigned int m_top_vbo_id{ 0 };
-    unsigned int m_bottom_vao_id{ 0 };
-    unsigned int m_bottom_vbo_id{ 0 };
-    //
+    unsigned int m_top_vao_id{0};
+    unsigned int m_top_vbo_id{0};
+    unsigned int m_bottom_vao_id{0};
+    unsigned int m_bottom_vbo_id{0};
+    // [STATE]
     // Size of the data sent to gpu, in bytes.
-    //
-    size_t m_size_in_bytes_gpu{ 0 };
+    size_t m_size_in_bytes_gpu{0};
 };
 
 } // namespace libvgcode
