@@ -94,6 +94,8 @@ struct Settings
     };
 };
 
+// [UNITY] TODO: Create corresponding C# struct for all settings
+
 } // namespace libvgcode
 
 #endif // VGCODE_SETTINGS_HPP
