@@ -1,4 +1,5 @@
-///|/ Copyright (c) Prusa Research 2023 Enrico Turri @enricoturri1966, Pavel Mikuš @Godrak, Vojtěch Bubník @bubnikv, Oleksandra Iushchenko @YuSanka
+///|/ Copyright (c) Prusa Research 2023 Enrico Turri @enricoturri1966, Pavel Mikuš @Godrak, Vojtěch Bubník @bubnikv, Oleksandra Iushchenko
+///@YuSanka
 ///|/
 ///|/ libvgcode is released under the terms of the AGPLv3 or higher
 ///|/
@@ -19,9 +20,11 @@
 #include <numeric>
 
 namespace libvgcode {
+// [INTENT] Core implementation of G-code visualization using OpenGL
+// [UNITY] Replaces OpenGL pipeline with Unity Scene / Graphics API (CommandBuffers)
+// [PORTING_HAZARD:P3] Heavy OpenGL dependency - requires complete shader and pipeline re-design
 
-template<class T, class O = T>
-using IntegerOnly = std::enable_if_t<std::is_integral<T>::value, O>;
+template<class T, class O = T> using IntegerOnly = std::enable_if_t<std::is_integral<T>::value, O>;
 
 // Rounding up.
 // 1.5 is rounded to 2
@@ -34,8 +37,7 @@ using IntegerOnly = std::enable_if_t<std::is_integral<T>::value, O>;
 // -1.51 is rounded to -2.
 // If input is not a valid float (it is infinity NaN or if it does not fit)
 // the float to int conversion produces a max int on Intel and +-max int on ARM.
-template<typename I>
-inline IntegerOnly<I, I> fast_round_up(double a)
+template<typename I> inline IntegerOnly<I, I> fast_round_up(double a)
 {
     // Why does Java Math.round(0.49999999999999994) return 1?
     // https://stackoverflow.com/questions/9902968/why-does-math-round0-49999999999999994-return-1
@@ -46,17 +48,18 @@ inline IntegerOnly<I, I> fast_round_up(double a)
 // Equivalent to conversion to string with sprintf(buf, "%.2g", value) and conversion back to float, but faster.
 static float round_to_bin(const float value)
 {
-//    assert(value >= 0);
-    constexpr float const scale[5]     = { 100.f,  1000.f,  10000.f,  100000.f,  1000000.f };
-    constexpr float const invscale[5]  = { 0.01f,  0.001f,  0.0001f,  0.00001f,  0.000001f };
-    constexpr float const threshold[5] = { 0.095f, 0.0095f, 0.00095f, 0.000095f, 0.0000095f };
+    //    assert(value >= 0);
+    constexpr float const scale[5]     = {100.f, 1000.f, 10000.f, 100000.f, 1000000.f};
+    constexpr float const invscale[5]  = {0.01f, 0.001f, 0.0001f, 0.00001f, 0.000001f};
+    constexpr float const threshold[5] = {0.095f, 0.0095f, 0.00095f, 0.000095f, 0.0000095f};
     // Scaling factor, pointer to the tables above.
-    int                   i = 0;
+    int i = 0;
     // While the scaling factor is not yet large enough to get two integer digits after scaling and rounding:
-    for (; value < threshold[i] && i < 4; ++i);
+    for (; value < threshold[i] && i < 4; ++i)
+        ;
     // At least on MSVC std::round() calls a complex function, which is pretty expensive.
     // our fast_round_up is much cheaper and it could be inlined.
-//    return std::round(value * scale[i]) * invscale[i];
+    //    return std::round(value * scale[i]) * invscale[i];
     double a = value * scale[i];
     assert(std::abs(a) < double(std::numeric_limits<int64_t>::max()));
     return fast_round_up<int64_t>(a) * invscale[i];
@@ -68,117 +71,52 @@ static Mat4x4 inverse(const Mat4x4& m)
 
     Mat4x4 inv;
 
-    inv[0] = m[5] * m[10] * m[15] -
-             m[5] * m[11] * m[14] -
-             m[9] * m[6] * m[15] +
-             m[9] * m[7] * m[14] +
-             m[13] * m[6] * m[11] -
+    inv[0] = m[5] * m[10] * m[15] - m[5] * m[11] * m[14] - m[9] * m[6] * m[15] + m[9] * m[7] * m[14] + m[13] * m[6] * m[11] -
              m[13] * m[7] * m[10];
 
-    inv[4] = -m[4] * m[10] * m[15] +
-             m[4] * m[11] * m[14] +
-             m[8] * m[6] * m[15] -
-             m[8] * m[7] * m[14] -
-             m[12] * m[6] * m[11] +
+    inv[4] = -m[4] * m[10] * m[15] + m[4] * m[11] * m[14] + m[8] * m[6] * m[15] - m[8] * m[7] * m[14] - m[12] * m[6] * m[11] +
              m[12] * m[7] * m[10];
 
-    inv[8] = m[4] * m[9] * m[15] -
-             m[4] * m[11] * m[13] -
-             m[8] * m[5] * m[15] +
-             m[8] * m[7] * m[13] +
-             m[12] * m[5] * m[11] -
+    inv[8] = m[4] * m[9] * m[15] - m[4] * m[11] * m[13] - m[8] * m[5] * m[15] + m[8] * m[7] * m[13] + m[12] * m[5] * m[11] -
              m[12] * m[7] * m[9];
 
-    inv[12] = -m[4] * m[9] * m[14] +
-               m[4] * m[10] * m[13] +
-               m[8] * m[5] * m[14] -
-               m[8] * m[6] * m[13] -
-               m[12] * m[5] * m[10] +
-               m[12] * m[6] * m[9];
+    inv[12] = -m[4] * m[9] * m[14] + m[4] * m[10] * m[13] + m[8] * m[5] * m[14] - m[8] * m[6] * m[13] - m[12] * m[5] * m[10] +
+              m[12] * m[6] * m[9];
 
-    inv[1] = -m[1] * m[10] * m[15] +
-             m[1] * m[11] * m[14] +
-             m[9] * m[2] * m[15] -
-             m[9] * m[3] * m[14] -
-             m[13] * m[2] * m[11] +
+    inv[1] = -m[1] * m[10] * m[15] + m[1] * m[11] * m[14] + m[9] * m[2] * m[15] - m[9] * m[3] * m[14] - m[13] * m[2] * m[11] +
              m[13] * m[3] * m[10];
 
-    inv[5] = m[0] * m[10] * m[15] -
-             m[0] * m[11] * m[14] -
-             m[8] * m[2] * m[15] +
-             m[8] * m[3] * m[14] +
-             m[12] * m[2] * m[11] -
+    inv[5] = m[0] * m[10] * m[15] - m[0] * m[11] * m[14] - m[8] * m[2] * m[15] + m[8] * m[3] * m[14] + m[12] * m[2] * m[11] -
              m[12] * m[3] * m[10];
 
-    inv[9] = -m[0] * m[9] * m[15] +
-             m[0] * m[11] * m[13] +
-             m[8] * m[1] * m[15] -
-             m[8] * m[3] * m[13] -
-             m[12] * m[1] * m[11] +
+    inv[9] = -m[0] * m[9] * m[15] + m[0] * m[11] * m[13] + m[8] * m[1] * m[15] - m[8] * m[3] * m[13] - m[12] * m[1] * m[11] +
              m[12] * m[3] * m[9];
 
-    inv[13] = m[0] * m[9] * m[14] -
-             m[0] * m[10] * m[13] -
-             m[8] * m[1] * m[14] +
-             m[8] * m[2] * m[13] +
-             m[12] * m[1] * m[10] -
-             m[12] * m[2] * m[9];
+    inv[13] = m[0] * m[9] * m[14] - m[0] * m[10] * m[13] - m[8] * m[1] * m[14] + m[8] * m[2] * m[13] + m[12] * m[1] * m[10] -
+              m[12] * m[2] * m[9];
 
-    inv[2] = m[1] * m[6] * m[15] -
-             m[1] * m[7] * m[14] -
-             m[5] * m[2] * m[15] +
-             m[5] * m[3] * m[14] +
-             m[13] * m[2] * m[7] -
+    inv[2] = m[1] * m[6] * m[15] - m[1] * m[7] * m[14] - m[5] * m[2] * m[15] + m[5] * m[3] * m[14] + m[13] * m[2] * m[7] -
              m[13] * m[3] * m[6];
 
-    inv[6] = -m[0] * m[6] * m[15] +
-             m[0] * m[7] * m[14] +
-             m[4] * m[2] * m[15] -
-             m[4] * m[3] * m[14] -
-             m[12] * m[2] * m[7] +
+    inv[6] = -m[0] * m[6] * m[15] + m[0] * m[7] * m[14] + m[4] * m[2] * m[15] - m[4] * m[3] * m[14] - m[12] * m[2] * m[7] +
              m[12] * m[3] * m[6];
 
-    inv[10] = m[0] * m[5] * m[15] -
-              m[0] * m[7] * m[13] -
-              m[4] * m[1] * m[15] +
-              m[4] * m[3] * m[13] +
-              m[12] * m[1] * m[7] -
+    inv[10] = m[0] * m[5] * m[15] - m[0] * m[7] * m[13] - m[4] * m[1] * m[15] + m[4] * m[3] * m[13] + m[12] * m[1] * m[7] -
               m[12] * m[3] * m[5];
 
-    inv[14] = -m[0] * m[5] * m[14] +
-              m[0] * m[6] * m[13] +
-              m[4] * m[1] * m[14] -
-              m[4] * m[2] * m[13] -
-              m[12] * m[1] * m[6] +
+    inv[14] = -m[0] * m[5] * m[14] + m[0] * m[6] * m[13] + m[4] * m[1] * m[14] - m[4] * m[2] * m[13] - m[12] * m[1] * m[6] +
               m[12] * m[2] * m[5];
 
-    inv[3] = -m[1] * m[6] * m[11] +
-             m[1] * m[7] * m[10] +
-             m[5] * m[2] * m[11] -
-             m[5] * m[3] * m[10] -
-             m[9] * m[2] * m[7] +
+    inv[3] = -m[1] * m[6] * m[11] + m[1] * m[7] * m[10] + m[5] * m[2] * m[11] - m[5] * m[3] * m[10] - m[9] * m[2] * m[7] +
              m[9] * m[3] * m[6];
 
-    inv[7] = m[0] * m[6] * m[11] -
-             m[0] * m[7] * m[10] -
-             m[4] * m[2] * m[11] +
-             m[4] * m[3] * m[10] +
-             m[8] * m[2] * m[7] -
+    inv[7] = m[0] * m[6] * m[11] - m[0] * m[7] * m[10] - m[4] * m[2] * m[11] + m[4] * m[3] * m[10] + m[8] * m[2] * m[7] -
              m[8] * m[3] * m[6];
 
-    inv[11] = -m[0] * m[5] * m[11] +
-             m[0] * m[7] * m[9] +
-             m[4] * m[1] * m[11] -
-             m[4] * m[3] * m[9] -
-             m[8] * m[1] * m[7] +
-             m[8] * m[3] * m[5];
+    inv[11] = -m[0] * m[5] * m[11] + m[0] * m[7] * m[9] + m[4] * m[1] * m[11] - m[4] * m[3] * m[9] - m[8] * m[1] * m[7] +
+              m[8] * m[3] * m[5];
 
-    inv[15] = m[0] * m[5] * m[10] -
-              m[0] * m[6] * m[9] -
-              m[4] * m[1] * m[10] +
-              m[4] * m[2] * m[9] +
-              m[8] * m[1] * m[6] -
-              m[8] * m[2] * m[5];
+    inv[15] = m[0] * m[5] * m[10] - m[0] * m[6] * m[9] - m[4] * m[1] * m[10] + m[4] * m[2] * m[9] + m[8] * m[1] * m[6] - m[8] * m[2] * m[5];
 
     float det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
     assert(det != 0.0f);
@@ -196,7 +134,7 @@ static Mat4x4 inverse(const Mat4x4& m)
 std::string check_shader(GLuint handle)
 {
     std::string ret;
-    GLint params;
+    GLint       params;
     glsafe(glGetShaderiv(handle, GL_COMPILE_STATUS, &params));
     if (params == GL_FALSE) {
         glsafe(glGetShaderiv(handle, GL_INFO_LOG_LENGTH, &params));
@@ -209,7 +147,7 @@ std::string check_shader(GLuint handle)
 std::string check_program(GLuint handle)
 {
     std::string ret;
-    GLint params;
+    GLint       params;
     glsafe(glGetProgramiv(handle, GL_LINK_STATUS, &params));
     if (params == GL_FALSE) {
         glsafe(glGetProgramiv(handle, GL_INFO_LOG_LENGTH, &params));
@@ -219,6 +157,9 @@ std::string check_program(GLuint handle)
     return ret;
 }
 
+// [INTENT] Initializes shader programs for G-code visualization
+// [OPENGL] Compiles and links GLSL shaders
+// [UNITY] Replaces with HLSL/ShaderGraph creation
 unsigned int init_shader(const std::string& shader_name, const char* vertex_shader, const char* fragment_shader)
 {
     const GLuint vs_id = glCreateShader(GL_VERTEX_SHADER);
@@ -280,47 +221,47 @@ static void delete_buffers(unsigned int& id)
     }
 }
 
-static const std::array<Color, size_t(EGCodeExtrusionRole::COUNT)> DEFAULT_EXTRUSION_ROLES_COLORS = { {
-    { 230, 179, 179 }, // None
-    { 255, 230,  77 }, // Perimeter
-    { 255, 125,  56 }, // ExternalPerimeter
-    {  31,  31, 255 }, // OverhangPerimeter
-    { 176,  48,  41 }, // InternalInfill
-    { 150,  84, 204 }, // SolidInfill
-    { 240,  64,  64 }, // TopSolidInfill
-    { 255, 140, 105 }, // Ironing
-    {  77, 128, 186 }, // BridgeInfill
-    { 255, 255, 255 }, // GapFill
-    {   0, 135, 110 }, // Skirt
-    {   0, 255,   0 }, // SupportMaterial
-    {   0, 128,   0 }, // SupportMaterialInterface
-    { 179, 227, 171 }, // WipeTower
-    {  94, 209, 148 },  // Custom
+static const std::array<Color, size_t(EGCodeExtrusionRole::COUNT)> DEFAULT_EXTRUSION_ROLES_COLORS = {{
+    {230, 179, 179}, // None
+    {255, 230, 77},  // Perimeter
+    {255, 125, 56},  // ExternalPerimeter
+    {31, 31, 255},   // OverhangPerimeter
+    {176, 48, 41},   // InternalInfill
+    {150, 84, 204},  // SolidInfill
+    {240, 64, 64},   // TopSolidInfill
+    {255, 140, 105}, // Ironing
+    {77, 128, 186},  // BridgeInfill
+    {255, 255, 255}, // GapFill
+    {0, 135, 110},   // Skirt
+    {0, 255, 0},     // SupportMaterial
+    {0, 128, 0},     // SupportMaterialInterface
+    {179, 227, 171}, // WipeTower
+    {94, 209, 148},  // Custom
     // ORCA
-    { 102,  92, 199 }, // BottomSurface
-    {  77, 128, 186 }, // InternalBridgeInfill
-    {   0,  59, 110 }, // Brim
-    {   0,  64,   0 }, // SupportTransition
-    { 128, 128, 128 }, // Mixed
-} };
+    {102, 92, 199},  // BottomSurface
+    {77, 128, 186},  // InternalBridgeInfill
+    {0, 59, 110},    // Brim
+    {0, 64, 0},      // SupportTransition
+    {128, 128, 128}, // Mixed
+}};
 
-static const std::array<Color, size_t(EOptionType::COUNT)> DEFAULT_OPTIONS_COLORS{ {
-    {  56,  72, 155 }, // Travels
-    { 255, 255,   0 }, // Wipes
-    { 205,  34, 214 }, // Retractions
-    {  73, 173, 207 }, // Unretractions
-    { 230, 230, 230 }, // Seams
-    { 193, 190,  99 }, // ToolChanges
-    { 218, 148, 139 }, // ColorChanges
-    {  82, 240, 131 }, // PausePrints
-    { 226, 210,  67 }  // CustomGCodes
-} };
+static const std::array<Color, size_t(EOptionType::COUNT)> DEFAULT_OPTIONS_COLORS{{
+    {56, 72, 155},   // Travels
+    {255, 255, 0},   // Wipes
+    {205, 34, 214},  // Retractions
+    {73, 173, 207},  // Unretractions
+    {230, 230, 230}, // Seams
+    {193, 190, 99},  // ToolChanges
+    {218, 148, 139}, // ColorChanges
+    {82, 240, 131},  // PausePrints
+    {226, 210, 67}   // CustomGCodes
+}};
 
 #ifdef ENABLE_OPENGL_ES
 static std::pair<size_t, size_t> width_height(size_t count)
 {
     std::pair<size_t, size_t> ret;
-    ret.first = std::min(count, OpenGLWrapper::max_texture_size());
+    ret.first         = std::min(count, OpenGLWrapper::max_texture_size());
     size_t rows_count = count / ret.first;
     if (count > rows_count * ret.first)
         ++rows_count;
@@ -333,12 +274,12 @@ void ViewerImpl::TextureData::init(size_t vertices_count)
     if (vertices_count == 0)
         return;
 
-    m_width = std::min(vertices_count, OpenGLWrapper::max_texture_size());
+    m_width           = std::min(vertices_count, OpenGLWrapper::max_texture_size());
     size_t rows_count = vertices_count / m_width;
     if (vertices_count > rows_count * m_width)
         ++rows_count;
     m_height = std::min(rows_count, OpenGLWrapper::max_texture_size());
-    m_count = rows_count / m_height;
+    m_count  = rows_count / m_height;
     if (rows_count > m_count * m_height)
         ++m_count;
 
@@ -372,9 +313,9 @@ void ViewerImpl::TextureData::set_positions(const std::vector<Vec3>& positions)
     glsafe(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
 
     const size_t tex_capacity = max_texture_capacity();
-    size_t remaining = positions.size();
+    size_t       remaining    = positions.size();
     for (size_t i = 0; i < m_count; ++i) {
-        const auto [w, h] = width_height(std::min(remaining, tex_capacity));
+        const auto [w, h]   = width_height(std::min(remaining, tex_capacity));
         const size_t offset = i * tex_capacity;
 
         glsafe(glGenTextures(1, &m_tex_ids[i].positions.first));
@@ -383,19 +324,22 @@ void ViewerImpl::TextureData::set_positions(const std::vector<Vec3>& positions)
         glsafe(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
         glsafe(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0));
         if (remaining >= tex_capacity) {
-            glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RGB, GL_FLOAT, &positions[offset]));
+            glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RGB, GL_FLOAT,
+                                &positions[offset]));
             m_tex_ids[i].positions.second = w * h;
-        }
-        else {
+        } else {
             // the last row is only partially fitted with data, send it separately
-            glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RGB, GL_FLOAT, nullptr));
-            glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(w), static_cast<GLsizei>(h - 1), GL_RGB, GL_FLOAT, &positions[offset]));
-            glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, static_cast<GLsizei>(h - 1), static_cast<GLsizei>(remaining % w), 1, GL_RGB, GL_FLOAT, &positions[offset + w * (h - 1)]));
+            glsafe(
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RGB, GL_FLOAT, nullptr));
+            glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(w), static_cast<GLsizei>(h - 1), GL_RGB, GL_FLOAT,
+                                   &positions[offset]));
+            glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, static_cast<GLsizei>(h - 1), static_cast<GLsizei>(remaining % w), 1, GL_RGB,
+                                   GL_FLOAT, &positions[offset + w * (h - 1)]));
             m_tex_ids[i].positions.second = w * (h - 1) + remaining % w;
         }
         m_positions_size += m_tex_ids[i].positions.second * sizeof(Vec3);
 
-        remaining = (remaining > tex_capacity) ? remaining - tex_capacity: 0;
+        remaining = (remaining > tex_capacity) ? remaining - tex_capacity : 0;
     }
 
     glsafe(glBindTexture(GL_TEXTURE_2D, curr_bound_texture));
@@ -425,9 +369,9 @@ void ViewerImpl::TextureData::set_heights_widths_angles(const std::vector<Vec3>&
     glsafe(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
 
     const size_t tex_capacity = max_texture_capacity();
-    size_t remaining = heights_widths_angles.size();
+    size_t       remaining    = heights_widths_angles.size();
     for (size_t i = 0; i < m_count; ++i) {
-        const auto [w, h] = width_height(std::min(remaining, tex_capacity));
+        const auto [w, h]   = width_height(std::min(remaining, tex_capacity));
         const size_t offset = i * tex_capacity;
 
         glsafe(glGenTextures(1, &m_tex_ids[i].heights_widths_angles.first));
@@ -436,14 +380,17 @@ void ViewerImpl::TextureData::set_heights_widths_angles(const std::vector<Vec3>&
         glsafe(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
         glsafe(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0));
         if (remaining >= tex_capacity) {
-            glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RGB, GL_FLOAT, &heights_widths_angles[offset]));
+            glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RGB, GL_FLOAT,
+                                &heights_widths_angles[offset]));
             m_tex_ids[i].heights_widths_angles.second = w * h;
-        }
-        else {
+        } else {
             // the last row is only partially fitted with data, send it separately
-            glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RGB, GL_FLOAT, nullptr));
-            glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(w), static_cast<GLsizei>(h - 1), GL_RGB, GL_FLOAT, &heights_widths_angles[offset]));
-            glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, static_cast<GLsizei>(h - 1), static_cast<GLsizei>(remaining % w), 1, GL_RGB, GL_FLOAT, &heights_widths_angles[offset + w * (h - 1)]));
+            glsafe(
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RGB, GL_FLOAT, nullptr));
+            glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(w), static_cast<GLsizei>(h - 1), GL_RGB, GL_FLOAT,
+                                   &heights_widths_angles[offset]));
+            glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, static_cast<GLsizei>(h - 1), static_cast<GLsizei>(remaining % w), 1, GL_RGB,
+                                   GL_FLOAT, &heights_widths_angles[offset + w * (h - 1)]));
             m_tex_ids[i].heights_widths_angles.second = w * (h - 1) + remaining % w;
         }
         m_height_width_angle_size += m_tex_ids[i].heights_widths_angles.second * sizeof(Vec3);
@@ -478,9 +425,9 @@ void ViewerImpl::TextureData::set_colors(const std::vector<float>& colors)
     glsafe(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
 
     const size_t tex_capacity = max_texture_capacity();
-    size_t remaining = colors.size();
+    size_t       remaining    = colors.size();
     for (size_t i = 0; i < m_count; ++i) {
-        const auto [w, h] = width_height(std::min(remaining, tex_capacity));
+        const auto [w, h]   = width_height(std::min(remaining, tex_capacity));
         const size_t offset = i * tex_capacity;
 
         glsafe(glGenTextures(1, &m_tex_ids[i].colors.first));
@@ -489,14 +436,16 @@ void ViewerImpl::TextureData::set_colors(const std::vector<float>& colors)
         glsafe(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
         glsafe(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0));
         if (remaining >= tex_capacity) {
-            glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RED, GL_FLOAT, &colors[offset]));
+            glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RED, GL_FLOAT,
+                                &colors[offset]));
             m_tex_ids[i].colors.second = w * h;
-        }
-        else {
+        } else {
             // the last row is only partially fitted with data, send it separately
             glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RED, GL_FLOAT, nullptr));
-            glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(w), static_cast<GLsizei>(h - 1), GL_RED, GL_FLOAT, &colors[offset]));
-            glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, static_cast<GLsizei>(h - 1), static_cast<GLsizei>(remaining % w), 1, GL_RED, GL_FLOAT, &colors[offset + w * (h - 1)]));
+            glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(w), static_cast<GLsizei>(h - 1), GL_RED, GL_FLOAT,
+                                   &colors[offset]));
+            glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, static_cast<GLsizei>(h - 1), static_cast<GLsizei>(remaining % w), 1, GL_RED,
+                                   GL_FLOAT, &colors[offset + w * (h - 1)]));
             m_tex_ids[i].colors.second = w * (h - 1) + remaining % w;
         }
         m_colors_size += m_tex_ids[i].colors.second * sizeof(float);
@@ -530,11 +479,11 @@ void ViewerImpl::TextureData::set_enabled_segments(const std::vector<uint32_t>& 
 
     glsafe(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
 
-    const size_t tex_capacity = max_texture_capacity();
-    size_t curr_tex_id = 0;
+    const size_t          tex_capacity = max_texture_capacity();
+    size_t                curr_tex_id  = 0;
     std::vector<uint32_t> curr_segments;
     for (size_t i = 0; i < enabled_segments.size(); ++i) {
-        uint32_t seg = enabled_segments[i];
+        uint32_t   seg     = enabled_segments[i];
         const bool new_tex = static_cast<size_t>(seg) > (curr_tex_id + 1) * tex_capacity;
         if (!new_tex)
             curr_segments.push_back(seg - static_cast<uint32_t>(curr_tex_id * tex_capacity));
@@ -547,19 +496,22 @@ void ViewerImpl::TextureData::set_enabled_segments(const std::vector<uint32_t>& 
             glsafe(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
             glsafe(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0));
             if (curr_segments.size() == tex_capacity) {
-                glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RED_INTEGER, GL_UNSIGNED_INT, curr_segments.data()));
+                glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RED_INTEGER,
+                                    GL_UNSIGNED_INT, curr_segments.data()));
                 m_tex_ids[curr_tex_id].enabled_segments.second = w * h;
-            }
-            else {
-                glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RED_INTEGER, GL_UNSIGNED_INT, nullptr));
+            } else {
+                glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RED_INTEGER,
+                                    GL_UNSIGNED_INT, nullptr));
                 if (h == 1) {
-                    glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, static_cast<GLsizei>(w), 1, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, curr_segments.data()));
+                    glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, static_cast<GLsizei>(w), 1, 0, GL_RED_INTEGER, GL_UNSIGNED_INT,
+                                        curr_segments.data()));
                     m_tex_ids[curr_tex_id].enabled_segments.second = w;
-                }
-                else {
+                } else {
                     // the last row is only partially fitted with data, send it separately
-                    glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(w), static_cast<GLsizei>(h - 1), GL_RED_INTEGER, GL_UNSIGNED_INT, curr_segments.data()));
-                    glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, static_cast<GLsizei>(h - 1), static_cast<GLsizei>(curr_segments.size() % w), 1, GL_RED_INTEGER, GL_UNSIGNED_INT, &curr_segments[w * (h - 1)]));
+                    glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(w), static_cast<GLsizei>(h - 1), GL_RED_INTEGER,
+                                           GL_UNSIGNED_INT, curr_segments.data()));
+                    glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, static_cast<GLsizei>(h - 1), static_cast<GLsizei>(curr_segments.size() % w),
+                                           1, GL_RED_INTEGER, GL_UNSIGNED_INT, &curr_segments[w * (h - 1)]));
                     m_tex_ids[curr_tex_id].enabled_segments.second = w * (h - 1) + curr_segments.size() % w;
                 }
             }
@@ -598,11 +550,11 @@ void ViewerImpl::TextureData::set_enabled_options(const std::vector<uint32_t>& e
 
     glsafe(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
 
-    const size_t tex_capacity = max_texture_capacity();
-    size_t curr_tex_id = 0;
+    const size_t          tex_capacity = max_texture_capacity();
+    size_t                curr_tex_id  = 0;
     std::vector<uint32_t> curr_options;
     for (size_t i = 0; i < enabled_options.size(); ++i) {
-        uint32_t opt = enabled_options[i];
+        uint32_t   opt     = enabled_options[i];
         const bool new_tex = static_cast<size_t>(opt) > (curr_tex_id + 1) * tex_capacity;
         if (!new_tex)
             curr_options.push_back(opt - static_cast<uint32_t>(curr_tex_id * tex_capacity));
@@ -615,19 +567,22 @@ void ViewerImpl::TextureData::set_enabled_options(const std::vector<uint32_t>& e
             glsafe(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
             glsafe(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0));
             if (curr_options.size() == tex_capacity) {
-                glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RED_INTEGER, GL_UNSIGNED_INT, curr_options.data()));
+                glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RED_INTEGER,
+                                    GL_UNSIGNED_INT, curr_options.data()));
                 m_tex_ids[curr_tex_id].enabled_options.second = w * h;
-            }
-            else {
-                glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RED_INTEGER, GL_UNSIGNED_INT, nullptr));
+            } else {
+                glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, static_cast<GLsizei>(w), static_cast<GLsizei>(h), 0, GL_RED_INTEGER,
+                                    GL_UNSIGNED_INT, nullptr));
                 if (h == 1) {
-                    glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, static_cast<GLsizei>(w), 1, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, curr_options.data()));
+                    glsafe(glTexImage2D(GL_TEXTURE_2D, 0, GL_R32UI, static_cast<GLsizei>(w), 1, 0, GL_RED_INTEGER, GL_UNSIGNED_INT,
+                                        curr_options.data()));
                     m_tex_ids[curr_tex_id].enabled_options.second = w;
-                }
-                else {
+                } else {
                     // the last row is only partially fitted with data, send it separately
-                    glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(w), static_cast<GLsizei>(h - 1), GL_RED_INTEGER, GL_UNSIGNED_INT, curr_options.data()));
-                    glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, static_cast<GLsizei>(h - 1), static_cast<GLsizei>(curr_options.size() % w), 1, GL_RED_INTEGER, GL_UNSIGNED_INT, &curr_options[w * (h - 1)]));
+                    glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(w), static_cast<GLsizei>(h - 1), GL_RED_INTEGER,
+                                           GL_UNSIGNED_INT, curr_options.data()));
+                    glsafe(glTexSubImage2D(GL_TEXTURE_2D, 0, 0, static_cast<GLsizei>(h - 1), static_cast<GLsizei>(curr_options.size() % w),
+                                           1, GL_RED_INTEGER, GL_UNSIGNED_INT, &curr_options[w * (h - 1)]));
                     m_tex_ids[curr_tex_id].enabled_options.second = w * (h - 1) + curr_options.size() % w;
                 }
             }
@@ -655,15 +610,15 @@ void ViewerImpl::TextureData::reset()
     }
     m_tex_ids.clear();
 
-    m_width = 0;
+    m_width  = 0;
     m_height = 0;
-    m_count = 0;
+    m_count  = 0;
 
-    m_positions_size = 0;
+    m_positions_size          = 0;
     m_height_width_angle_size = 0;
-    m_colors_size = 0;
-    m_enabled_segments_size = 0;
-    m_enabled_options_size = 0;
+    m_colors_size             = 0;
+    m_enabled_segments_size   = 0;
+    m_enabled_options_size    = 0;
 }
 
 std::pair<unsigned int, size_t> ViewerImpl::TextureData::get_positions_tex_id(size_t id) const
@@ -764,12 +719,8 @@ void ViewerImpl::init(const std::string& opengl_context_version)
     m_uni_segments_colors_tex_id             = glGetUniformLocation(m_segments_shader_id, "color_tex");
     m_uni_segments_segment_index_tex_id      = glGetUniformLocation(m_segments_shader_id, "segment_index_tex");
     glcheck();
-    assert(m_uni_segments_view_matrix_id != -1 &&
-           m_uni_segments_projection_matrix_id != -1 &&
-           m_uni_segments_camera_position_id != -1 &&
-           m_uni_segments_positions_tex_id != -1 &&
-           m_uni_segments_height_width_angle_tex_id != -1 &&
-           m_uni_segments_colors_tex_id != -1 &&
+    assert(m_uni_segments_view_matrix_id != -1 && m_uni_segments_projection_matrix_id != -1 && m_uni_segments_camera_position_id != -1 &&
+           m_uni_segments_positions_tex_id != -1 && m_uni_segments_height_width_angle_tex_id != -1 && m_uni_segments_colors_tex_id != -1 &&
            m_uni_segments_segment_index_tex_id != -1);
 
     m_segment_template.init();
@@ -788,12 +739,8 @@ void ViewerImpl::init(const std::string& opengl_context_version)
     m_uni_options_colors_tex_id             = glGetUniformLocation(m_options_shader_id, "color_tex");
     m_uni_options_segment_index_tex_id      = glGetUniformLocation(m_options_shader_id, "segment_index_tex");
     glcheck();
-    assert(m_uni_options_view_matrix_id != -1 &&
-           m_uni_options_projection_matrix_id != -1 &&
-           m_uni_options_positions_tex_id != -1 &&
-           m_uni_options_height_width_angle_tex_id != -1 &&
-           m_uni_options_colors_tex_id != -1 &&
-           m_uni_options_segment_index_tex_id != -1);
+    assert(m_uni_options_view_matrix_id != -1 && m_uni_options_projection_matrix_id != -1 && m_uni_options_positions_tex_id != -1 &&
+           m_uni_options_height_width_angle_tex_id != -1 && m_uni_options_colors_tex_id != -1 && m_uni_options_segment_index_tex_id != -1);
 
     m_option_template.init(16);
 
@@ -810,9 +757,7 @@ void ViewerImpl::init(const std::string& opengl_context_version)
     m_uni_cog_marker_view_matrix           = glGetUniformLocation(m_cog_marker_shader_id, "view_matrix");
     m_uni_cog_marker_projection_matrix     = glGetUniformLocation(m_cog_marker_shader_id, "projection_matrix");
     glcheck();
-    assert(m_uni_cog_marker_world_center_position != -1 &&
-           m_uni_cog_marker_scale_factor != -1 &&
-           m_uni_cog_marker_view_matrix != -1 &&
+    assert(m_uni_cog_marker_world_center_position != -1 && m_uni_cog_marker_scale_factor != -1 && m_uni_cog_marker_view_matrix != -1 &&
            m_uni_cog_marker_projection_matrix != -1);
 
     m_cog_marker.init(32, 1.0f);
@@ -831,11 +776,8 @@ void ViewerImpl::init(const std::string& opengl_context_version)
     m_uni_tool_marker_color_base        = glGetUniformLocation(m_tool_marker_shader_id, "color_base");
 
     glcheck();
-    assert(m_uni_tool_marker_world_origin != -1 &&
-           m_uni_tool_marker_scale_factor != -1 &&
-           m_uni_tool_marker_view_matrix != -1 &&
-           m_uni_tool_marker_projection_matrix != -1 &&
-           m_uni_tool_marker_color_base != -1);
+    assert(m_uni_tool_marker_world_origin != -1 && m_uni_tool_marker_scale_factor != -1 && m_uni_tool_marker_view_matrix != -1 &&
+           m_uni_tool_marker_projection_matrix != -1 && m_uni_tool_marker_color_base != -1);
 
     m_tool_marker.init(32, 2.0f, 4.0f, 1.0f, 8.0f);
 #endif // VGCODE_ENABLE_COG_AND_TOOL_MARKERS
@@ -871,8 +813,8 @@ void ViewerImpl::reset()
     m_extrusion_roles.reset();
     m_options.clear();
     m_used_extruders.clear();
-    m_total_time = { 0.0f, 0.0f };
-    m_travels_time = { 0.0f, 0.0f };
+    m_total_time   = {0.0f, 0.0f};
+    m_travels_time = {0.0f, 0.0f};
     m_vertices.clear();
     m_vertices_colors.clear();
     m_valid_lines_bitset.clear();
@@ -884,7 +826,7 @@ void ViewerImpl::reset()
     m_texture_data.reset();
 #else
     m_enabled_segments_count = 0;
-    m_enabled_options_count = 0;
+    m_enabled_options_count  = 0;
 
     m_settings_used_for_ranges = std::nullopt;
 
@@ -908,9 +850,15 @@ void ViewerImpl::reset()
 // to position and heights_widths_angles vectors
 using Vec4 = std::array<float, 4>;
 
-static void extract_pos_and_or_hwa(const std::vector<PathVertex>& vertices, float travels_radius, float wipes_radius, BitSet<>& valid_lines_bitset,
-    std::vector<Vec4>* positions = nullptr, std::vector<Vec4>* heights_widths_angles = nullptr, bool update_bitset = false) {
-  static constexpr const Vec3 ZERO = { 0.0f, 0.0f, 0.0f };
+static void extract_pos_and_or_hwa(const std::vector<PathVertex>& vertices,
+                                   float                          travels_radius,
+                                   float                          wipes_radius,
+                                   BitSet<>&                      valid_lines_bitset,
+                                   std::vector<Vec4>*             positions             = nullptr,
+                                   std::vector<Vec4>*             heights_widths_angles = nullptr,
+                                   bool                           update_bitset         = false)
+{
+    static constexpr const Vec3 ZERO = {0.0f, 0.0f, 0.0f};
     if (positions == nullptr && heights_widths_angles == nullptr)
         return;
     if (vertices.empty())
@@ -923,28 +871,25 @@ static void extract_pos_and_or_hwa(const std::vector<PathVertex>& vertices, floa
     if (heights_widths_angles != nullptr)
         heights_widths_angles->reserve(vertices.size());
     for (size_t i = 0; i < vertices.size(); ++i) {
-        const PathVertex& v = vertices[i];
-        const EMoveType move_type = v.type;
-        const bool prev_line_valid = i > 0 && valid_lines_bitset[i - 1];
-        const Vec3 prev_line = prev_line_valid ? v.position - vertices[i - 1].position : ZERO;
-        const bool this_line_valid = i + 1 < vertices.size() &&
-                                     vertices[i + 1].position != v.position &&
-                                     vertices[i + 1].type == move_type &&
-                                     move_type != EMoveType::Seam;
+        const PathVertex& v               = vertices[i];
+        const EMoveType   move_type       = v.type;
+        const bool        prev_line_valid = i > 0 && valid_lines_bitset[i - 1];
+        const Vec3        prev_line       = prev_line_valid ? v.position - vertices[i - 1].position : ZERO;
+        const bool        this_line_valid = i + 1 < vertices.size() && vertices[i + 1].position != v.position &&
+                                     vertices[i + 1].type == move_type && move_type != EMoveType::Seam;
         const Vec3 this_line = this_line_valid ? vertices[i + 1].position - v.position : ZERO;
 
         if (this_line_valid) {
             // there is a valid path between point i and i+1.
-        }
-        else {
+        } else {
             // the connection is invalid, there should be no line rendered, ever
             if (update_bitset)
                 valid_lines_bitset.reset(i);
         }
-        
+
         if (positions != nullptr) {
             // the last component is a dummy float to comply with GL_RGBA32F format
-            Vec4 position = { v.position[0], v.position[1], v.position[2], 0.0f };
+            Vec4 position = {v.position[0], v.position[1], v.position[2], 0.0f};
             if (move_type == EMoveType::Extrude)
                 // push down extrusion vertices by half height to render them at the right z
                 position[2] -= 0.5f * v.height;
@@ -953,22 +898,20 @@ static void extract_pos_and_or_hwa(const std::vector<PathVertex>& vertices, floa
 
         if (heights_widths_angles != nullptr) {
             float height = 0.0f;
-            float width = 0.0f;
+            float width  = 0.0f;
             if (v.is_travel()) {
                 height = travels_radius;
                 width  = travels_radius;
-            }
-            else if (v.is_wipe()) {
+            } else if (v.is_wipe()) {
                 height = wipes_radius;
                 width  = wipes_radius;
-            }
-            else {
+            } else {
                 height = v.height;
-                width = v.width;
+                width  = v.width;
             }
             // the last component is a dummy float to comply with GL_RGBA32F format
-            heights_widths_angles->push_back({ height, width,
-                std::atan2(prev_line[0] * this_line[1] - prev_line[1] * this_line[0], dot(prev_line, this_line)), 0.0f });
+            heights_widths_angles->push_back(
+                {height, width, std::atan2(prev_line[0] * this_line[1] - prev_line[1] * this_line[0], dot(prev_line, this_line)), 0.0f});
         }
     }
 }
@@ -983,8 +926,8 @@ void ViewerImpl::load(GCodeInputData&& gcode_data)
 
     reset();
 
-    m_vertices = std::move(gcode_data.vertices);
-    m_tool_colors = std::move(gcode_data.tools_colors);
+    m_vertices           = std::move(gcode_data.vertices);
+    m_tool_colors        = std::move(gcode_data.tools_colors);
     m_color_print_colors = std::move(gcode_data.color_print_colors);
     m_vertices_colors.resize(m_vertices.size());
 
@@ -1010,9 +953,9 @@ void ViewerImpl::load(GCodeInputData&& gcode_data)
 
             auto estruder_it = m_used_extruders.find(v.extruder_id);
             if (estruder_it == m_used_extruders.end())
-                estruder_it = m_used_extruders.insert({ v.extruder_id, std::vector<ColorPrint>() }).first;
+                estruder_it = m_used_extruders.insert({v.extruder_id, std::vector<ColorPrint>()}).first;
             if (estruder_it->second.empty() || estruder_it->second.back().color_id != v.color_id) {
-                const ColorPrint cp = { v.extruder_id, v.color_id, v.layer_id, m_total_time };
+                const ColorPrint cp = {v.extruder_id, v.color_id, v.layer_id, m_total_time};
                 estruder_it->second.emplace_back(cp);
             }
         }
@@ -1020,13 +963,9 @@ void ViewerImpl::load(GCodeInputData&& gcode_data)
         if (i > 0) {
 #if VGCODE_ENABLE_COG_AND_TOOL_MARKERS
             // updates calculation for center of gravity
-            if (v.type == EMoveType::Extrude &&
-                v.role != EGCodeExtrusionRole::Skirt &&
-                v.role != EGCodeExtrusionRole::SupportMaterial &&
-                v.role != EGCodeExtrusionRole::SupportMaterialInterface &&
-                v.role != EGCodeExtrusionRole::WipeTower &&
-                v.role != EGCodeExtrusionRole::Custom &&
-                v.role != EGCodeExtrusionRole::Brim &&
+            if (v.type == EMoveType::Extrude && v.role != EGCodeExtrusionRole::Skirt && v.role != EGCodeExtrusionRole::SupportMaterial &&
+                v.role != EGCodeExtrusionRole::SupportMaterialInterface && v.role != EGCodeExtrusionRole::WipeTower &&
+                v.role != EGCodeExtrusionRole::Custom && v.role != EGCodeExtrusionRole::Brim &&
                 v.role != EGCodeExtrusionRole::SupportTransition) {
                 m_cog_marker.update(0.5f * (v.position + m_vertices[i - 1].position), v.weight);
             }
@@ -1069,7 +1008,7 @@ void ViewerImpl::load(GCodeInputData&& gcode_data)
         // create and fill height, width and angle textures
         m_texture_data.set_heights_widths_angles(heights_widths_angles);
 #else
-        m_positions_tex_size = positions.size() * sizeof(Vec3);
+        m_positions_tex_size          = positions.size() * sizeof(Vec3);
         m_height_width_angle_tex_size = heights_widths_angles.size() * sizeof(Vec3);
 
         int old_bound_texture = 0;
@@ -1125,7 +1064,7 @@ void ViewerImpl::update_enabled_entities()
 
     std::vector<uint32_t> enabled_segments;
     std::vector<uint32_t> enabled_options;
-    Interval range = m_view_range.get_visible();
+    Interval              range = m_view_range.get_visible();
 
     // when top layer only visualization is enabled, we need to render
     // all the toolpaths in the other layers as grayed, so extend the range
@@ -1152,20 +1091,16 @@ void ViewerImpl::update_enabled_entities()
         if (v.is_travel()) {
             if (!m_settings.options_visibility[size_t(EOptionType::Travels)])
                 continue;
-        }
-        else if (v.is_wipe()) {
+        } else if (v.is_wipe()) {
             if (!m_settings.options_visibility[size_t(EOptionType::Wipes)])
                 continue;
-        }
-        else if (v.is_option()) {
+        } else if (v.is_option()) {
             if (!m_settings.options_visibility[size_t(move_type_to_option(v.type))])
                 continue;
-        }
-        else if (v.is_extrusion()) {
+        } else if (v.is_extrusion()) {
             if (!m_settings.extrusion_roles_visibility[size_t(v.role)])
                 continue;
-        }
-        else
+        } else
             continue;
 
         if (v.is_option())
@@ -1179,10 +1114,10 @@ void ViewerImpl::update_enabled_entities()
     m_texture_data.set_enabled_options(enabled_options);
 #else
     m_enabled_segments_count = enabled_segments.size();
-    m_enabled_options_count = enabled_options.size();
+    m_enabled_options_count  = enabled_options.size();
 
     m_enabled_segments_tex_size = enabled_segments.size() * sizeof(uint32_t);
-    m_enabled_options_tex_size = enabled_options.size() * sizeof(uint32_t);
+    m_enabled_options_tex_size  = enabled_options.size() * sizeof(uint32_t);
 
     // update gpu buffer for enabled segments
     assert(m_enabled_segments_buf_id > 0);
@@ -1206,14 +1141,14 @@ void ViewerImpl::update_enabled_entities()
     m_settings.update_enabled_entities = false;
 }
 
-static float encode_color(const Color& color) {
-    const int r = static_cast<int>(color[0]);
-    const int g = static_cast<int>(color[1]);
-    const int b = static_cast<int>(color[2]);
+static float encode_color(const Color& color)
+{
+    const int r       = static_cast<int>(color[0]);
+    const int g       = static_cast<int>(color[1]);
+    const int b       = static_cast<int>(color[2]);
     const int i_color = r << 16 | g << 8 | b;
     return static_cast<float>(i_color);
 }
-
 
 void ViewerImpl::update_colors_texture()
 {
@@ -1222,41 +1157,39 @@ void ViewerImpl::update_colors_texture()
         return;
 #endif // ENABLE_OPENGL_ES
 
-    const size_t top_layer_id = m_settings.top_layer_only_view_range ? m_layers.get_view_range()[1] : 0;
-    const bool color_top_layer_only = m_view_range.get_full()[1] != m_view_range.get_visible()[1];
+    const size_t top_layer_id         = m_settings.top_layer_only_view_range ? m_layers.get_view_range()[1] : 0;
+    const bool   color_top_layer_only = m_view_range.get_full()[1] != m_view_range.get_visible()[1];
 
     // Based on current settings and slider position, we might want to render some
     // vertices as dark grey. Use either that or the normal color (from the cache).
     std::vector<float> colors(m_vertices_colors.size());
     assert(colors.size() == m_vertices.size() && m_vertices_colors.size() == m_vertices.size());
-    for (size_t i=0; i<m_vertices.size(); ++i)
+    for (size_t i = 0; i < m_vertices.size(); ++i)
         colors[i] = (color_top_layer_only && m_vertices[i].layer_id < top_layer_id &&
-                    (!m_settings.spiral_vase_mode || i != m_view_range.get_enabled()[0])) ?
-                    encode_color(DUMMY_COLOR) : m_vertices_colors[i];
+                     (!m_settings.spiral_vase_mode || i != m_view_range.get_enabled()[0])) ?
+                        encode_color(DUMMY_COLOR) :
+                        m_vertices_colors[i];
 
-    #ifdef ENABLE_OPENGL_ES
-        if (!colors.empty())
-            // update gpu buffer for colors
-            m_texture_data.set_colors(colors);
-    #else
-        m_colors_tex_size = colors.size() * sizeof(float);
-
+#ifdef ENABLE_OPENGL_ES
+    if (!colors.empty())
         // update gpu buffer for colors
-        glsafe(glBindBuffer(GL_TEXTURE_BUFFER, m_colors_buf_id));
-        glsafe(glBufferData(GL_TEXTURE_BUFFER, colors.size() * sizeof(float), colors.data(), GL_STATIC_DRAW));
-        glsafe(glBindBuffer(GL_TEXTURE_BUFFER, 0));
-    #endif // ENABLE_OPENGL_ES
-}
+        m_texture_data.set_colors(colors);
+#else
+    m_colors_tex_size = colors.size() * sizeof(float);
 
+    // update gpu buffer for colors
+    glsafe(glBindBuffer(GL_TEXTURE_BUFFER, m_colors_buf_id));
+    glsafe(glBufferData(GL_TEXTURE_BUFFER, colors.size() * sizeof(float), colors.data(), GL_STATIC_DRAW));
+    glsafe(glBindBuffer(GL_TEXTURE_BUFFER, 0));
+#endif // ENABLE_OPENGL_ES
+}
 
 void ViewerImpl::update_colors()
 {
-
-
     if (!m_used_extruders.empty()) {
-        // ensure that the number of defined tool colors matches the max id of the used extruders 
+        // ensure that the number of defined tool colors matches the max id of the used extruders
         const size_t max_used_extruder_id = 1 + static_cast<size_t>(m_used_extruders.rbegin()->first);
-        const size_t tool_colors_size = m_tool_colors.size();
+        const size_t tool_colors_size     = m_tool_colors.size();
         if (m_tool_colors.size() < max_used_extruder_id) {
             for (size_t i = 0; i < max_used_extruder_id - tool_colors_size; ++i) {
                 m_tool_colors.emplace_back(DUMMY_COLOR);
@@ -1265,14 +1198,14 @@ void ViewerImpl::update_colors()
     }
 
     update_color_ranges();
-    
+
     // Recalculate "normal" colors of all the vertices for current view settings.
     // If some part of the preview should be rendered in dark grey, it is taken
     // care of in update_colors_texture. That is to avoid the need to recalculate
     // the "normal" color on every slider move.
     for (size_t i = 0; i < m_vertices.size(); ++i)
         m_vertices_colors[i] = encode_color(get_vertex_color(m_vertices[i]));
-    
+
     update_colors_texture();
     m_settings.update_colors = false;
 }
@@ -1289,7 +1222,7 @@ void ViewerImpl::render(const Mat4x4& view_matrix, const Mat4x4& projection_matr
         update_colors();
 
     const Mat4x4 inv_view_matrix = inverse(view_matrix);
-    const Vec3 camera_position = { inv_view_matrix[12], inv_view_matrix[13], inv_view_matrix[14] };
+    const Vec3   camera_position = {inv_view_matrix[12], inv_view_matrix[13], inv_view_matrix[14]};
     render_segments(view_matrix, projection_matrix, camera_position);
     render_options(view_matrix, projection_matrix);
 
@@ -1303,13 +1236,13 @@ void ViewerImpl::render(const Mat4x4& view_matrix, const Mat4x4& projection_matr
 
 void ViewerImpl::set_view_type(EViewType type)
 {
-    m_settings.view_type = type;
+    m_settings.view_type     = type;
     m_settings.update_colors = true;
 }
 
 void ViewerImpl::set_time_mode(ETimeMode mode)
 {
-    m_settings.time_mode = mode;
+    m_settings.time_mode     = mode;
     m_settings.update_colors = true;
     // Update layer_duration for all vertices based on the new time mode
     for (PathVertex& v : m_vertices) {
@@ -1326,7 +1259,7 @@ void ViewerImpl::set_layers_view_range(Interval::value_type min, Interval::value
     update_view_full_range();
     m_view_range.set_visible(m_view_range.get_enabled());
     m_settings.update_enabled_entities = true;
-    //m_settings.update_colors = true;
+    // m_settings.update_colors = true;
     update_colors_texture();
 }
 
@@ -1336,7 +1269,7 @@ void ViewerImpl::toggle_top_layer_only_view_range()
     update_view_full_range();
     m_view_range.set_visible(m_view_range.get_enabled());
     m_settings.update_enabled_entities = true;
-    //m_settings.update_colors = true;
+    // m_settings.update_colors = true;
     update_colors_texture();
 }
 
@@ -1344,8 +1277,7 @@ std::vector<ETimeMode> ViewerImpl::get_time_modes() const
 {
     std::vector<ETimeMode> ret;
     for (size_t i = 0; i < TIME_MODES_COUNT; ++i) {
-        if (std::accumulate(m_vertices.begin(), m_vertices.end(), 0.0f,
-            [i](float a, const PathVertex& v) { return a + v.times[i]; }) > 0.0f)
+        if (std::accumulate(m_vertices.begin(), m_vertices.end(), 0.0f, [i](float a, const PathVertex& v) { return a + v.times[i]; }) > 0.0f)
             ret.push_back(static_cast<ETimeMode>(i));
     }
     return ret;
@@ -1375,8 +1307,8 @@ std::vector<ColorPrint> ViewerImpl::get_color_prints(uint8_t extruder_id) const
 
 AABox ViewerImpl::get_bounding_box(const std::vector<EMoveType>& types) const
 {
-    Vec3 min = { FLT_MAX, FLT_MAX, FLT_MAX };
-    Vec3 max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+    Vec3 min = {FLT_MAX, FLT_MAX, FLT_MAX};
+    Vec3 max = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
     for (const PathVertex& v : m_vertices) {
         if (std::find(types.begin(), types.end(), v.type) != types.end()) {
             for (int j = 0; j < 3; ++j) {
@@ -1385,33 +1317,30 @@ AABox ViewerImpl::get_bounding_box(const std::vector<EMoveType>& types) const
             }
         }
     }
-    return { min, max };
+    return {min, max};
 }
 
 AABox ViewerImpl::get_extrusion_bounding_box(const std::vector<EGCodeExtrusionRole>& roles) const
 {
-    Vec3 min = { FLT_MAX, FLT_MAX, FLT_MAX };
-    Vec3 max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+    Vec3 min = {FLT_MAX, FLT_MAX, FLT_MAX};
+    Vec3 max = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
     for (const PathVertex& v : m_vertices) {
         if (v.is_extrusion() && std::find(roles.begin(), roles.end(), v.role) != roles.end()) {
             for (int j = 0; j < 3; ++j) {
-              min[j] = std::min(min[j], v.position[j]);
-              max[j] = std::max(max[j], v.position[j]);
+                min[j] = std::min(min[j], v.position[j]);
+                max[j] = std::max(max[j], v.position[j]);
             }
         }
     }
-    return { min, max };
+    return {min, max};
 }
 
-bool ViewerImpl::is_option_visible(EOptionType type) const
-{
-    return m_settings.options_visibility[size_t(type)];
-}
+bool ViewerImpl::is_option_visible(EOptionType type) const { return m_settings.options_visibility[size_t(type)]; }
 
 void ViewerImpl::toggle_option_visibility(EOptionType type)
 {
-    m_settings.options_visibility[size_t(type)] = ! m_settings.options_visibility[size_t(type)];
-    const Interval old_enabled_range = m_view_range.get_enabled();
+    m_settings.options_visibility[size_t(type)] = !m_settings.options_visibility[size_t(type)];
+    const Interval old_enabled_range            = m_view_range.get_enabled();
     update_view_full_range();
     const Interval& new_enabled_range = m_view_range.get_enabled();
     if (old_enabled_range != new_enabled_range) {
@@ -1422,20 +1351,17 @@ void ViewerImpl::toggle_option_visibility(EOptionType type)
             m_view_range.set_visible(new_enabled_range[0], visible_range[1]);
     }
     m_settings.update_enabled_entities = true;
-    m_settings.update_colors = true;
+    m_settings.update_colors           = true;
 }
 
-bool ViewerImpl::is_extrusion_role_visible(EGCodeExtrusionRole role) const
-{
-    return m_settings.extrusion_roles_visibility[size_t(role)];
-}
+bool ViewerImpl::is_extrusion_role_visible(EGCodeExtrusionRole role) const { return m_settings.extrusion_roles_visibility[size_t(role)]; }
 
 void ViewerImpl::toggle_extrusion_role_visibility(EGCodeExtrusionRole role)
 {
-    m_settings.extrusion_roles_visibility[size_t(role)] = ! m_settings.extrusion_roles_visibility[size_t(role)];
+    m_settings.extrusion_roles_visibility[size_t(role)] = !m_settings.extrusion_roles_visibility[size_t(role)];
     update_view_full_range();
     m_settings.update_enabled_entities = true;
-    m_settings.update_colors = true;
+    m_settings.update_colors           = true;
 }
 
 void ViewerImpl::set_view_visible_range(Interval::value_type min, Interval::value_type max)
@@ -1445,14 +1371,14 @@ void ViewerImpl::set_view_visible_range(Interval::value_type min, Interval::valu
     update_view_full_range();
     m_view_range.set_visible(min, max);
     update_enabled_entities();
-    //m_settings.update_colors = true;
+    // m_settings.update_colors = true;
     update_colors_texture();
 }
 
 float ViewerImpl::get_estimated_time_at(size_t id) const
 {
-    return std::accumulate(m_vertices.begin(), m_vertices.begin() + id + 1, 0.0f, 
-        [this](float a, const PathVertex& v) { return a + v.times[static_cast<size_t>(m_settings.time_mode)]; });
+    return std::accumulate(m_vertices.begin(), m_vertices.begin() + id + 1, 0.0f,
+                           [this](float a, const PathVertex& v) { return a + v.times[static_cast<size_t>(m_settings.time_mode)]; });
 }
 
 Color ViewerImpl::get_vertex_color(const PathVertex& v) const
@@ -1463,71 +1389,62 @@ Color ViewerImpl::get_vertex_color(const PathVertex& v) const
     if ((v.is_wipe() && (m_settings.view_type != EViewType::Speed && m_settings.view_type != EViewType::ActualSpeed)) || v.is_option())
         return get_option_color(move_type_to_option(v.type));
 
-    switch (m_settings.view_type)
-    {
-    case EViewType::FeatureType:
-    {
+    switch (m_settings.view_type) {
+    case EViewType::FeatureType: {
         return v.is_travel() ? get_option_color(move_type_to_option(v.type)) : get_extrusion_role_color(v.role);
     }
-    case EViewType::Height:
-    {
+    case EViewType::Height: {
         return v.is_travel() ? get_option_color(move_type_to_option(v.type)) : m_height_range.get_color_at(v.height);
     }
-    case EViewType::Width:
-    {
+    case EViewType::Width: {
         return v.is_travel() ? get_option_color(move_type_to_option(v.type)) : m_width_range.get_color_at(v.width);
     }
-    case EViewType::Speed:
-    {
+    case EViewType::Speed: {
         return m_speed_range.get_color_at(v.feedrate);
     }
-    case EViewType::ActualSpeed:
-    {
+    case EViewType::ActualSpeed: {
         return m_actual_speed_range.get_color_at(v.actual_feedrate);
     }
-    case EViewType::FanSpeed:
-    {
+    case EViewType::FanSpeed: {
         return v.is_travel() ? get_option_color(move_type_to_option(v.type)) : m_fan_speed_range.get_color_at(v.fan_speed);
     }
-    case EViewType::Temperature:
-    {
+    case EViewType::Temperature: {
         return v.is_travel() ? get_option_color(move_type_to_option(v.type)) : m_temperature_range.get_color_at(v.temperature);
     }
-// ORCA: Add Pressure Advance visualization support
-    case EViewType::PressureAdvance:
-    {
+        // ORCA: Add Pressure Advance visualization support
+    case EViewType::PressureAdvance: {
         return v.is_travel() ? get_option_color(move_type_to_option(v.type)) : m_pressure_advance_range.get_color_at(v.pressure_advance);
     }
-    case EViewType::VolumetricFlowRate:
-    {
+    case EViewType::VolumetricFlowRate: {
         return v.is_travel() ? get_option_color(move_type_to_option(v.type)) : m_volumetric_rate_range.get_color_at(v.volumetric_rate());
     }
-    case EViewType::ActualVolumetricFlowRate:
-    {
-        return v.is_travel() ? get_option_color(move_type_to_option(v.type)) : m_actual_volumetric_rate_range.get_color_at(v.actual_volumetric_rate());
-    }
-    case EViewType::LayerTimeLinear:
-    {
+    case EViewType::ActualVolumetricFlowRate: {
         return v.is_travel() ? get_option_color(move_type_to_option(v.type)) :
-            m_layer_time_range[0].get_color_at(m_layers.get_layer_time(m_settings.time_mode, static_cast<size_t>(v.layer_id)));
+                               m_actual_volumetric_rate_range.get_color_at(v.actual_volumetric_rate());
     }
-    case EViewType::LayerTimeLogarithmic:
-    {
-        return v.is_travel() ? get_option_color(move_type_to_option(v.type)) :
-            m_layer_time_range[1].get_color_at(m_layers.get_layer_time(m_settings.time_mode, static_cast<size_t>(v.layer_id)));
+    case EViewType::LayerTimeLinear: {
+        return v.is_travel() ?
+                   get_option_color(move_type_to_option(v.type)) :
+                   m_layer_time_range[0].get_color_at(m_layers.get_layer_time(m_settings.time_mode, static_cast<size_t>(v.layer_id)));
     }
-    case EViewType::Tool:
-    {
+    case EViewType::LayerTimeLogarithmic: {
+        return v.is_travel() ?
+                   get_option_color(move_type_to_option(v.type)) :
+                   m_layer_time_range[1].get_color_at(m_layers.get_layer_time(m_settings.time_mode, static_cast<size_t>(v.layer_id)));
+    }
+    case EViewType::Tool: {
         assert(static_cast<size_t>(v.extruder_id) < m_tool_colors.size());
         return m_tool_colors[v.extruder_id];
     }
     case EViewType::Summary: // ORCA
-    case EViewType::ColorPrint:
-    {
-        return m_layers.layer_contains_colorprint_options(static_cast<size_t>(v.layer_id)) ? DUMMY_COLOR :
-            m_color_print_colors[static_cast<size_t>(v.color_id) % m_color_print_colors.size()];
+    case EViewType::ColorPrint: {
+        return m_layers.layer_contains_colorprint_options(static_cast<size_t>(v.layer_id)) ?
+                   DUMMY_COLOR :
+                   m_color_print_colors[static_cast<size_t>(v.color_id) % m_color_print_colors.size()];
     }
-    default: { break; }
+    default: {
+        break;
+    }
     }
 
     return DUMMY_COLOR;
@@ -1535,85 +1452,130 @@ Color ViewerImpl::get_vertex_color(const PathVertex& v) const
 
 void ViewerImpl::set_tool_colors(const Palette& colors)
 {
-    m_tool_colors = colors;
+    m_tool_colors            = colors;
     m_settings.update_colors = true;
 }
 
 void ViewerImpl::set_color_print_colors(const Palette& colors)
 {
-    m_color_print_colors = colors;
+    m_color_print_colors     = colors;
     m_settings.update_colors = true;
 }
 
-const Color& ViewerImpl::get_extrusion_role_color(EGCodeExtrusionRole role) const
-{
-    return m_extrusion_roles_colors[size_t(role)];
-}
+const Color& ViewerImpl::get_extrusion_role_color(EGCodeExtrusionRole role) const { return m_extrusion_roles_colors[size_t(role)]; }
 
 void ViewerImpl::set_extrusion_role_color(EGCodeExtrusionRole role, const Color& color)
 {
     m_extrusion_roles_colors[size_t(role)] = color;
-    m_settings.update_colors = true;
+    m_settings.update_colors               = true;
 }
 
-void ViewerImpl::reset_default_extrusion_roles_colors()
-{
-    m_extrusion_roles_colors = DEFAULT_EXTRUSION_ROLES_COLORS;
-}
+void ViewerImpl::reset_default_extrusion_roles_colors() { m_extrusion_roles_colors = DEFAULT_EXTRUSION_ROLES_COLORS; }
 
-const Color& ViewerImpl::get_option_color(EOptionType type) const
-{
-    return m_options_colors[size_t(type)];
-}
+const Color& ViewerImpl::get_option_color(EOptionType type) const { return m_options_colors[size_t(type)]; }
 
 void ViewerImpl::set_option_color(EOptionType type, const Color& color)
 {
     m_options_colors[size_t(type)] = color;
-    m_settings.update_colors = true;
+    m_settings.update_colors       = true;
 }
 
-void ViewerImpl::reset_default_options_colors()
-{
-    m_options_colors = DEFAULT_OPTIONS_COLORS;
-}
+void ViewerImpl::reset_default_options_colors() { m_options_colors = DEFAULT_OPTIONS_COLORS; }
 
 const ColorRange& ViewerImpl::get_color_range(EViewType type) const
 {
-    switch (type)
-    {
-    case EViewType::Height:                   { return m_height_range; }
-    case EViewType::Width:                    { return m_width_range; }
-    case EViewType::Speed:                    { return m_speed_range; }
-    case EViewType::ActualSpeed:              { return m_actual_speed_range; }
-    case EViewType::FanSpeed:                 { return m_fan_speed_range; }
-    case EViewType::Temperature:              { return m_temperature_range; }
-// ORCA: Add Pressure Advance visualization support
-    case EViewType::PressureAdvance:          { return m_pressure_advance_range; }
-    case EViewType::VolumetricFlowRate:       { return m_volumetric_rate_range; }
-    case EViewType::ActualVolumetricFlowRate: { return m_actual_volumetric_rate_range; }
-    case EViewType::LayerTimeLinear:          { return m_layer_time_range[0]; }
-    case EViewType::LayerTimeLogarithmic:     { return m_layer_time_range[1]; }
-    default:                                  { return ColorRange::DUMMY_COLOR_RANGE; }
+    switch (type) {
+    case EViewType::Height: {
+        return m_height_range;
+    }
+    case EViewType::Width: {
+        return m_width_range;
+    }
+    case EViewType::Speed: {
+        return m_speed_range;
+    }
+    case EViewType::ActualSpeed: {
+        return m_actual_speed_range;
+    }
+    case EViewType::FanSpeed: {
+        return m_fan_speed_range;
+    }
+    case EViewType::Temperature: {
+        return m_temperature_range;
+    }
+        // ORCA: Add Pressure Advance visualization support
+    case EViewType::PressureAdvance: {
+        return m_pressure_advance_range;
+    }
+    case EViewType::VolumetricFlowRate: {
+        return m_volumetric_rate_range;
+    }
+    case EViewType::ActualVolumetricFlowRate: {
+        return m_actual_volumetric_rate_range;
+    }
+    case EViewType::LayerTimeLinear: {
+        return m_layer_time_range[0];
+    }
+    case EViewType::LayerTimeLogarithmic: {
+        return m_layer_time_range[1];
+    }
+    default: {
+        return ColorRange::DUMMY_COLOR_RANGE;
+    }
     }
 }
 
 void ViewerImpl::set_color_range_palette(EViewType type, const Palette& palette)
 {
-    switch (type)
-    {
-    case EViewType::Height:                   { m_height_range.set_palette(palette);          break; }
-    case EViewType::Width:                    { m_width_range.set_palette(palette);           break; }
-    case EViewType::Speed:                    { m_speed_range.set_palette(palette);           break; }
-    case EViewType::ActualSpeed:              { m_actual_speed_range.set_palette(palette);    break; }
-    case EViewType::FanSpeed:                 { m_fan_speed_range.set_palette(palette);       break; }
-    case EViewType::Temperature:              { m_temperature_range.set_palette(palette);     break; }
-// ORCA: Add Pressure Advance visualization support
-    case EViewType::PressureAdvance:          { m_pressure_advance_range.set_palette(palette); break; }
-    case EViewType::VolumetricFlowRate:       { m_volumetric_rate_range.set_palette(palette); break; }
-    case EViewType::ActualVolumetricFlowRate: { m_actual_volumetric_rate_range.set_palette(palette); break; }
-    case EViewType::LayerTimeLinear:          { m_layer_time_range[0].set_palette(palette);   break; }
-    case EViewType::LayerTimeLogarithmic:     { m_layer_time_range[1].set_palette(palette);   break; }
-    default:                                  { break; }
+    switch (type) {
+    case EViewType::Height: {
+        m_height_range.set_palette(palette);
+        break;
+    }
+    case EViewType::Width: {
+        m_width_range.set_palette(palette);
+        break;
+    }
+    case EViewType::Speed: {
+        m_speed_range.set_palette(palette);
+        break;
+    }
+    case EViewType::ActualSpeed: {
+        m_actual_speed_range.set_palette(palette);
+        break;
+    }
+    case EViewType::FanSpeed: {
+        m_fan_speed_range.set_palette(palette);
+        break;
+    }
+    case EViewType::Temperature: {
+        m_temperature_range.set_palette(palette);
+        break;
+    }
+        // ORCA: Add Pressure Advance visualization support
+    case EViewType::PressureAdvance: {
+        m_pressure_advance_range.set_palette(palette);
+        break;
+    }
+    case EViewType::VolumetricFlowRate: {
+        m_volumetric_rate_range.set_palette(palette);
+        break;
+    }
+    case EViewType::ActualVolumetricFlowRate: {
+        m_actual_volumetric_rate_range.set_palette(palette);
+        break;
+    }
+    case EViewType::LayerTimeLinear: {
+        m_layer_time_range[0].set_palette(palette);
+        break;
+    }
+    case EViewType::LayerTimeLogarithmic: {
+        m_layer_time_range[1].set_palette(palette);
+        break;
+    }
+    default: {
+        break;
+    }
     }
     m_settings.update_colors = true;
 }
@@ -1682,27 +1644,23 @@ size_t ViewerImpl::get_used_gpu_memory() const
 static bool is_visible(const PathVertex& v, const Settings& settings)
 {
     const EOptionType option_type = move_type_to_option(v.type);
-    try
-    {
+    try {
         return (option_type == EOptionType::COUNT) ?
-            (v.type == EMoveType::Extrude) ? settings.extrusion_roles_visibility[size_t(v.role)] : false :
-            settings.options_visibility[size_t(option_type)];
-    }
-    catch (...)
-    {
+                   (v.type == EMoveType::Extrude) ? settings.extrusion_roles_visibility[size_t(v.role)] : false :
+                   settings.options_visibility[size_t(option_type)];
+    } catch (...) {
         return false;
     }
 }
 
 void ViewerImpl::update_view_full_range()
 {
-    const Interval& layers_range = m_layers.get_view_range();
-    const bool travels_visible = m_settings.options_visibility[size_t(EOptionType::Travels)];
-    const bool wipes_visible   = m_settings.options_visibility[size_t(EOptionType::Wipes)];
+    const Interval& layers_range    = m_layers.get_view_range();
+    const bool      travels_visible = m_settings.options_visibility[size_t(EOptionType::Travels)];
+    const bool      wipes_visible   = m_settings.options_visibility[size_t(EOptionType::Wipes)];
 
     auto first_it = m_vertices.begin();
-    while (first_it != m_vertices.end() &&
-           (first_it->layer_id < layers_range[0] || !is_visible(*first_it, m_settings))) {
+    while (first_it != m_vertices.end() && (first_it->layer_id < layers_range[0] || !is_visible(*first_it, m_settings))) {
         ++first_it;
     }
 
@@ -1716,8 +1674,7 @@ void ViewerImpl::update_view_full_range()
         if (travels_visible || wipes_visible) {
             // if the global range starts with a travel/wipe move, extend it to the travel/wipe start
             while (first_it != m_vertices.begin() &&
-                   ((travels_visible && first_it->is_travel()) ||
-                    (wipes_visible && first_it->is_wipe()))) {
+                   ((travels_visible && first_it->is_travel()) || (wipes_visible && first_it->is_wipe()))) {
                 --first_it;
             }
         }
@@ -1729,7 +1686,7 @@ void ViewerImpl::update_view_full_range()
         if (last_it != first_it)
             --last_it;
 
-        // remove disabled trailing options, if any 
+        // remove disabled trailing options, if any
         auto rev_first_it = std::make_reverse_iterator(first_it);
         if (rev_first_it != m_vertices.rbegin())
             --rev_first_it;
@@ -1751,7 +1708,7 @@ void ViewerImpl::update_view_full_range()
             while (last_it != m_vertices.end() && last_it + 1 != m_vertices.end() &&
                    ((travels_visible && last_it->is_travel() && (last_it + 1)->is_travel()) ||
                     (wipes_visible && last_it->is_wipe() && (last_it + 1)->is_wipe()))) {
-                  ++last_it;
+                ++last_it;
             }
         }
 
@@ -1761,10 +1718,11 @@ void ViewerImpl::update_view_full_range()
             m_view_range.set_full(Range());
 
         if (m_settings.top_layer_only_view_range) {
-            const Interval& full_range = m_view_range.get_full();
-            auto top_first_it = m_vertices.begin() + full_range[0];
-            bool shortened = false;
-            while (top_first_it != m_vertices.end() && (top_first_it->layer_id < layers_range[1] || !is_visible(*top_first_it, m_settings))) {
+            const Interval& full_range   = m_view_range.get_full();
+            auto            top_first_it = m_vertices.begin() + full_range[0];
+            bool            shortened    = false;
+            while (top_first_it != m_vertices.end() &&
+                   (top_first_it->layer_id < layers_range[1] || !is_visible(*top_first_it, m_settings))) {
                 ++top_first_it;
                 shortened = true;
             }
@@ -1775,8 +1733,7 @@ void ViewerImpl::update_view_full_range()
             if (m_settings.spiral_vase_mode && layers_range[0] > 0 && layers_range[0] == layers_range[1])
                 --top_first_it;
             m_view_range.set_enabled(std::distance(m_vertices.begin(), top_first_it), full_range[1]);
-        }
-        else
+        } else
             m_view_range.set_enabled(m_view_range.get_full());
     }
 
@@ -1821,8 +1778,7 @@ void ViewerImpl::update_color_ranges()
                 m_pressure_advance_range.update(v.pressure_advance);
         }
         if ((v.is_travel() && m_settings.options_visibility[size_t(EOptionType::Travels)]) ||
-            (v.is_wipe() && m_settings.options_visibility[size_t(EOptionType::Wipes)]) ||
-             v.is_extrusion()) {
+            (v.is_wipe() && m_settings.options_visibility[size_t(EOptionType::Wipes)]) || v.is_extrusion()) {
             m_speed_range.update(v.feedrate);
             m_actual_speed_range.update(v.actual_feedrate);
         }
@@ -1859,8 +1815,7 @@ void ViewerImpl::update_heights_widths()
         if (v.is_travel()) {
             buffer[i][0] = m_travels_radius;
             buffer[i][1] = m_travels_radius;
-        }
-        else if (v.is_wipe()) {
+        } else if (v.is_wipe()) {
             buffer[i][0] = m_wipes_radius;
             buffer[i][1] = m_wipes_radius;
         }
@@ -1921,11 +1876,11 @@ void ViewerImpl::render_segments(const Mat4x4& view_matrix, const Mat4x4& projec
         m_segment_template.render(count);
     }
 #else
-    std::array<int, 4> curr_bound_texture = { 0, 0, 0, 0 };
+    std::array<int, 4> curr_bound_texture = {0, 0, 0, 0};
     for (int i = 0; i < curr_bound_texture.size(); ++i) {
         glsafe(glActiveTexture(GL_TEXTURE0 + i));
         glsafe(glGetIntegerv(GL_TEXTURE_BINDING_BUFFER, &curr_bound_texture[i]));
-        //assert(curr_bound_texture[i] == 0);
+        // assert(curr_bound_texture[i] == 0);
     }
 
     glsafe(glActiveTexture(GL_TEXTURE0));
@@ -2008,11 +1963,11 @@ void ViewerImpl::render_options(const Mat4x4& view_matrix, const Mat4x4& project
         m_option_template.render(count);
     }
 #else
-    std::array<int, 4> curr_bound_texture = { 0, 0, 0, 0 };
+    std::array<int, 4> curr_bound_texture = {0, 0, 0, 0};
     for (int i = 0; i < curr_bound_texture.size(); ++i) {
         glsafe(glActiveTexture(GL_TEXTURE0 + i));
         glsafe(glGetIntegerv(GL_TEXTURE_BINDING_BUFFER, &curr_bound_texture[i]));
-        //assert(curr_bound_texture[i] == 0);
+        // assert(curr_bound_texture[i] == 0);
     }
 
     glsafe(glActiveTexture(GL_TEXTURE0));
@@ -2054,7 +2009,7 @@ void ViewerImpl::render_cog_marker(const Mat4x4& view_matrix, const Mat4x4& proj
 
     int curr_shader;
     glsafe(glGetIntegerv(GL_CURRENT_PROGRAM, &curr_shader));
-    const bool curr_cull_face = glIsEnabled(GL_CULL_FACE);
+    const bool curr_cull_face  = glIsEnabled(GL_CULL_FACE);
     const bool curr_depth_test = glIsEnabled(GL_DEPTH_TEST);
     glcheck();
 
@@ -2091,7 +2046,7 @@ void ViewerImpl::render_tool_marker(const Mat4x4& view_matrix, const Mat4x4& pro
     int curr_shader;
     glsafe(glGetIntegerv(GL_CURRENT_PROGRAM, &curr_shader));
     const bool curr_cull_face = glIsEnabled(GL_CULL_FACE);
-    GLboolean curr_depth_mask;
+    GLboolean  curr_depth_mask;
     glsafe(glGetBooleanv(GL_DEPTH_WRITEMASK, &curr_depth_mask));
     const bool curr_blend = glIsEnabled(GL_BLEND);
     glcheck();
@@ -2105,9 +2060,9 @@ void ViewerImpl::render_tool_marker(const Mat4x4& view_matrix, const Mat4x4& pro
 
     glsafe(glUseProgram(m_tool_marker_shader_id));
 
-    const Vec3& origin = m_tool_marker.get_position();
-    const Vec3 offset = { 0.0f, 0.0f, m_tool_marker.get_offset_z() };
-    const Vec3 position = origin + offset;
+    const Vec3& origin   = m_tool_marker.get_position();
+    const Vec3  offset   = {0.0f, 0.0f, m_tool_marker.get_offset_z()};
+    const Vec3  position = origin + offset;
     glsafe(glUniform3fv(m_uni_tool_marker_world_origin, 1, position.data()));
     glsafe(glUniform1f(m_uni_tool_marker_scale_factor, m_tool_marker_scale_factor));
     glsafe(glUniformMatrix4fv(m_uni_tool_marker_view_matrix, 1, GL_FALSE, view_matrix.data()));
