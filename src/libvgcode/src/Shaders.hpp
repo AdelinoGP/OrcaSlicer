@@ -14,6 +14,7 @@ namespace libvgcode {
 
 // [OPENGL] Desktop OpenGL version uses samplerBuffer (texture buffer) instead of sampler2D
 // [PORTING_HAZARD:P3] Shader pipeline requires complete rewrite for Unity
+// [INTENT] Vertex shader for G-code line segments
 static const char* Segments_Vertex_Shader =
     "#version 150\n"
     "#define POINTY_CAPS\n"
@@ -144,6 +145,7 @@ static const char* Segments_Vertex_Shader =
     "}\n";
 
 // [OPENGL] Fragment shader for segments (desktop)
+// [INTENT] Fragment shader for G-code line segments
 static const char* Segments_Fragment_Shader = "#version 150\n"
                                               "in vec3 color;\n"
                                               "out vec4 fragment_color;\n"
@@ -152,6 +154,7 @@ static const char* Segments_Fragment_Shader = "#version 150\n"
                                               "}\n";
 
 // [OPENGL] Options vertex shader with platform-specific scaling (Windows vs Unix)
+// [INTENT] Vertex shader for option markers
 static const char* Options_Vertex_Shader = "#version 150\n"
                                            "const vec3  light_top_dir = vec3(-0.4574957, 0.4574957, 0.7624929);\n"
                                            "const float light_top_diffuse = 0.6 * 0.8;\n"
@@ -209,6 +212,7 @@ static const char* Options_Vertex_Shader = "#version 150\n"
                                            "}\n";
 
 // [OPENGL] Fragment shader for options (desktop)
+// [INTENT] Fragment shader for option markers
 static const char* Options_Fragment_Shader = "#version 150\n"
                                              "in vec3 color;\n"
                                              "out vec4 fragment_color;\n"
@@ -217,6 +221,7 @@ static const char* Options_Fragment_Shader = "#version 150\n"
                                              "}\n";
 #if VGCODE_ENABLE_COG_AND_TOOL_MARKERS
 // [INTENT] Platform-independent cog marker shader (same as ES but #version 150)
+// [INTENT] Vertex shader for cog markers
 static const char* Cog_Marker_Vertex_Shader = "#version 150\n"
                                               "const vec3  light_top_dir = vec3(-0.4574957, 0.4574957, 0.7624929);\n"
                                               "const float light_top_diffuse = 0.6 * 0.8;\n"
@@ -250,6 +255,7 @@ static const char* Cog_Marker_Vertex_Shader = "#version 150\n"
                                               "}\n";
 
 // [OPENGL] Fragment shader for cog marker checkerboard pattern
+// [INTENT] Fragment shader for cog markers
 static const char* Cog_Marker_Fragment_Shader = "#version 150\n"
                                                 "const vec3 BLACK = vec3(0.05);\n"
                                                 "const vec3 WHITE = vec3(0.95);\n"
@@ -265,6 +271,7 @@ static const char* Cog_Marker_Fragment_Shader = "#version 150\n"
                                                 "}\n";
 
 // [OPENGL] Vertex shader for tool marker (arrow) visualization
+// [INTENT] Vertex shader for tool markers
 static const char* Tool_Marker_Vertex_Shader = "#version 150\n"
                                                "const vec3  light_top_dir = vec3(-0.4574957, 0.4574957, 0.7624929);\n"
                                                "const float light_top_diffuse = 0.6 * 0.8;\n"
@@ -299,6 +306,7 @@ static const char* Tool_Marker_Vertex_Shader = "#version 150\n"
                                                "}\n";
 
 // [OPENGL] Fragment shader for tool marker (pass-through)
+// [INTENT] Fragment shader for tool markers
 static const char* Tool_Marker_Fragment_Shader = "#version 150\n"
                                                  "in vec4 color;\n"
                                                  "out vec4 fragment_color;\n"
