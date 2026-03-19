@@ -11,6 +11,9 @@
 
 namespace libvgcode {
 
+// [INTENT] Represents a single g-code move or instruction (toolpath segment) with rich metadata for rendering.
+// [UNITY] Maps to a C# struct. Data here translates into vertex attributes or compute buffer entries for toolpath mesh generation and
+// shader rendering.
 //
 // Struct representating a gcode move (toolpath segment)
 //
@@ -19,78 +22,78 @@ struct PathVertex
     //
     // Segment end position
     //
-    Vec3 position{ FLT_MAX, FLT_MAX, FLT_MAX };
+    Vec3 position{FLT_MAX, FLT_MAX, FLT_MAX};
     //
     // Segment height
     //
-    float height{ 0.0f };
+    float height{0.0f};
     //
     // Segment width
     //
-    float width{ 0.0f };
+    float width{0.0f};
     //
     // Segment speed
     //
-    float feedrate{ 0.0f };
+    float feedrate{0.0f};
     //
     // Segment actual speed
     //
-    float actual_feedrate{ 0.0f };
+    float actual_feedrate{0.0f};
     //
     // Segment mm3_per_mm
     //
-    float mm3_per_mm{ 0.0f };
+    float mm3_per_mm{0.0f};
     //
     // Segment fan speed
     //
-    float fan_speed{ 0.0f };
+    float fan_speed{0.0f};
     //
     // Segment temperature
     //
-    float temperature{ 0.0f };
+    float temperature{0.0f};
 #if VGCODE_ENABLE_COG_AND_TOOL_MARKERS
     //
     // Segment weight
     //
-    float weight{ 0.0f };
+    float weight{0.0f};
 #endif // VGCODE_ENABLE_COG_AND_TOOL_MARKERS
     //
     // Segment extrusion role
     //
-    EGCodeExtrusionRole role{ EGCodeExtrusionRole::None };
+    EGCodeExtrusionRole role{EGCodeExtrusionRole::None};
     //
     // Segment move type
     //
-    EMoveType type{ EMoveType::Noop };
+    EMoveType type{EMoveType::Noop};
     //
     // Segment gcode line id
     //
-    uint32_t gcode_id{ 0 };
+    uint32_t gcode_id{0};
     //
     // Segment layer id
     //
-    uint32_t layer_id{ 0 };
+    uint32_t layer_id{0};
     //
     // Segment extruder id
     //
-    uint8_t extruder_id{ 0 };
+    uint8_t extruder_id{0};
     //
     // Segment color id
     //
-    uint8_t color_id{ 0 };
+    uint8_t color_id{0};
     //
     // Segment estimated times
     //
-    std::array<float, TIME_MODES_COUNT> times{ 0.0f, 0.0f };
+    std::array<float, TIME_MODES_COUNT> times{0.0f, 0.0f};
     //
     // Layer duration in seconds
     //
-    float layer_duration{ 0.0f };
+    float layer_duration{0.0f};
     //
     // ORCA: Add Pressure Advance visualization support
     // Pressure advance value
     //
-    float pressure_advance{ 0.0f };
+    float pressure_advance{0.0f};
 
     //
     // Return true if the segment is an extrusion move

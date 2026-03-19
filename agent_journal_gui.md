@@ -123,3 +123,11 @@
 - Lines added: 9 comment lines
 - Verification excerpt: "// [UNITY] If libvgcode is ported to C#, this becomes a pure data class/struct."
 - Git: committed as annotate(gui): document GCodeInputData data structures
+
+**Task T104 COMPLETE**
+- Deliverable: src/libvgcode/include/PathVertex.hpp (annotated)
+- Lines added: 2 comment lines
+- Key findings: Defines `PathVertex`, holding rich metadata (speed, role, temp, etc.) for a single g-code move.
+- Verification excerpt: `// [UNITY] Maps to a C# struct. Data here translates into vertex attributes or compute buffer entries for toolpath mesh generation and shader rendering.`
+- Unity porting hazards identified: 0
+- Git: committed as annotate(gui): document PathVertex struct
