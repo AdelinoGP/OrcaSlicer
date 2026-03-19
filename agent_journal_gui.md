@@ -117,3 +117,9 @@
 - Lines added: 6 comment lines
 - Verification excerpt: "// [UNITY] Maps to a standard C# class or struct (possibly a ScriptableObject if palettes are authored in editor) used by the G-code rendering pipeline."
 - Git: committed as annotate(gui): document ColorRange mapping
+
+**Task T103 COMPLETE**
+- Deliverable: src/libvgcode/include/GCodeInputData.hpp (annotated)
+- Lines added: 9 comment lines
+- Verification excerpt: "// [UNITY] If libvgcode is ported to C#, this becomes a pure data class/struct."
+- Git: committed as annotate(gui): document GCodeInputData data structures

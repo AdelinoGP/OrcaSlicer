@@ -21,7 +21,7 @@ Last updated: 2026-03-18T23:55:00Z
 ## Phase 1 — Annotation
 - [x] T101 annotate: src/libvgcode/include/ColorPrint.hpp
 - [ ] T102 annotate: src/libvgcode/include/ColorRange.hpp
-- [ ] T103 annotate: src/libvgcode/include/GCodeInputData.hpp
+- [x] T103 annotate: src/libvgcode/include/GCodeInputData.hpp
 - [ ] T104 annotate: src/libvgcode/include/PathVertex.hpp
 - [ ] T105 annotate: src/libvgcode/include/Types.hpp
 - [ ] T106 annotate: src/libvgcode/include/Viewer.hpp
