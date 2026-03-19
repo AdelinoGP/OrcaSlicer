@@ -302,6 +302,8 @@ private:
     HMSQuery*               hms_query{nullptr};
     FilamentColorCodeQuery* m_filament_color_code_query{nullptr};
 
+    // [THREAD] Synchronizes user preset data
+    // [PORTING_HAZARD:P2] Unity uses C# Task or Unity Job System
     boost::thread        m_sync_update_thread;
     std::shared_ptr<int> m_user_sync_token;
     bool                 m_is_dark_mode{false};
@@ -312,7 +314,9 @@ private:
     wxString             m_info_dialog_content;
     HttpServer           m_http_server;
     bool                 m_show_gcode_window{true};
-    boost::thread        m_check_network_thread;
+    // [THREAD] Monitors network connectivity
+    // [PORTING_HAZARD:P2] Unity uses C# Task or Unity Job System
+    boost::thread m_check_network_thread;
 
 public:
     // try again when subscription fails
@@ -382,7 +386,9 @@ public:
     // Otherwise HTML formatted for the system info dialog.
     static std::string get_gl_info(bool for_github);
     wxGLContext*       init_glcontext(wxGLCanvas& canvas);
-    bool               init_opengl();
+    // [INTENT] Initialize OpenGL context
+    // [UNITY] Graphics context managed by Unity engine
+    bool init_opengl();
 
     void init_download_path();
 #if wxUSE_WEBVIEW_EDGE

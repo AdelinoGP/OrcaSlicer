@@ -20,3 +20,10 @@
 - Key findings: Annotated namespaces, utility functions, platform helpers, and string conversion tools.
 - Verification excerpt: "// [INTENT] Namespace providing global UI-related helper functions, platform-specific shortcuts, and string conversion utilities."
 - Unity porting hazards identified: 4 (P2 screensaver, P2 debugger, P1 shortcuts)
+
+**Task T166 COMPLETE**
+- Deliverable: src/slic3r/GUI/GUI_App.hpp (annotated)
+- Lines added: 6 comment lines
+- Key findings: Annotated main application class, threading, and OpenGL initialization. Identified porting hazards for Unity.
+- Verification excerpt: "// [THREAD] Synchronizes user preset data"
+- Git: committed as annotate(gui): document GUI_App (GUI_App.hpp)
