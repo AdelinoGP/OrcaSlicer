@@ -11,12 +11,13 @@
 #if VGCODE_ENABLE_COG_AND_TOOL_MARKERS
 
 namespace libvgcode {
+// [INTENT] ToolMarker generates arrow geometry for visualization
+// [STATE] m_vao_id, m_vbo_id, m_ibo_id, m_indices_count hold GPU state
+// [UNITY] Would become: ScriptableMeshObject with GenerateArrow() method
 
-// Geometry:
-// Arrow with cylindrical stem and conical tip, with the given dimensions and resolution
-// The origin of the arrow is at the tip of the conical section
-// The axis of symmetry is along the Z axis
-// The arrow is pointing downward
+// [INTENT] Generate arrow mesh data (conical tip + cylindrical stem)
+// [PORTING_HAZARD:P2] Geometry generation is CPU-side, but Unity needs Mesh API
+// [STATE] vertices and indices vectors hold temporary geometry before GPU upload
 void ToolMarker::init(uint16_t resolution, float tip_radius, float tip_height, float stem_radius, float stem_height)
 {
     if (m_vao_id != 0)
@@ -26,29 +27,29 @@ void ToolMarker::init(uint16_t resolution, float tip_radius, float tip_height, f
     resolution = std::clamp<uint16_t>(resolution, 4, 10922);
 
     std::vector<float> vertices;
-    const uint16_t vertices_count = 6 * resolution + 2;
+    const uint16_t     vertices_count = 6 * resolution + 2;
     vertices.reserve(6 * vertices_count);
 
     m_indices_count = 6 * resolution * 3;
     std::vector<uint16_t> indices;
     indices.reserve(m_indices_count);
 
-    const float angle_step = 2.0f * PI / float(resolution);
+    const float        angle_step = 2.0f * PI / float(resolution);
     std::vector<float> cosines(resolution);
     std::vector<float> sines(resolution);
 
     for (uint16_t i = 0; i < resolution; ++i) {
         const float angle = angle_step * float(i);
-        cosines[i] = std::cos(angle);
-        sines[i] = -std::sin(angle);
+        cosines[i]        = std::cos(angle);
+        sines[i]          = -std::sin(angle);
     }
 
     const float total_height = tip_height + stem_height;
 
     // tip vertices
-    add_vertex({ 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, vertices);
+    add_vertex({0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}, vertices);
     for (uint16_t i = 0; i < resolution; ++i) {
-        add_vertex({ tip_radius * sines[i], tip_radius * cosines[i], tip_height }, { sines[i], cosines[i], 0.0f }, vertices);
+        add_vertex({tip_radius * sines[i], tip_radius * cosines[i], tip_height}, {sines[i], cosines[i], 0.0f}, vertices);
     }
 
     // tip triangles
@@ -59,12 +60,12 @@ void ToolMarker::init(uint16_t resolution, float tip_radius, float tip_height, f
 
     // tip cap outer perimeter vertices
     for (uint16_t i = 0; i < resolution; ++i) {
-        add_vertex({ tip_radius * sines[i], tip_radius * cosines[i], tip_height }, { 0.0f, 0.0f, 1.0f }, vertices);
+        add_vertex({tip_radius * sines[i], tip_radius * cosines[i], tip_height}, {0.0f, 0.0f, 1.0f}, vertices);
     }
 
     // tip cap inner perimeter vertices
     for (uint16_t i = 0; i < resolution; ++i) {
-        add_vertex({ stem_radius * sines[i], stem_radius * cosines[i], tip_height }, { 0.0f, 0.0f, 1.0f }, vertices);
+        add_vertex({stem_radius * sines[i], stem_radius * cosines[i], tip_height}, {0.0f, 0.0f, 1.0f}, vertices);
     }
 
     // tip cap triangles
@@ -77,12 +78,12 @@ void ToolMarker::init(uint16_t resolution, float tip_radius, float tip_height, f
 
     // stem bottom vertices
     for (uint16_t i = 0; i < resolution; ++i) {
-        add_vertex({ stem_radius * sines[i], stem_radius * cosines[i], tip_height }, { sines[i], cosines[i], 0.0f }, vertices);
+        add_vertex({stem_radius * sines[i], stem_radius * cosines[i], tip_height}, {sines[i], cosines[i], 0.0f}, vertices);
     }
 
     // stem top vertices
     for (uint16_t i = 0; i < resolution; ++i) {
-        add_vertex({ stem_radius * sines[i], stem_radius * cosines[i], total_height }, { sines[i], cosines[i], 0.0f }, vertices);
+        add_vertex({stem_radius * sines[i], stem_radius * cosines[i], total_height}, {sines[i], cosines[i], 0.0f}, vertices);
     }
 
     // stem triangles
@@ -94,9 +95,9 @@ void ToolMarker::init(uint16_t resolution, float tip_radius, float tip_height, f
     }
 
     // stem cap vertices
-    add_vertex({ 0.0f, 0.0f, total_height }, { 0.0f, 0.0f, 1.0f }, vertices);
+    add_vertex({0.0f, 0.0f, total_height}, {0.0f, 0.0f, 1.0f}, vertices);
     for (uint16_t i = 0; i < resolution; ++i) {
-        add_vertex({ stem_radius * sines[i], stem_radius * cosines[i], total_height }, { 0.0f, 0.0f, 1.0f }, vertices);
+        add_vertex({stem_radius * sines[i], stem_radius * cosines[i], total_height}, {0.0f, 0.0f, 1.0f}, vertices);
     }
 
     // stem cap triangles
@@ -108,9 +109,9 @@ void ToolMarker::init(uint16_t resolution, float tip_radius, float tip_height, f
     m_size_in_bytes_gpu += vertices.size() * sizeof(float);
     m_size_in_bytes_gpu += indices.size() * sizeof(uint16_t);
 
-    const size_t vertex_stride = 6 * sizeof(float);
+    const size_t vertex_stride   = 6 * sizeof(float);
     const size_t position_offset = 0;
-    const size_t normal_offset = 3 * sizeof(float);
+    const size_t normal_offset   = 3 * sizeof(float);
 
     int curr_vertex_array;
     glsafe(glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &curr_vertex_array));
@@ -123,9 +124,9 @@ void ToolMarker::init(uint16_t resolution, float tip_radius, float tip_height, f
     glsafe(glBindBuffer(GL_ARRAY_BUFFER, m_vbo_id));
     glsafe(glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW));
     glsafe(glEnableVertexAttribArray(0));
-    glsafe(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertex_stride, (const void*)position_offset));
+    glsafe(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, vertex_stride, (const void*) position_offset));
     glsafe(glEnableVertexAttribArray(1));
-    glsafe(glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, vertex_stride, (const void*)normal_offset));
+    glsafe(glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, vertex_stride, (const void*) normal_offset));
 
     glsafe(glGenBuffers(1, &m_ibo_id));
     glsafe(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ibo_id));
@@ -133,9 +134,13 @@ void ToolMarker::init(uint16_t resolution, float tip_radius, float tip_height, f
 
     glsafe(glBindBuffer(GL_ARRAY_BUFFER, curr_array_buffer));
     glsafe(glBindVertexArray(curr_vertex_array));
+    // [OPENGL] GPU upload complete: VAO/VBO/IBO created with 6 float stride (position + normal)
+    // [UNITY] Unity equivalent: GraphicsBuffer with ComputeBufferStride(24), SetData(vertices), SetData(indices)
 }
 
 void ToolMarker::shutdown()
+// [INTENT] Clean up GPU resources (RAII-like pattern)
+// [PORTING_HAZARD:P1] RAII isn't automatic in Unity - needs IDisposable pattern
 {
     if (m_ibo_id != 0) {
         glsafe(glDeleteBuffers(1, &m_ibo_id));
@@ -154,6 +159,9 @@ void ToolMarker::shutdown()
 }
 
 void ToolMarker::render()
+// [INTENT] Draw the arrow using instanced rendering
+// [OPENGL] Bind VAO, draw elements with indexed instancing
+// [UNITY] Would call: Graphics.DrawMeshInstanced(mesh, 0, material, matrix, 1, properties)
 {
     if (m_vao_id == 0 || m_vbo_id == 0 || m_ibo_id == 0)
         return;
@@ -163,7 +171,7 @@ void ToolMarker::render()
     glcheck();
 
     glsafe(glBindVertexArray(m_vao_id));
-    glsafe(glDrawElements(GL_TRIANGLES, m_indices_count, GL_UNSIGNED_SHORT, (const void*)0));
+    glsafe(glDrawElements(GL_TRIANGLES, m_indices_count, GL_UNSIGNED_SHORT, (const void*) 0));
     glsafe(glBindVertexArray(curr_vertex_array));
 }
 
