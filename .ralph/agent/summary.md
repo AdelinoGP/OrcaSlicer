@@ -2,7 +2,7 @@
 
 **Status:** Completed successfully
 **Iterations:** 1
-**Duration:** 2m 23s
+**Duration:** 3m 46s
 
 ## Tasks
 
@@ -14,4 +14,4 @@ _No events recorded._
 
 ## Final Commit
 
-6536027715: annotate(gui): document AboutDialog (AboutDialog.hpp)
+d31ec2f96a: annotate(gui): document ConfigWizard bundle loading and PrinterPicker
