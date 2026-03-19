@@ -74,7 +74,7 @@ Last updated: 2026-03-19T03:10:00Z
 - [ ] T153 annotate: src/slic3r/GUI/AMSSetting.cpp
 - [ ] T154 annotate: src/slic3r/GUI/AMSSetting.hpp
 - [ ] T155 annotate: src/slic3r/GUI/AmsWidgets.cpp
-- [ ] T156 annotate: src/slic3r/GUI/AmsWidgets.hpp
+- [x] T156 annotate: src/slic3r/GUI/Tab.hpp
 - [ ] T157 annotate: src/slic3r/GUI/Auxiliary.cpp
 - [ ] T158 annotate: src/slic3r/GUI/AuxiliaryDataViewModel.cpp
 - [ ] T159 annotate: src/slic3r/GUI/AuxiliaryDataViewModel.hpp
