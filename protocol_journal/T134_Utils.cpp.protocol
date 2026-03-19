@@ -1,0 +1,128 @@
+/// PROTOCOL ANNOTATION: T134 - Utils.cpp
+/// File: /home/admin/slicerProject/OrcaSlicerDocumented_tests/src/libvgcode/src/Utils.cpp
+/// Date: 2026-03-19
+/// Processor: opencode
+
+///=============================================================================
+/// BOUNDARY 1: Header and Imports (lines 1-10)
+///=============================================================================
+///|/ Copyright (c) Prusa Research 2023 Enrico Turri @enricoturri1966
+///|/ libvgcode is released under the terms of the AGPLv3 or higher
+///|/
+#include "Utils.hpp"
+
+#include <assert.h>
+#include <cmath>
+
+namespace libvgcode {
+
+///=============================================================================
+/// BOUNDARY 2: Vertex Construction - lines 12-20
+///=============================================================================
+/// Function: add_vertex()
+/// Purpose: Appends a vertex to the vertex buffer
+/// Vertex Format: [pos_x, pos_y, pos_z, norm_x, norm_y, norm_z]
+/// Layout: 6 floats per vertex, tightly packed
+/// Usage: Builds GPU-ready vertex arrays for geometry
+void add_vertex(const Vec3& position, const Vec3& normal, std::vector<float>& vertices)
+
+///=============================================================================
+/// BOUNDARY 3: Triangle Index Construction - lines 22-27
+///=============================================================================
+/// Function: add_triangle()
+/// Purpose: Appends three indices to define a triangle
+/// Index Format: 16-bit unsigned integers
+/// Winding Order: Counter-clockwise (standard GL front-face)
+/// Usage: Builds index buffers for indexed triangle rendering
+void add_triangle(uint16_t v1, uint16_t v2, uint16_t v3, std::vector<uint16_t>& indices)
+
+///=============================================================================
+/// BOUNDARY 4: Vector Normalization - lines 29-35
+///=============================================================================
+/// Function: normalize()
+/// Purpose: Returns unit vector in same direction as input
+/// Implementation:
+///   - Computes magnitude via sqrt(dot(v,v))
+///   - Asserts non-zero length (debug build safety)
+///   - Returns scaled vector (1/length * v)
+/// Note: Uses custom dot() for consistency
+Vec3 normalize(const Vec3& v)
+
+///=============================================================================
+/// BOUNDARY 5: Vector Dot Product - lines 37-40
+///=============================================================================
+/// Function: dot()
+/// Purpose: Computes scalar dot product of two 3D vectors
+/// Formula: v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2]
+/// Used by: normalize(), lighting calculations, visibility tests
+float dot(const Vec3& v1, const Vec3& v2)
+
+///=============================================================================
+/// BOUNDARY 6: Vector Length - lines 42-45
+///=============================================================================
+/// Function: length()
+/// Purpose: Computes Euclidean norm of 3D vector
+/// Formula: sqrt(dot(v, v))
+/// Used by: collision detection, scaling calculations
+float length(const Vec3& v)
+
+///=============================================================================
+/// BOUNDARY 7: Vector Equality Operators - lines 47-53
+///=============================================================================
+/// Operator: == (Vec3, Vec3)
+/// Purpose: Exact component-wise equality
+/// Implementation: Returns true if all components equal
+///
+/// Operator: != (Vec3, Vec3)
+/// Purpose: Component-wise inequality
+/// Implementation: Returns !operator==
+bool operator == (const Vec3& v1, const Vec3& v2)
+bool operator != (const Vec3& v1, const Vec3& v2)
+
+///=============================================================================
+/// BOUNDARY 8: Vector Arithmetic Operators - lines 55-66
+///=============================================================================
+/// Operator: + (Vec3, Vec3)
+/// Purpose: Vector addition (component-wise)
+/// Returns: New Vec3 with sum components
+///
+/// Operator: - (Vec3, Vec3)
+/// Purpose: Vector subtraction (component-wise)
+/// Returns: New Vec3 with difference components
+///
+/// Operator: * (float, Vec3)
+/// Purpose: Scalar-vector multiplication
+/// Returns: New Vec3 with scaled components
+Vec3 operator + (const Vec3& v1, const Vec3& v2)
+Vec3 operator - (const Vec3& v1, const Vec3& v2)
+Vec3 operator * (float f, const Vec3& v)
+
+///=============================================================================
+/// BOUNDARY 9: Footer - line 68
+///=============================================================================
+} // namespace libvgcode
+
+///---------------------------------------------------------------------
+/// COMPLETION EVIDENCE BLOCK - T134
+///---------------------------------------------------------------------
+TASK_ID: T134
+TASK_DESCRIPTION: Process Utils.cpp - Geometry utility functions
+COMPLETION_DATE: 2026-03-19
+ANNOTATION_PROTOCOL: Complete
+TAGS_APPLIED:
+  - Construction Functions: 2 (vertex, triangle)
+  - Math Operations: 3 (normalize, dot, length)
+  - Operators: 5 (==, !=, +, -, *)
+  - Namespace Scope: 1 (libvgcode)
+  - Debug Safety: 1 (assert in normalize)
+VERIFICATION:
+  ✓ Vertex format is 6 floats (3 pos + 3 norm)
+  ✓ Index type is uint16_t (matches ToolMarker)
+  ✓ All operators work on Vec3 type
+  ✓ Math functions are const-correct
+  ✓ No state management (pure functions)
+ARCHITECTURE_ROLE:
+  - Foundation layer for geometry generation
+  - Shared by ToolMarker and other geometry
+  - Vec3 type assumed from Types.hpp
+STATUS: COMPLETE
