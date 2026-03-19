@@ -103,3 +103,17 @@
 - Lines added: 2
 - Verification excerpt: "Phase 0 Orientation complete."
 - Git: committed as orient(gui): complete Phase 0 orientation (hash: 2ecd24818a96caa343577f2623028f60df7d9519)
+
+**Task T101 COMPLETE**
+- Deliverable: src/libvgcode/include/ColorPrint.hpp (annotated)
+- Lines added: 6 comment lines
+- Key findings: Defines a simple pure data structure to track color print/extruder changes at specific layers with associated times. Trivially mapped to C#.
+- Verification excerpt: "// [UNITY] Map to a standard C# struct or simple class (e.g., ColorPrintEvent) for pure data representation."
+- Unity porting hazards identified: 0
+- Git: committed as annotate(gui): document ColorPrint data struct
+
+**Task T102 COMPLETE**
+- Deliverable: src/libvgcode/include/ColorRange.hpp (annotated)
+- Lines added: 6 comment lines
+- Verification excerpt: "// [UNITY] Maps to a standard C# class or struct (possibly a ScriptableObject if palettes are authored in editor) used by the G-code rendering pipeline."
+- Git: committed as annotate(gui): document ColorRange mapping

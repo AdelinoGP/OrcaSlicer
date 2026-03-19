@@ -11,20 +11,23 @@
 
 namespace libvgcode {
 
-static const Palette DEFAULT_RANGES_COLORS{ {
-    {  11,  44, 122 }, // bluish
-    {  19,  89, 133 },
-    {  28, 136, 145 },
-    {   4, 214,  15 },
-    { 170, 242,   0 },
-    { 252, 249,   3 },
-    { 245, 206,  10 },
-    { 227, 136,  32 },
-    { 209, 104,  48 },
-    { 194,  82,  60 },
-    { 148,  38,  22 }  // reddish
-} };
+static const Palette DEFAULT_RANGES_COLORS{{
+    {11, 44, 122}, // bluish
+    {19, 89, 133},
+    {28, 136, 145},
+    {4, 214, 15},
+    {170, 242, 0},
+    {252, 249, 3},
+    {245, 206, 10},
+    {227, 136, 32},
+    {209, 104, 48},
+    {194, 82, 60},
+    {148, 38, 22} // reddish
+}};
 
+// [INTENT] Manages mapping of continuous values (e.g., speed, layer height, temperature) to a discrete color palette for G-code
+// visualization. [UNITY] Maps to a standard C# class or struct (possibly a ScriptableObject if palettes are authored in editor) used by the
+// G-code rendering pipeline.
 class ColorRange
 {
 public:
@@ -74,20 +77,23 @@ public:
     static const ColorRange DUMMY_COLOR_RANGE;
 
 private:
-    EColorRangeType m_type{ EColorRangeType::Linear };
+    // [STATE] The actual runtime configuration of the color scale.
+    EColorRangeType m_type{EColorRangeType::Linear};
     //
     // The palette used by this ColorRange
-    // 
+    //
+    // [UNITY] Map to Unity's Gradient class or an array of Color32.
     Palette m_palette;
     //
     // [0] = min
     // [1] = max
     //
-    std::array<float, 2> m_range{ FLT_MAX, -FLT_MAX };
+    // [UNITY] Map to Vector2 range.
+    std::array<float, 2> m_range{FLT_MAX, -FLT_MAX};
     //
     // Count of different values passed to update()
-    // 
-    std::size_t m_count{ 0 };
+    //
+    std::size_t m_count{0};
 
     //
     // Use the passed value to update the range.
