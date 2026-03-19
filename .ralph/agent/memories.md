@@ -26,6 +26,14 @@
 
 ## Fixes
 
+### mem-1773963015-6a1e
+> failure: cmd=edit, error=LSP compilation errors (inconsistent file state or header removal), next=annotate in smaller, more surgical edits
+<!-- tags: gui, tooling, edit | created: 2026-03-19 -->
+
+### mem-1773962783-01f5
+> File src/slic3r/GUI/DPIFrame.cpp listed in task manifest does not exist in src/slic3r/GUI/.
+<!-- tags: gui, missing-file | created: 2026-03-19 -->
+
 ### mem-1773799068-f3c8
 > failure: cmd=git add agent_journal_gui.md .ralph/agent/scratchpad.md && git diff --cached -- agent_journal_gui.md .ralph/agent/scratchpad.md, exit=128, error=Unable to create .git/index.lock because a lock file already exists, next=inspect whether the lock is stale before retrying git staging
 <!-- tags: git, error-handling, tooling | created: 2026-03-18 -->
