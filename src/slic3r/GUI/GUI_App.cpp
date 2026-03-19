@@ -172,7 +172,7 @@ struct StaticBambuLib
 
 // [INTENT] Main application class derived from wxApp
 // [PORTING_HAZARD:P1] wxApp is the wxWidgets application singleton - Unity has MonoBehaviour with Awake/Start/OnDestroy
-// [UNITY] Unity uses MonoBehaviour-based applications; replace wxApp lifecycle with MonoBehaviour initialization/destruction
+// [UNITY] Unity: Use MonoBehaviour for application lifecycle (Awake, Start) instead of wxApp
 namespace Slic3r { namespace GUI {
 
 class MainFrame;
