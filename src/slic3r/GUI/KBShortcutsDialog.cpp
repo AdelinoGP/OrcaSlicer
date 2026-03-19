@@ -11,34 +11,42 @@
 #include "MainFrame.hpp"
 #include <wx/notebook.h>
 
-namespace Slic3r {
-namespace GUI {
+namespace Slic3r { namespace GUI {
 
 wxDEFINE_EVENT(EVT_PREFERENCES_SELECT_TAB, wxCommandEvent);
 
+// [INTENT] Dialog displaying keyboard shortcuts in tabs.
+// [UNITY] Reimplement as a UI Toolkit Window or Panel with a custom Tab controller.
 KBShortcutsDialog::KBShortcutsDialog()
-    : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY,_L("Keyboard Shortcuts"),
-    wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
+    : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe),
+                wxID_ANY,
+                _L("Keyboard Shortcuts"),
+                wxDefaultPosition,
+                wxDefaultSize,
+                wxDEFAULT_DIALOG_STYLE)
 {
     // fonts
-    const wxFont& font = wxGetApp().normal_font();
+    const wxFont& font      = wxGetApp().normal_font();
     const wxFont& bold_font = wxGetApp().bold_font();
     SetFont(font);
 
     this->SetSizeHints(wxDefaultSize, wxDefaultSize);
     this->SetBackgroundColour(wxColour(255, 255, 255));
 
-    wxBoxSizer *m_sizer_top = new wxBoxSizer(wxVERTICAL);
+    // [UNITY] Use UI Toolkit VisualElement for top line styling.
+    wxBoxSizer* m_sizer_top = new wxBoxSizer(wxVERTICAL);
 
     auto m_top_line = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(-1, 1), wxTAB_TRAVERSAL);
     m_top_line->SetBackgroundColour(wxColour(166, 169, 170));
 
     m_sizer_top->Add(m_top_line, 0, wxEXPAND, 0);
+    // [STATE] UI container for shortcuts panels.
     m_sizer_body = new wxBoxSizer(wxHORIZONTAL);
 
+    // [STATE] Panel containing the tab buttons.
     m_panel_selects = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
     m_panel_selects->SetBackgroundColour(wxColour(248, 248, 248));
-    wxBoxSizer *m_sizer_left = new wxBoxSizer(wxVERTICAL);
+    wxBoxSizer* m_sizer_left = new wxBoxSizer(wxVERTICAL);
 
     m_sizer_left->Add(0, 0, 0, wxEXPAND | wxTOP, FromDIP(20));
 
@@ -55,8 +63,10 @@ KBShortcutsDialog::KBShortcutsDialog()
 
     m_sizer_right = new wxBoxSizer(wxHORIZONTAL);
 
-    m_sizer_right->Add(0, 0, 0, wxEXPAND | wxLEFT,  FromDIP(12));
+    m_sizer_right->Add(0, 0, 0, wxEXPAND | wxLEFT, FromDIP(12));
 
+    // [STATE] Simplebook for tabbed content.
+    // [UNITY] Use UI Toolkit `Simplebook` or `TabView` component.
     m_simplebook = new wxSimplebook(this, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(870), FromDIP(500)), 0);
 
     m_sizer_right->Add(m_simplebook, 1, wxEXPAND, 0);
@@ -65,11 +75,13 @@ KBShortcutsDialog::KBShortcutsDialog()
 
     fill_shortcuts();
     for (size_t i = 0; i < m_full_shortcuts.size(); ++i) {
-        wxPanel *page = create_page(m_simplebook, m_full_shortcuts[i], font, bold_font);
+        wxPanel* page = create_page(m_simplebook, m_full_shortcuts[i], font, bold_font);
         m_pages.push_back(page);
         m_simplebook->AddPage(page, m_full_shortcuts[i].first.first, i == 0);
     }
 
+    // [EVENT] Bind event listener for tab selection.
+    // [UNITY] Handle via C# delegate or event listener in custom Controller class.
     Bind(EVT_PREFERENCES_SELECT_TAB, &KBShortcutsDialog::OnSelectTabel, this);
 
     SetSizer(m_sizer_top);
@@ -78,6 +90,8 @@ KBShortcutsDialog::KBShortcutsDialog()
     CenterOnParent();
 
     // select first
+    // [EVENT] Post event for async UI update.
+    // [UNITY] Use Unity's EventSystem or a messaging system.
     auto event = wxCommandEvent(EVT_PREFERENCES_SELECT_TAB);
     event.SetInt(0);
     event.SetEventObject(this);
@@ -85,15 +99,19 @@ KBShortcutsDialog::KBShortcutsDialog()
     wxGetApp().UpdateDlgDarkUI(this);
 }
 
-void KBShortcutsDialog::OnSelectTabel(wxCommandEvent &event)
+// [INTENT] Event handler for tab selection.
+// [UNITY] Handle UI update logic in controller, update styles in UI Toolkit.
+void KBShortcutsDialog::OnSelectTabel(wxCommandEvent& event)
 {
-    auto                   id = event.GetInt();
+    auto                 id = event.GetInt();
     SelectHash::iterator i  = m_hash_selector.begin();
     while (i != m_hash_selector.end()) {
-        Select *sel = i->second;
+        Select* sel = i->second;
         if (id == sel->m_index) {
-            sel->m_tab_button->SetBackgroundColour(StateColor::darkModeColorFor(wxColour("#BFE1DE"))); // ORCA color for selected tab background
-            sel->m_tab_text->SetBackgroundColour(StateColor::darkModeColorFor(wxColour("#BFE1DE"))); // ORCA color for selected tab background
+            sel->m_tab_button->SetBackgroundColour(
+                StateColor::darkModeColorFor(wxColour("#BFE1DE"))); // ORCA color for selected tab background
+            sel->m_tab_text->SetBackgroundColour(
+                StateColor::darkModeColorFor(wxColour("#BFE1DE"))); // ORCA color for selected tab background
             sel->m_tab_text->SetFont(::Label::Head_13);
             sel->m_tab_button->Refresh();
             sel->m_tab_text->Refresh();
@@ -111,11 +129,13 @@ void KBShortcutsDialog::OnSelectTabel(wxCommandEvent &event)
     wxGetApp().UpdateDlgDarkUI(this);
 }
 
-wxWindow *KBShortcutsDialog::create_button(int id, wxString text)
+// [INTENT] Helper for creating custom tab buttons.
+// [UNITY] Convert to a custom UI Toolkit Component/Control.
+wxWindow* KBShortcutsDialog::create_button(int id, wxString text)
 {
-    auto tab_button = new wxWindow(m_panel_selects, wxID_ANY, wxDefaultPosition, wxSize( FromDIP(150),  FromDIP(28)), wxTAB_TRAVERSAL);
+    auto tab_button = new wxWindow(m_panel_selects, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(150), FromDIP(28)), wxTAB_TRAVERSAL);
 
-    wxBoxSizer *sizer = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* sizer = new wxBoxSizer(wxHORIZONTAL);
 
     sizer->Add(0, 0, 0, wxEXPAND | wxLEFT, FromDIP(22));
 
@@ -125,21 +145,23 @@ wxWindow *KBShortcutsDialog::create_button(int id, wxString text)
     stext->Wrap(-1);
     sizer->Add(stext, 1, wxALIGN_CENTER, 0);
 
-    tab_button->Bind(wxEVT_LEFT_DOWN, [this, id](auto &e) {
+    // [EVENT] Bind event listener for tab selection.
+    tab_button->Bind(wxEVT_LEFT_DOWN, [this, id](auto& e) {
         auto event = wxCommandEvent(EVT_PREFERENCES_SELECT_TAB);
         event.SetInt(id);
         event.SetEventObject(this);
         wxPostEvent(this, event);
     });
 
-    stext->Bind(wxEVT_LEFT_DOWN, [this, id](wxMouseEvent &e) {
+    stext->Bind(wxEVT_LEFT_DOWN, [this, id](wxMouseEvent& e) {
         auto event = wxCommandEvent(EVT_PREFERENCES_SELECT_TAB);
         event.SetInt(id);
         event.SetEventObject(this);
         wxPostEvent(this, event);
     });
 
-    Select *sel                   = new Select;
+    // [STATE] Mapping index to select object.
+    Select* sel                   = new Select;
     sel->m_index                  = id;
     sel->m_tab_button             = tab_button;
     sel->m_tab_text               = stext;
@@ -154,7 +176,7 @@ void KBShortcutsDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
     m_logo_bmp.msw_rescale();
     m_header_bitmap->SetBitmap(m_logo_bmp.bmp());
-    msw_buttons_rescale(this, em_unit(), { wxID_OK });
+    msw_buttons_rescale(this, em_unit(), {wxID_OK});
 
     Layout();
     Fit();
@@ -168,57 +190,56 @@ void KBShortcutsDialog::fill_shortcuts()
     const std::string shift = L("Shift+");
 
     if (wxGetApp().is_editor()) {
-        Shortcuts global_shortcuts = {
-            // File
-            { ctrl + "N", L("New Project") },
-            { ctrl + "O", L("Open Project") },
-            { ctrl + "S", L("Save Project") },
-            { ctrl + shift + "S", L("Save Project as")},
-            // File>Import
-            { ctrl + "I", L("Import geometry data from STL/STEP/3MF/OBJ/AMF files") },
-            // File>Export
-            { ctrl + "G", L("Export plate sliced file")},
-            // Slice plate
-            { ctrl + "R", L("Slice plate")},
-            // Send to Print
-            { ctrl + shift + "G", L("Print plate")},
-            // Edit
-            { ctrl + "X", L("Cut") },
-            { ctrl + "C", L("Copy to clipboard") },
-            { ctrl + "V", L("Paste from clipboard") },
-            // Configuration
-            { ctrl + "P", L("Preferences") },
-            //3D control
+        Shortcuts global_shortcuts = {// File
+                                      {ctrl + "N", L("New Project")},
+                                      {ctrl + "O", L("Open Project")},
+                                      {ctrl + "S", L("Save Project")},
+                                      {ctrl + shift + "S", L("Save Project as")},
+                                      // File>Import
+                                      {ctrl + "I", L("Import geometry data from STL/STEP/3MF/OBJ/AMF files")},
+                                      // File>Export
+                                      {ctrl + "G", L("Export plate sliced file")},
+                                      // Slice plate
+                                      {ctrl + "R", L("Slice plate")},
+                                      // Send to Print
+                                      {ctrl + shift + "G", L("Print plate")},
+                                      // Edit
+                                      {ctrl + "X", L("Cut")},
+                                      {ctrl + "C", L("Copy to clipboard")},
+                                      {ctrl + "V", L("Paste from clipboard")},
+                                      // Configuration
+                                      {ctrl + "P", L("Preferences")},
+        // 3D control
 #ifdef __APPLE__
-            { ctrl + shift + "M", L("Show/Hide 3Dconnexion devices settings dialog") },
+                                      {ctrl + shift + "M", L("Show/Hide 3Dconnexion devices settings dialog")},
 #else
-            { ctrl + "M", L("Show/Hide 3Dconnexion devices settings dialog") },
+                                      {ctrl + "M", L("Show/Hide 3Dconnexion devices settings dialog")},
 #endif // __APPLE
 
-            // Switch table page
-            { ctrl + L("Tab"), L("Switch table page")},
-            //DEL
-            #ifdef __APPLE__
-                {"fn+⌫", L("Delete selected")},
-            #else
-                {L("Del"), L("Delete selected")},
-            #endif
-            // Help
-            { "?", L("Show keyboard shortcuts list") }
-        };
+                                      // Switch table page
+                                      {ctrl + L("Tab"), L("Switch table page")},
+// DEL
+#ifdef __APPLE__
+                                      {"fn+⌫", L("Delete selected")},
+#else
+                                      {L("Del"), L("Delete selected")},
+#endif
+                                      // Help
+                                      {"?", L("Show keyboard shortcuts list")}};
         m_full_shortcuts.push_back({{_L("Global shortcuts"), ""}, global_shortcuts});
-        
+
         bool swap_mouse_buttons = wxGetApp().app_config->get_bool("swap_mouse_buttons");
 
         Shortcuts plater_shortcuts = {
-            { L("Left mouse button"), swap_mouse_buttons ? L("Pan View") : L("Rotate View") },
-            { L("Right mouse button"), swap_mouse_buttons ? L("Rotate View") : L("Pan View") },
-            { L("Mouse wheel"), L("Zoom View") },
-            { "A", L("Arrange all objects") },
-            { shift + "A", L("Arrange objects on selected plates") },
+            {L("Left mouse button"), swap_mouse_buttons ? L("Pan View") : L("Rotate View")},
+            {L("Right mouse button"), swap_mouse_buttons ? L("Rotate View") : L("Pan View")},
+            {L("Mouse wheel"), L("Zoom View")},
+            {"A", L("Arrange all objects")},
+            {shift + "A", L("Arrange objects on selected plates")},
 
-            { "Q", L("Auto orients selected objects or all objects. If there are selected objects, it just orients the selected ones. Otherwise, it will orient all objects in the current project.") },
-            { shift + "Q", L("Auto orients all objects on the active plate.") },
+            {"Q", L("Auto orients selected objects or all objects. If there are selected objects, it just orients the selected ones. "
+                    "Otherwise, it will orient all objects in the current project.")},
+            {shift + "Q", L("Auto orients all objects on the active plate.")},
 
             {shift + L("Tab"), L("Collapse/Expand the sidebar")},
             {ctrl + L("Any arrow"), L("Movement in camera space")},
@@ -244,25 +265,25 @@ void KBShortcutsDialog::fill_shortcuts()
             {ctrl + "D", L("Delete all")},
             {ctrl + "Z", L("Undo")},
             {ctrl + "Y", L("Redo")},
-            { "M", L("Gizmo move") },
-            { "R", L("Gizmo rotate") },
-            { "S", L("Gizmo scale") },
-            { "F", L("Gizmo place face on bed") },
-            { "C", L("Gizmo cut") },
-            { "B", L("Gizmo mesh boolean") },
-            { "H", L("Gizmo FDM paint-on fuzzy skin") },
-            { "L", L("Gizmo SLA support points") },
-            { "P", L("Gizmo FDM paint-on seam") },
-            { "T", L("Gizmo text emboss/engrave") },
-            { "U", L("Gizmo measure") },
-            { "Y", L("Gizmo assemble") },
-            { "E", L("Gizmo brim ears") },
-            { "I", L("Zoom in") },
-            { "O", L("Zoom out") },
-            { L("Tab"), L("Switch between Prepare/Preview") },
+            {"M", L("Gizmo move")},
+            {"R", L("Gizmo rotate")},
+            {"S", L("Gizmo scale")},
+            {"F", L("Gizmo place face on bed")},
+            {"C", L("Gizmo cut")},
+            {"B", L("Gizmo mesh boolean")},
+            {"H", L("Gizmo FDM paint-on fuzzy skin")},
+            {"L", L("Gizmo SLA support points")},
+            {"P", L("Gizmo FDM paint-on seam")},
+            {"T", L("Gizmo text emboss/engrave")},
+            {"U", L("Gizmo measure")},
+            {"Y", L("Gizmo assemble")},
+            {"E", L("Gizmo brim ears")},
+            {"I", L("Zoom in")},
+            {"O", L("Zoom out")},
+            {L("Tab"), L("Switch between Prepare/Preview")},
 
         };
-        m_full_shortcuts.push_back({ { _L("Plater"), "" }, plater_shortcuts });
+        m_full_shortcuts.push_back({{_L("Plater"), ""}, plater_shortcuts});
 
         Shortcuts gizmos_shortcuts = {
             {L("Esc"), L("Deselect all")},
@@ -273,7 +294,7 @@ void KBShortcutsDialog::fill_shortcuts()
         m_full_shortcuts.push_back({{_L("Gizmo"), ""}, gizmos_shortcuts});
 
         Shortcuts object_list_shortcuts = {
-            {"1-9", L("Set extruder number for the objects and parts") },
+            {"1-9", L("Set extruder number for the objects and parts")},
             {L("Del"), L("Delete objects, parts, modifiers")},
             {L("Esc"), L("Deselect all")},
             {ctrl + "C", L("Copy to clipboard")},
@@ -286,30 +307,30 @@ void KBShortcutsDialog::fill_shortcuts()
             {L("Space"), L("Select the object/part and press space to change the name")},
             {L("Mouse click"), L("Select the object/part and mouse click to change the name")},
         };
-        m_full_shortcuts.push_back({ { _L("Objects List"), "" }, object_list_shortcuts });
+        m_full_shortcuts.push_back({{_L("Objects List"), ""}, object_list_shortcuts});
     }
 
     Shortcuts preview_shortcuts = {
-        { L("Arrow Up"),    L("Vertical slider - Move active thumb Up")},
-        { L("Arrow Down"),  L("Vertical slider - Move active thumb Down")},
-        { L("Arrow Left"),  L("Horizontal slider - Move active thumb Left")},
-        { L("Arrow Right"), L("Horizontal slider - Move active thumb Right")},
-        { "L", L("On/Off one layer mode of the vertical slider")},
-        { "C", L("On/Off G-code window")},
-        { L("Tab"), L("Switch between Prepare/Preview")},
+        {L("Arrow Up"), L("Vertical slider - Move active thumb Up")},
+        {L("Arrow Down"), L("Vertical slider - Move active thumb Down")},
+        {L("Arrow Left"), L("Horizontal slider - Move active thumb Left")},
+        {L("Arrow Right"), L("Horizontal slider - Move active thumb Right")},
+        {"L", L("On/Off one layer mode of the vertical slider")},
+        {"C", L("On/Off G-code window")},
+        {L("Tab"), L("Switch between Prepare/Preview")},
         {shift + L("Any arrow"), L("Move slider 5x faster")},
         {shift + L("Mouse wheel"), L("Move slider 5x faster")},
         {ctrl + L("Any arrow"), L("Move slider 5x faster")},
         {ctrl + L("Mouse wheel"), L("Move slider 5x faster")},
-        { L("Home"),        L("Horizontal slider - Move to start position")},
-        { L("End"),         L("Horizontal slider - Move to last position")},
+        {L("Home"), L("Horizontal slider - Move to start position")},
+        {L("End"), L("Horizontal slider - Move to last position")},
     };
-    m_full_shortcuts.push_back({ { _L("Preview"), "" }, preview_shortcuts });
+    m_full_shortcuts.push_back({{_L("Preview"), ""}, preview_shortcuts});
 }
 
 wxPanel* KBShortcutsDialog::create_page(wxWindow* parent, const ShortcutsItem& shortcuts, const wxFont& font, const wxFont& bold_font)
 {
-    wxPanel* main_page = new wxPanel(parent);
+    wxPanel*    main_page  = new wxPanel(parent);
     wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
 
     if (!shortcuts.first.second.empty()) {
@@ -322,17 +343,17 @@ wxPanel* KBShortcutsDialog::create_page(wxWindow* parent, const ShortcutsItem& s
         main_sizer->AddSpacer(FromDIP(10));
     }
 
-    int items_count = (int) shortcuts.second.size();
-    wxScrolledWindow *scrollable_panel = new wxScrolledWindow(main_page);
+    int               items_count      = (int) shortcuts.second.size();
+    wxScrolledWindow* scrollable_panel = new wxScrolledWindow(main_page);
     wxGetApp().UpdateDarkUI(scrollable_panel);
     scrollable_panel->SetScrollbars(20, 20, 50, 50);
     scrollable_panel->SetInitialSize(wxSize(FromDIP(850), FromDIP(450)));
 
-    wxBoxSizer *     scrollable_panel_sizer = new wxBoxSizer(wxVERTICAL);
-    wxFlexGridSizer *grid_sizer             = new wxFlexGridSizer(items_count, 2, FromDIP(10), FromDIP(20));
+    wxBoxSizer*      scrollable_panel_sizer = new wxBoxSizer(wxVERTICAL);
+    wxFlexGridSizer* grid_sizer             = new wxFlexGridSizer(items_count, 2, FromDIP(10), FromDIP(20));
 
     for (int i = 0; i < items_count; ++i) {
-        const auto &[shortcut, description] = shortcuts.second[i];
+        const auto& [shortcut, description] = shortcuts.second[i];
         auto key                            = new wxStaticText(scrollable_panel, wxID_ANY, _(shortcut));
         key->SetForegroundColour(wxColour(50, 58, 61));
         key->SetFont(bold_font);
@@ -354,5 +375,4 @@ wxPanel* KBShortcutsDialog::create_page(wxWindow* parent, const ShortcutsItem& s
     return main_page;
 }
 
-} // namespace GUI
-} // namespace Slic3r
+}} // namespace Slic3r::GUI
