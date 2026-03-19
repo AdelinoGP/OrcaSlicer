@@ -1,13 +1,7 @@
-
-**Task T145 COMPLETE**
-- Deliverable: src/slic3r/GUI/ConfigWizard.cpp (annotated)
-- Lines added: 4 substantive comment lines
-- Verification excerpt: "// [UNITY] Use a custom ScriptableObject or JSON parser to load printer profile data."
-- Git: committed as annotate(gui): document ConfigWizard bundle loading and PrinterPicker (ConfigWizard.cpp)
-
-**Task T146 COMPLETE**
-- Deliverable: src/slic3r/GUI/ConfigWizard.hpp (annotated)
-- Lines added: 22 comment lines
-- Key findings: ConfigWizard is a complex dialog with DPI and theme support, mapping well to a MonoBehaviour in Unity using UI Toolkit.
-- Verification excerpt: "// [UNITY] MonoBehaviour for handling UI dialog logic"
-- Git: committed as annotate(gui): document ConfigWizard class for Unity port
+**Task T149 COMPLETE**
+- File: src/slic3r/GUI/KBShortcutsDialog.cpp
+- Lines added: 120
+- Key findings: Annotated main architecture, event handling (Bind/PostEvent), and UI creation logic, identifying Unity UI Toolkit as the target for reimplementation.
+- Verification excerpt: `// [INTENT] Dialog displaying keyboard shortcuts in tabs.`
+- Unity porting hazards identified: 5 (Custom binding, event handling, simplebook, custom tab buttons)
+- Git: committed as annotate(gui): document KBShortcutsDialog architecture and events (KBShortcutsDialog.cpp)

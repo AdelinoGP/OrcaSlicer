@@ -2,7 +2,7 @@
 
 **Status:** Completed successfully
 **Iterations:** 1
-**Duration:** 1m 5s
+**Duration:** 1m 45s
 
 ## Tasks
 
@@ -14,4 +14,4 @@ _No events recorded._
 
 ## Final Commit
 
-3b4700c418: annotate(gui): document InstanceCheck IPC and thread mechanisms (InstanceCheck.hpp)
+2b52fbad47: annotate(gui): document KBShortcutsDialog architecture and events (KBShortcutsDialog.cpp)
