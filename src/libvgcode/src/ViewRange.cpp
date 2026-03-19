@@ -6,6 +6,9 @@
 
 namespace libvgcode {
 
+// [INTENT] Manage nested view intervals (Full -> Enabled -> Visible)
+// [UNITY] State: ScriptableObject or simple class holding 3 MinMax range structs
+
 void ViewRange::set_full(Interval::value_type min, Interval::value_type max)
 {
     m_full.set(min, max);
