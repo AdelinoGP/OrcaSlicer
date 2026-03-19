@@ -262,3 +262,10 @@ SKIP_TRIVIAL: src/libvgcode/src/GCodeInputData.cpp
 - Manifest total: 719
 - Remaining: 699
 - Loop status: CONTINUING
+
+**Task T127 COMPLETE**
+- File: src/libvgcode/src/Settings.cpp
+- Lines added: 3 comment lines
+- Key findings: Header-only struct with inline defaults; no direct logic.
+- Verification excerpt: "// [PORTING_HAZARD:P1] All member defaults defined in Settings.hpp - ensure Unity/C# mirrors default values"
+- Unity porting hazards identified: 1
