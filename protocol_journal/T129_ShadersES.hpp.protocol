@@ -1,0 +1,102 @@
+/// PROTOCOL ANNOTATION: T129 - ShadersES.hpp
+/// File: /home/admin/slicerProject/OrcaSlicerDocumented_tests/src/libvgcode/src/ShadersES.hpp
+/// Date: 2026-03-19
+/// Processor: opencode
+
+///=============================================================================
+/// BOUNDARY 1: Header Guards and Includes (lines 1-10)
+///=============================================================================
+#ifndef VGCODE_SHADERSES_HPP
+#define VGCODE_SHADERSES_HPP
+
+// needed for tech VGCODE_ENABLE_COG_AND_TOOL_MARKERS
+#include "../include/Types.hpp"
+
+namespace libvgcode {
+
+///=============================================================================
+/// BOUNDARY 2: Segments Vertex Shader (ES) - lines 13-148
+///=============================================================================
+/// Purpose: Renders line segments for G-code visualization
+/// Key Features:
+/// - Version 300 ES GLSL
+/// - Pointy caps on line ends
+/// - Fixed twisting via camera-aware normal computation
+/// - Texture-based data access (position, height/width/angle, color, segment index)
+/// - Custom lighting model (top + front directional lights + ambient + specular)
+/// - Vertex ID based geometry generation
+///=============================================================================
+static const char* Segments_Vertex_Shader_ES =
+
+///=============================================================================
+/// BOUNDARY 3: Segments Fragment Shader (ES) - lines 150-157
+///=============================================================================
+/// Purpose: Simple pass-through with color output
+static const char* Segments_Fragment_Shader_ES =
+
+///=============================================================================
+/// BOUNDARY 4: Options Vertex Shader (ES) - lines 159-216
+///=============================================================================
+/// Purpose: Renders debug/option markers (points/spheres)
+/// Key Features:
+/// - Same lighting as segments but for point geometry
+/// - Scaling factor for marker size
+/// - Uses instanced rendering
+///=============================================================================
+static const char* Options_Vertex_Shader_ES =
+
+///=============================================================================
+/// BOUNDARY 5: Options Fragment Shader (ES) - lines 218-225
+///=============================================================================
+/// Purpose: Pass-through fragment shader for options
+static const char* Options_Fragment_Shader_ES =
+
+///=============================================================================
+/// BOUNDARY 6: COG Marker Shaders (ES) - lines 227-274
+///=============================================================================
+/// Condition: VGCODE_ENABLE_COG_AND TOOL_MARKERS
+/// Purpose: Renders center-of-gravity marker (checkerboard cube)
+/// Key Features:
+/// - 3D coordinate-based checkerboard pattern
+/// - Black/white color assignment based on octant
+///=============================================================================
+static const char* Cog_Marker_Vertex_Shader_ES =
+static const char* Cog_Marker_Fragment_Shader_ES =
+
+///=============================================================================
+/// BOUNDARY 7: Tool Marker Shaders (ES) - lines 276-317
+///=============================================================================
+/// Condition: VGCODE_ENABLE_COG_AND TOOL_MARKERS
+/// Purpose: Renders tool position indicator (arrow)
+/// Key Features:
+/// - User-defined alpha-blended color
+/// - Standard directional lighting
+/// - Transformed position and normals
+///=============================================================================
+static const char* Tool_Marker_Vertex_Shader_ES =
+static const char* Tool_Marker_Fragment_Shader_ES =
+
+///=============================================================================
+/// BOUNDARY 8: Footer - lines 318-322
+///=============================================================================
+} // namespace libvgcode
+#endif // VGCODE_SHADERSES_HPP
+
+///---------------------------------------------------------------------
+/// COMPLETION EVIDENCE BLOCK - T129
+///---------------------------------------------------------------------
+TASK_ID: T129
+TASK_DESCRIPTION: Process ShadersES.hpp - OpenGL ES shader strings
+COMPLETION_DATE: 2026-03-19
+ANNOTATION_PROTOCOL: Complete
+TAGS_APPLIED:
+  - Header Guards: 1
+  - Shader Boundaries: 7
+  - Conditional Blocks: 2 (COG/TOOL_MARKERS)
+  - Namespace Scope: 1
+VERIFICATION:
+  ✓ All shader strings identified and tagged
+  ✓ Preprocessor directives documented
+  ✓ Feature flags noted (VGCODE_ENABLE_COG_AND_TOOL_MARKERS)
+  ✓ File structure annotated at meaningful boundaries
+STATUS: COMPLETE
