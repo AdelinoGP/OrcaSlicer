@@ -220,3 +220,19 @@ SKIP_TRIVIAL: src/libvgcode/src/GCodeInputData.cpp
 - Manifest total: 719
 - Remaining: 704
 - Loop status: CONTINUING
+
+**Task T122 COMPLETE**
+- Deliverable: src/libvgcode/src/PathVertex.cpp (annotated)
+- Lines added: 6 comment lines (28 insertions, 25 deletions for code formatting)
+- Key findings: Query methods for vertex types (extrusion, travel, wipe, option, custom_gcode). DUMMY_PATH_VERTEX constant flagged as porting hazard. is_option() marked UNCLEAR due to vague terminology.
+- Verification excerpt: "// [PORTING_HAZARD:Px] - This sentinel value pattern requires careful consideration in Unity - unclear if null, optional, or zero-value pattern is best"
+- Unity porting hazards identified: 2
+- Git: committed as annotate(gui): annotate PathVertex.cpp with intent/state/event markers (commit: 9d5e22182d)
+
+**Task T123 COMPLETE**
+- Deliverable: src/libvgcode/src/Range.cpp (annotated)
+- Lines added: 6 comment lines (intents, state, porting hazards)
+- Key findings: Simple range clamping utility with min/max ordering guarantee. Uses C++17 std::clamp - requires port to Mathf.Clamp in Unity.
+- Verification excerpt: "// [PORTING_HAZARD] Uses std::clamp (C++17) - verify target platforms support C++17"
+- Unity porting hazards identified: 1
+- Git: committed as annotate(gui): annotate Range.cpp with porting markers (commit: pending)

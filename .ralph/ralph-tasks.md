@@ -40,8 +40,8 @@ Last updated: 2026-03-18T23:55:00Z
 - [ ] T119 annotate: src/libvgcode/src/OpenGLUtils.hpp
 - [ ] T120 annotate: src/libvgcode/src/OptionTemplate.cpp
 - [ ] T121 annotate: src/libvgcode/src/OptionTemplate.hpp
-- [ ] T122 annotate: src/libvgcode/src/PathVertex.cpp
-- [ ] T123 annotate: src/libvgcode/src/Range.cpp
+- [x] T122 annotate: src/libvgcode/src/PathVertex.cpp
+- [x] T123 annotate: src/libvgcode/src/Range.cpp
 - [ ] T124 annotate: src/libvgcode/src/Range.hpp
 - [ ] T125 annotate: src/libvgcode/src/SegmentTemplate.cpp
 - [ ] T126 annotate: src/libvgcode/src/SegmentTemplate.hpp
