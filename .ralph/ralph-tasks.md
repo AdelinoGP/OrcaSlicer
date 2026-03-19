@@ -288,7 +288,7 @@ Last updated: 2026-03-19T03:10:00Z
 - [ ] T367 annotate: src/slic3r/GUI/GLTexture.hpp
 - [ ] T368 annotate: src/slic3r/GUI/GLToolbar.cpp
 - [ ] T369 annotate: src/slic3r/GUI/GLToolbar.hpp
-- [ ] T370 annotate: src/slic3r/GUI/GUI_App.cpp
+- [x] T370 annotate: src/slic3r/GUI/GUI_App.cpp
 - [ ] T371 annotate: src/slic3r/GUI/GUI_App.hpp
 - [ ] T372 annotate: src/slic3r/GUI/GUI_AuxiliaryList.cpp
 - [ ] T373 annotate: src/slic3r/GUI/GUI_AuxiliaryList.hpp
