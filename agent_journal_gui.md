@@ -34,3 +34,10 @@
 - Manifest total: 719
 - Remaining: 717
 - Loop status: CONTINUING
+
+**Task T150 COMPLETE**
+- Deliverable: src/slic3r/GUI/KBShortcutsDialog.hpp (annotated)
+- Lines added: 12 comment lines
+- Key findings: Annotated main UI dialog class with intent and component mappings for Unity. Identified key wxWidgets components for replacement.
+- Verification excerpt: "// [UNITY] Replace with a custom Unity Dialog MonoBehaviour (e.g., UI Toolkit UIDocument or uGUI Canvas based Dialog)."
+- Git: Committed as annotate(gui): document KBShortcutsDialog class intent
