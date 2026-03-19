@@ -181,3 +181,42 @@ SKIP_TRIVIAL: src/libvgcode/src/GCodeInputData.cpp
 - Manifest total: 719
 - Remaining: 709
 - Loop status: CONTINUING
+**Task T117 COMPLETE**
+- Deliverable: src/libvgcode/src/Layers.hpp (annotated)
+- Lines added: ~5 comment lines
+- Key findings: Class definition for Layers metadata. Requires simple mapping to C# struct/class.
+- Verification excerpt: "// [STATE] Metadata for a single layer."
+- Git: committed
+**Task T118 COMPLETE**
+- Deliverable: src/libvgcode/src/OpenGLUtils.cpp (annotated)
+- Lines added: ~3 comment lines
+- Key findings: Manages OpenGL context loading. Completely removed in Unity port (architectural hazard).
+- Verification excerpt: "// [UNITY] Not required; Unity handles all OpenGL context management and shader abstraction automatically. This class and Glad dependencies should be completely removed."
+- Git: committed
+**Task T119 COMPLETE**
+- Deliverable: src/libvgcode/src/OpenGLUtils.hpp (annotated)
+- Lines added: ~3 comment lines
+- Key findings: OpenGL wrapper and error-checking macros. Completely removed in Unity port (architectural hazard).
+- Verification excerpt: "// [UNITY] Not required; Unity handles all OpenGL context management and shader abstraction automatically."
+- Git: committed
+**Task T120 COMPLETE**
+- Deliverable: src/libvgcode/src/OptionTemplate.cpp (annotated)
+- Lines added: ~10 comment lines
+- Key findings: Procedural geometry generation for markers using OpenGL. Reimplement with Unity Mesh API + DrawMeshInstanced.
+- Verification excerpt: "// [UNITY] Use a MonoBehaviour to manage procedural Mesh generation and rendering."
+- Git: committed
+**Task T121 COMPLETE**
+- Deliverable: src/libvgcode/src/OptionTemplate.hpp (annotated)
+- Lines added: ~5 comment lines
+- Key findings: Header for marker template.
+- Verification excerpt: "// [STATE] Metadata for a single layer."
+- Git: committed
+### Loop Checkpoint — Tasks T107–T121
+- Files processed this batch: 5
+- Cumulative annotated: 10
+- Cumulative SKIP_TRIVIAL: 5
+- Cumulative SKIP_VENDORED: 0
+- Total accounted for: 15
+- Manifest total: 719
+- Remaining: 704
+- Loop status: CONTINUING
