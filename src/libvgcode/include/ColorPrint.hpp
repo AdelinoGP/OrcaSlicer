@@ -9,12 +9,18 @@
 
 namespace libvgcode {
 
+// [INTENT] Defines the data structure for a color change event in the G-code path visualization.
+// [UNITY] Map to a standard C# struct or simple class (e.g., ColorPrintEvent) for pure data representation.
 struct ColorPrint
 {
-    uint8_t extruder_id{ 0 };
-    uint8_t color_id{ 0 };
-    uint32_t layer_id{ 0 };
-    std::array<float, TIME_MODES_COUNT> times{ 0.0f, 0.0f };
+    // [STATE] The ID of the extruder to switch to.
+    uint8_t extruder_id{0};
+    // [STATE] The ID of the color to apply.
+    uint8_t color_id{0};
+    // [STATE] The index of the layer where the color change occurs.
+    uint32_t layer_id{0};
+    // [STATE] Estimated times associated with the color print change.
+    std::array<float, TIME_MODES_COUNT> times{0.0f, 0.0f};
 };
 
 } // namespace libvgcode
