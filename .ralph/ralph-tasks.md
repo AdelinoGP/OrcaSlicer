@@ -339,7 +339,7 @@ Last updated: 2026-03-19T03:10:00Z
 - [ ] T418 annotate: src/slic3r/GUI/IMSlider.hpp
 - [ ] T419 annotate: src/slic3r/GUI/IMToolbar.cpp
 - [ ] T420 annotate: src/slic3r/GUI/IMToolbar.hpp
-- [ ] T421 annotate: src/slic3r/GUI/InstanceCheck.cpp
+- [x] T421 annotate: src/slic3r/GUI/InstanceCheck.cpp
 - [ ] T422 annotate: src/slic3r/GUI/InstanceCheck.hpp
 - [ ] T423 annotate: src/slic3r/GUI/Jobs/ArrangeJob.cpp
 - [ ] T424 annotate: src/slic3r/GUI/Jobs/ArrangeJob.hpp
