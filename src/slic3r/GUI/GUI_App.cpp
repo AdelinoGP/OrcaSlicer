@@ -179,6 +179,7 @@ class MainFrame;
 // [INTENT] Diagnostics function to check network connectivity
 // [PORTING_HAZARD:P2] Uses wxExecute for shell commands - Unity needs Process.Start or UnityWebRequest
 // [UNITY] Unity: Use System.Diagnostics.Process or UnityWebRequest for network checks
+// [EVENT] Triggered during application initialization
 void start_ping_test()
 {
     return;
