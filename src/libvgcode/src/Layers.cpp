@@ -12,15 +12,15 @@
 
 namespace libvgcode {
 
-static bool is_colorprint_option(const PathVertex& v)
-{
-    return v.type == EMoveType::PausePrint || v.type == EMoveType::CustomGCode;
-}
+// [INTENT] Layers aggregates G-code layer data (Z-height, time, color print options).
+// [UNITY] Use a C# class `LayerManager` managing a List of `LayerInfo` structs.
+
+static bool is_colorprint_option(const PathVertex& v) { return v.type == EMoveType::PausePrint || v.type == EMoveType::CustomGCode; }
 
 void Layers::update(const PathVertex& vertex, uint32_t vertex_id)
 {
     if (m_items.empty() || vertex.layer_id == m_items.size()) {
-        // this code assumes that gcode paths are sent sequentially, one layer after the other
+        // [PORTING_HAZARD:P2] this code assumes that gcode paths are sent sequentially, one layer after the other
         assert(vertex.layer_id == static_cast<uint32_t>(m_items.size()));
         Item& item = m_items.emplace_back(Item());
         if (vertex.type == EMoveType::Extrude && vertex.role != EGCodeExtrusionRole::Custom)
@@ -28,8 +28,7 @@ void Layers::update(const PathVertex& vertex, uint32_t vertex_id)
         item.range.set(vertex_id, vertex_id);
         item.times = vertex.times;
         item.contains_colorprint_options |= is_colorprint_option(vertex);
-    }
-    else {
+    } else {
         Item& item = m_items.back();
         if (vertex.type == EMoveType::Extrude && vertex.role != EGCodeExtrusionRole::Custom && item.z != vertex.position[2])
             item.z = vertex.position[2];
@@ -37,6 +36,7 @@ void Layers::update(const PathVertex& vertex, uint32_t vertex_id)
         for (size_t i = 0; i < TIME_MODES_COUNT; ++i) {
             item.times[i] += vertex.times[i];
         }
+        // [EVENT] Updates color print flags.
         item.contains_colorprint_options |= is_colorprint_option(vertex);
     }
 }
