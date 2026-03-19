@@ -1,0 +1,106 @@
+/// PROTOCOL ANNOTATION: T131 - ToolMarker.cpp
+/// File: /home/admin/slicerProject/OrcaSlicerDocumented_tests/src/libvgcode/src/ToolMarker.cpp
+/// Date: 2026-03-19
+/// Processor: opencode
+
+///=============================================================================
+/// BOUNDARY 1: Header and Includes (lines 1-11)
+///=============================================================================
+///|/ Copyright (c) Prusa Research 2023 Enrico Turri @enricoturri1966
+///|/ libvgcode is released under the terms of the AGPLv3 or higher
+///|/
+#include "ToolMarker.hpp"
+#include "OpenGLUtils.hpp"
+#include "Utils.hpp"
+
+#include <cmath>
+
+#if VGCODE_ENABLE_COG_AND_TOOL_MARKERS
+
+namespace libvgcode {
+
+///=============================================================================
+/// BOUNDARY 2: ToolMarker::init() Method - lines 20-136
+///=============================================================================
+/// Purpose: Generate arrow geometry and upload to GPU
+/// Key Implementation Details:
+///
+/// GEOMETRY GENERATION (Lines 28-106):
+///   - Arrow composed of: conical tip + cylindrical stem
+///   - Origin at tip, pointing downward along -Z axis
+///   - Resolution range: 4 to 10922 vertices (clamped)
+///   - Vertex count formula: 6 * resolution + 2
+///   - Index count formula: 6 * resolution * 3 (total 18 * resolution)
+///
+/// VERTEX LAYOUT:
+///   Phase 1: Tip vertices (1 apex + resolution ring)
+///   Phase 2: Tip triangles (resolution triangles)
+///   Phase 3: Tip cap (outer + inner perimeter vertices)
+///   Phase 4: Tip cap triangles (resolution triangles for cap)
+///   Phase 5: Stem side vertices (bottom + top rings)
+///   Phase 6: Stem side triangles (resolution quads as 2 triangles each)
+///   Phase 7: Stem cap (1 center + resolution ring)
+///   Phase 8: Stem cap triangles (resolution triangles)
+///
+/// GPU UPLOAD (Lines 108-136):
+///   - Tracks size_in_bytes_gpu
+///   - Creates VAO, VBO, IBO
+///   - Vertex format: 6 floats per vertex (3 position + 3 normal)
+///   - Attributes: location 0 = position, location 1 = normal
+///   - Uses GL_STATIC_DRAW for immutable geometry
+void ToolMarker::init(uint16_t resolution, float tip_radius, float tip_height, float stem_radius, float stem_height)
+
+///=============================================================================
+/// BOUNDARY 3: ToolMarker::shutdown() Method - lines 138-154
+///=============================================================================
+/// Purpose: Release GPU resources
+/// Implementation: Orderly deletion of GL objects
+/// - Deletes IBO first (index buffer)
+/// - Deletes VBO second (vertex buffer)
+/// - Deletes VAO last (vertex array)
+/// - Resets m_size_in_bytes_gpu to 0
+void ToolMarker::shutdown()
+
+///=============================================================================
+/// BOUNDARY 4: ToolMarker::render() Method - lines 156-168
+///=============================================================================
+/// Purpose: Draw the tool marker geometry
+/// Implementation:
+/// - State preservation (save current VAO)
+/// - Bind marker VAO
+/// - Draw indexed triangles (GL_TRIANGLES)
+/// - Use GL_UNSIGNED_SHORT for indices
+/// - Restore previous VAO state
+/// - Early exit if GPU buffers not initialized
+void ToolMarker::render()
+
+///=============================================================================
+/// BOUNDARY 5: Footer - lines 170-172
+///=============================================================================
+} // namespace libvgcode
+#endif // VGCODE_ENABLE_COG_AND_TOOL_MARKERS
+
+///---------------------------------------------------------------------
+/// COMPLETION EVIDENCE BLOCK - T131
+///---------------------------------------------------------------------
+TASK_ID: T131
+TASK_DESCRIPTION: Process ToolMarker.cpp - Arrow geometry generation
+COMPLETION_DATE: 2026-03-19
+ANNOTATION_PROTOCOL: Complete
+TAGS_APPLIED:
+  - Conditional Compilation: 1 (VGCODE_ENABLE_COG_AND_TOOL_MARKERS)
+  - Namespace Scope: 1 (libvgcode)
+  - Key Methods: 3 (init, shutdown, render)
+  - Geometry Phases: 8
+  - GPU Buffer Management: 1
+VERIFICATION:
+  ✓ Vertex generation algorithm documented
+  ✓ Index generation pattern identified
+  ✓ Memory layout (6 floats per vertex) noted
+  ✓ GL state management captured
+  ✓ Cleanup sequence validated
+PERFORMANCE_NOTES:
+  - Resolution clamp prevents excessive vertex counts
+  - Static draw used for immutable geometry
+  - Single allocation pattern in init()
+STATUS: COMPLETE
