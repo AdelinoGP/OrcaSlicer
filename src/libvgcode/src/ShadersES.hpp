@@ -9,11 +9,9 @@
 #include "../include/Types.hpp"
 
 namespace libvgcode {
-// [INTENT] This file defines OpenGL ES 3.0 shader strings for G-code path visualization
-// [UNITY] These GLSL shaders would need conversion to HLSL/ShaderGraph for Unity's SRP
-
-// [OPENGL] Vertex shader for segment rendering with instanced drawing
-// [PORTING_HAZARD:P3] Shader code requires complete rewrite for Unity's shader pipeline
+// [INTENT] This file defines OpenGL ES 3.0 shader strings for G-code path visualization.
+// [UNITY] These GLSL shaders require conversion to URP HLSL / ShaderGraph.
+// [PORTING_HAZARD:P3] Shader syntax needs complete rewrite.
 static const char* Segments_Vertex_Shader_ES =
     "#version 300 es\n"
     "precision lowp usampler2D;\n"
