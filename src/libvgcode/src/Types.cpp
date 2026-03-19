@@ -7,26 +7,50 @@
 #include <algorithm>
 
 namespace libvgcode {
+// [INTENT] Utility functions for type conversions and color operations
+// [UNITY] These would become static methods in a C# utility class
 
-// mapping from EMoveType to EOptionType
+// [INTENT] Map move type to visibility option
+// [PORTING_HAZARD:P1] Enum mapping - must maintain same EOptionType enum in C#
 EOptionType move_type_to_option(EMoveType type)
 {
-    switch (type)
-    {
-    case EMoveType::Travel:      { return EOptionType::Travels; }
-    case EMoveType::Wipe:        { return EOptionType::Wipes; }
-    case EMoveType::Retract:     { return EOptionType::Retractions; }
-    case EMoveType::Unretract:   { return EOptionType::Unretractions; }
-    case EMoveType::Seam:        { return EOptionType::Seams; }
-    case EMoveType::ToolChange:  { return EOptionType::ToolChanges; }
-    case EMoveType::ColorChange: { return EOptionType::ColorChanges; }
-    case EMoveType::PausePrint:  { return EOptionType::PausePrints; }
-    case EMoveType::CustomGCode: { return EOptionType::CustomGCodes; }
-    default:                     { return EOptionType::COUNT; }
+    switch (type) {
+    case EMoveType::Travel: {
+        return EOptionType::Travels;
+    }
+    case EMoveType::Wipe: {
+        return EOptionType::Wipes;
+    }
+    case EMoveType::Retract: {
+        return EOptionType::Retractions;
+    }
+    case EMoveType::Unretract: {
+        return EOptionType::Unretractions;
+    }
+    case EMoveType::Seam: {
+        return EOptionType::Seams;
+    }
+    case EMoveType::ToolChange: {
+        return EOptionType::ToolChanges;
+    }
+    case EMoveType::ColorChange: {
+        return EOptionType::ColorChanges;
+    }
+    case EMoveType::PausePrint: {
+        return EOptionType::PausePrints;
+    }
+    case EMoveType::CustomGCode: {
+        return EOptionType::CustomGCodes;
+    }
+    default: {
+        return EOptionType::COUNT;
+    }
     }
 }
 
 static uint8_t lerp(uint8_t f1, uint8_t f2, float t)
+// [INTENT] Linear interpolation for 8-bit channel values
+// [PORTING_HAZARD:P0] Simple math, direct C# equivalent
 {
     const float one_minus_t = 1.0f - t;
     return static_cast<uint8_t>(one_minus_t * static_cast<float>(f1) + t * static_cast<float>(f2));
@@ -34,9 +58,11 @@ static uint8_t lerp(uint8_t f1, uint8_t f2, float t)
 
 // It will be possible to replace this with std::lerp when using c++20
 Color lerp(const Color& c1, const Color& c2, float t)
+// [INTENT] Color interpolation for gradient visualization
+// [UNITY] Equivalent: Color.Lerp(c1, c2, t)
 {
     t = std::clamp(t, 0.0f, 1.0f);
-    return { lerp(c1[0], c2[0], t), lerp(c1[1], c2[1], t), lerp(c1[2], c2[2], t) };
+    return {lerp(c1[0], c2[0], t), lerp(c1[1], c2[1], t), lerp(c1[2], c2[2], t)};
 }
 
 } // namespace libvgcode
