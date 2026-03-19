@@ -8,6 +8,7 @@
 #include <cmath>
 
 namespace libvgcode {
+// [INTENT] Geometry construction utilities// [UNITY] Static MeshUtils class with Vector3 helpers
 
 void add_vertex(const Vec3& position, const Vec3& normal, std::vector<float>& vertices)
 {
