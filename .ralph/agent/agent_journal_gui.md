@@ -204,15 +204,15 @@ Task registry initialization findings:
   - P3: Shader code complete rewrite needed (GLSL → HLSL/ShaderGraph)
   - Conditional compilation affects shader availability
 
-**Total files annotated so far:** T101, T103, T104, T105, T122, T123, T124, T125, T126, T127, T128, T129 = 12 files
+**Total files annotated so far:** T101, T103, T104, T105, T122, T123, T124, T125, T126, T127, T128, T129, T130, T131, T132, T133, T134 = 17 files
 **Skipped trivial:** T102, T107, T108, T109, T110, T111, T112, T113, T114, T115, T116, T117, T118, T119, T120, T121 = 16 files
 
-### Loop Checkpoint — Tasks T101–T129
-- Files processed this batch: 29
-- Cumulative annotated: 12
+### Loop Checkpoint — Tasks T101–T134
+- Files processed this batch: 34
+- Cumulative annotated: 17
 - Cumulative SKIP_TRIVIAL: 16
 - Cumulative SKIP_VENDORED: 0
-- Total accounted for: 28
+- Total accounted for: 33
 - Manifest total: 719
-- Remaining: 691
-- Loop status: CONTINUING (continue processing T130-T134 next)
+- Remaining: 686
+- Loop status: CONTINUING
