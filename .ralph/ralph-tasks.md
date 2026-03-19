@@ -454,7 +454,7 @@ Last updated: 2026-03-19T03:10:00Z
 - [ ] T533 annotate: src/slic3r/GUI/Preferences.hpp
 - [ ] T534 annotate: src/slic3r/GUI/PrePrintChecker.cpp
 - [ ] T535 annotate: src/slic3r/GUI/PrePrintChecker.hpp
-- [ ] T536 annotate: src/slic3r/GUI/PresetComboBoxes.cpp
+- [x] T536 annotate: src/slic3r/GUI/PresetComboBoxes.cpp
 - [ ] T537 annotate: src/slic3r/GUI/PresetComboBoxes.hpp
 - [ ] T538 annotate: src/slic3r/GUI/PresetHints.cpp
 - [ ] T539 annotate: src/slic3r/GUI/PresetHints.hpp
