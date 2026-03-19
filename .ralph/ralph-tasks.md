@@ -65,7 +65,7 @@ Last updated: 2026-03-19T03:10:00Z
 - [ ] T144 annotate: src/slic3r/GUI/3DBed.hpp
 - [ ] T145 annotate: src/slic3r/GUI/3DScene.cpp
 - [ ] T146 annotate: src/slic3r/GUI/3DScene.hpp
-- [ ] T147 annotate: src/slic3r/GUI/AboutDialog.cpp
+- [x] T147 annotate: src/slic3r/GUI/AboutDialog.cpp
 - [ ] T148 annotate: src/slic3r/GUI/AboutDialog.hpp
 - [ ] T149 annotate: src/slic3r/GUI/AmsMappingPopup.cpp
 - [ ] T150 annotate: src/slic3r/GUI/AmsMappingPopup.hpp
