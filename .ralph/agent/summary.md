@@ -2,7 +2,7 @@
 
 **Status:** Completed successfully
 **Iterations:** 1
-**Duration:** 1m 38s
+**Duration:** 1m 5s
 
 ## Tasks
 
@@ -14,4 +14,4 @@ _No events recorded._
 
 ## Final Commit
 
-f517a34a26: annotate(gui): document InstanceCheck IPC and OS-specific logic (InstanceCheck.cpp)
+3b4700c418: annotate(gui): document InstanceCheck IPC and thread mechanisms (InstanceCheck.hpp)
