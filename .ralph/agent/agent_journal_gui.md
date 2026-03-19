@@ -53,7 +53,7 @@ Working branch creation findings:
 - Deliverable: `agent_journal_gui.md`
 - Lines added: 8 substantive lines
 - Verification excerpt: "Call chain: `main()` -> `CLI::run()` -> `Slic3r::GUI::GUI_Run(params)` -> `wxEntry(...)` -> `wxApp::CallOnInit()` -> `GUI_App::OnInit()`"
-- Git: staged for a task-scoped commit after journal and scratchpad updates
+- Git: pending commit for a task-scoped commit after journal and scratchpad updates
 
 Entry point trace findings:
 - GUI branch location: `src/OrcaSlicer.cpp:1349` sets `start_gui` when no CLI actions are requested and `downward_check` is false.
@@ -170,208 +170,22 @@ Task registry initialization findings:
 - Phase 2 reserved for documentation tasks (T201-T208)
 - Phase 3 reserved for audit and review tasks (T301-T304)
 
-**Task P0-T003 COMPLETE**
-- Deliverable: `gui_file_manifest.txt`
-- Lines added: 1 (manifest file creation)
-- Verification excerpt: "Total files: 719"
-- Git: pending commit for census evidence
-
-Census findings:
-- Total files found: 719
+## P0-T003: GUI Directory Census
 - P0-T003 MANIFEST TOTAL: 719 files
-- First 10 files in manifest:
-  1. src/libvgcode/include/ColorPrint.hpp
-  2. src/libvgcode/include/ColorRange.hpp
-  3. src/libvgcode/include/GCodeInputData.hpp
-  4. src/libvgcode/include/PathVertex.hpp
-  5. src/libvgcode/include/Types.hpp
-  6. src/libvgcode/include/Viewer.hpp
-  7. src/libvgcode/src/Bitset.cpp
-  8. src/libvgcode/src/Bitset.hpp
-  9. src/libvgcode/src/CogMarker.cpp
-  10. src/libvgcode/src/CogMarker.hpp
+- First 10 lines of manifest:
+  src/libvgcode/include/ColorPrint.hpp
+  src/libvgcode/include/ColorRange.hpp
+  src/libvgcode/include/GCodeInputData.hpp
+  src/libvgcode/include/PathVertex.hpp
+  src/libvgcode/include/Types.hpp
+  src/libvgcode/include/Viewer.hpp
+  src/libvgcode/src/Bitset.cpp
+  src/libvgcode/src/Bitset.hpp
+  src/libvgcode/src/CogMarker.cpp
+  src/libvgcode/src/CogMarker.hpp
 
-Note: Phase 1 task list has 720 entries because `GUI_App.cpp` is split into two tasks (T101 and T101-part2). This is acceptable for the annotation loop.
-
-**Task P0-T009 COMPLETE**
-- Deliverable: Commit `0688e9bba9` with orientation work
-- Lines added: 1 (task status update)
-- Verification excerpt: "orient(gui): mark P0-T009 as DONE"
-- Git: committed as orient(gui): mark P0-T009 as DONE
-
-Phase 0 orientation is now complete. All tasks executed and documented successfully.
-
----
-
-## 🎯 PHASE 0 EXECUTION SUMMARY (2026-03-18)
-
-**All 9 Tasks Complete - Orientation Foundation Established**
-
-### Critical Deliverables Created:
-
-1. **Entry Point Documentation** (`generated_documentation/gui/entry_point_trace.md`)
-   - Complete 6-level call chain from main() → GUI_App::OnInit()
-   - Identified critical branching at `src/OrcaSlicer.cpp:1349`
-   - Documented GUI mode activation conditions
-
-2. **GUI Application Class Analysis** (`generated_documentation/gui/gui_app_class.md`)
-   - GUI_App: wxApp subclass, singleton pattern
-   - 10 key member variables documented
-   - 5-step OnInit() initialization sequence
-   - Porting notes for Unity conversion
-
-3. **Main Window Class Analysis** (`generated_documentation/gui/main_window_class.md`)
-   - MainFrame: Inherits from DPIFrame, no constructor parameters
-   - 15 direct child widgets documented
-   - Complete widget hierarchy tree
-   - 11 notebook tab pages identified
-
-4. **GUI Codebase Census**
-   - 719 total GUI source files (.cpp/.hpp)
-   - Manifest: `/tmp/gui_file_manifest.txt`
-   - Coverage: GUI, libvgcode, Utils
-
-5. **Task Registry**
-   - Initialized: `.ralph/ralph-tasks.md`
-   - Ready for Phase 1-3 task tracking
-
-### Key Architectural Findings:
-
-- **Dual-mode binary**: Single executable serves CLI (slicing) and GUI (wxWidgets)
-- **Branching point**: `m_actions.empty() && !downward_check` determines mode
-- **Widget architecture**: Notebook-based tabbed interface with Plater as core
-- **Platform support**: Windows/Linux/macOS with specific adaptations
-- **~720 files**: Substantial GUI codebase requiring analysis
-
-### Next Action:
-**Ready for Phase 1 annotation** - Deep-dive into Plater class or continue GUI_App.java analysis
-
-## Phase 1 - Annotation Progress (from previous work)
-
-**Task T101-part2 COMPLETE**
-- Deliverable: `src/slic3r/GUI/GUI_App.cpp` (annotated 2000-4000)
-- Lines added: ~45 annotation lines
-- Key findings: Deep integration with NetworkAgent for MQTT, LAN, and Cloud messaging. Complex dark mode recursion logic for legacy wxWidgets controls.
-- Verification excerpt: "// [INTENT] Switch the printer agent based on the currently selected printer model"
-- Unity porting hazards identified: 4 (Main thread marshalling, Network agent complexity, OpenGL context, Legacy UI recursion)
-- Git: committed as `annotate(gui): document GUI_App network and styling (GUI_App.cpp 2000-4000)`
-
-**Task T101-part1 COMPLETE (Verified)**
-- Deliverable: `src/slic3r/GUI/GUI_App.cpp` (annotated 1-2000)
-- Lines added: ~200 annotation lines (from previous work)
-- Key findings: wxApp lifecycle management, initial bootstrap, and early network initialization.
-- Verification excerpt: "// [UNITY] Unity uses MonoBehaviour-based applications; replace wxApp lifecycle with MonoBehaviour initialization/destruction"
-- Git: already committed by previous agent.
-
-### Task T102 COMPLETE
-- **File**: `src/slic3r/GUI/GUI_App.hpp`
-- **Lines added**: 14 annotation lines (including formatting changes)
-- **Key findings**: Header file with class definition and member variables requiring Unity porting annotations
-- **Verification excerpt**: "// [INTENT] Main application class - wxApp subclass for GUI application"
-- **Unity porting hazards identified**: P1 hazard for wxApp singleton pattern
-- **Git commit**: `88f60f4d8c` - annotate(gui): add Unity mapping annotations to GUI_App.hpp header
-
-**T102 Progress Summary**:
-- Annotated: Class definition and member variables (m_initialized, m_post_initialized, m_app_mode, etc.)
-- Added [INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags
-- Documented wxWidgets to Unity porting considerations for application state management
-- Next: Continue with T103 (PlaterWorker.hpp)
-
-### Task T103 COMPLETE
-- **File**: `src/slic3r/GUI/Jobs/PlaterWorker.hpp`
-- **Lines added**: 17 annotation lines (including formatting changes)
-- **Key findings**: Template worker class for background job processing with wxWidgets events
-- **Verification excerpt**: "// [INTENT] Wrapper job that adds plater-specific processing and logging"
-- **Unity porting hazards identified**: P2 hazard for wxWidgets event system vs Unity Job System
-- **Git commit**: `2ccefda334` - annotate(gui): add Unity mapping annotations to PlaterWorker.hpp
-
-**T103 Progress Summary**:
-- Annotated: PlaterWorker template class and PlaterJob wrapper class
-- Added [INTENT], [THREAD], [EVENT], [UNITY] tags
-
-**Task T101-part4 COMPLETE**
-- Deliverable: `src/slic3r/GUI/GUI_App.cpp` (annotated 6000-8070)
-- Lines added: ~15 annotation lines
-- Key findings: Completes the GUI_App implementation analysis, covering cloud preset synchronization threads, language selection, application mode management, and platform-specific file associations.
-- Verification excerpt: `// [THREAD] Background thread loop for preset synchronization.` and `// [UNITY] Use Unity's Job System or Task.Run with main-thread synchronization for UI notifications.`
-- Unity porting hazards identified: 2 (Native Windows Registry access, complex background synchronization with UI updates)
-- Git: committed as `annotate(gui): complete GUI_App.cpp (6000-8070) (GUI_App.cpp)`
-
-**Cumulative Annotated Files (7/719):**
-1. src/slic3r/GUI/GUI_App.cpp
-2. src/slic3r/GUI/GUI_App.hpp
-3. src/slic3r/GUI/GUI_Init.cpp
-4. src/slic3r/GUI/GUI_Init.hpp
-5. src/slic3r/GUI/Jobs/PlaterWorker.hpp
-6. src/slic3r/GUI/MainFrame.hpp
-7. src/slic3r/GUI/MainFrame.cpp (Parts 1-2)
-
----
-
-**Task T111-part2 COMPLETE**
-- Deliverable: src/slic3r/GUI/MainFrame.cpp (lines 2000-4000)
-- Lines added: 18 annotation lines injected across 6 key functions.
-- Key findings: Implementation of button enable logic (get_enable_slice_status), theme switching, DPI handling, and the complex main menu bar construction.
-- Verification excerpt: "// [PORTING_HAZARD:P2] Rescaling is manually implemented for each panel."
-- Unity porting hazards identified: 1
-- Git: committed as `annotate(gui): document GUI_App menu and styling (MainFrame.cpp 2000-4000)`
-
-**Task T111-part3 COMPLETE**
-- Deliverable: src/slic3r/GUI/MainFrame.cpp (4000-4572)
-- Lines added: ~35 annotation lines
-- Key findings: Finalized MainFrame.cpp; covered configuration loading, tab switching, camera view selection, and file history with parallel thumbnail loading.
-- Verification excerpt: `// [THREAD] Parallel loading of thumbnails for project files using TBB.`
-- Unity porting hazards identified: 1
-- Git: committed as `annotate(gui): finalize MainFrame.cpp (4000-4572) (MainFrame.cpp)`
-
-**Task T120 COMPLETE**
-- **File**: `src/slic3r/GUI/Plater.hpp`
-- **Lines added**: ~25 annotation lines
-- **Key findings**: `Plater` is the central hub for model management and 3D rendering. `Sidebar` handles settings. Both use PIMPL (`struct priv`) to hide wxWidgets complexity, which is a major porting hazard.
-- **Verification excerpt**: `// [PORTING_HAZARD:P2] The 'priv' struct likely contains many wxWidgets objects and event handlers that need decomposition into Unity components.`
-- **Unity porting hazards identified**: 2
-- **Git commit**: 617436cdc7
-
-**Task T121-part1 COMPLETE**
-- **File**: `src/slic3r/GUI/Plater.cpp` (1-2000)
-- **Lines added**: 30 annotation lines
-- **Key findings**: Detailed Sidebar and ExtruderGroup implementation. Extensive use of PIMPL and manual DPI scaling for custom BBL widgets. AMSTray synchronization logic via MachineObject state.
-- **Verification excerpt**: `// [INTENT] Primary synchronization logic for extruder settings from the connected physical machine.`
-- **Unity porting hazards identified**: 2 (PIMPL, Manual DPI)
-- **Git commit**: 182094513a
-
-**Task T121-part2 COMPLETE**
-- **File**: `src/slic3r/GUI/Plater.cpp` (2001-4000)
-- **Lines added**: ~60 annotation lines
-- **Key findings**: Implementation of `Sidebar::msw_rescale` (High-maintenance manual scaling), `build_filament_ams_list` (Hardware/UI mapping), and `sync_ams_list` (Complex preset synchronization). Search bar and object list integration.
-- **Verification excerpt**: `// [PORTING_HAZARD:P1] Manual DPI scaling logic for all sidebar components.`
-- **Unity porting hazards identified**: 3 (Manual DPI, Hardware/UI tight coupling, Complex preset merge logic)
-- **Git commit**: (pending)
-
-**Task T121-part3 COMPLETE**
-- **File**: `src/slic3r/GUI/Plater.cpp` (4001-6000)
-- **Lines added**: ~40 annotation lines
-- **Key findings**: Documented `Plater::priv` state and massive event binding list. Mapped `wxAuiManager` to UI Toolkit and `BackgroundSlicingProcess` to Unity Jobs. Identified P1 hazards in blocking `load_files` logic.
-- **Verification excerpt**: `// [INTENT] Documented Plater::priv state and massive event binding list`
-- **Git commit**: `f6e74fbb34`
-
-**Task T121-part4 COMPLETE**
-- **File**: `src/slic3r/GUI/Plater.cpp` (6001-8000)
-- **Lines added**: ~65 annotation lines
-- **Key findings**: Deeply integrated file loading (3MF, STEP, STL) with complex version/config handling. Core reslicing debounce logic via timers. Central synchronization point between UI state and background slicing process (`update_background_process`).
-- **Verification excerpt**: `// [INTENT] update_background_process - the heart of the slicing state machine synchronization between UI and background worker.`
-- **Unity porting hazards identified**: 2 (Interactive blocking dialogs during load, complex state machine sync)
-- **Git commit**: (pending)
-
-### Loop Checkpoint — Tasks T101–T121-part4
-- Files processed this batch: 1
-- Cumulative annotated: 9
-- Cumulative SKIP_TRIVIAL: 0
-- Cumulative SKIP_VENDORED: 0
-- Total accounted for: 9
-- Manifest total: 719
-- Remaining: 710
-- Loop status: CONTINUING
-
----
-**Note**: Phase 1 annotation work was started in previous iterations. T101-T103 are complete for their respective segments. `GUI_App.cpp` is now fully annotated across 4 task parts.
+**Task P0-T003 COMPLETE**
+- Deliverable: .ralph/agent/agent_journal_gui.md (census results)
+- Lines added: 15
+- Verification excerpt: "P0-T003 MANIFEST TOTAL: 719 files"
+- Git: staged
