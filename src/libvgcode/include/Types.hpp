@@ -19,18 +19,18 @@ static constexpr float PI = 3.141592f;
 // Predefined values for the radius, in mm, of the cylinders used to render the travel moves.
 //
 static constexpr float DEFAULT_TRAVELS_RADIUS_MM = 0.1f;
-static constexpr float MIN_TRAVELS_RADIUS_MM = 0.05f;
-static constexpr float MAX_TRAVELS_RADIUS_MM = 1.0f;
+static constexpr float MIN_TRAVELS_RADIUS_MM     = 0.05f;
+static constexpr float MAX_TRAVELS_RADIUS_MM     = 1.0f;
 
 //
 // Predefined values for the radius, in mm, of the cylinders used to render the wipe moves.
 //
 static constexpr float DEFAULT_WIPES_RADIUS_MM = 0.1f;
-static constexpr float MIN_WIPES_RADIUS_MM = 0.05f;
-static constexpr float MAX_WIPES_RADIUS_MM = 1.0f;
+static constexpr float MIN_WIPES_RADIUS_MM     = 0.05f;
+static constexpr float MAX_WIPES_RADIUS_MM     = 1.0f;
 
-//
-// Vector in 3 dimensions
+// [INTENT] Vector in 3 dimensions
+// [UNITY] Map to UnityEngine.Vector3 (note Y-up vs Z-up coordinate system differences between typical slicers and Unity)
 // [0] -> x
 // [1] -> y
 // [2] -> z
@@ -38,8 +38,8 @@ static constexpr float MAX_WIPES_RADIUS_MM = 1.0f;
 //
 using Vec3 = std::array<float, 3>;
 
-//
-// 4x4 square matrix with elements in column-major order:
+// [INTENT] 4x4 square matrix with elements in column-major order
+// [UNITY] Map to UnityEngine.Matrix4x4
 // | a[0] a[4] a[8]  a[12] |
 // | a[1] a[5] a[9]  a[13] |
 // | a[2] a[6] a[10] a[14] |
@@ -47,8 +47,8 @@ using Vec3 = std::array<float, 3>;
 //
 using Mat4x4 = std::array<float, 16>;
 
-//
-// RGB color
+// [INTENT] RGB color
+// [UNITY] Map to UnityEngine.Color32 for direct byte mapping or UnityEngine.Color for float representation
 // [0] -> red
 // [1] -> green
 // [2] -> blue
@@ -60,8 +60,8 @@ using Color = std::array<uint8_t, 3>;
 //
 using Palette = std::vector<Color>;
 
-//
-// Axis aligned box in 3 dimensions
+// [INTENT] Axis aligned box in 3 dimensions
+// [UNITY] Map to UnityEngine.Bounds
 // [0] -> { min_x, min_y, min_z }
 // [1] -> { max_x, max_y, max_z }
 //
@@ -74,11 +74,9 @@ using AABox = std::array<Vec3, 2>;
 //
 using Interval = std::array<std::size_t, 2>;
 
-//
-// View types
-//
-enum class EViewType : uint8_t
-{
+// [INTENT] View types
+// [UNITY] Port to a C# enum `ViewType`
+enum class EViewType : uint8_t {
     Summary, // ORCA
     FeatureType,
     ColorPrint,
@@ -92,7 +90,7 @@ enum class EViewType : uint8_t
     LayerTimeLogarithmic,
     FanSpeed,
     Temperature,
-// ORCA: Add Pressure Advance visualization support
+    // ORCA: Add Pressure Advance visualization support
     PressureAdvance,
     Tool,
     COUNT
@@ -103,8 +101,7 @@ static constexpr std::size_t VIEW_TYPES_COUNT = static_cast<std::size_t>(EViewTy
 //
 // Move types
 //
-enum class EMoveType : uint8_t
-{
+enum class EMoveType : uint8_t {
     Noop,
     Retract,
     Unretract,
@@ -124,31 +121,30 @@ static constexpr std::size_t MOVE_TYPES_COUNT = static_cast<std::size_t>(EMoveTy
 //
 // Extrusion roles
 //
-enum class EGCodeExtrusionRole : uint8_t
-{
-      // This enum is used as in index into extrusion_roles_visibility.
-      // Better only add things to the end.
-	  None,
-	  Perimeter,
-	  ExternalPerimeter,
-	  OverhangPerimeter,
-	  InternalInfill,
-	  SolidInfill,
-	  TopSolidInfill,
-	  Ironing,
-	  BridgeInfill,
-	  GapFill,
-	  Skirt,
-	  SupportMaterial,
-	  SupportMaterialInterface,
-	  WipeTower,
-	  Custom,
-      // ORCA
-      BottomSurface,
-      InternalBridgeInfill,
-      Brim,
-      SupportTransition,
-      Mixed,
+enum class EGCodeExtrusionRole : uint8_t {
+    // This enum is used as in index into extrusion_roles_visibility.
+    // Better only add things to the end.
+    None,
+    Perimeter,
+    ExternalPerimeter,
+    OverhangPerimeter,
+    InternalInfill,
+    SolidInfill,
+    TopSolidInfill,
+    Ironing,
+    BridgeInfill,
+    GapFill,
+    Skirt,
+    SupportMaterial,
+    SupportMaterialInterface,
+    WipeTower,
+    Custom,
+    // ORCA
+    BottomSurface,
+    InternalBridgeInfill,
+    Brim,
+    SupportTransition,
+    Mixed,
     COUNT
 };
 
@@ -157,8 +153,7 @@ static constexpr std::size_t GCODE_EXTRUSION_ROLES_COUNT = static_cast<std::size
 //
 // Option types
 //
-enum class EOptionType : uint8_t
-{
+enum class EOptionType : uint8_t {
     // This enum is used as in index into options_visibility.
     // Better only add things to the end.
     Travels,
@@ -182,31 +177,21 @@ static constexpr std::size_t OPTION_TYPES_COUNT = static_cast<std::size_t>(EOpti
 //
 // Time modes
 //
-enum class ETimeMode : uint8_t
-{
-    Normal,
-    Stealth,
-    COUNT
-};
+enum class ETimeMode : uint8_t { Normal, Stealth, COUNT };
 
 static constexpr std::size_t TIME_MODES_COUNT = static_cast<std::size_t>(ETimeMode::COUNT);
 
 //
 // Color range types
 //
-enum class EColorRangeType : uint8_t
-{
-    Linear,
-    Logarithmic,
-    COUNT
-};
+enum class EColorRangeType : uint8_t { Linear, Logarithmic, COUNT };
 
 static constexpr std::size_t COLOR_RANGE_TYPES_COUNT = static_cast<std::size_t>(EColorRangeType::COUNT);
 
 //
 // Predefined colors
 //
-static const Color DUMMY_COLOR{ 64, 64, 64 };
+static const Color DUMMY_COLOR{64, 64, 64};
 
 //
 // Mapping from EMoveType to EOptionType

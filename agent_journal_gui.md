@@ -131,3 +131,9 @@
 - Verification excerpt: `// [UNITY] Maps to a C# struct. Data here translates into vertex attributes or compute buffer entries for toolpath mesh generation and shader rendering.`
 - Unity porting hazards identified: 0
 - Git: committed as annotate(gui): document PathVertex struct
+
+**Task T105 COMPLETE**
+- Deliverable: src/libvgcode/include/Types.hpp (annotated)
+- Lines added: 10 comment lines
+- Verification excerpt: "// [UNITY] Map to UnityEngine.Vector3"
+- Git: committed as annotate(gui): document libvgcode Types mapping
