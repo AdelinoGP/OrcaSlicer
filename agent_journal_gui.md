@@ -292,6 +292,7 @@
 - Key findings: Annotated main UI dialog components and UI layout logic for porting.
 - Verification excerpt: "// [UNITY] MsgDialog maps to a MonoBehaviour managing a UI container (e.g., Canvas, Panel)"
 - Git: committed as annotate(gui): document MsgDialog components
+- Verification excerpt: "// [UNITY] Replace with a custom Unity Dialog MonoBehaviour (e.g., UI Toolkit UIDocument or uGUI Canvas based Dialog)."
 - Git: Committed as annotate(gui): document KBShortcutsDialog class intent
 **Task T151 COMPLETE**
 - Deliverable: src/slic3r/GUI/MsgDialog.cpp (annotated)
@@ -299,3 +300,19 @@
 - Key findings: Annotated main UI dialog components and UI layout logic for porting.
 - Verification excerpt: "// [UNITY] MsgDialog maps to a MonoBehaviour managing a UI container (e.g., Canvas, Panel)"
 - Git: committed as annotate(gui): document MsgDialog components
+
+**Task T152 COMPLETE**
+- File: src/slic3r/GUI/MsgDialog.hpp
+- Lines added: 12 comment lines
+- Key findings: Defines the core message and dialog system using wxWidgets, requiring a full UI replacement with Unity's Canvas/Panel system.
+- Verification excerpt: "// [INTENT] Base class for message/query dialogs. [UNITY] Map to Canvas with a modal Panel/UIDocument."
+- Unity porting hazards identified: 10 (Dialog/BoxSizer complexity)
+- Git: committed as annotate(gui): annotate MsgDialog.hpp
+
+**Task T153 COMPLETE**
+- Deliverable: src/slic3r/GUI/PresetComboBoxes.cpp (annotated)
+- Lines added: 30 comment lines (approx)
+- Key findings: Class manages preset selection UI. Key porting issues include platform-specific GTK workarounds (ellipsization) and complex wxWidgets event handling (OnSelect).
+- Verification excerpt: "// [UNITY] Unity equivalent: TMP_Dropdown wrapper in a MonoBehaviour for selection handling and custom UI item rendering."
+- Unity porting hazards identified: 2
+- Git: committed as annotate(gui): document PresetComboBox for Unity porting (PresetComboBoxes.cpp)
