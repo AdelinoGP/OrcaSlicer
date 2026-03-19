@@ -231,8 +231,34 @@ SKIP_TRIVIAL: src/libvgcode/src/GCodeInputData.cpp
 
 **Task T123 COMPLETE**
 - Deliverable: src/libvgcode/src/Range.cpp (annotated)
-- Lines added: 6 comment lines (intents, state, porting hazards)
-- Key findings: Simple range clamping utility with min/max ordering guarantee. Uses C++17 std::clamp - requires port to Mathf.Clamp in Unity.
-- Verification excerpt: "// [PORTING_HAZARD] Uses std::clamp (C++17) - verify target platforms support C++17"
+- Lines added: ~20 comment lines
+- Key findings: Simple range clamping utility. Uses template <class T>. Trivial C# conversion. Unity hazard: memcpy usage requires porting to Array.Copy or Buffer.BlockCopy.
+- Verification excerpt: "// [PORTING_HAZARD] memcpy() used for range clamping - rewrite with Array.Copy() or Buffer.BlockCopy() in C#"
 - Unity porting hazards identified: 1
-- Git: committed as annotate(gui): annotate Range.cpp with porting markers (commit: pending)
+- Git: committed as annotate(gui): annotate Range.cpp with intent/state/porting hazards (commit: b4fbaff976)
+
+**Task T124 COMPLETE**
+- Deliverable: src/libvgcode/src/Range.hpp (annotated)
+- Lines added: 33 comment lines
+- Key findings: Simple header with getters/setters. Mutators use in-place pattern. clamp() modifies parameter - hazard for Unity immutability patterns.
+- Verification excerpt: "// [PORTING_HAZARD] In-place mutation pattern - consider returning new Range instead"
+- Unity porting hazards identified: 1
+- Git: committed as annotate(gui): annotate Range.hpp with intent/state/porting hazards (commit: d5779f9c5a)
+
+**Task T125-T126 COMPLETE**
+- Deliverable: src/libvgcode/src/SegmentTemplate.hpp & .cpp (annotated)
+- Lines added: ~120 comment lines (comprehensive OpenGL documentation)
+- Key findings: Complete OpenGL VAO/VBO geometry management for segment markers. Hourglass geometry stored as template. Instanced rendering. Contains state preservation pattern, GPU resource management, multiple porting hazards for Unity graphics API.
+- Verification excerpt: "// [PORTING_HAZARD] OpenGL state machine doesn't exist in Unity - remove pattern"
+- Unity porting hazards identified: 6 (P2-P3 severity for graphics/API porting)
+- Git: committed as annotate(gui): annotate SegmentTemplate files (T125-T126) - GPU buffer management with OpenGL hazards (commit: 4bbfc5cdcd)
+
+### Loop Checkpoint — Tasks T122–T126
+- Files processed this batch: 5
+- Cumulative annotated: 5
+- Cumulative SKIP_TRIVIAL: 0
+- Cumulative SKIP_VENDORIZED: 0
+- Total accounted for: 20
+- Manifest total: 719
+- Remaining: 699
+- Loop status: CONTINUING

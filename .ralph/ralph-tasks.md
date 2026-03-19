@@ -42,9 +42,9 @@ Last updated: 2026-03-18T23:55:00Z
 - [ ] T121 annotate: src/libvgcode/src/OptionTemplate.hpp
 - [x] T122 annotate: src/libvgcode/src/PathVertex.cpp
 - [x] T123 annotate: src/libvgcode/src/Range.cpp
-- [ ] T124 annotate: src/libvgcode/src/Range.hpp
-- [ ] T125 annotate: src/libvgcode/src/SegmentTemplate.cpp
-- [ ] T126 annotate: src/libvgcode/src/SegmentTemplate.hpp
+- [x] T124 annotate: src/libvgcode/src/Range.hpp
+- [x] T125 annotate: src/libvgcode/src/SegmentTemplate.cpp
+- [x] T126 annotate: src/libvgcode/src/SegmentTemplate.hpp
 - [ ] T127 annotate: src/libvgcode/src/Settings.cpp
 - [ ] T128 annotate: src/libvgcode/src/Settings.hpp
 - [ ] T129 annotate: src/libvgcode/src/ShadersES.hpp
