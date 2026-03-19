@@ -269,3 +269,11 @@ SKIP_TRIVIAL: src/libvgcode/src/GCodeInputData.cpp
 - Key findings: Header-only struct with inline defaults; no direct logic.
 - Verification excerpt: "// [PORTING_HAZARD:P1] All member defaults defined in Settings.hpp - ensure Unity/C# mirrors default values"
 - Unity porting hazards identified: 1
+
+**Task T129 COMPLETE**
+- Deliverable: src/libvgcode/src/ShadersES.hpp (annotated)
+- Lines added: 1 new, -5 old (mostly header edits)
+- Key findings: File defines GLSL shader strings. Needs URP HLSL translation.
+- Verification excerpt: "// [UNITY] These GLSL shaders require conversion to URP HLSL / ShaderGraph."
+- Unity porting hazards identified: 1 (Shader syntax incompatibility)
+- Git: committed as annotate(gui): enhance shader annotations (ShadersES.hpp)
