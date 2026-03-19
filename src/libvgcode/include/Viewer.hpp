@@ -19,13 +19,15 @@ struct ColorPrint;
 
 class Viewer
 {
+    // [INTENT] Main public interface for the G-code visualization component.
+    // [UNITY] Maps to a primary MonoBehaviour or rendering system (e.g., GCodeViewerSystem) managing visualization state and data.
 public:
     Viewer();
     ~Viewer();
-    Viewer(const Viewer& other) = delete;
-    Viewer(Viewer&& other) = delete;
-    Viewer& operator = (const Viewer& other) = delete;
-    Viewer& operator = (Viewer&& other) = delete;
+    Viewer(const Viewer& other)            = delete;
+    Viewer(Viewer&& other)                 = delete;
+    Viewer& operator=(const Viewer& other) = delete;
+    Viewer& operator=(Viewer&& other)      = delete;
 
     //
     // Initialize the viewer.
@@ -74,13 +76,13 @@ public:
     // See: EViewType
     //
     EViewType get_view_type() const;
-    void set_view_type(EViewType type);
+    void      set_view_type(EViewType type);
     //
     // Time mode
     // See: ETimeMode
     //
     ETimeMode get_time_mode() const;
-    void set_time_mode(ETimeMode mode);
+    void      set_time_mode(ETimeMode mode);
     //
     // Top layer only
     // Whether or not the visible range is limited to the current top layer only.
@@ -240,12 +242,12 @@ public:
     // Full is the range of vertices that could potentially be visualized accordingly to the current settings.
     // Enabled is the part of the full range that is selected for visualization accordingly to the current settings.
     // Visible is the part of the enabled range that is actually visualized accordingly to the current settings.
-    // 
+    //
     const Interval& get_view_visible_range() const;
     //
     // Set the current visible range.
     // Values are clamped to the current view enabled range;
-    // 
+    //
     void set_view_visible_range(Interval::value_type min, Interval::value_type max);
     //
     // Return the current full range.
@@ -362,23 +364,23 @@ public:
     //
     // Return the axes aligned bounding box containing all the given types.
     //
-    AABox get_bounding_box(const std::vector<EMoveType>& types = {
-        EMoveType::Retract, EMoveType::Unretract, EMoveType::Seam, EMoveType::ToolChange,
-        EMoveType::ColorChange, EMoveType::PausePrint, EMoveType::CustomGCode, EMoveType::Travel,
-        EMoveType::Wipe, EMoveType::Extrude }) const;
+    AABox get_bounding_box(const std::vector<EMoveType>& types = {EMoveType::Retract, EMoveType::Unretract, EMoveType::Seam,
+                                                                  EMoveType::ToolChange, EMoveType::ColorChange, EMoveType::PausePrint,
+                                                                  EMoveType::CustomGCode, EMoveType::Travel, EMoveType::Wipe,
+                                                                  EMoveType::Extrude}) const;
     //
     // Return the axes aligned bounding box containing all the extrusions with the given roles.
     //
-    AABox get_extrusion_bounding_box(const std::vector<EGCodeExtrusionRole>& roles = {
-        EGCodeExtrusionRole::Perimeter, EGCodeExtrusionRole::ExternalPerimeter, EGCodeExtrusionRole::OverhangPerimeter,
-        EGCodeExtrusionRole::InternalInfill, EGCodeExtrusionRole::SolidInfill, EGCodeExtrusionRole::TopSolidInfill,
-        EGCodeExtrusionRole::Ironing, EGCodeExtrusionRole::BridgeInfill, EGCodeExtrusionRole::GapFill,
-        EGCodeExtrusionRole::Skirt, EGCodeExtrusionRole::SupportMaterial, EGCodeExtrusionRole::SupportMaterialInterface,
-        EGCodeExtrusionRole::WipeTower, EGCodeExtrusionRole::Custom,
-        // ORCA
-        EGCodeExtrusionRole::BottomSurface, EGCodeExtrusionRole::InternalBridgeInfill, EGCodeExtrusionRole::Brim,
-        EGCodeExtrusionRole::SupportTransition, EGCodeExtrusionRole::Mixed
-    }) const;
+    AABox get_extrusion_bounding_box(
+        const std::vector<EGCodeExtrusionRole>& roles =
+            {EGCodeExtrusionRole::Perimeter, EGCodeExtrusionRole::ExternalPerimeter, EGCodeExtrusionRole::OverhangPerimeter,
+             EGCodeExtrusionRole::InternalInfill, EGCodeExtrusionRole::SolidInfill, EGCodeExtrusionRole::TopSolidInfill,
+             EGCodeExtrusionRole::Ironing, EGCodeExtrusionRole::BridgeInfill, EGCodeExtrusionRole::GapFill, EGCodeExtrusionRole::Skirt,
+             EGCodeExtrusionRole::SupportMaterial, EGCodeExtrusionRole::SupportMaterialInterface, EGCodeExtrusionRole::WipeTower,
+             EGCodeExtrusionRole::Custom,
+             // ORCA
+             EGCodeExtrusionRole::BottomSurface, EGCodeExtrusionRole::InternalBridgeInfill, EGCodeExtrusionRole::Brim,
+             EGCodeExtrusionRole::SupportTransition, EGCodeExtrusionRole::Mixed}) const;
     //
     // Return the size of the used cpu memory, in bytes
     //
@@ -401,25 +403,25 @@ public:
     Vec3 get_cog_position() const;
 
     float get_cog_marker_scale_factor() const;
-    void set_cog_marker_scale_factor(float factor);
+    void  set_cog_marker_scale_factor(float factor);
 
     const Vec3& get_tool_marker_position() const;
 
     float get_tool_marker_offset_z() const;
-    void set_tool_marker_offset_z(float offset_z);
+    void  set_tool_marker_offset_z(float offset_z);
 
     float get_tool_marker_scale_factor() const;
-    void set_tool_marker_scale_factor(float factor);
+    void  set_tool_marker_scale_factor(float factor);
 
     const Color& get_tool_marker_color() const;
-    void set_tool_marker_color(const Color& color);
+    void         set_tool_marker_color(const Color& color);
 
     float get_tool_marker_alpha() const;
-    void set_tool_marker_alpha(float alpha);
+    void  set_tool_marker_alpha(float alpha);
 #endif // VGCODE_ENABLE_COG_AND_TOOL_MARKERS
 
 private:
-    ViewerImpl* m_impl{ nullptr };
+    ViewerImpl* m_impl{nullptr};
 };
 
 } // namespace libvgcode
