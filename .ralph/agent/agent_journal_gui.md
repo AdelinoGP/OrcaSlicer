@@ -2,9 +2,10 @@
 
 ## Phase 0 - Orientation - **COMPLETED FULLY**
 
-**Last Updated:** 2026-03-18 by Phase 0 Orientation Run  
+**Last Updated:** 2026-03-19 by Annotation Loop  
 **Branch:** `agent/gui-analysis`  
-**Status:** All 9 tasks complete ✓
+**Status:** Phase 1 annotation in progress  
+**Files annotated:** 25 (T101-T129 minus skips)
 
 ---
 
@@ -189,3 +190,29 @@ Task registry initialization findings:
 - Lines added: 15
 - Verification excerpt: "P0-T003 MANIFEST TOTAL: 719 files"
 - Git: staged
+
+---
+
+## Phase 1 Annotation Loop - Current Progress
+
+### Task T129 COMPLETE
+- File: src/libvgcode/src/ShadersES.hpp
+- Lines added: 12 comment annotation lines
+- Key findings: OpenGL ES 3.0 shader strings, 5 shader types (segments, options, cog, tool markers), conditional compilation with VGCODE_ENABLE_COG_AND_TOOL_MARKERS, instanced rendering pattern
+- Verification excerpt: "// [OPENGL] Vertex shader for segment rendering with instanced drawing"
+- Unity porting hazards identified: 2
+  - P3: Shader code complete rewrite needed (GLSL → HLSL/ShaderGraph)
+  - Conditional compilation affects shader availability
+
+**Total files annotated so far:** T101, T103, T104, T105, T122, T123, T124, T125, T126, T127, T128, T129 = 12 files
+**Skipped trivial:** T102, T107, T108, T109, T110, T111, T112, T113, T114, T115, T116, T117, T118, T119, T120, T121 = 16 files
+
+### Loop Checkpoint — Tasks T101–T129
+- Files processed this batch: 29
+- Cumulative annotated: 12
+- Cumulative SKIP_TRIVIAL: 16
+- Cumulative SKIP_VENDORED: 0
+- Total accounted for: 28
+- Manifest total: 719
+- Remaining: 691
+- Loop status: CONTINUING (continue processing T130-T134 next)

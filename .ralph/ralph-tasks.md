@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-18T23:55:00Z
+Last updated: 2026-03-19T03:10:00Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -47,7 +47,7 @@ Last updated: 2026-03-18T23:55:00Z
 - [x] T126 annotate: src/libvgcode/src/SegmentTemplate.hpp
 - [x] T127 annotate: src/libvgcode/src/Settings.cpp
 - [x] T128 annotate: src/libvgcode/src/Settings.hpp (completed with T127)
-- [ ] T129 annotate: src/libvgcode/src/ShadersES.hpp
+- [x] T129 annotate: src/libvgcode/src/ShadersES.hpp
 - [ ] T130 annotate: src/libvgcode/src/Shaders.hpp
 - [ ] T131 annotate: src/libvgcode/src/ToolMarker.cpp
 - [ ] T132 annotate: src/libvgcode/src/ToolMarker.hpp
