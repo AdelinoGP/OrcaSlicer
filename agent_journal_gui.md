@@ -137,3 +137,47 @@
 - Lines added: 10 comment lines
 - Verification excerpt: "// [UNITY] Map to UnityEngine.Vector3"
 - Git: committed as annotate(gui): document libvgcode Types mapping
+SKIP_TRIVIAL: src/libvgcode/src/Bitset.cpp
+**Task T108 COMPLETE**
+- Deliverable: src/libvgcode/src/Bitset.hpp (annotated)
+- Lines added: ~15 comment lines
+- Key findings: Class provides bitwise operations with atomic support. Requires C# Interlocked and bit manipulation for porting.
+- Verification excerpt: "// [THREAD] Atomic operations, ensure thread-safety."
+- Git: committed
+**Task T109 COMPLETE**
+- Deliverable: src/libvgcode/src/CogMarker.cpp (annotated)
+- Lines added: ~20 comment lines
+- Key findings: Class manages GPU resources for a sphere marker. Requires complete rewrite for Unity Mesh API.
+- Verification excerpt: "// [UNITY] Use a MonoBehaviour or ScriptableObject to manage procedural Mesh generation and rendering."
+- Git: committed
+**Task T110 COMPLETE**
+- Deliverable: src/libvgcode/src/CogMarker.hpp (annotated)
+- Lines added: ~20 comment lines
+- Key findings: Class definition for CogMarker. Requires Unity Mesh-based replacement for GPU buffer management.
+- Verification excerpt: "// [INTENT] CogMarker class manages the sphere marker geometry and CoG calculation."
+- Git: committed
+SKIP_TRIVIAL: src/libvgcode/src/ColorPrint.cpp
+**Task T112 COMPLETE**
+- Deliverable: src/libvgcode/src/ColorRange.cpp (annotated)
+- Lines added: ~10 comment lines
+- Key findings: Maps numerical values to colors. Needs C# Gradient-based equivalent for Unity.
+- Verification excerpt: "// [UNITY] Use Unity's Gradient class or a custom C# class that implements linear/logarithmic color interpolation."
+- Git: committed
+SKIP_TRIVIAL: src/libvgcode/src/ExtrusionRoles.cpp
+SKIP_TRIVIAL: src/libvgcode/src/ExtrusionRoles.hpp
+SKIP_TRIVIAL: src/libvgcode/src/GCodeInputData.cpp
+**Task T116 COMPLETE**
+- Deliverable: src/libvgcode/src/Layers.cpp (annotated)
+- Lines added: ~5 comment lines
+- Key findings: Aggregates layer information. Requires careful sequential data handling in Unity.
+- Verification excerpt: "// [INTENT] Layers aggregates G-code layer data (Z-height, time, color print options)."
+- Git: committed
+### Loop Checkpoint — Tasks T107–T116
+- Files processed this batch: 10
+- Cumulative annotated: 5
+- Cumulative SKIP_TRIVIAL: 5
+- Cumulative SKIP_VENDORED: 0
+- Total accounted for: 10
+- Manifest total: 719
+- Remaining: 709
+- Loop status: CONTINUING
