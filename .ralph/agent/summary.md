@@ -2,7 +2,7 @@
 
 **Status:** Completed successfully
 **Iterations:** 1
-**Duration:** 1m 54s
+**Duration:** 2m 23s
 
 ## Tasks
 
@@ -14,4 +14,4 @@ _No events recorded._
 
 ## Final Commit
 
-de3a94b1fc: annotate(gui): document AboutDialog GUI components (AboutDialog.cpp)
+6536027715: annotate(gui): document AboutDialog (AboutDialog.hpp)

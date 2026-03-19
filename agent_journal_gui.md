@@ -1,8 +1,18 @@
 
-**Task T143 COMPLETE**
-- File: src/slic3r/GUI/AboutDialog.cpp
-- Lines added: 16 comment lines (approx)
-- Key findings: Annotated AboutDialog classes for Unity porting mapping. AboutDialogLogo, CopyrightsDialog, and AboutDialog components need mapping to Unity UI Toolkit or Canvas equivalents.
-- Verification excerpt: "// [UNITY] Use UnityEngine.UI.Image with custom MonoBehaviour for drawing logic."
-- Unity porting hazards identified: 2 (Paint events, Rich text/HTML rendering)
-- Git: committed as annotate(gui): document AboutDialog GUI components (AboutDialog.cpp)
+**Task T144 COMPLETE**
+- Deliverable: src/slic3r/GUI/AboutDialog.hpp (annotated)
+- Lines added: 69 lines (diff output suggests 96-27 = 69 lines)
+- Key findings: AboutDialog uses wxWidgets Dialog (DPIDialog) and HTML window. Porting to Unity will require a custom UI for the About box, potentially using Unity UI Toolkit.
+- Verification excerpt: "// [PORTING_HAZARD:P1] wxHtmlWindow is not directly equivalent in Unity."
+- Unity porting hazards identified: 2
+- Git: committed as annotate(gui): document AboutDialog (AboutDialog.hpp)
+
+### Loop Checkpoint — Tasks T144
+- Files processed this batch: 1
+- Cumulative annotated: 1
+- Cumulative SKIP_TRIVIAL: 0
+- Cumulative SKIP_VENDORED: 0
+- Total accounted for: 1
+- Manifest total: 719
+- Remaining: 718
+- Loop status: CONTINUING
