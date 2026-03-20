@@ -1512,3 +1512,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 2 (P2 reliance on global `wxGetApp` services, P3 blocking `Methods[m_method_id].findfn`).
 - Git: annotate: RotoptimizeJob job lifecycle (T449)
 - Next recommended Phase 1 task: T450 annotate: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp
+
+## Phase 1 - Task T114 complete
+- Task type: annotate
+- File: src/libvgcode/src/ExtrusionRoles.hpp
+- Deliverables: src/libvgcode/src/ExtrusionRoles.hpp
+- Substantive additions: 6 targeted annotations (INTENT, STATE, THREAD, EVENT, UNITY, PORTING_HAZARD)
+- Verification excerpt: // [INTENT] Aggregate the duration signatures of every extrusion role so the UI/metrics layers can interpret gcode commands and schedule animations consistently.
+- Unity-impact summary:
+  - Mirror the per-role duration map as a ScriptableObject-backed dictionary and keep the C# `ETimeMode` sentinel synchronized with the native enum so ported indexing matches `Item.times`.
+  - Copy the stored map before exposing it to Unity UI/animation threads so the port avoids concurrent reads/writes when the slicer updates role timings.
+- Hazards found: 2 (P3 multi-thread access, P3 sentinel mismatch that will crash `get_time`).
+- Git: Annotate ExtrusionRoles header for Unity port
+- Next recommended Phase 1 task: T115 annotate: src/libvgcode/src/GCodeInputData.cpp
