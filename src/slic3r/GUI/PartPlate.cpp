@@ -748,6 +748,9 @@ void PartPlate::render_background(bool force_default_color)
     glsafe(::glDepthMask(GL_TRUE));
 }
 
+// [INTENT] Renders the plate logo texture, including handling of SVG/PNG formats and asynchronous GPU texture transfer.
+// [OPENGL] Uses glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA), glDepthMask, and glBindTexture.
+// [UNITY] Use a dedicated UI Layer/Canvas for the logo, with a Texture2D assigned to a Material.
 void PartPlate::render_logo_texture(GLTexture& logo_texture, GLModel& logo_buffer, bool bottom)
 {
     // check valid
