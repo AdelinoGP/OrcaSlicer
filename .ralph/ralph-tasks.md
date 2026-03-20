@@ -64,7 +64,7 @@ Last updated: 2026-03-19T03:10:00Z
 - [ ] T143 annotate: src/slic3r/GUI/3DBed.cpp
 - [ ] T144 annotate: src/slic3r/GUI/3DBed.hpp
 - [ ] T145 annotate: src/slic3r/GUI/3DScene.cpp
-- [ ] T146 annotate: src/slic3r/GUI/3DScene.hpp
+- [x] T146 annotate: src/slic3r/GUI/3DScene.hpp
 - [x] T147 annotate: src/slic3r/GUI/AboutDialog.cpp
 - [ ] T148 annotate: src/slic3r/GUI/AboutDialog.hpp
 - [x] T149 annotate: src/slic3r/GUI/KBShortcutsDialog.cpp

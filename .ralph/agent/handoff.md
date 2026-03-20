@@ -1,11 +1,11 @@
 # Session Handoff
 
-_Generated: 2026-03-20 06:30:46 UTC_
+_Generated: 2026-03-20 07:11:02 UTC_
 
 ## Git Context
 
 - **Branch:** `agent/gui-analysis`
-- **HEAD:** fbcb4dabaa: chore: auto-commit before merge (loop primary)
+- **HEAD:** daefa5cfb0: chore: auto-commit before merge (loop primary)
 
 ## Tasks
 
@@ -135,11 +135,15 @@ _Generated: 2026-03-20 06:30:46 UTC_
 - [x] T167 annotate: src/slic3r/GUI/GUI_ObjectList.cpp
 - [x] T168 annotate: src/slic3r/GUI/GUI_ObjectList.hpp
 - [x] T171 annotate: src/slic3r/GUI/PartPlate.cpp
+- [x] T175 annotate: src/slic3r/GUI/ImGuiWrapper.cpp
+- [x] T176 annotate: src/slic3r/GUI/ImGuiWrapper.hpp
 - [x] T356 annotate: src/slic3r/GUI/GLCanvas3D.cpp
 - [x] T357 annotate: src/slic3r/GUI/GLCanvas3D.hpp
 - [x] T370 annotate: src/slic3r/GUI/GUI_App.cpp
 - [x] T371 annotate: src/slic3r/GUI/GUI_App.hpp
 - [x] T378 annotate: src/slic3r/GUI/GUI.cpp
+- [x] T415 annotate: src/slic3r/GUI/ImGuiWrapper.cpp
+- [x] T416 annotate: src/slic3r/GUI/ImGuiWrapper.hpp
 - [x] T464 annotate: src/slic3r/GUI/MainFrame.cpp
 - [x] T465 annotate: src/slic3r/GUI/MainFrame.hpp
 - [x] T170 skip-trivial: src/slic3r/GUI/GUI_ObjectManipulation.hpp
@@ -158,8 +162,6 @@ _Generated: 2026-03-20 06:30:46 UTC_
 - [ ] T172 annotate: src/slic3r/GUI/PartPlate.hpp
 - [~] T173 annotate: src/slic3r/GUI/PalmTree.cpp
 - [ ] T174 annotate: src/slic3r/GUI/PalmTree.hpp
-- [ ] T175 annotate: src/slic3r/GUI/ImGuiWrapper.cpp
-- [ ] T176 annotate: src/slic3r/GUI/ImGuiWrapper.hpp
 - [ ] T177 annotate: src/slic3r/GUI/InputArchive.cpp
 - [ ] T178 annotate: src/slic3r/GUI/InputArchive.hpp
 - [ ] T179 annotate: src/slic3r/GUI/Jobs/ArrangeJob.cpp
@@ -293,8 +295,6 @@ _Generated: 2026-03-20 06:30:46 UTC_
 - [ ] T412 annotate: src/slic3r/GUI/ImageDPIFrame.cpp
 - [ ] T413 annotate: src/slic3r/GUI/ImageDPIFrame.hpp
 - [ ] T414 annotate: src/slic3r/GUI/ImageGrid.cpp
-- [ ] T415 annotate: src/slic3r/GUI/ImGuiWrapper.cpp
-- [ ] T416 annotate: src/slic3r/GUI/ImGuiWrapper.hpp
 - [ ] T417 annotate: src/slic3r/GUI/IMSlider.cpp
 - [ ] T418 annotate: src/slic3r/GUI/IMSlider.hpp
 - [ ] T419 annotate: src/slic3r/GUI/IMToolbar.cpp
@@ -707,22 +707,22 @@ _Generated: 2026-03-20 06:30:46 UTC_
 Recently modified:
 
 - `.ralph/agent/handoff.md`
-- `.ralph/agent/memories.md`
 - `.ralph/agent/scratchpad.md`
 - `.ralph/agent/summary.md`
 - `.ralph/agent/tasks.jsonl`
 - `.ralph/current-events`
 - `.ralph/current-loop-id`
-- `.ralph/events-20260320-055618.jsonl`
 - `.ralph/events-20260320-060506.jsonl`
 - `.ralph/events-20260320-060606.jsonl`
+- `.ralph/events-20260320-062836.jsonl`
+- `.ralph/events-20260320-063829.jsonl`
 
 ## Next Session
 
 The following prompt can be used to continue where this session left off:
 
 ```
-Continue the previous work. Remaining tasks (555):
+Continue the previous work. Remaining tasks (551):
 - P0-T006: Main Window Class Identification
 - T106 annotate: src/libvgcode/include/Viewer.hpp
 - T132 annotate: src/libvgcode/src/ToolMarker.hpp
@@ -735,8 +735,6 @@ Continue the previous work. Remaining tasks (555):
 - T172 annotate: src/slic3r/GUI/PartPlate.hpp
 - T173 annotate: src/slic3r/GUI/PalmTree.cpp
 - T174 annotate: src/slic3r/GUI/PalmTree.hpp
-- T175 annotate: src/slic3r/GUI/ImGuiWrapper.cpp
-- T176 annotate: src/slic3r/GUI/ImGuiWrapper.hpp
 - T177 annotate: src/slic3r/GUI/InputArchive.cpp
 - T178 annotate: src/slic3r/GUI/InputArchive.hpp
 - T179 annotate: src/slic3r/GUI/Jobs/ArrangeJob.cpp
@@ -870,8 +868,6 @@ Continue the previous work. Remaining tasks (555):
 - T412 annotate: src/slic3r/GUI/ImageDPIFrame.cpp
 - T413 annotate: src/slic3r/GUI/ImageDPIFrame.hpp
 - T414 annotate: src/slic3r/GUI/ImageGrid.cpp
-- T415 annotate: src/slic3r/GUI/ImGuiWrapper.cpp
-- T416 annotate: src/slic3r/GUI/ImGuiWrapper.hpp
 - T417 annotate: src/slic3r/GUI/IMSlider.cpp
 - T418 annotate: src/slic3r/GUI/IMSlider.hpp
 - T419 annotate: src/slic3r/GUI/IMToolbar.cpp
@@ -1282,37 +1278,16 @@ Continue the previous work. Remaining tasks (555):
 Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Port Preparation## Phase BoundaryThis prompt governs **Phase 1 only**.- Phase 0 is already complete.- Do **not** revisit Phase 0...
 ```
 
-## Phase 1 - Task T176 complete
+## Phase 1 - Task T204 complete
 - Task type: annotate
-- File: src/slic3r/GUI/ImGuiWrapper.hpp
-- Deliverables: src/slic3r/GUI/ImGuiWrapper.hpp
-- Substantive additions: 15 annotations covering intent, state, event flow, and unity mapping.
-- Verification excerpt: [UNITY] Maps to a MonoBehaviour (e.g., ImGuiManager) that handles NewFrame/Render in the Update/OnGUI loop.
+- File: src/slic3r/GUI/3DScene.hpp
+- Deliverables: src/slic3r/GUI/3DScene.hpp
+- Substantive additions: 8 annotations covering intent, state, transforms, IDs, rendering, and Unity mapping.
+- Verification excerpt: "// [INTENT] Represents a single renderable volume in the 3D scene (e.g., a part, support, or modifier)."
 - Unity-impact summary:
-  - Transition from manual wxWidgets event propagation to Unity's native Input System.
-  - Replacement of raw OpenGL texture management for fonts with Unity's Font/TMP system.
-  - Conversion of BBL custom widgets to Prefabs or UI Toolkit templates.
-- Hazards found: 1 (P2 - manual event synchronization).
-- Git: annotate(gui): document ImGuiWrapper interface (src/slic3r/GUI/ImGuiWrapper.hpp)
-- Next recommended Phase 1 task: T175 annotate: src/slic3r/GUI/ImGuiWrapper.cpp
-
-## Phase 1 - Task T175 complete
-- Task type: annotate
-- File: src/slic3r/GUI/ImGuiWrapper.cpp
-- Deliverables: src/slic3r/GUI/ImGuiWrapper.cpp
-- Substantive additions: 10+ annotations covering implementation details, GL state management, and event bridging.
-- Verification excerpt: [OPENGL] Manages GPU state: backups current state, sets up blending/scissor/viewport for UI, and restores state after draw calls.
-- Unity-impact summary:
-  - Complex raw OpenGL state management (backups/restores) is eliminated in Unity.
-  - Native Unity UI (UGUI or UI Toolkit) handles high-DPI scaling and screen-to-framebuffer mapping automatically.
-  - Custom ImGui widgets should be ported to Unity's UI component model.
-- Hazards found: 1 (P2 - Raw OpenGL state complexity).
-- Git: annotate(gui): document ImGuiWrapper implementation (src/slic3r/GUI/ImGuiWrapper.cpp)
-- Next recommended Phase 1 task: T177 annotate: src/slic3r/GUI/InputArchive.cpp
-
-## Phase 1 Reconciliation
-- Reconciled duplicate tasks for `ImGuiWrapper` in `tasks.jsonl` and `ralph-tasks.md`.
-- `ImGuiWrapper` was documented as `T415/T416` in `ralph-tasks.md` but also existed as `T175/T176` in `tasks.jsonl`.
-- Work completed for `src/slic3r/GUI/ImGuiWrapper.hpp` and `src/slic3r/GUI/ImGuiWrapper.cpp`.
-- Canonical Phase 1 tasks `T415` and `T416` marked as DONE.
-- `T175/T176` in `tasks.jsonl` were also closed to avoid confusion, but they refer to `BBLTopbar` in the markdown. I will handle `BBLTopbar` separately if needed.
+  - GLVolume maps to GameObject + MeshFilter + MeshRenderer.
+  - Transformation matrices map to Unity Transform component.
+  - GLVolumeCollection maps to a Manager script or parent GameObject.
+- Hazards found: P2 severity for mapping OrcaSlicer's CompositeID/GeometryID fingerprinting to Unity's mesh update lifecycle.
+- Git: annotate src/slic3r/GUI/3DScene.hpp for Phase 1
+- Next recommended Phase 1 task: T203 src/slic3r/GUI/Gizmos/3DScene.cpp

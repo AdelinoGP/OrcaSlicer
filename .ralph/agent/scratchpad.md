@@ -1,29 +1,16 @@
+# Ralph Scratchpad — OrcaSlicer GUI Analysis
 
-## Iteration Analysis: Phase 1 Annotation
+## Current Understanding (2026-03-20)
+- Objective: Phase 1 — GUI File-by-File Annotation for Unity Port Preparation.
+- Target: `src/slic3r/GUI/3DScene.hpp` (Task ID: `task-1773880086-41c7`, Key: `gui:T204`).
+- Priority: 2 (Viewport / OpenGL rendering and input).
+- File location: Found at `src/slic3r/GUI/3DScene.hpp` via `glob`.
 
-### Current State
-- The repository has 724 files missing from the `Phase 1` coverage in `ralph-tasks.md` according to the audit command (with fixed regex for dash).
-- Many files (like `ColorRange.hpp`, `Plater.cpp`, `GUI_App.hpp`) are ALREADY annotated in the filesystem but are marked as `[ ]` (pending) or `[in_progress]` (stale) in `ralph-tasks.md`.
-- No `handoff.md` evidence blocks for these completed files were found in the recent history.
-- `ralph tools task ready` reports "No ready tasks", possibly due to inconsistent state or loop ID filtering.
-
-### Plan
-1.  **Reconcile Task Registry**: I'll pick a high-priority unannotated file to demonstrate progress while also investigating why others are not marked.
-2.  **Selected File**: `src/slic3r/GUI/ImGuiWrapper.hpp` (T176).
-    - Category: Viewport / OpenGL rendering and input (Priority 2).
-    - Status: Not annotated in the file.
-3.  **Task Management**:
-    - Update `ralph-tasks.md`: Set `T176` to `[~] ACTIVE`.
-    - Run `ralph tools task start task-1773880086-c35b`.
-4.  **Implementation**:
-    - Read `src/slic3r/GUI/ImGuiWrapper.hpp`.
-    - Annotate with `[INTENT]`, `[STATE]`, `[EVENT]`, `[THREAD]`, `[OPENGL]`, `[UNITY]`, `[PORTING_HAZARD]`.
-5.  **Verification**:
-    - Ensure all required categories are covered.
-    - Commit with `annotate(gui): document ImGuiWrapper interface (src/slic3r/GUI/ImGuiWrapper.hpp)`.
-    - Update `handoff.md` with evidence block.
-    - Close task.
-
-### Note on Reconciliation
-I'll reconcile the already annotated files as I encounter them. If I find a file that is annotated but marked as `[ ]` in `ralph-tasks.md`, I'll update the registry to `[x]` and add an evidence block if it seems complete. This will speed up the audit.
-
+## Plan
+1. Mark task `task-1773880086-41c7` as `in_progress`.
+2. Read `src/slic3r/GUI/3DScene.hpp` to understand its logic, state, and event flow.
+3. Annotate with `[INTENT]`, `[STATE]`, `[EVENT]`, `[THREAD]`, `[OPENGL]`, `[UNITY]`, and `[PORTING_HAZARD]`.
+4. Verify the annotations meet the standard (all required categories).
+5. Append completion evidence to `handoff.md`.
+6. Commit the annotated file.
+7. Close the task.
