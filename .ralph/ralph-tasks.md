@@ -439,7 +439,7 @@ Last updated: 2026-03-19T03:10:00Z
 - [ ] T518 annotate: src/slic3r/GUI/ParamsDialog.hpp
 - [ ] T519 annotate: src/slic3r/GUI/ParamsPanel.cpp
 - [ ] T520 annotate: src/slic3r/GUI/ParamsPanel.hpp
-- [ ] T521 annotate: src/slic3r/GUI/PartPlate.cpp
+- [~] T521 annotate: src/slic3r/GUI/PartPlate.cpp
 - [ ] T522 annotate: src/slic3r/GUI/PartPlate.hpp
 - [ ] T523 annotate: src/slic3r/GUI/PartSkipCommon.hpp
 - [ ] T524 annotate: src/slic3r/GUI/PartSkipDialog.cpp
