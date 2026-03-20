@@ -20,26 +20,26 @@ Last updated: 2026-03-19T03:10:00Z
 
 ## Phase 1 — Annotation
 - [x] T101 annotate: src/libvgcode/include/ColorPrint.hpp
-- [ ] T102 annotate: src/libvgcode/include/ColorRange.hpp
+- [x] T102 annotate: src/libvgcode/include/ColorRange.hpp
 - [x] T103 annotate: src/libvgcode/include/GCodeInputData.hpp
 - [x] T104 annotate: src/libvgcode/include/PathVertex.hpp
 - [x] T105 annotate: src/libvgcode/include/Types.hpp
-- [ ] T106 annotate: src/libvgcode/include/Viewer.hpp
-- [ ] T107 annotate: src/libvgcode/src/Bitset.cpp
-- [ ] T108 annotate: src/libvgcode/src/Bitset.hpp
-- [ ] T109 annotate: src/libvgcode/src/CogMarker.cpp
-- [ ] T110 annotate: src/libvgcode/src/CogMarker.hpp
-- [ ] T111 annotate: src/libvgcode/src/ColorPrint.cpp
-- [ ] T112 annotate: src/libvgcode/src/ColorRange.cpp
+- [x] T106 annotate: src/libvgcode/include/Viewer.hpp
+- [x] T107 skip-trivial: src/libvgcode/src/Bitset.cpp
+- [x] T108 annotate: src/libvgcode/src/Bitset.hpp
+- [x] T109 annotate: src/libvgcode/src/CogMarker.cpp
+- [x] T110 annotate: src/libvgcode/src/CogMarker.hpp
+- [x] T111 annotate: src/libvgcode/src/ColorPrint.cpp
+- [x] T112 annotate: src/libvgcode/src/ColorRange.cpp
 - [ ] T113 annotate: src/libvgcode/src/ExtrusionRoles.cpp
 - [ ] T114 annotate: src/libvgcode/src/ExtrusionRoles.hpp
-- [ ] T115 annotate: src/libvgcode/src/GCodeInputData.cpp
-- [ ] T116 annotate: src/libvgcode/src/Layers.cpp
-- [ ] T117 annotate: src/libvgcode/src/Layers.hpp
-- [ ] T118 annotate: src/libvgcode/src/OpenGLUtils.cpp
-- [ ] T119 annotate: src/libvgcode/src/OpenGLUtils.hpp
-- [ ] T120 annotate: src/libvgcode/src/OptionTemplate.cpp
-- [ ] T121 annotate: src/libvgcode/src/OptionTemplate.hpp
+- [x] T115 skip-trivial: src/libvgcode/src/GCodeInputData.cpp
+- [x] T116 annotate: src/libvgcode/src/Layers.cpp
+- [x] T117 annotate: src/libvgcode/src/Layers.hpp
+- [x] T118 annotate: src/libvgcode/src/OpenGLUtils.cpp
+- [x] T119 annotate: src/libvgcode/src/OpenGLUtils.hpp
+- [x] T120 annotate: src/libvgcode/src/OptionTemplate.cpp
+- [x] T121 annotate: src/libvgcode/src/OptionTemplate.hpp
 - [x] T122 annotate: src/libvgcode/src/PathVertex.cpp
 - [x] T123 annotate: src/libvgcode/src/Range.cpp
 - [x] T124 annotate: src/libvgcode/src/Range.hpp
@@ -55,10 +55,10 @@ Last updated: 2026-03-19T03:10:00Z
 - [x] T134 annotate: src/libvgcode/src/Utils.cpp
 - [x] T135 annotate: src/libvgcode/src/Utils.hpp
 - [x] T136 annotate: src/libvgcode/src/Viewer.cpp
-- [ ] T137 annotate: src/libvgcode/src/ViewerImpl.cpp
-- [ ] T138 annotate: src/libvgcode/src/ViewerImpl.hpp
-- [ ] T139 annotate: src/libvgcode/src/ViewRange.cpp
-- [ ] T140 annotate: src/libvgcode/src/ViewRange.hpp
+- [x] T137 annotate: src/libvgcode/src/ViewerImpl.cpp
+- [x] T138 annotate: src/libvgcode/src/ViewerImpl.hpp
+- [x] T139 annotate: src/libvgcode/src/ViewRange.cpp
+- [x] T140 annotate: src/libvgcode/src/ViewRange.hpp
 - [ ] T141 annotate: src/slic3r/GUI/2DBed.cpp
 - [ ] T142 annotate: src/slic3r/GUI/2DBed.hpp
 - [ ] T143 annotate: src/slic3r/GUI/3DBed.cpp
@@ -81,8 +81,8 @@ Last updated: 2026-03-19T03:10:00Z
 - [ ] T160 annotate: src/slic3r/GUI/AuxiliaryDialog.cpp
 - [ ] T161 annotate: src/slic3r/GUI/AuxiliaryDialog.hpp
 - [ ] T162 annotate: src/slic3r/GUI/Auxiliary.hpp
-- [ ] T163 annotate: src/slic3r/GUI/BackgroundSlicingProcess.cpp
-- [ ] T164 annotate: src/slic3r/GUI/BackgroundSlicingProcess.hpp
+- [x] T163 annotate: src/slic3r/GUI/BackgroundSlicingProcess.cpp
+- [x] T164 annotate: src/slic3r/GUI/BackgroundSlicingProcess.hpp
 - [ ] T165 annotate: src/slic3r/GUI/BaseTransparentDPIFrame.cpp
 - [ ] T166 annotate: src/slic3r/GUI/BaseTransparentDPIFrame.hpp
 - [ ] T167 annotate: src/slic3r/GUI/BBLStatusBarBind.cpp
@@ -341,8 +341,8 @@ Last updated: 2026-03-19T03:10:00Z
 - [ ] T420 annotate: src/slic3r/GUI/IMToolbar.hpp
 - [x] T421 annotate: src/slic3r/GUI/InstanceCheck.cpp
 - [ ] T422 annotate: src/slic3r/GUI/InstanceCheck.hpp
-- [ ] T423 annotate: src/slic3r/GUI/Jobs/ArrangeJob.cpp
-- [ ] T424 annotate: src/slic3r/GUI/Jobs/ArrangeJob.hpp
+- [x] T423 annotate: src/slic3r/GUI/Jobs/ArrangeJob.cpp
+- [x] T424 annotate: src/slic3r/GUI/Jobs/ArrangeJob.hpp
 - [ ] T425 annotate: src/slic3r/GUI/Jobs/BindJob.cpp
 - [ ] T426 annotate: src/slic3r/GUI/Jobs/BindJob.hpp
 - [ ] T427 annotate: src/slic3r/GUI/Jobs/BoostThreadWorker.cpp

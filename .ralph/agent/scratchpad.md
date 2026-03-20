@@ -1,16 +1,19 @@
-# Ralph Scratchpad — OrcaSlicer GUI Analysis
+# OrcaSlicer GUI Analysis - Phase 1
 
-## Current Understanding (2026-03-20)
-- Objective: Phase 1 — GUI File-by-File Annotation for Unity Port Preparation.
-- Target: `src/slic3r/GUI/3DScene.hpp` (Task ID: `task-1773880086-41c7`, Key: `gui:T204`).
-- Priority: 2 (Viewport / OpenGL rendering and input).
-- File location: Found at `src/slic3r/GUI/3DScene.hpp` via `glob`.
+## Status
+Reconciling task state and beginning annotation of BackgroundSlicingProcess.cpp.
+
+## Current Task
+- T163 annotate: src/slic3r/GUI/BackgroundSlicingProcess.cpp
+
+## Observations
+- Many files are already annotated but not marked as DONE in ralph-tasks.md.
+- Task IDs in handoff.md and ralph-tasks.md are inconsistent; will prioritize ralph-tasks.md as the primary registry but use grep to verify actual file state.
+- BackgroundSlicingProcess.cpp is a high-priority file for background-process integration.
 
 ## Plan
-1. Mark task `task-1773880086-41c7` as `in_progress`.
-2. Read `src/slic3r/GUI/3DScene.hpp` to understand its logic, state, and event flow.
-3. Annotate with `[INTENT]`, `[STATE]`, `[EVENT]`, `[THREAD]`, `[OPENGL]`, `[UNITY]`, and `[PORTING_HAZARD]`.
-4. Verify the annotations meet the standard (all required categories).
-5. Append completion evidence to `handoff.md`.
-6. Commit the annotated file.
-7. Close the task.
+1. Reconcile ralph-tasks.md with actual file annotation state.
+2. Read src/slic3r/GUI/BackgroundSlicingProcess.cpp.
+3. Add architectural annotations.
+4. Update handoff.md and ralph-tasks.md.
+5. Commit.

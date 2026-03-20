@@ -147,6 +147,33 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - [x] T464 annotate: src/slic3r/GUI/MainFrame.cpp
 - [x] T465 annotate: src/slic3r/GUI/MainFrame.hpp
 - [x] T170 skip-trivial: src/slic3r/GUI/GUI_ObjectManipulation.hpp
+- [x] T163 annotate: src/slic3r/GUI/BackgroundSlicingProcess.cpp
+- [x] T164 annotate: src/slic3r/GUI/BackgroundSlicingProcess.hpp
+
+## Phase 1 - Task T163 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BackgroundSlicingProcess.cpp
+- Deliverables: src/slic3r/GUI/BackgroundSlicingProcess.cpp
+- Substantive additions: 4 architectural annotations (INTENT, THREAD, EVENT, UNITY)
+- Verification excerpt: // [INTENT] Main loop for the background worker thread.
+- Unity-impact summary:
+  - Reimplement worker thread using Unity Job System or Task Parallel Library.
+  - Marshal UI updates back to the main thread using async/await or MainThreadDispatcher.
+- Hazards found: 0
+- Git: annotate: src/slic3r/GUI/BackgroundSlicingProcess.cpp
+- Next recommended Phase 1 task: T165 annotate: src/slic3r/GUI/BaseTransparentDPIFrame.cpp
+
+## Phase 1 - Task T164 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BackgroundSlicingProcess.hpp
+- Deliverables: src/slic3r/GUI/BackgroundSlicingProcess.hpp
+- Substantive additions: 6 architectural annotations (INTENT, STATE, THREAD, EVENT, UNITY)
+- Verification excerpt: // [INTENT] Orchestrates background slicing and G-code generation...
+- Unity-impact summary:
+  - Use UniTask or standard C# Tasks for background orchestration.
+- Hazards found: 0
+- Git: annotate: src/slic3r/GUI/BackgroundSlicingProcess.hpp
+- Next recommended Phase 1 task: T165 annotate: src/slic3r/GUI/BaseTransparentDPIFrame.cpp
 
 ### Remaining
 
@@ -1291,3 +1318,22 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2 severity for mapping OrcaSlicer's CompositeID/GeometryID fingerprinting to Unity's mesh update lifecycle.
 - Git: annotate src/slic3r/GUI/3DScene.hpp for Phase 1
 - Next recommended Phase 1 task: T203 src/slic3r/GUI/Gizmos/3DScene.cpp
+
+## Phase 1 - Task T179 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/ArrangeJob.cpp
+- Deliverables: src/slic3r/GUI/Jobs/ArrangeJob.cpp, src/slic3r/GUI/Jobs/ArrangeJob.hpp
+- Substantive additions: 8 annotations covering intent, threading, state, and Unity mapping.
+- Verification excerpt: [INTENT] Implementation of the ArrangeJob for automated object placement on build plates.
+- Unity-impact summary:
+  - Maps to Unity Job System or Coroutine for non-blocking arrangement.
+  - Model result application marshaled to main thread via finalize() pattern.
+- Hazards found: 0
+- Git: annotate: src/slic3r/GUI/Jobs/ArrangeJob.cpp
+- Next recommended Phase 1 task: T181 annotate: src/slic3r/GUI/Jobs/BackgroundSlicingProcessJob.cpp
+
+## Reconciliation Note
+- Discrepancy found between .ralph/ralph-tasks.md numbering and ralph tools task state.
+- Ralph-tasks.md used T423/T424 for ArrangeJob while tools state used T179/T180.
+- Resolved by marking both DONE in .ralph/ralph-tasks.md and closing runtime tasks.
+- Future work will prioritize path-based matching over T-numbering.
