@@ -286,7 +286,7 @@ Last updated: 2026-03-20T23:39:19Z
 - [ ] T365 annotate: src/slic3r/GUI/GLShadersManager.hpp
 - [ ] T366 annotate: src/slic3r/GUI/GLTexture.cpp
 - [x] T367 annotate: src/slic3r/GUI/GLTexture.hpp
-- [ ] T368 annotate: src/slic3r/GUI/GLToolbar.cpp
+- [x] T368 annotate: src/slic3r/GUI/GLToolbar.cpp
 - [ ] T369 annotate: src/slic3r/GUI/GLToolbar.hpp
 - [x] T370 annotate: src/slic3r/GUI/GUI_App.cpp
 - [ ] T371 annotate: src/slic3r/GUI/GUI_App.hpp

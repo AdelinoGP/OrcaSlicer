@@ -57,3 +57,22 @@
 
 ## Iteration update
 - Added multi-tag comments to the GLTexture header, covering compressor threading, render helpers, loader events, and Unity mapping before capturing the evidence block and preparing to close T367.
+
+## Iteration plan update
+- Task selection: start `T194 annotate: src/slic3r/GUI/Jobs/MedialAxisJob.hpp` because the header looks reachable and defines job orchestration helpers that the Unity port will need clarified.
+- Steps: `ralph tools task start task-1773880086-591e`, read the header, sprinkle `[INTENT]/[STATE]/[EVENT]/[OPENGL]/[THREAD]/[UNITY]/[PORTING_HAZARD]` comments around classes and methods that own job/config state, record any ambiguous areas with hypotheses, append the evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header, and close the runtime task.
+
+## Iteration update
+- Observed: `src/slic3r/GUI/Jobs/MedialAxisJob.hpp` does not exist, so T194 was failed and a missing-file fix memory was recorded.
+- Next selection: `T195 annotate: src/slic3r/GUI/Jobs/RotoptJob.cpp` (task-1773880086-6efa). Will start that task, document its threading/GL/workflow cache, note Unity job-system mapping, and leave a handoff block before committing.
+
+## Iteration update
+- Observed: `src/slic3r/GUI/Jobs/RotoptJob.cpp` also missing, so T195 failed and another missing-file fix memory was recorded.
+- Next selection: `T196 annotate: src/slic3r/GUI/Jobs/RotoptJob.hpp` (task-1773880086-864d); the header may still exist and can help explain the intended job interface even if the source is absent.
+
+## Iteration update
+- Observed: `src/slic3r/GUI/Jobs/RotoptJob.hpp` is missing as well, so T196 failed; the intended functionality appears to now live in `RotoptimizeJob` files, so a blocker note will be needed while continuing with other ready tasks.
+
+## Iteration plan update
+- Selected task: T368 annotate `src/slic3r/GUI/GLToolbar.cpp` (task-1773880086-0cae); the toolbar gate handles GL events, job dispatchers, and stateful icons, so we need multi-tag insights for UI state, rendering, and event propagation.
+- Plan: read the file, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` notes near toolbar item definitions, visibility/effect callbacks, rendering loops, and event broadcasts; after editing append the Phase 1 evidence block to `.ralph/agent/handoff.md`, mark the task done in `.ralph/ralph-tasks.md`, commit, and then move to the next ready task.

@@ -192,7 +192,8 @@ _Generated: 2026-03-20 07:11:02 UTC_
   - Keep the `ETimeMode` sentinel in sync with Unity enums to avoid indexing mismatches when reading `Item.times`.
 - Hazards found: 1 (P3 intent: enum sentinel mismatch will crash the `get_time` index if Unity diverges from the native `ETimeMode::COUNT`).
 - Git: annotate: src/libvgcode/src/ExtrusionRoles.cpp
-- Next recommended Phase 1 task: T114 annotate: src/libvgcode/src/ExtrusionRoles.hpp
+ - Next recommended Phase 1 task: T114 annotate: src/libvgcode/src/ExtrusionRoles.hpp
+
 
 ## Phase 1 - Task T163 complete
 - Task type: annotate
@@ -1619,3 +1620,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2 (stateful SVG sprite flags/shader variants) and P3 (manual UV math + background compressor thread sync).
 - Git: Annotate GLTexture header state
 - Next recommended Phase 1 task: T368 annotate: src/slic3r/GUI/GLToolbar.cpp
+
+## Phase 1 - Task T368 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GLToolbar.cpp
+- Deliverables: src/slic3r/GUI/GLToolbar.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 18 inline annotations covering event wiring, state caching, GL rendering, and Unity migration guidance for the toolbar.
+- Verification excerpt: // [OPENGL] Central render entry ensures icons/texture atlases draw after layout/visibility updates.
+- Unity-impact summary:
+  - Map the wx toolbar events to UnityEvents on a dedicated ToolbarController MonoBehaviour so commands flow into coroutines/jobs.
+  - Replace the GL quad batch with a Canvas/RawImage or UI Toolkit cache that uses a Texture2D atlas and reuses the hover/highlight math.
+- Hazards found: 3 (P2: wx event coupling, P2: mixing rendering/state transitions inside do_action, P3: SVG atlas generator).
+- Git: Annotate GLToolbar event/render pipeline
+- Next recommended Phase 1 task: T369 annotate: src/slic3r/GUI/GLToolbar.hpp
