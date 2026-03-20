@@ -16,3 +16,9 @@
 - Manifest total: 719
 - Remaining: 713
 - Loop status: CONTINUING
+**Task GizmoObjectManipulation.hpp COMPLETE**
+- Deliverable: src/slic3r/GUI/Gizmos/GizmoObjectManipulation.hpp (annotated)
+- Lines added: ~87 comment lines
+- Key findings: Class manages gizmos, heavily reliant on ImGui and wxWidgets; significant state management for UI/undo-redo.
+- Verification excerpt: "// [INTENT] Class responsible for rendering and handling object manipulation gizmos (move, rotate, scale) in the 3D viewport."
+- Unity porting hazards identified: 5+ (GL integration, ImGui replacement, coordinate systems, Undo/Redo integration).
