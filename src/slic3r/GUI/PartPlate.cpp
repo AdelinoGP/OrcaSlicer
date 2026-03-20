@@ -1,3 +1,10 @@
+// [INTENT] PartPlate handles the GUI-side representation and rendering of a single build plate within the 3D scene.
+// [UNITY] PartPlate: Custom MonoBehaviour (e.g., BuildPlateController) representing a plate's state and rendering logic.
+// [STATE] m_selected, m_printable, m_config (DynamicPrintConfig): Plate status and configuration.
+// [OPENGL] Heavily reliant on direct OpenGL calls (glDepthMask, glBlendFunc, shader uniforms) for plate rendering.
+// [PORTING_HAZARD:P1] Must reimplement all OpenGL rendering, shader management (flat, printbed, dashed_lines), and texture handling in
+// Unity's engine.
+
 #include <cstddef>
 #include <algorithm>
 #include <numeric>
