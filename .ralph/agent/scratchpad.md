@@ -1,19 +1,18 @@
-# OrcaSlicer GUI Analysis - Phase 1
+# Ralph Analysis Scratchpad - Phase 1
 
-## Status
-Reconciling task state and beginning annotation of BackgroundSlicingProcess.cpp.
+## Objective
+Annotate GUI source files for Unity/C# porting.
 
-## Current Task
-- T163 annotate: src/slic3r/GUI/BackgroundSlicingProcess.cpp
-
-## Observations
-- Many files are already annotated but not marked as DONE in ralph-tasks.md.
-- Task IDs in handoff.md and ralph-tasks.md are inconsistent; will prioritize ralph-tasks.md as the primary registry but use grep to verify actual file state.
-- BackgroundSlicingProcess.cpp is a high-priority file for background-process integration.
+## Current State
+- Phase 0 complete.
+- Phase 1 in progress.
+- Many files already annotated.
+- Selected Task: T384 annotate: src/slic3r/GUI/GUI_Init.cpp
 
 ## Plan
-1. Reconcile ralph-tasks.md with actual file annotation state.
-2. Read src/slic3r/GUI/BackgroundSlicingProcess.cpp.
-3. Add architectural annotations.
-4. Update handoff.md and ralph-tasks.md.
-5. Commit.
+1. Mark T384 as ACTIVE in `.ralph/ralph-tasks.md`.
+2. Start task using `ralph tools task start`.
+3. Read `src/slic3r/GUI/GUI_Init.cpp` and its header.
+4. Add annotations ([INTENT], [STATE], [EVENT], [UNITY], etc.).
+5. Verify and commit.
+6. Close task.

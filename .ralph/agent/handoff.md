@@ -149,6 +149,32 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - [x] T170 skip-trivial: src/slic3r/GUI/GUI_ObjectManipulation.hpp
 - [x] T163 annotate: src/slic3r/GUI/BackgroundSlicingProcess.cpp
 - [x] T164 annotate: src/slic3r/GUI/BackgroundSlicingProcess.hpp
+- [x] T165 annotate: src/slic3r/GUI/BaseTransparentDPIFrame.cpp
+- [x] T166 annotate: src/slic3r/GUI/BaseTransparentDPIFrame.hpp
+
+## Phase 1 - Task T165 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BaseTransparentDPIFrame.cpp
+- Deliverables: src/slic3r/GUI/BaseTransparentDPIFrame.cpp
+- Substantive additions: 2 architectural annotations (INTENT, UNITY)
+- Verification excerpt: // [INTENT] Core animation logic: processes the timer events...
+- Unity-impact summary:
+  - Replace timer-based animation with Unity's Tweening systems or AnimationControllers.
+- Hazards found: 0
+- Git: annotate: src/slic3r/GUI/BaseTransparentDPIFrame.cpp
+- Next recommended Phase 1 task: T167 annotate: src/slic3r/GUI/BBLStatusBarBind.cpp
+
+## Phase 1 - Task T166 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BaseTransparentDPIFrame.hpp
+- Deliverables: src/slic3r/GUI/BaseTransparentDPIFrame.hpp
+- Substantive additions: 5 architectural annotations (INTENT, STATE, THREAD, EVENT, UNITY)
+- Verification excerpt: // [INTENT] Base class for semi-transparent overlay frames...
+- Unity-impact summary:
+  - Maps to UI Overlay system with CanvasGroup and RectTransform.
+- Hazards found: 0
+- Git: annotate: src/slic3r/GUI/BaseTransparentDPIFrame.hpp
+- Next recommended Phase 1 task: T167 annotate: src/slic3r/GUI/BBLStatusBarBind.cpp
 
 ## Phase 1 - Task T163 complete
 - Task type: annotate
@@ -1337,3 +1363,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Ralph-tasks.md used T423/T424 for ArrangeJob while tools state used T179/T180.
 - Resolved by marking both DONE in .ralph/ralph-tasks.md and closing runtime tasks.
 - Future work will prioritize path-based matching over T-numbering.
+
+## Phase 1 - Task T384 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Init.cpp
+- Deliverables: src/slic3r/GUI/GUI_Init.cpp
+- Substantive additions: 5 architectural annotations (INTENT, THREAD, STATE, EVENT, UNITY)
+- Verification excerpt: // [INTENT] Orchestrates the GUI startup sequence...
+- Unity-impact summary:
+  - Startup logic maps to a Bootstrapper script or Singleton Application manager.
+  - Instance checking and main loop handled by Unity's engine lifecycle.
+- Hazards found: 1 (PORTING_HAZARD:P3 regarding macOS signal handling)
+- Git: annotate: src/slic3r/GUI/GUI_Init.cpp
+- Next recommended Phase 1 task: T385 annotate: src/slic3r/GUI/GUI_Init.hpp

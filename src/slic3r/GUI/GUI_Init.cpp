@@ -1,3 +1,5 @@
+// [INTENT] Orchestrates the GUI startup sequence, including instance checking and wxWidgets lifecycle.
+// [THREAD] Executes on the main entry thread.
 #include "GUI_Init.hpp"
 
 #include "libslic3r/AppConfig.hpp"
@@ -24,11 +26,15 @@ namespace Slic3r { namespace GUI {
 
 const std::vector<std::pair<int, int>> OpenGLVersions::core = {{3, 2}, {3, 3}, {4, 0}, {4, 1}, {4, 2}, {4, 3}, {4, 4}, {4, 5}, {4, 6}};
 
-// [INTENT] Entry point for GUI mode, initializes wxWidgets application and enters main loop
-// [UNITY] Replace with Unity's SceneManager.LoadScene or custom bootstrap sequence
+// [INTENT] Orchestrates the GUI startup sequence, including instance checking and wxWidgets lifecycle.
+// [THREAD] Executes on the main thread, initializing global UI state.
 int GUI_Run(GUI_InitParams& params)
 {
+    // [STATE] Initialization parameters derived from CLI or prior config passes
+    // [UNITY] Use Command Line Arguments (System.Environment.GetCommandLineArgs) or a Bootstrapper ScriptableObject.
 #if __APPLE__
+    // [PORTING_HAZARD:P3] macOS specific signal handling for subprocess management.
+    // Unity typically manages its own process signals; verify if spawned slicer processes still need SIGCHLD reset.
     // On OSX, we use boost::process::spawn() to launch new instances of PrusaSlicer from another PrusaSlicer.
     // boost::process::spawn() sets SIGCHLD to SIGIGN for the child process, thus if a child PrusaSlicer spawns another
     // subprocess and the subrocess dies, the child PrusaSlicer will not receive information on end of subprocess
@@ -41,7 +47,8 @@ int GUI_Run(GUI_InitParams& params)
 
     // BBS: remove the try-catch and let exception goto above
     try {
-        // GUI::GUI_App* gui = new GUI::GUI_App(params.start_as_gcodeviewer ? GUI::GUI_App::EAppMode::GCodeViewer : GUI::GUI_App::EAppMode::Editor);
+        // [STATE] Global application instance (MonoBehaviour-like lifecycle managed by wxWidgets)
+        // [UNITY] Replace with a root Singleton MonoBehaviour or Application class.
         GUI::GUI_App* gui = new GUI::GUI_App();
         // if (gui->get_app_mode() != GUI::GUI_App::EAppMode::GCodeViewer) {
         //  G-code viewer is currently not performing instance check, a new G-code viewer is started every time.
@@ -62,12 +69,12 @@ int GUI_Run(GUI_InitParams& params)
             int                argc = 1;
             std::vector<char*> argv;
             argv.push_back(params.argv[0]);
-            // [EVENT] Starts wxWidgets event loop (main application loop)
-            // [UNITY] Replace with Unity's main loop or coroutines
+            // [EVENT] Starts wxWidgets event loop (main application loop).
+            // [UNITY] Handled implicitly by Unity. Custom startup logic goes into a root script.
             return wxEntry(argc, argv.data());
         } else {
-            // [EVENT] Starts wxWidgets event loop (main application loop)
-            // [UNITY] Replace with Unity's main loop or coroutines
+            // [EVENT] Starts wxWidgets event loop (main application loop).
+            // [UNITY] Handled implicitly by Unity. Custom startup logic goes into a root script.
             return wxEntry(params.argc, params.argv);
         }
     } catch (const Slic3r::Exception& ex) {

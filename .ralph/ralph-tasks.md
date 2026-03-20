@@ -302,7 +302,7 @@ Last updated: 2026-03-19T03:10:00Z
 - [ ] T381 annotate: src/slic3r/GUI/GUI_Geometry.cpp
 - [ ] T382 annotate: src/slic3r/GUI/GUI_Geometry.hpp
 - [ ] T383 annotate: src/slic3r/GUI/GUI.hpp
-- [ ] T384 annotate: src/slic3r/GUI/GUI_Init.cpp
+- [x] T384 annotate: src/slic3r/GUI/GUI_Init.cpp
 - [ ] T385 annotate: src/slic3r/GUI/GUI_Init.hpp
 - [ ] T386 annotate: src/slic3r/GUI/GUI_ObjectLayers.cpp
 - [ ] T387 annotate: src/slic3r/GUI/GUI_ObjectLayers.hpp
