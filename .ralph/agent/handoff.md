@@ -784,6 +784,13 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - [~] annotate: src/slic3r/GUI/AboutDialog.cpp
 - [~] annotate: src/slic3r/GUI/AboutDialog.hpp
 
+## Phase 1 - Task T186 blocked
+- Task type: annotate (blocked)
+- File: src/slic3r/GUI/Jobs/EmbossUpdateJob.hpp
+- Failure reason: header missing from repo, so no source to annotate; confirm whether the file was deleted/renamed or mark the pair of EmbossUpdate jobs as skipped.
+- Next recommended Phase 1 task: T187 annotate: src/slic3r/GUI/Jobs/Job.cpp (or the next ready `Jobs` file after resolving the missing header pair).
+- Hazards found: 1 (P3 missing dependency prevents mapping UI/Job coordination until the missing header is clarified).
+
 ## Key Files
 
 Recently modified:
