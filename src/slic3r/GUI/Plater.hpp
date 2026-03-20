@@ -1,6 +1,9 @@
 #ifndef slic3r_Plater_hpp_
 #define slic3r_Plater_hpp_
 
+// [PORTING_HAZARD:P1] This file uses extensive wxWidgets for UI.
+// [UNITY] Map to Unity Engine/C#. Replace wxWidgets components with Unity UI Toolkit (VisualElement) or uGUI components.
+
 #include <memory>
 #include <vector>
 #include <boost/filesystem/path.hpp>
@@ -39,6 +42,7 @@ class ComboBox;
 class Button;
 
 namespace Slic3r {
+// [UNITY] Use C# namespace for GUI components.
 
 class BuildVolume;
 enum class BuildVolume_Type : char;
@@ -142,6 +146,7 @@ class Sidebar : public wxPanel
 {
     // [STATE] Current configuration mode (Simple/Advanced).
     ConfigOptionMode m_mode;
+
     // Button *         btn_sync{nullptr};
     ScalableButton*         ams_btn{nullptr};
     bool                    m_last_slice_state = false;
