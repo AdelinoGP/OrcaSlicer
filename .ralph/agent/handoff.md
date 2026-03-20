@@ -214,6 +214,22 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate EmbossJob job pipeline (T434)
 - Next recommended Phase 1 task: T435 annotate: src/slic3r/GUI/Jobs/EmbossJob.hpp
 
+## Task reconciliation
+- Noticed `.ralph/ralph-tasks.md` still anchors T184 to `src/slic3r/GUI/BitmapComboBox.hpp`, yet the active runtime task `task-1773880086-730f` (key gui:T184) was used for `src/slic3r/GUI/Jobs/EmbossJob.hpp`; the registry and runtime numbering are misaligned and should be reconciled before T184 is reused.
+
+## Phase 1 - Task T435 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/EmbossJob.hpp
+- Deliverables: src/slic3r/GUI/Jobs/EmbossJob.hpp
+- Substantive additions: 12 multi-tag annotations covering intent, state, thread, event, unity, and hazards
+- Verification excerpt: /// [UNITY] Mirror this with a ScriptableObject holding text lines + volume metadata and reuse Unity's CancellationTokenSource for `cancel`.
+- Unity-impact summary:
+  - Recreate `DataBase` as a cancelable ScriptableObject/MonoBehaviour combo so Unity can serialize the font metadata, text lines, and cancel token separately from libslic3r.
+  - Transition raycast/gizmo placement to Unity PhysicsScene + InputSystem and mirror `CreateVolumeParams` as a DTO feeding tasks queued with `Task.Run`/`MainThreadDispatcher`.
+- Hazards found: 2 (P2 libslic3r geometry dependency, P3 raycast+GL selection coupling)
+- Git: annotate: src/slic3r/GUI/Jobs/EmbossJob.hpp
+- Next recommended Phase 1 task: T436 annotate: src/slic3r/GUI/Jobs/FillBedJob.cpp
+
 ### Remaining
 
 - [ ] P0-T006: Main Window Class Identification
