@@ -1462,3 +1462,15 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2=1, P3=2
 - Git: Document Job threading contract for Unity port
 - Next recommended Phase 1 task: T189 annotate: src/slic3r/GUI/Jobs/JobList.cpp
+## Phase 1 - Task T434 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/EmbossJob.cpp
+- Deliverables: src/slic3r/GUI/Jobs/EmbossJob.cpp, .ralph/agent/scratchpad.md
+- Substantive additions: 12 targeted `[THREAD]`, `[EVENT]`, `[UNITY]`, and `[PORTING_HAZARD]` annotations clarify worker/UI flow for emboss jobs.
+- Verification excerpt: `// [THREAD] `process` executes inside the shared Job worker; it polls `Job::Ctl` so UI-driven cancellations abort before finalize runs.`
+- Unity-impact summary:
+  - Worker vs UI thread split described for Unity's async mesh creation pipeline.
+  - Raycast + gizmo selection hazards call out replacing RaycastManager with Unity Physics callbacks.
+- Hazards found: P2=2, P3=2
+- Git: Annotate EmbossJob orchestration
+- Next recommended Phase 1 task: T435 annotate: src/slic3r/GUI/Jobs/EmbossJob.hpp

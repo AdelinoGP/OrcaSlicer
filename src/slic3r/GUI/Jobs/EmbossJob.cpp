@@ -134,6 +134,10 @@ public:
     void finalize(bool canceled, std::exception_ptr& eptr) override;
 };
 
+// [THREAD] `process` runs on the worker while `finalize` marshals results back to the UI thread, keeping the object list updates
+// serialized. [UNITY] Replace with a `Task<Mesh>` + `MainThreadDispatcher.Enqueue` to update `MeshFilter` while the Unity Selection API
+// mirrors the new instance.
+
 /// <summary>
 /// Hold neccessary data to create(cut) volume from surface object in job
 /// </summary>
@@ -157,6 +161,9 @@ struct CreateSurfaceVolumeData : public SurfaceVolumeData
 /// Cut surface from object and create cutted volume
 /// Should not be stopped
 /// </summary>
+// [THREAD] `process` runs inside the shared worker while `finalize` immediately switches back to the UI thread so the gizmo state remains
+// serialized with other Emboss jobs. [UNITY] Translate to a Unity `IJob`/`JobHandle` that produces mesh data plus a `MainThreadDispatcher`
+// callback to mutate scene graph GameObjects.
 class CreateSurfaceVolumeJob : public Job
 {
     CreateSurfaceVolumeData m_input;
@@ -421,6 +428,7 @@ void CreateObjectJob::finalize(bool canceled, std::exception_ptr& eptr)
 /// Update Volume
 UpdateJob::UpdateJob(DataUpdate&& input) : m_input(std::move(input)) { assert(check(m_input, true)); }
 
+// [THREAD] `process` executes inside the shared Job worker; it polls `Job::Ctl` so UI-driven cancellations abort before finalize runs.
 void UpdateJob::process(Ctl& ctl)
 {
     if (!check(m_input))
@@ -434,6 +442,7 @@ void UpdateJob::process(Ctl& ctl)
         throw JobException(_u8L("Created text volume is empty. Change text or font."));
 }
 
+// [EVENT] `finalize` always runs on the main thread and can safely touch GUI/selection state once the mesh is built.
 void UpdateJob::finalize(bool canceled, std::exception_ptr& eptr)
 {
     if (!::finalize(canceled, eptr, *m_input.base))
@@ -441,6 +450,7 @@ void UpdateJob::finalize(bool canceled, std::exception_ptr& eptr)
     ::update_volume(std::move(m_result), m_input);
 }
 
+// [STATE] `update_volume` reconciles mesh data, metadata, and selection/undo callbacks so the emboss gizmo stays consistent.
 void UpdateJob::update_volume(ModelVolume* volume, TriangleMesh&& mesh, const DataBase& base)
 {
     // check inputs
@@ -542,6 +552,8 @@ bool is_valid(ModelVolumeType volume_type);
 /// <param name="volume_type">Type of volume: Part, negative, modifier</param>
 /// <param name="gizmo">Define which gizmo open on the success</param>
 /// <returns>Nullptr when job is sucessfully add to worker otherwise return data to be processed different way</returns>
+// [THREAD] Chooses between surface and volume jobs before enqueuing on the shared worker so mesh building stays off the UI thread.
+// [PORTING_HAZARD:P3] Unity will need to replace this worker queue with its own JobSystem + dispatcher while keeping mesh transform logic intact.
 bool start_create_volume_job(Worker&                           worker,
                              const ModelObject&                object,
                              const std::optional<Transform3d>& volume_tr,
@@ -596,6 +608,9 @@ SurfaceVolumeData::ModelSources create_volume_sources(const ModelVolume& text_vo
 bool start_create_volume(CreateVolumeParams& input, DataBasePtr data, const Vec2d& mouse_pos)
 {
     // [EVENT] Called from mouse/toolbar actions so that the selection and canvas state are captured before dispatching a worker job.
+    // [STATE] Input bundles camera, selection, and gizmo targets so the worker receives a consistent snapshot before async mesh creation.
+    // [UNITY] Map to a Unity `EmbossController` MonoBehaviour that marshals a `UnityEvent` into an `async Task<Mesh>` and returns to the
+    // main thread for placement.
     if (data == nullptr)
         return false;
     if (!check(input))
@@ -616,6 +631,9 @@ bool start_create_volume_without_position(CreateVolumeParams& input, DataBasePtr
         return false;
     if (!check(input))
         return false;
+
+    // [EVENT] Fallback when no raycast hit is available, so we compute the screen center placement before handing off to the worker.
+    // [UNITY] Mirror with a Unity editor command that samples `SceneView.camera` and dispatches to an async mesh builder with serialized completion.
 
     // select position by camera position and view direction
     const Selection& selection  = input.canvas.get_selection();
@@ -663,8 +681,10 @@ static inline bool execute_job(std::shared_ptr<Job> j)
 } // namespace
 #endif
 
-// [PORTING_HAZARD:P2] Heavy reliance on custom RaycastManager + GLVolume selection to compute surface hits; Unity will likely reimplement
-// this using `Physics.Raycast` or `Physics.ComputePenetration` with explicit colliders.
+// [EVENT] Called from the emboss inspector to reissue a mesh build after property changes, so selection and raycasts are re-evaluated.
+// [UNITY] Convert to a Unity `EditorWindow` or `MonoBehaviour` that fans out to the Job System while preserving the `CancellationToken`
+// logic. [PORTING_HAZARD:P2] Heavy reliance on custom RaycastManager + GLVolume selection to compute surface hits; Unity will likely
+// reimplement this using `Physics.Raycast` or `Physics.ComputePenetration` with explicit colliders.
 bool start_update_volume(DataUpdate&& data, const ModelVolume& volume, const Selection& selection, RaycastManager& raycaster)
 {
     assert(data.volume_id == volume.id());
@@ -1018,6 +1038,7 @@ TriangleMesh create_default_mesh()
 
 void update_name_in_list(const ObjectList& object_list, const ModelVolume& volume)
 {
+    // [EVENT] Keeps the right-side object list synchronized when the emboss volume metadata changes.
     const ModelObjectPtrs* objects_ptr = object_list.objects();
     if (objects_ptr == nullptr)
         return;
@@ -1502,6 +1523,8 @@ bool start_create_volume_job(Worker&                           worker,
 const GLVolume* find_closest(
     const Selection& selection, const Vec2d& screen_center, const Camera& camera, const ModelObjectPtrs& objects, Vec2d* closest_center)
 {
+    // [STATE] Iterates over the current selection to keep track of which GLVolume is nearest the camera center so the new volume docks
+    // cleanly. [UNITY] Mirror with cached `GameObject` highlights and a simple nearest-point search before dispatching raycasts.
     assert(closest_center != nullptr);
     const GLVolume*               closest = nullptr;
     const Selection::IndicesList& indices = selection.get_volume_idxs();
@@ -1537,6 +1560,9 @@ bool start_create_object_job(const CreateVolumeParams& input, DataBasePtr emboss
     const Pointfs&   bed_shape  = input.build_volume.printable_area();
     auto             gizmo_type = static_cast<GLGizmosManager::EType>(input.gizmo);
     DataCreateObject data{std::move(emboss_data), coor, input.camera, bed_shape, gizmo_type, input.angle};
+    // [EVENT] Triggered when the user explicitly asks to drop new text onto the bed, so we capture explicit drop coordinates before the
+    // worker begins. [UNITY] Represent this with a `Button` or context command that posts a `Task<Mesh>` to Unity's job queue and later
+    // updates the `SceneView` with `MeshFilter` data.
 
     // Fix: adding text on print bed with style containing use_surface
     if (data.base->shape.projection.use_surface)
@@ -1547,6 +1573,10 @@ bool start_create_object_job(const CreateVolumeParams& input, DataBasePtr emboss
     return queue_job(input.worker, std::move(job));
 }
 
+// [THREAD] Performs raycasts while still on the UI thread, then enqueues a worker job once a valid hit and transform are computed.
+// [PORTING_HAZARD:P2] Unity will need to rewire `RaycastManager` logic into `Physics.Raycast`/`Physics.RaycastAll` plus matcher utilities,
+// keeping editor-friendly selection behavior. [UNITY] Replace canvas raycasts with Unity `Physics.Raycast` against colliders that mirror
+// `GLVolume`, then use `MainThreadDispatcher` to queue the worker-mesh job.
 bool start_create_volume_on_surface_job(CreateVolumeParams& input, DataBasePtr data, const Vec2d& screen_coor, bool try_no_coor)
 {
     auto on_bad_state = [&input, try_no_coor](DataBasePtr data_, const ModelObject* object = nullptr) {
@@ -1617,6 +1647,8 @@ bool start_create_volume_on_surface_job(CreateVolumeParams& input, DataBasePtr d
     return start_create_volume_job(input.worker, *object, transform, std::move(data), input.volume_type, gizmo_type);
 }
 
+// [EVENT] Centralized error reporting for volume creation/update failures so the UI can show dialogs consistently.
+// [UNITY] Replace with `Debug.LogError`/`EditorUtility.DisplayDialog` in Unity if porting to an editor tool.
 void create_message(const std::string& message) { show_error(nullptr, message.c_str()); }
 
 } // namespace
