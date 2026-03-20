@@ -179,6 +179,20 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate: src/slic3r/GUI/BaseTransparentDPIFrame.hpp
 - Next recommended Phase 1 task: T167 annotate: src/slic3r/GUI/BBLStatusBarBind.cpp
 
+## Phase 1 - Task T113 complete
+- Task type: annotate
+- File: src/libvgcode/src/ExtrusionRoles.cpp
+- Deliverables: src/libvgcode/src/ExtrusionRoles.cpp
+- Substantive additions: 3 architectural annotations across `add`, `get_roles`, and `get_time` (INTENT/STATE/UNITY/PORTING_HAZARD tags)
+- Verification excerpt: // [INTENT] Accumulate time budgets for each extrusion role so higher layers can report or visualize how long actions such as travel, extrusion, or waiting consume per slice.
+- Unity-impact summary:
+  - Mirror the `role -> Item` map with a `Dictionary<EGCodeExtrusionRole, RoleTiming>` ScriptableObject so Unity UI/logic can inspect per-mode budgets safely.
+  - Expose `get_roles()` as a `List<EGCodeExtrusionRole>` feeding a UI Toolkit `ListView` or dropdown for selection overlays.
+  - Keep the `ETimeMode` sentinel in sync with Unity enums to avoid indexing mismatches when reading `Item.times`.
+- Hazards found: 1 (P3 intent: enum sentinel mismatch will crash the `get_time` index if Unity diverges from the native `ETimeMode::COUNT`).
+- Git: annotate: src/libvgcode/src/ExtrusionRoles.cpp
+- Next recommended Phase 1 task: T114 annotate: src/libvgcode/src/ExtrusionRoles.hpp
+
 ## Phase 1 - Task T163 complete
 - Task type: annotate
 - File: src/slic3r/GUI/BackgroundSlicingProcess.cpp
@@ -793,6 +807,13 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Failure reason: header missing from repo, so no source to annotate; confirm whether the file was deleted/renamed or mark the pair of EmbossUpdate jobs as skipped.
 - Next recommended Phase 1 task: T187 annotate: src/slic3r/GUI/Jobs/Job.cpp (or the next ready `Jobs` file after resolving the missing header pair).
 - Hazards found: 1 (P3 missing dependency prevents mapping UI/Job coordination until the missing header is clarified).
+
+## Phase 1 - Task T189 failed
+- Task type: annotate (failed)
+- File: src/slic3r/GUI/Jobs/JobList.cpp
+- Failure reason: source file absent from repo; confirm whether it was renamed or intentionally removed before retrying this job list task.
+- Next recommended Phase 1 task: T190 annotate: src/slic3r/GUI/Jobs/JobList.hpp
+- Hazards found: 1 (P3 missing job list UI entrypoint blocks accurate Unity component mapping for the job browser)
 
 ## Key Files
 
