@@ -2,6 +2,26 @@
 
 ## Patterns
 
+### mem-1773981659-cd27
+> SKIP_TRIVIAL: src/slic3r/GUI/AboutDialog.hpp
+<!-- tags: gui, annotation, skip | created: 2026-03-20 -->
+
+### mem-1773981636-e5ed
+> SKIP_TRIVIAL: src/slic3r/GUI/AboutDialog.cpp
+<!-- tags: gui, annotation, skip | created: 2026-03-20 -->
+
+### mem-1773981616-d20e
+> SKIP_TRIVIAL: src/slic3r/GUI/3DBed.cpp
+<!-- tags: gui, annotation, skip | created: 2026-03-20 -->
+
+### mem-1773981590-bd5c
+> SKIP_TRIVIAL: src/slic3r/GUI/2DBed.hpp
+<!-- tags: gui, annotation, skip | created: 2026-03-20 -->
+
+### mem-1773981566-14a6
+> SKIP_TRIVIAL: src/slic3r/GUI/2DBed.cpp
+<!-- tags: gui, annotation, skip | created: 2026-03-20 -->
+
 ### mem-1773855069-f68b
 > MainFrame.cpp annotated: maps to MainUIController managing the main application panels (Prepare, Preview, Monitor, etc.). Includes complex configuration change propagation and parallel thumbnail loading.
 <!-- tags: gui, unity, mainframe, threading | created: 2026-03-18 -->
@@ -25,6 +45,10 @@
 ## Decisions
 
 ## Fixes
+
+### mem-1773981545-7bab
+> failure: cmd=edit, error=LSP compilation errors (inconsistent file state or header removal/missing includes), next=annotate in smaller, more surgical edits
+<!-- tags: gui, tooling, edit | created: 2026-03-20 -->
 
 ### mem-1773963015-6a1e
 > failure: cmd=edit, error=LSP compilation errors (inconsistent file state or header removal), next=annotate in smaller, more surgical edits
