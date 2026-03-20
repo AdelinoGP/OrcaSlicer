@@ -70,47 +70,68 @@ class PartPlateList;
 
 using GCodeResult = GCodeProcessorResult;
 
-// [INTENT] Represents a single build plate and its contents in the 3D scene
-// [UNITY] Replace with custom PartPlate MonoBehaviour component or ScriptableObject
-// [INTENT] Represents a single build plate and its contents in the 3D scene
+// [INTENT] Manages a single build plate, its geometry, objects, and rendering state in the 3D workspace
+// [STATE] Tracks plate dimensions, origin, locked state, slice validity, and object instances
+// [UNITY] Replace with MonoBehaviour managing plate representation or ScriptableObject for data
+// [PORTING_HAZARD:P1] ObjectBase inheritance needs Unity-compatible base class or interface
+// [PORTING_HAZARD:P2] GL rendering requires Unity's Mesh/Renderer system
 class PartPlate : public ObjectBase
 {
 public:
     enum HeightLimitMode { HEIGHT_LIMIT_NONE, HEIGHT_LIMIT_BOTTOM, HEIGHT_LIMIT_TOP, HEIGHT_LIMIT_BOTH };
 
 private:
+    // [STATE] References to parent container, UI, and data model
+    // [UNITY] Use Unity's scene references (PlateManager, PlaterController, ModelData)
+    // [PORTING_HAZARD:P1] Weak references - Unity's reference system handles lifetime
     PartPlateList*    m_partplate_list{nullptr};
     Plater*           m_plater; // Plater reference, not own it
     Model*            m_model;  // Model reference, not own it
     PrinterTechnology printer_technology;
 
+    // [STATE] Object-instance mappings tracking what's on this plate
+    // [UNITY] Use Dictionary<int, HashSet<int>> or PlateInstanceData struct
     std::set<std::pair<int, int>> obj_to_instance_set;
     std::set<std::pair<int, int>> instance_outside_set;
-    int                           m_plate_index;
-    Vec3d                         m_origin;
-    int                           m_width;
-    int                           m_depth;
-    int                           m_height;
-    float                         m_height_to_lid;
-    float                         m_height_to_rod;
-    bool                          m_printable;
-    bool                          m_locked;
-    bool                          m_ready_for_slice;
-    bool                          m_slice_result_valid;
-    bool                          m_apply_invalid{false};
-    float                         m_slice_percent;
 
+    // [STATE] Plate metadata: index, origin, dimensions, and operational flags
+    // [UNITY] Use int index, Vector3 origin, Vector2 size, bool flags
+    // [PORTING_HAZARD:P1] Coordinate system: Blender/OpenGL (Y-up) vs Unity (Y-up, right-handed)
+    int   m_plate_index;
+    Vec3d m_origin;
+    int   m_width;
+    int   m_depth;
+    int   m_height;
+    float m_height_to_lid;
+    float m_height_to_rod;
+    bool  m_printable;
+    bool  m_locked;
+    bool  m_ready_for_slice;
+    bool  m_slice_result_valid;
+    bool  m_apply_invalid{false};
+    float m_slice_percent;
+
+    // [STATE] Slicing results and filament information
+    // [UNITY] Use ScriptableObject for print data, List<FilamentData> for filaments
+    // [THREAD] Slicing runs in background thread - unity needs coroutines or Job System
     Print*                    m_print; // Print reference, not own it, no need to serialize
     GCodeProcessorResult*     m_gcode_result;
     std::vector<FilamentInfo> slice_filaments_info;
     int                       m_print_index;
 
+    // [STATE] Temporary file paths for gcode and config storage
+    // [UNITY] Use Application.persistentDataPath or temporary cache
     std::string m_tmp_gcode_path;       // use a temp path to store the gcode
     std::string m_temp_config_3mf_path; // use a temp path to store the config 3mf
     std::string m_gcode_path_from_3mf;  // use a path to store the gcode loaded from 3mf
 
     friend class PartPlateList;
 
+    // [STATE] Plate geometry and spatial data for collision, rendering, and raycasting
+    // [UNITY] Use MeshCollider for collision, Mesh for rendering, Vector3 arrays for vertices
+    // [OPENGL] GLVertexBuffer equivalent for m_triangles and other GLModels
+    // [PORTING_HAZARD:P1] Transform3d -> Matrix4x4, verify coordinate space (Y-up vs Y-up)
+    // [PORTING_HAZARD:P2] PickingModel -> Unity's picking/raycasting system
     Pointfs                            m_shape;
     Pointfs                            m_exclude_area;
     std::vector<Pointfs>               m_extruder_areas;
@@ -124,36 +145,46 @@ private:
     std::vector<Vec3f>                 positions;
     ExPolygon                          m_print_polygon;
     PickingModel                       m_triangles;
-    GLModel                            m_exclude_triangles;
-    GLModel                            m_wrapping_detection_triangles;
-    GLModel                            m_logo_triangles;
-    GLModel                            m_gridlines;
-    GLModel                            m_gridlines_bolder;
-    GLModel                            m_height_limit_common;
-    GLModel                            m_height_limit_bottom;
-    GLModel                            m_height_limit_top;
-    PickingModel                       m_del_icon;
-    PickingModel                       m_arrange_icon;
-    PickingModel                       m_orient_icon;
-    PickingModel                       m_lock_icon;
-    PickingModel                       m_plate_settings_icon;
-    PickingModel                       m_plate_filament_map_icon;
-    PickingModel                       m_plate_name_edit_icon;
-    PickingModel                       m_move_front_icon;
-    GLModel                            m_plate_idx_icon;
-    GLTexture                          m_texture;
+    // [OPENGL] Render models for plate visualization (excludes, logo, grid, height limits)
+    // [UNITY] Use Mesh/MeshFilter/MeshRenderer components, convert GLModel to Mesh
+    GLModel m_exclude_triangles;
+    GLModel m_wrapping_detection_triangles;
+    GLModel m_logo_triangles;
+    GLModel m_gridlines;
+    GLModel m_gridlines_bolder;
+    GLModel m_height_limit_common;
+    GLModel m_height_limit_bottom;
+    GLModel m_height_limit_top;
 
+    // [OPENGL] Interactive icons for plate controls (delete, arrange, orient, lock, etc.)
+    // [UNITY] Use UI.Image components with Button or custom pickable meshes
+    PickingModel m_del_icon;
+    PickingModel m_arrange_icon;
+    PickingModel m_orient_icon;
+    PickingModel m_lock_icon;
+    PickingModel m_plate_settings_icon;
+    PickingModel m_plate_filament_map_icon;
+    PickingModel m_plate_name_edit_icon;
+    PickingModel m_move_front_icon;
+    GLModel      m_plate_idx_icon;
+    GLTexture    m_texture;
+
+    // [STATE] UI interaction state and rendering properties
+    // [UNITY] Use MonoBehaviour fields, raycast target flags, selection state in manager
     float             m_scale_factor{1.0f};
     GLUquadricObject* m_quadric;
     int               m_hover_id;
     bool              m_selected;
     int               m_timelapse_warning_code = 0;
 
-    // BBS
+    // [STATE] Runtime configuration for this plate (temp, speed, etc.)
+    // [UNITY] Use ScriptableObject or Serializable config class
+    // [CONFIG] DynamicPrintConfig bridges Slic3r config system to Unity
     DynamicPrintConfig m_config;
 
-    // SoftFever
-    // part plate name
+    // [STATE] User-facing plate name and display texture
+    // [UNITY] Use string field + TextMeshPro for name, Texture2D for icon
+    // [PORTING_HAZARD:P1] wxCoord -> Unity UI units
     std::string m_name;
     GLModel     m_plate_name_icon;
     GLTexture   m_name_texture;
@@ -200,10 +231,14 @@ private:
     void on_filament_map_mode_change();
 
 public:
+    // [STATE] Constants for UI interaction (hover IDs, grabber count)
+    // [UNITY] Use const int or enum in PlateUIManager
     static constexpr unsigned int PLATE_NAME_HOVER_ID   = 6;
     static constexpr unsigned int PLATE_FILAMENT_MAP_ID = 8;
     static constexpr unsigned int GRABBER_COUNT         = 9;
 
+    // [STATE] Render color scheme for plate states
+    // [UNITY] Use MaterialPropertyBlock or separate materials per state
     static ColorRGBA SELECT_COLOR;
     static ColorRGBA UNSELECT_COLOR;
     static ColorRGBA UNSELECT_DARK_COLOR;
@@ -216,10 +251,18 @@ public:
     static ColorRGBA HEIGHT_LIMIT_BOTTOM_COLOR;
     static ColorRGBA HEIGHT_LIMIT_TOP_COLOR;
 
+    // [EVENT] Initialize color scheme on startup
+    // [UNITY] Call on PlateManager Awake() or before first render
     static void update_render_colors();
     static void load_render_colors();
 
+    // [EVENT] Default constructor - creates uninitialized plate
+    // [PORTING_HAZARD:P2] Unity requires Awake/Start initialization pattern
     PartPlate();
+
+    // [INTENT] Main constructor - establishes plate geometry and references
+    // [EVENT] Called when creating new plates or loading from file
+    // [PORTING_HAZARD:P1] Verify parameter order matches Unity constructor patterns
     PartPlate(PartPlateList*    partplate_list,
               Vec3d             origin,
               int               width,
@@ -229,19 +272,28 @@ public:
               Model*            modelObj,
               bool              printable = true,
               PrinterTechnology tech      = ptFFF);
+    // [EVENT] Destructor - cleans up GL resources and references
+    // [UNITY] Use OnDisable() or OnDestroy() for cleanup
     ~PartPlate();
 
     bool operator<(PartPlate&) const;
 
-    // clear alll the instances in plate
+    // [EVENT] Clear - removes all objects from plate, optionally clears slice data
+    // [UNITY] Use Clear() method on PlateManager, clear instance list and game objects
     void clear(bool clear_sliced_result = true);
 
+    // [STATE] Bed type management for compatibility checking
+    // [UNITY] Use enum field mapped to material presets
     BedType get_bed_type(bool load_from_project = false) const;
     void    set_bed_type(BedType bed_type);
     void    reset_bed_type();
 
+    // [EVENT] Reset skirt start angle for print configuration
+    // [CONFIG] Modulates print config parameter
     void reset_skirt_start_angle();
 
+    // [CONFIG] Access plate-specific configuration
+    // [UNITY] Use getter returning SerializableConfig or ScriptableObject
     DynamicPrintConfig* config() { return &m_config; }
 
     // set print sequence per plate
@@ -361,11 +413,16 @@ public:
                                                              const std::vector<std::string>& filament_presets,
                                                              std::string&                    error_msg);
 
-    /* instance related operations*/
-    // judge whether instance is bound in plate or not
+    /* [INTENT] Instance related operations - plate membership and containment
+       [STATE] Maintains obj_to_instance_set and instance_outside_set
+       [UNITY] Use Dictionary<int, HashSet<int>> for instance tracking */
+
+    // [EVENT] Check if instance is bound to plate (intersects or contained)
     bool contain_instance(int obj_id, int instance_id);
+
+    // [EVENT] Check if instance is fully contained within plate boundaries
+    // [PORTING_HAZARD:P1] Manifold collision detection system needed
     bool contain_instance_totally(ModelObject* object, int instance_id) const;
-    // judge whether instance is totally included in plate or not
     bool contain_instance_totally(int obj_id, int instance_id) const;
 
     // judge whether the plate's origin is at the left of instance or not
@@ -410,8 +467,15 @@ public:
     // move instances to left or right PartPlate
     void move_instances_to(PartPlate& left_plate, PartPlate& right_plate, BoundingBoxf3* bounding_box = nullptr);
 
-    /*rendering related functions*/
-    const Pointfs&              get_shape() const { return m_shape; }
+    /* [INTENT] Rendering related functions - visualization of plate geometry
+       [OPENGL] Direct GL rendering with transforms
+       [UNITY] Use MeshRenderer, MaterialPropertyBlock, Camera.Render() */
+
+    // [EVENT/STATE] Get plate geometry shape
+    const Pointfs& get_shape() const { return m_shape; }
+
+    // [EVENT] Set/update plate geometry, exclude areas, and parameters
+    // [UNITY] Update mesh colliders and render meshes
     bool                        set_shape(const Pointfs&              shape,
                                           const Pointfs&              exclude_areas,
                                           const std::vector<Pointfs>& extruder_areas,
@@ -421,11 +485,17 @@ public:
                                           float                       height_to_rod);
     const std::vector<Pointfs>& get_extruder_areas() const { return m_extruder_areas; }
     const std::vector<double>&  get_extruder_heights() const { return m_extruder_heights; }
-    bool                        contains(const Vec3d& point) const;
-    bool                        contains(const GLVolume& v) const;
-    bool                        contains(const BoundingBoxf3& bb) const;
-    bool                        intersects(const BoundingBoxf3& bb) const;
 
+    // [EVENT] Spatial containment and intersection queries
+    // [PORTING_HAZARD:P1] Bounding box logic may differ in Unity's coordinate space
+    bool contains(const Vec3d& point) const;
+    bool contains(const GLVolume& v) const;
+    bool contains(const BoundingBoxf3& bb) const;
+    bool intersects(const BoundingBoxf3& bb) const;
+
+    // [OPENGL] Main render method - draws plate and all visual elements
+    // [EVENT] Called every frame during scene render
+    // [PORTING_HAZARD:P2] Requires conversion to Unity's rendering pipeline (URP/HDRP)
     void render(const Transform3d& view_matrix,
                 const Transform3d& projection_matrix,
                 bool               bottom,
@@ -489,12 +559,18 @@ public:
 
     float get_slicing_percent() { return m_slice_percent; }
 
-    /*slice related functions*/
-    // update current slice context into backgroud slicing process
+    /* [INTENT] Slicing related functions - background processing
+       [THREAD] Slicing runs in background worker thread
+       [STATE] Manages print context and results */
+
+    // [EVENT] Update slice context to background process
+    // [THREAD] Called from main thread to pass context to worker
+    // [PORTING_HAZARD:P1] Unity needs Job System or async/await pattern
     void update_slice_context(BackgroundSlicingProcess& process);
-    // return the fff print object
-    Print* fff_print() { return m_print; }
-    // return the slice result
+
+    // [STATE] Access print object and slice results
+    // [UNITY] Use references to ScriptableObject or generated data
+    Print*                fff_print() { return m_print; }
     GCodeProcessorResult* get_slice_result() { return m_gcode_result; }
 
     std::string get_tmp_gcode_path();
@@ -524,9 +600,12 @@ public:
     void on_filament_added();
     void on_filament_deleted(int filament_count, int filament_id);
 
+    // [PORTING_HAZARD:P1] Cereal serialization - Unity uses JsonUtility, ScriptableObjects, or PlayerPrefs
     friend class cereal::access;
     friend class UndoRedo::StackImpl;
 
+    // [EVENT].Deserialize plate state from archive
+    // [PORTING_HAZARD:P1] Requires porting to Unity serialization (JSON, binary, or asset persistence)
     template<class Archive> void load(Archive& ar)
     {
         std::vector<std::pair<int, int>> objects_and_instances;
@@ -541,13 +620,16 @@ public:
         for (std::vector<std::pair<int, int>>::iterator it = instances_outside.begin(); it != instances_outside.end(); ++it)
             instance_outside_set.insert(std::pair(it->first, it->second));
     }
+
+    // [EVENT] Serialize plate state to archive
+    // [PORTING_HAZARD:P1] Requires porting to Unity serialization
     template<class Archive> void save(Archive& ar) const
     {
         std::vector<std::pair<int, int>> objects_and_instances;
         std::vector<std::pair<int, int>> instances_outside;
 
         for (std::set<std::pair<int, int>>::iterator it = instance_outside_set.begin(); it != instance_outside_set.end(); ++it)
-            instances_outside.emplace_back(it->first, it->second);
+            instance_outside.emplace_back(it->first, it->second);
 
         for (std::set<std::pair<int, int>>::iterator it = obj_to_instance_set.begin(); it != obj_to_instance_set.end(); ++it)
             objects_and_instances.emplace_back(it->first, it->second);
@@ -566,78 +648,112 @@ public:
 
 class PartPlateList : public ObjectBase
 {
+    // [INTENT] Manages all build plates in the workspace, handles creation, deletion, selection
+    // [STATE] Maintains ordered list of plates, current selection, global geometry
+    // [UNITY] Use PlateManager singleton or GameObject with PlateList component
+    // [PORTING_HAZARD:P1] ObjectBase inheritance needs Unity-compatible base
+    // [PORTING_HAZARD:P2] Requires Scene or ScriptableObject to persist plates
+
+    // [STATE] References to global systems
+    // [UNITY] Use Unity scene references or singleton pattern
     Plater*           m_plater; // Plater reference, not own it
     Model*            m_model;  // Model reference, not own it
     PrinterTechnology printer_technology;
 
+    // [STATE] Collection of all plates and their print results
+    // [UNITY] Use List<PartPlateMonoBehaviour> and Dictionary<int, PrintData>
+    // [THREAD] Mutex protects concurrent access during async operations
     std::vector<PartPlate*>     m_plate_list;
     std::map<int, PrintBase*>   m_print_list;
     std::map<int, GCodeResult*> m_gcode_result_list;
-    std::mutex                  m_plates_mutex;
+    std::mutex                  m_plates_mutex; // [THREAD] Guards plate list access
     int                         m_plate_count;
-    int                         m_plate_cols;
+    int                         m_plate_cols; // Grid layout columns
     int                         m_current_plate;
     int                         m_print_index;
 
+    // [STATE] Global plate dimensions
+    // [UNITY] MaterialPropertyBlock or ScriptableObject for dimensions
     int m_plate_width;
     int m_plate_depth;
     int m_plate_height;
 
+    // [STATE] Height limit parameters for collision avoidance
     float                      m_height_to_lid;
     float                      m_height_to_rod;
     PartPlate::HeightLimitMode m_height_limit_mode{PartPlate::HEIGHT_LIMIT_BOTH};
 
-    PartPlate            unprintable_plate;
+    // [STATE] Special unprintable plate for overflow/out-of-bounds objects
+    // [UNITY] Use separate GameObject or flag in plate system
+    PartPlate unprintable_plate;
+
+    // [STATE] Global geometry configuration (shape, exclude areas, extruder zones)
+    // [UNITY] Use shared MeshCollider for zones, serialized exclude areas
     Pointfs              m_shape;
     Pointfs              m_exclude_areas;
     Pointfs              m_wrapping_exclude_areas;
     std::vector<Pointfs> m_extruder_areas;
     std::vector<double>  m_extruder_heights;
     BoundingBoxf3        m_bounding_box;
-    bool                 m_intialized;
-    std::string          m_logo_texture_filename;
-    GLTexture            m_logo_texture;
-    GLTexture            m_del_texture;
-    GLTexture            m_del_hovered_texture;
-    GLTexture            m_move_front_hovered_texture;
-    GLTexture            m_move_front_texture;
-    GLTexture            m_arrange_texture;
-    GLTexture            m_arrange_hovered_texture;
-    GLTexture            m_orient_texture;
-    GLTexture            m_orient_hovered_texture;
-    GLTexture            m_locked_texture;
-    GLTexture            m_locked_hovered_texture;
-    GLTexture            m_lockopen_texture;
-    GLTexture            m_lockopen_hovered_texture;
-    GLTexture            m_plate_settings_texture;
-    GLTexture            m_plate_settings_changed_texture;
-    GLTexture            m_plate_settings_hovered_texture;
-    GLTexture            m_plate_settings_changed_hovered_texture;
-    GLTexture            m_plate_set_filament_map_texture;
-    GLTexture            m_plate_set_filament_map_hovered_texture;
-    GLTexture            m_plate_name_edit_texture;
-    GLTexture            m_plate_name_edit_hovered_texture;
-    GLTexture            m_idx_textures[MAX_PLATE_COUNT];
-    // set render option
+
+    // [STATE] Initialization flag and shared texture resources
+    // [UNITY] Use AssetBundle or Resources for textures
+    bool        m_intialized;
+    std::string m_logo_texture_filename;
+    GLTexture   m_logo_texture; // Bed type logo
+    GLTexture   m_del_texture;  // Delete icon
+    GLTexture   m_del_hovered_texture;
+    GLTexture   m_move_front_hovered_texture;
+    GLTexture   m_move_front_texture;
+    GLTexture   m_arrange_texture; // Auto-arrange icon
+    GLTexture   m_arrange_hovered_texture;
+    GLTexture   m_orient_texture; // Orientation icon
+    GLTexture   m_orient_hovered_texture;
+    GLTexture   m_locked_texture;
+    GLTexture   m_locked_hovered_texture;
+    GLTexture   m_lockopen_texture;
+    GLTexture   m_lockopen_hovered_texture;
+    GLTexture   m_plate_settings_texture; // Settings icon
+    GLTexture   m_plate_settings_changed_texture;
+    GLTexture   m_plate_settings_hovered_texture;
+    GLTexture   m_plate_settings_changed_hovered_texture;
+    GLTexture   m_plate_set_filament_map_texture; // Filament mapping icon
+    GLTexture   m_plate_set_filament_map_hovered_texture;
+    GLTexture   m_plate_name_edit_texture; // Name edit icon
+    GLTexture   m_plate_name_edit_hovered_texture;
+    GLTexture   m_idx_textures[MAX_PLATE_COUNT]; // Plate number labels
+
+    // [STATE] Render options for UI toggles
+    // [UNITY] Use boolean fields in PlateUIManager or settings
     bool render_bedtype_logo   = true;
     bool render_plate_settings = true;
     bool render_cali_logo      = true;
 
+    // [STATE] Theme and UI state
+    // [UNITY] Material themes or UI style manager
     bool m_is_dark = false;
 
+    // [STATE] Filament count for UI updates
+    // [UNITY] Reacts to configuration changes
     int m_filament_count = 1;
 
+    // [EVENT] Initialize plates, textures, and global state
+    // [UNITY] Call in Awake() or Start()
     void init();
-    // compute the origin for printable plate with index i
-    Vec3d compute_origin(int index, int column_count);
-    // compute the origin for unprintable plate
-    Vec3d compute_origin_for_unprintable();
-    // compute shape position
-    Vec2d compute_shape_position(int index, int cols);
-    // generate icon textures
-    void generate_icon_textures();
-    void release_icon_textures();
 
+    // [MATH] Compute plate origins for grid layout
+    // [PORTING_HAZARD:P1] Coordinate calculations may differ in Unity's 2D/UI space
+    Vec3d compute_origin(int index, int column_count);
+    Vec3d compute_origin_for_unprintable();
+    Vec2d compute_shape_position(int index, int cols);
+
+    // [EVENT] Generate and release UI icon textures
+    // [UNITY] Use Texture2D generation or load from sprites
+    void generate_icon_textures();
+    void release_icon_textures(); // [UNITY] Texture2D.Dispose()
+
+    // [STATE] Position wipe tower on specific plate
+    // [PORTING_HAZARD:P1] Port wipe tower logic to Unity
     void set_default_wipe_tower_pos_for_plate(int plate_idx);
 
     friend class cereal::access;
@@ -645,13 +761,17 @@ class PartPlateList : public ObjectBase
     friend class PartPlate;
 
 public:
+    // [INTENT] Helper class for managing bed/texture data
+    // [UNITY] Use ScriptableObject for texture atlases or Serializabe bed data
     class BedTextureInfo
     {
     public:
+        // [STATE] Texture sub-region definition
+        // [UNITY] Use Texture2D with UV rect
         class TexturePart
         {
         public:
-            // position
+            // position in texture atlas
             float       x;
             float       y;
             float       w;
@@ -660,6 +780,8 @@ public:
             GLTexture*  texture{nullptr};
             Vec2d       offset;
             GLModel*    buffer{nullptr};
+
+            // [EVENT] Constructor taking UV coordinates
             TexturePart(float xx, float yy, float ww, float hh, std::string file)
             {
                 x        = xx;
@@ -672,6 +794,7 @@ public:
                 offset   = Vec2d(0, 0);
             }
 
+            // [PORTING_HAZARD:P1] Copy constructor - verify Unity reference handling
             TexturePart(const TexturePart& part)
             {
                 this->x        = part.x;
@@ -692,14 +815,23 @@ public:
         void                     reset();
     };
 
+    // [STATE] Global constants and static texture resources
+    // [UNITY] Use LoadingManager or Addressables for texture loading
     static constexpr unsigned int MAX_PLATES_COUNT = MAX_PLATE_COUNT;
     static GLTexture              bed_textures[(unsigned int) btCount];
     static bool                   is_load_bedtype_textures;
     static bool                   is_load_cali_texture;
     static bool                   is_load_extruder_only_area_textures;
 
+    // [EVENT] Main constructor with full parameters
+    // [PORTING_HAZARD:P1] Requires Unity Awake/Start pattern for initialization
     PartPlateList(int width, int depth, int height, Plater* platerObj, Model* modelObj, PrinterTechnology tech = ptFFF);
+
+    // [EVENT] Simplified constructor
     PartPlateList(Plater* platerObj, Model* modelObj, PrinterTechnology tech = ptFFF);
+
+    // [EVENT] Destructor - cleans up plate list and textures
+    // [UNITY] Use OnDestroy() to release resources
     ~PartPlateList();
 
     // this may be happened after machine changed
@@ -727,25 +859,33 @@ public:
     // Pantheon: update plates after moving plate to the front
     void update_plates();
 
-    /*basic plate operations*/
-    // create an empty plate and return its index
+    /* [INTENT] Basic plate lifecycle operations
+       [EVENT] Creation, duplication, deletion plates
+       [UNITY] Use PlateManager methods to spawn/destroy GameObjects */
+
+    // [EVENT] Create new empty plate, return index
+    // [UNITY] Instantiate plate GameObject, add to list
     int create_plate(bool adjust_position = true);
 
-    // duplicate plate
+    // [EVENT] Duplicate existing plate and its configuration
+    // [PORTING_HAZARD:P1] Deep copy objects and instances
     int duplicate_plate(int index);
 
-    // destroy print which has the index of print_index
+    // [EVENT] Destroy print associated with index
+    // [THREAD] May involve async cleanup
     int destroy_print(int print_index);
 
-    // delete a plate by index
+    // [EVENT] Remove plate by index
+    // [UNITY] Destroy GameObject and cleanup references
     int delete_plate(int index);
 
-    // delete a plate by pointer
-    // int delete_plate(PartPlate* plate);
+    // [EVENT] Remove currently selected plate
     void delete_selected_plate();
 
+    // [STATE] Check bed type compatibility across plates
     bool check_all_plate_local_bed_type(const std::vector<BedType>& cur_bed_types);
-    // get a plate pointer by index
+
+    // [ACCESS] Get plate reference
     PartPlate* get_plate(int index);
 
     void get_height_limits(float& height_to_lid, float& height_to_rod)
@@ -805,56 +945,76 @@ public:
     // find plate by print index, return -1 if not found
     int find_plate_by_print_index(int index);
 
-    /*instance related operations*/
-    // find instance in which plate, return -1 when not found
-    // this function only judges whether it is intersect with plate
+    /* [INTENT] Instance cross-plate management
+       [STATE] Tracks where instances are, moves them between plates
+       [PORTING_HAZARD:P1] All spatial queries need Unity Bounds/Colliders */
+
+    // [EVENT] Find which plate contains instance (partial intersection)
     int find_instance(int obj_id, int instance_id);
     int find_instance(BoundingBoxf3& bounding_box);
 
-    // find instance belongs to which plate
-    // this function not only judges whether it is intersect with plate, but also judges whether it is fully included in plate
-    // returns -1 when can not find any plate
+    // [EVENT] Find plate that fully contains instance
+    // [PORTING_HAZARD:P2] Requires manifold containment test
     int find_instance_belongs(int obj_id, int instance_id);
 
-    // notify instance's update, need to refresh the instance in plates
+    // [EVENT] Refresh instance after transformation changes
+    // [UNITY] Called when objects move/rotate
     int notify_instance_update(int obj_id, int instance_id, bool is_new = false);
 
-    // notify instance is removed
+    // [EVENT] Remove instance from plate tracking
     int notify_instance_removed(int obj_id, int instance_id);
 
-    // add instance to special plate, need to remove from the original plate
+    // [EVENT] Explicitly move instance to target plate
     int add_to_plate(int obj_id, int instance_id, int plate_id);
 
-    // reload all objects
+    // [EVENT] Re-scan scene and rebuild plate content
+    // [PORTING_HAZARD:P1] Unity requires SceneObject enumeration
     int reload_all_objects(bool except_locked = false, int plate_index = -1);
 
-    // reload objects for newly created plate
+    // [EVENT] Populate plate after creation
     int construct_objects_list_for_new_plate(int plate_index);
 
-    /* arrangement related functions */
-    // compute the plate index
+    /* [INTENT] Arrangement and packing logic for auto-layout
+       [STATE] Compute plate assignments, collision avoidance, constraints
+       [PORTING_HAZARD:P1] Slic3r's Arrange -> Unity's packing algorithms */
+
+    // [MATH] Compute target plate index for object based on geometry
     int compute_plate_index(arrangement::ArrangePolygon& arrange_polygon);
-    // preprocess an arrangement::ArrangePolygon, return true if it is in a locked plate
+
+    // [EVENT] Pre-process single object for arrangement with lock constraints
     bool preprocess_arrange_polygon(int obj_index, int instance_index, arrangement::ArrangePolygon& arrange_polygon, bool selected);
+
+    // [EVENT] Check locked plate constraints
     bool preprocess_arrange_polygon_other_locked(int                          obj_index,
                                                  int                          instance_index,
                                                  arrangement::ArrangePolygon& arrange_polygon,
                                                  bool                         selected);
+
+    // [MATH] Exclude areas inflation and wrapping detection
+    // [PORTING_HAZARD:P2] Complex geometry algorithms
     bool preprocess_exclude_areas(arrangement::ArrangePolygons& unselected,
                                   bool                          enable_wrapping_detect,
                                   int                           num_plates = 16,
                                   float                         inflation  = 0);
     bool preprocess_nonprefered_areas(arrangement::ArrangePolygons& regions, int num_plates = 1, float inflation = 0);
 
+    // [EVENT] Post-process assigned plate index into arrange polygon
     void postprocess_bed_index_for_selected(arrangement::ArrangePolygon& arrange_polygon);
     void postprocess_bed_index_for_unselected(arrangement::ArrangePolygon& arrange_polygon);
     void postprocess_bed_index_for_current_plate(arrangement::ArrangePolygon& arrange_polygon);
 
-    // postprocess an arrangement:;ArrangePolygon
+    // [EVENT] Finalize arrangement assignment
     void postprocess_arrange_polygon(arrangement::ArrangePolygon& arrange_polygon, bool selected);
 
-    /*rendering related functions*/
+    /* [INTENT] Rendering all plates and global UI
+       [OPENGL] Orchestrates individual plate renders
+       [UNITY] Use Scene rendering, Camera.Render(), or URP ScriptableRenderPass */
+
+    // [EVENT] Theme change notification
     void on_change_color_mode(bool is_dark) { m_is_dark = is_dark; }
+
+    // [OPENGL] Main render orchestration for all plates
+    // [EVENT] Called every frame
     void render(const Transform3d& view_matrix,
                 const Transform3d& projection_matrix,
                 bool               bottom,
@@ -863,18 +1023,34 @@ public:
                 int                hover_id     = -1,
                 bool               render_cali  = false,
                 bool               show_grid    = true);
+
+    // [STATE] Set render feature toggles
     void set_render_option(bool bedtype_texture, bool plate_settings);
     void set_render_cali(bool value = true) { render_cali_logo = value; }
+
+    // [EVENT] Setup raycast/picking for UI interaction
+    // [UNITY] Register colliders with EventSystem or Physics.Raycast
     void register_raycasters_for_picking(GLCanvas3D& canvas)
     {
         for (auto plate : m_plate_list)
             plate->register_raycasters_for_picking(canvas);
     }
+
+    // [STATE] Get global bounding box
     BoundingBoxf3& get_bounding_box() { return m_bounding_box; }
-    // int select_plate_by_hover_id(int hover_id);
-    int  select_plate_by_obj(int obj_index, int instance_index);
+
+    // [EVENT] Select plate by object reference
+    int select_plate_by_obj(int obj_index, int instance_index);
+
+    // [EVENT] Update all plate bounding boxes
     void calc_bounding_boxes();
+
+    // [EVENT] Visual focus/center on current plate
+    // [UNITY] Camera control or UI highlight
     void select_plate_view();
+
+    // [EVENT] Update global plate geometry - affects all plates
+    // [PORTING_HAZARD:P2] Requires mesh regeneration cascade
     bool set_shapes(const Pointfs&              shape,
                     const Pointfs&              exclude_areas,
                     const Pointfs&              wrapping_exclude_areas,
@@ -883,50 +1059,73 @@ public:
                     const std::string&          custom_texture,
                     float                       height_to_lid,
                     float                       height_to_rod);
+
+    // [STATE] Hover state management
     void set_hover_id(int id);
     void reset_hover_id();
+
+    // [EVENT] Spatial queries for global bounding box
     bool intersects(const BoundingBoxf3& bb);
     bool contains(const BoundingBoxf3& bb);
 
     const std::string& get_logo_texture_filename() { return m_logo_texture_filename; }
     void               update_logo_texture_filename(const std::string& texture_filename);
-    /*slice related functions*/
-    // update current slice context into backgroud slicing process
+    /* [INTENT] Global slicing management - orchestrates slicing per plate
+       [THREAD] Background slicing operation coordination
+       [STATE] Track slice validity across all plates */
+
+    // [EVENT] Pass context to current plate for background slicing
+    // [PORTING_HAZARD:P1] Unity: Jobs or async/await for background work
     void update_slice_context_to_current_plate(BackgroundSlicingProcess& process);
-    // return the current fff print object
-    Print& get_current_fff_print() const;
-    // return the slice result
+
+    // [STATE] Access current plate's print and results
+    Print&                get_current_fff_print() const;
     GCodeProcessorResult* get_current_slice_result() const;
-    // will create a plate and load gcode, return the plate index
+
+    // [EVENT] Import gcode as new plate
+    // [PORTING_HAZARD:P2] File I/O, marshalling
     int create_plate_from_gcode_file(const std::string& filename);
 
-    // invalid all the plater's slice result
+    // [EVENT] Invalidate all cached slice results (e.g., after config change)
     void invalid_all_slice_result();
-    // set current plater's slice result to valid
+
+    // [EVENT] Update single plate slice valid state
     void update_current_slice_result_state(bool valid) { m_plate_list[m_current_plate]->update_slice_result_valid_state(valid); }
-    // is slice result valid or not
+
+    // [STATE] Aggregate slice validity checks
     bool is_all_slice_results_valid() const;
     bool is_all_slice_results_ready_for_print() const;
     bool is_all_plates_ready_for_slice() const;
     bool is_all_slice_result_ready_for_export() const;
+
+    // [DEBUG] Print state to console
     void print() const;
 
-    // get the all the sliced result
+    // [EVENT] Collect slice results from all plates
     void get_sliced_result(std::vector<bool>& sliced_result, std::vector<std::string>& gcode_paths);
-    // retruct plates structures after de-serialize
+
+    // [EVENT] Restore plates after deserialization
+    // [PORTING_HAZARD:P1] Unity: JsonUtility.FromJsonOverwrite or asset restoration
     int rebuild_plates_after_deserialize(std::vector<bool>& previous_sliced_result, std::vector<std::string>& previous_gcode_paths);
 
-    // retruct plates structures after auto-arrangement
-    int rebuild_plates_after_arrangement(bool recycle_plates = true, bool except_locked = false, int plate_index = -1);
+    // [EVENT] Rebuild plate layout after auto-arrangement
+    // [PORTING_HAZARD:P2] Recycle GameObjects by destroying old plates and creating new ones
+    int rebuild_plates_after_arrangement(bool recycle_plates = true, bool except_locked = false, int plate_idx = -1);
 
-    /* load/store releted functions, with_gcode = true and plate_idx = -1, export all gcode
-     * if with_gcode = true and specify plate_idx, export plate_idx gcode only
-     */
+    /* [INTENT] 3MF file serialization - import/export workspaces
+       [PORTING_HAZARD:P1] Port 3MF parser/serializer or use Unity's 3MF libraries */
+
+    // [EVENT] Export to 3MF structure
+    // [UNITY] Use MeshExport or custom 3MF writer
     int store_to_3mf_structure(PlateDataPtrs& plate_data_list, bool with_slice_info = true, int plate_idx = -1);
+
+    // [EVENT] Import from 3MF structure
     int load_from_3mf_structure(PlateDataPtrs& plate_data_list, int filament_count = 1);
-    // load gcode files
+
+    // [EVENT] Load gcode files after import
     int load_gcode_files();
 
+    // [PORTING_HAZARD:P1] Cereal serialization requires Unity replacement
     template<class Archive> void serialize(Archive& ar)
     {
         // ar(cereal::base_class<ObjectBase>(this));
@@ -936,6 +1135,7 @@ public:
            m_current_plate, m_plate_list, unprintable_plate);
         // ar(m_plate_width, m_plate_depth, m_plate_height, m_plate_count, m_current_plate);
     }
+    // [INTENT] Helper structures and texture management
     struct Rect
     {
         int x;
@@ -943,26 +1143,49 @@ public:
         int w;
         int h;
     };
+
+    // [MATH] Calculate extruder-only safe areas for dual nozzle
     bool calc_extruder_only_area(Rect& left_only_rect, Rect& right_only_rect);
+
+    // [EVENT] Initialize bed type texture metadata
     void init_bed_type_info();
+
+    // [EVENT] Initialize extruder-only area texture metadata
     bool init_extruder_only_area_info();
+
+    // [EVENT] Load bed type texture assets
+    // [UNITY] Use Resources.Load<Texture2D> or AssetBundle
     void load_bedtype_textures();
     void load_extruder_only_area_textures();
 
+    // [EVENT] Toggle calibration texture visibility
     void show_cali_texture(bool show = true);
+
+    // [EVENT] Initialize calibration texture metadata
     void init_cali_texture_info();
+
+    // [EVENT] Load calibration texture assets
     void load_cali_textures();
 
+    // [EVENT] Respond to extruder count changes
+    // [UNITY] Recalculate display and compatibility
     void on_extruder_count_changed(int extruder_count);
 
+    // [STATE] Update filament count for UI
     void set_filament_count(int filament_count);
+
+    // [EVENT] Handle filament lifecycle in plates
     void on_filament_deleted(int filament_count, int filament_id);
     void on_filament_added(int filament_count);
 
+    // [STATE] Per-plate compatibility flags for dual nozzle setups
+    // [UNITY] Use Dictionary<int, bool>
     std::map<int, bool> m_allow_bed_type_in_double_nozzle;
-    BedTextureInfo      bed_texture_info[btCount];
-    BedTextureInfo      cali_texture_info;
-    BedTextureInfo      extruder_only_area_info[(unsigned char) Slic3r::ExtruderOnlyAreaType::btAreaCount];
+
+    // [STATE/RESOURCE] Texture atlases for bed types, calibration, areas
+    BedTextureInfo bed_texture_info[btCount];
+    BedTextureInfo cali_texture_info;
+    BedTextureInfo extruder_only_area_info[(unsigned char) Slic3r::ExtruderOnlyAreaType::btAreaCount];
 };
 
 } // namespace GUI
