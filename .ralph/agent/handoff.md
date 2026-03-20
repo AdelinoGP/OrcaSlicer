@@ -1376,3 +1376,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (PORTING_HAZARD:P3 regarding macOS signal handling)
 - Git: annotate: src/slic3r/GUI/GUI_Init.cpp
 - Next recommended Phase 1 task: T385 annotate: src/slic3r/GUI/GUI_Init.hpp
+
+## Phase 1 - Task T385 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Init.hpp
+- Deliverables: src/slic3r/GUI/GUI_Init.hpp
+- Substantive additions: 4 architectural annotations (INTENT, STATE, THREAD, UNITY)
+- Verification excerpt: // [INTENT] Defines the initialization parameters and entry point...
+- Unity-impact summary:
+  - Init parameters map to CLI argument handling and Bootstrapper script.
+  - Global state storage for startup configs.
+- Hazards found: 0
+- Git: annotate: src/slic3r/GUI/GUI_Init.hpp
+- Next recommended Phase 1 task: T386 annotate: src/slic3r/GUI/GUI_ObjectLayers.cpp
