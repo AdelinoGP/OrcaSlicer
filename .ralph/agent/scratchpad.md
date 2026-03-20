@@ -1,11 +1,7 @@
 # Scratchpad
 
-- Objective: Phase 1 Annotation for Unity Port
-- Current state: Starting Phase 1 work.
-- Initial check: Many tasks are in `open` state, but files seem to be missing (e.g., T170 `src/slic3r/GUI/GUI_ObjectManipulation.hpp`).
-- Plan: 
-  1. Reconcile tasks with file manifest.
-  2. For missing files, create skip-trivial tasks and mark them as done in handoff.md.
-  3. For actual existing files, perform annotation.
-  4. Track progress in `tasks.jsonl` and `handoff.md`.
-- Next task: T170 is in the manifest but doesn't exist on disk. I will mark it as skipped.
+## 2026-03-20T06:05:00Z
+- Started runtime task `task-1773880086-7d47` (`T173 annotate: src/slic3r/GUI/PalmTree.cpp`) because it was the first ready Phase 1 task in the injected runtime queue.
+- Reconciliation note: runtime ready-task state and `.ralph/ralph-tasks.md` disagree materially. The runtime queue refers to `PalmTree.cpp`, while `.ralph/ralph-tasks.md` uses the same `T173` slot for `src/slic3r/GUI/BBLStatusBarSend.cpp` and contains no `PalmTree` entry.
+- Verification result: `src/slic3r/GUI/PalmTree.cpp` and `src/slic3r/GUI/PalmTree.hpp` do not exist anywhere under `src/`; glob and content search both returned no matches.
+- Action for this iteration: record the stale-task blocker in handoff, save a fix memory, fail the runtime task, and leave the next iteration to pick the next valid ready task after reconciliation.
