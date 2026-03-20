@@ -72,6 +72,7 @@ using GCodeResult = GCodeProcessorResult;
 
 // [INTENT] Represents a single build plate and its contents in the 3D scene
 // [UNITY] Replace with custom PartPlate MonoBehaviour component or ScriptableObject
+// [INTENT] Represents a single build plate and its contents in the 3D scene
 class PartPlate : public ObjectBase
 {
 public:
