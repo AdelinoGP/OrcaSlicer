@@ -40,5 +40,9 @@
 - Current iteration plan: select `T447 annotate: src/slic3r/GUI/Jobs/PrintJob.hpp`, verify header exists, capture PrintJob state/event/GL/threading semantics, layer `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments, append evidence block to `.ralph/agent/handoff.md`, and commit the change before closing the task.
 
 ## Iteration plan update
-- Current focus: wrap up active `T696 annotate: src/slic3r/GUI/Widgets/StateColor.hpp` by inserting the required `[INTENT|STATE|EVENT|THREAD|OPENGL|UNITY|PORTING_HAZARD]` notes across the shared color mapping utilities, state cloak, and construction helpers.
-- Steps: read header, sprinkle targeted annotations around the static factory helpers and runtime state accessors, update `.ralph/agent/handoff.md` with the required evidence block, and commit a single file before closing the task and selecting the next ready widget.
+## Iteration plan
+- Current focus: T443 annotate `src/slic3r/GUI/Jobs/OrientJob.cpp` (task-1773880087-c029); file exists so follow multi-tag documentation for job lifecycle, GL usage, threading, and Unity mapping.
+- Steps: read file, embed `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` notes around key structures and methods, append evidence block to `.ralph/agent/handoff.md`, commit the annotated file, and close the task before picking the next ready entry.
+## Iteration update
+- Documented orientation selection, background orchestration, and mesh application inside `OrientJob.cpp` with `[INTENT]` through `[PORTING_HAZARD]` tags plus Unity mapping guidance and hazard notes about `orientation::orient` mutations and selection threading.
+- Next focus: T444 annotate `src/slic3r/GUI/Jobs/OrientJob.hpp` once ready to keep the Jobs sequence moving.

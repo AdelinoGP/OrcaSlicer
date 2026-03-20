@@ -247,6 +247,19 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate: src/slic3r/GUI/Jobs/EmbossJob.hpp
 - Next recommended Phase 1 task: T436 annotate: src/slic3r/GUI/Jobs/FillBedJob.cpp
 
+## Phase 1 - Task T443 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/OrientJob.cpp
+- Deliverables: src/slic3r/GUI/Jobs/OrientJob.cpp
+- Substantive additions: 11 multi-tag annotations documenting intent, selection state, threading, events, OpenGL hints, Unity mapping, and porting hazards
+- Verification excerpt: // [INTENT] OrientJob drives the auto-orientation of selected model instances before printing, balancing selection, locked plates, and notification feedback.
+- Unity-impact summary:
+  - Treat OrientJob as a Unity coroutine that wraps a Burst-able orientation JobHandle and marshals selected instances back to the main thread for `Transform` updates.
+  - Replace notification calls with UI Toolkit toasts/status updates triggered by the coroutine's progress and completion callbacks.
+- Hazards found: 2 (P2 due to the CPU-bound `orientation::orient` mutation of meshes, P2 for mixing selection/raw state on the worker/main threads)
+- Git: annotate: src/slic3r/GUI/Jobs/OrientJob.cpp
+- Next recommended Phase 1 task: T444 annotate: src/slic3r/GUI/Jobs/OrientJob.hpp
+
 ### Remaining
 
 - [ ] P0-T006: Main Window Class Identification
