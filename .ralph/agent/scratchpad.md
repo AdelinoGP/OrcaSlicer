@@ -48,5 +48,5 @@
 - Next focus: T444 annotate `src/slic3r/GUI/Jobs/OrientJob.hpp` once ready to keep the Jobs sequence moving.
 
 ## Iteration plan update
-- Current focus: T450 annotate `src/slic3r/GUI/Jobs/RotoptimizeJob.hpp` (task-1773880087-732b) since the header exists and aligns with the ready list.
-- Steps: start the runtime task, read the header to understand job lifecycle, OpenGL/GL state, threading handoff, and Unity partner; add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments to the key declarations, update `.ralph/agent/handoff.md` with the evidence block, commit changes, close the task, and then pick the subsequent unblocked Phase 1 job.
+- Current focus: T366 annotate `src/slic3r/GUI/GLTexture.cpp` (tooling ready list) because the file exists and contains GL resource management we can self-contain.
+- Steps: start the runtime task, read the full `GLTexture.cpp`, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around texture lifecycle, cache state, and OpenGL interactions, append the evidence block to `.ralph/agent/handoff.md`, stage/commit the single file, and close T366 afterward.

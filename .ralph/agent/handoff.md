@@ -273,6 +273,7 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp
 - Next recommended Phase 1 task: T451 annotate: src/slic3r/GUI/Jobs/SendJob.cpp
 
+
 ### Remaining
 
 - [ ] P0-T006: Main Window Class Identification
@@ -1576,3 +1577,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 2 (P2 dark-mode global toggle, P3 LAB conversions & high-bit `Not*` masks require precise replicas).
 - Git: annotate: src/slic3r/GUI/Widgets/StateColor.hpp
 - Next recommended Phase 1 task: T647 annotate: src/slic3r/GUI/Widgets/Button.cpp
+
+## Phase 1 - Task T366 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GLTexture.cpp
+- Deliverables: src/slic3r/GUI/GLTexture.cpp
+- Substantive additions: 14 multi-tag annotations covering compression threading, texture loading, sprite atlas state, and rendering hooks (INTENT/STATE/EVENT/THREAD/OPENGL/UNITY/PORTING_HAZARD)
+- Verification excerpt: // [OPENGL] GPU uploads must happen on the main GL thread; bindings/texsubimage calls here drive the mipmap series.
+- Unity-impact summary:
+  - Implement the compressor as a Unity Job System worker that produces Texture2D byte buffers and schedules `Graphics.UploadTexture` on the render thread.
+  - Move PNG/SVG loading to Texture2D.LoadImage + Vector Graphics tessellation, then apply TextureImporter settings (mipmaps/compression/anisotropy) before use.
+  - Replace render_sub_texture with Graphics.DrawMesh/DrawProcedural in URP/HDRP to decouple from fixed-function GL states.
+- Hazards found: 3 (P1 async GL uploads, P2 thread + data ownership mix, P2 manual mipmap + resampling logic)
+- Git: annotate: GLTexture resource pipeline (T366)
+- Next recommended Phase 1 task: T367 annotate: src/slic3r/GUI/GLTexture.hpp
