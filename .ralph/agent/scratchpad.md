@@ -33,3 +33,7 @@
 - Selected task: T449 annotate: src/slic3r/GUI/Jobs/RotoptimizeJob.cpp (as manifest file exists and is reachable).
 - Process: start the runtime task, read the source to capture job setup, state, triggers, GL usage, threading, and hazard/Unity notes; insert high-value multi-tag comments; append evidence block to `.ralph/agent/handoff.md`; commit and close task; will then re-evaluate next ready entry for future turns.
 - Verification: confirm annotations mention event wiring, worker/GUI boundaries, OpenGL/resources, Unity translation (e.g., Job System, Coroutine), and porting hazards (threading, job lifecycle).
+
+## Iteration plan update
+- Completed `T114 annotate: src/libvgcode/src/ExtrusionRoles.hpp` with multi-tag comments that explain role timing storage, thread assumptions, and Unity mapping; updated `.ralph/ralph-tasks.md` to `[x]` and appended the evidence block for the file.
+- Next focus: begin `T115 annotate: src/libvgcode/src/GCodeInputData.cpp` once `ralph tools task ready` confirms it is primary, and ensure the annotation touches parser state, GL data flows, threading, Unity translation, and hazards before committing.

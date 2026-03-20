@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-20T23:15:00Z
+Last updated: 2026-03-20T23:34:00Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -32,7 +32,7 @@ Last updated: 2026-03-20T23:15:00Z
 - [x] T111 annotate: src/libvgcode/src/ColorPrint.cpp
 - [x] T112 annotate: src/libvgcode/src/ColorRange.cpp
 - [x] T113 annotate: src/libvgcode/src/ExtrusionRoles.cpp
-- [~] T114 annotate: src/libvgcode/src/ExtrusionRoles.hpp
+- [x] T114 annotate: src/libvgcode/src/ExtrusionRoles.hpp
 - [x] T115 skip-trivial: src/libvgcode/src/GCodeInputData.cpp
 - [x] T116 annotate: src/libvgcode/src/Layers.cpp
 - [x] T117 annotate: src/libvgcode/src/Layers.hpp
