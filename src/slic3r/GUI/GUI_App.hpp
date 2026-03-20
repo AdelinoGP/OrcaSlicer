@@ -268,30 +268,30 @@ private:
     // Best translation language, provided by Windows or OSX, owned by wxWidgets.
     const wxLanguageInfo* m_language_info_best = nullptr;
 
-    OpenGLManager                          m_opengl_mgr;
-    std::unique_ptr<RemovableDriveManager> m_removable_drive_manager;
+    OpenGLManager                          m_opengl_mgr;              // [OPENGL] OpenGL lifecycle management
+    std::unique_ptr<RemovableDriveManager> m_removable_drive_manager; // [STATE] Removable drive tracking
 
-    std::unique_ptr<ImGuiWrapper>                m_imgui;
-    std::unique_ptr<PrintHostJobQueue>           m_printhost_job_queue;
-    std::unique_ptr<OtherInstanceMessageHandler> m_other_instance_message_handler;
-    std::unique_ptr<wxSingleInstanceChecker>     m_single_instance_checker;
+    std::unique_ptr<ImGuiWrapper>                m_imgui; // [UNITY] ImGuiWrapper -> Unity UI Toolkit or custom ImGui implementation
+    std::unique_ptr<PrintHostJobQueue>           m_printhost_job_queue;            // [THREAD] Background job queue
+    std::unique_ptr<OtherInstanceMessageHandler> m_other_instance_message_handler; // [EVENT] Inter-process communication
+    std::unique_ptr<wxSingleInstanceChecker>     m_single_instance_checker;        // [STATE] Ensure single instance
     std::string                                  m_instance_hash_string;
     size_t                                       m_instance_hash_int;
 
-    std::unique_ptr<Downloader> m_downloader;
+    std::unique_ptr<Downloader> m_downloader; // [THREAD] Background file downloading
 
     // BBS
-    std::atomic<bool>                  m_is_closing{false};
-    Slic3r::DeviceManager*             m_device_manager{nullptr};
-    Slic3r::UserManager*               m_user_manager{nullptr};
-    Slic3r::TaskManager*               m_task_manager{nullptr};
-    NetworkAgent*                      m_agent{nullptr};
-    std::vector<std::string>           need_delete_presets;                                               // store setting ids of preset
-    std::vector<bool>                  m_create_preset_blocked{false, false, false, false, false, false}; // excceed limit
+    std::atomic<bool>                  m_is_closing{false};       // [STATE] App shutdown state
+    Slic3r::DeviceManager*             m_device_manager{nullptr}; // [STATE] Connected printer manager
+    Slic3r::UserManager*               m_user_manager{nullptr};   // [STATE] User session manager
+    Slic3r::TaskManager*               m_task_manager{nullptr};   // [THREAD] Background task coordination
+    NetworkAgent*                      m_agent{nullptr};          // [STATE] Networking interface
+    std::vector<std::string>           need_delete_presets;
+    std::vector<bool>                  m_create_preset_blocked{false, false, false, false, false, false};
     bool                               m_networking_compatible{false};
     bool                               m_networking_need_update{false};
     bool                               m_networking_cancel_update{false};
-    std::shared_ptr<UpgradeNetworkJob> m_upgrade_network_job;
+    std::shared_ptr<UpgradeNetworkJob> m_upgrade_network_job; // [THREAD] Background network update job
 
     // login widget
     ZUserLogin* login_dlg{nullptr};
