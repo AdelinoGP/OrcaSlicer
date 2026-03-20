@@ -5,7 +5,7 @@ event_loop:
   completion_promise: RALPH_TASK_COMPLETE
   idle_timeout_secs: 600
   max_iterations: 200
-  max_runtime: 28800
+  max_runtime_seconds: 28800
   verbose: true
 tasks:
   enabled: true    
