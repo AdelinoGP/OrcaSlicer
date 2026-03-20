@@ -201,6 +201,19 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate: src/slic3r/GUI/BackgroundSlicingProcess.hpp
 - Next recommended Phase 1 task: T165 annotate: src/slic3r/GUI/BaseTransparentDPIFrame.cpp
 
+## Phase 1 - Task T434 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/EmbossJob.cpp
+- Deliverables: src/slic3r/GUI/Jobs/EmbossJob.cpp
+- Substantive additions: 9 targeted annotations (INTENT, STATE, THREAD, EVENT, OPENGL, UNITY, PORTING_HAZARD, UNCLEAR)
+- Verification excerpt: // [INTENT] Run every emboss creation/update/cut path from one cohesive implementation so the GUI can queue jobs without duplicating mesh math.
+- Unity-impact summary:
+  - Map the async emboss job to a Unity Task/Job that creates the mesh off the main loop and marshals completion via a main-thread dispatcher.
+  - Translate the GLCanvas3D/GLGizmos refresh into updating the affected MeshFilter/MeshCollider and a GizmoController MonoBehaviour.
+- Hazards found: 2 (P2 raycast/cut surface plumbing, P3 mixed GL/worker/undo responsibilities)
+- Git: annotate EmbossJob job pipeline (T434)
+- Next recommended Phase 1 task: T435 annotate: src/slic3r/GUI/Jobs/EmbossJob.hpp
+
 ### Remaining
 
 - [ ] P0-T006: Main Window Class Identification

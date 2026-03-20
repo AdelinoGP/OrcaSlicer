@@ -352,7 +352,7 @@ Last updated: 2026-03-19T03:10:00Z
 - [ ] T431 annotate: src/slic3r/GUI/Jobs/CreateFontNameImageJob.hpp
 - [ ] T432 annotate: src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.cpp
 - [ ] T433 annotate: src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.hpp
-- [ ] T434 annotate: src/slic3r/GUI/Jobs/EmbossJob.cpp
+- [x] T434 annotate: src/slic3r/GUI/Jobs/EmbossJob.cpp
 - [ ] T435 annotate: src/slic3r/GUI/Jobs/EmbossJob.hpp
 - [ ] T436 annotate: src/slic3r/GUI/Jobs/FillBedJob.cpp
 - [ ] T437 annotate: src/slic3r/GUI/Jobs/FillBedJob.hpp
