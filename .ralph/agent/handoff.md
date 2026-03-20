@@ -273,8 +273,8 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - [ ] T186 annotate: src/slic3r/GUI/Jobs/EmbossUpdateJob.hpp
 - [ ] T187 annotate: src/slic3r/GUI/Jobs/Job.cpp
 - [ ] T188 annotate: src/slic3r/GUI/Jobs/Job.hpp
-- [ ] T189 annotate: src/slic3r/GUI/Jobs/JobList.cpp
-- [ ] T190 annotate: src/slic3r/GUI/Jobs/JobList.hpp
+- [!] T189 annotate: src/slic3r/GUI/Jobs/JobList.cpp
+- [!] T190 annotate: src/slic3r/GUI/Jobs/JobList.hpp
 - [ ] T191 annotate: src/slic3r/GUI/Jobs/LightJob.cpp
 - [ ] T192 annotate: src/slic3r/GUI/Jobs/LightJob.hpp
 - [ ] T193 annotate: src/slic3r/GUI/Jobs/MedialAxisJob.cpp
@@ -814,6 +814,20 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Failure reason: source file absent from repo; confirm whether it was renamed or intentionally removed before retrying this job list task.
 - Next recommended Phase 1 task: T190 annotate: src/slic3r/GUI/Jobs/JobList.hpp
 - Hazards found: 1 (P3 missing job list UI entrypoint blocks accurate Unity component mapping for the job browser)
+
+## Phase 1 - Task T190 failed
+- Task type: annotate (failed)
+- File: src/slic3r/GUI/Jobs/JobList.hpp
+- Failure reason: header absent from repo; we cannot begin annotating the job list interface without the missing definitions.
+- Next recommended Phase 1 task: T191 annotate: src/slic3r/GUI/Jobs/LightJob.cpp (assuming the job module files are present)
+- Hazards found: 1 (P3 absence of JobList definitions leaves JobList/GUI orchestration undocumented, forcing subsequent tasks to infer its behavior)
+
+## Phase 1 - Task T193 failed
+- Task type: annotate (failed)
+- File: src/slic3r/GUI/Jobs/MedialAxisJob.cpp
+- Failure reason: source file absent from repo; need to confirm whether the MedialAxis job lives elsewhere or should be skipped.
+- Next recommended Phase 1 task: T194 annotate: src/slic3r/GUI/Jobs/MedialAxisJob.hpp
+- Hazards found: 1 (P3 missing MedialAxis job implementation leaves its geometry-processing impact undocumented for Unity mapping)
 
 ## Key Files
 
@@ -1474,3 +1488,27 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2=2, P3=2
 - Git: Annotate EmbossJob orchestration
 - Next recommended Phase 1 task: T435 annotate: src/slic3r/GUI/Jobs/EmbossJob.hpp
+
+## Task failure log
+- T191 annotate: src/slic3r/GUI/Jobs/LightJob.cpp (blocked: file missing in repo; both .cpp/.hpp absent).
+- Blocker action: confirm path or supply missing source before the next attempt.
+- Next recommended Phase 1 task: T192 annotate: src/slic3r/GUI/Jobs/LightJob.hpp or, if missing too, skip-trivial justification for T191/T192.
+- T193 annotate: src/slic3r/GUI/Jobs/MedialAxisJob.cpp (blocked: source missing in repo).
+- Blocker action: locate the implementation or document that the MedialAxis job was removed before retrying.
+- Next recommended Phase 1 task: T194 annotate: src/slic3r/GUI/Jobs/MedialAxisJob.hpp.
+- T192 annotate: src/slic3r/GUI/Jobs/LightJob.hpp (blocked: header missing in repo).
+- Blocker action: confirm the LightJob definitions still exist or update the manifest; no source file present for comment insertion.
+- Next recommended Phase 1 task: T194 annotate: src/slic3r/GUI/Jobs/MedialAxisJob.hpp (or revisit T192 once sources are available).
+
+## Phase 1 - Task T449 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/RotoptimizeJob.cpp
+- Deliverables: src/slic3r/GUI/Jobs/RotoptimizeJob.cpp
+- Substantive additions: 4 multi-tag annotations covering INTENT/STATE/THREAD/EVENT/OPENGL/UNITY/PORTING_HAZARD guidance for the job lifecycle.
+- Verification excerpt: // [THREAD] `process()` runs on the background worker bound to the job queue; `Ctl` carries the cancellation/progress channel back to the GUI.
+- Unity-impact summary:
+  - Mirror this job as a MonoBehaviour-triggered Worker that caches selection/config, runs a Unity Job/System, and surfaces progress via `IProgress<float>`/`CancellationToken`.
+  - Apply the computed rotations to Unity GameObjects (via `Transform.rotation`) and trigger a camera redraw instead of `Plater::update()` once the job completes.
+- Hazards found: 2 (P2 reliance on global `wxGetApp` services, P3 blocking `Methods[m_method_id].findfn`).
+- Git: annotate: RotoptimizeJob job lifecycle (T449)
+- Next recommended Phase 1 task: T450 annotate: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp

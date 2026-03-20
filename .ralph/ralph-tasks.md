@@ -367,7 +367,7 @@ Last updated: 2026-03-20T22:49:42Z
 - [ ] T446 annotate: src/slic3r/GUI/Jobs/PrintJob.cpp
 - [ ] T447 annotate: src/slic3r/GUI/Jobs/PrintJob.hpp
 - [ ] T448 annotate: src/slic3r/GUI/Jobs/ProgressIndicator.hpp
-- [ ] T449 annotate: src/slic3r/GUI/Jobs/RotoptimizeJob.cpp
+- [x] T449 annotate: src/slic3r/GUI/Jobs/RotoptimizeJob.cpp
 - [ ] T450 annotate: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp
 - [ ] T451 annotate: src/slic3r/GUI/Jobs/SendJob.cpp
 - [ ] T452 annotate: src/slic3r/GUI/Jobs/SendJob.hpp
@@ -614,7 +614,7 @@ Last updated: 2026-03-20T22:49:42Z
 - [ ] T693 annotate: src/slic3r/GUI/Widgets/SpinInput.cpp
 - [ ] T694 annotate: src/slic3r/GUI/Widgets/SpinInput.hpp
 - [ ] T695 annotate: src/slic3r/GUI/Widgets/StateColor.cpp
-- [ ] T696 annotate: src/slic3r/GUI/Widgets/StateColor.hpp
+- [~] T696 annotate: src/slic3r/GUI/Widgets/StateColor.hpp
 - [ ] T697 annotate: src/slic3r/GUI/Widgets/StateHandler.cpp
 - [ ] T698 annotate: src/slic3r/GUI/Widgets/StateHandler.hpp
 - [ ] T699 annotate: src/slic3r/GUI/Widgets/StaticBox.cpp
