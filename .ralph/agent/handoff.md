@@ -1428,3 +1428,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 0
 - Git: annotate: src/slic3r/GUI/GUI_Init.hpp
 - Next recommended Phase 1 task: T386 annotate: src/slic3r/GUI/GUI_ObjectLayers.cpp
+
+## Phase 1 - Task T188 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/Job.hpp
+- Deliverables: src/slic3r/GUI/Jobs/Job.hpp
+- Substantive additions: 6 architectural annotations (INTENT, STATE, EVENT, THREAD, UNITY, PORTING_HAZARD)
+- Verification excerpt: // [INTENT] A base job encapsulating work that must run off the UI thread so the main application stays responsive while `Worker` orchestrates execution.
+- Unity-impact summary:
+  - Mirror `process` with `Task.Run` + `CancellationTokenSource` and marshal updates via `SynchronizationContext.Post` or `UnityMainThreadDispatcher`.
+  - Surface UI-side finalization through MonoBehaviour callbacks to keep exception handling on Unity's main thread.
+- Hazards found: P2=1, P3=2
+- Git: Document Job threading contract for Unity port
+- Next recommended Phase 1 task: T189 annotate: src/slic3r/GUI/Jobs/JobList.cpp
