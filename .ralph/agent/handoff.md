@@ -260,6 +260,19 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate: src/slic3r/GUI/Jobs/OrientJob.cpp
 - Next recommended Phase 1 task: T444 annotate: src/slic3r/GUI/Jobs/OrientJob.hpp
 
+## Phase 1 - Task T450 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp
+- Deliverables: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp
+- Substantive additions: 9 multi-tag annotations (INTENT/STATE/EVENT/THREAD/UNITY/PORTING_HAZARD)
+- Verification excerpt: // [THREAD] Executes on a background worker via Job::process, using `Ctl` for progress/cancel and `Methods[m_method_id]` to compute rotations.
+- Unity-impact summary:
+  - Model this job as a ScriptableObject descriptor scheduled by a MonoBehaviour/coroutine so rotated results can be marshaled back to the UI thread.
+  - Mirror the dropdown metadata with a Unity `ListSource` and expose accuracy/method controls as serialized fields on the controlling component.
+- Hazards found: 2 (P3 selection copy, P2 finalize writing back into `Plater`)
+- Git: annotate: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp
+- Next recommended Phase 1 task: T451 annotate: src/slic3r/GUI/Jobs/SendJob.cpp
+
 ### Remaining
 
 - [ ] P0-T006: Main Window Class Identification
