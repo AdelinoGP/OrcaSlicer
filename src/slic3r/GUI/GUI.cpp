@@ -41,7 +41,7 @@ IOPMAssertionID assertionID;
 #endif
 
 // [INTENT] Prevents system sleep/screensaver during long operations.
-// [UNITY] Use Screen.sleepTimeout = SleepTimeout.NeverSleep.
+// [UNITY] Use Screen.sleepTimeout = SleepTimeout.NeverSleep;
 void disable_screensaver()
 {
 #if __APPLE__
@@ -50,40 +50,40 @@ void disable_screensaver()
                                                                               reasonForActivity, &assertionID);
 // ignore result: success == kIOReturnSuccess
 #elif _WIN32
-    SetThreadExecutionState(ES_DISPLAY_REQUIRED | ES_CONTINUOUS);
+    SetThreadExecutionState(ES_DISPLAY_REQUIRED | ES_CONTINUOUS); // [PORTING_HAZARD:P1] Platform-specific API
 #endif
 }
 
 // [INTENT] Re-enables system sleep/screensaver.
-// [UNITY] Use Screen.sleepTimeout = SleepTimeout.SystemSetting.
+// [UNITY] Use Screen.sleepTimeout = SleepTimeout.SystemSetting;
 void enable_screensaver()
 {
 #if __APPLE__
     IOPMAssertionRelease(assertionID);
 #elif _WIN32
-    SetThreadExecutionState(ES_CONTINUOUS);
+    SetThreadExecutionState(ES_CONTINUOUS); // [PORTING_HAZARD:P1] Platform-specific API
 #endif
 }
 
 // [INTENT] Checks if the application is currently being debugged.
-// [UNITY] Use Debug.isDebugBuild or System.Diagnostics.Debugger.IsAttached.
+// [UNITY] Use UnityEngine.Debug.isDebugBuild.
 bool debugged()
 {
 #ifdef _WIN32
-    return IsDebuggerPresent() == TRUE;
+    return IsDebuggerPresent() == TRUE; // [PORTING_HAZARD:P1] Platform-specific API
 #else
     return false;
 #endif /* _WIN32 */
 }
 
 // [INTENT] Triggers a breakpoint if a debugger is attached.
-// [UNITY] Use Debug.Break() or System.Diagnostics.Debugger.Break().
+// [UNITY] Use UnityEngine.Debug.Break().
 void break_to_debugger()
 {
 #ifdef _WIN32
     if (IsDebuggerPresent())
-        DebugBreak();
-#endif /* _WIN32 */
+        DebugBreak(); // [PORTING_HAZARD:P1] Platform-specific API
+#endif                /* _WIN32 */
 }
 
 const std::string& shortkey_ctrl_prefix()
