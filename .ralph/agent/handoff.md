@@ -38,6 +38,7 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - [x] T101-part2 annotate: src/slic3r/GUI/GUI_App.cpp (part 2: lines 3257-7965, remaining functions)
 - [x] T104 annotate: src/slic3r/GUI/MainFrame.cpp
 - [x] Verify and document P0-T003 GUI directory census
+
 - [x] Commit orientation complete
 - [x] P0-T001: Repository state verification
 - [x] P0-T003: GUI Directory Census
@@ -1604,3 +1605,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 2 (P2 marshaling requirement for `call_on_main_thread`, P3 main-thread exclusivity for `finalize()`)
 - Git: annotate Job.hpp with migration-focused remarks
 - Next recommended Phase 1 task: T439 annotate: src/slic3r/GUI/Jobs/NotificationProgressIndicator.cpp
+
+## Phase 1 - Task T367 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GLTexture.hpp
+- Deliverables: src/slic3r/GUI/GLTexture.hpp
+- Substantive additions: ~12 multi-tag annotations covering compressor threading, loader events, and render/Unity guidance for texture helpers.
+- Verification excerpt: `// [EVENT] Called whenever a GUI component requests a new texture (icon, label, atlas) so the loader can swap GPU resources without blocking.`
+- Unity-impact summary:
+  - Texture management becomes a `Texture2D`/ScriptableObject asset with background Task uploads that call `Apply()` before sampling.
+  - The compressor mirrors a Unity Job that stages mipmaps and signals the main thread via `MaterialPropertyBlock`/`Texture2D.SetPixelData`.
+  - Render helpers map to `Graphics.DrawTexture` or sprite-mesh draws, and manual UV math should translate to `Sprite.Create` slices.
+- Hazards found: P2 (stateful SVG sprite flags/shader variants) and P3 (manual UV math + background compressor thread sync).
+- Git: Annotate GLTexture header state
+- Next recommended Phase 1 task: T368 annotate: src/slic3r/GUI/GLToolbar.cpp

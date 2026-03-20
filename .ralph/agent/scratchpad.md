@@ -50,3 +50,10 @@
 ## Iteration plan update
 - Current focus: T366 annotate `src/slic3r/GUI/GLTexture.cpp` (tooling ready list) because the file exists and contains GL resource management we can self-contain.
 - Steps: start the runtime task, read the full `GLTexture.cpp`, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around texture lifecycle, cache state, and OpenGL interactions, append the evidence block to `.ralph/agent/handoff.md`, stage/commit the single file, and close T366 afterward.
+
+## Iteration plan update
+- Selected task: T367 annotate: `src/slic3r/GUI/GLTexture.hpp`, the immutable header that orchestrates GL texture lifecycle and compression helpers.
+- Steps: audit the header for GPU state, thread/async concerns, OpenGL renders, Unity replacements, and porting hazards, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` tags, append the mandated handoff evidence, and finish the runtime task plus commit.
+
+## Iteration update
+- Added multi-tag comments to the GLTexture header, covering compressor threading, render helpers, loader events, and Unity mapping before capturing the evidence block and preparing to close T367.
