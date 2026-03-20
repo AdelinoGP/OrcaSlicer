@@ -1295,3 +1295,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2 - manual event synchronization).
 - Git: annotate(gui): document ImGuiWrapper interface (src/slic3r/GUI/ImGuiWrapper.hpp)
 - Next recommended Phase 1 task: T175 annotate: src/slic3r/GUI/ImGuiWrapper.cpp
+
+## Phase 1 - Task T175 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ImGuiWrapper.cpp
+- Deliverables: src/slic3r/GUI/ImGuiWrapper.cpp
+- Substantive additions: 10+ annotations covering implementation details, GL state management, and event bridging.
+- Verification excerpt: [OPENGL] Manages GPU state: backups current state, sets up blending/scissor/viewport for UI, and restores state after draw calls.
+- Unity-impact summary:
+  - Complex raw OpenGL state management (backups/restores) is eliminated in Unity.
+  - Native Unity UI (UGUI or UI Toolkit) handles high-DPI scaling and screen-to-framebuffer mapping automatically.
+  - Custom ImGui widgets should be ported to Unity's UI component model.
+- Hazards found: 1 (P2 - Raw OpenGL state complexity).
+- Git: annotate(gui): document ImGuiWrapper implementation (src/slic3r/GUI/ImGuiWrapper.cpp)
+- Next recommended Phase 1 task: T177 annotate: src/slic3r/GUI/InputArchive.cpp
