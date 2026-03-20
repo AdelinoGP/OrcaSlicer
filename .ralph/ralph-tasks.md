@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-20T23:32:24Z
+Last updated: 2026-03-20T23:39:19Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -356,7 +356,7 @@ Last updated: 2026-03-20T23:32:24Z
 - [x] T435 annotate: src/slic3r/GUI/Jobs/EmbossJob.hpp
 - [ ] T436 annotate: src/slic3r/GUI/Jobs/FillBedJob.cpp
 - [ ] T437 annotate: src/slic3r/GUI/Jobs/FillBedJob.hpp
-- [ ] T438 annotate: src/slic3r/GUI/Jobs/Job.hpp
+- [x] T438 annotate: src/slic3r/GUI/Jobs/Job.hpp
 - [ ] T439 annotate: src/slic3r/GUI/Jobs/NotificationProgressIndicator.cpp
 - [ ] T440 annotate: src/slic3r/GUI/Jobs/NotificationProgressIndicator.hpp
 - [ ] T441 annotate: src/slic3r/GUI/Jobs/OAuthJob.cpp

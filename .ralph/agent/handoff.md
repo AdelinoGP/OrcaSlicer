@@ -1591,3 +1591,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 3 (P1 async GL uploads, P2 thread + data ownership mix, P2 manual mipmap + resampling logic)
 - Git: annotate: GLTexture resource pipeline (T366)
 - Next recommended Phase 1 task: T367 annotate: src/slic3r/GUI/GLTexture.hpp
+
+## Phase 1 - Task T438 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/Job.hpp
+- Deliverables: src/slic3r/GUI/Jobs/Job.hpp
+- Substantive additions: 5 architectural annotations covering enum state, worker events, main-thread dispatch, and Unity lifecycle mapping
+- Verification excerpt: // [EVENT] Marshals a lambda back to the UI thread so that the job can rerender widgets or display dialogs without racing the worker.
+- Unity-impact summary:
+  - Route callbacks through a `MainThreadDispatcher` MonoBehaviour or `SynchronizationContext.Post` so Unity Tasks never touch UI directly.
+  - Mirror `finalize()` with a dispatcher-run continuation that updates shared `ScriptableObject` state and reports errors on the main thread.
+- Hazards found: 2 (P2 marshaling requirement for `call_on_main_thread`, P3 main-thread exclusivity for `finalize()`)
+- Git: annotate Job.hpp with migration-focused remarks
+- Next recommended Phase 1 task: T439 annotate: src/slic3r/GUI/Jobs/NotificationProgressIndicator.cpp
