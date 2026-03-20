@@ -2,7 +2,7 @@
 
 **Status:** Completed successfully
 **Iterations:** 1
-**Duration:** 2m 8s
+**Duration:** 32m 33s
 
 ## Tasks
 
@@ -14,4 +14,4 @@ _No events recorded._
 
 ## Final Commit
 
-0b72a16bb9: Record stale PalmTree runtime task
+452a347110: chore(gui): reconcile ImGuiWrapper tasks and update registry
