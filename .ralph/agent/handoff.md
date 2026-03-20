@@ -2,6 +2,9 @@
 
 _Generated: 2026-03-20 07:11:02 UTC_
 
+## Task reconciliation
+- `.ralph/ralph-tasks.md` currently tracks Phase 1 entries through T186 (mostly earlier GUI widgets), but the runtime `ralph tools task list` and the supplied `<ready-tasks>` manifest now describe tasks starting at T187 (Jobs/Job.cpp and later). We'll treat the runtime task list as the canonical manifest for the current work and document these differences in this handoff log going forward.
+
 ## Git Context
 
 - **Branch:** `agent/gui-analysis`
