@@ -1309,3 +1309,10 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2 - Raw OpenGL state complexity).
 - Git: annotate(gui): document ImGuiWrapper implementation (src/slic3r/GUI/ImGuiWrapper.cpp)
 - Next recommended Phase 1 task: T177 annotate: src/slic3r/GUI/InputArchive.cpp
+
+## Phase 1 Reconciliation
+- Reconciled duplicate tasks for `ImGuiWrapper` in `tasks.jsonl` and `ralph-tasks.md`.
+- `ImGuiWrapper` was documented as `T415/T416` in `ralph-tasks.md` but also existed as `T175/T176` in `tasks.jsonl`.
+- Work completed for `src/slic3r/GUI/ImGuiWrapper.hpp` and `src/slic3r/GUI/ImGuiWrapper.cpp`.
+- Canonical Phase 1 tasks `T415` and `T416` marked as DONE.
+- `T175/T176` in `tasks.jsonl` were also closed to avoid confusion, but they refer to `BBLTopbar` in the markdown. I will handle `BBLTopbar` separately if needed.

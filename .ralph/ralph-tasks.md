@@ -333,8 +333,8 @@ Last updated: 2026-03-19T03:10:00Z
 - [ ] T412 annotate: src/slic3r/GUI/ImageDPIFrame.cpp
 - [ ] T413 annotate: src/slic3r/GUI/ImageDPIFrame.hpp
 - [ ] T414 annotate: src/slic3r/GUI/ImageGrid.cpp
-- [ ] T415 annotate: src/slic3r/GUI/ImGuiWrapper.cpp
-- [ ] T416 annotate: src/slic3r/GUI/ImGuiWrapper.hpp
+- [x] DONE T415 annotate: src/slic3r/GUI/ImGuiWrapper.cpp
+- [x] DONE T416 annotate: src/slic3r/GUI/ImGuiWrapper.hpp
 - [ ] T417 annotate: src/slic3r/GUI/IMSlider.cpp
 - [ ] T418 annotate: src/slic3r/GUI/IMSlider.hpp
 - [ ] T419 annotate: src/slic3r/GUI/IMToolbar.cpp
