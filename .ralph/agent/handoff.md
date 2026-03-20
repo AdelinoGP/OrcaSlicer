@@ -1537,3 +1537,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2:1, P3:3
 - Git: Annotate PrintJob job state
 - Next recommended Phase 1 task: T448 annotate: src/slic3r/GUI/Jobs/ProgressIndicator.hpp
+
+## Phase 1 - Task T696 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/StateColor.hpp
+- Deliverables: src/slic3r/GUI/Widgets/StateColor.hpp
+- Substantive additions: 8 multi-tag annotations covering INTENT, STATE, UNITY, THREAD, and PORTING_HAZARD insights around the palette helpers.
+- Verification excerpt: // [INTENT] Centralize the shared palettes that widgets use for hover/focus/pressed/disabled color variations so renderers stay consistent.
+- Unity-impact summary:
+  - Store the mask-to-color mapping inside a ScriptableObject or UI Toolkit style asset so runtime selectors can reuse the same palette dictionaries.
+  - Reproduce the LAB/lightness helpers with ColorUtility/Color.Lerp and keep a serialized bool so dark mode toggles flip all lookup tables atomically.
+- Hazards found: 2 (P2 dark-mode global toggle, P3 LAB conversions & high-bit `Not*` masks require precise replicas).
+- Git: annotate: src/slic3r/GUI/Widgets/StateColor.hpp
+- Next recommended Phase 1 task: T647 annotate: src/slic3r/GUI/Widgets/Button.cpp
