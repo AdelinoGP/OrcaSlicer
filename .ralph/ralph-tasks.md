@@ -54,7 +54,7 @@ Last updated: 2026-03-19T03:10:00Z
 - [x] T133 annotate: src/libvgcode/src/Types.cpp
 - [x] T134 annotate: src/libvgcode/src/Utils.cpp
 - [x] T135 annotate: src/libvgcode/src/Utils.hpp
-- [~] T136 annotate: src/libvgcode/src/Viewer.cpp
+- [x] T136 annotate: src/libvgcode/src/Viewer.cpp
 - [ ] T137 annotate: src/libvgcode/src/ViewerImpl.cpp
 - [ ] T138 annotate: src/libvgcode/src/ViewerImpl.hpp
 - [ ] T139 annotate: src/libvgcode/src/ViewRange.cpp
