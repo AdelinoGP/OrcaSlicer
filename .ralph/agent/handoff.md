@@ -1525,3 +1525,15 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 2 (P3 multi-thread access, P3 sentinel mismatch that will crash `get_time`).
 - Git: Annotate ExtrusionRoles header for Unity port
 - Next recommended Phase 1 task: T115 annotate: src/libvgcode/src/GCodeInputData.cpp
+## Phase 1 - Task T447 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/PrintJob.hpp
+- Deliverables: src/slic3r/GUI/Jobs/PrintJob.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 13 multi-tag annotations (INTENT/STATE/THREAD/EVENT/OPENGL/UNITY/PORTING_HAZARD) describing job state, event wiring, Unity mapping, and hazards
+- Verification excerpt: // [UNITY] Replace with a `MonoBehaviour` or `ScriptableObject` `PrintJobController` that schedules `Task.Run` uploads and posts success/failure back to Unity UI via a singleton `MainThreadDispatcher`.
+- Unity-impact summary:
+  - Model PrintJob as a `PrintJobController` MonoBehaviour that hosts a background upload `Task` or coroutine and exposes `UnityEvent`-style callbacks for panels.
+  - Surface the boolean state toggles (SSL, AMS, bed leveling, SD card access) through a shared `ScriptableObject` settings model so Unity panels render the same options without wxWidgets.
+- Hazards found: P2:1, P3:3
+- Git: Annotate PrintJob job state
+- Next recommended Phase 1 task: T448 annotate: src/slic3r/GUI/Jobs/ProgressIndicator.hpp

@@ -365,7 +365,7 @@ Last updated: 2026-03-20T23:34:00Z
 - [ ] T444 annotate: src/slic3r/GUI/Jobs/OrientJob.hpp
 - [ ] T445 annotate: src/slic3r/GUI/Jobs/PlaterWorker.hpp
 - [ ] T446 annotate: src/slic3r/GUI/Jobs/PrintJob.cpp
-- [ ] T447 annotate: src/slic3r/GUI/Jobs/PrintJob.hpp
+- [x] T447 annotate: src/slic3r/GUI/Jobs/PrintJob.hpp
 - [ ] T448 annotate: src/slic3r/GUI/Jobs/ProgressIndicator.hpp
 - [x] T449 annotate: src/slic3r/GUI/Jobs/RotoptimizeJob.cpp
 - [ ] T450 annotate: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp

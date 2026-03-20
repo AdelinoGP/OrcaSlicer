@@ -37,3 +37,4 @@
 ## Iteration plan update
 - Completed `T114 annotate: src/libvgcode/src/ExtrusionRoles.hpp` with multi-tag comments that explain role timing storage, thread assumptions, and Unity mapping; updated `.ralph/ralph-tasks.md` to `[x]` and appended the evidence block for the file.
 - Next focus: begin `T115 annotate: src/libvgcode/src/GCodeInputData.cpp` once `ralph tools task ready` confirms it is primary, and ensure the annotation touches parser state, GL data flows, threading, Unity translation, and hazards before committing.
+- Current iteration plan: select `T447 annotate: src/slic3r/GUI/Jobs/PrintJob.hpp`, verify header exists, capture PrintJob state/event/GL/threading semantics, layer `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments, append evidence block to `.ralph/agent/handoff.md`, and commit the change before closing the task.
