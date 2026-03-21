@@ -282,3 +282,7 @@
 ## Iteration plan update
 - Focus: T337 annotate src/slic3r/GUI/Gizmos/GLGizmoRotate.cpp (task-1773880086-41ad).
 - Steps: mark task active, read the file to capture rotate gizmo intent/state/events/render flow, add multi-tag annotations covering intent/state/event/thread/OpenGL/Unity/porting hazard, append evidence to .ralph/agent/handoff.md after annotations, commit the change, close the task, and then select the next ready Phase 1 file for the next iteration.
+
+## Iteration plan update
+- Current focus: T338 annotate `src/slic3r/GUI/Gizmos/GLGizmoRotate.hpp` (task-1773880086-5808).
+- Plan: start the runtime task, read the header end-to-end, annotate the class intent, cached state (rotation axis, grabber IDs, hover/capture toggles), event wiring (mouse drag/ray hits, key modifiers, ImGui triggers), OpenGL helper math, and explicit Unity replacements (e.g., a `MonoBehaviour` with `GraphicRaycaster` for input + `RenderPipeline` mesh handles) using the full tag set; append the mandated evidence block to `.ralph/agent/handoff.md`, commit the annotated header, close the task, and then continue with the next ready entry.

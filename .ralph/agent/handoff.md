@@ -342,6 +342,19 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: Annotate GUI color helpers for Unity port
 - Next recommended Phase 1 task: T375 annotate: src/slic3r/GUI/GuiColor.hpp
 
+## Phase 1 - Task T338 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoRotate.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoRotate.hpp
+- Substantive additions: 13 multi-tag annotations clarifying axis state, GL caching, event entry points, local transform math, and rotation UI tooling for the Unity port.
+- Verification excerpt: // [INTENT] Axis-specific rotation handle that renders an arc, snap radii, and grabber in the 3D viewport while emitting drag events via GLGizmoBase.
+- Unity-impact summary:
+  - Mirror each axis handle with a dedicated MonoBehaviour that draws MeshCollider arcs via `Graphics.DrawMesh` and forwards InputSystem pointer drags to rotate the shared transform.
+  - Capture the rotoptimize ImGui popup in UI Toolkit or a lightweight overlay component and serialize its accuracy/method state through ScriptableObjects.
+- Hazards found: P3=1 (local vs world coordinate toggle used by emboss-specific flows requires careful porting).
+- Git: Annotate GLGizmoRotate header
+- Next recommended Phase 1 task: T339 annotate: src/slic3r/GUI/Gizmos/GLGizmoScale.cpp
+
 ## Phase 1 - Task T309 complete
 - Task type: annotate
 - File: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp
