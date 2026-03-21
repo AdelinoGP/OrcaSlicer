@@ -1725,3 +1725,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P2: Cancel callback assumes wx event loop semantics and must be re-architected for Unity CancelFns/job tokens.)
 - Git: Annotate NotificationProgressIndicator.hpp
 - Next recommended Phase 1 task: T441 annotate: src/slic3r/GUI/Jobs/OAuthJob.cpp
+
+
+## Phase 1 - Task T647 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/Button.cpp
+- Deliverables: src/slic3r/GUI/Widgets/Button.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md
+- Substantive additions: 8 multi-tag annotations covering styling state, event wiring, rendering, and Unity mapping guidance.
+- Verification excerpt: // [INTENT] Custom render path paints the background/border/text/icon to match the cached StateColor palette and layout logic.
+- Unity-impact summary:
+  - Documented pointer/keyboard event routing and interactability changes so Unity can mirror these through IPointer*/ISelect handler hooks.
+  - Captured the manual render + DPI rescale strategy for a custom Graphic/CanvasRenderer implementation alongside a ScriptableObject-based style palette.
+- Hazards found: 1 P2 (manual wxDC rendering) + 1 P3 (StateColor bitmask state machine)
+- Git: Annotate Button widget for Unity port
+- Next recommended Phase 1 task: T648 annotate: src/slic3r/GUI/Widgets/Button.hpp

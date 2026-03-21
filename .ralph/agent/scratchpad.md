@@ -128,3 +128,8 @@
 - Selected task: T440 annotate `src/slic3r/GUI/Jobs/NotificationProgressIndicator.hpp` as today's focus.
 - Plan: start the runtime task, read the header for NotificationProgressIndicator, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations around the interface, event handlers, and worker-aware callbacks, append the evidence block to `.ralph/agent/handoff.md`, commit the change, and then choose the next ready Phase 1 task.
 - Verification: documentation-only annotation; ensure thread/event/OGL notes are concrete, no runtime test needed.
+
+## Iteration plan
+- Context: Phase 1 GUI annotation; selecting a Widgets file for today's run.
+- Selected task: T647 annotate `src/slic3r/GUI/Widgets/Button.cpp`.
+- Plan: review the Button implementation, add the mandated `[INTENT]` through `[PORTING_HAZARD]` comments (covering styling state, event handling, rendering, threading, Unity mapping, hazards), append the evidence block to `.ralph/agent/handoff.md`, stage/commit the file, close the task, then pause for the next iteration.
