@@ -205,3 +205,10 @@
 ## Iteration update
 - Completed T317 annotate `src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.cpp` by adding multi-tag comments for the GL overlay lifecycle, event gating, and Unity replacements; no tests required for documentation changes.
 - Next focus: T318 annotate `src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.hpp` to document class state, headers, and sample interval hooks for the Unity port.
+
+## Iteration update
+- Completed T318 annotate `src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.hpp` by adding focused `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around the gizmo lifecycle, GLModel cache, rendering hooks, and Unity migration guidance before committing and closing the task.
+- Next selection: T319 annotate `src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp` once the runtime task becomes active; plan to document the support-geometry workflow, stateful toggles, event wiring, OpenGL draw helpers, and Unity mapping for the support generation UI.
+## Iteration plan update
+- Selected task: T319 annotate `src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp` so the support painting flow, background preview generator, and UI bindings are described.
+- Plan: Read the full file (already loaded), insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around key sections (constructor, lifecycle hooks, UI, worker thread, GLVolume updates, cancellation), update `.ralph/agent/handoff.md` with evidence, stage/commit the single file, and close the task before the next iteration.

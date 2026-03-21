@@ -1986,3 +1986,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 (P2 face adjacency metadata + P3 sampling resolution and GLModel lifetime mismatch).
 - Git: Annotate GLGizmoFaceDetector header
 - Next recommended Phase 1 task: T319 annotate: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp
+
+## Phase 1 - Task T319 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp; .ralph/agent/scratchpad.md; .ralph/ralph-tasks.md
+- Substantive additions: Multiple `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments covering lifecycle hooks, ImGui UI, selection filters, background support generation, and render overlays.
+- Verification excerpt: // [OPENGL] Enable blending and depth test to paint selection meshes and support previews on top of the scene.
+- Unity-impact summary:
+  - Recreate the support painting controls as a UI Toolkit VisualElement toolbar with Input System events to switch brushes, adjust sliders, and trigger gap-fill/block actions.
+  - Generate the support preview on a Task/Job and create a Mesh + MeshRenderer overlay via a MainThreadDispatcher so the Unity render thread never accesses Print data off-main-thread.
+  - Mirror triangle selector brush filtering with MeshCollider-enabled selectors and expose undo snapshots via `GizmoAction` commands tied to the same state machine.
+- Hazards found: P1=1, P2=1 (Print/GLVolume lifetime plus cross-thread cancellation); P3=1 (triangle selector mesh mutation/UndoRedo coupling).
+- Git: Annotate support painting gizmo for Unity port
+- Next recommended Phase 1 task: T320 annotate: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp
