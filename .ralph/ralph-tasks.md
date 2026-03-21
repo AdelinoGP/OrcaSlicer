@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-21T03:36:59Z
+Last updated: 2026-03-21T05:00:00Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -253,8 +253,8 @@ Last updated: 2026-03-21T03:36:59Z
 - [x] T332 annotate: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.hpp
 - [ ] T333 annotate: src/slic3r/GUI/Gizmos/GLGizmoMove.cpp
 - [x] T334 annotate: src/slic3r/GUI/Gizmos/GLGizmoMove.hpp
-- [ ] T335 annotate: src/slic3r/GUI/Gizmos/GLGizmoPainterBase.cpp
-- [ ] T336 annotate: src/slic3r/GUI/Gizmos/GLGizmoPainterBase.hpp
+- [x] T335 annotate: src/slic3r/GUI/Gizmos/GLGizmoPainterBase.cpp
+- [x] T336 annotate: src/slic3r/GUI/Gizmos/GLGizmoPainterBase.hpp
 - [ ] T337 annotate: src/slic3r/GUI/Gizmos/GLGizmoRotate.cpp
 - [ ] T338 annotate: src/slic3r/GUI/Gizmos/GLGizmoRotate.hpp
 - [ ] T339 annotate: src/slic3r/GUI/Gizmos/GLGizmoScale.cpp

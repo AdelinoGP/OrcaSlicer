@@ -267,3 +267,14 @@
 ## Iteration plan update
 - Selected Task T332 annotate `src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.hpp` as today's focus since the header defines the MMU picker state that Unity will need documented.
 - Plan: verify the header exists, read it entirely, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around the class, enum, and key methods (state management, segmentation overrides, OpenGL helpers), append the evidence block to `.ralph/agent/handoff.md`, commit the header, close the task, and record the iteration outcome before moving on in the next cycle.
+## Iteration plan update - T333
+- Task: annotate `src/slic3r/GUI/Gizmos/GLGizmoMove.cpp` covering tooltip, grabber state, selection/move event wiring, render flow, and Unity analogs.
+- Steps: inspect file, insert [INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD] comments at class-level, data members (like m_grabbers/displacement), drag handlers, rendering loop, shader use, raycaster toggles, input window, and selection updates; add evidence block to `.ralph/agent/handoff.md`; run tests? n/a; commit.
+
+## Iteration plan update
+- Current focus: T335 annotate `src/slic3r/GUI/Gizmos/GLGizmoPainterBase.cpp` (task-1773880086-1182 now ready).
+- Plan: start the task, read `GLGizmoPainterBase.cpp` top-to-bottom, note the painter state, shader selection, GL render pass, ImGui hooks, and worker interactions; add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around initialization, painting dispatch, color caches, hover/click handling, and indicators of GL resource ownership, append the required handoff evidence block, commit the annotated file, close the task, and pick T336 next iteration.
+
+## Iteration plan update
+- Selected task: T336 annotate `src/slic3r/GUI/Gizmos/GLGizmoPainterBase.hpp`.
+- Plan: start `task-1773880086-2994`, review the header, annotate painter intents, input hooks, GL cache lifetimes, and stateful flags with the full tag set, update `.ralph/agent/handoff.md` with an evidence block, and commit before stopping for the next task.

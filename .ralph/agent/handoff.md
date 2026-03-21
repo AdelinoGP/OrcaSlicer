@@ -2232,3 +2232,29 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=2 (GL shader/raycast state coupling, handle re-selection logic); P3=1 (ImGui dialog relies on wxWidgets positioning/timers).
 - Git: Annotate GLGizmoMeasure for Unity port
 - Next recommended Phase 1 task: T329 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.cpp
+
+## Phase 1 - Task T333 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoMove.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoMove.cpp; .ralph/agent/scratchpad.md
+- Substantive additions: 12 multi-tag annotations covering tooltip state, grabber lifecycle, drag math, shader picks, raycaster toggles, and coordinate tracking for move operations.
+- Verification excerpt: // [OPENGL] Clears depth, draws dashed axis helpers, and renders grabbers on top of the scene every frame; this assumes `GLShaderProgram` resources stay valid while the gizmo is active.
+- Unity-impact summary:
+  - Use a Canvas + GraphicRaycaster overlay that renders axis handles via MeshRenderer/CommandBuffer draws and honors hover/material swaps.
+  - Mirror the drag math and shift-snapping in a MonoBehaviour that updates a `SelectionModel` ScriptableObject while UI Toolkit picks call into `GizmoController`.
+- Hazards found: P2=1 (dashed-line immediate-mode drawing requires rebuilding at runtime), P3=1 (custom shader uniforms are wxApp specific and missing in Unity).
+- Git: annotate: src/slic3r/GUI/Gizmos/GLGizmoMove.cpp
+- Next recommended Phase 1 task: T334 annotate: src/slic3r/GUI/Gizmos/GLGizmoMove.hpp
+
+## Phase 1 - Task T336 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoPainterBase.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoPainterBase.hpp; .ralph/ralph-tasks.md; .ralph/agent/scratchpad.md; .ralph/agent/handoff.md
+- Substantive additions: 15 multi-tag annotations covering triangle selectors, painter state/metrics, cursor rendering, and event/thread/logging notes.
+- Verification excerpt: // [INTENT] Centralize render/input/state helpers used by all painter gizmos to keep cursor/triangle overlays in sync with model data.
+- Unity-impact summary:
+  - Model the painter overlay as a Mesh + Graphics.DrawMesh pass driven by a MonoBehaviour that caches TriangleSelector vertex/UV lists and triggers RenderTexture redraws.
+  - Replace global slider state (`gap_area`) and shared sphere cache with ScriptableObject-backed settings plus pooled Mesh assets so Unity can manage lifetime deterministically.
+- Hazards found: P2=1 (shared GL sphere cache without explicit lifetime), P3=1 (global `gap_area` state that needs centralization)
+- Git: Annotate GLGizmoPainterBase header for Unity port
+- Next recommended Phase 1 task: T337 annotate: src/slic3r/GUI/Gizmos/GLGizmoRotate.cpp
