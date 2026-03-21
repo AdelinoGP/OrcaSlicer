@@ -2301,3 +2301,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 P2, 3 P3
 - Git: Annotate GLGizmoScale for Unity port
 - Next recommended Phase 1 task: T340 annotate: src/slic3r/GUI/Gizmos/GLGizmoScale.hpp
+
+## Phase 1 - Task T340 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoScale.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoScale.hpp
+- Substantive additions: 20 multi-tag annotations covering handle state, event wiring, OpenGL rendering, and Unity mapping notes.
+- Verification excerpt: // [OPENGL] Renders grabbers and axis helpers; Unity will replicate this through LineRenderer/MeshRenderer code.
+- Unity-impact summary:
+  - Map the axis/uniform handles to a `ScaleHandleController` MonoBehaviour with MeshCollider children and GraphicRaycaster hits.
+  - Replace OpenGL connection lines with Unity LineRenderer draws tethered to the selection metrics and surface the floating input window via UI Toolkit overlays.
+- Hazards found: P3=1 (GizmoObjectManipulation lifetime dependency must be re-established before scale handles activate in Unity)
+- Git: Document GLGizmoScale header for Unity port
+- Next recommended Phase 1 task: T341 annotate: src/slic3r/GUI/Gizmos/GLGizmosCommon.cpp

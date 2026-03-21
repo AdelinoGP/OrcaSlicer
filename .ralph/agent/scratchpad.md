@@ -293,3 +293,7 @@
 ## Iteration update
 - Completed T339 annotate `src/slic3r/GUI/Gizmos/GLGizmoScale.cpp` with multi-tag comments across ctor, input, render, and math helpers plus the required Phase 1 evidence block.
 - Next iteration focus: T340 annotate `src/slic3r/GUI/Gizmos/GLGizmoScale.hpp` once the runtime task is ready so the header's state/event layout has matching Unity guidance.
+
+## Iteration plan update
+- Selected task: T340 annotate `src/slic3r/GUI/Gizmos/GLGizmoScale.hpp` (task-1773880086-870e now active).
+- Plan: review the header, annotate class intent, cached matrices, axis/operation state, event wiring, OpenGL data members, Unity mapping (AABB handles + GraphicRaycaster), and porting hazards via `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]`; append the mandatory evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file, close the task, and then stop so the next agent can continue.
