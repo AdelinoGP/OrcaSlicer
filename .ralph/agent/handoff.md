@@ -2258,3 +2258,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (shared GL sphere cache without explicit lifetime), P3=1 (global `gap_area` state that needs centralization)
 - Git: Annotate GLGizmoPainterBase header for Unity port
 - Next recommended Phase 1 task: T337 annotate: src/slic3r/GUI/Gizmos/GLGizmoRotate.cpp
+
+## Phase 1 - Task T337 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoRotate.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoRotate.cpp
+- Substantive additions: added ~25 `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments documenting grabber lifecycle, render caches, and ImGui hooks
+- Verification excerpt: // [OPENGL] Depth testing, eye-space matrices, and shader uniforms are managed per-frame before drawing the cached circle, scale marks, and grabber highlight.
+- Unity-impact summary: 
+  - rebuild these axis meshes via MeshRenderer + Material updates and pipe camera matrices through a dedicated Gizmo camera
+  - replace the ImGui Optimize Orientation popup with a UI Toolkit/VisualElement dialog plus GraphicRaycaster handling for selection
+  - keep the rotopt job dispatch on a background job worker and mirror it as an async Task or Job System workflow
+- Hazards found: 1 (P2: immediate-mode OpenGL + ImGui state tightly couples rendering and input)
+- Git: Annotate GLGizmoRotate for Unity port
+- Next recommended Phase 1 task: T338 annotate: src/slic3r/GUI/Gizmos/GLGizmoRotate.hpp

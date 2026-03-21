@@ -278,3 +278,7 @@
 ## Iteration plan update
 - Selected task: T336 annotate `src/slic3r/GUI/Gizmos/GLGizmoPainterBase.hpp`.
 - Plan: start `task-1773880086-2994`, review the header, annotate painter intents, input hooks, GL cache lifetimes, and stateful flags with the full tag set, update `.ralph/agent/handoff.md` with an evidence block, and commit before stopping for the next task.
+
+## Iteration plan update
+- Focus: T337 annotate src/slic3r/GUI/Gizmos/GLGizmoRotate.cpp (task-1773880086-41ad).
+- Steps: mark task active, read the file to capture rotate gizmo intent/state/events/render flow, add multi-tag annotations covering intent/state/event/thread/OpenGL/Unity/porting hazard, append evidence to .ralph/agent/handoff.md after annotations, commit the change, close the task, and then select the next ready Phase 1 file for the next iteration.
