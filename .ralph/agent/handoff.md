@@ -288,6 +288,19 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate SLAImportJob for Unity port
 - Next recommended Phase 1 task: T455 annotate: src/slic3r/GUI/Jobs/SLAImportJob.hpp
 
+## Phase 1 - Task T198 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/SLAImportJob.hpp
+- Deliverables: src/slic3r/GUI/Jobs/SLAImportJob.hpp, .ralph/agent/scratchpad.md
+- Substantive additions: 6 multi-tag annotations clarifying view state capture, background worker threading, and lifecycle hooks.
+- Verification excerpt: // [THREAD] These getters execute on the UI thread; the job must marshal the captured values before the worker thread reads them.
+- Unity-impact summary:
+  - Snapshot the selection/size/path fields into a MonoBehaviour (ScriptableObject + controller) before kicking off Unity Job System work.
+  - Use a MainThreadDispatcher to marshal `finalize()` completion back to UI Toolkit components instead of relying on wx events.
+- Hazards found: P2=1 (finalize callbacks must run on main thread), P3=1 (view data can mutate after prepare)
+- Git: Annotate SLAImportJob view for Unity port
+- Next recommended Phase 1 task: T199 annotate: src/slic3r/GUI/Jobs/SVGFileJob.cpp
+
 ### Remaining
 
 - [ ] P0-T006: Main Window Class Identification
@@ -1443,7 +1456,21 @@ Continue the previous work. Remaining tasks (551):
 - annotate: src/slic3r/GUI/AboutDialog.cpp
 - annotate: src/slic3r/GUI/AboutDialog.hpp
 
-Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Port Preparation## Phase BoundaryThis prompt governs **Phase 1 only**.- Phase 0 is already complete.- Do **not** revisit Phase 0...
+Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Port Preparation
+
+
+
+## Phase Boundary
+
+
+
+This prompt governs **Phase 1 only**.
+
+
+
+- Phase 0 is already complete.
+
+- Do **not** revisit Phase 0...
 ```
 
 ## Phase 1 - Task T204 complete

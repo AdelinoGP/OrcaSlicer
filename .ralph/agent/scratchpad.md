@@ -88,3 +88,8 @@
 ## Iteration plan update
 - Selected task: T197 annotate `src/slic3r/GUI/Jobs/SLAImportJob.cpp` (task-1773880086-9d0a); this job coordinates STL slicing output to the SLA pipeline so we need to capture job lifecycle, state, OpenGL upload, and user event hooks.
 - Plan: start the task, read the source fully, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around the job orchestration, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, update `.ralph/ralph-tasks.md`, commit, and close the runtime task before choosing the next item.
+
+## Iteration plan update
+- Selected task: T198 annotate `src/slic3r/GUI/Jobs/SLAImportJob.hpp` (task-1773880086-b462) to document how job views provide selection state and how the importer job threads cross UI boundaries.
+- Actions: annotate the header with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` comments around the view interface, private state, prepare/ process/ finalize hooks, and reset helper so future Unity engineers understand scheduling and hazards.
+- Verification: confirm comments mention UI snapshotting, worker/MainThread boundaries, and the need for a Unity job dispatcher rather than wxWidgets events; no automated test run since this is documentation-only.
