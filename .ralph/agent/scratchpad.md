@@ -133,3 +133,24 @@
 - Context: Phase 1 GUI annotation; selecting a Widgets file for today's run.
 - Selected task: T647 annotate `src/slic3r/GUI/Widgets/Button.cpp`.
 - Plan: review the Button implementation, add the mandated `[INTENT]` through `[PORTING_HAZARD]` comments (covering styling state, event handling, rendering, threading, Unity mapping, hazards), append the evidence block to `.ralph/agent/handoff.md`, stage/commit the file, close the task, then pause for the next iteration.
+
+## Iteration plan update
+- Selected task: T200 annotate `src/slic3r/GUI/Jobs/SVGFileJob.hpp` for this iteration because it likely contains the job interface wiring that the Unity port will need annotated.
+- Plan: start `task-1773880086-e250`, read the header completely, annotate key structures/methods with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]`, append the required handoff evidence block, and commit the single file before closing the task.
+
+## Iteration update
+- Attempted `T201 annotate: src/slic3r/GUI/Files/SVG.cpp`; the file is missing from the repo, so the runtime task failed with "File not found" and was marked blocked. Recorded the fix memory and blocked evidence. The phase needs the manifest or file restored before annotation can proceed.
+- Next plan: Select another ready Phase 1 task (e.g., `T202 annotate: src/slic3r/GUI/Files/SVG.hpp` or other accessible file) once the absence is documented and we have a path that actually exists.
+
+## Iteration plan update
+- Selected task: T202 annotate `src/slic3r/GUI/Files/SVG.hpp` because the manifest entry exists and the header is likely present; it defines SVG import helpers used by the GUI and needs Unity port clarity.
+- Plan: read the entire header, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around classes, enums, and methods that control SVG parsing, state, and GL resources; append the required evidence block to `.ralph/agent/handoff.md`, update `.ralph/ralph-tasks.md` status, commit the annotated header, close T202, and then begin the next annotated file.
+- Verification: annotation-only change, no runtime tests required; rely on code inspection.
+
+## Iteration update
+- Attempted `T202 annotate: src/slic3r/GUI/Files/SVG.hpp` but the file folder is absent from the repo so the header cannot be read; recorded a fix memory and failed the runtime task. 
+- Next plan: pick another Phase 1 task that points to an existing file (maybe `T205 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp` if available) once we confirm the file is present.
+
+## Iteration plan update
+- Context: Phase 1 GUI annotation; ready task `T205 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp` appears valid and the source file exists.
+- Plan: start the task, read `GLGizmoBase.cpp` fully, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around the grabber setup, render flow, mouse handling, drop-in ImGui inputs, and GL resource management, append the required evidence block to `.ralph/agent/handoff.md`, mark the task done in `.ralph/ralph-tasks.md`, commit the annotated file, and then prepare to span the next ready entry.

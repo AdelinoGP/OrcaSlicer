@@ -1739,3 +1739,35 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 P2 (manual wxDC rendering) + 1 P3 (StateColor bitmask state machine)
 - Git: Annotate Button widget for Unity port
 - Next recommended Phase 1 task: T648 annotate: src/slic3r/GUI/Widgets/Button.hpp
+
+## Phase 1 - Task T200 blocked
+- Task type: annotate (blocked)
+- File: src/slic3r/GUI/Jobs/SVGFileJob.hpp
+- Reason: file is missing from the repo; the runtime task failed with a "File not found" error and requires either a manifest correction or the creation of the new file before continuing.
+- Next recommended Phase 1 task: T201 annotate: src/slic3r/GUI/Files/SVG.cpp
+
+## Phase 1 - Task T201 blocked
+- Task type: annotate (blocked)
+- File: src/slic3r/GUI/Files/SVG.cpp
+- Reason: file is not present in the repo at the manifest path; the runtime task failed when attempting to read `src/slic3r/GUI/Files/SVG.cpp`. Need to reconcile the manifest or supply the missing source before annotating.
+- Next recommended Phase 1 task: T202 annotate: src/slic3r/GUI/Files/SVG.hpp
+
+## Phase 1 - Task T202 blocked
+- Task type: annotate (blocked)
+- File: src/slic3r/GUI/Files/SVG.hpp
+- Reason: the `src/slic3r/GUI/Files` folder and SVG header are missing from the repository; recorded a fix memory when the read failed. Please confirm the manifest path or restore the file before resuming.
+- Next recommended Phase 1 task: T205 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp
+
+## Phase 1 - Task T205 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp
+- Substantive additions: 12 multi-tag annotations clarifying theme state, OpenGL rendering, input handling, and Unity mapping
+- Verification excerpt: // [INTENT] Render the grabber handle/axis with the current camera, color, and picking registration state.
+- Unity-impact summary:
+  - Derive inverse zoom and palette updates from a Unity `GizmoTheme` ScriptableObject so Material colors follow living theme data.
+  - Replace ImGui combos/drag events with UI Toolkit dropdowns and `IPointerDownHandler`/`IDragHandler` MonoBehaviours to keep selection/events on the Unity main thread.
+  - Mirror OpenGL grabbers/cross marks with MeshRenderer/LineRenderer + Physics raycasts instead of relying on GL shaders and `SceneRaycaster` singletons.
+- Hazards found: P2=2, P3=2
+- Git: annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp
+- Next recommended Phase 1 task: T206 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.hpp
