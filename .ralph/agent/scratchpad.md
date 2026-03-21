@@ -100,3 +100,21 @@
 
 ## Iteration update
 - Completed T439 by annotating the notification progress adapter, capturing the manager bridge, cancel wiring, state resets, and Unity mapping before updating the handoff/evidence block and tasks registry.
+
+## Iteration plan update
+- Current focus: T199 annotate `src/slic3r/GUI/Jobs/SVGFileJob.cpp` to cover SVG ingestion, job threading, GL texture updates, and Unity job-system equivalence.
+- Steps: plan to start/record the runtime task, read the file fully, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations documenting lifecycle, event bindings, render scheduling, worker boundary, and hazards; append the mandated handoff evidence block and mark the task done before choosing the next target.
+
+## Iteration update
+- Attempted T199 annotate `src/slic3r/GUI/Jobs/SVGFileJob.cpp` but the file is absent from the repo; noted the missing entry and failed the runtime task.
+
+## Iteration plan update
+ - Next focus: T200 annotate `src/slic3r/GUI/Jobs/SVGFileJob.hpp` after confirming whether the header exists or if the job was removed; plan to record blockers if necessary.
+
+## Iteration plan update
+- Selected task: T651 annotate `src/slic3r/GUI/Widgets/ComboBox.cpp` as the current work item.
+- Plan: start the runtime task, read the file end-to-end for intent, state, event, GL, and threading concerns, sprinkle `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations where they clarify Unity port intent and hazards, update `.ralph/agent/handoff.md` with the evidence block, set the task `[x]` in `.ralph/ralph-tasks.md`, commit, and close the task before moving on.
+
+## Iteration update
+- Completed T651 annotate `src/slic3r/GUI/Widgets/ComboBox.cpp` with multi-tag guidance and linked the evidence block to `.ralph/agent/handoff.md`.
+- Next recommended focus: T652 annotate `src/slic3r/GUI/Widgets/ComboBox.hpp` (mirror the inline widget description in the header).

@@ -1685,3 +1685,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3:3 (clear_percent/stub, silent show_error_info, rebind-on-zero progress)
 - Git: Annotate NotificationProgressIndicator
 - Next recommended Phase 1 task: T440 annotate: src/slic3r/GUI/Jobs/NotificationProgressIndicator.hpp
+
+## Phase 1 - Task T651 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/ComboBox.cpp
+- Deliverables: src/slic3r/GUI/Widgets/ComboBox.cpp
+- Substantive additions: ~18 inline annotations covering intent, state caches, event routing, thread guards, OpenGL repaint hints, and Unity mapping for the combo.
+- Verification excerpt: // [EVENT][THREAD] sendComboBoxEvent packages the wxEVT_COMBOBOX on the UI thread so external handlers receive the updated selection safely.
+- Unity-impact summary:
+  - Keep the TMP_InputField and Dropdown synchronized via a shared MonoBehaviour so typed text, icons, and tooltips replay the same state as wxWidgets.
+  - Mirror the dropdown popup with a world-space Canvas + ScrollRect pairing that watches parent scrolling before showing the overlay.
+  - Recreate the Windows WM_GETDLGCODE focus grab inside Unity’s input module to keep arrow/tab keys bound to the combo.
+- Hazards found: P2:2, P3:3
+- Git: Annotate ComboBox widget states and events
+- Next recommended Phase 1 task: T652 annotate: src/slic3r/GUI/Widgets/ComboBox.hpp
