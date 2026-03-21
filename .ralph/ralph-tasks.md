@@ -567,7 +567,7 @@ Last updated: 2026-03-21T05:30:00Z
 - [ ] T646 annotate: src/slic3r/GUI/Widgets/AxisCtrlButton.hpp
 - [x] T647 annotate: src/slic3r/GUI/Widgets/Button.cpp
 - [x] T648 annotate: src/slic3r/GUI/Widgets/Button.hpp
-- [ ] T649 annotate: src/slic3r/GUI/Widgets/CheckBox.cpp
+- [x] T649 annotate: src/slic3r/GUI/Widgets/CheckBox.cpp
 - [ ] T650 annotate: src/slic3r/GUI/Widgets/CheckBox.hpp
 - [x] T651 annotate: src/slic3r/GUI/Widgets/ComboBox.cpp
 - [ ] T652 annotate: src/slic3r/GUI/Widgets/ComboBox.hpp

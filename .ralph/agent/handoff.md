@@ -2012,3 +2012,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 P2 (boost::thread/GLVolume concurrency)
 - Git: Annotate GLGizmoFdmSupports header
 - Next recommended Phase 1 task: T321 annotate: src/slic3r/GUI/Gizmos/GLGizmoFlatten.cpp
+## Phase 1 - Task T649 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/CheckBox.cpp
+- Deliverables: src/slic3r/GUI/Widgets/CheckBox.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 7 focused annotations covering constructor intent, toggle events, checker state flow, Rescale handling, Unity mapping, and mac focus hazards
+- Verification excerpt: // [EVENT] When the toggle fires, drop the half-checked override and repaint; the handler is invoked on the main wxWidgets thread.
+- Unity-impact summary:
+  - Mirror the three sprite states (on/half/off and focus/disabled) via a UI Toolkit Toggle + MonoBehaviour that swaps VisualElement sprites.
+  - Replicate the toggle bindings with Unity's InputSystem/main-thread dispatcher so UI updates stay serialized like wxWidgets locks.
+  - Rebuild macOS hover/focus semantics with `IPointerEnterHandler`/`IPointerExitHandler` and manual `Selectable.interactable` toggles.
+- Hazards found: 2 (P3: replaying `SetBitmapFocus`/`SetBitmapCurrent` layering; P3: macOS enter/leave/focus event wiring has no direct Unity helper)
+- Git: annotate: src/slic3r/GUI/Widgets/CheckBox.cpp
+- Next recommended Phase 1 task: T650 annotate: src/slic3r/GUI/Widgets/CheckBox.hpp

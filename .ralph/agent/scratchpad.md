@@ -216,3 +216,7 @@
 ## Iteration plan update
 - Selected next task: T320 annotate `src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp` to cover support state, selection management, and GL helper interfaces that pair with the source file.
 - Plan: read the header, capture intent for the gizmo API, annotate caches/state, event hooks, OpenGL utility comments, Unity replacement hints (e.g., Input system + GL mesh updates), thread/worker expectations, and porting hazards; append the evidence block to `.ralph/agent/handoff.md`, stage/commit the single file, close the task, and then pick the next ready file after verifying the manifest.
+
+## Iteration plan update
+- Selected task: T649 annotate `src/slic3r/GUI/Widgets/CheckBox.cpp` (per the Phase 1 ready list) to document how the checkbox bridges wxWidgets events, GL overlays, and Unity input expectations.
+- Plan: read the entire source, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations for the control lifecycle, state cache, event handling, draw routine, and Unity mapping; append the mandatory evidence block to `.ralph/agent/handoff.md`, update `.ralph/ralph-tasks.md` from `[ ]` to `[~]` and then `[x]`, commit the single-file change, and then continue to the next ready file.
