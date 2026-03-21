@@ -2141,3 +2141,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (PickRaycaster/SceneRaycaster threading and GL state must stay isolated for Unity's Physics/Render loops).
 - Git: Annotate GLGizmoMeasure header for Unity port
 - Next recommended Phase 1 task: T329 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.cpp
+## Phase 1 - Task T328 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoMeasure.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoMeasure.hpp; .ralph/agent/scratchpad.md; .ralph/agent/handoff.md
+- Substantive additions: 7 targeted multi-tag annotations covering picker hazards, measurement state caches, Unity mapping, and event/thread notes
+- Verification excerpt: // [STATE][THREAD] Cache of Measurement helpers per volume; reads happen on the UI thread but calculators use worker tessellation so Unity needs a `JobHandle` handshake when a mesh updates.
+- Unity-impact summary:
+  - Model the measurement result + assembly action as shared `ScriptableObject` state so Unity UI Toolkit panels and event handlers stay in sync across controllers.
+  - Replace `PickRaycaster`/scene raycaster IDs with `GraphicRaycaster` + `MeshCollider` combinations that preserve the overlay pick semantics and interceptor hitches.
+- Hazards found: 1 (P3: relying on wxPickRaycaster IDs that Unity must map into GraphicRaycast hits)
+- Git: annotate: GLGizmoMeasure.hpp measurement annotations
+- Next recommended Phase 1 task: T329 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.cpp

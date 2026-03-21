@@ -92,7 +92,9 @@ class GLGizmoMeasure : public GLGizmoBase
 {
 protected:
     using PickRaycaster = SceneRaycasterItem;
-    // [STATE][EVENT] Each gripper type maps to a dedicated raycaster ID so `on_mouse` knows which helper is hovered or dragged.
+    // [PORTING_HAZARD:P3][UNITY] PickRaycaster links wxGL event IDs with `SceneRaycaster` hits; Unity must instead align `GraphicRaycaster`
+    // modules with `RaycastHit` IDs on the overlay camera. [STATE][EVENT] Each gripper type maps to a dedicated raycaster ID so `on_mouse`
+    // knows which helper is hovered or dragged.
     enum GripperType {
         UNDEFINE,
         POINT,
@@ -170,12 +172,18 @@ protected:
     // std::vector<VolumeCacheItem> m_volumes_cache;
 
     // [STATE][INTENT] Keeps track of whether the gizmo is collecting features or placing measurement points before reporting distances.
-    EMode                      m_mode{EMode::FeatureSelection};
+    EMode m_mode{EMode::FeatureSelection};
+    // [STATE] Accumulated measurement output (distance text, units, warnings) ready for the ImGui window and Unity overlay.
     Measure::MeasurementResult m_measurement_result;
-    Measure::AssemblyAction    m_assembly_action;
-    // [STATE][THREAD] Cache of Measurement helpers per volume; reads happen on the UI thread but the helpers drive background tessellation.
+    // [STATE][UNITY] Current assembly action tracks toggles between face-face/point-point combos; Unity should keep this in a shared
+    // ScriptableObject so other controllers see it instantly.
+    Measure::AssemblyAction m_assembly_action;
+    // [STATE][THREAD] Cache of Measurement helpers per volume; reads happen on the UI thread but calculators use worker tessellation so
+    // Unity needs a `JobHandle` handshake when a mesh updates.
     std::map<GLVolume*, std::shared_ptr<Measure::Measuring>> m_mesh_measure_map;
-    std::shared_ptr<Measure::Measuring>                      m_curr_measuring{nullptr};
+    // [STATE][THREAD][UNITY] Unity port should mirror `m_curr_measuring` with a `ThreadSafe` reference to the active `MeasureMeasuring` so
+    // the UI thread never races with background jobs.
+    std::shared_ptr<Measure::Measuring> m_curr_measuring{nullptr};
 
     // [OPENGL][STATE] Mesh-based pick models used to snap measurement handles to geometry; Unity will want MeshCollider helpers instead.
     PickingModel m_sphere;
@@ -216,13 +224,17 @@ protected:
     Dimensioning m_dimensioning;
 
     // [EVENT][STATE] PickRaycasters keep per-volume and per-gripper hit data so mouse events know which geometry to highlight.
-    std::map<GLVolume*, std::shared_ptr<PickRaycaster>>   m_mesh_raycaster_map;
+    // [EVENT][OPENGL][UNITY] Maps geometry volume to raycasters; Unity needs `GraphicRaycaster` adapters that keep per-Volume
+    // `RaycastResult` caches.
+    std::map<GLVolume*, std::shared_ptr<PickRaycaster>> m_mesh_raycaster_map;
+    // [STATE][EVENT] Gripper-specific IDs reutilized by Unity via layered `MeshCollider` objects with matching tooltips.
     std::map<GripperType, std::shared_ptr<PickRaycaster>> m_gripper_id_raycast_map;
     std::vector<GLVolume*>                                m_hit_different_volumes;
     std::vector<GLVolume*>                                m_hit_order_volumes;
     GLVolume*                                             m_last_hit_volume;
     // std::vector<std::shared_ptr<GLModel>>                 m_plane_models_cache;
-    // [STATE][EVENT] Tracks the last ImGui widget and buffered distances so keyboard edits remain in sync with the GL overlay.
+    // [STATE][EVENT][UNITY] Tracks the last ImGui widget and buffered distances so keyboard edits remain in sync; Unity should mirror this
+    // with current `VisualElement` focus IDs.
     unsigned int m_last_active_item_imgui{0};
     Vec3d        m_buffered_distance;
     Vec3d        m_distance;
@@ -230,20 +242,23 @@ protected:
     double       m_buffered_around_center{0};
     // used to keep the raycasters for point/center spheres
     // std::vector<std::shared_ptr<PickRaycaster>> m_selected_sphere_raycasters;
-    // [STATE] Current surface feature plus the point-on-feature used when entering PointSelection mode.
+    // [STATE][UNITY] Current surface feature plus point-on-feature used when entering PointSelection; Unity should store these on a
+    // component so the UI Toolkit panel can read them.
     std::optional<Measure::SurfaceFeature> m_curr_feature;
     std::optional<Vec3d>                   m_curr_point_on_feature_position;
 
-    // These hold information to decide whether recalculation is necessary:
+    // These hold information to decide whether recalculation is necessary; Unity should trigger re-layout when any of these flags change.
     float                                  m_last_inv_zoom{0.0f};
     std::optional<Measure::SurfaceFeature> m_last_circle_feature;
     int                                    m_last_plane_idx{-1};
 
-    // [EVENT] Mouse capture flags guard left-up event delivery to prevent closing the gizmo prematurely.
+    // [EVENT][UNITY] Mouse capture flags guard left-up event delivery to prevent closing the gizmo prematurely; replicate with
+    // `PointerEventData` interception in Unity.
     bool m_mouse_left_down{false};           // for detection left_up of this gizmo
     bool m_mouse_left_down_mesh_deal{false}; // for pick mesh
 
-    // [EVENT] Key repeats feed the Shift+Input filter used by the XYZ distance UI.
+    // [EVENT][UNITY] Key repeats feed the Shift+Input filter used by the XYZ distance UI; Unity should mirror them with `InputSystem`
+    // `PressAndHold` bindings.
     KeyAutoRepeatFilter m_shift_kar_filter;
 
     SelectedFeatures m_selected_features;
@@ -321,11 +336,12 @@ protected:
     // [STATE] Helpers to clear cached picks while maintaining whichever ones are currently hovered.
     void reset_all_pick();
     void reset_gripper_pick(GripperType id, bool is_all = false);
-    // [EVENT] Re-registers the mesh pickers when geometry volume changes.
+    // [EVENT][THREAD] Re-registers the mesh pickers when the active geometry changes; Unity needs to queue this registration onto the main
+    // thread before raycasts run.
     void register_single_mesh_pick();
     // void update_single_mesh_pick(GLVolume* v);
 
-    // [INTENT] Text helpers for the ImGui summary labels.
+    // [INTENT][UNITY] Text helpers for the ImGui summary labels; Unity should port these to `TextElement` formatters.
     std::string format_double(double value);
     std::string format_vec3(const Vec3d& v);
     std::string surface_feature_type_as_string(Measure::SurfaceFeatureType type);
