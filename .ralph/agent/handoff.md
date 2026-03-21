@@ -315,6 +315,20 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: Annotate SLAImportJob view for Unity port
 - Next recommended Phase 1 task: T199 annotate: src/slic3r/GUI/Jobs/SVGFileJob.cpp
 
+## Phase 1 - Task T332 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md
+- Substantive additions: 18 annotations covering the 3D scene cache, painter lifecycle, remap UI hooks, and Unity translation hints (INTENT/STATE/EVENT/THREAD/OPENGL/UNITY/PORTING_HAZARD).
+- Verification excerpt: // [OPENGL][THREAD] Called during the GLCanvas draw pass to update segmentation overlays before ImGui draws frameless controls.
+- Unity-impact summary:
+  - Mirror the VBO-backed triangle caches with a Mesh/MeshCollider pair plus ComputeBuffer streaming inside a `GizmoController` MonoBehaviour.
+  - Swap the ImGui input/tooltip popovers and remap dialog for UI Toolkit windows anchored to the painter controller and routed through GraphicRaycaster.
+  - Represent localized descriptions and extruder colors as ScriptableObjects so Unity reuses the same palette + locale state instead of rebuilding wxStrings every frame.
+- Hazards found: 2 (P2 manual VBO/serialization limits, P3 remap map translation)
+- Git: Annotate GLGizmoMmuSegmentation.hpp for Unity port
+- Next recommended Phase 1 task: T333 annotate: src/slic3r/GUI/Gizmos/GLGizmoMove.cpp
+
 ## Phase 1 - Task T374 complete
 - Task type: annotate
 - File: src/slic3r/GUI/GuiColor.cpp
