@@ -118,3 +118,8 @@
 ## Iteration update
 - Completed T651 annotate `src/slic3r/GUI/Widgets/ComboBox.cpp` with multi-tag guidance and linked the evidence block to `.ralph/agent/handoff.md`.
 - Next recommended focus: T652 annotate `src/slic3r/GUI/Widgets/ComboBox.hpp` (mirror the inline widget description in the header).
+
+## Iteration plan update
+- Selected task: T667 annotate `src/slic3r/GUI/Widgets/Label.cpp` (task-1773880088-88d2, key gui:T667) because it centralizes font handling, hyperlink behavior, and wrapping across the UI.
+- Plan: start the runtime task, read the widget code end-to-end, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` tags near the font cache, mouse propagation hook, auto wrap support, and wrapper helpers; ensure labels mention UI thread assumptions and Unity Text replacement. Append the required handoff evidence block, mark the task `[x]`, and commit before selecting the next ready file.
+- Verification: documentation-only change, so no runtime tests; rely on reasoning that comments don't build.

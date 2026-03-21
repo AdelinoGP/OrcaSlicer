@@ -249,6 +249,19 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate: src/slic3r/GUI/Jobs/EmbossJob.hpp
 - Next recommended Phase 1 task: T436 annotate: src/slic3r/GUI/Jobs/FillBedJob.cpp
 
+## Phase 1 - Task T667 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/Label.cpp
+- Deliverables: src/slic3r/GUI/Widgets/Label.cpp
+- Substantive additions: 11 multi-tag annotations (FONT cache, wrapper helpers, constructor wiring, hyperlink state, wrapping, and size events)
+- Verification excerpt: // [EVENT] Forward left-clicks and releases to the parent handler so the label behaves like part of the containing panel.
+- Unity-impact summary:
+  - Move the HarmonyOS/NanumGothic font catalog into a ScriptableObject that provides TMP_FontAssets and scaling instead of `wxFont`.
+  - Use a TMP_Text controller/MonoBehaviour to mirror the wrapping+resize guard logic and the hyperlink style toggles (`EventTrigger` + pointer cursor updates).
+- Hazards found: 2 (P2 preloading resource fonts in the right order, P3 manual wrapping/hyperlink markup divergence)
+- Git: annotate: src/slic3r/GUI/Widgets/Label.cpp
+- Next recommended Phase 1 task: T668 annotate: src/slic3r/GUI/Widgets/LabeledStaticBox.cpp
+
 ## Phase 1 - Task T443 complete
 - Task type: annotate
 - File: src/slic3r/GUI/Jobs/OrientJob.cpp

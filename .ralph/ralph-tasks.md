@@ -585,7 +585,7 @@ Last updated: 2026-03-21T00:20:58Z
 - [ ] T664 annotate: src/slic3r/GUI/Widgets/HyperLink.hpp
 - [ ] T665 annotate: src/slic3r/GUI/Widgets/ImageSwitchButton.cpp
 - [ ] T666 annotate: src/slic3r/GUI/Widgets/ImageSwitchButton.hpp
-- [ ] T667 annotate: src/slic3r/GUI/Widgets/Label.cpp
+- [x] T667 annotate: src/slic3r/GUI/Widgets/Label.cpp
 - [ ] T668 annotate: src/slic3r/GUI/Widgets/LabeledStaticBox.cpp
 - [ ] T669 annotate: src/slic3r/GUI/Widgets/LabeledStaticBox.hpp
 - [ ] T670 annotate: src/slic3r/GUI/Widgets/Label.hpp
