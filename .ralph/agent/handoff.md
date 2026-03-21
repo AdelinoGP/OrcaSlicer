@@ -1934,3 +1934,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 (P2: GL picking sync with Unity raycasters, and `perform_cut`’s job-like model mutations).
 - Git: annotate GLGizmoCut.hpp
 - Next recommended Phase 1 task: T315 annotate: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp
+
+## Phase 1 - Task T315 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md
+- Substantive additions: ~15 multi-tag annotations covering state cache, UI events, OpenGL rendering, job scheduling, and Unity mapping notes.
+- Verification excerpt: // [EVENT][THREAD] `create_volume` runs on user input (toolbar button/shortcut) to gather selection + style state and kick off an EmbossJob; Unity must capture the same selection context and marshal to its job system via a main-thread dispatcher.
+- Unity-impact summary:
+  - Canvas + GraphicRaycaster + TextMeshPro controller must mirror the ImGui overlay layout, icon buttons, glyph warnings, and input scaling.
+  - Main-thread texture caches and job dispatch now require Texture2D + JobHandle/MainThreadDispatcher pairs in Unity.
+- Hazards found: P2=2 (main-thread texture cache + job gating), P3=2 (slider limits + DPI/translation cache resets).
+- Git: Annotate emboss gizmo for Unity port
+- Next recommended Phase 1 task: T316 annotate: src/slic3r/GUI/Gizmos/GLGizmoEmboss.hpp
