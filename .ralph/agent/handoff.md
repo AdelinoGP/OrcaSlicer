@@ -2141,6 +2141,19 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (PickRaycaster/SceneRaycaster threading and GL state must stay isolated for Unity's Physics/Render loops).
 - Git: Annotate GLGizmoMeasure header for Unity port
 - Next recommended Phase 1 task: T329 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.cpp
+## Phase 1 - Task T329 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.cpp; .ralph/agent/scratchpad.md; .ralph/ralph-tasks.md
+- Substantive additions: 9 multi-tag annotations clarifying raycast selection, Control-B shortcut, render highlight overlays, ImGui inputs, serialization, and volume creation/reset flows.
+- Verification excerpt: // [OPENGL] Bounding-box draws issue wireframe primitives after the scene render, so Unity needs an overlay camera or post-GPU pass.
+- Unity-impact summary:
+  - Replicate the two-step source/tool selection and Control-B shortcut inside Unity UI Toolkit with InputSystem actions bound to a MonoBehaviour controller panel.
+  - Move the bounding-box highlight + warning lifecycle into a MeshCollider/Graphics.DrawMesh overlay synced with a selection ScriptableObject so Unity can display the same guidance.
+  - Rebuild `generate_new_volume` as a MeshFilter/MeshCollider update plus notification/SelectionModel refresh while keeping delete semantics synchronized with the unity object list.
+- Hazards found: P2=2 (raycast/clipper handshake, MeshBoolean delete-input semantics), P3=1 (selection index stability when trimming volumes)
+- Git: Annotate GLGizmoMeshBoolean
+- Next recommended Phase 1 task: T330 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.hpp
 ## Phase 1 - Task T328 complete
 - Task type: annotate
 - File: src/slic3r/GUI/Gizmos/GLGizmoMeasure.hpp
