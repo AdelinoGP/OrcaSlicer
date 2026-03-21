@@ -15,17 +15,21 @@ using namespace Slic3r;
 AuxiliaryList::AuxiliaryList(wxWindow* parent)
 	: wxDataViewCtrl(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxDV_NO_HEADER)
 {
+	// [INTENT] Manage the auxiliary file tree that lives alongside the Plater model and expose it through a sortable tree control.
 	wxDataViewTextRenderer* tr = new wxDataViewTextRenderer("string", wxDATAVIEW_CELL_INERT);
 	wxDataViewColumn* column0 = new wxDataViewColumn("", tr, 0, 200, wxALIGN_LEFT,
 		wxDATAVIEW_COL_SORTABLE | wxDATAVIEW_COL_RESIZABLE);
 	this->AppendColumn(column0);
 
 	m_auxiliary_model = new AuxiliaryModel();
+	// [STATE] The AuxiliaryModel owns canonical auxiliary paths so toolbar/context actions operate on a shared tree.
 	this->AssociateModel(m_auxiliary_model);
 	m_sizer = new wxBoxSizer(wxVERTICAL);
+	// [STATE][UNITY] Store the sizer so Unity"s VisualElement layout can treat this tree + toolbar block as one unit.
 	m_sizer->Add(this, 1, wxEXPAND | wxALL, 0);
 
 	wxPanel* panel = new wxPanel(parent, wxID_ANY, wxDefaultPosition, wxSize(-1, FromDIP(21)));
+	// [INTENT] Host an inline toolbar row under the explorer so Add/Open/Delete stay visually tied to the tree.
 	//panel->SetBackgroundColour(*wxLIGHT_GREY);
 
 #if 0
@@ -42,6 +46,7 @@ AuxiliaryList::AuxiliaryList(wxWindow* parent)
 	m_if_btn = new wxButton(panel, wxID_ADD, _L("Import File"));
 	m_of_btn = new wxButton(panel, wxID_OPEN, _("Open File"));
 	m_del_btn = new wxButton(panel, wxID_DELETE, _L("Delete"));
+	// [STATE][UNITY] Keep toolbar actions centralized so Unity buttons can map to the same commands on a shared controller.
 
 	wxBoxSizer* hsizer = new wxBoxSizer(wxHORIZONTAL);
 	//hsizer->Add(m_nf_btn, 0, wxRIGHT, 5);
@@ -54,6 +59,7 @@ AuxiliaryList::AuxiliaryList(wxWindow* parent)
 
 	EnableDragSource(wxDF_UNICODETEXT);
 	EnableDropTarget(wxDF_UNICODETEXT);
+	// [EVENT][THREAD] Enable native drag/drop on the UI thread; Unity will need a DragAndDrop bridge that uses this signal for reordering.
 
 	// Keyboard events
 	Bind(wxEVT_CHAR, [this](wxKeyEvent& event) { this->handle_key_event(event); });
@@ -72,6 +78,7 @@ AuxiliaryList::AuxiliaryList(wxWindow* parent)
 			evt.Skip();
 		}
 	}, wxID_OPEN);
+	// [EVENT][PORTING_HAZARD:P3][UNITY] Launching files uses platform APIs; Unity should call Application.OpenURL/Process.Start on the UI thread.
 
 	// Dataview events
 	this->Bind(wxEVT_DATAVIEW_ITEM_CONTEXT_MENU, &AuxiliaryList::on_context_menu, this);
@@ -93,6 +100,7 @@ AuxiliaryList::AuxiliaryList(wxWindow* parent)
 
 		m_del_btn->Enable(!sel_node->IsContainer());
 	});
+    // [STATE][EVENT] Keep delete interactability in lock-step with selection so Unity UI buttons mirror the same state.
 }
 
 AuxiliaryList::~AuxiliaryList()
@@ -106,6 +114,7 @@ void AuxiliaryList::init_auxiliary()
 	Model& model = wxGetApp().plater()->model();
 	std::string aux_path = encode_path(model.get_auxiliary_file_temp_path().c_str());
 	m_auxiliary_model->Init(aux_path);
+	// [STATE] Model initialization pulls from the Plater auxiliary temp path so Unity needs to mirror that shared path before exposing tree entries.
 }
 
 void AuxiliaryList::reload(wxString aux_path)
@@ -117,6 +126,7 @@ void AuxiliaryList::reload(wxString aux_path)
 	for (wxDataViewItem item : items) {
 		Expand(item);
 	}
+	// [STATE] Keep every node expanded right after reload so the UI reflects imports or deletions without manual expansion.
 }
 
 void AuxiliaryList::create_new_folder()
@@ -160,6 +170,7 @@ void AuxiliaryList::do_import_file(AuxiliaryModelNode* folder)
 			}
 		}
 	}
+	// [EVENT][THREAD] File dialogs block the UI thread; Unity must surface native file pickers and then call back into this helper on the main thread.
 }
 
 void AuxiliaryList::on_create_folder(wxCommandEvent& evt)
@@ -184,6 +195,7 @@ void AuxiliaryList::on_import_file(wxCommandEvent& evt)
 	}
 
 	do_import_file(folder_node);
+	// [EVENT] Centralize the import workflow so Unity's controller can reuse this entry point when wiring toolbar buttons.
 }
 
 void AuxiliaryList::on_delete(wxCommandEvent& evt)
@@ -238,6 +250,7 @@ void AuxiliaryList::on_context_menu(wxDataViewEvent& evt)
 	}
 
 	PopupMenu(menu);
+	// [INTENT] Keep context menus aligned with toolbar verbs so Unity can reuse the same helper methods for right-click overlays.
 }
 
 void AuxiliaryList::on_begin_drag(wxDataViewEvent& evt)
@@ -253,11 +266,13 @@ void AuxiliaryList::on_begin_drag(wxDataViewEvent& evt)
 	obj->SetText("Some text");
 	evt.SetDataObject(obj);
 	evt.SetDragFlags(wxDrag_DefaultMove);
+	// [STATE] Record the dragged item so the drop handler can resolve the source even if the mouse moves outside the tree.
 }
 
 void AuxiliaryList::on_drop_possible(wxDataViewEvent& evt)
 {
 	evt.Allow();
+	// [EVENT] Always allow drops so Unity can highlight targets prior to commits.
 }
 
 void AuxiliaryList::on_drop(wxDataViewEvent& evt)
@@ -267,6 +282,7 @@ void AuxiliaryList::on_drop(wxDataViewEvent& evt)
 	Expand(evt.GetItem());
 	Select(m_dragged_item);
 	m_dragged_item = wxDataViewItem(nullptr);
+	// [STATE] Clear the drag sentinel once the move completes so future drops start fresh.
 }
 
 void AuxiliaryList::on_editing_started(wxDataViewEvent& evt)
@@ -291,9 +307,11 @@ void AuxiliaryList::on_left_dclick(wxMouseEvent& evt)
 		evt.Skip();
 	}
 }
+// [EVENT][PORTING_HAZARD:P3] Double-click launching relies on native shells; Unity should use a cross-platform helper (Process.Start or Application.OpenURL).
 
 void AuxiliaryList::handle_key_event(wxKeyEvent& evt)
 {
 	if (evt.GetKeyCode() == WXK_DELETE || evt.GetKeyCode() == WXK_BACK)
 		m_auxiliary_model->Delete(this->GetSelection());
+	// [EVENT][STATE] Keyboard delete/backspace mirrors the toolbar Delete button so Unity can wire the same hotkeys into this helper.
 }

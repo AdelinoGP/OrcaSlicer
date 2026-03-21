@@ -1838,3 +1838,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3: `RenderCol` ordering must stay in sync with GL draw indices or the wrong primitives will be tinted.)
 - Git: Annotate GUI color palette
 - Next recommended Phase 1 task: T377 annotate: src/slic3r/GUI/GUI_Colors.hpp
+
+## Phase 1 - Task T372 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Deliverables: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Substantive additions: 12 targeted annotations spanning intent, state, events, Unity mapping, and hazard notes across the list's lifecycle and toolbar.
+- Verification excerpt: // [INTENT] Manage the auxiliary file tree that lives alongside the Plater model and expose it through a sortable tree control.
+- Unity-impact summary:
+  - Mirror the columned dataview and inline toolbar as a UI Toolkit VisualElement + HorizontalLayout so buttons stay tied to the list.
+  - Harmonize AuxiliaryModel/state, selection toggles, and delete command so Unity commands reuse a single controller for context menus, buttons, and keyboard shortcuts.
+  - Map drag/drop plus file-launch flows to Unity's DragAndDrop/ListView reorder patterns and provide a cross-platform process helper instead of `wxLaunchDefaultApplication`.
+- Hazards found: 2 (P3) – the toolbar/Open button and double-click both rely on `wxLaunchDefaultApplication`, so Unity must supply safe equivalents.
+- Git: Annotate auxiliary list UI for Unity port
+- Next recommended Phase 1 task: T373 annotate: src/slic3r/GUI/GUI_AuxiliaryList.hpp
