@@ -260,3 +260,7 @@
 ## Iteration plan update
 - Selected task: T330 annotate `src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.hpp` (key gui:T330) because the header defines the gizmo API and stateful handles that the Unity port must replicate.
 - Plan: invoke `ralph tools task start task-1773880086-977f`, read the header fully to capture the state, event, and GL wiring, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around each struct and method responsible for boolean composition, append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header, close the task, and stop for this iteration.
+
+## Iteration plan update
+- Selected task: T334 annotate `src/slic3r/GUI/Gizmos/GLGizmoMove.hpp` (task-1773880086-fa5a now open) to capture the remaining move gizmo state, event hooks, and Unity migration hints.
+- Plan: start the runtime task, review the header to understand its coordinate state, grabbers, and input hooks, sprinkle `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments describing each member/method, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the single-file change, close the task, and then stop for this iteration as required.

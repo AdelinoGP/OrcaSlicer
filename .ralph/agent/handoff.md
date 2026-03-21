@@ -2141,6 +2141,19 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (PickRaycaster/SceneRaycaster threading and GL state must stay isolated for Unity's Physics/Render loops).
 - Git: Annotate GLGizmoMeasure header for Unity port
 - Next recommended Phase 1 task: T329 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.cpp
+
+## Phase 1 - Task T334 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoMove.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoMove.hpp
+- Substantive additions: 11 guidance annotations covering state caches, event hooks, rendering, Unity mapping, and the key mouse-porting hazard
+- Verification excerpt: // [EVENT] Consumes wxMouseEvent to decide which grabber owns the drag.
+- Unity-impact summary:
+  - Map the three axis grabber models to Unity GameObjects with MeshColliders and a shared RuntimeHandleManager state.
+  - Replace the floating ImGui input bubble with a world-space Canvas + TextMeshPro panel that tracks the selection.
+- Hazards found: 1 (P2: wxMouseEvent coordinates arrive in GLCanvas space; Unity must translate these via GraphicRaycaster + Input.GetMouseButtonDown)
+- Git: Annotate GLGizmoMove header for Unity port
+- Next recommended Phase 1 task: T335 annotate: src/slic3r/GUI/Gizmos/GLGizmoPainterBase.cpp
 ## Phase 1 - Task T330 complete
 - Task type: annotate
 - File: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.hpp

@@ -252,7 +252,7 @@ Last updated: 2026-03-21T03:36:59Z
 - [ ] T331 annotate: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp
 - [ ] T332 annotate: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.hpp
 - [ ] T333 annotate: src/slic3r/GUI/Gizmos/GLGizmoMove.cpp
-- [ ] T334 annotate: src/slic3r/GUI/Gizmos/GLGizmoMove.hpp
+- [x] T334 annotate: src/slic3r/GUI/Gizmos/GLGizmoMove.hpp
 - [ ] T335 annotate: src/slic3r/GUI/Gizmos/GLGizmoPainterBase.cpp
 - [ ] T336 annotate: src/slic3r/GUI/Gizmos/GLGizmoPainterBase.hpp
 - [ ] T337 annotate: src/slic3r/GUI/Gizmos/GLGizmoRotate.cpp
