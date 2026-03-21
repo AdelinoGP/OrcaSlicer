@@ -200,6 +200,9 @@
 - Plan: start the runtime task, read the entire file, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around emboss state transitions, UI event plumbing, GL draw calls, and Unity migration hints; append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the change, and mark the task done before selecting the next ready entry.
 
 ## Iteration plan update
+- Current focus: T325 annotate `src/slic3r/GUI/Gizmos/GLGizmoHollow.cpp` (task-1773880086-2719) because the hollowing gizmo orchestrates tool selection, face sampling, and mesh fragment states that Unity will need to reproduce precisely.
+- Plan: `ralph tools task start task-1773880086-2719`, read the file to capture intents for the hollow outline, state caches, event wiring (mouse/keyboard/GL), rendering hooks, thread expectations, and Unity equivalents; inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments near the key structures and methods, append the evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file, close the runtime task, and then immediately pick the next ready Phase 1 entry.
+## Iteration plan update
 - Selected task: T317 annotate `src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.cpp` (now active task-1773880086-71d1).
 - Plan: read the entire `GLGizmoFaceDetector.cpp`, flag class-level intent for face detection, explain state caches, event bindings, render flow, OpenGL resource use, thread boundaries, Unity analogs (likely a MonoBehaviour raycaster + Job System), and porting hazards; add annotated comments with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]`, append the mandated evidence block to `.ralph/agent/handoff.md`, commit the single file, and close the task before selecting the next eligible file.
 ## Iteration update

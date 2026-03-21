@@ -2076,3 +2076,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3=1 (localization cache rebuild tied to wxWidgets recreation)
 - Git: Annotate GLGizmoFuzzySkin for Unity context
 - Next recommended Phase 1 task: T325 annotate: src/slic3r/GUI/Gizmos/GLGizmoHollow.cpp
+
+## Phase 1 - Task T325 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoHollow.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoHollow.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 16 multi-tag annotations clarifying GL rendering, mesh picking, input events, and ImGui controls for the hollow gizmo.
+- Verification excerpt: // [OPENGL][STATE][UNITY] Draws drain hole markers using WX shaders; Unity should replace this with `Graphics.DrawMesh`/`CommandBuffer` and reuse a MeshRenderer or shader property block for color/picking.
+- Unity-impact summary:
+  - Rebuild the hollowing panel as a UI Toolkit VisualElement tree bound to ScriptableObject settings so Unity preserves slider state, localization, and preview buttons.
+  - Translate the hole-selection raycast + cylinder draw loop into MeshRenderer/Graphics.DrawMesh plus Physics.Raycast inside a MonoBehaviour while keeping the selection cache synced with UI input.
+- Hazards found: 2 (P2 direct GL state toggles on the shared pipeline; P3 wxWidgets localization/CallAfter dependencies for the dialog strings and scheduled reslice).
+- Git: Annotate GLGizmoHollow for Unity port
+- Next recommended Phase 1 task: T326 annotate: src/slic3r/GUI/Gizmos/GLGizmoHollow.hpp
