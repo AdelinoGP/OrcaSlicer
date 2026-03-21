@@ -1972,3 +1972,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1, P3=1
 - Git: annotate: src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.cpp
 - Next recommended Phase 1 task: T318 annotate: src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.hpp
+
+## Phase 1 - Task T318 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.hpp
+- Substantive additions: multi-tag comments covering intent, render lifecycle, event/state hooks, Unity mapping, and porting hazards for this detector.
+- Verification excerpt: // [OPENGL] Highlights the detected face with GLModel draw calls, so it must play nicely with other GL state.
+- Unity-impact summary:
+  - Mirror the overlay using a MeshCollider-driven MonoBehaviour that caches the highlighted face and issues Graphics.DrawMesh overlays from Update/OnRenderObject.
+  - Rebuild the input/toolbar controls as a UI Toolkit VisualElement tied to the viewport camera so pointer events stay on the main thread.
+  - Keep recognition and sampling on the UI thread (or UnityMainThreadDispatcher) so MeshFilter reads stay safe and `m_sample_interval` tuning remains deterministic.
+- Hazards found: 2 (P2 face adjacency metadata + P3 sampling resolution and GLModel lifetime mismatch).
+- Git: Annotate GLGizmoFaceDetector header
+- Next recommended Phase 1 task: T319 annotate: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp
