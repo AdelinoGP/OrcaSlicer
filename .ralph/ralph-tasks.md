@@ -228,7 +228,7 @@ Last updated: 2026-03-21T00:40:00Z
 - [ ] T307 annotate: src/slic3r/GUI/Gizmos/GLGizmoAssembly.cpp
 - [x] T308 annotate: src/slic3r/GUI/Gizmos/GLGizmoAssembly.hpp
 - [x] T309 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp
-- [ ] T310 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.hpp
+- [x] T310 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.hpp
 - [ ] T311 annotate: src/slic3r/GUI/Gizmos/GLGizmoBrimEars.cpp
 - [ ] T312 annotate: src/slic3r/GUI/Gizmos/GLGizmoBrimEars.hpp
 - [ ] T313 annotate: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp

@@ -1810,3 +1810,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1, P3=1
 - Git: Annotate GLGizmoAssembly header for Unity
 - Next recommended Phase 1 task: T309 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp
+
+## Phase 1 - Task T310 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoBase.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoBase.hpp
+- Substantive additions: 12 inline annotations covering palette state, grabbers, event hooks, OpenGL rendering, and Unity migration notes
+- Verification excerpt: // [UNITY] Map this to a MonoBehaviour base that wires MeshColliders/ProximitySensors for picking plus a GraphicRaycaster-driven UI overlay that reuses a ScriptableObject color palette and pointer events.
+- Unity-impact summary:
+  - Treat the shared color arrays as a `GizmoColorPalette` ScriptableObject so Unity handles can reuse the same theme data without duplicating bitfield masks.
+  - Mirror `Grabber` + `register_raycasters_for_picking` with MeshCollider + EventTrigger combos feeding pointer events into the job system on the main thread.
+  - Replace ImGui overlays and dirty flag rerenders with UI Toolkit panels and explicit repaint requests tied to camera movement instead of GLCanvas idle scheduling.
+- Hazards found: 3 (P2=2 for pointer/ImGui replacements, P3=1 for manual dirty flag rendering)
+- Git: annotate: T310 GLGizmoBase header
+- Next recommended Phase 1 task: T311 annotate: src/slic3r/GUI/Gizmos/GLGizmoBrimEars.cpp

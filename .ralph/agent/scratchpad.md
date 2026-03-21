@@ -171,3 +171,8 @@
 - Selected task: T309 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp (current runtime task `task-1773880086-b6f2`).
 - Actions: confirm GLGizmoBase already has high-level tags but needs explicit `[STATE]`/`[EVENT]` notes for picking registration, render state, and ImGui positioning; add targeted `[UNITY]` guidance for each new stateful hook, append the evidence block to `.ralph/agent/handoff.md`, commit, and then move to the next ready file.
 - Verification: ensure new comments mention event wiring, worker/GL thread expectations, OpenGL resource lifetime, Unity analog (MeshCollider + RaycastManager, UI Toolkit layout), and porting hazards around singleton use.
+
+## Iteration plan update
+- Current focus: T310 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.hpp (runtime task `task-1773880086-cdee` now active).
+- Plan: cover every struct/enum/method with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations concentrating on render/picking lifecycle, grabber ownership, raycaster registration, ImGui helpers, and color caches before adding the evidence block to `.ralph/agent/handoff.md`, committing the single-file change, and closing the task.
+- Verification: confirm the static color loaders, `Grabber` state, ImGui input window setup, dirty flags, and `set_state`/`set_hover_id` hooks all explain the UI intent, event wiring, thread boundaries, and Unity replacements (e.g., `ScriptableObject` color sets + `MeshCollider` pick handling) prior to task close.
