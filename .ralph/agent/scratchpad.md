@@ -154,3 +154,15 @@
 ## Iteration plan update
 - Context: Phase 1 GUI annotation; ready task `T205 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp` appears valid and the source file exists.
 - Plan: start the task, read `GLGizmoBase.cpp` fully, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around the grabber setup, render flow, mouse handling, drop-in ImGui inputs, and GL resource management, append the required evidence block to `.ralph/agent/handoff.md`, mark the task done in `.ralph/ralph-tasks.md`, commit the annotated file, and then prepare to span the next ready entry.
+
+## Iteration plan update
+- Target task: T206 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.hpp
+- Plan: analyze header to capture widget state, event flow, GL handling, Unity mapping, and porting hazards; after annotating add evidence block to handoff and update task status.
+
+## Iteration plan update
+- Target task: T307 annotate: src/slic3r/GUI/Gizmos/GLGizmoAssembly.cpp
+- Plan: Add [INTENT]/[STATE]/[EVENT]/[OPENGL]/[THREAD]/[UNITY] comments around assembly initialization, event wiring, and grabber rendering to guide Unity porters.
+
+## Iteration plan
+- Current focus: T308 annotate: src/slic3r/GUI/Gizmos/GLGizmoAssembly.hpp (task-1773880086-9fc6) to document the assembly gizmo interface and layout state for the Unity port.
+- Plan: read the header, capture class intent, ownership, and state (selection slots, transformation matrices, shared resources), insert the full tag set ([INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]) targeting initialization, callbacks, coordinate transforms, thread safety for GL resource access, and provide Unity mapping guidance (likely a MonoBehaviour using UI Toolkit and Graphics API abstraction), add evidence block to `.ralph/agent/handoff.md`, stage/commit the single file, close the task, and then proceed to the next ready entry.

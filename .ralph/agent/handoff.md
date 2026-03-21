@@ -1771,3 +1771,28 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=2, P3=2
 - Git: annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp
 - Next recommended Phase 1 task: T206 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.hpp
+
+## Phase 1 - Task T307 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoAssembly.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoAssembly.cpp
+- Substantive additions: 7 multi-tag comments clarifying mode selection, ImGui overlay behavior, and state resets for assembly operations.
+- Verification excerpt: // [OPENGL][UNITY] Handles the ImGui overlay for assembly instructions, rerunning extra frames when the window size or content changes and marshaling input through the canvas event loop.
+- Unity-impact summary: {1} Assembly overlay must become a UI Toolkit panel after each frame, {2} Mode combo changes should trigger state updates via Unity events, {3} SceneRaycaster-driven picking needs Unity Physics.Raycast alternatives.
+- Hazards found: P2=1 (ImGui overlay), P3=1 (SceneRaycaster replacement)
+- Git: Annotate GLGizmoAssembly UI hints
+- Next recommended Phase 1 task: T308 annotate: src/slic3r/GUI/Gizmos/GLGizmoAssembly.hpp
+
+## Phase 1 - Task T308 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoAssembly.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoAssembly.hpp
+- Substantive additions: 8 multi-tag annotations covering lifecycle intent, UI state, event flow, OpenGL overlay rendering, and Unity mapping guidance.
+- Verification excerpt: // [PORTING_HAZARD:P3] Relies on GLGizmoMeasure's immediate-mode rendering and direct AssemblyMode enum; Unity will need to mirror the mode enum in a ScriptableObject and dispatch events through its JobSystem or async UI controller.
+- Unity-impact summary:
+  - Convert the input window overlay to a UI Toolkit VisualElement panel layered on the viewport camera while keeping the AssemblyMode combo, warning text, and tooltip in sync with the UnityEvent wiring.
+  - Mirror `switch_to_mode` logic via a MonoBehaviour-backed ScriptableObject that exposes mode enums and raises change events for the canvas controller.
+  - Replace the immediate-mode warning render with a UI Toolkit label or tooltip that toggles when the same-model object flag is set and no longer relies on GL text draws.
+- Hazards found: P2=1, P3=1
+- Git: Annotate GLGizmoAssembly header for Unity
+- Next recommended Phase 1 task: T309 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp
