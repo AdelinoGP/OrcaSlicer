@@ -235,3 +235,7 @@
 ## Iteration update
 - Completed T324 annotate `src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.hpp`; added intent/state/event/thread/OpenGL/Unity guidance plus a localization hazard note and prepared for the next file.
 - Next recommended focus: T325 annotate `src/slic3r/GUI/Gizmos/GLGizmoHollow.cpp` once the current runtime task closes.
+
+## Iteration plan update
+- Selected task: T374 annotate `src/slic3r/GUI/GuiColor.cpp` as a focused utility annotation opportunity since the file defines conversion helpers and a color-distance utility.
+- Plan: start `task-1773880086-9933`, read the converter and math functions, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations describing the wrapper purpose, consistent color state expectations, event-agnostic conversions, UI thread assumptions, and Unity equivalents (e.g., `Color` struct conversions and `ColorUtility` usage), append the required handoff evidence block, commit the file, close the task, and then continue with the next ready Phase 1 item.

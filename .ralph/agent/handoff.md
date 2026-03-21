@@ -315,6 +315,19 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: Annotate SLAImportJob view for Unity port
 - Next recommended Phase 1 task: T199 annotate: src/slic3r/GUI/Jobs/SVGFileJob.cpp
 
+## Phase 1 - Task T374 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GuiColor.cpp
+- Deliverables: src/slic3r/GUI/GuiColor.cpp
+- Substantive additions: 5 multi-tag annotations covering converter helpers and perceptual distance utilities (INTENT/STATE/THREAD/UNITY/PORTING_HAZARD)
+- Verification excerpt: // [UNITY] Unity can mirror these helpers with `Color32` ↔ `Color` conversions and share the result via a ScriptableObject palette.
+- Unity-impact summary:
+  - Centralizes `Color` ↔ `Color32` conversions so Unity’s UI Toolkit and URP shader uniforms share the same palette state.
+  - Aligns delta-E distance checks with Unity’s `ColorUtility.ToLinearSpace`/`ColorSpace.Convert` helpers to keep selection thresholds consistent.
+- Hazards found: P2=1 (delta-E linear-space mismatch), P3=2 (gamma/tone mapping differences and explicit clamp ordering)
+- Git: Annotate GUI color helpers for Unity port
+- Next recommended Phase 1 task: T375 annotate: src/slic3r/GUI/GuiColor.hpp
+
 ## Phase 1 - Task T309 complete
 - Task type: annotate
 - File: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp
