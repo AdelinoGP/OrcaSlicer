@@ -228,3 +228,7 @@
 ## Iteration plan update
 - Selected task: T323 annotate `src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.cpp` (task-1773880086-f99b now active).
 - Plan: read the full implementation, document the fuzzy skin manipulator intent, state, event bindings, rendering, thread boundaries, Unity analog (e.g., Skinned MeshRenderer + custom handles), and porting hazards via the standard `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` tags, append the evidence block to `.ralph/agent/handoff.md`, stage/commit, and close the task before moving to the next ready entry.
+
+## Iteration update
+- Completed T324 annotate `src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.hpp`; added intent/state/event/thread/OpenGL/Unity guidance plus a localization hazard note and prepared for the next file.
+- Next recommended focus: T325 annotate `src/slic3r/GUI/Gizmos/GLGizmoHollow.cpp` once the current runtime task closes.

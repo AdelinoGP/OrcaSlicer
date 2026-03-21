@@ -2066,3 +2066,13 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P2: shared GL state around `render_painter_gizmo()` must stay isolated before/after other gizmos run).
 - Git: Annotate GLGizmoFuzzySkin rendering for Unity port
 - Next recommended Phase 1 task: T324 annotate: src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.hpp
+## Phase 1 - Task T324 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.hpp
+- Substantive additions: ~10 multi-tag comments covering render, tooltip, and localization state behavior
+- Verification excerpt: [OPENGL][EVENT] Called inside the shared painter draw loop to emit fuzzy-skin handles and color bands.
+- Unity-impact summary: Canvas + GraphicRaycaster overlay for input window rendering; TextMeshPro tooltip element for fuzzy-skin captions; ScriptableObject/localization cache must be refreshed instead of recreating the wxWidget window.
+- Hazards found: P3=1 (localization cache rebuild tied to wxWidgets recreation)
+- Git: Annotate GLGizmoFuzzySkin for Unity context
+- Next recommended Phase 1 task: T325 annotate: src/slic3r/GUI/Gizmos/GLGizmoHollow.cpp
