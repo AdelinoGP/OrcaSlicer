@@ -26,6 +26,7 @@ namespace CommonGizmosDataObjects { class ObjectClipper; }
 
 class GLGizmoCut3D : public GLGizmoBase
 {
+    // [INTENT] Provides the Cut gizmo entry point: manages selection state, rendering helpers, and user adjustments so the Unity port can offer the same cut/split workflow.
     enum GrabberID {
         X = 0,
         Y,
@@ -37,6 +38,7 @@ class GLGizmoCut3D : public GLGizmoBase
         Count,
     };
 
+    // [STATE] Stores the current gizmo orientation, snap grid, and connector grouping that define how user input mutates the cut plane.
     Transform3d                 m_rotation_m{ Transform3d::Identity() };
     double                      m_snap_step{ 1.0 };
     int                         m_connectors_group_id;
@@ -61,6 +63,7 @@ class GLGizmoCut3D : public GLGizmoBase
     double m_grabber_connection_len{ 0.0 };
     Vec3d  m_cut_plane_start_move_pos {Vec3d::Zero()};
 
+    // [STATE] Coarse/fine snap radius values define the grabber sensitivity; Unity should expose them to the docking UI so designers can mimic tuning.
     double m_snap_coarse_in_radius{ 0.0 };
     double m_snap_coarse_out_radius{ 0.0 };
     double m_snap_fine_in_radius{ 0.0 };
@@ -69,6 +72,7 @@ class GLGizmoCut3D : public GLGizmoBase
     // dragging angel in hovered axes
     double m_angle{ 0.0 };
 
+    // [OPENGL] Connector mesh kept between frames so Unity can mirror it onto a MeshFilter and upload only when connector layout changes.
     TriangleMesh    m_connector_mesh;
     // workaround for using of the clipping plane normal
     Vec3d           m_clp_normal{ Vec3d::Ones() };
@@ -78,9 +82,12 @@ class GLGizmoCut3D : public GLGizmoBase
 
     Vec2d           m_ldown_mouse_position{ Vec2d::Zero() };
 
+    // [OPENGL] These GLModels package vertex/index buffers for connection lines and the preview cut; Unity should map them to child GameObjects carrying MeshFilter + MeshRenderer so GPU data is explicit.
     GLModel m_grabber_connection;
     GLModel m_cut_line;
 
+    // [EVENT] These picking models cache interactive handles that should translate into Unity's MeshCollider + raycast callback wiring so pointer input routes through `gizmo_event`.
+    // [PORTING_HAZARD:P2] wxWidgets uses GL selection buffers; the Unity shader pipeline must duplicate these shapes (e.g., MeshCollider) and keep them synchronized with `m_shapes` updates.
     PickingModel m_plane;
     PickingModel m_sphere;
     PickingModel m_cone;
@@ -88,6 +95,7 @@ class GLGizmoCut3D : public GLGizmoBase
     std::map<CutConnectorAttributes, PickingModel> m_shapes;
     std::vector<std::shared_ptr<SceneRaycasterItem>> m_raycasters;
 
+    // [OPENGL] Circle, scale, and angle overlays fed into render loop; Unity should reuse shared materials and update transforms from `render_*` helpers.
     GLModel m_circle;
     GLModel m_scale;
     GLModel m_snap_radii;
@@ -97,6 +105,7 @@ class GLGizmoCut3D : public GLGizmoBase
     Vec3d   m_old_center;
     Vec3d   m_cut_normal;
 
+    // [STATE] Tracks connector validation issues so UI can highlight invalid pins before performing cuts.
     struct InvalidConnectorsStatistics
     {
         unsigned int    outside_cut_contour;
@@ -110,6 +119,7 @@ class GLGizmoCut3D : public GLGizmoBase
         } 
     } m_info_stats;
 
+    // [STATE] Toggle flags controlling post-cut retention and rotation behavior; Unity must bind them to toggles or UI Toolkit values plus shared settings models.
     bool m_keep_upper{ true };
     bool m_keep_lower{ true };
     bool m_keep_as_parts{ false };
@@ -118,12 +128,14 @@ class GLGizmoCut3D : public GLGizmoBase
     bool m_rotate_upper{ false };
     bool m_rotate_lower{ false };
 
+    // [STATE] Tongue & groove parameters maintained when entering groove mode; Unity should store them in a ScriptableObject to persist across activations.
     // Input params for cut with tongue and groove
     Cut::Groove m_groove;
     bool m_groove_editing { false };
 
     bool m_is_slider_editing_done { false };
 
+    // [STATE] Snapping proportions that influence connector spacing and validation; bind them to sliders in Unity UI Toolkit for live preview.
     // Input params for cut with snaps
     float m_snap_bulge_proportion{ 0.15f };
     float m_snap_space_proportion{ 0.3f };
@@ -132,6 +144,7 @@ class GLGizmoCut3D : public GLGizmoBase
     bool m_connectors_editing{ false };
     bool m_cut_plane_as_circle{ false };
 
+    // [STATE][UNCLEAR] Connector geometry ratios describing how pins extend from the cut; exact Unity mapping might require experimenting with MeshScale.
     float m_connector_depth_ratio{ 3.f };
     float m_connector_size{ 2.5f };
     float m_connector_angle{ 0.f };
@@ -150,8 +163,10 @@ class GLGizmoCut3D : public GLGizmoBase
     mutable std::vector<bool> m_selected; // which pins are currently selected
     int  m_selected_count{ 0 };
 
+    // [EVENT] Selection rectangle tracks drag gestures for selecting multiple connectors; Unity should map this to InputSystem drag events to keep the same selection affordance.
     GLSelectionRectangle m_selection_rectangle;
 
+    // [STATE] Tracks invalid connector indices + drag toggles for UI validation phases; Unity needs to surface these warnings in the cut configuration pane.
     std::vector<size_t> m_invalid_connectors_idxs;
     bool m_was_cut_plane_dragged { false };
     bool m_was_contour_selected { false };
@@ -159,6 +174,7 @@ class GLGizmoCut3D : public GLGizmoBase
     // Vertices of the groove used to detection if groove is valid
     std::vector<Vec3d> m_groove_vertices;
 
+    // [INTENT] Holds per-object selection and raycaster info so Unity can mirror these decisions via GameObjects with MeshRaycaster + highlight state.
     class PartSelection {
     public:
         PartSelection() = default;
@@ -200,6 +216,7 @@ class GLGizmoCut3D : public GLGizmoBase
 
     PartSelection m_part_selection;
 
+    // [EVENT] Shortcut descriptions used in UI hints; Unity can feed them into tooltip overlays or binding helpers for keyboard guidance.
     std::vector<std::pair<wxString, wxString>> m_shortcuts_cut;
     std::vector<std::pair<wxString, wxString>> m_shortcuts_connector;
 
@@ -216,6 +233,7 @@ class GLGizmoCut3D : public GLGizmoBase
         , Manual
     };
 
+    // [STATE] Mode/type collections drive the input window contents; convert them to Unity enum/string dictionaries and keep `m_mode`/`m_connector_mode` in sync with dropdowns.
     std::vector<std::string> m_modes;
     size_t m_mode{ size_t(CutMode::cutPlanar) };
 
@@ -233,13 +251,16 @@ class GLGizmoCut3D : public GLGizmoBase
 
     std::vector<std::string> m_axis_names;
 
+    // [STATE] Orientation + label maps refresh the tooltip/legend text; Unity should keep this dictionary in a ScriptableObject shared across gizmos.
     std::map<std::string, wxString> m_part_orientation_names;
 
     std::map<std::string, std::string> m_labels_map;
 
 public:
+    // [INTENT] Initializes the gizmo and registers callbacks with GLCanvas3D so Unity can mimic the same spawn + lifecycle via MonoBehaviours.
     GLGizmoCut3D(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id);
 
+    // [EVENT] Tooltip + projection helpers keep input in sync with the wxWidgets UI; Unity should route similar queries through UI Toolkit EventHandlers.
     std::string get_tooltip() const override;
     bool unproject_on_cut_plane(const Vec2d& mouse_pos, Vec3d& pos, Vec3d& pos_world, bool respect_contours = true);
     bool gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down);
@@ -253,6 +274,7 @@ public:
     /// </summary>
     /// <param name="mouse_event">Keep information about mouse click</param>
     /// <returns>Return True when use the information otherwise False.</returns>
+    // [EVENT][THREAD] Handles mouse drag events on the GUI thread, pushing pointer deltas into the cut plane state; Unity must forward InputSystem drags here.
     bool on_mouse(const wxMouseEvent &mouse_event) override;
 
     void shift_cut(double delta);
@@ -265,6 +287,7 @@ public:
     BoundingBoxf3   transformed_bounding_box(const Vec3d& plane_center, const Transform3d& rotation_m = Transform3d::Identity()) const;
 
 protected:
+    // [THREAD] Lifecycle hooks invoked by GLGizmoBase on the main/render thread; Unity must mirror their invocation order inside the MonoBehaviour lifecycle.
     bool               on_init() override;
     void               on_load(cereal::BinaryInputArchive&ar) override;
     void               on_save(cereal::BinaryOutputArchive&ar) const override;
@@ -290,6 +313,7 @@ protected:
     void render_connectors_input_window(CutConnectors &connectors, float x, float y, float bottom_limit);
     void render_build_size();
     void reset_cut_plane();
+    // [EVENT][OPENGL] Helpers for toggling modes, clipping data, and rendering the input window; Unity should hook these into the UI Toolkit pane and keep GPU draw calls synchronized.
     void set_connectors_editing(bool connectors_editing);
     void flip_cut_plane();
     void process_contours();
@@ -328,6 +352,7 @@ protected:
     std::string get_gizmo_leaving_text() const override     { return _u8L("Leaving Cut gizmo"); }
     std::string get_action_snapshot_name() const override   { return _u8L("Cut gizmo editing"); }
 
+    // [THREAD] `data_changed` runs when the gizmo saves/loading, so Unity's serialization mapping must keep these values on the main thread.
     void data_changed(bool is_serializing) override; 
     Transform3d get_cut_matrix(const Selection& selection);
 
@@ -356,10 +381,12 @@ private:
     void render_cut_plane();
     static void render_model(GLModel& model, const ColorRGBA& color, Transform3d view_model_matrix);
     void render_line(GLModel& line_model, const ColorRGBA& color, Transform3d view_model_matrix, float width);
+    // [OPENGL] Drawing utilities for snap visuals and the cut plane itself; Unity must keep these calls in sync with the camera/lighting pipeline.
     void render_rotation_snapping(GrabberID axis, const ColorRGBA& color);
     void render_grabber_connection(const ColorRGBA& color, Transform3d view_matrix, double line_len_koef = 1.0);
     void render_cut_plane_grabbers();
     void render_cut_line();
+    // [PORTING_HAZARD:P2] `perform_cut` alters ModelObject geometry and may run worker-style validations; Unity must expose an explicit job/coroutine so this logic can run safely outside the render loop.
     void perform_cut(const Selection&selection);
     void set_center_pos(const Vec3d&center_pos, bool update_tbb = false);
     void update_bb();
@@ -374,10 +401,12 @@ private:
     bool process_cut_line(SLAGizmoEventType action, const Vec2d& mouse_position);
     void check_and_update_connectors_state();
 
+    // [UNITY] Visibility toggles map to GameObject.SetActive calls for each `ModelObject`; maintain a dictionary of GameObjects to restore visibility state in Unity.
     void toggle_model_objects_visibility();
 
     indexed_triangle_set its_make_groove_plane();
 
+    // [OPENGL] Utility for building transient meshes when connectors change, so Unity should cache these sets to avoid GC churn.
     indexed_triangle_set get_connector_mesh(CutConnectorAttributes connector_attributes);
     void apply_cut_connectors(ModelObject* mo, const std::string& connector_name);
 };

@@ -196,7 +196,7 @@ _Generated: 2026-03-20 07:11:02 UTC_
 
 
 
-## Phase 1 - Task T163 complete
+-## Phase 1 - Task T163 complete
 - Task type: annotate
 - File: src/slic3r/GUI/BackgroundSlicingProcess.cpp
 - Deliverables: src/slic3r/GUI/BackgroundSlicingProcess.cpp
@@ -1906,3 +1906,31 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P2: `StateColor` bitmask combos and manual hover/checked logic must be explicitly rebuilt in Unity's Selectable/Toggle state machine).
 - Git: Annotate Button header for Unity port
 - Next recommended Phase 1 task: T649 annotate: src/slic3r/GUI/Widgets/CheckBox.cpp
+## Phase 1 - Task T313 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp
+- Substantive additions: 6 tag-rich comments that document input/event routing, OpenGL clip/raycaster updates, the connectors UI, and the cut execution workflow for Unity porters.
+- Verification excerpt: // [OPENGL][UNITY][PORTING_HAZARD:P2] Directly manipulates GL state (blend/cull/depth) to draw the cut plane mesh; Unity migration will need a dedicated RenderTexture or shader pass that mimics glEnable/Disable calls and respects Camera clip plane ordering.
+- Unity-impact summary:
+  - Centralize connector/color state on a `CutToolController` MonoBehaviour with serialized `Color`/axis fields so Unity UI matches the desktop look.
+  - Mirror the wx mouse/Shift/Alt `gizmo_event` pipeline with a Unity `MonoBehaviour` that routes `Input.GetMouseButton` onto `Physics.Raycast` hits and shares dragging state with the UI panel.
+  - Replace ImGui input windows with UI Toolkit or Runtime UI panels that expose the groover/connector sliders and push updates through the same cut-state machine.
+- Hazards found: 1×P2 (OpenGL blend/raycaster interplay that Unity must replicate carefully).
+- Git: Annotate GLGizmoCut for Unity port
+- Next recommended Phase 1 task: T314 annotate: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp
+
+## Phase 1 - Task T314 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp
+- Substantive additions: 15 multi-tag annotations covering state, event flow, rendering, and Unity mapping guidance.
+- Verification excerpt: // [INTENT] Provides the Cut gizmo entry point: manages selection state, rendering helpers, and user adjustments so the Unity port can offer the same cut/split workflow.
+- Unity-impact summary:
+  - Map GL models/meshes to MeshFilter + MeshRenderer children so Unity can replicate the grabber, cut line, and circle overlays.
+  - Replace picking models with MeshCollider/GraphicsRaycaster combinations and feed raycast hits through `gizmo_event` (guarding against the stale `m_shapes` map hazard).
+  - Push `perform_cut` into a Unity coroutine/job triggered from UI input while keeping connector validation state in a ScriptableObject.
+- Hazards found: 2 (P2: GL picking sync with Unity raycasters, and `perform_cut`’s job-like model mutations).
+- Git: annotate GLGizmoCut.hpp
+- Next recommended Phase 1 task: T315 annotate: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp

@@ -184,3 +184,13 @@
 ## Iteration plan update
 - Current focus: T648 annotate `src/slic3r/GUI/Widgets/Button.hpp`.
 - Plan: read the header, annotate fields and methods with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` notes (especially around event table, state caches, Unity mapping for styles/interactions), append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the single file, close T648, and continue to the subsequent ready item.
+## Iteration plan update
+ - Planned task: T141 annotate `src/slic3r/GUI/2DBed.cpp`, but discovered it already marked done, so pivoting to T313 annotate `src/slic3r/GUI/Gizmos/GLGizmoCut.cpp` for this iteration.
+ - Steps: start `task-1773880086-1397`, read `GLGizmoCut.cpp` fully, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2-P3]` comments around the cut gizmo render loop, input binding, property cache, and selection state, note any unknowns with `[UNCLEAR]`, append the mandated evidence block to `.ralph/agent/handoff.md`, commit the change, close the runtime task, then select the next ready file in the queue.
+
+## Iteration plan update
+- Selected task: T314 annotate `src/slic3r/GUI/Gizmos/GLGizmoCut.hpp` (task-1773880086-2bd6 now active) because the header defines the gizmo state and event bindings the Unity port must replicate.
+- Plan: read the header, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments describing the class purpose, cached state, control-plane callbacks, OpenGL utility helpers, and Unity mapping, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header, close the task, and continue with the next ready file (likely T315) so the pipeline keeps moving.
+
+## Iteration update
+- Completed T314 annotate: `src/slic3r/GUI/Gizmos/GLGizmoCut.hpp`; multi-tag comments now cover intent, state caches, event wiring, OpenGL draw helpers, Unity analogs, and porting hazards; the evidence block is appended and `.ralph/ralph-tasks.md` now marks the task done.
