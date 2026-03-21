@@ -286,3 +286,10 @@
 ## Iteration plan update
 - Current focus: T338 annotate `src/slic3r/GUI/Gizmos/GLGizmoRotate.hpp` (task-1773880086-5808).
 - Plan: start the runtime task, read the header end-to-end, annotate the class intent, cached state (rotation axis, grabber IDs, hover/capture toggles), event wiring (mouse drag/ray hits, key modifiers, ImGui triggers), OpenGL helper math, and explicit Unity replacements (e.g., a `MonoBehaviour` with `GraphicRaycaster` for input + `RenderPipeline` mesh handles) using the full tag set; append the mandated evidence block to `.ralph/agent/handoff.md`, commit the annotated header, close the task, and then continue with the next ready entry.
+
+## Iteration plan
+- Context: Phase 1 GUI annotation; `T339 annotate: src/slic3r/GUI/Gizmos/GLGizmoScale.cpp` now active (task-1773880086-6f4b).
+- Plan: read `GLGizmoScale.cpp`, identify scale gizmo intent, selection/hover caches, event bindings, render toggles, OpenGL usage, threading constraints, and Unity equivalents; insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments where they clarify the port; append the required evidence block to `.ralph/agent/handoff.md`; commit the change and close the task, then select the next ready file.
+## Iteration update
+- Completed T339 annotate `src/slic3r/GUI/Gizmos/GLGizmoScale.cpp` with multi-tag comments across ctor, input, render, and math helpers plus the required Phase 1 evidence block.
+- Next iteration focus: T340 annotate `src/slic3r/GUI/Gizmos/GLGizmoScale.hpp` once the runtime task is ready so the header's state/event layout has matching Unity guidance.

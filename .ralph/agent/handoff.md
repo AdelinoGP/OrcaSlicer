@@ -2286,3 +2286,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P2: immediate-mode OpenGL + ImGui state tightly couples rendering and input)
 - Git: Annotate GLGizmoRotate for Unity port
 - Next recommended Phase 1 task: T338 annotate: src/slic3r/GUI/Gizmos/GLGizmoRotate.hpp
+
+## Phase 1 - Task T339 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoScale.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoScale.cpp
+- Substantive additions: added ~25 multi-tag annotations on constructor wiring, drag lifecycle, OpenGL rendering, and input helpers
+- Verification excerpt: // [PORTING_HAZARD:P2] wxWidgets shortcut binding and GizmoObjectManipulation integration have no direct analog, requiring a new Unity input layer and shared manipulation cache.
+- Unity-impact summary: 
+  - map the scale gizmo to a MonoBehaviour overlay that draws handles via `Graphics.DrawMesh` and receives `GraphicRaycaster` hits
+  - reroute hover/drag math (ray-plane intersection, snap steps, CTRL constraints) into Unity `InputAction` callbacks that update transform handles
+  - replace OpenGL connection lines with shader-drivenDashed meshes and a dedicated overlay camera so handles stay on top
+- Hazards found: 1 P2, 3 P3
+- Git: Annotate GLGizmoScale for Unity port
+- Next recommended Phase 1 task: T340 annotate: src/slic3r/GUI/Gizmos/GLGizmoScale.hpp
