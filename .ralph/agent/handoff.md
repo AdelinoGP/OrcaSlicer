@@ -2141,6 +2141,19 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (PickRaycaster/SceneRaycaster threading and GL state must stay isolated for Unity's Physics/Render loops).
 - Git: Annotate GLGizmoMeasure header for Unity port
 - Next recommended Phase 1 task: T329 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.cpp
+## Phase 1 - Task T330 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 10 multi-tag annotations covering the boolean gizmo’s intent, state cache, event wiring, OpenGL render hooks, Unity equivalents, and porting hazards.
+- Verification excerpt: // [INTENT] Mesh boolean tool that reuses GLGizmoBase to draw overlay handles, respond to selection clicks, and emit boolean operations between two volumes.
+- Unity-impact summary:
+  - Rebuild GLGizmoMeshBoolean as a MonoBehaviour that holds two MeshFilter/Transform pairs plus a boolean `MeshBooleanOperation` enum field exposed in the inspector.
+  - Map `gizmo_event`/`on_mouse` into InputSystem pointer callbacks that dispatch to the selection state machine and feed the Unity GraphicRaycaster so clicks only hit the intended slot.
+  - Mirror `VolumeInfo` as `ScriptableObject` references to the cached Mesh/Transform pair and let `generate_new_volume` update MeshFilter/MeshCollider data while keeping the selection cache in sync.
+- Hazards found: P2=2 (enum ordering must stay aligned with C#; mesh replacement requires careful main-thread scheduling), P3=1 (wx event ordering differs from Unity pointer events).
+- Git: Annotate GLGizmoMeshBoolean.hpp for Unity
+- Next recommended Phase 1 task: T331 annotate: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp
 ## Phase 1 - Task T329 complete
 - Task type: annotate
 - File: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.cpp
