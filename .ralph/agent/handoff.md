@@ -1893,3 +1893,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 × P2 (GLVolume lifetime/picking cache, wx mouse + GLSelectionRectangle plumbing that Unity must reimplement safely).
 - Git: Annotate GLGizmoBrimEars header for Unity port
 - Next recommended Phase 1 task: T313 annotate: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp
+
+## Phase 1 - Task T648 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/Button.hpp
+- Deliverables: src/slic3r/GUI/Widgets/Button.hpp
+- Substantive additions: Multi-tag annotations covering class intent, state caches, event routing, and Unity mapping for the button skin.
+- Verification excerpt: // [INTENT] Specialized StaticBox-derived button that batches layout, state, and event wiring for consistent multi-platform behaviour.
+- Unity-impact summary:
+  - Represent this widget as a Canvas Graphic/Selectable pair (or UI Toolkit VisualElement) whose color block and TextMeshPro label match the `StateColor` states guarded by SetStyle.
+  - Replace the event capture+tooltip logic with Unity pointer callbacks + Graphics Raycaster events that keep disabled tooltips alive without capturing the focus thread.
+- Hazards found: 1 (P2: `StateColor` bitmask combos and manual hover/checked logic must be explicitly rebuilt in Unity's Selectable/Toggle state machine).
+- Git: Annotate Button header for Unity port
+- Next recommended Phase 1 task: T649 annotate: src/slic3r/GUI/Widgets/CheckBox.cpp
