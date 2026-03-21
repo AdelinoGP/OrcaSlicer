@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-21T05:30:00Z
+Last updated: 2026-03-21T03:36:59Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -238,7 +238,7 @@ Last updated: 2026-03-21T05:30:00Z
 - [x] T317 annotate: src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.cpp
 - [x] T318 annotate: src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.hpp
 - [x] T319 annotate: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp
-- [ ] T320 annotate: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp
+- [x] T320 annotate: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp
 - [x] T321 annotate: src/slic3r/GUI/Gizmos/GLGizmoFlatten.cpp
 - [x] T322 annotate: src/slic3r/GUI/Gizmos/GLGizmoFlatten.hpp
 - [x] T323 annotate: src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.cpp

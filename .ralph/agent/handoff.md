@@ -2102,3 +2102,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 (P2 direct GL state toggles on the shared pipeline; P3 wxWidgets localization/CallAfter dependencies for the dialog strings and scheduled reslice).
 - Git: Annotate GLGizmoHollow for Unity port
 - Next recommended Phase 1 task: T326 annotate: src/slic3r/GUI/Gizmos/GLGizmoHollow.hpp
+
+## Phase 1 - Task T320 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/tasks.jsonl, .ralph/agent/handoff.md
+- Substantive additions: Added 14 multi-tag annotations across painter init/state, tool events, support preview generation, threading, and Unity guidance.
+- Verification excerpt: // [THREAD][PORTING_HAZARD:P2] Recomputes support volume geometry on the dedicated thread before the UI renders it; Unity needs a Job System worker + main-thread marshaling to keep the shared Mesh/Volume safe.
+- Unity-impact summary:
+  - Use a RenderTexture-backed preview camera + CommandBuffer overlay for the support painter so UI Toolkit can layer the highlighted areas.
+  - Mirror tool and slider state with InputSystem actions + UI Toolkit FloatFields so Unity keeps the painter state in sync with wxWidgets toggles.
+  - Replace the boost::thread/mutex generator with Unity Jobs/Task/Coroutine plus a main-thread dispatcher to avoid GL thread races.
+- Hazards found: P2=2 (background worker/GL thread boundary; duplicate generation counter concurrency).
+- Git: Annotate GLGizmoFdmSupports
+- Next recommended Phase 1 task: T321 annotate: src/slic3r/GUI/Gizmos/GLGizmoFlatten.cpp
