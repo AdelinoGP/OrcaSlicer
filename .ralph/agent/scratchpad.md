@@ -264,3 +264,6 @@
 ## Iteration plan update
 - Selected task: T334 annotate `src/slic3r/GUI/Gizmos/GLGizmoMove.hpp` (task-1773880086-fa5a now open) to capture the remaining move gizmo state, event hooks, and Unity migration hints.
 - Plan: start the runtime task, review the header to understand its coordinate state, grabbers, and input hooks, sprinkle `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments describing each member/method, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the single-file change, close the task, and then stop for this iteration as required.
+## Iteration plan update
+- Selected Task T331 annotate `src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp` to capture the MMU segmentation painter gizmo's UI state, render flow, and remap workflows.
+- Plan: read the source, sprinkle `[INTENT]/[STATE]/[EVENT]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` notes near lifecycle hooks, ImGui layout helpers, remapping logic, and 3D scene VBO management; update `.ralph/agent/handoff.md` with the evidence block; commit; close task; stop for the iteration.

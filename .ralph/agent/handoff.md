@@ -2141,6 +2141,19 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (PickRaycaster/SceneRaycaster threading and GL state must stay isolated for Unity's Physics/Render loops).
 - Git: Annotate GLGizmoMeasure header for Unity port
 - Next recommended Phase 1 task: T329 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.cpp
+## Phase 1 - Task T331 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp
+- Substantive additions: Broad multi-tag coverage (INTENT/STATE/EVENT/THREAD/OPENGL/UNITY/[UNCLEAR]/PORTING_HAZARD) for the segmenter lifecycle, ImGui layout, remap UI, and GL helper classes.
+- Verification excerpt: // [INTENT] GLGizmoMmuSegmentation coordinates MMU color painting: selection state, triangle selectors, and remapping UI.
+- Unity-impact summary:
+  - Port the painter overlay to a UI Toolkit VisualElement window backed by a MonoBehaviour that updates slider bounds, icons, and tooltip data from the shared `m_desc` descriptions.
+  - Move triangle selector renders to MeshRenderer/Graphics.DrawMesh + MeshCollider selection so Unity replicates `render_painter_gizmo()` and `GLMmSegmentationGizmo3DScene` VBO uploads without raw GL handles.
+  - Recreate the filament remap panel as a color grid + popup list that writes into a ScriptableObject remap state, keeping `m_used_filaments` filtered and hooking to InputSystem events.
+- Hazards found: 2 (P2 global `wxGetApp` reliance for filament/preset state; P2 manual GL buffer cleanup needs replacement by Unity Mesh lifecycle management).
+- Git: Annotate GLGizmoMmuSegmentation for Unity port
+- Next recommended Phase 1 task: T332 annotate: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.hpp
 
 ## Phase 1 - Task T334 complete
 - Task type: annotate

@@ -249,7 +249,7 @@ Last updated: 2026-03-21T03:36:59Z
 - [x] T328 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeasure.hpp
 - [x] T329 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.cpp
 - [x] T330 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.hpp
-- [ ] T331 annotate: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp
+- [x] T331 annotate: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.cpp
 - [ ] T332 annotate: src/slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.hpp
 - [ ] T333 annotate: src/slic3r/GUI/Gizmos/GLGizmoMove.cpp
 - [x] T334 annotate: src/slic3r/GUI/Gizmos/GLGizmoMove.hpp
