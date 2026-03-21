@@ -200,6 +200,10 @@
 - Plan: start the runtime task, read the entire file, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around emboss state transitions, UI event plumbing, GL draw calls, and Unity migration hints; append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the change, and mark the task done before selecting the next ready entry.
 
 ## Iteration plan update
+- Selected task: T341 annotate `src/slic3r/GUI/Gizmos/GLGizmosCommon.cpp` (task-1773880086-9ee5) as the current focus.
+- Plan: read the implementation to capture the shared gizmo helpers, event plumbing, and render utilities; add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` notes at module-level helpers and cross-gizmo utilities, append the mandatory handoff evidence block, git commit, and close the runtime task once done before moving to the next unblocked file.
+
+## Iteration plan update
 - Current focus: T325 annotate `src/slic3r/GUI/Gizmos/GLGizmoHollow.cpp` (task-1773880086-2719) because the hollowing gizmo orchestrates tool selection, face sampling, and mesh fragment states that Unity will need to reproduce precisely.
 - Plan: `ralph tools task start task-1773880086-2719`, read the file to capture intents for the hollow outline, state caches, event wiring (mouse/keyboard/GL), rendering hooks, thread expectations, and Unity equivalents; inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments near the key structures and methods, append the evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file, close the runtime task, and then immediately pick the next ready Phase 1 entry.
 ## Iteration plan update

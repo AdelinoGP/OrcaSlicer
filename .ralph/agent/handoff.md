@@ -2314,3 +2314,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3=1 (GizmoObjectManipulation lifetime dependency must be re-established before scale handles activate in Unity)
 - Git: Document GLGizmoScale header for Unity port
 - Next recommended Phase 1 task: T341 annotate: src/slic3r/GUI/Gizmos/GLGizmosCommon.cpp
+
+## Phase 1 - Task T341 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmosCommon.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmosCommon.cpp
+- Substantive additions: 15 targeted `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations describing the shared data pool, selection/clipper caches, render hooks, and Unity mapping notes.
+- Verification excerpt: // [OPENGL] Iterates over assembly objects to render clip outlines; a Unity port should create dedicated compute passes or shader-driven contours.
+- Unity-impact summary:
+  - Centralize the selection/clipping helpers in a MonoBehaviour-managed service so Unity gizmos reuse the same caches instead of duplicating state.
+  - Replace Instances/ObjectClipper cut rendering with Graphics.DrawMesh + material passes instead of GL state toggles, and keep the clipping plane backed by a `Plane` and `Transform`.
+  - Mirror the Raycaster cache rebuild on selection changes with a MeshCollider/MeshFilter refresh triggered by InputSystem/GraphicRaycaster events.
+- Hazards found: 1 (P2: direct GL depth state toggles in `render_cut` routines)
+- Git: Annotate GLGizmosCommon for Unity port
+- Next recommended Phase 1 task: T342 annotate: src/slic3r/GUI/Gizmos/GLGizmosCommon.hpp

@@ -20,6 +20,8 @@ using namespace CommonGizmosDataObjects;
 CommonGizmosDataPool::CommonGizmosDataPool(GLCanvas3D* canvas)
     : m_canvas(canvas)
 {
+    // [INTENT] Central pool so every gizmo can pull shared selection, clipping, and raycasting helpers without duplicating GL state.
+    // [STATE] `m_data` maps each CommonGizmosDataID to live helper instances while `m_canvas` anchors them to the canvas lifecycle.
     using c = CommonGizmosDataID;
     m_data[c::SelectionInfo].reset(   new SelectionInfo(this));
     m_data[c::InstancesHider].reset(  new InstancesHider(this));
@@ -32,6 +34,8 @@ CommonGizmosDataPool::CommonGizmosDataPool(GLCanvas3D* canvas)
 
 void CommonGizmosDataPool::update(CommonGizmosDataID required)
 {
+    // [EVENT] Triggered inside the gizmo update loop so only the requested data helpers stay alive each frame.
+    // [STATE] Releases any helper whose bit is not set to keep GPU resources lean while the active gizmo swaps data.
     assert(check_dependencies(required));
     for (auto& [id, data] : m_data) {
         if (int(required) & int(CommonGizmosDataID(id)))
@@ -106,6 +110,8 @@ bool CommonGizmosDataPool::check_dependencies(CommonGizmosDataID required) const
 
 void SelectionInfo::on_update()
 {
+    // [EVENT] Triggered during the shared data pool refresh so all gizmos read a consistent selection snapshot per frame.
+    // [STATE] Caches the active `ModelObject`, instance index, and SLA shift to avoid repeated selection queries while rendering.
     const Selection& selection = get_pool()->get_canvas()->get_selection();
 
     m_model_object = nullptr;
@@ -134,6 +140,8 @@ int SelectionInfo::get_active_instance() const
 
 void InstancesHider::on_update()
 {
+    // [STATE] Tracks the selection that must remain visible and rebuilds `m_clippers` whenever the mesh cache changes.
+    // [UNITY] Translate this into SelectionManager-driven renderer toggling plus GPU clipping materials in Unity.
     const ModelObject* mo = get_pool()->selection_info()->model_object();
     int active_inst = get_pool()->selection_info()->get_active_instance();
     GLCanvas3D* canvas = get_pool()->get_canvas();
@@ -181,6 +189,8 @@ void InstancesHider::on_release()
 
 void InstancesHider::render_cut() const
 {
+    // [OPENGL] Draws clipping cuts by issuing GL draw calls per mesh; Unity needs equivalent shader passes or Graphics.DrawMesh commands.
+    // [PORTING_HAZARD:P2] Relies on `glPushAttrib`/`glDisable` so the GL state changes must be carefully ported to avoid interfering with Unity's shared render context.
     const SelectionInfo* sel_info = get_pool()->selection_info();
     const ModelObject* mo = sel_info->model_object();
     Geometry::Transformation inst_trafo = mo->instances[sel_info->get_active_instance()]->get_transformation();
@@ -215,6 +225,8 @@ void InstancesHider::render_cut() const
 
 void Raycaster::on_update()
 {
+    // [THREAD] Runs on the UI/GL thread with a `wxBusyCursor` while rebuilding raycaster meshes; Unity should reschedule this via async main-thread jobs.
+    // [STATE] Keeps filtered triangle meshes cached so the pick helpers avoid recomputing unless the selection changes.
     wxBusyCursor wait;
     const ModelObject* mo = get_pool()->selection_info()->model_object();
 
@@ -261,6 +273,8 @@ void CommonGizmosDataObjects::Raycaster::set_only_support_model_part_flag(bool f
 
 void ObjectClipper::on_update()
 {
+    // [STATE] Rebuilds `m_clippers` whenever a new model or volume is selected, keeping the clipper set synchronized with the active instance.
+    // [UNITY] Mirrors updating MeshCollider ancestors on a MonoBehaviour when a selection changes, so keep it on the main thread.
     const ModelObject* mo = get_pool()->selection_info()->model_object();
     if (! mo)
         return;
@@ -298,6 +312,8 @@ void ObjectClipper::on_release()
 
 void ObjectClipper::render_cut(const std::vector<size_t>* ignore_idxs) const
 {
+    // [OPENGL] Draws contours directly via MeshClipper helpers; translating this to Unity will need explicit mesh/line render passes.
+    // [PORTING_HAZARD:P2] The call assumes GL context ownership and direct buffer manipulation, which Unity's renderer does not expose.
     if (m_clp_ratio == 0.)
         return;
     const SelectionInfo* sel_info = get_pool()->selection_info();
@@ -326,6 +342,7 @@ void ObjectClipper::render_cut(const std::vector<size_t>* ignore_idxs) const
 
 void ObjectClipper::set_position_to_init_layer()
 {
+    // [STATE] Resets the clipping plane to the start layer and forces a canvas redraw so renderers respect the new plane.
     m_clp.reset(new ClippingPlane({0, 0, 1}, 0.1));
     get_pool()->get_canvas()->set_as_dirty();
 }
@@ -370,6 +387,9 @@ std::vector<Vec3d> ObjectClipper::point_per_contour() const
 
 void ObjectClipper::set_position_by_ratio(double pos, bool keep_normal, bool vertical_normal)
 {
+    // [EVENT] Invoked by UI sliders or gizmo handles when the user drags the clipping layer; keeps `m_clp_ratio`/`m_clp` in sync.
+    // [STATE] Chooses the plane normal from the camera direction or kept normal so Unity can store the same plane in a Transform.
+    // [UNITY] Mirror this behavior by updating a `Plane` field and triggering a `VisualElement` slider change event inside a MonoBehaviour.
     const ModelObject* mo = get_pool()->selection_info()->model_object();
     int active_inst = get_pool()->selection_info()->get_active_instance();
     double z_shift = get_pool()->selection_info()->get_sla_shift();
@@ -410,6 +430,7 @@ void ObjectClipper::set_position_by_ratio(double pos, bool keep_normal, bool ver
 
 void ObjectClipper::set_range_and_pos(const Vec3d& cpl_normal, double cpl_offset, double pos)
 {
+    // [STATE] Overrides the clipping plane directly, keeping `m_clp_ratio` aligned with the supplied values.
     m_clp.reset(new ClippingPlane(cpl_normal, cpl_offset));
     m_clp_ratio = pos;
     get_pool()->get_canvas()->set_as_dirty();
@@ -423,6 +444,7 @@ const ClippingPlane* ObjectClipper::get_clipping_plane(bool ignore_hide_clipped)
 
 void ObjectClipper::set_behavior(bool hide_clipped, bool fill_cut, double contour_width)
 {
+    // [STATE] Controls whether clipped regions are hidden and how contour strokes are rendered.
     m_hide_clipped = hide_clipped;
     for (auto& clipper : m_clippers)
         clipper.first->set_behaviour(fill_cut, contour_width);
@@ -433,6 +455,7 @@ using namespace AssembleViewDataObjects;
 AssembleViewDataPool::AssembleViewDataPool(GLCanvas3D* canvas)
     : m_canvas(canvas)
 {
+    // [INTENT] Keeps the Assemble view helpers (model info + clippers) grouped together because they source data from the assembly-specific canvas.
     using c = AssembleViewDataID;
     m_data[c::ModelObjectsInfo].reset(new ModelObjectsInfo(this));
     m_data[c::ModelObjectsClipper].reset(new ModelObjectsClipper(this));
@@ -440,6 +463,7 @@ AssembleViewDataPool::AssembleViewDataPool(GLCanvas3D* canvas)
 
 void AssembleViewDataPool::update(AssembleViewDataID required)
 {
+    // [EVENT] Called from assemble view controllers to refresh whichever helper datasets are requested this frame.
     assert(check_dependencies(required));
     for (auto& [id, data] : m_data) {
         if (int(required) & int(AssembleViewDataID(id)))
@@ -495,6 +519,7 @@ return true;
 
 void ModelObjectsInfo::on_update()
 {
+    // [STATE] Mirrors the canvas object list so assembly helpers always read the latest set of model objects for cutting.
     if (!get_pool()->get_canvas()->get_model()->objects.empty()) {
         m_model_objects = get_pool()->get_canvas()->get_model()->objects;
     }
@@ -517,6 +542,7 @@ void ModelObjectsInfo::on_release()
 
 void ModelObjectsClipper::on_update()
 {
+    // [STATE] Rebuilds shared clippers for every object in the assemble view and caches their bounding radius for clipping math.
     const ModelObjectPtrs model_objects = get_pool()->model_objects_info()->model_objects();
     if (model_objects.empty())
         return;
@@ -554,6 +580,7 @@ void ModelObjectsClipper::on_release()
 
 void ModelObjectsClipper::render_cut() const
 {
+    // [OPENGL] Iterates over assemble objects to render clip outlines; a Unity port should create dedicated compute passes or shader-driven contours.
     if (m_clp_ratio == 0.)
         return;
     const ModelObjectPtrs model_objects = get_pool()->model_objects_info()->model_objects();
@@ -581,6 +608,7 @@ void ModelObjectsClipper::render_cut() const
 
 void ModelObjectsClipper::set_position(double pos, bool keep_normal)
 {
+    // [EVENT] Driven by assembly view UI controls; keeps the clipping plane state in sync with user input and requests a redraw.
     Vec3d normal = (keep_normal && m_clp) ? m_clp->get_normal() : -wxGetApp().plater()->get_camera().get_dir_forward();
     const Vec3d& center = get_pool()->get_canvas()->volumes_bounding_box().center();
     float dist = normal.dot(center);
