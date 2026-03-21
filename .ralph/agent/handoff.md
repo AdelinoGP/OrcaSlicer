@@ -2000,3 +2000,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P1=1, P2=1 (Print/GLVolume lifetime plus cross-thread cancellation); P3=1 (triangle selector mesh mutation/UndoRedo coupling).
 - Git: Annotate support painting gizmo for Unity port
 - Next recommended Phase 1 task: T320 annotate: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp
+## Phase 1 - Task T320 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp, .ralph/agent/handoff.md
+- Substantive additions: 21 multi-tag annotations describing painter intent/state/events/thread/OpenGL/Unity hazards
+- Verification excerpt: // [THREAD][PORTING_HAZARD:P2] Background worker that races against the GL render thread; Unity must replace this with Task.Run + main-thread dispatch boundaries.
+- Unity-impact summary:
+  - Support preview rendering must move to a RenderTexture+CommandBuffer overlay so Unity can layer it on the scene.
+  - Worker-generated GLVolume data needs to become a Mesh/RenderTexture update scheduled via Unity's main-thread dispatcher.
+- Hazards found: 1 P2 (boost::thread/GLVolume concurrency)
+- Git: Annotate GLGizmoFdmSupports header
+- Next recommended Phase 1 task: T321 annotate: src/slic3r/GUI/Gizmos/GLGizmoFlatten.cpp

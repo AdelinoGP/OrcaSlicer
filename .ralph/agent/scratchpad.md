@@ -212,3 +212,7 @@
 ## Iteration plan update
 - Selected task: T319 annotate `src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp` so the support painting flow, background preview generator, and UI bindings are described.
 - Plan: Read the full file (already loaded), insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around key sections (constructor, lifecycle hooks, UI, worker thread, GLVolume updates, cancellation), update `.ralph/agent/handoff.md` with evidence, stage/commit the single file, and close the task before the next iteration.
+
+## Iteration plan update
+- Selected next task: T320 annotate `src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp` to cover support state, selection management, and GL helper interfaces that pair with the source file.
+- Plan: read the header, capture intent for the gizmo API, annotate caches/state, event hooks, OpenGL utility comments, Unity replacement hints (e.g., Input system + GL mesh updates), thread/worker expectations, and porting hazards; append the evidence block to `.ralph/agent/handoff.md`, stage/commit the single file, close the task, and then pick the next ready file after verifying the manifest.
