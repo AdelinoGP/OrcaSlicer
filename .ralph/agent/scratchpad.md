@@ -76,3 +76,15 @@
 ## Iteration plan update
 - Selected task: T368 annotate `src/slic3r/GUI/GLToolbar.cpp` (task-1773880086-0cae); the toolbar gate handles GL events, job dispatchers, and stateful icons, so we need multi-tag insights for UI state, rendering, and event propagation.
 - Plan: read the file, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` notes near toolbar item definitions, visibility/effect callbacks, rendering loops, and event broadcasts; after editing append the Phase 1 evidence block to `.ralph/agent/handoff.md`, mark the task done in `.ralph/ralph-tasks.md`, commit, and then move to the next ready task.
+
+## Iteration plan update
+- Selected task: T369 annotate `src/slic3r/GUI/GLToolbar.hpp` (task-1773880086-232c); the header declares toolbar commands, layout helpers, and GL-enabled widgets that need explicit Unity port guidance and hazard notes.
+- Steps: read the header to capture class layout + states, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around the toolbar controller, button lifecycle, and event dispatch, append evidence to `.ralph/agent/handoff.md`, mark `.ralph/ralph-tasks.md` `[~]`→`[x]`, commit the annotated header, and close the task.
+
+## Iteration update
+- Added multi-tag comments around GLToolbar events, state caches, render helpers, and Unity mappings so future ports understand how buttons feed into UnityEvents, how textures live on the GPU, and where layout math lives.
+- Next plan: T371 annotate `src/slic3r/GUI/GUI_App.hpp` once ready, keeping the same annotation rubric.
+
+## Iteration plan update
+- Selected task: T197 annotate `src/slic3r/GUI/Jobs/SLAImportJob.cpp` (task-1773880086-9d0a); this job coordinates STL slicing output to the SLA pipeline so we need to capture job lifecycle, state, OpenGL upload, and user event hooks.
+- Plan: start the task, read the source fully, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around the job orchestration, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, update `.ralph/ralph-tasks.md`, commit, and close the runtime task before choosing the next item.

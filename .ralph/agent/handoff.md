@@ -275,6 +275,18 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp
 - Next recommended Phase 1 task: T451 annotate: src/slic3r/GUI/Jobs/SendJob.cpp
 
+## Phase 1 - Task T454 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/SLAImportJob.cpp
+- Deliverables: src/slic3r/GUI/Jobs/SLAImportJob.cpp
+- Substantive additions: 12 targeted annotations covering intent/runtime state, worker threading, event flow, Unity mapping, and hazards
+- Verification excerpt: // [INTENT] Worker entry point that loads SLA archives off the main thread while caching errors/status for finalize().
+- Unity-impact summary:
+  - Treat this job as an async Task/Coroutine on a `SlaImportController` MonoBehaviour that marshals progress through UnityEvents and exceptions through a dispatcher.
+  - Replace `NotificationManager`/`show_info` calls with UI Toolkit modals/toasts and mirror `load_mesh_object` via a scene graph loader and `MeshFilter` update.
+- Hazards found: 2 (P2 libslic3r import must stay on a worker, P3 NotificationManager calls rely on wx handlers)
+- Git: annotate SLAImportJob for Unity port
+- Next recommended Phase 1 task: T455 annotate: src/slic3r/GUI/Jobs/SLAImportJob.hpp
 
 ### Remaining
 

@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-20T23:39:19Z
+Last updated: 2026-03-21T00:20:58Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -287,7 +287,7 @@ Last updated: 2026-03-20T23:39:19Z
 - [ ] T366 annotate: src/slic3r/GUI/GLTexture.cpp
 - [x] T367 annotate: src/slic3r/GUI/GLTexture.hpp
 - [x] T368 annotate: src/slic3r/GUI/GLToolbar.cpp
-- [ ] T369 annotate: src/slic3r/GUI/GLToolbar.hpp
+- [x] T369 annotate: src/slic3r/GUI/GLToolbar.hpp
 - [x] T370 annotate: src/slic3r/GUI/GUI_App.cpp
 - [ ] T371 annotate: src/slic3r/GUI/GUI_App.hpp
 - [ ] T372 annotate: src/slic3r/GUI/GUI_AuxiliaryList.cpp
@@ -372,7 +372,7 @@ Last updated: 2026-03-20T23:39:19Z
 - [ ] T451 annotate: src/slic3r/GUI/Jobs/SendJob.cpp
 - [ ] T452 annotate: src/slic3r/GUI/Jobs/SendJob.hpp
 - [ ] T453 annotate: src/slic3r/GUI/Jobs/SLAImportDialog.hpp
-- [ ] T454 annotate: src/slic3r/GUI/Jobs/SLAImportJob.cpp
+- [x] T454 annotate: src/slic3r/GUI/Jobs/SLAImportJob.cpp
 - [ ] T455 annotate: src/slic3r/GUI/Jobs/SLAImportJob.hpp
 - [ ] T456 annotate: src/slic3r/GUI/Jobs/ThreadSafeQueue.hpp
 - [ ] T457 annotate: src/slic3r/GUI/Jobs/UpgradeNetworkJob.cpp
