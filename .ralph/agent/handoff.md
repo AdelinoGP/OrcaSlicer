@@ -1712,3 +1712,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2:2, P3:3
 - Git: Annotate ComboBox widget states and events
 - Next recommended Phase 1 task: T652 annotate: src/slic3r/GUI/Widgets/ComboBox.hpp
+
+## Phase 1 - Task T440 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/NotificationProgressIndicator.hpp
+- Deliverables: src/slic3r/GUI/Jobs/NotificationProgressIndicator.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md
+- Substantive additions: 9 contextual annotations covering INTENT/STATE/EVENT/THREAD/UNITY/PORTING_HAZARD senses around the indicator API and stored cancel handler.
+- Verification excerpt: // [EVENT][THREAD] Receives error signals (often from worker threads) and marshals them through NotificationManager to the UI dialog; guard for wxString encoding.
+- Unity-impact summary:
+  - Map progress updates to a UI Toolkit VisualElement tree with a `ProgressBar` driven by a `ScriptableObject` state and marshaled via `SynchronizationContext.Post`.
+  - Treat the status text as a main-thread `Label` binding and route cancel callbacks through Unity Job System tokens instead of wx CancelFn events.
+- Hazards found: 1 (P2: Cancel callback assumes wx event loop semantics and must be re-architected for Unity CancelFns/job tokens.)
+- Git: Annotate NotificationProgressIndicator.hpp
+- Next recommended Phase 1 task: T441 annotate: src/slic3r/GUI/Jobs/OAuthJob.cpp

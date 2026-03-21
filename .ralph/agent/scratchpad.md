@@ -123,3 +123,8 @@
 - Selected task: T667 annotate `src/slic3r/GUI/Widgets/Label.cpp` (task-1773880088-88d2, key gui:T667) because it centralizes font handling, hyperlink behavior, and wrapping across the UI.
 - Plan: start the runtime task, read the widget code end-to-end, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` tags near the font cache, mouse propagation hook, auto wrap support, and wrapper helpers; ensure labels mention UI thread assumptions and Unity Text replacement. Append the required handoff evidence block, mark the task `[x]`, and commit before selecting the next ready file.
 - Verification: documentation-only change, so no runtime tests; rely on reasoning that comments don't build.
+
+## Iteration plan update
+- Selected task: T440 annotate `src/slic3r/GUI/Jobs/NotificationProgressIndicator.hpp` as today's focus.
+- Plan: start the runtime task, read the header for NotificationProgressIndicator, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations around the interface, event handlers, and worker-aware callbacks, append the evidence block to `.ralph/agent/handoff.md`, commit the change, and then choose the next ready Phase 1 task.
+- Verification: documentation-only annotation; ensure thread/event/OGL notes are concrete, no runtime test needed.
