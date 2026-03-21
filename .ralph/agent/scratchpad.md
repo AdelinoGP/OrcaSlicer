@@ -178,5 +178,5 @@
 - Verification: confirm the static color loaders, `Grabber` state, ImGui input window setup, dirty flags, and `set_state`/`set_hover_id` hooks all explain the UI intent, event wiring, thread boundaries, and Unity replacements (e.g., `ScriptableObject` color sets + `MeshCollider` pick handling) prior to task close.
 
 ## Iteration plan update
-- Current focus: T376 annotate: src/slic3r/GUI/GUI_Colors.cpp (runtime task `task-1773880086-c73a`).
-- Plan: read the concise color palette file, document the `RenderColor` array lifecycle and naming helper with `[INTENT]` for palette ownership, `[STATE]` for the shared color cache, `[OPENGL]` ties to render passes, `[UNITY]` concrete replacements such as a ScriptableObject palette + `MaterialPropertyBlock`, and `[PORTING_HAZARD:P3]` notes for the implicit color-to-GL state contract. After updating `GUI_Colors.cpp`, update `.ralph/agent/handoff.md` with the evidence block, mark the task done in `.ralph/ralph-tasks.md`, commit the file, and then prepare for the next ready entry.
+- Current focus: T373 annotate: src/slic3r/GUI/GUI_AuxiliaryList.hpp (ready task `task-1773880086-81c6`).
+- Plan: open the header, document the list/object binding hooks, state caches, command IDs, event tables, and lifetime invariants with the full tag set; ensure Unity guidance mentions a UI Toolkit ListView + event bridge, highlight thread boundaries around worker updates, append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the header, and close the task before selecting the next file.

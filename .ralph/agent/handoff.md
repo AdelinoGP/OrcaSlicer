@@ -1852,3 +1852,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 (P3) – the toolbar/Open button and double-click both rely on `wxLaunchDefaultApplication`, so Unity must supply safe equivalents.
 - Git: Annotate auxiliary list UI for Unity port
 - Next recommended Phase 1 task: T373 annotate: src/slic3r/GUI/GUI_AuxiliaryList.hpp
+
+## Phase 1 - Task T373 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_AuxiliaryList.hpp
+- Deliverables: src/slic3r/GUI/GUI_AuxiliaryList.hpp
+- Substantive additions: 7 multi-tag annotations covering class intent, reload strategy, event handlers, state tracking, and porting guidance.
+- Verification excerpt: // [INTENT] Creates the default button panel + tree model and populates the view; keeps the UI-ready state in sync with the underlying AuxiliaryModel.
+- Unity-impact summary:
+  - Mirror the tree + button panel with a UI Toolkit VisualElement layout containing a ListView and command buttons wired through a MonoBehaviour controller owning a ScriptableObject-backed AuxiliaryModel.
+  - Replace drag/drop/context-menu wiring with UI Toolkit drag/drop callbacks and Input System events, ensuring the same selection state feeds the rest of the job pipeline.
+- Hazards found: 1 (P3: drag/drop/context menu bridging requires explicit InputSystem+EventTrigger wiring that wxWidgets handled automatically).
+- Git: annotate: GUI AuxiliaryList header
+- Next recommended Phase 1 task: T374 annotate: src/slic3r/GUI/GuiColor.cpp
