@@ -2025,3 +2025,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 (P3: replaying `SetBitmapFocus`/`SetBitmapCurrent` layering; P3: macOS enter/leave/focus event wiring has no direct Unity helper)
 - Git: annotate: src/slic3r/GUI/Widgets/CheckBox.cpp
 - Next recommended Phase 1 task: T650 annotate: src/slic3r/GUI/Widgets/CheckBox.hpp
+
+## Phase 1 - Task T321 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoFlatten.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoFlatten.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md
+- Substantive additions: multi-tag guidance on selection handling, render state, raycast registration, and mesh rebuild heuristics for the flatten gizmo.
+- Verification excerpt: // [INTENT] Rebuilds the flatten planes from the current convex hull once per selection change and prepares the GL/mesh-raycaster data.
+- Unity-impact summary:
+  - Graphics.DrawMesh + hover material swap mirrors the on_render highlight path.
+  - MeshCollider/Physics.Raycast equivalents replicate the SceneRaycaster setup for gizmo picking.
+- Hazards found: P2=1 (plane rebuild cost), P3=1 (single-instance precondition)
+- Git: annotate flatten gizmo intent for Unity port
+- Next recommended Phase 1 task: T322 annotate: src/slic3r/GUI/Gizmos/GLGizmoFlatten.hpp

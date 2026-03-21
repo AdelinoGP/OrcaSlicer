@@ -220,3 +220,7 @@
 ## Iteration plan update
 - Selected task: T649 annotate `src/slic3r/GUI/Widgets/CheckBox.cpp` (per the Phase 1 ready list) to document how the checkbox bridges wxWidgets events, GL overlays, and Unity input expectations.
 - Plan: read the entire source, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations for the control lifecycle, state cache, event handling, draw routine, and Unity mapping; append the mandatory evidence block to `.ralph/agent/handoff.md`, update `.ralph/ralph-tasks.md` from `[ ]` to `[~]` and then `[x]`, commit the single-file change, and then continue to the next ready file.
+
+## Iteration plan update
+- Selected task: T321 annotate `src/slic3r/GUI/Gizmos/GLGizmoFlatten.cpp` to clarify the transform flatten gizmo lifecycle, selection state, drawing logic, and Unity migration path.
+- Plan: mark the runtime task started, read the source, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around initialization, event wiring, render updates, and raycast hazards, append the required evidence block to `.ralph/agent/handoff.md`, commit the single file, and close the task before proceeding.
