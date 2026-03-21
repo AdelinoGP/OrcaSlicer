@@ -176,3 +176,7 @@
 - Current focus: T310 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.hpp (runtime task `task-1773880086-cdee` now active).
 - Plan: cover every struct/enum/method with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations concentrating on render/picking lifecycle, grabber ownership, raycaster registration, ImGui helpers, and color caches before adding the evidence block to `.ralph/agent/handoff.md`, committing the single-file change, and closing the task.
 - Verification: confirm the static color loaders, `Grabber` state, ImGui input window setup, dirty flags, and `set_state`/`set_hover_id` hooks all explain the UI intent, event wiring, thread boundaries, and Unity replacements (e.g., `ScriptableObject` color sets + `MeshCollider` pick handling) prior to task close.
+
+## Iteration plan update
+- Current focus: T376 annotate: src/slic3r/GUI/GUI_Colors.cpp (runtime task `task-1773880086-c73a`).
+- Plan: read the concise color palette file, document the `RenderColor` array lifecycle and naming helper with `[INTENT]` for palette ownership, `[STATE]` for the shared color cache, `[OPENGL]` ties to render passes, `[UNITY]` concrete replacements such as a ScriptableObject palette + `MaterialPropertyBlock`, and `[PORTING_HAZARD:P3]` notes for the implicit color-to-GL state contract. After updating `GUI_Colors.cpp`, update `.ralph/agent/handoff.md` with the evidence block, mark the task done in `.ralph/ralph-tasks.md`, commit the file, and then prepare for the next ready entry.

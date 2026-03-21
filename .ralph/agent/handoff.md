@@ -192,7 +192,8 @@ _Generated: 2026-03-20 07:11:02 UTC_
   - Keep the `ETimeMode` sentinel in sync with Unity enums to avoid indexing mismatches when reading `Item.times`.
 - Hazards found: 1 (P3 intent: enum sentinel mismatch will crash the `get_time` index if Unity diverges from the native `ETimeMode::COUNT`).
 - Git: annotate: src/libvgcode/src/ExtrusionRoles.cpp
- - Next recommended Phase 1 task: T114 annotate: src/libvgcode/src/ExtrusionRoles.hpp
+- Next recommended Phase 1 task: T114 annotate: src/libvgcode/src/ExtrusionRoles.hpp
+
 
 
 ## Phase 1 - Task T163 complete
@@ -1824,3 +1825,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 3 (P2=2 for pointer/ImGui replacements, P3=1 for manual dirty flag rendering)
 - Git: annotate: T310 GLGizmoBase header
 - Next recommended Phase 1 task: T311 annotate: src/slic3r/GUI/Gizmos/GLGizmoBrimEars.cpp
+
+## Phase 1 - Task T376 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Colors.cpp
+- Deliverables: src/slic3r/GUI/GUI_Colors.cpp
+- Substantive additions: 2 multi-tag annotations covering palette ownership/state and legend naming
+- Verification excerpt: // [INTENT] Provide the legend label used by UI controls when a user inspects or edits a render layer color.
+- Unity-impact summary:
+  - Mirror the shared palette with a ScriptableObject `RenderPalette` and push values through a MaterialPropertyBlock for each renderer.
+  - Feed the same string list into a VisualElement list or dropdown so Unity UI labels remain one-to-one with the swatches.
+- Hazards found: 1 (P3: `RenderCol` ordering must stay in sync with GL draw indices or the wrong primitives will be tinted.)
+- Git: Annotate GUI color palette
+- Next recommended Phase 1 task: T377 annotate: src/slic3r/GUI/GUI_Colors.hpp
