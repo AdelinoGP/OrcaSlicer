@@ -1879,3 +1879,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1
 - Git: Annotate GLGizmoBrimEars for Unity port
 - Next recommended Phase 1 task: T312 annotate: src/slic3r/GUI/Gizmos/GLGizmoBrimEars.hpp
+
+## Phase 1 - Task T312 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoBrimEars.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoBrimEars.hpp; .ralph/ralph-tasks.md; .ralph/agent/scratchpad.md
+- Substantive additions: 20+ multi-tag comments covering handle cache state, selection events, OpenGL render flow, Unity mapping, and porting hazards.
+- Verification excerpt: `// [STATE][THREAD][PORTING_HAZARD:P2] Maintains GLVolume -> SceneRaycasterItem mapping so the UI thread can query hits; Unity needs to mirror this with MeshCollider references and safe teardown.`
+- Unity-impact summary:
+  - Render each brim handle by replacing the GL draw calls with `Graphics.DrawMesh` on an overlay camera so Unity reuses raycastable cylinders.
+  - Recreate the selection rectangle and tooltip overlays via UI Toolkit VisualElements and EventSystem pointer drag events backed by the Input System.
+  - Translate the GLVolume-to-pick raycaster cache into managed MeshCollider references with explicit lifecycle handling to avoid dangling pointers.
+- Hazards found: 2 × P2 (GLVolume lifetime/picking cache, wx mouse + GLSelectionRectangle plumbing that Unity must reimplement safely).
+- Git: Annotate GLGizmoBrimEars header for Unity port
+- Next recommended Phase 1 task: T313 annotate: src/slic3r/GUI/Gizmos/GLGizmoCut.cpp
