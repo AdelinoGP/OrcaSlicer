@@ -242,3 +242,7 @@
 ## Iteration plan update
 - Selected task: T326 annotate `src/slic3r/GUI/Gizmos/GLGizmoHollow.hpp` after realizing the header still lacked the multi-tag notes but the previous run handled only the .cpp counterpart.
 - Plan: add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around the class definition, public API, state caches (selection, stash, cylinder preview), event hooks, triangle/hollow rendering and storage helpers, and serialization overrides; update `.ralph/agent/handoff.md` with the required evidence block, commit the header, close the runtime task, and then stop for the iteration so the next agent can continue.
+
+## Iteration plan update
+- Current focus: T328 annotate `src/slic3r/GUI/Gizmos/GLGizmoMeasure.hpp` (runtime task `task-1773880086-6b2f` now active).
+- Plan: read the header to understand gizmo state, selection/cursor helpers, GL model caching, and measure mode toggles; insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments on enums, data members, helper classes, and methods that shape measurement history, remaining hazards, and Unity replacements; append the mandated Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the file, mark the task done, and then stop for the next iteration.

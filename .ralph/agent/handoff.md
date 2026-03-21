@@ -2127,3 +2127,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=2 (background worker/GL thread boundary; duplicate generation counter concurrency).
 - Git: Annotate GLGizmoFdmSupports
 - Next recommended Phase 1 task: T321 annotate: src/slic3r/GUI/Gizmos/GLGizmoFlatten.cpp
+
+## Phase 1 - Task T328 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoMeasure.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoMeasure.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md
+- Substantive additions: Numerous INTENT/STATE/EVENT/THREAD/OPENGL/UNITY/P2 annotations clarifying gripper wiring, measurement state, and Unity replacements for the event pipeline.
+- Verification excerpt: // [OPENGL][UNITY] Matrix helpers that rewrite wxGL-to-screen math; ported Unity widget should rely on `Camera` APIs instead of raw matrices.
+- Unity-impact summary:
+  - Map `SLAGizmoEventType` into UI Toolkit actions and use the keyboard hint string (`CTRL_STR`) to keep cross-platform UX consistent.
+  - Replace GL pick raycasters with Unity `Physics.Raycast` + `MeshCollider` layers while reusing the color palette from the annotated constants.
+  - Move measurement overlays (dimension lines, axis tooltips, ImGui windows) into a Canvas/UI Toolkit window backed by ScriptableObject selection state.
+- Hazards found: P2=1 (PickRaycaster/SceneRaycaster threading and GL state must stay isolated for Unity's Physics/Render loops).
+- Git: Annotate GLGizmoMeasure header for Unity port
+- Next recommended Phase 1 task: T329 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.cpp
