@@ -314,6 +314,20 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: Annotate SLAImportJob view for Unity port
 - Next recommended Phase 1 task: T199 annotate: src/slic3r/GUI/Jobs/SVGFileJob.cpp
 
+## Phase 1 - Task T309 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp, .ralph/agent/scratchpad.md
+- Substantive additions: 6 multi-tag annotations covering hover tracking, dirty state resets, popup bounds, picking registration, grabber rendering highlights, and cleanup hooks.
+- Verification excerpt: // [EVENT] Prepares each grabber to accept hits by registering its raycaster; derived gizmos call this once per visibility change.
+- Unity-impact summary:
+  - Treat `m_hover_id` + `m_dirty` as state stored in a `GizmoState` ScriptableObject so Unity's UI Toolkit and render loop know when resets/rebuilds are needed.
+  - Register/unregister raycasters by binding `MeshCollider` handles to a centralized `RaycastManager` during `OnEnable`/`OnDisable` instead of relying on `SceneRaycaster` singletons.
+  - Bake the ImGui window clamp into UI Toolkit `VisualElement` layout guards before calling `MarkDirtyRepaint` so popups never fall outside the canvas.
+- Hazards found: 0
+- Git: Annotate GLGizmoBase picking hooks
+- Next recommended Phase 1 task: T310 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.hpp
+
 ### Remaining
 
 - [ ] P0-T006: Main Window Class Identification

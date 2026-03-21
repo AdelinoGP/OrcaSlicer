@@ -327,6 +327,9 @@ std::string GLGizmoBase::get_action_snapshot_name() const { return "Gizmo action
 
 void GLGizmoBase::set_icon_filename(const std::string& filename) { m_icon_filename = filename; }
 
+// [STATE] Hover tracking only changes when not dragging so `on_set_hover_id` runs consistently and derived gizmos can refresh their preview
+// cursors. [UNITY] Map this to pointer enter/exit handlers on each axis MeshCollider so Unity keeps UI state in lockstep without relying on
+// implicit global hover ids.
 void GLGizmoBase::set_hover_id(int id)
 {
     // do not change hover id during dragging
@@ -340,6 +343,8 @@ void GLGizmoBase::set_hover_id(int id)
     on_set_hover_id();
 }
 
+// [STATE] Clears the dirty flag that indicates the ImGui panel or grabber geometry needs to rebuild; called every frame by derived gizmos.
+// [UNITY] Mirror this with a bool in a shared `GizmoState` ScriptableObject so UI Toolkit knows when to invalidate meshes.
 bool GLGizmoBase::update_items_state()
 {
     bool res = m_dirty;
@@ -360,6 +365,8 @@ void GLGizmoBase::GizmoImguiSetNextWIndowPos(float& x, float y, int flag, float 
     GizmoImguiSetNextWIndowPos(x, y, last_input_window_width, 0, flag, pivot_x, pivot_y);
 }
 
+// [STATE] Clamps popup windows to the viewport so dialog placement always remains inside the canvas bounds.
+// [UNITY] Translate this guard to UI Toolkit by baking the parent `VisualElement` bounds into the layout pass before calling `MarkDirtyRepaint`.
 void GLGizmoBase::GizmoImguiSetNextWIndowPos(float& x, float y, float w, float h, int flag, float pivot_x, float pivot_y)
 {
     if (abs(w) > 0.01f) {
@@ -375,6 +382,9 @@ void GLGizmoBase::GizmoImguiSetNextWIndowPos(float& x, float y, float w, float h
     m_imgui->set_next_window_pos(x, y, flag, pivot_x, pivot_y);
 }
 
+// [EVENT] Prepares each grabber to accept hits by registering its raycaster; derived gizmos call this once per visibility change.
+// [THREAD] Runs on the GL/UI thread before rendering so it can touch `SceneRaycaster`. [UNITY] Mirror this by binding each handle's
+// collider to a dedicated `RaycastManager` when the meta-gizmo becomes active.
 void GLGizmoBase::register_grabbers_for_picking()
 {
     for (size_t i = 0; i < m_grabbers.size(); ++i) {
@@ -382,6 +392,8 @@ void GLGizmoBase::register_grabbers_for_picking()
     }
 }
 
+// [EVENT] Removes the SceneRaycaster bindings so the gizmo stops capturing mouse events when hidden or reset.
+// [UNITY] Call during `OnDisable`/`OnDestroy` to detach Unity colliders from the raycast registry and avoid ghost hits.
 void GLGizmoBase::unregister_grabbers_for_picking()
 {
     for (size_t i = 0; i < m_grabbers.size(); ++i) {
@@ -400,7 +412,10 @@ void GLGizmoBase::render_grabbers(const BoundingBoxf3& box) const
 
 void GLGizmoBase::render_grabbers(float size) const { render_grabbers(0, m_grabbers.size() - 1, size, false); }
 
-// [OPENGL] Binds the shared `gouraud_light` shader, disables face culling, and renders each enabled grabber along with hover cues.
+// [OPENGL] Binds the shared `gouraud_light` shader, disables face culling, and renders each enabled grabber along with hover cues using the
+// current camera matrix. [STATE] `m_hover_id` drives highlight logic while `m_grabbers[i].enabled` gates visibility so derived Gizmo
+// classes can toggle handles mid-frame. [UNITY] Reproduce this with `MeshRenderer`/`MeshCollider` prefabs that swap materials and trigger
+// UnityEvents before hit-testing.
 void GLGizmoBase::render_grabbers(size_t first, size_t last, float size, bool force_hover) const
 {
     GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
