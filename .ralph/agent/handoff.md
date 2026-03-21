@@ -2024,7 +2024,18 @@ This prompt governs **Phase 1 only**.
   - Worker-generated GLVolume data needs to become a Mesh/RenderTexture update scheduled via Unity's main-thread dispatcher.
 - Hazards found: 1 P2 (boost::thread/GLVolume concurrency)
 - Git: Annotate GLGizmoFdmSupports header
-- Next recommended Phase 1 task: T321 annotate: src/slic3r/GUI/Gizmos/GLGizmoFlatten.cpp
+## Phase 1 - Task T326 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoHollow.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoHollow.hpp, .ralph/agent/scratchpad.md
+- Substantive additions: 15 multi-tag comments covering intent/state/event/thread/OpenGL/Unity guidance for hole selection, cache refresh, and persistence hooks.
+- Verification excerpt: // [INTENT] Coordinates SLA hollow editing controls by combining input, selection rectangles, and preview rendering so operators can punch drain holes on meshes with immediate visual feedback.
+- Unity-impact summary:
+  - Treat this header as the MonoBehaviour glue that couples VisualElement slider panels, MeshCollider raycasts, and a ScriptableObject-style hole cache.
+  - Replace `GLSelectionRectangle` with a GraphicRaycaster/PointerEventData scrub overlay and copy the selection mask to a Unity-friendly `List<bool>` before `Physics.Raycast` runs.
+- Hazards found: P2=1 (hollow_mesh scheduling + libslic3r dependency), P3=2 (marquee selection helper and cereal persistence expectations)
+- Git: annotate GLGizmoHollow header
+- Next recommended Phase 1 task: T327 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp
 ## Phase 1 - Task T649 complete
 - Task type: annotate
 - File: src/slic3r/GUI/Widgets/CheckBox.cpp

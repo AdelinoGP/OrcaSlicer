@@ -239,6 +239,6 @@
 ## Iteration plan update
 - Selected task: T374 annotate `src/slic3r/GUI/GuiColor.cpp` as a focused utility annotation opportunity since the file defines conversion helpers and a color-distance utility.
 - Plan: start `task-1773880086-9933`, read the converter and math functions, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations describing the wrapper purpose, consistent color state expectations, event-agnostic conversions, UI thread assumptions, and Unity equivalents (e.g., `Color` struct conversions and `ColorUtility` usage), append the required handoff evidence block, commit the file, close the task, and then continue with the next ready Phase 1 item.
-## Iteration plan
-- Selected task: T320 annotate: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp (key gui:T320 will be created this iteration).
-- Plan: ensure the header exists, read it thoroughly to capture stateful members, callback hooks, and resource helpers; sprinkle `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` notes around the Support Gizmo interface, GL helper functions, and raycast/cancellation signals; append the mandated evidence block to `.ralph/agent/handoff.md`, commit the single-file change, and close the task before moving on.
+## Iteration plan update
+- Selected task: T326 annotate `src/slic3r/GUI/Gizmos/GLGizmoHollow.hpp` after realizing the header still lacked the multi-tag notes but the previous run handled only the .cpp counterpart.
+- Plan: add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around the class definition, public API, state caches (selection, stash, cylinder preview), event hooks, triangle/hollow rendering and storage helpers, and serialization overrides; update `.ralph/agent/handoff.md` with the required evidence block, commit the header, close the runtime task, and then stop for the iteration so the next agent can continue.
