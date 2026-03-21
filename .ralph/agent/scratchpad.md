@@ -200,5 +200,8 @@
 - Plan: start the runtime task, read the entire file, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around emboss state transitions, UI event plumbing, GL draw calls, and Unity migration hints; append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the change, and mark the task done before selecting the next ready entry.
 
 ## Iteration plan update
-- Selected task: T316 annotate `src/slic3r/GUI/Gizmos/GLGizmoEmboss.hpp`.
-- Plan: read the header, document the kiln-style controller state, event wiring, and GL/OpenGL helpers with tags `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]`, highlight how the gizmo exposes inputs to Unity (MonoBehaviour coordinate handler and RenderTexture controller) and any hazard around mouse capture or GPU ownership, append the evidence block to `.ralph/agent/handoff.md`, then commit and mark the task done.
+- Selected task: T317 annotate `src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.cpp` (now active task-1773880086-71d1).
+- Plan: read the entire `GLGizmoFaceDetector.cpp`, flag class-level intent for face detection, explain state caches, event bindings, render flow, OpenGL resource use, thread boundaries, Unity analogs (likely a MonoBehaviour raycaster + Job System), and porting hazards; add annotated comments with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]`, append the mandated evidence block to `.ralph/agent/handoff.md`, commit the single file, and close the task before selecting the next eligible file.
+## Iteration update
+- Completed T317 annotate `src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.cpp` by adding multi-tag comments for the GL overlay lifecycle, event gating, and Unity replacements; no tests required for documentation changes.
+- Next focus: T318 annotate `src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.hpp` to document class state, headers, and sample interval hooks for the Unity port.

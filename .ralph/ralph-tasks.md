@@ -235,7 +235,7 @@ Last updated: 2026-03-21T04:30:00Z
 - [x] T314 annotate: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp
 - [x] T315 annotate: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp
 - [x] T316 annotate: src/slic3r/GUI/Gizmos/GLGizmoEmboss.hpp
-- [ ] T317 annotate: src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.cpp
+- [x] T317 annotate: src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.cpp
 - [ ] T318 annotate: src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.hpp
 - [ ] T319 annotate: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp
 - [ ] T320 annotate: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp

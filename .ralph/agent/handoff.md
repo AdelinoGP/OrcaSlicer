@@ -383,7 +383,6 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - [ ] T314 annotate: src/slic3r/GUI/Gizmos/GLGizmoCut.hpp
 - [ ] T315 annotate: src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp
 - [ ] T316 annotate: src/slic3r/GUI/Gizmos/GLGizmoEmboss.hpp
-- [ ] T317 annotate: src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.cpp
 - [ ] T318 annotate: src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.hpp
 - [ ] T319 annotate: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.cpp
 - [ ] T320 annotate: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp
@@ -1960,3 +1959,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 (P2 background re-emboss job, P3 stale ModelVolume pointer).
 - Git: src/slic3r/GUI/Gizmos/GLGizmoEmboss.hpp
 - Next recommended Phase 1 task: T317 annotate: src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.cpp
+
+## Phase 1 - Task T317 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.cpp
+- Substantive additions: 9 multi-tag annotations covering overlay state, selection/event gating, GL rendering, and Unity replacements.
+- Verification excerpt: // [OPENGL] GLModel handles VAO/VBO binding and draw calls so the highlight renders after the main mesh.
+- Unity-impact summary:
+  - Update a MeshFilter + MeshRenderer to draw the exterior faces and share the tinted material between overlay instances.
+  - Replace the disabled ImGui input window with a UI Toolkit VisualElement toolbar panel plus float field bound to `m_sample_interval` via a ScriptableObject controller.
+- Hazards found: P2=1, P3=1
+- Git: annotate: src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.cpp
+- Next recommended Phase 1 task: T318 annotate: src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.hpp
