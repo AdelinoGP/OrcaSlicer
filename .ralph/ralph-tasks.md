@@ -241,7 +241,7 @@ Last updated: 2026-03-21T05:30:00Z
 - [ ] T320 annotate: src/slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp
 - [x] T321 annotate: src/slic3r/GUI/Gizmos/GLGizmoFlatten.cpp
 - [x] T322 annotate: src/slic3r/GUI/Gizmos/GLGizmoFlatten.hpp
-- [ ] T323 annotate: src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.cpp
+- [x] T323 annotate: src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.cpp
 - [ ] T324 annotate: src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.hpp
 - [ ] T325 annotate: src/slic3r/GUI/Gizmos/GLGizmoHollow.cpp
 - [ ] T326 annotate: src/slic3r/GUI/Gizmos/GLGizmoHollow.hpp

@@ -2052,3 +2052,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (Unity must mirror the cached transform/type comparison or the planes go stale)
 - Git: Annotate GLGizmoFlatten.hpp for Unity port
 - Next recommended Phase 1 task: T323 annotate: src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.cpp
+
+## Phase 1 - Task T323 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md
+- Substantive additions: 6 multi-tag annotations describing GL state, tooltip events, ImGui layout bounds, config overrides, and thread handoffs for the fuzzy skin painter.
+- Verification excerpt: // [OPENGL] Blend + depth testing are required for the cursor overlay and colored mesh preview to layer over the scene.
+- Unity-impact summary:
+  - Map the painter overlay to a `Graphics.DrawMesh` + `MeshCollider` combo or `Handles`-style renderer so Unity can activate blending/depth for the cursor.
+  - Rebuild the tooltip/toolbar UI inside UI Toolkit using `VisualElement`s + `GraphicRaycaster` equivalents, retaining the slider layout math from ImGui.
+  - Store painted masks on a `ScriptableObject` and replicate `Plater::TakeSnapshot` + Undo handling through a `FuzzySkinController` MonoBehaviour.
+- Hazards found: 1 (P2: shared GL state around `render_painter_gizmo()` must stay isolated before/after other gizmos run).
+- Git: Annotate GLGizmoFuzzySkin rendering for Unity port
+- Next recommended Phase 1 task: T324 annotate: src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.hpp

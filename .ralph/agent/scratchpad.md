@@ -224,3 +224,7 @@
 ## Iteration plan update
 - Selected task: T321 annotate `src/slic3r/GUI/Gizmos/GLGizmoFlatten.cpp` to clarify the transform flatten gizmo lifecycle, selection state, drawing logic, and Unity migration path.
 - Plan: mark the runtime task started, read the source, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around initialization, event wiring, render updates, and raycast hazards, append the required evidence block to `.ralph/agent/handoff.md`, commit the single file, and close the task before proceeding.
+
+## Iteration plan update
+- Selected task: T323 annotate `src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.cpp` (task-1773880086-f99b now active).
+- Plan: read the full implementation, document the fuzzy skin manipulator intent, state, event bindings, rendering, thread boundaries, Unity analog (e.g., Skinned MeshRenderer + custom handles), and porting hazards via the standard `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` tags, append the evidence block to `.ralph/agent/handoff.md`, stage/commit, and close the task before moving to the next ready entry.
