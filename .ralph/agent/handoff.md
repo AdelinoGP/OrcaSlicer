@@ -1672,3 +1672,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 3 (P2: wx event coupling, P2: mixing rendering/state transitions inside do_action, P3: SVG atlas generator).
 - Git: Annotate GLToolbar event/render pipeline
 - Next recommended Phase 1 task: T369 annotate: src/slic3r/GUI/GLToolbar.hpp
+
+## Phase 1 - Task T439 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/NotificationProgressIndicator.cpp
+- Deliverables: src/slic3r/GUI/Jobs/NotificationProgressIndicator.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 6 multi-tag annotations clarifying manager bridging, state/event flow, cancel wiring, and Unity guidance for the progress HUD.
+- Verification excerpt: // [EVENT] Progress updates stream through the notification manager, keeping the HUD slider, status, and spinner aligned with job ticks.
+- Unity-impact summary:
+  - Model the HUD as a `NotificationHUDController : MonoBehaviour` that exposes `SetProgress/SetStatus` and consumes `MainThreadDispatcher.Schedule`.
+  - Connect the cancel button to a `CancellationTokenSource` so the Unity controller can cancel background tasks without touching wx events.
+- Hazards found: P3:3 (clear_percent/stub, silent show_error_info, rebind-on-zero progress)
+- Git: Annotate NotificationProgressIndicator
+- Next recommended Phase 1 task: T440 annotate: src/slic3r/GUI/Jobs/NotificationProgressIndicator.hpp

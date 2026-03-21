@@ -93,3 +93,10 @@
 - Selected task: T198 annotate `src/slic3r/GUI/Jobs/SLAImportJob.hpp` (task-1773880086-b462) to document how job views provide selection state and how the importer job threads cross UI boundaries.
 - Actions: annotate the header with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` comments around the view interface, private state, prepare/ process/ finalize hooks, and reset helper so future Unity engineers understand scheduling and hazards.
 - Verification: confirm comments mention UI snapshotting, worker/MainThread boundaries, and the need for a Unity job dispatcher rather than wxWidgets events; no automated test run since this is documentation-only.
+
+## Iteration plan update
+- Selected task: T439 annotate `src/slic3r/GUI/Jobs/NotificationProgressIndicator.cpp` (task-1773880087-61b7 in progress).
+- Steps: read the source to capture notification job wire-up, event handling, progress state, threading boundaries, and OpenGL hooks for the indicator; sprinkle `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments at key methods; append the mandated evidence block to `.ralph/agent/handoff.md`, update `.ralph/ralph-tasks.md` to mark task done, commit the annotated file, and then immediately prepare for the next ready task.
+
+## Iteration update
+- Completed T439 by annotating the notification progress adapter, capturing the manager bridge, cancel wiring, state resets, and Unity mapping before updating the handoff/evidence block and tasks registry.

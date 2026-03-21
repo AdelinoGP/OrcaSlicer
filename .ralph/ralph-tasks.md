@@ -357,7 +357,7 @@ Last updated: 2026-03-21T00:20:58Z
 - [ ] T436 annotate: src/slic3r/GUI/Jobs/FillBedJob.cpp
 - [ ] T437 annotate: src/slic3r/GUI/Jobs/FillBedJob.hpp
 - [x] T438 annotate: src/slic3r/GUI/Jobs/Job.hpp
-- [ ] T439 annotate: src/slic3r/GUI/Jobs/NotificationProgressIndicator.cpp
+- [x] T439 annotate: src/slic3r/GUI/Jobs/NotificationProgressIndicator.cpp
 - [ ] T440 annotate: src/slic3r/GUI/Jobs/NotificationProgressIndicator.hpp
 - [ ] T441 annotate: src/slic3r/GUI/Jobs/OAuthJob.cpp
 - [ ] T442 annotate: src/slic3r/GUI/Jobs/OAuthJob.hpp
