@@ -2153,3 +2153,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3: relying on wxPickRaycaster IDs that Unity must map into GraphicRaycast hits)
 - Git: annotate: GLGizmoMeasure.hpp measurement annotations
 - Next recommended Phase 1 task: T329 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.cpp
+## Phase 1 - Task T327 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp, .ralph/agent/scratchpad.md
+- Substantive additions: 12 multi-tag comments describing input handling, measured-state caches, GL rendering, ImGui tooltips, and assembly helpers.
+- Verification excerpt: // [OPENGL] Setup shader state, depth test, and emission uniforms before drawing grippers and dimension lines.
+- Unity-impact summary:
+  - Mirror the GL gripper rendering in Unity with Graphics.DrawMesh/CommandBuffer plus cached MeshCollider pickers tied to a shared selection state.
+  - Drive the selection summary and distance panel with UI Toolkit/Canvas elements bound to a ScriptableObject measurement model.
+  - Translate the on_mouse/gizmo_event logic into InputSystem pointer callbacks and GraphicRaycaster hits while keeping modifier keys in sync.
+- Hazards found: P2=2 (GL shader/raycast state coupling, handle re-selection logic); P3=1 (ImGui dialog relies on wxWidgets positioning/timers).
+- Git: Annotate GLGizmoMeasure for Unity port
+- Next recommended Phase 1 task: T329 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.cpp

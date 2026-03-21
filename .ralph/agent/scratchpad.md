@@ -250,3 +250,5 @@
 ## Iteration plan update
 - Selected task: T328 annotate `src/slic3r/GUI/Gizmos/GLGizmoMeasure.hpp` (since manifest entry is current and file exists).
 - Plan: start `task-1773880086-6b2f`, inspect the header top-to-bottom, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` tags explaining the measure gizmo's intent, measurement mode state, event hooks, GL model cache, and Unity analog (e.g., runtime `VisualElement` tree + `GraphicRaycaster` picks plus `MeshCollider` highlights), append Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header, close the task, then pause for the next iteration.
+
+- Plan: T327 (GLGizmoMeasure.cpp) -- read entire source, add multi-tag comments around measure state, rendering, input hooking, and GL cache, append evidence block to handoff, stage+commit the annotated file, close task, then pick next ready task.

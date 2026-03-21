@@ -20,6 +20,11 @@
 
 namespace Slic3r {
 namespace GUI {
+// [INTENT] GLGizmoMeasure owns selection, measurement, and render state for the onscreen Measure tool.
+// [STATE] m_selected_features/m_mode/m_hover_id and the ImGui helpers cache whether we show points, centers, or distance edits.
+// [THREAD] Runs on the main UI/GL thread so raycasts, shader draws, and ImGui flags remain serialized with rendering.
+// [UNITY] Porting into Unity means mapping this to a MonoBehaviour that uses GraphicRaycaster/MeshCollider picks and UI Toolkit overlays.
+// [PORTING_HAZARD:P2] Direct wxWidgets/GL state and ImGui calls require reengineering instead of literal translation.
 std::string GLGizmoMeasure::format_double(double value)
 {
     char buf[1024];
@@ -178,6 +183,10 @@ TransformHelper::Cache TransformHelper::s_cache = { { 0, 0, 0, 0 }, Matrix4d::Id
 GLGizmoMeasure::GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
 : GLGizmoBase(parent, icon_filename, sprite_id)
 {
+    // [INTENT] Cache sphere/cylinder handles plus raycasters so picking stays responsive before any input arrives.
+    // [OPENGL] Geometry + MeshRaycaster objects are prebuilt here to avoid repeated GPU uploads during render loops.
+    // [STATE] m_gripper_id_raycast_map maps GripperType IDs to pickers used by the render loop for hover detection.
+    // [UNITY] Unity would create MeshFilter/MeshCollider prefabs for point/edge glints and register pointer IDs via GraphicRaycaster.
     GLModel::Geometry sphere_geometry = smooth_sphere(16, 7.5f);
     m_sphere.mesh_raycaster = std::make_unique<MeshRaycaster>(std::make_shared<const TriangleMesh>(sphere_geometry.get_as_indexed_triangle_set()));
     m_sphere.model.init_from(std::move(sphere_geometry));
@@ -191,6 +200,11 @@ GLGizmoMeasure::GLGizmoMeasure(GLCanvas3D& parent, const std::string& icon_filen
 
 bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
 {
+    // [EVENT] Mouse handler filters drag/selection versus canvas nav while honoring Shift/Ctrl modifiers.
+    // [STATE] m_mouse_left_down and m_hover_id track ownership of the pointer and hovered gripper.
+    // [THREAD] Runs on the UI event loop so we mutate selection state before repainting.
+    // [UNITY] In Unity this should live in IPointer* callbacks that interrogate MeshColliders, InputSystem modifiers, and GraphicRaycaster results.
+    // [PORTING_HAZARD:P2] Translate the multi-branch re-selection/promotion logic carefully into Unity's event order to avoid dropped picks.
     if (mouse_event.Moving()) {
         // only for sure
         m_mouse_left_down = false;
@@ -384,6 +398,9 @@ bool GLGizmoMeasure::on_mouse(const wxMouseEvent &mouse_event)
 
 void GLGizmoMeasure::data_changed(bool is_serializing)
 {
+    // [STATE] Reset visibility, raycasters, and edit flags when selection data or scale gets updated.
+    // [EVENT] Called after selection changes or scaling operations to refresh cached info.
+    // [UNITY] Unity port should clear cached collider references, re-register raycasts, and refresh UI state here.
     wxBusyCursor wait;
 
     if (m_pending_scale > 0) {
@@ -407,6 +424,9 @@ void GLGizmoMeasure::data_changed(bool is_serializing)
 
 bool GLGizmoMeasure::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down)
 {
+    // [EVENT] Keyboard-like gizmo events toggle point mode, delete selections, or escape back to feature selection.
+    // [STATE] m_mode and m_selected_features mutate here so the UI reflects the current phase.
+    // [UNITY] Port to Unity using InputSystem actions/Update polling to flip between modes and send clean events to the selection controller.
     if (action == SLAGizmoEventType::ShiftDown) {
         if (m_shift_kar_filter.is_first()) {
             m_mode = EMode::PointSelection;
@@ -442,6 +462,9 @@ bool GLGizmoMeasure::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_po
 
 bool GLGizmoMeasure::on_init()
 {
+    // [INTENT] Set up help/tooltip strings so the toolbar explains how to use the Measure tool.
+    // [STATE] m_desc stores the caption+tooltip pairs shown in the UI window.
+    // [UNITY] Map these hints to UI Toolkit tooltips or a shortcut reference panel when porting.
     m_shortcut_key = WXK_CONTROL_U;
 
     const wxString shift = _L("Shift+");
@@ -459,6 +482,8 @@ bool GLGizmoMeasure::on_init()
 
 void GLGizmoMeasure::on_set_state()
 {
+    // [STATE] Turn Off hides the selected volume, resets picks, and clears caches; turning On resets input modes.
+    // [UNITY] Mirror this by enabling/disabling the Measure controller MonoBehaviour and resetting its selection state.
     if (m_state == Off) {
         m_parent.toggle_selected_volume_visibility(false);
         m_shift_kar_filter.reset_count();
@@ -559,6 +584,11 @@ void GLGizmoMeasure::init_plane_glmodel(GripperType gripper_type, const Measure:
 
 void GLGizmoMeasure::on_render()
 {
+    // [OPENGL] Configures the gouraud shader, depth test, and emission uniforms before drawing grippers, mesh hits, and overlay PryDOTs.
+    // [INTENT] Render hovered/selected features plus dimension overlays while updating hover IDs via raycasters.
+    // [EVENT] Runs inside the render loop and signals m_imgui when extra frames are needed to keep UI aligned with picks.
+    // [UNITY] In Unity, replace the shader work with Graphics.DrawMesh/CommandBuffer executed from a MonoBehaviour.
+    // [PORTING_HAZARD:P2] OpenGL state toggles and low-level raycaster mapping must be rewritten for Unity's render+physics pipeline.
 #if ENABLE_MEASURE_GIZMO_DEBUG
     render_debug_dialog();
 #endif // ENABLE_MEASURE_GIZMO_DEBUG
@@ -1142,6 +1172,9 @@ void GLGizmoMeasure::restore_scene_raycasters_state()
 
 void GLGizmoMeasure::render_dimensioning()
 {
+    // [INTENT] Draw distance/angle overlays with screen-space lines/arrows plus ImGui labels for the selected feature pair.
+    // [OPENGL] Builds temporary GLModel lines/triangles and swaps shaders to mimic thick/dashed dimensioning.
+    // [UNITY] A Unity port should render these using Graphics.DrawMesh and a UI Toolkit window anchored to the projection.
     static SelectedFeatures last_selected_features;
 
     if (!m_selected_features.first.feature.has_value())
@@ -1809,6 +1842,9 @@ void GLGizmoMeasure::render_debug_dialog()
 
 void GLGizmoMeasure::show_selection_ui()
 {
+    // [INTENT] Render the ImGui selection summary, reset buttons, and warnings for the Measure selections.
+    // [STATE] Responds to m_selected_features, m_measure_mode, and assembly flags to show labels/warnings.
+    // [UNITY] Unity should bind a UI Toolkit list/tree to ScriptableObject selection state so the panel mirrors these states.
     auto space_size = m_space_size;
     // Show selection
     {
@@ -1933,6 +1969,9 @@ void GLGizmoMeasure::show_selection_ui()
 
 void GLGizmoMeasure::show_distance_xyz_ui()
 {
+    // [INTENT] Build the pinboard for measurement values plus clipboard copies and per-axis edit controls.
+    // [EVENT] Inputs fire set_distance when the user changes X/Y/Z while the `m_hit_different_volumes` gate opens.
+    // [UNITY] Unity should reimplement this as a UI Toolkit/Canvas table bound to a measurement ScriptableObject model.
     if (m_measure_mode == EMeasureMode::ONLY_MEASURE) {
         m_imgui->text(_u8L("Measure"));
     }
@@ -2145,6 +2184,9 @@ void GLGizmoMeasure::init_render_input_window()
 
 void GLGizmoMeasure::on_render_input_window(float x, float y, float bottom_limit)
 {
+    // [INTENT] Position the toolbar window, show selection/distance panels, and keep extra frames queued when size changes.
+    // [EVENT] Tracks last_feature/last_mode so the window requests a repaint if its contents change size.
+    // [UNITY] In Unity replace this with a UI Toolkit window that updates from MonoBehaviour state and anchors to the view.
     static std::optional<Measure::SurfaceFeature> last_feature;
     static EMode last_mode = EMode::FeatureSelection;
     static SelectedFeatures last_selected_features;
@@ -2211,6 +2253,8 @@ void GLGizmoMeasure::remove_selected_sphere_raycaster(int id)
 
 void GLGizmoMeasure::update_measurement_result()
 {
+    // [STATE] Recompute Measure::MeasurementResult + AssemblyAction so the UI and assembly buttons match the current pair.
+    // [UNITY] Share this result via a ScriptableObject so UI Toolkit panels and controllers stay synchronized.
     if (!m_selected_features.first.feature.has_value()) {
         m_measurement_result = Measure::MeasurementResult();
         m_assembly_action    = Measure::AssemblyAction();
@@ -2485,6 +2529,8 @@ void GLGizmoMeasure::update_feature_by_tran(Measure::SurfaceFeature &feature)
 
 void GLGizmoMeasure::set_distance(bool same_model_object, const Vec3d &displacement, bool take_shot)
 {
+    // [INTENT] Translate the second hit volume by the given displacement while optionally taking an undo snapshot.
+    // [PORTING_HAZARD:P2] Unity must express this via Transform.Translate/SetPosition plus a dedicated selection controller.
     if (m_hit_different_volumes.size() == 2 && displacement.norm() > 0.0f) {
         auto v         = m_hit_different_volumes[1];
         auto selection = const_cast<Selection *>(&m_parent.get_selection());
@@ -2513,6 +2559,8 @@ void GLGizmoMeasure::set_distance(bool same_model_object, const Vec3d &displacem
 
 void GLGizmoMeasure::set_to_parallel(bool same_model_object, bool take_shot, bool is_anti_parallel)
 {
+    // [INTENT] Rotate the second volume so its selected plane becomes parallel to the reference plane.
+    // [UNITY] Unity should run equivalent Transform rotations and undo snapshots via a controller MonoBehaviour.
     if (m_hit_different_volumes.size() == 2) {
         auto &action    = m_assembly_action;
         auto  v         = m_hit_different_volumes[1];
@@ -2557,6 +2605,7 @@ void GLGizmoMeasure::set_to_parallel(bool same_model_object, bool take_shot, boo
 
 void GLGizmoMeasure::set_to_reverse_rotation(bool same_model_object, int feature_index)
 {
+    // [PORTING_HAZARD:P3] Unity must re-run this reflection logic through Transform manipulations instead of flipping GLVolume internals.
     if (m_hit_different_volumes.size() == 2 && feature_index < 2) {
         auto &action    = m_assembly_action;
         auto  v         = m_hit_different_volumes[feature_index];
