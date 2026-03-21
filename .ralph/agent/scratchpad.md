@@ -198,3 +198,7 @@
 ## Iteration plan update
 - Selected task: T315 annotate `src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp` (task-1773880086-441c) since the source resides in the ready list and carries important emboss gizmo state/rendering insights for Unity.
 - Plan: start the runtime task, read the entire file, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around emboss state transitions, UI event plumbing, GL draw calls, and Unity migration hints; append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the change, and mark the task done before selecting the next ready entry.
+
+## Iteration plan update
+- Selected task: T316 annotate `src/slic3r/GUI/Gizmos/GLGizmoEmboss.hpp`.
+- Plan: read the header, document the kiln-style controller state, event wiring, and GL/OpenGL helpers with tags `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]`, highlight how the gizmo exposes inputs to Unity (MonoBehaviour coordinate handler and RenderTexture controller) and any hazard around mouse capture or GPU ownership, append the evidence block to `.ralph/agent/handoff.md`, then commit and mark the task done.

@@ -1947,3 +1947,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=2 (main-thread texture cache + job gating), P3=2 (slider limits + DPI/translation cache resets).
 - Git: Annotate emboss gizmo for Unity port
 - Next recommended Phase 1 task: T316 annotate: src/slic3r/GUI/Gizmos/GLGizmoEmboss.hpp
+
+## Phase 1 - Task T316 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoEmboss.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoEmboss.hpp
+- Substantive additions: ~20 multi-tag annotations covering intents, state transitions, event bindings, threading, OpenGL overlays, and Unity replacement guidance.
+- Verification excerpt: // [EVENT] Hooked to toolbar/hotkey dispatch so Unity should surface this via a button command that raycasts to the surface before invoking the controller.
+- Unity-impact summary:
+  - Replace the toolbar dispatch with a GraphicRaycaster-driven MonoBehaviour that raycasts to the surface and schedules the emboss job on the main thread.
+  - Mirror the RaycastManager + OpenGL overlay draws via Unity `Physics.Raycast` caches + `Graphics.DrawMesh` overlays so rotating/picking have identical behavior.
+- Hazards found: 2 (P2 background re-emboss job, P3 stale ModelVolume pointer).
+- Git: src/slic3r/GUI/Gizmos/GLGizmoEmboss.hpp
+- Next recommended Phase 1 task: T317 annotate: src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.cpp
