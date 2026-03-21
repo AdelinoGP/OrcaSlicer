@@ -2038,3 +2038,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (plane rebuild cost), P3=1 (single-instance precondition)
 - Git: annotate flatten gizmo intent for Unity port
 - Next recommended Phase 1 task: T322 annotate: src/slic3r/GUI/Gizmos/GLGizmoFlatten.hpp
+
+## Phase 1 - Task T322 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoFlatten.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoFlatten.hpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 8 multi-tag comments covering plane caches, picking wiring, rendering, and Unity mapping
+- Verification excerpt: // [UNITY] Listen to a `ScriptableObject` selection model so the flatten MonoBehaviour knows when to rebuild.
+- Unity-impact summary:
+  - Use a ScriptableObject-backed selection model so the flatten controller knows when to rebuild cached meshes.
+  - Render the preview planes with MeshFilter/MeshRenderer and a MeshCollider so `SceneRaycaster` logic translates to `Physics.Raycast`.
+  - Replace the GL overlay with a RenderTexture+CommandBuffer or dedicated MeshRenderer so Unity can layer the flatten planes on top of the scene.
+- Hazards found: P2=1 (Unity must mirror the cached transform/type comparison or the planes go stale)
+- Git: Annotate GLGizmoFlatten.hpp for Unity port
+- Next recommended Phase 1 task: T323 annotate: src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.cpp
