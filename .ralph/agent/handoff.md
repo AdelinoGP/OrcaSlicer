@@ -1865,3 +1865,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3: drag/drop/context menu bridging requires explicit InputSystem+EventTrigger wiring that wxWidgets handled automatically).
 - Git: annotate: GUI AuxiliaryList header
 - Next recommended Phase 1 task: T374 annotate: src/slic3r/GUI/GuiColor.cpp
+
+## Phase 1 - Task T311 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoBrimEars.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoBrimEars.cpp; .ralph/agent/scratchpad.md; .ralph/ralph-tasks.md
+- Substantive additions: 8 multi-tag annotations covering color state, cache synchronization, render/event flow, and Unity migration/hazard guidance.
+- Verification excerpt: // [STATE] Hover/selection/error palettes reused by render_points keep brim ears visually consistent and highlight editing context.
+- Unity-impact summary:
+  - Share the color palette via a ScriptableObject and render the cylinder marker through `Graphics.DrawMesh` so Unity reuses the same geometry for each brim ear.
+  - Replace the `gizmo_event` router with a MonoBehaviour wired to Unity's Input System that toggles selection rectangles, mouse-wheel sliders, and viewport events.
+  - Push the `first_layer_slicer` computation into a Unity Job or background Task and marshal results back to the UI Toolkit panel instead of running it sync on the render thread.
+- Hazards found: P2=1
+- Git: Annotate GLGizmoBrimEars for Unity port
+- Next recommended Phase 1 task: T312 annotate: src/slic3r/GUI/Gizmos/GLGizmoBrimEars.hpp

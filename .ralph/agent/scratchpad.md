@@ -180,3 +180,7 @@
 ## Iteration plan update
 - Current focus: T373 annotate: src/slic3r/GUI/GUI_AuxiliaryList.hpp (ready task `task-1773880086-81c6`).
 - Plan: open the header, document the list/object binding hooks, state caches, command IDs, event tables, and lifetime invariants with the full tag set; ensure Unity guidance mentions a UI Toolkit ListView + event bridge, highlight thread boundaries around worker updates, append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the header, and close the task before selecting the next file.
+
+## Iteration plan update
+- Current focus: T311 annotate `src/slic3r/GUI/Gizmos/GLGizmoBrimEars.cpp` (task-1773880086-e537 now active).
+- Plan: read the file completely, add the mandated `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around remedy triggers, GL buffer setup, render/event loops, and Unity equivalents, append the required handoff evidence block, commit the change, and then determine the next ready Phase 1 task.
