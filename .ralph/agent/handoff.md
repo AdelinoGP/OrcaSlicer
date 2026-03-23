@@ -438,6 +438,20 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate GUI_ObjectList for Unity port
 - Next recommended Phase 1 task: T395 annotate: src/slic3r/GUI/GUI_ObjectTableSettings.hpp
 
+## Phase 1 - Task T397 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Preview.hpp
+- Deliverables: src/slic3r/GUI/GUI_Preview.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: Added multi-tag notes on View3D/Preview/AssembleView ownership, slider/option state, background-process scheduling, and Windows-only combo hazards to keep the preview workflow intelligible for Unity ports.
+- Verification excerpt: // [STATE][UNITY] Exposes slider visibility toggles for the Unity toolbar/VisualElement tree.
+- Unity-impact summary:
+  - Treat each GL view as a RenderTexture+Camera pair governed by a controller MonoBehaviour so the existing selection helpers map cleanly to Unity’s input layer.
+  - Translate OptionType slider toggles and layer slider syncs into UI Toolkit ToggleGroups/Slider bindings backed by a shared ScriptableObject config asset.
+  - Surface `update_gcode_result`/`m_schedule_background_process` as a main-thread callback that mirrors Unity’s async G-code refresh loop before signaling the RenderTexture to redraw.
+- Hazards found: P2=1 (background scheduling callback requires strict main-thread marshaling), P3=2 (Win32 BitmapComboBox and the legacy "only G-code" branch need concrete Unity replacements).
+- Git: Annotate GUI_Preview.hpp for Unity port
+- Next recommended Phase 1 task: T399 annotate: src/slic3r/GUI/GUI_Utils.hpp
+
 ## Phase 1 - Task T309 complete
 - Task type: annotate
 - File: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp

@@ -617,5 +617,9 @@
 ## Iteration plan update - T383
 - Current focus: T383 annotate `src/slic3r/GUI/GUI.hpp` (task-1773880086-6aa6).  Read the header, add multi-tag annotations for config sprites, menu wiring, main frame helpers, and cross-thread dialogs, note Unity translations for the main menu/toolbar + config service, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the annotated header, close the task, and stop this iteration so the next agent can continue along the manifest.
 
+## Iteration plan update (current run)
+- Observed `T383 annotate: src/slic3r/GUI/GUI.hpp` is already marked done and the header contains the multi-tag annotations, so next open priority task is `T397 annotate: src/slic3r/GUI/GUI_Preview.hpp` (ID `task-1773880086-be55`).
+- Plan: start `task-1773880086-be55`, read `GUI_Preview.hpp` in full, add or verify `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` notes for the preview state, slider bindings, GL canvas connections, and Unity equivalents, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the header (plus metadata), close the task, and then pause for the next iteration.
+
 ## Iteration plan update - T372
 - Actual task: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp` (task-1773880086-6aa6 now in progress).  Plan: read the entire CPP, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` annotations especially around list lifecycle, selection caches, layout events, drag/drop, keyboard shortcuts, and wxListCtrl interactions; append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the annotated file, close the task, and pause for the next iteration so another agent can continue.
