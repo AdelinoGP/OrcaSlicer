@@ -565,3 +565,10 @@
 ## Iteration plan update
 - Current focus: T391 annotate `src/slic3r/GUI/GUI_ObjectSettings.hpp` (task-1773880086-29f9 active again).
 - Plan: refresh the header to cover both the legacy `NEW_OBJECT_SETTING` branch and the newer fallback, add missing `[STATE]`/`[EVENT]`/`[UNITY]`/`[PORTING_HAZARD]` tags around the branch toggle, tab/list caches, and config helpers, detail `update_config_values()` intent, note a Unity mapping (VisualElement + ScriptableObject controller), append the Phase 1 evidence block, stage/commit this header and handoff, and then stop so the next agent can pick up another file.
+
+## Iteration update
+- Completed `T392 annotate: src/slic3r/GUI/GUI_ObjectTable.cpp` by weaving INTENT/STATE/EVENT/UNITY/PORTING_HAZARD notes through the ObjectGridTable lifecycle, editors, row ordering, and dialog wiring; added Unity guidance for the ListView/ListView detail mix, discussed reset-button hooks, and recorded the Phase 1 evidence block plus commit.
+
+## Iteration plan update
+- Selected task: T401 annotate `src/slic3r/GUI/HintNotification.hpp` (task-1773880086-1cb9 now active).
+- Plan: read the header to capture hint lifecycle structures, config-backed text data, and platform-facing helpers; sprinkle `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2]` tags through the reader/writer mix, fade timer logic, UI notifier class, and external process calls; note hazards around `ImGuiRenderer` expectations and html launching, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the header plus handoff metadata, mark the task done, and stop so the next iteration picks the following file.

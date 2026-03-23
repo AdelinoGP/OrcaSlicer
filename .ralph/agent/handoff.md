@@ -3009,6 +3009,19 @@ This prompt governs **Phase 1 only**.
 - Git: Annotate GUI_ObjectList for Unity selection
 - Next recommended Phase 1 task: T390 annotate: src/slic3r/GUI/GUI_ObjectSettings.cpp
 
+## Phase 1 - Task T401 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HintNotification.hpp
+- Deliverables: src/slic3r/GUI/HintNotification.hpp
+- Substantive additions: ~20 multi-tag annotations covering hint state, navigation, ImGui layout, and Unity replacement guidance
+- Verification excerpt: // [INTENT][UNITY] Floating Did-You-Know notification that draws via ImGui and can be replaced in Unity with a Canvas overlay + GraphicRaycaster
+- Unity-impact summary:
+  - Recreate the notification overlay as a Canvas + GraphicRaycaster + MonoBehaviour controller that formats TextMeshPro lines with fade state and button hit tests.
+  - Port the HintDatabase singleton to a ScriptableObject-backed catalog that loads `hints.ini` metadata, tracks shown IDs, and exposes navigation commands through an async dispatcher.
+- Hazards found: P2=2 (boost-based INI parser plus browser launch gate), P3=1 (rand seed/command wiring with wx preferences button)
+- Git: annotate: src/slic3r/GUI/HintNotification.hpp
+- Next recommended Phase 1 task: T402 annotate: src/slic3r/GUI/HMS.cpp
+
 ## Phase 1 - Task T372 complete
 - Task type: annotate
 - File: src/slic3r/GUI/GUI_AuxiliaryList.cpp

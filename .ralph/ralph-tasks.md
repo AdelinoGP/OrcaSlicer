@@ -319,7 +319,7 @@ Last updated: 2026-03-23T14:03:10Z
 - [ ] T398 annotate: src/slic3r/GUI/GUI_Utils.cpp
 - [ ] T399 annotate: src/slic3r/GUI/GUI_Utils.hpp
 - [ ] T400 annotate: src/slic3r/GUI/HintNotification.cpp
-- [ ] T401 annotate: src/slic3r/GUI/HintNotification.hpp
+- [x] T401 annotate: src/slic3r/GUI/HintNotification.hpp
 - [ ] T402 annotate: src/slic3r/GUI/HMS.cpp
 - [ ] T403 annotate: src/slic3r/GUI/HMS.hpp
 - [ ] T404 annotate: src/slic3r/GUI/HMSPanel.cpp
