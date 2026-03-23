@@ -107,6 +107,7 @@ AuxiliaryList::AuxiliaryList(wxWindow* parent)
 
 AuxiliaryList::~AuxiliaryList()
 {
+	// [INTENT] Quietly release the auxiliary tree before the list goes away so Unity can mirror the same deterministic teardown order.
 	// [STATE][THREAD] Disassociate the model and clean it up on the UI thread so bound controls never reference freed data.
 	this->AssociateModel(nullptr);
 	delete m_auxiliary_model;
@@ -114,6 +115,7 @@ AuxiliaryList::~AuxiliaryList()
 
 void AuxiliaryList::init_auxiliary()
 {
+	// [INTENT] Pull the Plater's auxiliary temp path into the view so the Unity tree can point at the identical source folder.
 	Model& model = wxGetApp().plater()->model();
 	std::string aux_path = encode_path(model.get_auxiliary_file_temp_path().c_str());
 	m_auxiliary_model->Init(aux_path);
@@ -263,7 +265,7 @@ void AuxiliaryList::on_context_menu(wxDataViewEvent& evt)
 	}
 
 	PopupMenu(menu);
-	// [EVENT][INTENT][UNITY][STATE] Keep context menus aligned with toolbar verbs so Unity can reuse the same helper methods for right-click overlays.
+	// [EVENT][INTENT][UNITY][STATE][THREAD] Keep context menus aligned with toolbar verbs so Unity can reuse the same helper methods for right-click overlays (menu creation must stay on the UI thread).
 }
 
 void AuxiliaryList::on_begin_drag(wxDataViewEvent& evt)

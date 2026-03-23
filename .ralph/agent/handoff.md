@@ -3048,3 +3048,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P1=1 (accelerator mapping); P2=1 (screensaver suppression); P3=1 (user-data folder launches).
 - Git: Document GUI helper Unity implications
 - Next recommended Phase 1 task: T393 annotate: src/slic3r/GUI/GUI_ObjectTable.hpp
+
+## Phase 1 - Task T372 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Deliverables: src/slic3r/GUI/GUI_AuxiliaryList.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 3 new `[INTENT]`/`[THREAD]` cues for initialization, teardown, and context-menu threading so Unity can synchronize selection state and overlays on its main loop.
+- Verification excerpt: // [INTENT] Quietly release the auxiliary tree before the list goes away so Unity can mirror the same deterministic teardown order.
+- Unity-impact summary:
+  - Keep the tree+toolbar block built/expanded on the Unity main thread so the VisualElement layout locks to a single scheduler like wxWidgets did.
+  - Mirror the destructor comment to enforce deterministic disposal of the shared model/controller on Unity's `IDisposable` equivalent so no dangling handlers remain.
+  - Build context menus on the UI thread alongside the tree so Unity can render right-click overlays without racing background jobs.
+- Hazards found: P2=1 (blocking file dialog) + P3=1 (native shell launches)
+- Git: annotate: GUI auxiliary list thread notes
+- Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp

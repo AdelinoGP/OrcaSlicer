@@ -439,6 +439,10 @@
 - Wrap-up: Added `[STATE]`, `[EVENT]`, `[OPENGL]`, and `[THREAD]` detail to `src/slic3r/GUI/GUI_Geometry.cpp` so the empty translation unit documents why it exists for the Unity port, and no other logic is needed. The file is now ready for handoff.
 
 ## Iteration plan update
+- Current focus: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp` (runtime task `task-1773880086-6aa6` now active after I started it).
+- Plan: digest the full source, sprinkle within-class `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` guidance at lifecycle hooks, list state caches, and render helper sections so Unity knows how to mirror the list model, drag/selection, and multi-thread hints; append the standard Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the annotated file plus any bookkeeping, and then hand off the next ready task for the following iteration.
+
+## Iteration plan update
 - Selected task: T381 annotate: src/slic3r/GUI/GUI_Geometry.cpp (task-1773880086-3b67)
 - Plan: Confirm the TU already contains the necessary intent/state/event tags, expand the comment block to mention GL and thread mapping, update `.ralph/agent/handoff.md` with the evidence block, stage/commit the metadata, and close the task before moving to the next Phase 1 item.
 
