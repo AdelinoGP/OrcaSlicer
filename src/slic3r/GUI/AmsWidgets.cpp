@@ -12,19 +12,19 @@
 
 #include "DeviceCore/DevFilaSystem.h"
 
+namespace Slic3r { namespace GUI {
 
-namespace Slic3r {
-namespace GUI {
+// [INTENT] Provide a data driver for the AMS tray list so the GUI can lazily render dozens of trays without copying rows into an
+// intermediate buffer. [STATE] Column caches below mirror the `wxDataViewVirtualListModel` contract. [UNITY] Unity should back this
+// model with a `ListView`/`TreeView` bound to an `ObservableCollection<TrayViewModel>` and update it whenever `update()` mutates
+// the cache. [PORTING_HAZARD:P3] wxDataView relies on `wxVariant` values, so Unity must duplicate the type coercion logic manually.
 
-TrayListModel::TrayListModel() :
-    wxDataViewVirtualListModel(0)
+TrayListModel::TrayListModel() : wxDataViewVirtualListModel(0) { ; }
+
+void TrayListModel::GetValueByRow(wxVariant& variant, unsigned int row, unsigned int col) const
 {
-    ;
-}
-
-void TrayListModel::GetValueByRow(wxVariant& variant,
-    unsigned int row, unsigned int col) const
-{
+    // [EVENT] Invoked by wxWidgets during `wxDataView` rendering; reads from column caches to keep UI sync with the latest `update()`.
+    // [STATE] Column caches supply both textual and styled values so downstream `wxDataView` can render the tray list without blocking.
     switch (col) {
     case Col_TrayTitle:
         if (row >= m_titleColValues.GetCount())
@@ -92,22 +92,17 @@ void TrayListModel::GetValueByRow(wxVariant& variant,
         else
             variant = m_smoothColValues[row];
         break;
-    default:
-        break;
+    default: break;
     }
 }
 
-bool TrayListModel::GetAttrByRow(unsigned int row, unsigned int col,
-    wxDataViewItemAttr& attr) const
-{
-    return true;
-}
+bool TrayListModel::GetAttrByRow(unsigned int row, unsigned int col, wxDataViewItemAttr& attr) const { return true; }
 
-bool TrayListModel::SetValueByRow(const wxVariant& variant,
-    unsigned int row, unsigned int col)
+bool TrayListModel::SetValueByRow(const wxVariant& variant, unsigned int row, unsigned int col)
 {
-    switch (col)
-    {
+    // [EVENT] `wxDataViewVirtualListModel` calls this when the user edits a cell. The AMS tray list is read-only, so we accept but ignore
+    // the request to keep the control editable flags intact.
+    switch (col) {
     case Col_TrayTitle:
     case Col_TrayColor:
     case Col_TrayMeterial:
@@ -118,17 +113,19 @@ bool TrayListModel::SetValueByRow(const wxVariant& variant,
     case Col_TrayManufacturer:
     case Col_TraySaturability:
     case Col_TrayTransmittance:
-    case Col_TraySmooth:
-        return true;
-    default:
-        break;
+    case Col_TraySmooth: return true;
+    default: break;
     }
     return false;
 }
 
 void TrayListModel::update(MachineObject* obj)
 {
-    if (!obj) return;
+    // [INTENT] Rebuild the column caches from the machine's AMS trays and notify the view via `Reset()` so it re-queries `GetValueByRow()`.
+    // [THREAD] Must run on the main UI thread because `MachineObject` uses wxWidgets data structures that are not thread-safe.
+    // [UNITY] Unity would move this into a ViewModel service that populates a `List<TrayViewModel>` and calls `ListView.Refresh()`.
+    if (!obj)
+        return;
 
     m_titleColValues.clear();
     m_colorColValues.clear();
@@ -141,13 +138,12 @@ void TrayListModel::update(MachineObject* obj)
     m_saturabilityColValues.clear();
     m_transmittanceColValues.clear();
 
-    std::map<std::string, DevAms*>::iterator ams_it;
+    std::map<std::string, DevAms*>::iterator           ams_it;
     std::map<std::string, DevAmsTray*>::const_iterator tray_it;
-    int tray_index = 0;
+    int                                                tray_index = 0;
 
     const auto& ams_list = obj->GetFilaSystem()->GetAmsList();
-    for (auto ams_it = ams_list.begin(); ams_it != ams_list.end(); ams_it++)
-    {
+    for (auto ams_it = ams_list.begin(); ams_it != ams_list.end(); ams_it++) {
         if (ams_it->second) {
             for (tray_it = ams_it->second->GetTrays().cbegin(); tray_it != ams_it->second->GetTrays().cend(); tray_it++) {
                 DevAmsTray* tray = tray_it->second;
@@ -169,13 +165,13 @@ void TrayListModel::update(MachineObject* obj)
                     m_snColValues.push_back(sn_text);
                     wxString manufacturer_text = wxString::Format("%s", tray->sub_brands);
                     m_manufacturerColValues.push_back(manufacturer_text);
-                    // TODO: 
-                    //wxString saturability_text = wxString::Format("%s", tray->saturability);
-                    //m_saturabilityColValues.push_back(saturability_text);
-                    //wxString transmittance_text = wxString::Format("%s", tray->transmittance);
-                    //m_transmittanceColValues.push_back(transmittance_text);
-                    //wxString smooth_text = wxString::Format("%s", tray->smooth);
-                    //m_smoothColValues.push_back(smooth_text);
+                    // TODO:
+                    // wxString saturability_text = wxString::Format("%s", tray->saturability);
+                    // m_saturabilityColValues.push_back(saturability_text);
+                    // wxString transmittance_text = wxString::Format("%s", tray->transmittance);
+                    // m_transmittanceColValues.push_back(transmittance_text);
+                    // wxString smooth_text = wxString::Format("%s", tray->smooth);
+                    // m_smoothColValues.push_back(smooth_text);
                 }
             }
         }
@@ -185,6 +181,8 @@ void TrayListModel::update(MachineObject* obj)
 }
 void TrayListModel::clear_data()
 {
+    // [INTENT] Empty every cache before populating new data or when the AMS list disappears so stale rows do not linger in the view.
+    // [STATE] Resets the data model to zero rows for `Reset(0)`.
     m_titleColValues.clear();
     m_colorColValues.clear();
     m_meterialColValues.clear();
@@ -200,5 +198,4 @@ void TrayListModel::clear_data()
     Reset(0);
 }
 
-} // GUI
-} // Slic3r
+}} // namespace Slic3r::GUI

@@ -426,3 +426,7 @@
 ## Iteration update
 - Completed T143 annotate `src/slic3r/GUI/3DBed.cpp` with multi-tag coverage of palette sync, `set_shape`, render paths, fallback geometry, and porting hazards.
 - Next recommended focus: T144 annotate `src/slic3r/GUI/3DBed.hpp` so the header explains the same lifecycle/state guidance.
+
+## Iteration plan update
+- Selected task: T155 annotate `src/slic3r/GUI/AmsWidgets.cpp`.
+- Plan: add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations around the `TrayListModel` data lifecycle, column cache handling, and update/clear helpers so Unity can replicate the virtual list provider and concurrency expectations; record hazards about `wxVariant`-based row rendering, append the evidence block, stage/commit, and then stop for this iteration.

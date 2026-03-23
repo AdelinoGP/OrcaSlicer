@@ -2817,3 +2817,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3=1 (system color/theme change events lack a direct Unity analog, so a theme dispatcher is required).
 - Git: Annotate GUI_ObjectLayers for Unity port
 - Next recommended Phase 1 task: T387 annotate: src/slic3r/GUI/GUI_ObjectLayers.hpp
+
+## Phase 1 - Task T155 complete
+- Task type: annotate
+- File: src/slic3r/GUI/AmsWidgets.cpp
+- Deliverables: src/slic3r/GUI/AmsWidgets.cpp, .ralph/agent/scratchpad.md
+- Substantive additions: 3 multi-tag comments describing the tray list virtualization intent, event bindings, and cache lifecycles
+- Verification excerpt: // [INTENT] Provide a data driver for the AMS tray list so the GUI can lazily render dozens of trays without copying rows into an intermediate buffer.
+- Unity-impact summary:
+  - Map the virtual table to a UI Toolkit `ListView` backed by an `ObservableCollection<TrayViewModel>` so Unity can render dozens of AMS rows without copying data.
+  - Treat `update()` as a ViewModel refresh that mutates the collection and calls `ListView.Refresh()` rather than relying on `wxDataView` virtualization APIs.
+- Hazards found: 1 (P3: `wxVariant`/`wxDataView` virtualization requires manual type conversion inside Unity)
+- Git: Annotate AMS tray list model
+- Next recommended Phase 1 task: T156 annotate: src/slic3r/GUI/AMSSetting.cpp
