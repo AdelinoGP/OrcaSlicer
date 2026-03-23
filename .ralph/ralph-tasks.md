@@ -298,7 +298,7 @@ Last updated: 2026-03-23T07:46:00Z
 - [x] T377 annotate: src/slic3r/GUI/GUI_Colors.hpp
 - [ ] T378 annotate: src/slic3r/GUI/GUI.cpp
 - [ ] T379 annotate: src/slic3r/GUI/GUI_Factories.cpp
-- [ ] T380 annotate: src/slic3r/GUI/GUI_Factories.hpp
+- [x] T380 annotate: src/slic3r/GUI/GUI_Factories.hpp
 - [ ] T381 annotate: src/slic3r/GUI/GUI_Geometry.cpp
 - [ ] T382 annotate: src/slic3r/GUI/GUI_Geometry.hpp
 - [ ] T383 annotate: src/slic3r/GUI/GUI.hpp

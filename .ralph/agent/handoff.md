@@ -2700,3 +2700,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=5, P3=3
 - Git: Annotate GUI factories for Unity port
 - Next recommended Phase 1 task: T380 annotate: src/slic3r/GUI/GUI_Factories.hpp
+# Phase 1 - Task T380 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Factories.hpp
+- Deliverables: multi-tag comments covering settings metadata, menu caching, and event wiring for menu builders
+- Substantive additions: ~15 inline annotations describing intent, state, events, Unity mappings, and hazards drawn from `SettingsFactory` and `MenuFactory` blocks
+- Verification excerpt: "// [STATE] Cache the category icon name so menu builders reuse the same wxBitmap resources."
+- Unity-impact summary:
+  1. `SimpleSettingData` maps to a lightweight `ScriptableObject` record that UI Toolkit `ListView` rows can bind to.
+  2. `MenuFactory` becomes a Unity `MenuController` MonoBehaviour that populates UI Toolkit `Toolbar`/`ContextualMenu` templates while reusing cached bitmaps.
+  3. Filament submenu state needs a persistent `MenuController` dataset to avoid duplicated allocations.
+- Hazards found: P2 (dynamic wxWidgets menu rebuilds require careful Unity rehydration of commands).
+- Git: Annotate GUI menu helpers
+- Next recommended Phase 1 task: T381 annotate: src/slic3r/GUI/GUI_Geometry.cpp
