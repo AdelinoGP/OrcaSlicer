@@ -3508,6 +3508,19 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 P2 (catalog tooling, pluralization strategy) + 1 P3 (context key encoding) migration notes.
 - Git: docs: annotate I18N helpers
 - Next recommended Phase 1 task: T410 annotate: src/slic3r/GUI/IconManager.cpp
+ 
+## Phase 1 - Task T410 complete
+- Task type: annotate
+- File: src/slic3r/GUI/IconManager.cpp
+- Deliverables: src/slic3r/GUI/IconManager.cpp
+- Substantive additions: Added ~9 tags describing atlas packing, SVG raster sequencing, GL uploads, shared `m_icons` caching, Unity analogs, and porting hazards.
+- Verification excerpt: // [STATE][THREAD] Build a per-atlas RGBA buffer so the subsequent GL upload can happen in a single pass on the GL thread.
+- Unity-impact summary:
+  - Map the atlas rebuild to Unity `Texture2DArray`/`SpriteAtlas` slices + ScriptableObjects storing UV offsets so the runtime uses deterministic UV handles.
+  - Document background SVG parsing before the single GL upload so Unity can mirror rasterization via `Texture2D.LoadRawTextureData` and marshal `glGenTextures`/`glBindTexture` to the main thread.
+- Hazards found: P2=1 (release/clear requires UI thread cleanup), P3=1 (atlas width limits), P3=1 (background rasterization must not block UI thread)
+- Git: annotate: src/slic3r/GUI/IconManager.cpp
+- Next recommended Phase 1 task: T411 annotate: src/slic3r/GUI/IconManager.hpp
 
 ## Phase 1 - Task T372 complete
 - Task type: annotate

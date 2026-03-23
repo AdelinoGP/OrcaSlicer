@@ -81,6 +81,7 @@ IconManager::Icons IconManager::init(const InitTypes& input)
 
     // TODO: remove in future
     if (m_id != 0) {
+        // [OPENGL][THREAD] Recreate the atlas texture on the UI/GL thread while the context is current to avoid leaks.
         glsafe(::glDeleteTextures(1, &m_id));
         m_id = 0;
     }
@@ -131,6 +132,7 @@ IconManager::Icons IconManager::init(const InitTypes& input)
     }
 
     Icons result(input.size());
+    // [STATE] Keep shared pointers in `result` and `m_icons` so any UI consumer can hold onto icons without dropping the atlas.
     for (int i = 0; i < pack_rects.Size; i++) {
         const stbrp_rect& rect = pack_rects[i];
         assert(rect.was_packed);
@@ -142,8 +144,10 @@ IconManager::Icons IconManager::init(const InitTypes& input)
 
         assert(input[i].size.x == rect.w);
         assert(input[i].size.y == rect.h);
-        Icon icon = {input[i].size, tl, br};
-        result[i] = std::make_shared<Icon>(std::move(icon));
+        Icon icon        = {input[i].size, tl, br};
+        auto shared_icon = std::make_shared<Icon>(std::move(icon));
+        result[i]        = shared_icon;
+        m_icons.push_back(shared_icon);
     }
 
     NSVGrasterizer* rast = nsvgCreateRasterizer();
@@ -154,20 +158,21 @@ IconManager::Icons IconManager::init(const InitTypes& input)
 
     int channels = 4;
     int n_pixels = tex_size.x * tex_size.y;
-    // store data for whole texture
+    // [STATE][THREAD] Build a per-atlas RGBA buffer so the subsequent GL upload can happen in a single pass on the GL thread.
     std::vector<unsigned char> data(n_pixels * channels, {0});
 
     // initialize original index locations
     std::vector<size_t> idx(input.size());
     std::iota(idx.begin(), idx.end(), 0);
 
-    // Group same filename by sort inputs
+    // [STATE][INTENT] Group identical file paths so repeated SVGs rasterize in one batch and keep atlas ordering deterministic.
     // sort indexes based on comparing values in input
     std::sort(idx.begin(), idx.end(), [&input](size_t i1, size_t i2) { return input[i1].filepath < input[i2].filepath; });
     for (size_t j : idx) {
         const InitType& i = input[j];
         if (i.filepath.empty())
             continue; // no file path only reservation of space for texture
+        // [STATE] Placeholder slots avoid raster work so `InitType` can reserve atlas space before image availability.
         assert(boost::filesystem::exists(i.filepath));
         if (!boost::filesystem::exists(i.filepath))
             continue;
@@ -189,6 +194,7 @@ IconManager::Icons IconManager::init(const InitTypes& input)
         const stbrp_rect&          rect     = pack_rects[j];
         int                        n_pixels = rect.w * rect.h;
         std::vector<unsigned char> icon_data(n_pixels * channels, {0});
+        // [THREAD] Each icon rasterizes on the CPU before the final GL upload; keep these loops off the UI frame if it ever stalls.
         ::nsvgRasterize(rast, image, 0, 0, svg_scale, icon_data.data(), i.size.x, i.size.y, i.size.x * channels);
         // [THREAD][UNITY] Rasterizing each SVG is CPU-bound; Unity should offload this to a background job and push the bytes to
         // `Texture2D.LoadRawTextureData` before the UI uses the atlas.
@@ -256,7 +262,9 @@ std::vector<IconManager::Icons> IconManager::init(const std::vector<std::string>
     // state order has to match the enum IconState
     const auto& states = priv::get_states(type);
 
-    bool compress  = false;
+    bool compress = false;
+    // [THREAD][PORTING_HAZARD:P3] The texture loader must run on the GL thread and can fail on limited platforms; Unity should guard this
+    // with its `Texture2DArray` helper.
     bool is_loaded = m_icons_texture.load_from_svg_files_as_sprites_array(file_paths, states, width, compress);
     if (!is_loaded || (size_t) m_icons_texture.get_width() < (states.size() * width) ||
         (size_t) m_icons_texture.get_height() < (file_paths.size() * width)) {
@@ -276,6 +284,7 @@ std::vector<IconManager::Icons> IconManager::init(const std::vector<std::string>
     Icon def_icon;
     def_icon.tex_id = m_icons_texture.get_id();
     def_icon.size   = size;
+    // [STATE] Template icon stores the atlas reference + uniform size so each `std::make_shared` starts from the same base state.
 
     // float beacouse of dividing
     float tex_height = static_cast<float>(m_icons_texture.get_height());
@@ -299,8 +308,9 @@ std::vector<IconManager::Icons> IconManager::init(const std::vector<std::string>
             icon->tl         = ImVec2(x1, y1);
             icon->br         = ImVec2(x2, y2);
             file_icons.push_back(icon);
-            m_icons.push_back(std::move(icon));
+            m_icons.push_back(icon);
         }
+        // [STATE] Cache each file's icon list back into the master `result` so UI owners can traverse by file.
         result.emplace_back(std::move(file_icons));
     }
     return result;
@@ -308,15 +318,15 @@ std::vector<IconManager::Icons> IconManager::init(const std::vector<std::string>
 
 void IconManager::release()
 {
-    // [STATE][UNCLEAR][UNITY] Release reserved icons by resetting the shared pointers; Unity would dispose of the Texture2D/Sprite assets
-    // here as soon as they are unused.
+    // [STATE][UNCLEAR][UNITY][PORTING_HAZARD:P3] Placeholder for freeing `m_icons_texture` and shared icon handles; Unity must replicate
+    // this by unloading the `Texture2D`/`SpriteAtlas` so the GPU texture does not leak.
     BOOST_LOG_TRIVIAL(error) << "Not implemented yet";
 }
 
 void priv::clear(IconManager::Icons& icons)
 {
-    // [STATE][THREAD] Detach shared icons from the atlas so each consumer can drop its copy safely; keep this on the UI thread whenever it
-    // walks shared pointers.
+    // [STATE][THREAD][PORTING_HAZARD:P2] Tear down shared icon pointers before calling GL delete so Unity ports can release on the main
+    // thread without leaking texture handles.
     std::string message;
     for (auto& icon : icons) {
         // Exist more than this instance of shared ptr?

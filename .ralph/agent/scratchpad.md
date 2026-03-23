@@ -669,3 +669,11 @@
 ## Iteration plan update
 - Selected task: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp`.
 - Plan: reinforce the auxiliary tree comments with a module-level [INTENT]/[UNITY] note, clarify how the context menu mirrors node state and ensure delete stays on the UI thread, then capture the evidence block and close the task for the next iteration.
+
+## Iteration plan update
+- Selected task: T408 annotate `src/slic3r/GUI/I18N.cpp` (task-1773880086-c1af now active for this run).
+- Plan: read `I18N.cpp` fully, weave the required `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P2]` tags through the translation cache builders, lookup helpers, signal wiring, and file-watcher logic, emphasize global config dependency and Unity analogs (ScriptableObject string tables + `LocalizationSettings` refresh), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated source plus metadata, close the task, and stop this iteration.
+
+## Iteration plan update
+- Selected task: T410 annotate `src/slic3r/GUI/IconManager.cpp` (task-1773880086-f0fa now in focus).
+- Plan: read the file to decode atlas packing, bitmap caching, GL upload, and wx event wiring; insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments covering sprite construction, lazy icon loading, ImGui/toolbar usage, worker threading, and hazard around shared `wxBitmap` ownership; append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file, close the task, and stop so the next agent can continue.
