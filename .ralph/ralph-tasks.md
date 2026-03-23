@@ -306,7 +306,7 @@ Last updated: 2026-03-23T07:10:00Z
 - [x] T385 annotate: src/slic3r/GUI/GUI_Init.hpp
 - [x] T386 annotate: src/slic3r/GUI/GUI_ObjectLayers.cpp
 - [x] T387 annotate: src/slic3r/GUI/GUI_ObjectLayers.hpp
-- [ ] T388 annotate: src/slic3r/GUI/GUI_ObjectList.cpp
+- [x] T388 annotate: src/slic3r/GUI/GUI_ObjectList.cpp
 - [ ] T389 annotate: src/slic3r/GUI/GUI_ObjectList.hpp
 - [ ] T390 annotate: src/slic3r/GUI/GUI_ObjectSettings.cpp
 - [ ] T391 annotate: src/slic3r/GUI/GUI_ObjectSettings.hpp

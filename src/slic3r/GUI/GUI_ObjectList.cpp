@@ -49,8 +49,14 @@ namespace Slic3r { namespace GUI {
 wxDEFINE_EVENT(EVT_OBJ_LIST_OBJECT_SELECT, SimpleEvent);
 wxDEFINE_EVENT(EVT_PARTPLATE_LIST_PLATE_SELECT, IntEvent);
 
+// [INTENT] Provide the currently active printer technology so menus and dialogs can pick platform-appropriate commands.
+// [STATE] Reads `wxApp().preset_bundle` so Unity needs an equivalent singleton-backed PrinterProfile service for the same value.
+// [UNITY] Mirror this through a `ScriptableObject` or singleton `PrinterProfileManager` that exposes `printerTechnology` for UI controllers.
 static PrinterTechnology printer_technology() { return wxGetApp().preset_bundle->printers.get_selected_preset().printer_technology(); }
 
+// [INTENT] Access the current canvas selection so list logic stays in sync with the 3D view hit test state.
+// [STATE] The selection is owned by whichever `GLCanvas3D` is active, so Unity should align this with the focused `SceneViewController` selection cache.
+// [UNITY] Translate to an Input System raycast result bound to whichever `SceneView` or `AssembleView` camera is active.
 static const Selection& scene_selection()
 {
     // BBS AssembleView canvas has its own selection
@@ -61,10 +67,15 @@ static const Selection& scene_selection()
 }
 
 // Config from current edited printer preset
+// [INTENT] Surface the printer config currently being edited so the object list can edit layer/extruder hints.
+// [STATE] Unity should cache a reference to the pending `PrintConfig` ScriptableObject and mirror the `DynamicPrintConfig` behavior.
 static DynamicPrintConfig& printer_config() { return wxGetApp().preset_bundle->printers.get_edited_preset().config; }
 
+// [STATE] Central filament count is tracked on `wxApp`. Unity controllers should read from the `FilamentManager` singleton to stay in sync.
 static int filaments_count() { return wxGetApp().filaments_cnt(); }
 
+// [EVENT] Bundles undo/redo snapshots around any object list change, so Unity should emit the same `ActionHistory` events here.
+// [THREAD] Runs on the UI thread because it reads `Plater`; the Unity port must marshal to the main thread before mutating history.
 static void take_snapshot(const std::string& snapshot_name)
 {
     Plater* plater = wxGetApp().plater();
@@ -95,10 +106,10 @@ class wxRenderer : public wxDelegateRendererNative
     }
 };
 
-// [INTENT] Main controller for the object list UI in the sidebar. Manages item hierarchy, selection, and editing.
-// [UNITY] Use a TreeView (UI Toolkit) with a custom controller/adapter pattern for hierarchy and data binding.
-// [INTENT] Main controller for the object list UI in the sidebar. Manages item hierarchy, selection, and editing.
-// [UNITY] Use a TreeView (UI Toolkit) with a custom controller/adapter pattern for hierarchy and data binding.
+// [INTENT] Main controller for the object list UI in the sidebar. Manages item hierarchy, selection, editing, and palette-driven columns.
+// [STATE] The control tracks `m_prevent_*` guards and the current selection so Unity needs to mirror this in its controller state machine.
+// [EVENT] Data view bindings and global actions fire through this class, so the Unity port should hook ListView selection events and ToolBar
+// commands here. [UNITY] Use a UI Toolkit `TreeView`/`ListView` with custom adapters, `PointerEvent` callbacks, and a `SelectionHistory` service.
 ObjectList::ObjectList(wxWindow* parent)
     : wxDataViewCtrl(parent,
                      wxID_ANY,
@@ -126,6 +137,9 @@ ObjectList::ObjectList(wxWindow* parent)
     // BBS: add part plate related event
     // Bind(EVT_PARTPLATE_LIST_PLATE_SELECT, &ObjectList::on_select_plate, this);
 
+    // [EVENT] Describe behavior wires SelectionChanged handlers and mouse capture to keep UI and canvas in sync.
+    // [THREAD] Runs entirely on the main thread; Unity must dispatch the same events through its main-loop event pump.
+    // [UNITY] Hook `ListView.onSelectionChange` and pointer events on a `TreeView` rather than raw `wxEVT_DATAVIEW` events.
     // describe control behavior
     Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, [this](wxDataViewEvent& event) {
         // detect the current mouse position here, to pass it to list_manipulation() method
@@ -352,10 +366,13 @@ void ObjectList::update_min_height()
     set_min_height();
 }
 
-// [INTENT] Sets up the list columns and data view model.
-// [UNITY] Use a TreeView (UI Toolkit) with a custom VisualElement factory for column rendering.
-// [INTENT] Sets up the list columns and data view model.
-// [UNITY] Use a TreeView (UI Toolkit) with a custom VisualElement factory for column rendering.
+// [INTENT] Sets up the list columns, model, drag/drop hooks, and renderer cache so the control stays responsive.
+// [STATE] Builds `m_columns_width` and caches `BitmapTextRenderer` state, so Unity must keep a parallel `ColumnState` model.
+// [OPENGL] Enables drag-and-drop and selection so GL scene hits appear in sync with the list; Unity needs to trigger `SceneView`
+// refreshes during reordering.
+// [UNITY] Recreate this with a UI Toolkit `ListView` + virtualization and custom `VisualElement` renderers for icons/inline editors.
+// [PORTING_HAZARD:P3] wxDataViewCtrl column auto-sizing and native DragSource/DropTarget behavior have no direct Unity counterpart; plan
+// to implement manual pointer/drag handling.
 void ObjectList::create_objects_ctrl()
 {
     // BBS
@@ -1369,6 +1386,8 @@ void ObjectList::OnChar(wxKeyEvent& event)
 
 void ObjectList::OnContextMenu(wxDataViewEvent& evt)
 {
+    // [EVENT] Handles showing object-specific context menus after mouse release, ensuring GLCanvas drag state is cleaned up.
+    // [UNITY] Map this to `PointerReleased` on the Unity `TreeView` and show a `ContextMenu` VisualElement under the cursor.
     // The mouse position returned by get_mouse_position_in_control() here is the one at the time the mouse button is released (mouse up event)
     wxPoint mouse_pos = this->get_mouse_position_in_control();
 
@@ -1383,6 +1402,11 @@ void ObjectList::OnContextMenu(wxDataViewEvent& evt)
 
 void ObjectList::list_manipulation(const wxPoint& mouse_pos, bool evt_context_menu /* = false*/)
 {
+    // [EVENT] Central dispatcher for pointer hits in the list; Unity should map this to PointerPressed/PointerReleased on a Virtual TreeView.
+    // [STATE] Guards via `m_prevent_list_manipulation` and column indexes decide whether editing or gizmo actions run.
+    // [OPENGL] Specialized columns trigger GL gizmos (sinking, support painting, extrusion) so the Unity port must send similar commands to
+    // the `SceneRaycaster` and gizmo controller. [PORTING_HAZARD:P2] The function relies on column order/hard-coded indexes from wxDataView;
+    // Unity's layout system will need a custom column lookup to avoid brittle enum dependencies.
     if (m_prevent_list_manipulation)
         return;
 
@@ -1506,7 +1530,11 @@ void ObjectList::list_manipulation(const wxPoint& mouse_pos, bool evt_context_me
 
 void ObjectList::show_context_menu(const bool evt_context_menu)
 {
-    // BBS Disable menu popup if current canvas is Preview
+    // [INTENT] Central place for mapping list selection (single/multi) to the correct menu provided by `Plater`.
+    // [STATE] Menu choices depend on selection state and printer technology, so Unity needs to query the same `SelectionService` before showing
+    // a context menu. [UNITY] Materialize this using `ContextualMenu` attached to the VisualElement, backed by a `MenuProvider` that mimics
+    // `Plater` menus. [PORTING_HAZARD:P3] `wxMenu` lifetimes are tightly coupled to the UI thread; Unity must keep its menu data separated
+    // from the immediate callback to avoid GC when the event queue re-entrants. BBS Disable menu popup if current canvas is Preview
     if (wxGetApp().plater()->get_current_canvas3D()->get_canvas_type() == GLCanvas3D::ECanvasType::CanvasPreview)
         return;
 
@@ -1557,6 +1585,10 @@ void ObjectList::show_context_menu(const bool evt_context_menu)
 
 void ObjectList::extruder_editing()
 {
+    // [EVENT] Presents inline extruder selector and writes back to the model when the combobox fires `wxEVT_COMBOBOX`.
+    // [STATE] Relies on `m_extruder_editor` and on `m_objects_model` for current selection info; Unity should route this through a
+    // `BindableProperty<int>` on the UI element. [UNITY] This is equivalent to showing a `PopupWindow` with `Dropdown` content and
+    // connecting `ValueChanged` events to the `SelectionModel`.
     wxDataViewItem item = GetSelection();
     if (!item || !(m_objects_model->GetItemType(item) & (itVolume | itObject)))
         return;
@@ -1593,6 +1625,8 @@ void ObjectList::extruder_editing()
     });
 }
 
+// [EVENT] Expose the standard clipboard/duplicate actions by posting events to the GL canvas toolbar handler.
+// [UNITY] Replace these with Command bus calls that talk to the Unity `ToolbarController` when key combos arrive.
 void ObjectList::copy() { wxPostEvent((wxEvtHandler*) wxGetApp().plater()->canvas3D()->get_wxglcanvas(), SimpleEvent(EVT_GLTOOLBAR_COPY)); }
 
 void ObjectList::paste()
@@ -1697,6 +1731,10 @@ void ObjectList::key_event(wxKeyEvent& event)
 }
 #endif /* __WXOSX__ */
 
+// [EVENT] Begin dragging volumes/objects after verifying selection state and storing payload in `m_dragged_data`.
+// [STATE] `m_prevent_list_events` is set here to keep GTK from reselecting, so Unity must coordinate its equivalent `ListView` guards.
+// [PORTING_HAZARD:P2] Unity does not have wxDataViewCtrl drag helpers, so reimplement drag/buffers through `PointerEvent` + custom
+// `DragAndDrop` data.
 void ObjectList::OnBeginDrag(wxDataViewEvent& event)
 {
     const bool mult_sel = multiple_selection();
@@ -1831,6 +1869,7 @@ bool ObjectList::can_drop(const wxDataViewItem& item, int& src_obj_id, int& src_
 
 void ObjectList::OnDropPossible(wxDataViewEvent& event)
 {
+    // [EVENT] Approves or vetoes potential drop destinations; keeps `m_prevent_list_events` false to continue normal selection.
     const wxDataViewItem& item = event.GetItem();
 
     int src_obj_id, src_plate, dest_obj_id, dest_plate;
@@ -1842,6 +1881,10 @@ void ObjectList::OnDropPossible(wxDataViewEvent& event)
 
 void ObjectList::OnDrop(wxDataViewEvent& event)
 {
+    // [INTENT] Commit object/volume reorder to the model, snapshot history, and mark the 3D canvas dirty so view reflects the new order.
+    // [UNITY] Mirror this with a `ReorderObjects` command sent from the `SelectionController` to the `SceneGraph` data model.
+    // [PORTING_HAZARD:P2] The code swaps raw vectors and expects a single global `m_objects`; Unity must respect the SceneGraph + Plate
+    // list constraints as well as undo history.
     const wxDataViewItem& item = event.GetItem();
 
     int src_obj_id, src_plate, dest_obj_id, dest_plate;

@@ -442,6 +442,6 @@
 - Selected task: T381 annotate: src/slic3r/GUI/GUI_Geometry.cpp (task-1773880086-3b67)
 - Plan: Confirm the TU already contains the necessary intent/state/event tags, expand the comment block to mention GL and thread mapping, update `.ralph/agent/handoff.md` with the evidence block, stage/commit the metadata, and close the task before moving to the next Phase 1 item.
 
-## Iteration update
-- Completed T387 annotate `src/slic3r/GUI/GUI_ObjectLayers.hpp` by adding layered intent/state/event comments plus Unity/porting guidance for the editor widgets and focus/rescale helpers.
-- Next target: T388 annotate `src/slic3r/GUI/GUI_ObjectList.cpp` so the object list panel receives matching lifecycle annotations before moving on.
+## Iteration plan
+- Selected task: T388 annotate `src/slic3r/GUI/GUI_ObjectList.cpp` (gui:T388) because starting T383 collided with the existing T372 entry that shares the same ID, so switching to the next ready panel makes progress while respecting the active task list.
+- Plan: mark T388 active, read the object list implementation thoroughly, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around list lifecycle, selection caching, drag/drop handling, GL refresh triggers, and settings observers; capture Unity analogs (UI Toolkit `ListView` with `ScrollView`, `Command`-style callbacks), note hazards (wx `wxListCtrl` messing with native model), append the evidence block to `.ralph/agent/handoff.md`, stage and commit the single file plus task bookkeeping, close the task, and stop for this iteration so the next agent can take over.

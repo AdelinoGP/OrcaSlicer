@@ -409,6 +409,20 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: Annotate GLShadersManager header for Unity port
 - Next recommended Phase 1 task: T366 annotate: src/slic3r/GUI/GLTexture.cpp
 
+## Phase 1 - Task T388 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectList.cpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectList.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md
+- Substantive additions: added multi-tag annotations for the helper utilities, constructor wiring, context-menu lifecycle, drag/drop orchestration, extruder inline editing, and clipboard/toolbar commands.
+- Verification excerpt: // [EVENT] Central dispatcher for pointer hits in the list; Unity should map this to PointerPressed/PointerReleased on a Virtual TreeView.
+- Unity-impact summary:
+  - Capture the tree/list controller responsibilities and SceneView selection sync so a UI Toolkit VisualElement `TreeView` can mirror the state machine.
+  - Document context menu routing and lifetime so Unity can use a `ContextualMenu` that compensates for the wxMenu/preview lock and printer-technology branches.
+  - Describe drag/drop reordering plus toolbar command posting so Unity can implement ListView pointer drags and toolbar actions coherently.
+- Hazards found: P2=3 (column-dependent list_manipulation, drag-start guard with GTK veto, reorder commit that rewrites shared `m_objects`), P3=2 (wxDataView column/renderer expectations, wxMenu lifetime bound to the UI thread)
+- Git: Annotate GUI object list for Unity port
+- Next recommended Phase 1 task: T389 annotate: src/slic3r/GUI/GUI_ObjectList.hpp
+
 ## Phase 1 - Task T143 complete
 - Task type: annotate
 - File: src/slic3r/GUI/3DBed.cpp
