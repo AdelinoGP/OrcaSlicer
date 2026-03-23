@@ -320,3 +320,7 @@
 ## Iteration plan update
 - Selected task: T350 annotate `src/slic3r/GUI/Gizmos/GLGizmosManager.cpp` (task-1773880086-6f8e now active).
 - Plan: read the manager implementation to capture GL event routing, render sequencing, gizmo lifecycle, and OpenGL resource lifetimes; annotate with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` notes (plus `[UNCLEAR]` if uncertain), append the required handoff evidence block, commit the single-file change, close the task, and then pause for the next iteration.
+
+## Iteration plan update
+- Selected task: T351 annotate `src/slic3r/GUI/Gizmos/GLGizmosManager.hpp` (task-1773880086-87fb now active).
+- Plan: analyze the manager header to capture the toolbar state, gizmo registration, icon resource tracking, event methods, object manipulation hooks, and serialization API; insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around the enum, layout struct, member variables, public control methods, serialize helpers, rendering stubs, and input responses; append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the single file, close the runtime task, and then prepare for the next ready file.

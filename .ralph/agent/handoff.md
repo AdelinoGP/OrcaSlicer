@@ -2434,3 +2434,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 (dynamic_cast-based event dispatch + manual glyph atlas), P3 (wxTimer capture + GL overlay ordering restrictions versus Unity input/event pipeline)
 - Git: Annotate GLGizmosManager toolbar events
 - Next recommended Phase 1 task: T351 annotate: src/slic3r/GUI/Gizmos/GLGizmosManager.hpp
+## Phase 1 - Task T351 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmosManager.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmosManager.hpp
+- Substantive additions: annotated toolbar layout, state caches, rendering lifecycle, event handlers, serialization, and Unity mapping with `[INTENT]/[STATE]/[EVENT]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` cues.
+- Verification excerpt: "// [EVENT] Routes mouse events through the toolbar before passing them to the active gizmo."
+- Unity-impact summary:
+  - Toolbar buttons, icon atlas, and dark-mode toggle should become Texture2D-backed UI Toolkit controls with GraphicRaycaster pickup.
+  - Shared gizmo data pools and object-manipulation helpers need ScriptableObject/MonoBehaviour bridges that maintain the same state caches.
+  - `[PORTING_HAZARD:P2]` ensures the enum order stays synchronized with serialized `m_current`, and `[PORTING_HAZARD:P3]` highlights icon reload and ImGui texture ID mapping concerns.
+- Hazards found: P2=1, P3=2
+- Git: docs: annotate GLGizmosManager toolbar state
+- Next recommended Phase 1 task: T352 annotate: src/slic3r/GUI/Gizmos/GLGizmoSVG.cpp
