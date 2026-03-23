@@ -3666,3 +3666,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=2 (blocking boost::filesystem cleanup and reload workflows)
 - Git: annotate: src/slic3r/GUI/AuxiliaryDataViewModel.hpp
 - Next recommended Phase 1 task: T160 annotate: src/slic3r/GUI/AuxiliaryDialog.cpp
+
+## Phase 1 - Task T414 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ImageGrid.cpp
+- Deliverables: src/slic3r/GUI/ImageGrid.cpp
+- Substantive additions: 18 architectural annotations covering layout metrics, hit-testing, event wiring, rendering helpers, and Unity mappings
+- Verification excerpt: // [EVENT] Translate pointer/X/Y coordinates into item/action/mode hits so mouse handlers can drive selection or toolbar actions; Unity's PointerEventData would use a similar hit-test pass.
+- Unity-impact summary:
+  - Virtualize the grid inside a UI Toolkit ScrollView/ListView with cached Texture2D thumbnails instead of wxDC blits.
+  - Recreate the button overlays using VisualElement/PanelRenderer pairs wired through InputSystem pointer events and UnityEvent actions.
+  - Map the PrinterFileSystem focus range and timer-driven position bar to Unity's background prefetch service + main-thread dispatcher.
+- Hazards found: P2=1 (DownloadCheckFiles blocks while scanning storage), P3=2 (manual alpha/shadow bitmap builders and custom button blending need Texture2D Shader replacements)
+- Git: Annotate ImageGrid layout
+- Next recommended Phase 1 task: T417 annotate: src/slic3r/GUI/IMSlider.cpp

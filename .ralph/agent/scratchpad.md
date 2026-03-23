@@ -703,3 +703,7 @@
 ## Iteration plan update
 - Observed `T158 annotate: src/slic3r/GUI/AuxiliaryDataViewModel.cpp` is already closed in the task log/handoff but still marked `[~]` in `.ralph/ralph-tasks.md`; will reconcile that flag before moving on.
 - Selected `T159 annotate: src/slic3r/GUI/AuxiliaryDataViewModel.hpp` as this iteration's work item; plan to annotate node/model declarations with `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD]` guidance, update tasks/hand off metadata, and capture the completion evidence block before committing.
+
+## Iteration plan update
+- Selected task: T414 annotate `src/slic3r/GUI/ImageGrid.cpp`.
+- Plan: read `ImageGrid.cpp` end-to-end, document the grid layout lifecycle, selection state, texture caching, rendering hooks, and mouse/keyboard wiring; insert `[INTENT]/[STATE]/[EVENT]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around the tile generation, refresh timers, deferred image loads, and input dispatch, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only the annotated file plus metadata, mark the task done, and then stop for the next iteration so another agent can continue.
