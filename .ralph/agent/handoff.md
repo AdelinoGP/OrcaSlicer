@@ -3671,6 +3671,18 @@ This prompt governs **Phase 1 only**.
 - Git: annotate: src/slic3r/GUI/HttpServer.hpp
 - Next recommended Phase 1 task: T408 annotate: src/slic3r/GUI/I18N.cpp
 
+## Phase 1 - Task T372 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Deliverables: src/slic3r/GUI/GUI_AuxiliaryList.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: Added a [STATE][THREAD][UNITY] note clarifying inline rename hooks on the UI thread.
+- Verification excerpt: `// [STATE][THREAD][UNITY] Editing begins on the UI thread, so Unity should mirror this hook to update focus state and inline TextField visibility through its main-thread dispatcher before showing the rename editor.`
+- Unity-impact summary:
+  - Documented the inline rename entry point so Unity can tie the inline TextField visibility/focus state to the Input System's main-thread dispatcher.
+- Hazards found: 0
+- Git: Annotate auxiliary list inline edit hook
+- Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp
+
 ## Phase 1 - Task T157 complete
 
 - Task type: annotate

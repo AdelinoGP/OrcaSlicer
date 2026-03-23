@@ -300,6 +300,8 @@ void AuxiliaryList::on_drop(wxDataViewEvent& evt)
 void AuxiliaryList::on_editing_started(wxDataViewEvent& evt)
 {
     // [EVENT] Placeholder hook for edit-start notifications so Unity can show inline text fields when renaming begins.
+    // [STATE][THREAD][UNITY] Editing begins on the UI thread, so Unity should mirror this hook to update focus state and inline TextField
+    // visibility through its main-thread dispatcher before showing the rename editor.
 }
 
 void AuxiliaryList::on_editing_done(wxDataViewEvent& evt)
