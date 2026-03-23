@@ -315,6 +315,20 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate: src/slic3r/GUI/GLSelectionRectangle.cpp
 - Next recommended Phase 1 task: T361 annotate: src/slic3r/GUI/GLSelectionRectangle.hpp
 
+## Phase 1 - Task T361 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GLSelectionRectangle.hpp
+- Deliverables: src/slic3r/GUI/GLSelectionRectangle.hpp
+- Substantive additions: 6 multi-tag annotations covering intent, drag events, state caches, OpenGL rendering, Unity overlay guidance, and porting hazards (INTENT/STATE/EVENT/THREAD/OPENGL/UNITY/PORTING_HAZARD:P2,P3)
+- Verification excerpt: // [INTENT] Model the viewport drag-selection rectangle so the GUI can make bulk selection/deselection decisions quickly.
+- Unity-impact summary:
+  - Represent this control as a UI Toolkit VisualElement border or Canvas+LineRenderer overlay driven by the Input System to replicate `start_dragging`/`dragging`/`stop_dragging`.
+  - Calculate `contains()` via `Camera.WorldToScreenPoint` + `Rect` intersection inside a main-thread dispatcher so Unity selection matches the native GL bounds.
+  - Cache the rectangle mesh as a reusable `Mesh` or `LineRenderer` buffer so the overlay can redraw without rebuilding resources each frame.
+- Hazards found: P2=2 (contains projection vs world-to-screen assumptions, GLModel dependency), P3=1 (legacy GLModel lifecycle and immediate-mode expectations)
+- Git: Annotate GLSelectionRectangle.hpp for Unity port
+- Next recommended Phase 1 task: T362 annotate: src/slic3r/GUI/GLShader.cpp
+
 ## Phase 1 - Task T198 complete
 - Task type: annotate
 - File: src/slic3r/GUI/Jobs/SLAImportJob.hpp
