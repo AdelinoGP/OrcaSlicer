@@ -91,6 +91,8 @@ AuxiliaryList::AuxiliaryList(wxWindow* parent)
 	this->Bind(wxEVT_DATAVIEW_ITEM_DROP, &AuxiliaryList::on_drop, this);
 	this->Bind(wxEVT_DATAVIEW_ITEM_EDITING_STARTED, &AuxiliaryList::on_editing_started, this);
 	this->Bind(wxEVT_DATAVIEW_ITEM_EDITING_DONE, &AuxiliaryList::on_editing_done, this);
+	// [THREAD][EVENT] These dataview handlers always fire on wxWidgets' UI thread, so Unity must marshal equivalent callbacks through its
+	// main-thread dispatcher before touching shared state.
 
 	// Mouse events
 	wxWindow* win = this->GetMainWindow();
@@ -113,6 +115,7 @@ AuxiliaryList::~AuxiliaryList()
 	// [STATE][THREAD] Disassociate the model and clean it up on the UI thread so bound controls never reference freed data.
 	this->AssociateModel(nullptr);
 	delete m_auxiliary_model;
+	// [PORTING_HAZARD:P3] wxDataViewCtrl holds implicit listeners, so Unity must unregister events before nulling the controller to avoid callbacks into disposed logic.
 	// [UNITY] Unity should dispose of the matching tree controller and cached state so the selection/mode cleanup mirrors the wx teardown.
 }
 

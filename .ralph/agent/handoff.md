@@ -3838,3 +3838,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 (P2:1, P3:1)
 - Git: Annotate ASCIIFolding ASCII helpers
 - Next recommended Phase 1 task: T724 annotate: src/slic3r/Utils/AstroBox.cpp
+
+## Phase 1 - Task T372 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Deliverables: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Substantive additions: 2 new comments clarifying dataview event threading and tree teardown hazards
+- Verification excerpt: // [THREAD][EVENT] These dataview handlers always fire on wxWidgets' UI thread, so Unity must marshal equivalent callbacks through its main-thread dispatcher before touching shared state.
+- Unity-impact summary:
+  - Unity needs a main-thread dispatcher for dataview events and consistent toolbar routing.
+  - Tree/selection teardown must unregister listeners before disposing the controller to avoid callbacks into nil state.
+- Hazards found: P3=1
+- Git: annotate: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp

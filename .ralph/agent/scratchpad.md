@@ -750,3 +750,7 @@
 ## Iteration plan
 - Current focus: T723 annotate: `src/slic3r/Utils/ASCIIFolding.hpp`.
 - Plan: read the tiny header, document the accent-folding helpers, call out the filename sanitization intent, detail the `is_convert_for_filename` toggle if it biases replacement tables, explain that `fold_to_ascii` writes up to four ASCII `wchar_t`s and relies on caller-managed buffers, note the Unity analog using `System.Globalization` normalization plus `StringBuilder` sanitizers, add `[PORTING_HAZARD:P2]` for wchar_t size/encoding mismatches, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header plus metadata, close T723, and hand off the next ready file (T724 AstrBox).
+
+## Iteration plan update
+- Current focus: T383 annotate `src/slic3r/GUI/GUI.hpp`.
+- Plan: read the header end-to-end, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2]` comments for the GUI manager helpers, menu builder, and config caches, highlight Unity equivalents (MenuBar + ScriptableObject config controller) plus hazard notes about wxWidgets ownership rules, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header plus handoff metadata, mark the task closed, and stop for this iteration so the next agent can continue.
