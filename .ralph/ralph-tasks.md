@@ -263,7 +263,7 @@ Last updated: 2026-03-23T01:12:37Z
 - [ ] T342 annotate: src/slic3r/GUI/Gizmos/GLGizmosCommon.hpp
 - [x] T343 annotate: src/slic3r/GUI/Gizmos/GLGizmoSeam.cpp
 - [x] T344 annotate: src/slic3r/GUI/Gizmos/GLGizmoSeam.hpp
-- [ ] T345 annotate: src/slic3r/GUI/Gizmos/GLGizmos.hpp
+- [x] T345 annotate: src/slic3r/GUI/Gizmos/GLGizmos.hpp
 - [ ] T346 annotate: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp
 - [ ] T347 annotate: src/slic3r/GUI/Gizmos/GLGizmoSimplify.hpp
 - [ ] T348 annotate: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp

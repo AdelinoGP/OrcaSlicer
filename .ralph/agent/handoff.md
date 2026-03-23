@@ -2354,3 +2354,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P2 caching translations requires explicit refresh when locale toggles)
 - Git: annotate: src/slic3r/GUI/Gizmos/GLGizmoSeam.hpp
 - Next recommended Phase 1 task: T345 annotate: src/slic3r/GUI/Gizmos/GLGizmos.hpp
+
+## Phase 1 - Task T345 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmos.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmos.hpp
+- Substantive additions: 6 inline annotations describing the GL canvas event vocabulary and the downstream aggregator includes for Unity mapping.
+- Verification excerpt: [INTENT][EVENT][STATE][OPENGL][UNITY][PORTING_HAZARD:P2] Capture the cross-gizmo event vocabulary so the GL canvas -> gizmo dispatcher can make deterministic choices and carry modifier-state signals.
+- Unity-impact summary: Shared enum becomes `GizmosInputBridge` tokens; header-level aggregator maps to `GizmosManager` registry/ScriptableObject list; hazard comments highlight input-channel fidelity requirements.
+- Hazards found: P2=1, P3=1
+- Git: Annotate GLGizmos header for Unity port
+- Next recommended Phase 1 task: T346 annotate: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp

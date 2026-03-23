@@ -1,9 +1,10 @@
 #ifndef slic3r_GLGizmos_hpp_
 #define slic3r_GLGizmos_hpp_
 
-// this describes events being passed from GLCanvas3D to SlaSupport gizmo
-namespace Slic3r {
-namespace GUI {
+// [INTENT][EVENT][STATE][OPENGL][UNITY][PORTING_HAZARD:P2] Capture the cross-gizmo event vocabulary so the GL canvas -> gizmo dispatcher
+// can make deterministic choices and carry modifier-state signals; Unity ports will re-express this as a shared C# enum consumed by a
+// `GizmosInputBridge` MonoBehaviour that mirrors the GL canvas input pipeline and drag/selection state.
+namespace Slic3r { namespace GUI {
 
 enum class SLAGizmoEventType : unsigned char {
     LeftDown = 1,
@@ -23,10 +24,11 @@ enum class SLAGizmoEventType : unsigned char {
     ResetClippingPlane
 };
 
-} // namespace GUI
-} // namespace Slic3r
+}} // namespace Slic3r::GUI
 
-// BBS
+// [INTENT][PORTING_HAZARD:P3][UNITY] This aggregator header forces every gizmo implementation along the SlaSupport/AdvancedCut path to
+// compile at once; in Unity the equivalent is a registry or `ScriptableObject` list referenced by the `GizmosManager` MonoBehaviour so
+// deferred assembly scanning keeps runtime declaration order intact.
 #include "slic3r/GUI/Gizmos/GLGizmoMoveScale.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoRotate.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoFlatten.hpp"
@@ -38,4 +40,4 @@ enum class SLAGizmoEventType : unsigned char {
 #include "slic3r/GUI/Gizmos/GLGizmoAdvancedCut.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoHollow.hpp"
 
-#endif //slic3r_GLGizmos_hpp_
+#endif // slic3r_GLGizmos_hpp_
