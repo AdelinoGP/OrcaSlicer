@@ -502,3 +502,12 @@
 ## Iteration plan update
 - Selected task: T383 annotate `src/slic3r/GUI/GUI.hpp` (task-1773880086-6aa7 now in focus).
 - Plan: read the core GUI namespace header top-to-bottom, document the helper classes and config/menu state maps with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations, append the Phase 1 evidence block, stage/commit, and close the task before pausing for the next iteration.
+
+## Iteration plan update
+- Selected task: T383 annotate src/slic3r/GUI/GUI.hpp
+- Plan: read GUI.hpp, add [INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD] comments around config helpers, menu wiring, and main-window helpers, append evidence block to .ralph/agent/handoff.md, then close task and continue.
+
+## Iteration plan update
+- Selected task: T333 annotate src/slic3r/GUI/Gizmos/GLGizmoMove.cpp
+- Plan: read the move gizmo implementation, embed the required tags around event hooks, rendering, coordinate state, projection math, and raycast registration, append the evidence block to .ralph/agent/handoff.md, then mark the task done and commit.
+

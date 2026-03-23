@@ -3062,3 +3062,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (blocking file dialog) + P3=1 (native shell launches)
 - Git: annotate: GUI auxiliary list thread notes
 - Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp
+## Phase 1 - Task T333 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoMove.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoMove.cpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md, .ralph/agent/scratchpad.md
+- Substantive additions: 14 multi-tag annotations across event hooks, render/state churn, Unity mappings, and projection math.
+- Verification excerpt: // [OPENGL] on_render clears depth and draws axis grabbers/shaders so this is the GL frame batch for the gizmo overlay.
+- Unity-impact summary:
+  - Move gizmo becomes a MonoBehaviour that uses Graphics.DrawMesh/LineRenderer for axis lines and overlays SelectionService-driven handle state.
+  - Translation input/drag events should target a UI Toolkit VisualElement bound to the Selection and GizmoObjectManipulation services so coordinate toggles stay synced.
+  - The raycast overlay requires an overlay camera or CustomPass to match `set_raycaster_gizmos_on_top` ordering and highlight axial rendering effectively.
+- Hazards found: P2=2 (wxGetApp singleton + perspective assumption in calc_projection), P3=1 (raycaster layering).
+- Git: Annotate GLGizmoMove manipulator for Unity port
+- Next recommended Phase 1 task: T339 annotate: src/slic3r/GUI/Gizmos/GLGizmoScale.cpp
+
