@@ -2420,4 +2420,17 @@ This prompt governs **Phase 1 only**.
   - Mirror `reslice_SLA_supports` and dialog localization maps as async/await jobs tied to Unity's SynchronizationContext and LocalizationService so density/diameter sliders and help text stay consistent.
 - Hazards found: 1 (P2 editing-state reliance on GL event ordering + selection caching)
 - Git: annotate: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.hpp
-- Next recommended Phase 1 task: T350 annotate: src/slic3r/GUI/Gizmos/GLGizmosManager.cpp
+- Next recommended Phase 1 task: T351 annotate: src/slic3r/GUI/Gizmos/GLGizmosManager.hpp
+
+## Phase 1 - Task T350 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmosManager.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmosManager.cpp
+- Substantive additions: 12 multi-tag annotations describing toolbar initialization, event routing, icon atlas state, OpenGL overlay rendering, and Unity migration guidance.
+- Verification excerpt: // [INTENT] GLGizmosManager orchestrates the toolbar overlay, proxies canvas interaction into the active gizmo, and keeps the shared data pool aligned with the selection manager.
+- Unity-impact summary:
+  - Rebuild the toolbar as a UI Toolkit VisualElement tree bound to a MonoBehaviour that dispatches GraphicRaycaster hits plus InputSystem shortcuts to each gizmo controller.
+  - Swap the SVG icon atlas for a Unity SpriteAtlas/Texture2D cache that mimics the 6-state rows and rebuilds whenever the toolbar scale or theme changes.
+- Hazards found: P2 (dynamic_cast-based event dispatch + manual glyph atlas), P3 (wxTimer capture + GL overlay ordering restrictions versus Unity input/event pipeline)
+- Git: Annotate GLGizmosManager toolbar events
+- Next recommended Phase 1 task: T351 annotate: src/slic3r/GUI/Gizmos/GLGizmosManager.hpp

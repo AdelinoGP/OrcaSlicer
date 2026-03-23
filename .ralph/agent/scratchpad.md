@@ -316,3 +316,7 @@
 ## Iteration plan update
 - Completed T346 annotate `src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp` with multi-tag commentary.
 - Current focus: T349 annotate `src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.hpp`; the header is annotated and logged, so the next task will be T350 `src/slic3r/GUI/Gizmos/GLGizmosManager.cpp` once it's ready.
+
+## Iteration plan update
+- Selected task: T350 annotate `src/slic3r/GUI/Gizmos/GLGizmosManager.cpp` (task-1773880086-6f8e now active).
+- Plan: read the manager implementation to capture GL event routing, render sequencing, gizmo lifecycle, and OpenGL resource lifetimes; annotate with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` notes (plus `[UNCLEAR]` if uncertain), append the required handoff evidence block, commit the single-file change, close the task, and then pause for the next iteration.

@@ -36,6 +36,10 @@
 
 namespace Slic3r {
 namespace GUI {
+// [INTENT] GLGizmosManager orchestrates the toolbar overlay, proxies canvas interaction into the active gizmo, and keeps the shared data pool aligned with the selection manager.
+// [STATE] m_current/m_hover/m_highlight plus the palette (`m_is_dark`, layout, common pools) gate which icon is drawn, which gizmo is accepting input, and which tooltip is shown.
+// [UNITY] In Unity this would be a toolbar VisualElement tree plus a MonoBehaviour dispatcher that routes GraphicRaycaster hits into each gizmo controller.
+// [PORTING_HAZARD:P2] The current implementation assumes wxWidgets events, immediate OpenGL overlay rendering, and undo snapshots that need a Unity-compatible controller (render texture overlay + UI Toolkit binding).
 //BBS: GUI refactor: to support top layout
 #if BBS_TOOLBAR_ON_TOP
 const float GLGizmosManager::Default_Icons_Size = 40;
@@ -56,6 +60,8 @@ GLGizmosManager::GLGizmosManager(GLCanvas3D& parent)
 {
     m_timer_set_color.Bind(wxEVT_TIMER, &GLGizmosManager::on_set_color_timer, this);
 }
+
+// [THREAD] The per-gizmo timer runs on the wxWidgets UI thread; Unity should mirror this with a MainThread coroutine or InputSystem timer so MMU segmentation hotkeys stay deterministic.
 
 std::vector<size_t> GLGizmosManager::get_selectable_idxs() const
 {
@@ -79,6 +85,8 @@ std::vector<size_t> GLGizmosManager::get_selectable_idxs() const
 }
 
 //BBS: GUI refactor: GLToolbar&&Gizmo adjust
+// [EVENT] Map raw canvas mouse coordinates into the toolbar slot grid so hovering tools hijacks pointer events before the scene sees them.
+// [UNITY] Implement the same hit logic with GraphicRaycaster + InputSystem pointer data inside the VisualElement toolbar guard.
 GLGizmosManager::EType GLGizmosManager::get_gizmo_from_mouse(const Vec2d &mouse_pos) const
 {
     if (! m_enabled)
@@ -120,6 +128,9 @@ GLGizmosManager::EType GLGizmosManager::get_gizmo_from_mouse(const Vec2d &mouse_
     return Undefined;
 }
 
+// [OPENGL] Switches every gizmo icon file to the active theme so the GPU sprite atlas stays in sync.
+// [STATE] m_is_dark governs the icon choice, keeping overlays consistent across light/dark modes.
+// [UNITY] Unity would swap SpriteAsset references and trigger VisualElement invalidation instead of manual SVG loads.
 void GLGizmosManager::switch_gizmos_icon_filename()
 {
     m_background_texture.metadata.filename = m_is_dark ? "toolbar_background_dark.png" : "toolbar_background.png";
@@ -181,6 +192,9 @@ void GLGizmosManager::switch_gizmos_icon_filename()
     }
 }
 
+// [INTENT] Builds the shared gizmo list, loads theme icons, and wires the common data pools so the overlay state stays consistent per canvas.
+// [OPENGL] Texture loads and icon atlases originate here so the overlay draw path remains GPU-driven with ready-to-use sprites.
+// [STATE] Clears current/hover/highlight state before initialization so stale tool choices never persist across fills.
 bool GLGizmosManager::init()
 {
     if (!m_gizmos.empty())
@@ -243,6 +257,8 @@ bool GLGizmosManager::init()
     return true;
 }
 std::map<int, void *> GLGizmosManager::icon_list = {};
+// [OPENGL] Lazily caches toolbar SVG icons into ImTextureIDs so the overlay renderer reuses GPU textures instead of reloading SVGs.
+// [UNITY] Equivalent to a SpriteAtlas asset list stored in a ScriptableObject, reducing runtime loads.
 bool GLGizmosManager::init_icon_textures()
 {
     if (icon_list.size() > 0) {
@@ -338,6 +354,7 @@ bool GLGizmosManager::init_arrow(const std::string& filename)
     return (!filename.empty()) ? m_arrow_texture.load_from_svg_file(path + filename, false, false, false, 1000) : false;
 }
 
+// [STATE] Changing overlay icon size marks the texture dirty so the atlas faithfully rebuilds before rendering.
 void GLGizmosManager::set_overlay_icon_size(float size)
 {
     if (m_layout.icons_size != size)
@@ -432,6 +449,9 @@ void GLGizmosManager::update_assemble_view_data()
     }
 }
 
+// [STATE] Pushes the selection snapshot into the active gizmo caches (and flatten fallback) so each tool renders fresh data.
+// [THREAD] Runs on the wxWidgets UI thread; Unity must invoke the equivalent through the main-thread dispatcher.
+// [UNITY] A ScriptableObject-backed SelectionModel can notify each MonoBehaviour gizmo controller to refresh.
 void GLGizmosManager::update_data()
 {
     if (!m_enabled) return;
@@ -464,6 +484,7 @@ bool GLGizmosManager::is_running() const
     return m_current != Undefined;
 }
 
+// [EVENT] Keyboard shortcuts (especially Emboss) can open gizmos without a selection; Unity should map InputSystem actions into the toolbar controller.
 bool GLGizmosManager::handle_shortcut(int key)
 {
     if (!m_enabled)
@@ -500,6 +521,8 @@ bool GLGizmosManager::is_dragging() const
     return m_gizmos[m_current]->is_dragging();
 }
 
+// [EVENT] Routes canvas input into whichever painter/selection gizmo is active, merging mouse/key state before handing it off.
+// [PORTING_HAZARD:P2] The current dynamic_cast dispatch pattern is hard to mirror in Unity; consider an IGizmoHandler registry on a MonoBehaviour.
 // Returns true if the gizmo used the event to do something, false otherwise.
 bool GLGizmosManager::gizmo_event(SLAGizmoEventType action, const Vec2d& mouse_position, bool shift_down, bool alt_down, bool control_down)
 {
@@ -611,6 +634,8 @@ void GLGizmosManager::render_painter_assemble_view() const
         m_assemble_view_data->model_objects_clipper()->render_cut();
 }
 
+// [OPENGL] Generates the toolbar overlay texture plus sprites so the GLCanvas can composite the toolbar into the viewport.
+// [PORTING_HAZARD:P2] Unity requires a separate overlay camera/RenderTexture to avoid depth conflicts while still capturing toolbar events.
 void GLGizmosManager::render_overlay()
 {
     if (!m_enabled)
@@ -622,6 +647,7 @@ void GLGizmosManager::render_overlay()
     do_render_overlay();
 }
 
+// [STATE] Serves cached tooltip overrides if present; otherwise asks the active gizmo for a human-readable hint so UI hints stay consistent.
 std::string GLGizmosManager::get_tooltip() const
 {
     if (!m_tooltip.empty())
@@ -651,6 +677,8 @@ bool GLGizmosManager::on_mouse_wheel(const wxMouseEvent &evt)
     return processed;
 }
 
+// [EVENT] Captures toolbar mouse drags to prevent them from reaching the viewport while maintaining tooltip/drag state.
+// [PORTING_HAZARD:P3] Unity must explicitly StopPropagation on VisualElement pointer events to match this behavior.
 bool GLGizmosManager::gizmos_toolbar_on_mouse(const wxMouseEvent &mouse_event) {
     assert(m_enabled);
     // keep information about events to process
@@ -748,6 +776,7 @@ bool GLGizmosManager::gizmos_toolbar_on_mouse(const wxMouseEvent &mouse_event) {
     return false;
 }
 
+// [EVENT] Handles toolbar mouse interactions first and only lets the scene see events when the toolbar defers them.
 bool GLGizmosManager::on_mouse(const wxMouseEvent &mouse_event)
 {
     if (!m_enabled) return false;
@@ -1052,6 +1081,7 @@ bool GLGizmosManager::on_key(wxKeyEvent& evt)
     return processed;
 }
 
+// [THREAD] Timer callback runs on the wxWidgets main thread; Unity should use a coroutine or InputSystem timer that posts updates before touching gizmo state.
 void GLGizmosManager::on_set_color_timer(wxTimerEvent& evt)
 {
     if (m_current == MmSegmentation) {
