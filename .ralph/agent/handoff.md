@@ -195,6 +195,19 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate: src/libvgcode/src/ExtrusionRoles.cpp
 - Next recommended Phase 1 task: T114 annotate: src/libvgcode/src/ExtrusionRoles.hpp
 
+## Phase 1 - Task T392 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectTable.cpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectTable.cpp
+- Substantive additions: 7 clarity annotations covering config persistence, filament caches, selection bridging, and editor commits.
+- Verification excerpt: // [STATE] Keeps filament overrides in sync with `ModelConfig` so the preview reflects the per-object extruder choice plus dirty state.
+- Unity-impact summary:
+  - Documented how the object-grid diff logic maps to a `ScriptableObject` config binder plus `ListView` controllers so Unity can reuse the same validation flow.
+  - Clarified filament preset/color caches and hazard around mismatched counts so Unity can preload `Color`+`string` pairs safely.
+- Hazards found: 2 (P3)
+- Git: Document GUI object table config wiring
+- Next recommended Phase 1 task: T396 annotate: src/slic3r/GUI/GUI_Preview.cpp
+
 
 
 -## Phase 1 - Task T163 complete

@@ -1271,6 +1271,10 @@ wxString ObjectGridTable::GetValue(int row, int col)
     return wxString();
 }
 
+// [STATE] Keeps filament overrides in sync with `ModelConfig` so the preview reflects the per-object extruder choice plus dirty state.
+// [UNITY] Mirror this by updating a `ScriptableObject` `ModelConfig` override entry and invoking
+// `SerializedObject.ApplyModifiedProperties()` for the collection. [PORTING_HAZARD:P3] Relies on cloning `ConfigOption` objects; the C#
+// port must avoid sharing references between `ObjectRow` instances.
 void ObjectGridTable::update_filament_to_config(
     ModelConfig* config, std::string& key, ConfigOption& new_value, ConfigOption& ori_value, bool is_object)
 {
@@ -1283,6 +1287,9 @@ void ObjectGridTable::update_filament_to_config(
     }
 }
 
+// [STATE] Centralizes the config diff logic that writes a changed `ConfigOption` back to the preset and removes it when the override is
+// cleared. [UNITY] Implement as a helper on the shared config binder that toggles `SerializedProperty` entries and invokes a persistence
+// callback.
 void ObjectGridTable::update_value_to_config(ModelConfig* config, std::string& key, ConfigOption& new_value, ConfigOption& ori_value)
 {
     if (!config->has(key)) {
@@ -1522,6 +1529,9 @@ double ObjectGridTable::GetValueAsDouble(int row, int col)
     return (double) option_value.getFloat();
 }
 
+// [EVENT] Typed `wxGrid` accessors (long/bool/double) call through these helpers after editor commits so we can reuse the config diff logic.
+// [STATE] Each helper routes the typed value through `ConfigOption` pairs to keep the original baseline handy for undo/reset badges.
+// [UNITY] In Unity, hook the equivalent to your `ListView` cell controller to clamp/parse and raise a binding event that updates the model config.
 void ObjectGridTable::SetValueAsLong(int row, int col, long value)
 {
     ObjectGridRow*   grid_row         = m_grid_data[row - 1];
@@ -2661,6 +2671,9 @@ wxBEGIN_EVENT_TABLE(ObjectTablePanel, wxPanel)
     Layout();
 }
 
+// [INTENT] Prepares the undo badge and filament color icons so renderers can reuse pre-scaled bitmaps without per-frame loads.
+// [STATE] Stores the result in `m_undo_bitmap`/`m_color_bitmaps` for every `GridCellFilamentsRenderer` reference.
+// [UNITY] Port by caching `Texture2D` assets and assigning them to the Unity cell template `Image` components during table creation.
 int ObjectTablePanel::init_bitmap()
 {
     m_undo_bitmap   = create_scaled_bitmap("lock_normal", nullptr, 18);
@@ -2669,6 +2682,11 @@ int ObjectTablePanel::init_bitmap()
     return 0;
 }
 
+// [INTENT] Harvests filament preset names/colors so the object table can render consistent swatches and selectors.
+// [STATE] Populates `m_filaments_count`, `m_filaments_name`, and `m_filaments_colors` based on the current `Plater` config.
+// [UNITY] Reflect in Unity by caching `Color` + `string` pairs inside a shared `ScriptableObject` that the table template references.
+// [PORTING_HAZARD:P3] Expects the filament count to match color entries from the preset; Unity will need to clamp or add defaults when
+// counts diverge.
 int ObjectTablePanel::init_filaments_and_colors()
 {
     // DynamicPrintConfig&  global_config   = wxGetApp().preset_bundle->prints.get_edited_preset().config;
@@ -2968,6 +2986,9 @@ void ObjectTablePanel::load_data()
                                     m_object_grid_table->GetNumberCols();
 }
 
+// [EVENT] Bridges external selection requests (e.g., from object list) into the grid so the UI Kit side pane can highlight the matching
+// row. [UNITY] Invoke this from the Unity object list controller when the selection changes, keeping the `ListView` scroll position and
+// detail pane synchronized.
 void ObjectTablePanel::SetSelection(int object_id, int volume_id) { m_object_grid_table->SetSelection(object_id, volume_id); }
 
 ObjectTablePanel::~ObjectTablePanel()
@@ -3370,5 +3391,7 @@ void GridCellTextEditor::ApplyEdit(int row, int col, wxGrid* grid)
     grid->GetTable()->SetValue(row, col, m_value);
     m_value.clear();
 }
+// [EVENT] Applies the buffered `m_value` into the grid table when the editor hides, mirroring Unity's `CellEditor.Commit` event.
+// [STATE] Clears `m_value` so repeated edits do not reuse stale text.
 
 }} // namespace Slic3r::GUI

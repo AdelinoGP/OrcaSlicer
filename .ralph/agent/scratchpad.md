@@ -816,3 +816,7 @@
 ## Iteration plan update - T383 (current)
 - Selected task: `T383 annotate: src/slic3r/GUI/GUI.hpp` from the ready queue after confirming the header remains active and unannotated.
 - Plan: mark the runtime task `[~]` active, read `GUI.hpp` fully, annotate the menu/toolbar setup, preview panel lifecycles, config caches, and helper bridges with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2]` comments, describe Unity analogs (MenuBar + ScriptableObject config + RenderTexture preview) and wxWidgets ownership hazards, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only the updated files, close `T383`, and pause so the next agent can continue after this single atomic change.
+
+## Iteration plan update
+- Task: `T392 annotate: src/slic3r/GUI/GUI_ObjectTable.cpp`
+- Plan: read `GUI_ObjectTable.cpp` top-to-bottom to understand how the object grid/table/dialog interact, then insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations around cache management, selection synchronization, `wxGrid` wiring, and event dispatch. After the file-level coverage is complete, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, mark the task done in `.ralph/ralph-tasks.md`, stage/commit the annotated file plus metadata, and stop so the next iteration can continue.
