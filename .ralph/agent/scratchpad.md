@@ -455,3 +455,7 @@
 
 ## Iteration update
 - Completed T148 annotate `src/slic3r/GUI/AboutDialog.hpp`: annotated the dialog layout, button ID wiring, Unity mapping, clipboard handling, and duplicate block hazard; appended the evidence block and marked the task done before progressing to T145.
+
+## Iteration plan update
+- Selected task: T383 annotate `src/slic3r/GUI/GUI.hpp` so the core namespace helpers also document the UI intent, state, and event responsibilities.
+- Plan: finish a read-through of the header, add the missing `[STATE]`, `[EVENT]`, `[THREAD]`, and `[INTENT]` tags around the config accessor, menu wiring, config mutation helper, error/report dialogs, and folder launch helpers; append the phase evidence block to `.ralph/agent/handoff.md`, flip T383 to `[x]`, commit the annotated file plus handoff, and leave the next ready header for the next iteration.

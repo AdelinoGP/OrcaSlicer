@@ -2926,3 +2926,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3: duplicate declarations add confusion that Unity must resolve before porting)
 - Git: Annotate AboutDialog.hpp for Unity port
 - Next recommended Phase 1 task: T145 annotate: src/slic3r/GUI/3DScene.cpp
+
+## Phase 1 - Task T383 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI.hpp
+- Deliverables: src/slic3r/GUI/GUI.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: Inserted 13 new multi-tag comments describing screensaver control, debugger flags, accelerator prefixes, config mutation events, error/info flows, combo checklist state, encoding helpers, and folder menu commands.
+- Verification excerpt: // [STATE][EVENT] Builds checkbox list state backed by a bitmask string so Unity can present the same selections without losing contextual text.
+- Unity-impact summary:
+  - Surface the screensaver toggle state as a Unity `Screen.sleepTimeout` helper guarded by main-thread calls, and treat the OS-level folder launches as `Application.OpenURL`/`Process.Start` operations that double-check UI-thread execution.
+  - Keep the shared `AppConfig` pointer, `DynamicPrintConfig` mutator, and modifier prefixes synced with Unity ScriptableObjects/ViewModels so all UI modules share the same state/cache.
+  - Replay the error/info dialogs, warning catcher, and substitution inspectors via UI Toolkit dialogs tied to a `DialogService` MonoBehaviour so warnings carry the same state/context across threads.
+- Hazards found: P2=1 (platform-specific screensaver/folder launches), P1=1 (accelerator prefix cache tied to wx accelerator format)
+- Git: annotate: src/slic3r/GUI/GUI.hpp
+- Next recommended Phase 1 task: T389 annotate: src/slic3r/GUI/GUI_ObjectList.hpp
