@@ -3494,3 +3494,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 P2 (catalog tooling, pluralization strategy) + 1 P3 (context key encoding) migration notes.
 - Git: docs: annotate I18N helpers
 - Next recommended Phase 1 task: T410 annotate: src/slic3r/GUI/IconManager.cpp
+
+## Phase 1 - Task T372 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Deliverables: src/slic3r/GUI/GUI_AuxiliaryList.cpp, .ralph/agent/scratchpad.md
+- Substantive additions: Added module-level INTENT/UNITY guidance, clarified context menu state/threading, and documented delete-command thread hazard for Unity controllers.
+- Verification excerpt: // [STATE][THREAD] Menu contents mirror the current node's container state and must be built on the UI thread before the popup is shown.
+- Unity-impact summary:
+  - Treat the auxiliary tree+toolbar as a single controller so Unity VisualElements can reuse the same command bindings.
+  - Keep context menus and delete operations on the main thread, using Unity's dispatcher to mirror the wx drop-down and toolbar behavior without racing.
+  - Use a shared controller to mirror the `m_auxiliary_model` lifecycle so the Unity port can keep the selection/canvas state coherent.
+- Hazards found: P3=2 (context menu/main-thread menu rebuild + delete-thread coupling).
+- Git: docs: annotate GUI Auxiliary list
+- Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp

@@ -12,6 +12,8 @@
 using namespace Slic3r::GUI;
 using namespace Slic3r;
 
+// [INTENT][UNITY] Provide a focused auxiliary tree controller so Unity can reproduce the tree + toolbar combination with consistent command wiring.
+
 AuxiliaryList::AuxiliaryList(wxWindow* parent)
 	: wxDataViewCtrl(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxDV_NO_HEADER)
 {
@@ -217,12 +219,14 @@ void AuxiliaryList::on_import_file(wxCommandEvent& evt)
 void AuxiliaryList::on_delete(wxCommandEvent& evt)
 {
 	m_auxiliary_model->Delete(this->GetSelection());
+	// [THREAD][PORTING_HAZARD:P3] Deletion must stay on the UI thread because the shared model is not thread-safe; Unity should marshal the Delete command before updating the tree.
 	// [EVENT][STATE][UNITY] Deletes always funnel through this helper so Unity can tie toolbar buttons and hotkeys to the same state change.
 }
 
 void AuxiliaryList::on_context_menu(wxDataViewEvent& evt)
 {
 	wxMenu* menu = new wxMenu();
+	// [STATE][THREAD] Menu contents mirror the selected node type and must be built on the UI thread before the popup displays.
 	// [INTENT][UNITY] Compose this context menu so Unity can offer the same verbs via its right-click overlay and re-use the existing handlers.
 	wxDataViewItem item = evt.GetItem();
 	AuxiliaryModelNode* node = (AuxiliaryModelNode*)item.GetID();

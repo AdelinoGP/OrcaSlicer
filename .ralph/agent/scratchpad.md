@@ -644,3 +644,11 @@
 ## Iteration plan update
 - Selected task: T406 annotate `src/slic3r/GUI/HttpServer.cpp` (current ready entry from the manifest).
 - Plan: start the runtime task, read `HttpServer.cpp` completely, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments covering the server lifecycle, request handling, config/state bridges, worker threading, and GL/GUI hooks; note Unity equivalents (background `UnityWebRequest` manager + `MainThreadDispatcher` mocks) and any hazards around blocking HTTP sockets; append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit just `HttpServer.cpp` plus any updated metadata, mark the task done, and then stop for this iteration so the next agent can continue.
+
+## Iteration plan update
+- Selected task: T409 annotate `src/slic3r/GUI/I18N.hpp` (task-1773880086-d8ea now active).
+- Plan: read the entire header to capture translation map caches, signal wiring, locale fallback helpers, and external file watch hooks; sprinkle `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P2]` annotations around cache lifecycle, config dependency, request callbacks, and `wxLocale` bridging, note Unity analogs (ScriptableObject string tables + `LocalizationSettings` refresh) plus hazards like synchronous file IO, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the header plus metadata, close the task, and pause for the next iteration.
+
+## Iteration plan update
+- Selected task: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp`.
+- Plan: reinforce the auxiliary tree comments with a module-level [INTENT]/[UNITY] note, clarify how the context menu mirrors node state and ensure delete stays on the UI thread, then capture the evidence block and close the task for the next iteration.
