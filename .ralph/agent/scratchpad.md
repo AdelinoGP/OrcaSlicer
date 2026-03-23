@@ -765,3 +765,7 @@
 ## Iteration plan update - T166
 - Selected task: T166 annotate `src/slic3r/GUI/BaseTransparentDPIFrame.hpp` as the current work item.
 - Plan: confirm the header is complete, add missing `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations around the animation helpers, timer hooks, display state, and helper methods, update `.ralph/ralph-tasks.md` to mark the task `[~]` and later `[x]`, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the single file plus metadata, and close the task before handing off to the next iteration.
+
+## Iteration plan update
+- Current focus: T420 annotate `src/slic3r/GUI/IMToolbar.hpp` (runtime task `task-1773880086-dd6c`).
+- Plan: read the header fully, document toolbar state caches, action binding tables, icon resource ownership, and event wiring with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` tags; note how button IDs map to wxMenu commands, how icon atlases are cached, and how toolbar visibility/state toggles persist across config; append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only the annotated header plus metadata, close the task, and then pause so the next agent can continue after this single-file change.

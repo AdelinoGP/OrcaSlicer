@@ -3876,3 +3876,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 (P3: timer coroutine replacement, P3: layout translation)
 - Git: Annotate BaseTransparentDPIFrame overlay lifecycle
 - Next recommended Phase 1 task: T167 annotate: src/slic3r/GUI/BaseTransparentDPIFrame.cpp
+
+## Phase 1 - Task T420 complete
+- Task type: annotate
+- File: src/slic3r/GUI/IMToolbar.hpp
+- Deliverables: src/slic3r/GUI/IMToolbar.hpp, .ralph/agent/scratchpad.md
+- Substantive additions: 7 targeted annotations covering toolbar state, font/icon scaling, event gating, OpenGL texture ownership, and Unity mapping (INTENT/STATE/EVENT/THREAD/OPENGL/UNITY/PORTING_HAZARD)
+- Verification excerpt: // [EVENT][STATE] Adjusts the ImGui button sizing so Unity's RectTransform height/width matches the toolbar layout.
+- Unity-impact summary:
+  - Drive the toolbar through a ScriptableObject list + GraphicRaycaster buttons (matching the `IMToolbarItem` cache + rendering hint) so Unity mirrors the native layout.
+  - Preserve `icon_width`/`icon_height` + `fontScale` in a MonoBehaviour controller to keep the toolbar RectTransform and TMP scaling in sync with the ImGui layout.
+  - Host the return icon as a dedicated Unity `Button` + Texture2D lifecycle instead of ImGui texture IDs while still honoring the enable flags.
+- Hazards found: 3 (P2 textures still use ImGui/GL handles, P3 toolbar font scaling/RectTransform alignment, P3 manual return Texture2D lifecycle)
+- Git: annotate: src/slic3r/GUI/IMToolbar.hpp
+- Next recommended Phase 1 task: T421 annotate: src/slic3r/GUI/InstanceCheck.cpp
+

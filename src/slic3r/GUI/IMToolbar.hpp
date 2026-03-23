@@ -43,7 +43,7 @@ public:
 
     bool generate_texture(); // [OPENGL][THREAD] Called on the UI thread to load the latest image bytes into the GLTexture before ImGui
                              // draws the toolbar.
-    ~IMToolbarItem();
+    ~IMToolbarItem();        // [INTENT][THREAD] Destroys GL textures on the UI thread so ImGui/Unity texture handles stay valid.
 };
 
 // [INTENT] Coordinates the ImGui toolbar layout, sizing, and enable/disable toggles for the rendering loop.
@@ -65,19 +65,24 @@ public:
         icon_height = DEFAULT_TOOLBAR_BUTTON_HEIGHT;
     }
 
-    void del_all_item();   // [INTENT] Clears every toolbar entry so the next machine/project can repopulate icons without stale state.
-    void del_stats_item(); // [INTENT] Removes the always-on stats entry when the stats overlay is hidden by user prefs.
+    void del_all_item();   // [INTENT][THREAD] Clears every toolbar entry on the UI thread so the next machine/project can repopulate icons
+                           // without stale state.
+    void del_stats_item(); // [INTENT][THREAD] Removes the always-on stats entry when the stats overlay is hidden by user prefs.
 
     IMToolbarItem* m_all_plates_stats_item =
         nullptr; // [STATE] Optional summary entry that exposes the shared stats texture for the toolbar.
     std::vector<IMToolbarItem*> m_items =
         {}; // [STATE] Owner list of shared items; Unity would mirror this with `List<ScriptableObject>` plus `UI Toolkit ListView`.
-    float fontScale;
+    float fontScale; // [STATE][PORTING_HAZARD:P3] Tracks the scaling factor applied to the ImGui font so Unity can keep its `Text`/`TMP`
+                     // scaling aligned.
 
     bool is_enabled() const { return m_enabled; }
-    void set_enabled(bool enable); // [EVENT] Called from UI panels to gate toolbar visibility when switching views.
+    void set_enabled(
+        bool enable); // [EVENT][THREAD] Called from UI panels on the main thread to gate toolbar visibility when switching views.
 
-    void set_icon_size(float width, float height)
+    void set_icon_size(
+        float width,
+        float height) // [EVENT][STATE] Adjusts the ImGui button sizing so Unity's RectTransform height/width matches the toolbar layout.
     {
         icon_width  = width;
         icon_height = height;
@@ -91,18 +96,26 @@ public:
 class IMReturnToolbar
 {
 private:
-    bool        m_enabled{false};
-    ImTextureID texture_id;     // [OPENGL] ImGui texture handle; Unity should keep a `Texture2D` and expose it to the button renderer.
-    GLTexture   return_textrue; // [OPENGL][PORTING_HAZARD:P3] Manual GPU texture lifecycle tied to ImGui, so Unity must own the Texture2D
-                                // lifecycle on the C# side.
+    bool m_enabled{false}; // [STATE] Tracks whether the return button is active so the toolbar can reappear on demand.
+    ImTextureID
+        texture_id; // [OPENGL][PORTING_HAZARD:P2] ImGui texture handle; Unity should keep a `Texture2D` and expose it to the button renderer.
+    GLTexture return_textrue; // [OPENGL][PORTING_HAZARD:P3] Manual GPU texture lifecycle tied to ImGui, so Unity must own the Texture2D
+                              // lifecycle on the C# side.
 
 public:
     IMReturnToolbar() {}
 
-    bool        init(); // [INTENT] Loads the return icon into `return_textrue` and registers it with ImGui.
-    bool        is_enabled() const { return m_enabled; }
-    void        set_enabled(bool enable) { m_enabled = enable; }
-    ImTextureID get_return_texture_id() { return texture_id; }
+    bool init(); // [INTENT][THREAD] Loads the return icon on the UI thread so the ImGui texture can be registered safely.
+    bool is_enabled() const { return m_enabled; }
+    void set_enabled(bool enable)
+    {
+        // [EVENT] Reacts to navigation state changes so the return button hides/shows as needed.
+        m_enabled = enable;
+    }
+    ImTextureID get_return_texture_id() // [OPENGL] Exposes the ImGui texture handle to render the button icon.
+    {
+        return texture_id;
+    }
 };
 
 }} // namespace Slic3r::GUI
