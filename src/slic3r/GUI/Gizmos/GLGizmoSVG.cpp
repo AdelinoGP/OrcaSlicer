@@ -43,6 +43,9 @@ using namespace Slic3r::Emboss;
 using namespace Slic3r::GUI;
 using namespace Slic3r::GUI::Emboss;
 
+// [INTENT] Encapsulate the SVG rotation/translation handles and toolbar UI so all emboss controls live in one class.
+// [STATE] Owns the cached UI config, current selection, and dedicated rotation grabber used for GL hit tests.
+// [UNITY] A Unity port would expose this as a MonoBehaviour that wires GraphicRaycaster input + MeshCollider hits into the same rotation widget.
 GLGizmoSVG::GLGizmoSVG(GLCanvas3D &parent)
     : GLGizmoBase(parent, M_ICON_FILENAME, -3)
     , m_gui_cfg(nullptr)
@@ -52,6 +55,8 @@ GLGizmoSVG::GLGizmoSVG(GLCanvas3D &parent)
     m_rotate_gizmo.set_force_local_coordinate(true);
 }
 
+// [STATE] These helpers carry the slider limits, icon atlas, and undo-text constants that survive locale or DPI changes.
+// [PORTING_HAZARD:P3] They depend on wxWidgets globals such as wxDisplay/wxString and a static last-used directory, so Unity needs an explicit settings cache.
 // Private functions to create emboss volume
 namespace{
 
@@ -194,6 +199,9 @@ GuiCfg create_gui_configuration();
 // use private definition
 struct GLGizmoSVG::GuiCfg: public ::GuiCfg{};
 
+// [EVENT] Entry point for toolbar buttons or drop handlers that turn the SVG configuration into a new emboss volume.
+// [THREAD] The worker starts an EmbossJob via start_create_volume, so Unity must marshal to its job queue and back before mutating meshes.
+// [PORTING_HAZARD:P2] Relies on the selection staying valid while the job runs, so Unity must copy the MeshCollider + GraphicRaycaster locking semantics.
 bool GLGizmoSVG::create_volume(ModelVolumeType volume_type, const Vec2d &mouse_pos)
 {
     CreateVolumeParams input = create_input(m_parent, m_raycast_manager, volume_type);
@@ -329,6 +337,8 @@ void GLGizmoSVG::volume_transformation_changed()
     calculate_scale();
 }
 
+// [EVENT] Consolidates the rotation and translation mouse handlers and blocks stale selection hits mid-drag.
+// [STATE] Keeps m_dragging and m_surface_drag synchronized so Unity can match the same GraphicRaycaster/MeshCollider gating via a MonoBehaviour.
 bool GLGizmoSVG::on_mouse(const wxMouseEvent &mouse_event)
 {
     // not selected volume
@@ -359,6 +369,7 @@ bool GLGizmoSVG::on_init()
 
 std::string GLGizmoSVG::on_get_name() const { return _u8L("SVG"); }
 
+// [OPENGL] Renders the rotation handles only when the selected volume still exists and no surface drag is active; Unity needs an overlay camera that mirrors this.
 void GLGizmoSVG::on_render() {
     if (const Selection &selection = m_parent.get_selection(); 
         selection.volumes_count() != 1 || // only one selected volume
@@ -442,6 +453,8 @@ bool reset_button(const IconManager::VIcons &icons)
 
 } // namespace 
 
+// [EVENT] Builds the ImGui toolbar, repositions when DPI/theme shifts, and requests extra frames when the panel moves.
+// [STATE] Tracks m_gui_cfg, m_icons, and the drag preview so Unity can replace the immediate-mode overlay with a UI Toolkit controller.
 void GLGizmoSVG::on_render_input_window(float x, float y, float bottom_limit)
 {
     set_volume_by_selection();
@@ -926,6 +939,7 @@ ExPolygons union_ex(const ExPolygonsWithIds &shapes)
     return union_ex(result);
 }
 
+// [OPENGL] Rasterizes the expolygons and streams the RGBA pixels to a GL texture, requiring Unity to run the same logic on the graphics thread and copy into a Texture2D.
 // init texture by draw expolygons into texture
 bool init_texture(Texture &texture, const ExPolygonsWithIds& shapes_with_ids, unsigned max_size_px, const std::vector<std::string>& shape_warnings){
     BoundingBox bb = get_extents(shapes_with_ids);
@@ -1273,6 +1287,7 @@ void GLGizmoSVG::calculate_scale() {
 float GLGizmoSVG::get_scale_for_tolerance(){ 
     return std::max(m_scale_width.value_or(1.f), m_scale_height.value_or(1.f)); }
 
+// [THREAD] Cancels the previous EmbossJob and queues a new update via start_update_volume, so Unity must mirror the cancellation + JobHandle pattern for slider adjustments.
 bool GLGizmoSVG::process(bool make_snapshot) {
     // no volume is selected -> selection from right panel
     assert(m_volume != nullptr);
@@ -1307,6 +1322,8 @@ void GLGizmoSVG::close()
     reset_volume();
 }
 
+// [INTENT] Drives the SVG configuration panel, exposing the preview, depth/size controls, and action buttons while aligning with gizmo state.
+// [EVENT] Button callbacks trigger process/faceSelected hooks so Unity can marshal these through UI Toolkit commands wired to the MonoBehaviour controller.
 void GLGizmoSVG::draw_window()
 {
     assert(m_volume != nullptr);
@@ -1370,6 +1387,7 @@ void GLGizmoSVG::draw_face_the_camera(){
     }
 }
 
+// [OPENGL] Uploads the SVG preview texture on demand and renders it via ImGui::Image; Unity should replicate this via a RenderTexture/Texture2D + RawImage combo.
 void GLGizmoSVG::draw_preview(){
     // init texture when not initialized yet.
     // drag&drop is out of rendering scope so texture must be created on this place

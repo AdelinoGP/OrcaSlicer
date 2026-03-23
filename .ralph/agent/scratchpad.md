@@ -323,3 +323,7 @@
 ## Iteration plan update
 - Selected task: T354 annotate `src/slic3r/GUI/Gizmos/GLGizmoText.cpp` now that GLGizmoSVG is documented and the manifest entry is active.
 - Plan: annotate the source with `[INTENT]/[STATE]/[EVENT]/[OPENGL]/[THREAD]/[UNITY]/[PORTING_HAZARD]` tags covering toolbar hookups, text rendering cache, selection state, worker cancellation, and Unity mapping (e.g., UI Toolkit `TextField` + `GraphicRaycaster` bridging). After annotating, append the required evidence block to `.ralph/agent/handoff.md`, commit the file, close the task, and return to the next ready Phase 1 item if time remains.
+
+## Iteration update
+- Completed T355 annotate src/slic3r/GUI/Gizmos/GLGizmoText.hpp with multi-tag annotations for intent/state/event/OpenGL/Unity hazards.
+- Next focus: T356 annotate src/slic3r/GUI/GLCanvas3D.cpp to continue Phase 1 AI-guided coverage.

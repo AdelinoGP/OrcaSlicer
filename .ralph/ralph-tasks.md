@@ -273,7 +273,7 @@ Last updated: 2026-03-23T03:20:00Z
 - [x] T352 annotate: src/slic3r/GUI/Gizmos/GLGizmoSVG.cpp
 - [x] T353 annotate: src/slic3r/GUI/Gizmos/GLGizmoSVG.hpp
 - [x] T354 annotate: src/slic3r/GUI/Gizmos/GLGizmoText.cpp
-- [ ] T355 annotate: src/slic3r/GUI/Gizmos/GLGizmoText.hpp
+- [x] T355 annotate: src/slic3r/GUI/Gizmos/GLGizmoText.hpp
 - [ ] T356 annotate: src/slic3r/GUI/GLCanvas3D.cpp
 - [ ] T357 annotate: src/slic3r/GUI/GLCanvas3D.hpp
 - [ ] T358 annotate: src/slic3r/GUI/GLModel.cpp

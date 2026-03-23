@@ -2489,3 +2489,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=2 (font enumeration/GL texture creation and Plater snapshot/volume replacement rely on wx/GDI APIs and undo-aware snapshotting).
 - Git: annotate: src/slic3r/GUI/Gizmos/GLGizmoText.cpp
 - Next recommended Phase 1 task: T355 annotate: src/slic3r/GUI/Gizmos/GLGizmoText.hpp
+
+## Phase 1 - Task T355 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoText.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoText.hpp
+- Substantive additions: 11 inline comments capturing the text gizmo lifecycle across INTENT/STATE/EVENT/OPENGL/UNITY/PORTING_HAZARD dimensions
+- Verification excerpt: // [OPENGL] Rebuild the atlas textures shared by text previews, widget buttons, and final extrusion meshes.
+- Unity-impact summary:
+  - Shadow the font + tooltip dropdown state with ScriptableObjects/TMP_FontAssets to mirror the wx-based catalog.
+  - Mirror the tooltip input window via UI Toolkit VisualElements driven by a TextGizmo MonoBehaviour and GraphicRaycaster.
+  - Keep temporary preview volumes in sync with MeshFilter/MeshCollider pairs so hit tests match the GL-based raycasts.
+- Hazards found: P3=1 (wxString-based localization map is tied to wxWidgets lifetime semantics)
+- Git: annotate: GLGizmoText.hpp
+- Next recommended Phase 1 task: T356 annotate: src/slic3r/GUI/GLCanvas3D.cpp
