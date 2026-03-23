@@ -711,3 +711,6 @@
 ## Iteration plan update
 - Selected task: T670 annotate `src/slic3r/GUI/Widgets/Label.hpp` for this run because it is a compact header that centralizes font/link behavior Unity must reproduce precisely.
 - Plan: confirm the header exists, read it top-to-bottom, insert `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD]` comments describing Label intent, font cache state, mouse/hover handling, layout macros, and any config bindings; note thread/GL dependencies if present, append the Phase 1 evidence block plus Unity impact summary to `.ralph/agent/handoff.md`, stage/commit `Label.hpp` along with handoff metadata, close the task, and then pause so the next agent continues.
+## Iteration plan update
+- Selected task: T417 annotate `src/slic3r/GUI/IMSlider.cpp` (task-1773880086-9900 now active).
+- Plan: read the slider implementation, highlight throttle/value binding, event hookups, OpenGL painting, and config persistence; add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` comments around the custom painting, slider caching, event dispatch, and high-frequency updates, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file plus metadata, mark the task done, then stop this iteration so the next agent can continue.

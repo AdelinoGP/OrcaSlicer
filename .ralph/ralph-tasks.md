@@ -335,7 +335,7 @@ Last updated: 2026-03-23T16:40:00Z
 - [x] T414 annotate: src/slic3r/GUI/ImageGrid.cpp
 - [x] T415 annotate: src/slic3r/GUI/ImGuiWrapper.cpp
 - [x] T416 annotate: src/slic3r/GUI/ImGuiWrapper.hpp
-- [ ] T417 annotate: src/slic3r/GUI/IMSlider.cpp
+- [x] T417 annotate: src/slic3r/GUI/IMSlider.cpp
 - [ ] T418 annotate: src/slic3r/GUI/IMSlider.hpp
 - [ ] T419 annotate: src/slic3r/GUI/IMToolbar.cpp
 - [ ] T420 annotate: src/slic3r/GUI/IMToolbar.hpp

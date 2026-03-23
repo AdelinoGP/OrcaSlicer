@@ -3694,3 +3694,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3 manual wrap measurement helper replicating `wxDC` vs Unity auto-wrapping semantics).
 - Git: annotate: src/slic3r/GUI/Widgets/Label.hpp
 - Next recommended Phase 1 task: T671 annotate: src/slic3r/GUI/Widgets/PopupWindow.cpp
+## Phase 1 - Task T417 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/IMSlider.cpp
+- Deliverables: src/slic3r/GUI/IMSlider.cpp
+- Substantive additions: Added INTENT/STATE/EVENT/OPENGL/UNITY/THREAD/PORTING_HAZARD tags around the slider rendering, tick menu, and dialog input plumbing to document how the ImGui overlay should map to Unity.
+- Verification excerpt: // [OPENGL] Draws custom groove, handles, and floating label through direct ImGui DrawList calls so the slider blends with the ORCA theme.
+- Unity-impact summary:
+  - Documented horizontal/vertical slider flows, tick overlays, and colored band rendering for UI Toolkit RangeSlider + VisualElement overlays.
+  - Highlighted custom G-code modal, jump-to-layer dialog, and context menus so Unity can provide equivalent menu popups and notifications.
+- Hazards found: P3 (main-thread texture loading, ImGui focus/window names, modifier-aware wheel handling, custom popup focus).
+- Git: Annotate IMSlider slider logic for Unity port
+- Next recommended Phase 1 task: T418 annotate: src/slic3r/GUI/IMSlider.hpp
