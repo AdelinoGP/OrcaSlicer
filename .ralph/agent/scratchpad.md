@@ -348,6 +348,10 @@
 - Plan: read the selection rectangle implementation, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around drag lifecycle, point containment, and render path; note viewport transforms, shader selection, and GL state toggles plus Unity equivalents (UI overlay camera + LineRenderer), append the required evidence block to `.ralph/agent/handoff.md`, commit the updated file, close the task, and then pause for the next iteration.
 ## Iteration plan update
 - Selected task: T361 annotate `src/slic3r/GUI/GLSelectionRectangle.hpp` (runtime task `task-1773880086-6dd1` now active).
+
+## Iteration plan update
+- Selected task: T363 annotate `src/slic3r/GUI/GLShader.hpp` to capture shader program intent/state/render bindings for the Unity migration.
+- Plan: mark the task active, read the header, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around the shader lifecycle, caches, binding helpers, and uniform setters; append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the file, close the task, and then pick the next ready Phase 1 file.
 - Plan: read the header thoroughly, document the UI representation of the selection drag rectangle, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around the class purpose, cached states (anchor, current lod rect), event hooks (mouse update, capture), render helpers (OpenGL buffer setup), Unity equivalents (Overlay Canvas + LineRenderer or GL line mesh + Input System), append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only this file, mark the task done, and then pause for the next iteration.
 
 ## Iteration plan update

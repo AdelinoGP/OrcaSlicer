@@ -4,6 +4,7 @@
 #include <array>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "libslic3r/Point.hpp"
 
@@ -11,6 +12,10 @@ namespace Slic3r {
 
 class ColorRGB;
 class ColorRGBA;
+
+// [INTENT] Encapsulate a single OpenGL shader program so renderers can bind it via a stable API.
+// [UNITY] Map to a Unity `Shader`/`Material` pair with `ShaderVariantCollection` to mirror per-pass permutations.
+// [PORTING_HAZARD:P2] Relies on legacy GL program binding; Unity needs explicit per-camera material setup.
 
 class GLShaderProgram
 {
@@ -32,7 +37,9 @@ public:
 private:
     std::string m_name;
     unsigned int m_id{ 0 };
+    // [STATE] Cache of attribute lookups to avoid repeated `glGetAttribLocation` during frame rendering.
     std::vector<std::pair<std::string, int>> m_attrib_location_cache;
+    // [STATE] Cache of uniform locations so render workers can set properties without querying GL every time.
     std::vector<std::pair<std::string, int>> m_uniform_location_cache;
 
 public:
@@ -44,9 +51,13 @@ public:
     const std::string& get_name() const { return m_name; }
     unsigned int get_id() const { return m_id; }
 
+    // [EVENT] Called around each render batch to bind/unbind this program on the GL context thread.
+    // [THREAD] Must run on the OpenGL owner thread that created `m_id` to avoid context violations.
     void start_using() const;
     void stop_using() const;
 
+    // [OPENGL] Helpers that resolve uniform locations once before delegating to setter overloads.
+    // [UNITY] Bridge to `Shader.PropertyToID` + `Material.Set*` in Unity so property hashing happens once per shader.
     void set_uniform(const char* name, int value) const { set_uniform(get_uniform_location(name), value); }
     void set_uniform(const char* name, bool value) const { set_uniform(get_uniform_location(name), value); }
     void set_uniform(const char* name, float value) const { set_uniform(get_uniform_location(name), value); }
@@ -97,9 +108,8 @@ public:
     void set_uniform(int id, const ColorRGB& value) const;
     void set_uniform(int id, const ColorRGBA& value) const;
 
-    // returns -1 if not found
+    // [OPENGL] Query helpers that can fail (return -1) when a shader lacks the symbol, so callers regretfully skip the draw.
     int get_attrib_location(const char* name) const;
-    // returns -1 if not found
     int get_uniform_location(const char* name) const;
 };
 

@@ -2611,4 +2611,17 @@ This prompt governs **Phase 1 only**.
   - Mirror attribute/uniform caching with `MaterialPropertyBlock` lookups and `Shader.PropertyToID` so Unity render loops avoid repeated string-based queries.
 - Hazards found: P2=1 (resources_dir + StreamingAssets path/define ordering), P3=1 (runtime stage creation/linking differs from Unity import pipeline)
 - Git: Annotate GLShader program for Unity port
-- Next recommended Phase 1 task: T363 annotate: src/slic3r/GUI/GLShader.hpp
+- Next recommended Phase 1 task: T364 annotate: src/slic3r/GUI/GLShadersManager.cpp
+
+## Phase 1 - Task T363 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GLShader.hpp
+- Deliverables: src/slic3r/GUI/GLShader.hpp
+- Substantive additions: Added intent/state/event/thread/OpenGL/Unity/porting hazard annotations for the shader cache and uniform binding helpers.
+- Verification excerpt: // [EVENT] Called around each render batch to bind/unbind this program on the GL context thread.
+- Unity-impact summary:
+  - GLShader maps to a Unity `Shader`/`Material` pair so material variants can mirror OGLE program permutations.
+  - Uniform caches should instead reuse `Shader.PropertyToID` + material `Set*` calls, and binding must happen on the render thread.
+- Hazards found: 1 (PORTING_HAZARD:P2)
+- Git: document: annotate GLShader program intent for Unity port
+- Next recommended Phase 1 task: T364 annotate: src/slic3r/GUI/GLShadersManager.cpp
