@@ -3225,6 +3225,19 @@ This prompt governs **Phase 1 only**.
 - Git: annotate: src/slic3r/GUI/GUI_ObjectSettings.hpp
 - Next recommended Phase 1 task: T392 annotate: src/slic3r/GUI/GUI_ObjectTable.cpp
 
+## Phase 1 - Task T168 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BBLStatusBarBind.hpp
+- Deliverables: src/slic3r/GUI/BBLStatusBarBind.hpp
+- Substantive additions: 9 multi-tag annotations covering intent, gauge/cancel state, Unity mapping, threading/yield, and hazard notes.
+- Verification excerpt: // [INTENT] Bridge the BBL job runner/progress instrumentation to the status bar UI that Plater/Monitor panels own.
+- Unity-impact summary:
+  - Mirror the gauge/labels using a UI Toolkit VisualElement panel (ProgressBar + Label + cancel Button) bound to a shared ScriptableObject status model.
+  - Replace the Perl cancel callbacks with a single `CancellationTokenSource` that Unity buttons and job controllers can share.
+- Hazards found: 2 (P2=1 for MSW DPI rescale, P3=1 for the wxPanel ownership cheat).
+- Git: annotate: src/slic3r/GUI/BBLStatusBarBind.hpp
+- Next recommended Phase 1 task: T169 annotate: src/slic3r/GUI/BBLStatusBar.cpp
+
 ## Phase 1 - Task T396 complete
 - Task type: annotate
 - File: src/slic3r/GUI/GUI_Preview.cpp

@@ -351,6 +351,10 @@
 
 ## Iteration plan update
 - Selected task: T359 annotate `src/slic3r/GUI/GLModel.hpp` now that the implementation prioritized the viewport metadata.
+
+## Current iteration plan
+- Selected task: T168 annotate `src/slic3r/GUI/BBLStatusBarBind.hpp` (needs multi-tag hints for the status bar bridge between the job system and the BBL overlay).
+- Plan: create the runtime task (gui:T168) since it is missing, start it once ready, read the header to capture intent/state/event/user input flow, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P3]` comments, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header, close T168, and then stop after the single atomic task for this iteration.
 - Plan: mark the runtime task active, read the entire header, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments on the class description, key members (camera matrices, render cache, selection state), and public APIs; add Unity-port hints (e.g., `RenderTexture` ownership, `XR Interaction Toolkit` analogs), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the header, close the task, and then stop for this iteration so the next agent can pick up.
 
 - New plan: start task T353 annotate `src/slic3r/GUI/Gizmos/GLGizmoSVG.hpp`, read the header, insert the full `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations for the class and helpers, append the Phase 1 evidence block, and commit before moving on.
