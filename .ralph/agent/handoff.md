@@ -3131,3 +3131,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (raw ModelObject pointer), P3=1 (msw_rescale DPI logic tied to wx)
 - Git: docs: annotate ObjectLayers header
 - Next recommended Phase 1 task: T388 annotate: src/slic3r/GUI/GUI_ObjectList.cpp
+
+## Phase 1 - Task T394 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectTableSettings.cpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectTableSettings.cpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md, .ralph/agent/scratchpad.md
+- Substantive additions: 20 targeted annotations covering the dynamic option panel rebuild, reset column helpers, config diff tracking, and Unity port guidance (INTENT/STATE/EVENT/THREAD/OPENGL/UNITY/PORTING_HAZARD).
+- Verification excerpt: // [INTENT] Rebuild the right-side settings tree whenever the table selection changes, tracking the edited preset vs the base config so Unity can show diffs.
+- Unity-impact summary:
+  - Document the `ScalableButton` reset column as a UI Toolkit `ListView` row button wired to a ScriptableObject diff so the Unity table can reset overrides without bespoke macros.
+  - Highlight that `wxGetApp().obj_list()->changed_object()` drives viewport updates, so the Unity preview camera must requery the selection when the diff map changes.
+  - Explain the ConfigManipulation toggles/visibility helpers so Unity can replicate the filtered option logic while keeping VisualElement lifetimes aligned with the table state.
+- Hazards found: P2=2 (global `wxGetApp().plater()` + synchronous `Freeze/Thaw` assumptions), P3=1 (macOS `EVT_LOCK` bitmap dance needs replacement).
+- Git: annotate: src/slic3r/GUI/GUI_ObjectTableSettings.cpp
+- Next recommended Phase 1 task: T395 annotate: src/slic3r/GUI/GUI_ObjectTableSettings.hpp

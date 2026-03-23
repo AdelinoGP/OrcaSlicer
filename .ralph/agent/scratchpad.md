@@ -529,3 +529,7 @@
 ## Iteration update
 - Completed `T393 annotate: src/slic3r/GUI/GUI_ObjectTable.hpp` by adding multi-tag notes across cell renderers/editors, the ObjectGridTable model, the panel, and the dialog plus corresponding Unity/hazard guidance; appended the Phase 1 evidence block and handed off to T394.
 - Next up: pick `T394 annotate: src/slic3r/GUI/GUI_ObjectTableSettings.cpp` after verifying runtime readiness.
+
+## Iteration plan update
+- Selected task: T394 annotate `src/slic3r/GUI/GUI_ObjectTableSettings.cpp` (runtime task `task-1773880086-7731`).
+- Plan: start the task, add the required multi-tag annotations around the reset buttons, config group builder, visibility toggles, and config propagation loops; highlight Unity equivalents (UI Toolkit settings panel, ScriptableObject-backed `ModelConfig`) and any porting hazards (wx event capture, manual `Freeze/Thaw`, macOS lock events); append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the file, update `.ralph/ralph-tasks.md`, and close the task before stopping for this iteration.

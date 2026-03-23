@@ -25,61 +25,60 @@ namespace GUI
 wxDEFINE_EVENT(EVT_LOCK_DISABLE, wxCommandEvent);
 wxDEFINE_EVENT(EVT_LOCK_ENABLE, wxCommandEvent);
 
+// [PORTING_HAZARD:P3] macOS needs fake lock events to swap bitmap states, so Unity must drive interactable toggles instead of posting
+// custom wx events.
 
-OTG_Settings::OTG_Settings(wxWindow* parent, const bool staticbox) :
-    m_parent(parent)
+OTG_Settings::OTG_Settings(wxWindow* parent, const bool staticbox) : m_parent(parent)
 {
+    // [INTENT] Wrap the dynamic group used for per-object settings so the table can toggle visibility without rebuilding the entire sizer
+    // tree. [STATE] `m_og` keeps the shared ConfigOptionsGroup pointer and its sizer, which is shown/hidden based on the current selection.
     wxString title = ""; // temporary workaround - #ys_FIXME
-    m_og = std::make_shared<ConfigOptionsGroup>(parent, title, (DynamicPrintConfig*)nullptr, true);
+    m_og           = std::make_shared<ConfigOptionsGroup>(parent, title, (DynamicPrintConfig*) nullptr, true);
 }
 
 bool OTG_Settings::IsShown()
 {
+    // [STATE] The sizer query ensures the cached ConfigOptionsGroup is still part of the layout before attempting to re-show its content.
     return m_og->sizer->IsEmpty() ? false : m_og->sizer->IsShown(size_t(0));
 }
 
-void OTG_Settings::Show(const bool show)
-{
-    m_og->Show(show);
-}
+void OTG_Settings::Show(const bool show) { m_og->Show(show); }
 
-void OTG_Settings::Hide()
-{
-    Show(false);
-}
+void OTG_Settings::Hide() { Show(false); }
 
 void OTG_Settings::UpdateAndShow(const bool show)
 {
     Show(show);
-//    m_parent->Layout();
+    //    m_parent->Layout();
 }
 
-wxSizer* OTG_Settings::get_sizer()
+wxSizer* OTG_Settings::get_sizer() { return m_og->sizer; }
+
+ObjectTableSettings::ObjectTableSettings(wxWindow* parent, ObjectGridTable* table) : OTG_Settings(parent, true), m_table(table)
 {
-    return m_og->sizer;
-}
-
-
-
-ObjectTableSettings::ObjectTableSettings(wxWindow* parent, ObjectGridTable* table) :
-    OTG_Settings(parent, true), m_table(table)
-{
+    // [INTENT] Keep the shared OTG_Settings tree activated so the object table can reuse the same sizer root for every selection.
+    // [STATE] `m_settings_list_sizer` gathers the `ConfigOptionsGroup` widgets while the three bitmap variants define hover/focus/disabled
+    // states for the reset buttons.
     m_og->activate();
-    //m_og->set_name(_(L("Per-Object Settings")));    
+    // m_og->set_name(_(L("Per-Object Settings")));
 
     m_settings_list_sizer = new wxBoxSizer(wxVERTICAL);
     m_og->sizer->Add(m_settings_list_sizer, 1, wxEXPAND | wxLEFT, 5);
 
-    m_bmp_reset = ScalableBitmap(parent, "lock_normal");
+    m_bmp_reset       = ScalableBitmap(parent, "lock_normal");
     m_bmp_reset_focus = ScalableBitmap(parent, "lock_normal");
-    //TODO, adjust later
+    // TODO, adjust later
     m_bmp_reset_disable = ScalableBitmap(parent, "dot");
 }
 
-bool ObjectTableSettings::update_settings_list(bool is_object, bool is_multiple_selection, ModelObject* object, ModelConfig* config, const std::string& category)
+bool ObjectTableSettings::update_settings_list(
+    bool is_object, bool is_multiple_selection, ModelObject* object, ModelConfig* config, const std::string& category)
 {
+    // [INTENT] Rebuild the right-side settings tree whenever the table selection changes, tracking the edited preset vs the base config so
+    // Unity can show diffs. [STATE] `m_current_config`/`m_origin_config` pair retain the last applied values to drive reset visibility and
+    // `m_different_map` tracking.
     std::string group_category;
-    int different_count = 0;
+    int         different_count = 0;
 
     m_settings_list_sizer->Clear(true);
     m_og_settings.resize(0);
@@ -88,27 +87,31 @@ bool ObjectTableSettings::update_settings_list(bool is_object, bool is_multiple_
     if (!config || is_multiple_selection || !object)
         return false;
 
-    const auto printer_technology   = wxGetApp().plater()->printer_technology();
+    const auto printer_technology = wxGetApp().plater()->printer_technology();
+    // [STATE] `printer_technology` gates whether the `DynamicPrintConfig` snapshot derives from FFF or SLA presets, so Unity must read the
+    // correct `PrinterProfile` before showing toggles. [PORTING_HAZARD:P2] The current code relies on the `wxGetApp().plater()` singleton;
+    // Unity needs an explicit `PrinterManager` service rather than globals.
 
     // update config values according to configuration hierarchy
-    m_current_config   = printer_technology == ptFFF ?
-                                        wxGetApp().preset_bundle->prints.get_edited_preset().config :
-                                        wxGetApp().preset_bundle->sla_prints.get_edited_preset().config;
+    m_current_config = printer_technology == ptFFF ? wxGetApp().preset_bundle->prints.get_edited_preset().config :
+                                                     wxGetApp().preset_bundle->sla_prints.get_edited_preset().config;
 
-    //ConfigManipulation config_manipulation(load_config, toggle_field, nullptr, config);
+    // ConfigManipulation config_manipulation(load_config, toggle_field, nullptr, config);
 
-    if (!is_object)
-    {
+    if (!is_object) {
+        // [STATE] Combine the object's stored overrides into the working config before we diff against the current presets.
         m_current_config.apply(object->config.get(), true);
     }
 
+    // [STATE] Snapshot the origin before applying the row config so `m_current_config` only tracks user edits per cell.
     m_origin_config = m_current_config;
     m_current_config.apply(config->get(), true);
 
-    //SettingsFactory::Bundle cat_options = SettingsFactory::get_bundle(&config->get(), is_object);
+    // SettingsFactory::Bundle cat_options = SettingsFactory::get_bundle(&config->get(), is_object);
     std::map<std::string, std::vector<SimpleSettingData>> cat_options;
-    std::vector<SimpleSettingData> category_settings = SettingsFactory::get_visible_options(category, !is_object);
-    bool display_multiple = false;
+    std::vector<SimpleSettingData>                        category_settings = SettingsFactory::get_visible_options(category, !is_object);
+    bool                                                  display_multiple  = false;
+    // [UNCLEAR] `display_multiple` seems intended to signal that fallback options were shown, but the flag is unused downstream.
     auto is_option_modified = [this](std::string key) {
         ConfigOption* config_option1 = m_origin_config.option(key);
         ConfigOption* config_option2 = m_current_config.option(key);
@@ -120,25 +123,23 @@ bool ObjectTableSettings::update_settings_list(bool is_object, bool is_multiple_
         return false;
     };
 
-    //get the category and settings
+    // get the category and settings
     if (category_settings.size() == 0) {
-        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << "can not find settings for category " <<category <<", display all the modified settings instead!!!" << std::endl;
-        //return false;
-        cat_options = SettingsFactory::get_all_visible_options(!is_object);
+        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << "can not find settings for category " << category
+                                << ", display all the modified settings instead!!!" << std::endl;
+        // return false;
+        cat_options                                                         = SettingsFactory::get_all_visible_options(!is_object);
         std::map<std::string, std::vector<SimpleSettingData>>::iterator it1 = cat_options.begin();
 
-        while (it1 != cat_options.end())
-        {
-            std::vector<SimpleSettingData>& settings = it1->second;
-            std::vector<SimpleSettingData>::iterator it2 = settings.begin();
+        while (it1 != cat_options.end()) {
+            std::vector<SimpleSettingData>&          settings = it1->second;
+            std::vector<SimpleSettingData>::iterator it2      = settings.begin();
 
-            while ( it2 != settings.end() )
-            {
+            while (it2 != settings.end()) {
                 if (!is_option_modified(it2->name)) {
                     it2 = settings.erase(it2);
-                }
-                else {
-                    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(" category %1% , keep option %2%")%it1->first % it2->name;
+                } else {
+                    BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(" category %1% , keep option %2%") % it1->first % it2->name;
                     it2++;
                 }
             }
@@ -148,52 +149,59 @@ bool ObjectTableSettings::update_settings_list(bool is_object, bool is_multiple_
                 it1 = cat_options.erase(it1);
         }
         display_multiple = true;
-    }
-    else {
+    } else {
         cat_options.emplace(category, category_settings);
     }
     std::vector<std::string> categories;
     categories.reserve(cat_options.size());
 
-    for (auto& cat : cat_options)
-    {
+    for (auto& cat : cat_options) {
         categories.push_back(cat.first);
         group_category = cat.first;
 
-        auto extra_column = [this, is_object, object, config, group_category](wxWindow* parent, const Line& line)
-        {
-            auto opt_key = (line.get_options())[0].opt_id;  //we assume that we have one option per line
+        // [INTENT] Inject a reset button into each line so the user can clear overrides without leaving the table view.
+        // [UNITY] In UI Toolkit the analogous pattern would be a `ListView` row containing a `Button` wired to a `UnityAction` resetting
+        // the bound ScriptableObject property.
+        auto extra_column = [this, is_object, object, config, group_category](wxWindow* parent, const Line& line) {
+            auto opt_key = (line.get_options())[0].opt_id; // we assume that we have one option per line
 
             auto btn = new ScalableButton(parent, wxID_ANY, m_bmp_reset);
+            // [STATE] Each reset button stores the bitmap templates so hover/disabled states resolve without reloading the cache.
             btn->SetToolTip(_(L("Reset parameter")));
 
-            #ifdef __WINDOWS__
+#ifdef __WINDOWS__
             btn->SetBackgroundColour(parent->GetBackgroundColour());
-            #endif // DEBUG
+#endif // DEBUG
 
-            
             btn->SetBitmapFocus(m_bmp_reset_focus.bmp());
             btn->SetBitmapHover(m_bmp_reset_focus.bmp());
 
-            #ifdef __WINDOWS__
+#ifdef __WINDOWS__
             btn->SetBitmapDisabled(m_bmp_reset_disable.bmp());
-            #endif
-            
-            #ifdef __WXOSX_MAC__
-            btn->Bind(EVT_LOCK_DISABLE, [this, btn](auto &e) { btn->SetBitmap(m_bmp_reset_disable.bmp()); });
-            btn->Bind(EVT_LOCK_ENABLE, [this, btn](auto &e) { btn->SetBitmap(m_bmp_reset_focus.bmp()); });
-            #endif
+#endif
 
-            btn->Bind(wxEVT_BUTTON, [btn, opt_key, this, is_object, object, config, group_category](wxEvent &event) {
-                //wxGetApp().plater()->take_snapshot(from_u8((boost::format(_utf8(L("Reset Option %s"))) % opt_key).str()));
+#ifdef __WXOSX_MAC__
+            btn->Bind(EVT_LOCK_DISABLE, [this, btn](auto& e) { btn->SetBitmap(m_bmp_reset_disable.bmp()); });
+            btn->Bind(EVT_LOCK_ENABLE, [this, btn](auto& e) { btn->SetBitmap(m_bmp_reset_focus.bmp()); });
+#endif
+
+            btn->Bind(wxEVT_BUTTON, [btn, opt_key, this, is_object, object, config, group_category](wxEvent& event) {
+                // [EVENT] Clearing an override fires the config update path and tells the object list to redraw, which cascades into the
+                // OpenGL preview. [OPENGL] `changed_object()` triggers the viewport renderer to refresh selection highlights. [UNITY] In
+                // Unity this would be a `Button` `onClick` that calls a `Command` updating the ScriptableObject and `EventBus` for the
+                // preview camera. [THREAD] The Freeze/Thaw pair below keeps the UI thread stable while the tree rebuilds; the Unity
+                // equivalent should batch layout updates on the main thread.
+                // wxGetApp().plater()->take_snapshot(from_u8((boost::format(_utf8(L("Reset Option %s"))) % opt_key).str()));
                 config->erase(opt_key);
-                //btn->Hide();
+                // btn->Hide();
                 wxGetApp().obj_list()->changed_object();
                 /*wxTheApp->CallAfter([this, is_object, object, config, category]() {
                     wxWindowUpdateLocker noUpdates(m_parent);
-                    update_settings_list(is_object, false, object, config, category); 
+                    update_settings_list(is_object, false, object, config, category);
                 });*/
                 this->m_parent->Freeze();
+                // [PORTING_HAZARD:P2] Synchronous `Freeze/Thaw` calls assume immediate UI-thread execution; Unity should defer layout
+                // rebuilds through the main dispatch loop.
                 /* Check overriden options list after deleting.
                  * Some options couldn't be deleted because of another one.
                  * Like, we couldn't delete fill pattern, if fill density is set to 100%
@@ -203,13 +211,15 @@ bool ObjectTableSettings::update_settings_list(bool is_object, bool is_multiple_
                 update_config_values(is_object, object, config, group_category);
                 this->m_parent->Thaw();
 
-                #ifdef __WXOSX_MAC__
+#ifdef __WXOSX_MAC__
                 if (!btn->IsEnabled()) {
                     btn->SetBitmap(m_bmp_reset_disable.bmp());
                 } else {
                     btn->SetBitmap(m_bmp_reset_focus.bmp());
                 }
-                #endif
+// [PORTING_HAZARD:P3] macOS relies on manual bitmap swaps via custom `EVT_LOCK` posts, which Unity cannot mimic; use `Button.interactable`
+// drives and keyframe sprites instead.
+#endif
             });
             (const_cast<Line&>(line)).extra_widget_win = btn;
             return btn;
@@ -221,31 +231,34 @@ bool ObjectTableSettings::update_settings_list(bool is_object, bool is_multiple_
         optgroup->set_config_category_and_type(GUI::from_u8(group_category), Preset::TYPE_PRINT);
 
         std::weak_ptr<ConfigOptionsGroup> weak_optgroup(optgroup);
-        optgroup->m_on_change = [this, is_object, object, config, group_category](const t_config_option_key &opt_id, const boost::any &value) {
-                                    this->m_parent->Freeze();
-                                    this->update_config_values(is_object, object, config, group_category);
-                                    wxGetApp().obj_list()->changed_object();
-                                    this->m_parent->Thaw();
-                                    //update_extra_column_visible_status(optgroup.get(), cat.second, config);
-                                };
+        optgroup->m_on_change = [this, is_object, object, config, group_category](const t_config_option_key& opt_id,
+                                                                                  const boost::any&          value) {
+            // [EVENT] Field edits lock the layout, recalc diffs, and refresh the object list so the GL preview stays current.
+            // [THREAD] The explicit Freeze/Thaw blocks keep the UI thread from redrawing mid-update; Unity should queue layout passes on
+            // the main thread.
+            this->m_parent->Freeze();
+            this->update_config_values(is_object, object, config, group_category);
+            wxGetApp().obj_list()->changed_object();
+            this->m_parent->Thaw();
+            // update_extra_column_visible_status(optgroup.get(), cat.second, config);
+        };
 
         // call back for rescaling of the extracolumn control
         optgroup->rescale_extra_column_item = [this](wxWindow* win) {
-            auto *ctrl = dynamic_cast<ScalableButton*>(win);
+            auto* ctrl = dynamic_cast<ScalableButton*>(win);
             if (ctrl == nullptr)
                 return;
             ctrl->SetBitmap_(m_bmp_reset);
-            ctrl->SetBitmapFocus(m_bmp_reset_focus.bmp()); 
+            ctrl->SetBitmapFocus(m_bmp_reset_focus.bmp());
             ctrl->SetBitmapHover(m_bmp_reset_focus.bmp());
-            #ifdef __WINDOWS__  
+#ifdef __WINDOWS__
             ctrl->SetBitmapDisabled(m_bmp_reset_disable.bmp());
-            #endif
+#endif
         };
 
         const bool is_extruders_cat = cat.first == "Extruders";
-        for (auto& opt : cat.second)
-        {
-            Option option = optgroup->get_option(opt.name);
+        for (auto& opt : cat.second) {
+            Option option    = optgroup->get_option(opt.name);
             option.opt.width = Field::def_width_wider(); // ORCA match parameter box width
             if (is_extruders_cat)
                 option.opt.max = wxGetApp().extruders_edited_cnt();
@@ -267,6 +280,7 @@ bool ObjectTableSettings::update_settings_list(bool is_object, bool is_multiple_
 
         optgroup->reload_config();
         different_count = update_extra_column_visible_status(optgroup.get(), cat.second, config);
+        // [STATE] `different_count` tracks rows with overrides so the `reset all` button and icons stay in sync with the dirty map.
         m_current_different += different_count;
         if (different_count > 0)
             m_different_map[group_category] = different_count;
@@ -284,30 +298,33 @@ bool ObjectTableSettings::update_settings_list(bool is_object, bool is_multiple_
         m_settings_list_sizer->Add(optgroup->sizer, 0, wxEXPAND | wxALL, 0);
         m_og_settings.push_back(optgroup);
 
-        auto toggle_field = [this, optgroup](const t_config_option_key & opt_key, bool toggle, int opt_index)
-        {
-            Field* field = optgroup->get_fieldc(opt_key, opt_index);;
+        auto toggle_field = [this, optgroup](const t_config_option_key& opt_key, bool toggle, int opt_index) {
+            Field* field = optgroup->get_fieldc(opt_key, opt_index);
+            ;
             if (field)
                 field->toggle(toggle);
         };
-        auto toggle_line = [this, optgroup](const t_config_option_key &opt_key, bool toggle, int opt_index)
-        {
+        auto toggle_line = [this, optgroup](const t_config_option_key& opt_key, bool toggle, int opt_index) {
             Line* line = optgroup->get_line(opt_key);
-            if (line) line->toggle_visible = toggle;
+            if (line)
+                line->toggle_visible = toggle;
         };
+        // [STATE] The ConfigManipulation hook enables hiding/disabling dependent fields; Unity needs an equivalent rule engine to replicate
+        // filtered options. [PORTING_HAZARD:P3] The toggle helpers assume synchronous UI updates and direct wx control access.
         ConfigManipulation config_manipulation(nullptr, toggle_field, toggle_line, nullptr, &m_current_config);
 
         bool is_BBL_printer = wxGetApp().preset_bundle->is_bbl_vendor();
         config_manipulation.set_is_BBL_Printer(is_BBL_printer);
 
-        printer_technology == ptFFF  ?  config_manipulation.toggle_print_fff_options(&m_current_config) :
-                                        config_manipulation.toggle_print_sla_options(&m_current_config) ;
+        printer_technology == ptFFF ? config_manipulation.toggle_print_fff_options(&m_current_config) :
+                                      config_manipulation.toggle_print_sla_options(&m_current_config);
         optgroup->update_visibility(wxGetApp().get_mode());
     }
 
-    //if (!categories.empty()) {
-    //    update_config_values(is_object, object, config, category);
-    //}
+    // if (!categories.empty()) {
+    //     update_config_values(is_object, object, config, category);
+    // }
+    // [STATE] Track the aggregate dirty count so the `Reset All` button matches Unity's `Clear` action availability.
     if (m_current_different > 0)
         m_table->enable_reset_all_button(true);
     else
@@ -318,11 +335,10 @@ bool ObjectTableSettings::update_settings_list(bool is_object, bool is_multiple_
 
 bool ObjectTableSettings::add_missed_options(ModelConfig* config_to, const DynamicPrintConfig& config_from)
 {
+    // [INTENT] Backfill missing SLA preference keys when the printer insists on dependent defaults so the Unity port keeps presets consistent.
     bool is_added = false;
-    if (wxGetApp().plater()->printer_technology() == ptFFF)
-    {
-        if (config_to->has("sparse_infill_density") && !config_to->has("sparse_infill_pattern"))
-        {
+    if (wxGetApp().plater()->printer_technology() == ptFFF) {
+        if (config_to->has("sparse_infill_density") && !config_to->has("sparse_infill_pattern")) {
             if (config_from.option<ConfigOptionPercent>("sparse_infill_density")->value == 100) {
                 config_to->set_key_value("sparse_infill_pattern", config_from.option("sparse_infill_pattern")->clone());
                 is_added = true;
@@ -333,33 +349,36 @@ bool ObjectTableSettings::add_missed_options(ModelConfig* config_to, const Dynam
     return is_added;
 }
 
-int ObjectTableSettings::update_extra_column_visible_status(ConfigOptionsGroup* option_group, const std::vector<SimpleSettingData>& option_keys, ModelConfig* config)
+int ObjectTableSettings::update_extra_column_visible_status(ConfigOptionsGroup*                   option_group,
+                                                            const std::vector<SimpleSettingData>& option_keys,
+                                                            ModelConfig*                          config)
 {
+    // [INTENT] Turn the extra reset column on/off so the UI reflects which options the user has overridden.
+    // [UNITY] Unity would drive the extra button's `interactable` and tooltip via `ListView` row bindings to a `ScriptableObject` diff map.
     int count = 0;
 
-    for (auto& opt : option_keys)
-    {
-        auto line = option_group->get_line(opt.name);
-        Field* field = option_group->get_fieldc(opt.name, -1);
-        wxWindow *reset_window = field?field->getWindow():nullptr;
+    for (auto& opt : option_keys) {
+        auto      line         = option_group->get_line(opt.name);
+        Field*    field        = option_group->get_fieldc(opt.name, -1);
+        wxWindow* reset_window = field ? field->getWindow() : nullptr;
         if (line) {
-            if ((config->has(opt.name)) && reset_window&&reset_window->IsEnabled()) {
+            if ((config->has(opt.name)) && reset_window && reset_window->IsEnabled()) {
                 line->extra_widget_win->Enable();
 
-                #ifdef __WXOSX_MAC__
+#ifdef __WXOSX_MAC__
                 wxCommandEvent event(EVT_LOCK_ENABLE);
                 event.SetEventObject(line->extra_widget_win);
                 wxPostEvent(line->extra_widget_win, event);
-                #endif
+#endif
 
                 count++;
             } else {
                 line->extra_widget_win->Disable();
-                #ifdef __WXOSX_MAC__
+#ifdef __WXOSX_MAC__
                 wxCommandEvent event(EVT_LOCK_DISABLE);
                 event.SetEventObject(line->extra_widget_win);
                 wxPostEvent(line->extra_widget_win, event);
-                #endif
+#endif
             }
         }
     }
@@ -371,18 +390,18 @@ int ObjectTableSettings::update_extra_column_visible_status(ConfigOptionsGroup* 
 
 void ObjectTableSettings::update_config_values(bool is_object, ModelObject* object, ModelConfig* config, const std::string& category)
 {
-    int different_count = 0;
-    const auto printer_technology   = wxGetApp().plater()->printer_technology();
+    // [INTENT] Spread the updated config returned from the option controls back into the table and object presets.
+    // [STATE] `different_count` resets each call so we can recompute overrides per category.
+    int        different_count    = 0;
+    const auto printer_technology = wxGetApp().plater()->printer_technology();
 
     if (!object || !config)
         return;
 
     // update config values according to configuration hierarchy
-    DynamicPrintConfig  &main_config   = m_current_config;
+    DynamicPrintConfig& main_config = m_current_config;
 
-
-    auto toggle_field = [this](const t_config_option_key & opt_key, bool toggle, int opt_index)
-    {
+    auto toggle_field = [this](const t_config_option_key& opt_key, bool toggle, int opt_index) {
         Field* field = nullptr;
         for (auto og : m_og_settings) {
             field = og->get_fieldc(opt_key, opt_index);
@@ -392,10 +411,13 @@ void ObjectTableSettings::update_config_values(bool is_object, ModelObject* obje
         if (field)
             field->toggle(toggle);
     };
-    auto toggle_line = [this](const t_config_option_key &opt_key, bool toggle, int opt_index) {
+    auto toggle_line = [this](const t_config_option_key& opt_key, bool toggle, int opt_index) {
         for (auto og : m_og_settings) {
-            Line *line = og->get_line(opt_key);
-            if (line) { line->toggle_visible = toggle; break; }
+            Line* line = og->get_line(opt_key);
+            if (line) {
+                line->toggle_visible = toggle;
+                break;
+            }
         }
     };
 
@@ -403,21 +425,24 @@ void ObjectTableSettings::update_config_values(bool is_object, ModelObject* obje
 
     config_manipulation.set_is_BBL_Printer(wxGetApp().preset_bundle->is_bbl_vendor());
 
-    printer_technology == ptFFF  ?  config_manipulation.update_print_fff_config(&main_config) :
-                                    config_manipulation.update_print_sla_config(&main_config) ;
+    printer_technology == ptFFF ? config_manipulation.update_print_fff_config(&main_config) :
+                                  config_manipulation.update_print_sla_config(&main_config);
 
-    printer_technology == ptFFF  ?  config_manipulation.toggle_print_fff_options(&main_config) :
-                                    config_manipulation.toggle_print_sla_options(&main_config) ;
+    printer_technology == ptFFF ? config_manipulation.toggle_print_fff_options(&main_config) :
+                                  config_manipulation.toggle_print_sla_options(&main_config);
     for (auto og : m_og_settings) {
+        // [STATE] Visibility toggles align the option groups with the selected `ObjectGridTable` mode (e.g., `Prepare` vs `Preview`).
+        // [UNITY] Unity needs to mirror this with `VisualElement` `style.display` switches or `AddToClassList` updates.
         og->update_visibility(wxGetApp().get_mode());
     }
+    // [THREAD] Layout/Fit calls must happen on the UI thread because they mutate wx geometry; Unity must do the same on the main loop.
     m_parent->Layout();
     m_parent->Fit();
     m_parent->GetParent()->Layout();
     t_config_option_keys diff_keys;
-    for (const t_config_option_key &opt_key : main_config.keys()) {
-        const ConfigOption *this_opt  = main_config.option(opt_key);
-        const ConfigOption *other_opt = m_origin_config.option(opt_key);
+    for (const t_config_option_key& opt_key : main_config.keys()) {
+        const ConfigOption* this_opt  = main_config.option(opt_key);
+        const ConfigOption* other_opt = m_origin_config.option(opt_key);
         if (this_opt != nullptr && (other_opt == nullptr || *this_opt != *other_opt))
             diff_keys.emplace_back(opt_key);
     }
@@ -427,20 +452,18 @@ void ObjectTableSettings::update_config_values(bool is_object, ModelObject* obje
     config->apply_only(main_config, diff_keys, true);
     // Initialize UI components with the config values.
     std::vector<SimpleSettingData> category_settings = SettingsFactory::get_visible_options(category, !is_object);
-    std::string current_category;
-    for (auto og : m_og_settings)
-    {
+    std::string                    current_category;
+    for (auto og : m_og_settings) {
         current_category = GUI::into_u8(og->config_category());
         og->reload_config();
         if (category == ObjectGridTable::category_all) {
             category_settings = SettingsFactory::get_visible_options(current_category, !is_object);
-            different_count = update_extra_column_visible_status(og.get(), category_settings, config);
+            different_count   = update_extra_column_visible_status(og.get(), category_settings, config);
             if (different_count > 0)
                 m_different_map[current_category] = different_count;
             else
                 m_different_map.erase(current_category);
-        }
-        else if (category == current_category){
+        } else if (category == current_category) {
             different_count = update_extra_column_visible_status(og.get(), category_settings, config);
             if (different_count > 0)
                 m_different_map[current_category] = different_count;
@@ -453,35 +476,44 @@ void ObjectTableSettings::update_config_values(bool is_object, ModelObject* obje
     else
         m_table->enable_reset_all_button(false);
 
-    //update the table and volume settings
+    // [OPENGL] Calling `reload_cell_data` ensures the table change propagates to the viewport renderers via their row-change hooks.
+    // update the table and volume settings
     m_table->reload_cell_data(m_current_row, category);
 }
 
-void ObjectTableSettings::UpdateAndShow(int row, const bool show, bool is_object, bool is_multiple_selection, ModelObject* object, ModelConfig* config, const std::string& category)
+void ObjectTableSettings::UpdateAndShow(int                row,
+                                        const bool         show,
+                                        bool               is_object,
+                                        bool               is_multiple_selection,
+                                        ModelObject*       object,
+                                        ModelConfig*       config,
+                                        const std::string& category)
 {
-    m_current_row = row;
-    m_current_category = category;
+    // [EVENT] Triggered by the table selection change so the settings pane shows the right row.
+    // [STATE] Reset per-row caches before repopulating.
+    m_current_row       = row;
+    m_current_category  = category;
     m_current_different = 0;
     m_different_map.clear();
-    //OTG_Settings::UpdateAndShow(show ? update_settings_list(is_object, is_multiple_selection, object, config, category) : false);
+    // OTG_Settings::UpdateAndShow(show ? update_settings_list(is_object, is_multiple_selection, object, config, category) : false);
     if (show) {
         update_settings_list(is_object, is_multiple_selection, object, config, category);
-    }
-    else
+    } else
         OTG_Settings::UpdateAndShow(false);
 }
 
-void ObjectTableSettings::ValueChanged(int row, bool is_object,  ModelObject* object, ModelConfig* config, const std::string& category, const std::string& key)
+void ObjectTableSettings::ValueChanged(
+    int row, bool is_object, ModelObject* object, ModelConfig* config, const std::string& category, const std::string& key)
 {
-    if ((row != m_current_row)
-        || ((category != m_current_category) && (m_current_category != ObjectGridTable::category_all)))
+    // [EVENT] Propagated from the table row when a single cell mutates, so we keep `m_current_config` aligned with the `ModelConfig`.
+    // [STATE] This function relies on the cached `m_current_row`/`m_current_category` before updating diff keys.
+    if ((row != m_current_row) || ((category != m_current_category) && (m_current_category != ObjectGridTable::category_all)))
         return;
 
-    ConfigOption *my_opt = m_current_config.option(key, true);
+    ConfigOption* my_opt = m_current_config.option(key, true);
     if (config->has(key)) {
         my_opt->set(config->option(key));
-    }
-    else {
+    } else {
         ConfigOption* config_option = m_origin_config.option(key);
         if (config_option)
             my_opt->set(config_option);
@@ -491,36 +523,33 @@ void ObjectTableSettings::ValueChanged(int row, bool is_object,  ModelObject* ob
     update_config_values(is_object, object, config, category);
 }
 
-void  ObjectTableSettings::resetAllValues(int row, bool is_object, ModelObject* object, ModelConfig* config, const std::string& category)
+void ObjectTableSettings::resetAllValues(int row, bool is_object, ModelObject* object, ModelConfig* config, const std::string& category)
 {
+    // [INTENT] Clear per-row overrides so the user can drop back to preset defaults without reloading the table.
     if ((row != m_current_row) || (category != m_current_category))
         return;
 
     if (category == ObjectGridTable::category_all) {
         std::map<std::string, std::vector<SimpleSettingData>> cat_options;
 
-        //get the category and settings
-        cat_options = SettingsFactory::get_all_visible_options(!is_object);
+        // get the category and settings
+        cat_options                                                         = SettingsFactory::get_all_visible_options(!is_object);
         std::map<std::string, std::vector<SimpleSettingData>>::iterator it1 = cat_options.begin();
 
-        while (it1 != cat_options.end())
-        {
-            std::vector<SimpleSettingData>& settings = it1->second;
-            std::vector<SimpleSettingData>::iterator it2 = settings.begin();
+        while (it1 != cat_options.end()) {
+            std::vector<SimpleSettingData>&          settings = it1->second;
+            std::vector<SimpleSettingData>::iterator it2      = settings.begin();
 
-            while ( it2 != settings.end() )
-            {
+            while (it2 != settings.end()) {
                 config->erase(it2->name);
                 it2++;
             }
             it1++;
         }
-    }
-    else {
+    } else {
         // Initialize UI components with the config values.
         std::vector<SimpleSettingData> category_settings = SettingsFactory::get_visible_options(category, !is_object);
-        for (auto& opt : category_settings)
-        {
+        for (auto& opt : category_settings) {
             config->erase(opt.name);
         }
     }
@@ -531,10 +560,10 @@ void  ObjectTableSettings::resetAllValues(int row, bool is_object, ModelObject* 
 
 void ObjectTableSettings::msw_rescale()
 {
+    // [INTENT] DPI-rescale each ConfigOptionsGroup so the canvas stays crisp on high-dpi monitors; Unity should call this when the scale changes.
     for (auto group : m_og_settings)
         group->msw_rescale();
 }
 
 } //namespace GUI
-} //namespace Slic3r 
-
+} //namespace Slic3r
