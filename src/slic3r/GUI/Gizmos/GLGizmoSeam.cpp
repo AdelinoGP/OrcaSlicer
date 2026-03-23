@@ -18,6 +18,8 @@ namespace Slic3r::GUI {
 
 
 
+// [EVENT][INTENT] Executed when the gizmo lifecycle shuts down so the parent viewport can re-show any objects hidden while painting seams.
+// [STATE] This routine also restores the visibility flag toggled at activation.
 void GLGizmoSeam::on_shutdown()
 {
     m_parent.toggle_model_objects_visibility(true);
@@ -29,6 +31,8 @@ bool GLGizmoSeam::on_init()
 {
     m_shortcut_key = WXK_CONTROL_P;
 
+    // [EVENT][INTENT][STATE] Shortcut and tooltip metadata live in `m_desc` so the toolbar reflects the active painter state.
+    // [UNITY] Mirror these strings into ScriptableObject-backed UI data tied to InputSystem actions.
     // FIXME: maybe should be using GUI::shortkey_ctrl_prefix() or equivalent?
     const wxString ctrl  = _L("Ctrl+");
     // FIXME: maybe should be using GUI::shortkey_alt_prefix() or equivalent?
@@ -54,6 +58,7 @@ bool GLGizmoSeam::on_init()
     return true;
 }
 
+// [INTENT] Keep the circle brush as the default so downstream Unity controllers can rely on a deterministic initial tool.
 GLGizmoSeam::GLGizmoSeam(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoPainterBase(parent, icon_filename, sprite_id), m_current_tool(ImGui::CircleButtonIcon)
 {
@@ -68,6 +73,8 @@ std::string GLGizmoSeam::on_get_name() const
 
 
 
+// [OPENGL][INTENT] Render seam strokes each frame while managing blend/depth state before compositing the cursor.
+// [UNITY] Translate to a RenderTexture overlay camera using Graphics.DrawMesh for triangles and a MonoBehaviour cursor.
 void GLGizmoSeam::render_painter_gizmo()
 {
     const Selection& selection = m_parent.get_selection();
@@ -85,6 +92,7 @@ void GLGizmoSeam::render_painter_gizmo()
 }
 
 // BBS
+// [EVENT][STATE] Keyboard shortcuts keep `m_current_tool` aligned with the sphere/circle glyphs so toolbar input stays consistent.
 bool GLGizmoSeam::on_key_down_select_tool_type(int keyCode) {
     switch (keyCode)
     {
@@ -101,6 +109,8 @@ bool GLGizmoSeam::on_key_down_select_tool_type(int keyCode) {
     return true;
 }
 
+// [EVENT][INTENT] Build the ImGui tooltip shown on hover; scales for DPI so icons stay sharp.
+// [UNITY] Replace with a UI Toolkit tooltip VisualElement that reads from the same `m_desc` map and anchors to the cursor.
 void GLGizmoSeam::show_tooltip_information(float caption_max, float x, float y)
 {
     ImTextureID normal_id = m_parent.get_gizmos_manager().get_icon_texture_id(GLGizmosManager::MENU_ICON_NAME::IC_TOOLBAR_TOOLTIP);
@@ -132,6 +142,7 @@ void GLGizmoSeam::show_tooltip_information(float caption_max, float x, float y)
     ImGui::PopStyleVar(2);
 }
 
+// [STATE] Switching between gap-fill and paint modes toggles TriangleSelectorPatch filters.
 void GLGizmoSeam::tool_changed(wchar_t old_tool, wchar_t new_tool)
 {
     if ((old_tool == ImGui::GapFillIcon && new_tool == ImGui::GapFillIcon) ||
@@ -144,6 +155,8 @@ void GLGizmoSeam::tool_changed(wchar_t old_tool, wchar_t new_tool)
     }
 }
 
+// [INTENT][EVENT] Build the ImGui modal that adjusts seam brush size, clipping, cursor, and erasing tools.
+// [UNITY] Represent this panel as a UI Toolkit VisualElement bound to a MonoBehaviour seam controller.
 void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
 {
     if (! m_c->selection_info()->model_object())
@@ -157,6 +170,7 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
 #else
     GizmoImguiSetNextWIndowPos(x, y, ImGuiCond_Always, 1.0f, 0.0f);
 #endif
+    // [UNCLEAR] The toolbar anchor arguments appear to toggle the window edge depending on the flag.
     //m_imgui->set_next_window_pos(x, y, ImGuiCond_Always);
 
     wchar_t old_tool = m_current_tool;
@@ -264,6 +278,7 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
     }
     else {
         if (m_imgui->button(m_desc.at("reset_direction"))) {
+            // [EVENT][THREAD] Resetting the clip plane is a wx operation so we marshal it with CallAfter.
             wxGetApp().CallAfter([this](){
                     m_c->object_clipper()->set_position_by_ratio(-1., false);
                 });
@@ -274,6 +289,7 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
     ImGui::SameLine(sliders_left_width);
 
     ImGui::PushItemWidth(sliders_width);
+    // [EVENT][PORTING_HAZARD:P3] Unity must mirror this slider to keep the clipping plane state in sync.
     bool slider_clp_dist = m_imgui->bbl_slider_float_style("##clp_dist", &clp_dist, 0.f, 1.f, "%.2f", 1.0f, true);
 
     ImGui::SameLine(drag_left_width);
@@ -282,6 +298,7 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
     if (slider_clp_dist || b_clp_dist_input) { m_c->object_clipper()->set_position_by_ratio(clp_dist, true); }
 
     ImGui::Separator();
+    // [STATE] The vertical checkbox gates whether selections stay restricted to vertical facets.
     m_imgui->bbl_checkbox(_L("Vertical"), m_vertical_only);
 
     ImGui::Separator();
@@ -295,6 +312,7 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
 
     ImGui::SameLine();
 
+    // [EVENT][INTENT] "Remove all" clears selectors and records a GizmoAction snapshot for undo history.
     if (m_imgui->button(m_desc.at("remove_all"))) {
         Plater::TakeSnapshot snapshot(wxGetApp().plater(), "Reset selection", UndoRedo::SnapshotType::GizmoAction);
         ModelObject         *mo  = m_c->selection_info()->model_object();
@@ -317,6 +335,7 @@ void GLGizmoSeam::on_render_input_window(float x, float y, float bottom_limit)
 }
 
 // BBS
+// [THREAD][INTENT] Persist the mesh whenever the painter deactivates so seam edits survive beyond the gizmo lifecycle.
 void GLGizmoSeam::on_set_state()
 {
     GLGizmoPainterBase::on_set_state();
@@ -328,6 +347,7 @@ void GLGizmoSeam::on_set_state()
 }
 
 //BBS: remove const
+// [INTENT][STATE] Commit triangle selector edits back into the model volumes so the UI and undo state stay accurate.
 void GLGizmoSeam::update_model_object()
 {
     bool updated = false;
@@ -343,12 +363,15 @@ void GLGizmoSeam::update_model_object()
     if (updated) {
         const ModelObjectPtrs& mos = wxGetApp().model().objects;
         wxGetApp().obj_list()->update_info_items(std::find(mos.begin(), mos.end(), mo) - mos.begin());
+        // [THREAD] Signal the canvas to rerun background rendering so selector highlights stay in sync.
         m_parent.post_event(SimpleEvent(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS));
     }
 }
 
 
 //BBS: add logic to distinguish the first_time_update and later_update
+// [INTENT][STATE] Rehydrate triangle selectors from the volumes' seam_facets so color/selection mapping stays intact.
+// [PORTING_HAZARD:P2] The loop assumes volume ordering matches selectors; Unity must preserve that alignment or add metadata.
 void GLGizmoSeam::update_from_model_object(bool first_update)
 {
     wxBusyCursor wait;
@@ -378,11 +401,13 @@ void GLGizmoSeam::update_from_model_object(bool first_update)
 }
 
 
+// [INTENT] This identifies the seam painter so the manager can dispatch brush-specific logic.
 PainterGizmoType GLGizmoSeam::get_painter_type() const
 {
     return PainterGizmoType::SEAM;
 }
 
+// [EVENT] Build descriptive undo labels depending on shift and mouse buttons so history captures the action.
 wxString GLGizmoSeam::handle_snapshot_action_name(bool shift_down, GLGizmoPainterBase::Button button_down) const
 {
     wxString action_name;

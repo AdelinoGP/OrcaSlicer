@@ -2328,3 +2328,29 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P2: direct GL depth state toggles in `render_cut` routines)
 - Git: Annotate GLGizmosCommon for Unity port
 - Next recommended Phase 1 task: T342 annotate: src/slic3r/GUI/Gizmos/GLGizmosCommon.hpp
+
+## Phase 1 - Task T343 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoSeam.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoSeam.cpp
+- Substantive additions: ~22 targeted `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments describing startup/teardown, render hooks, input flows, and Unity mappings for seam painting.
+- Verification excerpt: // [OPENGL][INTENT] Render seam strokes each frame while managing blend/depth state before compositing the cursor.
+- Unity-impact summary:
+  - map tooltip metadata and shortcut strings into a ScriptableObject + InputSystem pairing so Unity receives the same captions and hotkeys.
+  - convert the ImGui brush panel to a UI Toolkit VisualElement overlay tied to a RenderTexture camera so cursor size, clipper slider, and removal actions are captured by the GraphicRaycaster.
+- Hazards found: P2=1 (selector ordering during `update_from_model_object`), P3=1 (slider mutates shared wx clipper state directly).
+- Git: pending (T343 annotate: GLGizmoSeam.cpp)
+- Next recommended Phase 1 task: T344 annotate: src/slic3r/GUI/Gizmos/GLGizmoSeam.hpp
+
+## Phase 1 - Task T344 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoSeam.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoSeam.hpp; .ralph/agent/scratchpad.md; .ralph/ralph-tasks.md; .ralph/agent/handoff.md
+- Substantive additions: 11 targeted annotations covering INTENT, STATE, EVENT, OPENGL, UNITY, and PORTING_HAZARD hints
+- Verification excerpt: // [INTENT] Host the seam-editing painter, wiring wxWidgets + OpenGL controls to the seam brush state machine inherited from GLGizmoPainterBase.
+- Unity-impact summary:
+  - Treat this gizmo as a SeamPainterController MonoBehaviour that draws the brush overlay on a RenderTexture via Graphics.DrawMesh and dispatches InputSystem actions for pointer + keyboard combos.
+  - Mirror the tooltip/localization cache with a ScriptableObject-backed caption map so UI Toolkit panels can refresh when locale or tool type changes.
+- Hazards found: 1 (P2 caching translations requires explicit refresh when locale toggles)
+- Git: annotate: src/slic3r/GUI/Gizmos/GLGizmoSeam.hpp
+- Next recommended Phase 1 task: T345 annotate: src/slic3r/GUI/Gizmos/GLGizmos.hpp

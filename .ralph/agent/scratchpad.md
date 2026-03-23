@@ -301,3 +301,6 @@
 ## Iteration plan update
 - Selected task: T340 annotate `src/slic3r/GUI/Gizmos/GLGizmoScale.hpp` (task-1773880086-870e now active).
 - Plan: review the header, annotate class intent, cached matrices, axis/operation state, event wiring, OpenGL data members, Unity mapping (AABB handles + GraphicRaycaster), and porting hazards via `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]`; append the mandatory evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file, close the task, and then stop so the next agent can continue.
+- 2026-03-22: plan to annotate `src/slic3r/GUI/Gizmos/GLGizmoSeam.cpp` next. Steps: confirm task state, read current file, document intent/state/events/render/thread/Unity concerns, record handoff evidence, commit.
+- 2026-03-22: Annotated `src/slic3r/GUI/Gizmos/GLGizmoSeam.cpp` (GL state, event flow, and Unity mapping notes); next focus is `T344: GLGizmoSeam.hpp`.
+- 2026-03-22: Starting `T344: GLGizmoSeam.hpp` -- read header, collect rendering and event hooks, note Unity mappings, capture handoff details, prepare annotation stub.
