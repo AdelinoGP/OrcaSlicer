@@ -551,3 +551,10 @@
 - Plan: start the runtime task, parse the full `3DScene.cpp` to capture initialization, camera/view updates, state caches, selection management, event handlers, GL rendering hooks, and hazards; insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around constructors, update loops, interaction helpers, and worker crossovers; append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit `3DScene.cpp`, close the task, and then stop for this iteration so the next agent continues.
 ## Iteration update
 - Finalized T145 annotate `src/slic3r/GUI/3DScene.cpp` by adding multi-tag comments around the portal constants, GLVolume/SinkingContours lifecycle, render pass, extrusion geometry builder, and extrusion entity conversions; recorded the evidence block and queued the next Phase 1 suggestion in the handoff before closing the runtime task.
+
+## Iteration plan update
+- Observed: `T372 annotate: src/slic3r/GUI/GUI_AuxiliaryList.cpp` inadvertently activated; canceled and will let the original owner pick it up.
+- New plan: `T389 annotate: src/slic3r/GUI/GUI_ObjectList.hpp` is the current target—read the header thoroughly, sprinkle `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments covering the list lifecycle, selection caching, drag/drop events, column layout, GL refresh triggers, and settings sync; append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file, close the task, and pause for the next iteration.
+
+## Iteration update
+- Completed `T389 annotate: src/slic3r/GUI/GUI_ObjectList.hpp` with event/state/thread/OpenGL/Unity callouts for selection, clipboard commands, drag/drop, loader threading, transform resets, and column caching; recorded the evidence block and lined up `T392` as the next ready file.

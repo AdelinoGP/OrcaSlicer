@@ -3186,3 +3186,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (global `GUI::wxGetApp()` shader/framebuffer assumptions must be untangled before Unity can render the same pass).
 - Git: annotate: src/slic3r/GUI/3DScene.cpp (GLVolume lifecycle notes)
 - Next recommended Phase 1 task: T152 annotate: src/slic3r/GUI/AMSMaterialsSetting.hpp
+
+## Phase 1 - Task T389 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectList.hpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectList.hpp
+- Substantive additions: 6 multi-tag callouts covering selection events, clipboard commands, import threading, drag/drop flow, instance-transform resets, and column-layout caching for Unity.
+- Verification excerpt: // [EVENT] Called when the wxDataView selection changes so the list can refresh cached `ObjectVolumeID`s and raise selection events.
+- Unity-impact summary:
+  - Mirror the selection-change handler with UI Toolkit `ListView.onSelectionChanged` plus a dedicated selection controller that feeds manipulators.
+  - Surface clipboard, command, and drag operations through Unity's `InputAction`/`CommandPalette` pipeline while keeping the `ObservableCollection` indexes aligned.
+  - Treat instance-transformation resets and column width caching as shared state so controller-managed UI layouts stay in sync with camera gizmos.
+- Hazards found: P3=1 (copy/undo commands rely on wxDataView internal indices so Unity must safeguard selection caches before mutating the model).
+- Git: annotate: src/slic3r/GUI/GUI_ObjectList.hpp
+- Next recommended Phase 1 task: T392 annotate: src/slic3r/GUI/GUI_ObjectTable.cpp

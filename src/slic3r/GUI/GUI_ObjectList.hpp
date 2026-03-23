@@ -303,15 +303,22 @@ public:
     // [OPENGL] Called during pointer motion to show mesh warnings on the GL canvas; Unity needs to drive tooltips with `PointerEventData`
     // over the viewport.
 
+    // [EVENT] Called when the wxDataView selection changes so the list can refresh cached `ObjectVolumeID`s and raise selection events.
+    // [UNITY] Map this to `ListView.onSelectionChanged` + selection controller that pushes updates to the manipulator model.
     void selection_changed();
+    // [EVENT] Mouse/context menu entry point so the list can show operations for the hovered row.
+    // [UNITY] Mirror this through a UI Toolkit `VisualElement` context menu service that logs the hit point.
     void show_context_menu(const bool evt_context_menu);
+    // [EVENT] Triggered when the extruder-edit fields grab focus; Unity should bind these to `PopupField`/`FloatField` edit events.
     void extruder_editing();
 #ifndef __WXOSX__
     void key_event(wxKeyEvent& event);
 #endif /* __WXOSX__ */
 
     // [EVENT] Clipboard/manipulation commands invoked by toolbar buttons or menu actions; Unity should expose them through a
-    // `CommandPalette` or `InputAction` set.
+    // `CommandPalette` or `InputAction` set and make sure they marshal to the main thread.
+    // [PORTING_HAZARD:P3] `wxDataViewCtrl` copies/undo reuse internal row indices; Unity must keep the selection cache in sync when
+    // commands mutate the `ObservableCollection`.
     void copy();
     void paste();
     void cut();
@@ -330,6 +337,9 @@ public:
     void show_settings(const wxDataViewItem settings_item);
     bool is_instance_or_object_selected();
 
+    // [THREAD] Sub-object imports can block on file parsing; Unity should run this via `Task.Run` and queue the UI update on the main
+    // thread dispatcher. [UNITY] Consider wrapping the logic in a `ScriptableObject` loader that yields to `MainThreadDispatcher` before
+    // mutating the VisualElement tree.
     void load_subobject(ModelVolumeType type, bool from_galery = false);
     // ! ysFIXME - delete commented code after testing and rename "load_modifier" to something common
     // void                load_part(ModelObject& model_object, std::vector<ModelVolume*>& added_volumes, ModelVolumeType type, bool
@@ -545,6 +555,7 @@ private:
     // BBS
     void update_name_column_width() const;
 
+    // [EVENT] Drag-and-drop lifecycle: begin, evaluate, drop; Unity should replicate via `DragAndDrop` callbacks on a `ListView` node.
     void OnBeginDrag(wxDataViewEvent& event);
     void OnDropPossible(wxDataViewEvent& event);
     void OnDrop(wxDataViewEvent& event);
@@ -556,9 +567,11 @@ private:
     void OnEditingStarted(wxDataViewEvent& event);
     void OnEditingDone(wxDataViewEvent& event);
 
-    // apply the instance transform to all volumes and reset instance transform except the offset
+    // [INTENT] Apply the instance transform to every nested volume so the list stays consistent, then reset the per-instance offsets.
+    // [UNITY] Mirror this with a `Transform` hierarchy update (parented `GameObject`s) and an ECS/Job System task if using DOTS.
     void apply_object_instance_transfrom_to_all_volumes(ModelObject* model_object, bool need_update_assemble_matrix = true);
 
+    // [STATE] Persisted column widths and last control size avoid reflow storms; Unity should mirror this cache in its layout controller.
     std::vector<int> m_columns_width;
     wxSize           m_last_size;
 };
