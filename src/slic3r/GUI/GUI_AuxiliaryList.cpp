@@ -105,6 +105,7 @@ AuxiliaryList::AuxiliaryList(wxWindow* parent)
 
 AuxiliaryList::~AuxiliaryList()
 {
+	// [STATE][THREAD] Disassociate the model and clean it up on the UI thread so bound controls never reference freed data.
 	this->AssociateModel(nullptr);
 	delete m_auxiliary_model;
 }
@@ -115,6 +116,7 @@ void AuxiliaryList::init_auxiliary()
 	std::string aux_path = encode_path(model.get_auxiliary_file_temp_path().c_str());
 	m_auxiliary_model->Init(aux_path);
 	// [STATE] Model initialization pulls from the Plater auxiliary temp path so Unity needs to mirror that shared path before exposing tree entries.
+	// [UNITY] Expose the same temp directory (e.g., via a ScriptableObject path provider) before Unity's tree populates so both views share the same source.
 }
 
 void AuxiliaryList::reload(wxString aux_path)
@@ -127,10 +129,12 @@ void AuxiliaryList::reload(wxString aux_path)
 		Expand(item);
 	}
 	// [STATE] Keep every node expanded right after reload so the UI reflects imports or deletions without manual expansion.
+	// [UNITY] Mirror this refresh pattern in Unity by expanding the TreeView entries immediately so the list matches user expectations.
 }
 
 void AuxiliaryList::create_new_folder()
 {
+	// [INTENT][UNITY] Drive inline folder creation so Unity's controller can call this helper for toolbar/context "New Folder" actions.
 	wxDataViewItem folder_item = m_auxiliary_model->CreateFolder(wxEmptyString);
 	AuxiliaryModelNode* folder = (AuxiliaryModelNode*)folder_item.GetID();
 	if (folder == nullptr)
@@ -170,11 +174,12 @@ void AuxiliaryList::do_import_file(AuxiliaryModelNode* folder)
 			}
 		}
 	}
-	// [EVENT][THREAD] File dialogs block the UI thread; Unity must surface native file pickers and then call back into this helper on the main thread.
+	// [EVENT][THREAD][UNITY] File dialogs block the UI thread; Unity must surface native file pickers and marshal the selection back to this helper.
 }
 
 void AuxiliaryList::on_create_folder(wxCommandEvent& evt)
 {
+	// [EVENT] Toolbar/context buttons route here so Unity can reuse this entry point for the same verbs.
 	create_new_folder();
 }
 
@@ -195,12 +200,13 @@ void AuxiliaryList::on_import_file(wxCommandEvent& evt)
 	}
 
 	do_import_file(folder_node);
-	// [EVENT] Centralize the import workflow so Unity's controller can reuse this entry point when wiring toolbar buttons.
+	// [EVENT][UNITY] Centralize the import workflow so Unity's controller can reuse this entry point when wiring toolbar buttons or menu actions.
 }
 
 void AuxiliaryList::on_delete(wxCommandEvent& evt)
 {
 	m_auxiliary_model->Delete(this->GetSelection());
+	// [EVENT][STATE][UNITY] Deletes always funnel through this helper so Unity can tie toolbar buttons and hotkeys to the same state change.
 }
 
 void AuxiliaryList::on_context_menu(wxDataViewEvent& evt)
@@ -250,7 +256,7 @@ void AuxiliaryList::on_context_menu(wxDataViewEvent& evt)
 	}
 
 	PopupMenu(menu);
-	// [INTENT] Keep context menus aligned with toolbar verbs so Unity can reuse the same helper methods for right-click overlays.
+	// [INTENT][UNITY] Keep context menus aligned with toolbar verbs so Unity can reuse the same helper methods for right-click overlays.
 }
 
 void AuxiliaryList::on_begin_drag(wxDataViewEvent& evt)
@@ -266,13 +272,13 @@ void AuxiliaryList::on_begin_drag(wxDataViewEvent& evt)
 	obj->SetText("Some text");
 	evt.SetDataObject(obj);
 	evt.SetDragFlags(wxDrag_DefaultMove);
-	// [STATE] Record the dragged item so the drop handler can resolve the source even if the mouse moves outside the tree.
+	// [STATE][UNITY] Record the dragged item so the drop handler can resolve the source even if the mouse moves outside the tree and so Unity's DragAndDrop layer can track the origin.
 }
 
 void AuxiliaryList::on_drop_possible(wxDataViewEvent& evt)
 {
 	evt.Allow();
-	// [EVENT] Always allow drops so Unity can highlight targets prior to commits.
+	// [EVENT][UNITY] Always allow drops so Unity can highlight targets prior to commits and keep the drop hint overlay in sync.
 }
 
 void AuxiliaryList::on_drop(wxDataViewEvent& evt)
@@ -282,11 +288,12 @@ void AuxiliaryList::on_drop(wxDataViewEvent& evt)
 	Expand(evt.GetItem());
 	Select(m_dragged_item);
 	m_dragged_item = wxDataViewItem(nullptr);
-	// [STATE] Clear the drag sentinel once the move completes so future drops start fresh.
+	// [STATE][UNITY] Clear the drag sentinel once the move completes so future drops start fresh and Unity's DragAndDrop state resets.
 }
 
 void AuxiliaryList::on_editing_started(wxDataViewEvent& evt)
 {
+	// [EVENT] Placeholder hook for edit-start notifications so Unity can show inline text fields when renaming begins.
 }
 
 void AuxiliaryList::on_editing_done(wxDataViewEvent& evt)
@@ -294,6 +301,7 @@ void AuxiliaryList::on_editing_done(wxDataViewEvent& evt)
 	bool is_done = m_auxiliary_model->Rename(evt.GetItem(), evt.GetValue().GetString());
 	if (!is_done)
 		evt.Veto();
+	// [STATE][UNITY] Accept or veto rename results to keep the UI tree synchronized; Unity should surface validation feedback before closing a text field.
 }
 
 void AuxiliaryList::on_left_dclick(wxMouseEvent& evt)
@@ -307,11 +315,11 @@ void AuxiliaryList::on_left_dclick(wxMouseEvent& evt)
 		evt.Skip();
 	}
 }
-// [EVENT][PORTING_HAZARD:P3] Double-click launching relies on native shells; Unity should use a cross-platform helper (Process.Start or Application.OpenURL).
+// [EVENT][PORTING_HAZARD:P3] Double-click launching relies on native shells; Unity should use a cross-platform helper (Process.Start or Application.OpenURL) on the main thread.
 
 void AuxiliaryList::handle_key_event(wxKeyEvent& evt)
 {
 	if (evt.GetKeyCode() == WXK_DELETE || evt.GetKeyCode() == WXK_BACK)
 		m_auxiliary_model->Delete(this->GetSelection());
-	// [EVENT][STATE] Keyboard delete/backspace mirrors the toolbar Delete button so Unity can wire the same hotkeys into this helper.
+	// [EVENT][STATE][UNITY] Keyboard delete/backspace mirrors the toolbar Delete button so Unity can wire the same hotkeys into this helper via the Input System command map.
 }

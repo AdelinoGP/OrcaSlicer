@@ -2830,3 +2830,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3: `wxVariant`/`wxDataView` virtualization requires manual type conversion inside Unity)
 - Git: Annotate AMS tray list model
 - Next recommended Phase 1 task: T156 annotate: src/slic3r/GUI/AMSSetting.cpp
+
+## Phase 1 - Task T372 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Deliverables: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Substantive additions: 11 multi-tag annotations tying cleanup, reload, import/delete, drag/drop, and hotkey flows to Unity equivalents and state consistency.
+- Verification excerpt: // [STATE][UNITY] Record the dragged item so the drop handler can resolve the source even if the mouse moves outside the tree and so Unity's DragAndDrop layer can track the origin.
+- Unity-impact summary:
+  - Mirror the auxiliary temp directory path via a shared ScriptableObject before populating the Unity tree so both sides see the same folder.
+  - Reuse the import/delete helpers for toolbar/context actions and the Input System command map so Unity buttons invoke the same workflow.
+  - Map the drag/drop+keyboard handlers to Unity's DragAndDrop/Pointer system so the overlay resets and highlights match the native list state.
+- Hazards found: 1 (P3 double-click launching relies on native shell helpers).
+- Git: Annotate GUI auxiliary list for Unity guidance
+- Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp
+
