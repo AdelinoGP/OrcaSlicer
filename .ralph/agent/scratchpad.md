@@ -435,5 +435,9 @@
 - Selected task: T372 annotate: src/slic3r/GUI/GUI_AuxiliaryList.cpp (runtime task task-1773880086-6aa6 is active).
 - Plan: read the source thoroughly, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations at class/method boundaries covering list state, event wiring, caching, render helpers, and Unity equivalents, append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the file, close the task, and then pause for the next iteration.
 
-## Iteration note
-- Attempted to target T383, but `task-1773880086-6aa6` remained tied to T372; picking up T372 as the active work item.
+## Iteration update
+- Wrap-up: Added `[STATE]`, `[EVENT]`, `[OPENGL]`, and `[THREAD]` detail to `src/slic3r/GUI/GUI_Geometry.cpp` so the empty translation unit documents why it exists for the Unity port, and no other logic is needed. The file is now ready for handoff.
+
+## Iteration plan update
+- Selected task: T381 annotate: src/slic3r/GUI/GUI_Geometry.cpp (task-1773880086-3b67)
+- Plan: Confirm the TU already contains the necessary intent/state/event tags, expand the comment block to mention GL and thread mapping, update `.ralph/agent/handoff.md` with the evidence block, stage/commit the metadata, and close the task before moving to the next Phase 1 item.

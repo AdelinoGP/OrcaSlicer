@@ -2858,3 +2858,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3 double-click launch reliance on native shells).
 - Git: Document auxiliary list event signals
 - Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp
+
+## Phase 1 - Task T381 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Geometry.cpp
+- Deliverables: src/slic3r/GUI/GUI_Geometry.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md
+- Substantive additions: Expanded the singleton comment block so it now documents state, event, OpenGL, and thread context for the header-only geometry helpers.
+- Verification excerpt: // [STATE] There is no runtime state held here; every helper stores its own cache wherever it is instantiated, so this TU simply forces the inline definitions to compile into the GUI binary.
+- Unity-impact summary:
+  - Reinforce that Unity should keep the geometry helpers in a static C# module that is referenced by the GUI assembly so the header-only logic is not stripped.
+  - Note that these helpers execute on the UI thread and feed geometry caches consumed by the GL viewport, so Unity should call them from the main thread before updating meshes.
+- Hazards found: 1 (P3: header-only helpers may be dropped by the managed build if no direct reference exists)
+- Git: Annotate GUI geometry translation unit
+- Next recommended Phase 1 task: T382 annotate: src/slic3r/GUI/GUI_Geometry.hpp
