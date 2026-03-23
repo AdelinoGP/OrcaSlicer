@@ -572,3 +572,7 @@
 ## Iteration plan update
 - Selected task: T401 annotate `src/slic3r/GUI/HintNotification.hpp` (task-1773880086-1cb9 now active).
 - Plan: read the header to capture hint lifecycle structures, config-backed text data, and platform-facing helpers; sprinkle `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2]` tags through the reader/writer mix, fade timer logic, UI notifier class, and external process calls; note hazards around `ImGuiRenderer` expectations and html launching, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the header plus handoff metadata, mark the task done, and stop so the next iteration picks the following file.
+
+## Iteration plan update
+- Selected task: T402 annotate `src/slic3r/GUI/HMS.cpp`.
+- Plan: start `task-1773880086-330c`, read `HMS.cpp` end-to-end, annotate the frame lifecycle, stateful HTML/http data, event hooks, thread interactions, and Unity analogs (e.g., UI Toolkit panel + HttpClient automation); insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments at key sections, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file plus handoff, mark the task done, and then pause for the next task selection.

@@ -3049,6 +3049,19 @@ This prompt governs **Phase 1 only**.
 - Git: annotate: src/slic3r/GUI/GUI_ObjectSettings.cpp
 - Next recommended Phase 1 task: T391 annotate: src/slic3r/GUI/GUI_ObjectSettings.hpp
 
+## Phase 1 - Task T402 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HMS.cpp
+- Deliverables: src/slic3r/GUI/HMS.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: Added multi-tag documentation covering HMS config gating, HTTP downloads, schema-sensitive caching, and Unity mapping notes for the message/query helpers.
+- Verification excerpt: // [INTENT] Synchronize remote HMS info/action bundles with local JSON caches so UI helpers can read device-specific messages offline.
+- Unity-impact summary:
+  - Documented the AppConfig/stealth guards plus Http completion/error wiring so Unity can re-implement the checks via UnityWebRequest and a ScriptableObject HMSService.
+  - Captured the local copy/save/load flow along with language/query helpers so Unity can seed persistent JSON under Application.persistentDataPath and keep caches aligned with dev_id prefixes.
+- Hazards found: P2=2 (wxGetApp singleton + reliance on `Slic3r::Http`/JSON schema), P3=1 (hard-coded dev_id prefix mapping)
+- Git: annotate: src/slic3r/GUI/HMS.cpp
+- Next recommended Phase 1 task: T403 annotate: src/slic3r/GUI/HMS.hpp
+
 ## Phase 1 - Task T391 complete
 - Task type: annotate
 - File: src/slic3r/GUI/GUI_ObjectSettings.hpp
