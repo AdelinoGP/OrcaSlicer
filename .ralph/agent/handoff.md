@@ -3745,3 +3745,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 (P2 main-thread DPI dispatch, P3 per-monitor scaling mismatch)
 - Git: annotate: AuxiliaryDialog.hpp
 - Next recommended Phase 1 task: T162 annotate: src/slic3r/GUI/Auxiliary.hpp
+## Phase 1 - Task T420 complete
+- Task type: annotate
+- File: src/slic3r/GUI/IMToolbar.hpp
+- Deliverables: src/slic3r/GUI/IMToolbar.hpp
+- Substantive additions: Annotated toolbar-item state, toolbar controller, and return helper so Unity can mirror the ImGui state machine, textures, and event wiring.
+- Verification excerpt: // [UNITY] Replace with a dedicated `Button` GameObject hosting a `RawImage` that swaps textures without ImGui hooks.
+- Unity-impact summary:
+  - Mapped each toolbar item to a ScriptableObject-style model feeding a `GraphicRaycaster`/`RawImage` button and described how progress/states map to Unity UI.
+  - Highlighted icon-size/state toggles so the layout controller can align with Unity `RectTransform` sizing and visibility toggles.
+  - Explained how the return toolbar still holds a `Texture2D`-like handle so Unity can reuse a `Button` instead of manual ImGui draws.
+- Hazards found: 2 (P2 manual `ImTextureID` ownership, P3 GL texture lifecycle tied to ImGui uploads).
+- Git: Annotate IMToolbar header for Unity migration
+- Next recommended Phase 1 task: T419 annotate: src/slic3r/GUI/IMToolbar.cpp

@@ -354,7 +354,8 @@
 - Selected task: T360 annotate `src/slic3r/GUI/GLSelectionRectangle.cpp` (task-1773880086-5683 now active).
 
 ## Iteration plan update
-- Selected task: T418 annotate `src/slic3r/GUI/IMSlider.hpp` (task-1773880086-afc8 now active).
+- Selected task: T420 annotate `src/slic3r/GUI/IMToolbar.hpp` as the next focus.
+- Plan: review the header, insert `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD]` tags around the toolbar/return classes and their state helpers, highlight how textures and ImGui inputs map to Unity equivalents, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, update `.ralph/ralph-tasks.md` status, commit the file plus metadata, and stop after this single atomic task per the instruction queue.
 - Plan: read the header to document slider intent, value caches, event bindings, OpenGL paint helper hooks, and Unity analogs (e.g., UI Toolkit slider + `Binding` to ScriptableObject config). Include `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` annotations around property bindings and high-frequency updates, note any `[UNCLEAR]` behaviors, append the Phase 1 evidence block to `.ralph/agent/handoff.md` after edits, stage/commit the annotated header, close the task, and stop for this iteration so the next agent can continue.
 - Plan: read the selection rectangle implementation, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around drag lifecycle, point containment, and render path; note viewport transforms, shader selection, and GL state toggles plus Unity equivalents (UI overlay camera + LineRenderer), append the required evidence block to `.ralph/agent/handoff.md`, commit the updated file, close the task, and then pause for the next iteration.
 ## Iteration plan update
