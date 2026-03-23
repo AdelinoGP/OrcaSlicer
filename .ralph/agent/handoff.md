@@ -2393,3 +2393,31 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3: cancellation exception must propagate back to Unity's job/async system on the main thread or mesh state stays inconsistent)
 - Git: Annotate GLGizmoSimplify.hpp
 - Next recommended Phase 1 task: T348 annotate: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp
+
+## Phase 1 - Task T348 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp; .ralph/agent/scratchpad.md; .ralph/ralph-tasks.md; .ralph/agent/handoff.md
+- Substantive additions: 20 multi-tag annotations covering cache-syncing, GL paint passes, event branching, ImGui input, backend sync, and Unity replacement notes.
+- Verification excerpt: // [OPENGL] Draw blend-enabled support glyphs, selection rect, and clipping planes each frame; [STATE] relies on cached cone/sphere/cylinder meshes so the GPU doesn't reinitialize every update, and [UNITY] this would map to a `MonoBehaviour` issuing `Graphics.DrawMesh` while mirroring the clipping plane state via a `MeshRenderer` shader.
+- Unity-impact summary:
+  - Drive the point/capsule draws from a MonoBehaviour that keeps a `MeshFilter`/`MeshRenderer` pair for each glyph and reads slicing clipper state from a shared `ClipperController` so the overlay matches the wxWidgets renderer.
+  - Rebuild the ImGui slider/button panel as a UI Toolkit window bound to `DynamicPrintConfig` values so the diameter/density sliders can push snapshots to the Undo system and reapply via `ScriptableObject` presets.
+  - Replace `CallAfter`-backed reslice/autogeneration flows with Unity jobs plus `SynchronizationContext.Post` so the UI thread only posts state changes back to the render loop.
+- Hazards found: P2=2 (event branching + modal dialog triggers), P3=2 (clipping/winding flips, manual cache vs. backend sync).
+- Git: annotate: document GLGizmoSlaSupports
+- Next recommended Phase 1 task: T349 annotate: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.hpp
+
+## Phase 1 - Task T349 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.hpp; .ralph/ralph-tasks.md; .ralph/agent/scratchpad.md; .ralph/agent/handoff.md
+- Substantive additions: 16 multi-tag annotations across the SLA gizmo header highlighting intent, cache/state, event handling, OpenGL render helpers, Unity mapping, and a high-risk porting note.
+- Verification excerpt: // [INTENT] Encapsulates SLA-specific support point editing on top of the shared gizmo stack so SLA builds can paint and manipulate auxiliary points without affecting the other contexts.
+- Unity-impact summary:
+  - Build a MonoBehaviour overlay that owns prefab cones/cylinders/spheres and renders via Graphics.DrawMesh on a dedicated overlay camera while syncing clipping planes with the original `GLModel`s.
+  - Recreate the `gizmo_event`/selection-rectangle flows with Unity `InputAction` callbacks plus a GraphicRaycaster-aware drag controller so ctrl/shift modifiers and hover state match the wx pipeline.
+  - Mirror `reslice_SLA_supports` and dialog localization maps as async/await jobs tied to Unity's SynchronizationContext and LocalizationService so density/diameter sliders and help text stay consistent.
+- Hazards found: 1 (P2 editing-state reliance on GL event ordering + selection caching)
+- Git: annotate: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.hpp
+- Next recommended Phase 1 task: T350 annotate: src/slic3r/GUI/Gizmos/GLGizmosManager.cpp

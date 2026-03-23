@@ -314,5 +314,5 @@
 - Plan: read the header to document the manager-level intent/state/event bindings, add the standard annotation tags, update handoff, and commit before moving on.
 
 ## Iteration plan update
-- Selected task: T346 annotate `src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp` (current focus after warm-up review).
-- Plan: read the simplified gizmo implementation, capture the stateful tool selection, face sampling, and render pipeline hooks, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments across the main lifecycle functions, append the required evidence block to `.ralph/agent/handoff.md`, commit the annotated file, and then keep moving to the next ready task (e.g., T347 for the header).
+- Completed T346 annotate `src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp` with multi-tag commentary.
+- Current focus: T349 annotate `src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.hpp`; the header is annotated and logged, so the next task will be T350 `src/slic3r/GUI/Gizmos/GLGizmosManager.cpp` once it's ready.
