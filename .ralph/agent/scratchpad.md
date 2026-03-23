@@ -354,6 +354,12 @@
 - Plan: mark the task active, read the header, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around the shader lifecycle, caches, binding helpers, and uniform setters; append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the file, close the task, and then pick the next ready Phase 1 file.
 
 ## Iteration plan update
+- Selected task: T383 annotate `src/slic3r/GUI/GUI.hpp` (per the latest ready list and unify direction).
+- Plan: mark the runtime task active, read the header fully, add `[INTENT]` on the GUI namespace helpers, `[STATE]` on the config/menu caches, `[EVENT]` on menu binding and handler scaffolding, `[THREAD]` on cross-thread dialog helpers, `[OPENGL]` on menu-driven render refresh hooks, `[UNITY]` guidance for MainMenu/MenuBar replacements plus config dialog controllers, and `[PORTING_HAZARD:P2]` notes where wxWidgets lifetime assumptions conflict with Unity; append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the annotated file, close the task, and stop after this single atomic change.
+
+## Iteration plan update
+- Selected task: T390 annotate `src/slic3r/GUI/GUI_ObjectSettings.cpp` (since T383 is already documented per the registry; this run will keep the steady momentum).
+- Plan: start the runtime task, read `GUI_ObjectSettings.cpp` end-to-end to extract the settings panel's intent/state/event/threading/openGL flows, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around initialization, selection state, render updates, and config hooks, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file, close the task, and end this iteration as required.
 - Selected task: T386 annotate `src/slic3r/GUI/GUI_ObjectLayers.cpp` (current runtime task `task-1773880086-b3db`).
 - Plan: finish the layered height editor annotations by inserting `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` comments around the row builder, plus/minus wiring, focus/scene update helpers, and editor event handlers; document DPI/color helpers too, append the required evidence block to `.ralph/agent/handoff.md`, update `.ralph/ralph-tasks.md` to mark T386 done, and commit only this file before ending the iteration.
 - Verification: rely on manual inspection that each block explains state/event context and Unity mapping since this change is documentation-only.

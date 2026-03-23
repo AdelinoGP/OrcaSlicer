@@ -4,6 +4,7 @@ _Generated: 2026-03-20 07:11:02 UTC_
 
 ## Task reconciliation
 - `.ralph/ralph-tasks.md` currently tracks Phase 1 entries through T186 (mostly earlier GUI widgets), but the runtime `ralph tools task list` and the supplied `<ready-tasks>` manifest now describe tasks starting at T187 (Jobs/Job.cpp and later). We'll treat the runtime task list as the canonical manifest for the current work and document these differences in this handoff log going forward.
+- Noting a discrepancy observed right away: the provided `<ready-tasks>` list still surfaces `T383 annotate: src/slic3r/GUI/GUI.hpp` as pending, yet `.ralph/ralph-tasks.md` marks it `[x]` and the header already contains the multi-tag annotations. We'll consider the registry/handoff state authoritative and proceed with downstream tasks such as `T390` to keep Phase 1 progressing.
 
 ## Git Context
 
@@ -341,6 +342,20 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Hazards found: P2=1 (finalize callbacks must run on main thread), P3=1 (view data can mutate after prepare)
 - Git: Annotate SLAImportJob view for Unity port
 - Next recommended Phase 1 task: T199 annotate: src/slic3r/GUI/Jobs/SVGFileJob.cpp
+
+## Phase 1 - Task T390 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectSettings.cpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectSettings.cpp, .ralph/agent/handoff.md, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md
+- Substantive additions: 18 multi-tag annotations covering OG_Settings lifecycle, selection-state guards, delete button events, tabbed config routing, and Unity replacement hints.
+- Verification excerpt: // [EVENT] Injects a delete button per row so users can remove overrides directly from the combo list while keeping the undo snapshot in sync.
+- Unity-impact summary:
+  - Recreate the ConfigOptionsGroup list as a UI Toolkit ScrollView + VisualElement tree driven by a MonoBehaviour-backed ConfigBinder, including delete buttons packed with SnapshotService calls.
+  - Mirror the `TabPrint*` controllers and `ParamsPanel` active tab handling with MonoBehaviour-managed VisualElement tabs and ScriptableObject `ModelConfig` caches.
+  - Replace `wxTheApp->CallAfter`/`wxWindowUpdateLocker` layout refreshes with main-thread coroutines that re-layout the VisualElement toggles before repaint.
+- Hazards found: P3=1 (wxGetApp singletons + CallAfter layout updates create implicit UI-thread coupling)
+- Git: annotate: src/slic3r/GUI/GUI_ObjectSettings.cpp
+- Next recommended Phase 1 task: T393 annotate: src/slic3r/GUI/GUI_ObjectTable.hpp
 
 ## Phase 1 - Task T332 complete
 - Task type: annotate
