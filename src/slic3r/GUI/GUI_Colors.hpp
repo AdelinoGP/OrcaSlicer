@@ -5,6 +5,9 @@
 #include "libslic3r/Color.hpp"
 #include <array>
 
+// [INTENT]/[STATE]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3] Logical palette indices consumed by every viewport renderer and GUI overlay so
+// OpenGL draw calls can read the same color slot; Unity should mirror this enum inside a ScriptableObject-backed Color[] and keep the order
+// synchronized with the ImGui/GL pipeline because shared indices determine which color is bound to which mesh or gizmo.
 enum RenderCol_ {
     RenderCol_3D_Background = 0,
     RenderCol_Plate_Unselected,
@@ -37,10 +40,14 @@ namespace Slic3r {
 
 class RenderColor {
 public:
-    static ImVec4      colors[RenderCol_Count];
+    // [STATE]/[UNITY] Cached ImGui-compatible RGBA colors that match the enum order above so render code can index into one static array.
+    // Unity should provide an equivalent cached Color[] and expose it to shaders and the UI controller for palette editing.
+    static ImVec4 colors[RenderCol_Count];
 };
+// [INTENT]/[UNITY] Provides a human-readable label (used for diagnostics and palette panels).
+// Unity port tooling should expose the same names through `EditorGUI` or UI Toolkit helpers.
 const char* GetRenderColName(RenderCol idx);
 
-}
+} // namespace Slic3r
 
 #endif

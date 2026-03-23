@@ -2674,3 +2674,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1, P3=1 (gamma-space assumptions and wxColour-to-RGBA mapping differences)
 - Git: Annotate GuiColor conversions
 - Next recommended Phase 1 task: T377 annotate: src/slic3r/GUI/GUI_Colors.hpp
+## Phase 1 - Task T377 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Colors.hpp
+- Deliverables: src/slic3r/GUI/GUI_Colors.hpp
+- Substantive additions: 3 comments clarifying the shared palette enum, cached color array, and name helper for render tooling
+- Verification excerpt: // [INTENT]/[STATE]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3] Logical palette indices consumed by every viewport renderer and GUI overlay so OpenGL draw calls can read the same color slot; Unity should mirror this enum inside a ScriptableObject-backed Color[] and keep the order synchronized with the ImGui/GL pipeline because shared indices determine which color is bound to which mesh or gizmo.
+- Unity-impact summary:
+  - Mirror the enum order in Unity as a ScriptableObject-managed `Color[]` so shaders and gizmos can share a deterministic index.
+  - Expose the palette names through Unity UI Toolkit/EditorGUI to match `GetRenderColName` labels in diagnostic panels.
+- Hazards found: P3 (palette order must stay synced between the enum, `RenderColor::colors`, and any Unity equivalent).
+- Git: Annotate GUI color palette header
+- Next recommended Phase 1 task: T379 annotate: src/slic3r/GUI/GUI_Factories.cpp

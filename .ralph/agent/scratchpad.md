@@ -376,3 +376,11 @@
 ## Iteration plan update - T375
 - Objective: Annotate `src/slic3r/GUI/GuiColor.hpp` with full intent/state/event/thread/OpenGL/Unity/porting-hazard tags focusing on color definitions, caching, and usage signals.
 - Plan: scan entire header, note color constants, lazy loading helpers, and UI bindings; insert multi-tag comments near enums, static helpers, and accessor methods; ensure Unity equivalent references (ScriptableObject palette, ThemeManager); append evidence block after committing; next task will continue the prioritized manifest order.
+
+## Iteration plan update - T377
+- Objective: Annotate `src/slic3r/GUI/GUI_Colors.hpp` with the same tag set plus concrete Unity mapping for the palette loader and macro-based helpers.
+- Plan: read the header, annotate the color enum definitions, palette accessors, and caching helpers with `[INTENT]/[STATE]/[UNITY]/[PORTING_HAZARD:P3]` plus other relevant tags, call out OpenGL color usage if present, append the Phase 1 evidence block after committing, and ensure the active task is closed before selecting the next ready file.
+
+## Iteration update
+- Completed T377 annotate `src/slic3r/GUI/GUI_Colors.hpp` with intent/state/OpenGL/Unity comments on the shared palette indices, cached color array, and `GetRenderColName` helper; appended the Phase 1 evidence block and marked the task done.
+- Next target: T379 annotate `src/slic3r/GUI/GUI_Factories.cpp` as the subsequent Phase 1 work item.
