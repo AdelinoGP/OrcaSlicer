@@ -2447,4 +2447,45 @@ This prompt governs **Phase 1 only**.
   - `[PORTING_HAZARD:P2]` ensures the enum order stays synchronized with serialized `m_current`, and `[PORTING_HAZARD:P3]` highlights icon reload and ImGui texture ID mapping concerns.
 - Hazards found: P2=1, P3=2
 - Git: docs: annotate GLGizmosManager toolbar state
-- Next recommended Phase 1 task: T352 annotate: src/slic3r/GUI/Gizmos/GLGizmoSVG.cpp
+-- Next recommended Phase 1 task: T352 annotate: src/slic3r/GUI/Gizmos/GLGizmoSVG.cpp
+
+## Phase 1 - Task T352 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoSVG.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoSVG.cpp; .ralph/ralph-tasks.md; .ralph/agent/scratchpad.md
+- Substantive additions: 8 new `[INTENT]/[STATE]/[EVENT]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments clarifying the SVG gizmo lifecycle, drag/state handling, GL preview creation, and job dispatch.
+- Verification excerpt: // [EVENT] Called when the user confirms an emboss action or drops an SVG; acts as the gatekeeper before the asynchronous `start_create_volume` worker executes.
+- Unity-impact summary:
+  - Port the ImGui panel to a UI Toolkit VisualElement panel with GraphicRaycaster buttons that feed into the MonoBehaviour controller so the toolbar retains the same look + tooltips.
+  - Replace the GL preview texture upload with a cached `Texture2D`/`RawImage` combo (or `RenderTexture`) that updates whenever the SVG changes and runs on the main thread.
+  - Mirror the `process` job/cancellation flow via Unity `JobHandle` or `AsyncOperation` plus a `CancellationTokenSource` so emboss recalculations cancel safely when sliders change.
+- Hazards found: P2=1, P3=2
+- Git: annotate: GLGizmoSVG
+- Next recommended Phase 1 task: T353 annotate: src/slic3r/GUI/Gizmos/GLGizmoSVG.hpp
+
+## Phase 1 - Task T353 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoSVG.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoSVG.hpp; .ralph/agent/scratchpad.md
+- Substantive additions: Added `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations that describe class intent, toolbar-triggered volume creation, render hook authorizations, raycasting events, GL texture caching, and the job cancel handshake.
+- Verification excerpt: // [EVENT] Triggered by toolbar buttons, drop targets, or menu shortcuts to bake an emboss volume from the current SVG selection.
+- Unity-impact summary:
+  - Rebuild the header-defined helper as a MonoBehaviour/VisualElement controller so Unity can host the same toolbar panel, GraphicRaycaster hooks, and MeshCollider-based rotate handles with shared state.
+  - Mirror the GLSL preview cache with a Texture2D/RawImage surface tied to a script, ensuring the overlay updates only when `m_filename_preview` or the bounding box mutates.
+  - Port the job start/cancel handshake to Unity `JobHandle` + `CancellationTokenSource` so the embosser cancels mid-drag without leaking the selection pointer that the header still relies on.
+- Hazards found: P2=1 (static selection/volume ID assumptions in the header), P3=1 (cross-thread cancel flag for `EmbossJob`).
+- Git: annotate: GLGizmoSVG header
+- Next recommended Phase 1 task: T354 annotate: src/slic3r/GUI/Gizmos/GLGizmoText.cpp
+
+## Phase 1 - Task T354 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoText.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoText.cpp; .ralph/ralph-tasks.md; .ralph/agent/scratchpad.md
+- Substantive additions: 13 multi-tag annotations covering font cache bootstrapping, input events, OpenGL rendering, raycast caching, text mesh generation, and UI window plumbing.
+- Verification excerpt: // [INTENT] Materialize the typed string by slicing meshes at the cached hit plane, generating text meshes, and either emitting a snapshot-modified volume or a temporary preview volume.
+- Unity-impact summary:
+  - Rebuild the ImGui toolbar as a UI Toolkit VisualElement overlay that exposes dropdowns/checkboxes/sliders tied to a MonoBehaviour controller that feeds GraphicRaycaster hits and InputSystem drags to the gizmo state.
+  - Replace the GL texture/font cache with TMP_FontAsset-derived atlas previews and mirror text placement by updating TextMeshPro-generated meshes plus MeshCollider hits on the main thread.
+- Hazards found: P2=2 (font enumeration/GL texture creation and Plater snapshot/volume replacement rely on wx/GDI APIs and undo-aware snapshotting).
+- Git: annotate: src/slic3r/GUI/Gizmos/GLGizmoText.cpp
+- Next recommended Phase 1 task: T355 annotate: src/slic3r/GUI/Gizmos/GLGizmoText.hpp

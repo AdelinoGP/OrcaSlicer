@@ -310,17 +310,16 @@
 - 2026-03-22: Starting `T344: GLGizmoSeam.hpp` -- read header, collect rendering and event hooks, note Unity mappings, capture handoff details, prepare annotation stub.
 
 ## Iteration plan update
-- Selected task: T345 annotate `src/slic3r/GUI/Gizmos/GLGizmos.hpp`.
-- Plan: read the header to document the manager-level intent/state/event bindings, add the standard annotation tags, update handoff, and commit before moving on.
+- Selected task: T352 annotate `src/slic3r/GUI/Gizmos/GLGizmoSVG.cpp` (task-1773880086-9e8e is open).
+- Plan: start the runtime task formally, read `GLGizmoSVG.cpp`, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` notes around the SVG gizmo lifecycle, draw helpers, event bindings, and Unity analogs (e.g., UI Toolkit/SK Renderer mapping), append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage and commit only that file, and then close the task before deferring the next Phase 1 item to future iterations.
+
+## Iteration update
+- Completed T353 annotate `src/slic3r/GUI/Gizmos/GLGizmoSVG.hpp` with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments covering the class intent, toolbar workflows, render hook, texture cache, raycaster events, and job cancel tokens; appended the evidence block to `.ralph/agent/handoff.md` and marked the task done in `.ralph/ralph-tasks.md`.
+- Next recommended Phase 1 task: T354 annotate: `src/slic3r/GUI/Gizmos/GLGizmoText.cpp`.
 
 ## Iteration plan update
-- Completed T346 annotate `src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp` with multi-tag commentary.
-- Current focus: T349 annotate `src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.hpp`; the header is annotated and logged, so the next task will be T350 `src/slic3r/GUI/Gizmos/GLGizmosManager.cpp` once it's ready.
-
+- Selected task: T354 annotate `src/slic3r/GUI/Gizmos/GLGizmoText.cpp`.
+- Plan: read the SVG text gizmo implementation, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments that call out the toolbar binding, GL preview, job dispatch, and hazards like shared selection state; append the Phase 1 evidence block, stage/commit the file, close the task, and then continue with the next ready entry in the manifest.
 ## Iteration plan update
-- Selected task: T350 annotate `src/slic3r/GUI/Gizmos/GLGizmosManager.cpp` (task-1773880086-6f8e now active).
-- Plan: read the manager implementation to capture GL event routing, render sequencing, gizmo lifecycle, and OpenGL resource lifetimes; annotate with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` notes (plus `[UNCLEAR]` if uncertain), append the required handoff evidence block, commit the single-file change, close the task, and then pause for the next iteration.
-
-## Iteration plan update
-- Selected task: T351 annotate `src/slic3r/GUI/Gizmos/GLGizmosManager.hpp` (task-1773880086-87fb now active).
-- Plan: analyze the manager header to capture the toolbar state, gizmo registration, icon resource tracking, event methods, object manipulation hooks, and serialization API; insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around the enum, layout struct, member variables, public control methods, serialize helpers, rendering stubs, and input responses; append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the single file, close the runtime task, and then prepare for the next ready file.
+- Selected task: T354 annotate `src/slic3r/GUI/Gizmos/GLGizmoText.cpp` now that GLGizmoSVG is documented and the manifest entry is active.
+- Plan: annotate the source with `[INTENT]/[STATE]/[EVENT]/[OPENGL]/[THREAD]/[UNITY]/[PORTING_HAZARD]` tags covering toolbar hookups, text rendering cache, selection state, worker cancellation, and Unity mapping (e.g., UI Toolkit `TextField` + `GraphicRaycaster` bridging). After annotating, append the required evidence block to `.ralph/agent/handoff.md`, commit the file, close the task, and return to the next ready Phase 1 item if time remains.
