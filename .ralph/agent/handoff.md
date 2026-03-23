@@ -3930,3 +3930,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3: wxLocale + `wxTranslations` caching does not line up with Unity string-table refresh semantics, so explicit cache invalidation is required.)
 - Git: Annotate I18N translation helper
 - Next recommended Phase 1 task: T410 annotate: src/slic3r/GUI/IconManager.cpp
+
+## Phase 1 - Task T427 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/BoostThreadWorker.cpp
+- Deliverables: src/slic3r/GUI/Jobs/BoostThreadWorker.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: Inserted 13 focused inline annotations covering message delivery, queue pumping, status updates, and Unity mapping for worker lifecycle.
+- Verification excerpt: // [EVENT][THREAD] Deliver encapsulated worker messages while the UI thread drains `m_output_queue`, keeping finalization serialized with the main event pump.
+- Unity-impact summary:
+  - Mirror the worker's output queue pumping via a `UnityMainThreadDispatcher` that polls for job completion updates before letting UI widgets react.
+  - Keep progress/cancellation updates on the main thread and bind them to Unity `ProgressBar`/`Cursor` controllers so the AsyncOperation results stay responsive.
+  - Replace `call_on_main_thread` with `TaskCompletionSource` + `SynchronizationContext.Post` so Unity can marshal callbacks back to the main loop safely.
+- Hazards found: 1 (P3 worker teardown/join must run during shutdown to keep the thread from leaking).
+- Git: Document BoostThreadWorker threading flow
+- Next recommended Phase 1 task: T428 annotate: src/slic3r/GUI/Jobs/BoostThreadWorker.hpp

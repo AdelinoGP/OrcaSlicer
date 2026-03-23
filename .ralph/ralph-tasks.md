@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-23T21:55:00Z
+Last updated: 2026-03-23T22:10:00Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -345,7 +345,7 @@ Last updated: 2026-03-23T21:55:00Z
 - [x] T424 annotate: src/slic3r/GUI/Jobs/ArrangeJob.hpp
 - [ ] T425 annotate: src/slic3r/GUI/Jobs/BindJob.cpp
 - [ ] T426 annotate: src/slic3r/GUI/Jobs/BindJob.hpp
-- [ ] T427 annotate: src/slic3r/GUI/Jobs/BoostThreadWorker.cpp
+- [x] T427 annotate: src/slic3r/GUI/Jobs/BoostThreadWorker.cpp
 - [ ] T428 annotate: src/slic3r/GUI/Jobs/BoostThreadWorker.hpp
 - [x] T429 annotate: src/slic3r/GUI/Jobs/BusyCursorJob.hpp
 - [ ] T430 annotate: src/slic3r/GUI/Jobs/CreateFontNameImageJob.cpp

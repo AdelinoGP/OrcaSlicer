@@ -788,3 +788,7 @@
 ## Iteration plan update
 - Selected task: T383 annotate `src/slic3r/GUI/GUI.hpp`
 - Plan: read the header end-to-end, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2]` comments for the GUI manager helpers, menu builder, and config caches, highlight Unity equivalents (MenuBar + ScriptableObject config controller) plus hazard notes about wxWidgets ownership rules, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header plus handoff metadata, mark the task closed, and stop for this iteration so the next agent can continue.
+
+## Iteration plan update
+- Selected task: T427 annotate `src/slic3r/GUI/Jobs/BoostThreadWorker.cpp` (task-1773880086-89ec now active).
+- Plan: document the worker thread loop, message dispatch, cancellation flow, and progress binding with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[PORTING_HAZARD:P3]/[UNITY]` comments, call out how the Boost queues marshal through the UI thread, note the Unity analogue (`BackgroundWorker` + `MainThreadDispatcher` with `CancellationToken`), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit `BoostThreadWorker.cpp` plus metadata, close the task, and then pause for the next iteration so another agent can continue.
