@@ -521,3 +521,7 @@
 ## Iteration plan (T372 annotate GUI_AuxiliaryList.cpp)
 - Observed that the file already carries many tags but still needs more explicit Unity/porting context at init and teardown, so we can add focused [UNITY] + [PORTING_HAZARD:P3] notes.
 - Plan: add hazard note around wxGetApp dependency, mention Unity model cleanup in the destructor, verify every event and state mention is covered, then append the required handoff evidence block.
+
+## Iteration plan update
+- Selected task: T387 annotate `src/slic3r/GUI/GUI_ObjectLayers.hpp`
+- Plan: read the header, capture both the layer model state (active layer, selection caches, visible flags) and the layer list view/event bindings; insert `[INTENT]` comments on the controller structs, `[STATE]` on layer caching and menu sync helpers, `[EVENT]` on wxListCtrl/toolbar button wiring, `[THREAD]` where background updates push to UI, `[OPENGL]` around any GL refresh triggers, and `[UNITY]` guidance for a UI Toolkit `ListView` plus `ScriptableObject` layer model plus `Command` bridging; note any `[PORTING_HAZARD]` (e.g., dual ownership of wxWidgets controls) and append the Phase 1 evidence block before closing the task.

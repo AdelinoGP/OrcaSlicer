@@ -40,6 +40,7 @@ class LayerRangeEditor : public wxTextCtrl
     EditorType m_type;
 
     std::function<void(EditorType)> m_set_focus_data;
+    // [EVENT] Notifies ObjectLayers which editor owns focus so focus-based indicators and PlusMinusButton caches follow the active row.
 
 public:
     LayerRangeEditor(
@@ -62,16 +63,18 @@ private:
 };
 
 // [INTENT] Object-specific layer-height inspector that keeps text edits, plus/minus buttons, and the 3D preview synchronized for the
-// current model object. [UNITY] Implement as a LayerHeightPanel MonoBehaviour that spawns InputFields and Buttons on a Canvas, binding to a
-// shared LayerConfig ScriptableObject.
+// current model object while ObjectSettings owns the host panel instance. [UNITY] Implement as a LayerHeightPanel MonoBehaviour that
+// spawns InputFields and Buttons on a Canvas, binding to a shared LayerConfig ScriptableObject.
 class ObjectLayers : public OG_Settings
 {
     ScalableBitmap m_bmp_delete;
     ScalableBitmap m_bmp_add;
-    ModelObject*   m_object{
-        nullptr}; // [STATE] the inspected object, dictates which layer data is shown and which undo/redo target is updated.
+    ModelObject*   m_object{nullptr}; // [STATE] the inspected object, dictates which layer data is shown and which undo/redo target is
+                                      // updated. [PORTING_HAZARD:P2] Unity must keep a managed reference and null the panel when the C#
+                                      // ModelObject is destroyed instead of relying on wxWidgets-owned raw pointers.
 
-    wxFlexGridSizer*     m_grid_sizer;
+    wxFlexGridSizer* m_grid_sizer;
+    // [STATE] caches the dynamic layer row layout so rebuilds can reuse the sizer instead of reallocating every frame.
     t_layer_height_range m_selectable_range; // [STATE] this clamp ensures PlusMinusButton ranges stay within the allowed slider bounds.
     EditorType           m_selection_type{etUndef}; // [STATE] the kind of editor that currently owns keyboard focus for styling keyframes.
 
@@ -84,6 +87,8 @@ public:
     // by the respective text edit field, so that this button emits an action for an up to date layer height range value.
     // [STATE] Button stores the layer height range it was last bound to so clicks always emit fresh values.
     // [EVENT] click handlers read this range and notify the preview/controller about the intended stretch.
+    // [UNITY] Mirror as UI Toolkit Buttons with a LayerHeightRange property that pipelines through a Command-style handler on the
+    // LayerHeightPanel controller.
     class PlusMinusButton : public ScalableButton
     {
     public:
@@ -102,12 +107,15 @@ public:
     wxSizer* create_layer(const t_layer_height_range& range,
                           PlusMinusButton*            delete_button,
                           PlusMinusButton* add_button); // [INTENT] builds the row template reused every time we refresh the layer list.
+    // [UNITY] Rehydrate VisualElements created by a ListView row builder so Unity can reuse cached row trees and avoid GC churn.
     // [INTENT] generated once when object/layer range changes; this mirrors Unity's Rebuild() for List/VisualElement trees.
     void create_layers_list();
     // [EVENT] triggered when a child editor mutates so cached buttons and focus states stay accurate.
+    // [UNITY] Should map to a UI Toolkit ListView.UpdateSelection() call that rebinds VisualElement state from the shared LayerConfig.
     void update_layers_list();
 
     // [OPENGL] notifies the viewport about the active range so highlight overlays and selection caches refresh.
+    // [THREAD] run on the wx event thread so it can push the new selection to the preview without racing with background jobs.
     // [UNITY] Trigger the PreviewController MonoBehaviour (LineRenderer + RenderTexture) to re-sample the layer cursor.
     void update_scene_from_editor_selection() const;
 
@@ -118,8 +126,10 @@ public:
     // [EVENT] reacts to theme/color changes coming from the wxWidgets paint loop; Unity needs similar ThemeManager hooks.
     void sys_color_changed();
     // [EVENT] clear focus metadata when a new object is bound so stale highlight states disappear.
+    // [UNITY] Reset the VisualElement focus ring and layer cursor highlight in the LayerHeightPanel controller.
     void reset_selection();
     // [STATE] update the selectable range used by editors and PlusMinusButton instances.
+    // [UNITY] Mirror by updating the ScriptableObject bounds so Unity bindings know when to clamp slider handles.
     void set_selectable_range(const t_layer_height_range& range) { m_selectable_range = range; }
 
     friend class LayerRangeEditor;

@@ -3104,3 +3104,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3)
 - Git: Note Unity hazard in AuxiliaryList
 - Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp
+
+## Phase 1 - Task T387 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectLayers.hpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectLayers.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: Added focus/row-sizer caching, Unity row-builder mapping, and manned preview/reset guidance for ObjectLayers.
+- Verification excerpt: // [UNITY] Mirror as UI Toolkit Buttons with a LayerHeightRange property that pipelines through a Command-style handler on the LayerHeightPanel controller.
+- Unity-impact summary:
+  - Outline how the LayerHeightPanel MonoBehaviour ownership mirrors ObjectSettings and when to null-out ModelObject references in Unity.
+  - Describe ListView row builder reuse, VisualElement rehydration, and scriptable range clamping to keep layer sliders deterministic.
+  - Call out the PreviewController+RenderTexture update and focus ring reset so Unity keeps overlays and highlight state in sync with the layer list.
+- Hazards found: P2=1 (raw ModelObject pointer), P3=1 (msw_rescale DPI logic tied to wx)
+- Git: docs: annotate ObjectLayers header
+- Next recommended Phase 1 task: T388 annotate: src/slic3r/GUI/GUI_ObjectList.cpp
