@@ -50,8 +50,9 @@ std::vector<unsigned int> GLSelectionRectangle::contains(const std::vector<Vec3d
     // [STATE] `rectangle` caches the current drag bounds so the projection loop can do a simple containment test.
 
     // Iterate over all points and determine whether they're in the rectangle.
-    const Camera& camera    = wxGetApp().plater()->get_camera();
-    Points        points_2d = CameraUtils::project(camera, points);
+    const Camera& camera = wxGetApp().plater()->get_camera();
+    // [STATE] Always read the live `Plater` camera so viewport zoom/orbit adjustments stay in sync with the drag projection.
+    Points points_2d = CameraUtils::project(camera, points);
     // [PORTING_HAZARD:P3] Requires the same viewport camera as GLCanvas3D; Unity port must keep camera filters in sync before projecting.
     unsigned int size = static_cast<unsigned int>(points.size());
     for (unsigned int i = 0; i < size; ++i)
@@ -92,6 +93,7 @@ void GLSelectionRectangle::render(const GLCanvas3D& canvas)
     const float right  = 2.0f * (get_right() * cnv_inv_width - 0.5f);
     const float top    = -2.0f * (get_top() * cnv_inv_height - 0.5f);
     const float bottom = -2.0f * (get_bottom() * cnv_inv_height - 0.5f);
+    // [PORTING_HAZARD:P3] Unity must duplicate this pixel-to-clip conversion to keep the overlay aligned as the canvas size or DPI changes.
 
 #if !SLIC3R_OPENGL_ES
     if (!OpenGLManager::get_gl_info().is_core_profile()) {
@@ -200,6 +202,8 @@ void GLSelectionRectangle::render(const GLCanvas3D& canvas)
             shader->set_uniform("width", 0.25f);
             shader->set_uniform("dash_size", 0.01f);
             shader->set_uniform("gap_size", 0.0075f);
+            // [PORTING_HAZARD:P2] These dash/width uniforms live in code rather than config, so ensure the Unity line material exposes
+            // matching knobs when the design system needs tweaking.
 #if !SLIC3R_OPENGL_ES
         }
 #endif // !SLIC3R_OPENGL_ES

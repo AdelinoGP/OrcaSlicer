@@ -278,7 +278,7 @@ Last updated: 2026-03-23T22:50:28Z
 - [ ] T357 annotate: src/slic3r/GUI/GLCanvas3D.hpp
 - [x] T358 annotate: src/slic3r/GUI/GLModel.cpp
 - [x] T359 annotate: src/slic3r/GUI/GLModel.hpp
-- [ ] T360 annotate: src/slic3r/GUI/GLSelectionRectangle.cpp
+- [x] T360 annotate: src/slic3r/GUI/GLSelectionRectangle.cpp
 - [ ] T361 annotate: src/slic3r/GUI/GLSelectionRectangle.hpp
 - [ ] T362 annotate: src/slic3r/GUI/GLShader.cpp
 - [x] T363 annotate: src/slic3r/GUI/GLShader.hpp

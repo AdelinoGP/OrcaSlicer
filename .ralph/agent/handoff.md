@@ -3972,3 +3972,20 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3 VisualElement tree rebuild guard required when the layer panel loses focus or gets rebuilt).
 - Git: annotate: src/slic3r/GUI/GUI_ObjectList.hpp
 - Next recommended Phase 1 task: T391 annotate: src/slic3r/GUI/GUI_ObjectSettings.hpp
+
+## Reconciliation note
+- Runtime `ralph tools task list` shows T372 in progress while `.ralph/ralph-tasks.md` marks it done; from here onward I will use `.ralph/ralph-tasks.md` as the faithful ledger and will not rely on the runtime view.
+
+## Phase 1 - Task T360 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GLSelectionRectangle.cpp
+- Deliverables: src/slic3r/GUI/GLSelectionRectangle.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: three targeted comments clarifying camera state alignment, pixel-to-clip math, and dash/width uniform hazards.
+- Verification excerpt: // [STATE] Always read the live `Plater` camera so viewport zoom/orbit adjustments stay in sync with the drag projection.
+- Unity-impact summary:
+  - Unity must reproject drag coordinates through the live Plater camera before checking the UI `Rect` containment.
+  - Pixel→clip conversion needs an exact mirror in the Unity overlay so DPI/canvas resizing does not misalign the selection box.
+  - The Unity LineRenderer/material should expose width/dash/gap knobs matching the hard-coded GLSL uniforms for consistent theming.
+- Hazards found: 2 (P2: dash uniform knobs, P3: pixel-to-clip conversion).
+- Git: Document GL selection rectangle overlay
+- Next recommended Phase 1 task: T361 annotate: src/slic3r/GUI/GLSelectionRectangle.hpp

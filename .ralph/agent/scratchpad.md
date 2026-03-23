@@ -797,3 +797,18 @@
 ## Iteration plan update - T395
 - Selected task: T395 annotate `src/slic3r/GUI/GUI_ObjectTableSettings.hpp` (task-1773880086-8f2d now active).
 - Plan: review and enhance the header’s current annotations so every field, helper, and method carries `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD]` context, clarify the ownership of the bitmap resources and `ConfigOptionsGroup` cache, call out Unity equivalents (UI Toolkit ListView + VisualElement per-group controller backed by ScriptableObject configs), note hazards around manual bitmap DPI work and wxWindow parent lifetime, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the header update plus metadata, close T395, and then stop for this iteration.
+
+## Plan update
+- Task: T383 annotate `src/slic3r/GUI/GUI.hpp`
+- Understanding: GUI manager aggregates menu and toolbar entries plus GL/preview coordination that Unity must mirror with UI Toolkit + RenderTexture combo.
+- Plan: read `GUI.hpp`, sprinkle [INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2] notes around the menu builder, state caches, and config hooks, log evidence to `.ralph/agent/handoff.md`, commit once annotated, close task, and exit this iteration.
+
+## Plan correction
+- Task: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp` (started accidentally but now primary).
+- Understanding: Auxiliary list manages tree state for materials/presets, includes tree control state, selection, context menus, and DPI scaling that require clear Unity mapping.
+- Plan: read the file end-to-end, annotate with [INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD], record Phase 1 evidence in `.ralph/agent/handoff.md`, stage/commit, close the task, and stop iteration.
+
+## Plan adjustment
+- Task: T360 annotate `src/slic3r/GUI/GLSelectionRectangle.cpp` (switching targets due to canonical task queue).
+- Understanding: selection rectangle overlays the GL viewport, holding selection corners and drawing helpers triggered by mouse events; critical to map to Unity as an overlay that mirrors zoomed coordinates.
+- Plan: review the CPP, annotate key class/methods with [INTENT]/[STATE]/[EVENT]/[OPENGL]/[UNITY]/[PORTING_HAZARD], note thread assumptions, log conflict between runtime and static task lists in `.ralph/agent/handoff.md`, update `.ralph/ralph-tasks.md` states, stage/commit, append evidence, close task.
