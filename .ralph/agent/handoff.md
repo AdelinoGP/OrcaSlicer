@@ -2980,3 +2980,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (blocking file dialog), P3=1 (native shell double-click launches)
 - Git: docs: annotate GUI auxiliary list
 - Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp
+
+## Phase 1 - Task T390 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectSettings.cpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectSettings.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 12 multi-tag annotations that capture intent/state/event/thread/OpenGL/Unity insights for the object settings list, delete controls, config hydration, and tabbed model routing.
+- Verification excerpt: // [EVENT] Adds a per-line delete button so object-specific overrides can be removed directly from the option list.
+- Unity-impact summary:
+  1. Rebuild the option list as a `ScrollView`/`ListView` pair that binds to a ScriptableObject config per selection and hosts inline delete `Button`s with UnityEvent callbacks.
+  2. Replace `ConfigManipulation` with a ViewModel binder that keeps `Config` ScriptableObjects, toggle callbacks, and preview snapshots coordinated on the main thread.
+- Hazards found: P2=1 (recursive `update_config_values`/`load_config` combo plus global `wxGetApp()` singletons) + P3=1 (delete buttons and snapshots tied to blocking UI updates and `plater` preview hooks).
+- Git: annotate: src/slic3r/GUI/GUI_ObjectSettings.cpp
+- Next recommended Phase 1 task: T391 annotate: src/slic3r/GUI/GUI_ObjectSettings.hpp

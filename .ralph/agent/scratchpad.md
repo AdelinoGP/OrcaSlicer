@@ -477,3 +477,11 @@
 ## Iteration plan update
 - Selected task: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp` (task-1773880086-6aa6 revived).
 - Plan: expand the existing comments with `[THREAD]`, `[STATE]`, and `[PORTING_HAZARD:P2]` cues around keyboard handling, model init/reload, folder creation, file imports, context menus, drag/drop, double-clicks, and hotkeys so Unity receives explicit lifecycle/state guidance; update `.ralph/agent/handoff.md` with the Phase 1 evidence block, stage/commit the annotated file plus metadata, and keep the task bookkeeping in sync for the next iteration.
+
+## Iteration plan update
+- Selected task: T383 annotate `src/slic3r/GUI/GUI.hpp` (task-1773880086-6aa6 now in focus).
+- Plan: read the core GUI namespace header top-to-bottom, add `[INTENT]` for the base GUI manager, `[STATE]` on config maps and panel caches, `[EVENT]` on menu binding and handler helpers, `[THREAD]` on any cross-thread dialog/reporting helpers, `[OPENGL]` where menu choices trigger render refreshes, `[UNITY]` pointers to Main Menu `MenuBar` equivalents and config dialog controllers, and `[PORTING_HAZARD]` for wxWidgets owner-based lifetime assumptions; append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit just the annotated header plus handoff metadata, close T383, and stop so the next iteration can continue.
+
+## Iteration plan update
+- Selected task: T390 annotate `src/slic3r/GUI/GUI_ObjectSettings.cpp` (task-1773880086-1203 now open).
+- Plan: review `GUI_ObjectSettings.cpp`, document the object-specific settings panel creation, event wiring, and rendering triggers with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments; highlight caches for selected object, selection filters, timer-based updates, and Unity analogs (UI Toolkit `ListView` + `VisualElement` selection + ScriptableObject settings binder); append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit just this file plus handoff metadata, close T390, and stop for this iteration.

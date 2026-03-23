@@ -265,6 +265,8 @@ bool ObjectSettings::update_settings_list()
     auto tab_volume = dynamic_cast<TabPrintModel*>(wxGetApp().get_model_tab(true));
     auto tab_layer = dynamic_cast<TabPrintModel*>(wxGetApp().get_layer_tab());
 
+    // [UNITY] Mirror TabPrint tab switches with MonoBehaviour-controlled VisualElements so Unity can rebuild the right panel when selection state changes.
+
     if (is_plate_settings) {
         tab_plate->set_model_config(plate_configs);
         tab_object->set_model_config({});
