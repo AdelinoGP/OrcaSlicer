@@ -631,3 +631,7 @@
 ## Iteration plan update
 - Selected task: T399 annotate `src/slic3r/GUI/GUI_Utils.hpp` (task-1773880086-ecab now open).
 - Plan: start the task, read `GUI_Utils.hpp` top-to-bottom to capture layout helpers, shared state, event wiring, and caching logic; insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations around the layout utilities, event handlers, and helper structs; append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit `GUI_Utils.hpp` plus metadata, close the task, and hand off to the next iteration.
+
+## Iteration plan update
+- Selected task: T400 annotate `src/slic3r/GUI/HintNotification.cpp` (task-1773880086-05a9 now active).
+- Plan: review the hint pool lifecycle, fade/timer state, text construction/HTML rendering, event hooks for dismiss and info buttons, and cross-thread hint loading; annotate critical sections with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2]`, include `[UNCLEAR]` where serial config persistence intent is ambiguous, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit `HintNotification.cpp` plus metadata, close this task, and pause for the next iteration.

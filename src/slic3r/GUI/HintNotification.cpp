@@ -289,8 +289,8 @@ bool tags_check(const std::string& disabled_tags, const std::string& enabled_tag
     }
     return true;
 }
-// [EVENT][PORTING_HAZARD:P2] Centralized link launches feed into wxWidgets' browser warning flow; Unity needs a confirmation dialog before
-// calling `Application.OpenURL` so phishing cannot trigger in-overlay navigation.
+// [EVENT][PORTING_HAZARD:P2][UNITY] Centralized link launches feed into wxWidgets' browser warning flow; Unity needs a confirmation dialog
+// before calling `Application.OpenURL` so phishing cannot trigger in-overlay navigation.
 void launch_browser_if_allowed(const std::string& url) { wxGetApp().open_browser_with_warning_dialog(url); }
 } // namespace
 // [STATE][THREAD] Destructor flushes the persisted hint usage while the app is still running on the UI thread so the next session starts
@@ -566,8 +566,10 @@ HintData* HintDatabase::get_hint(HintDataNavigation nav)
     return &m_loaded_hints[m_hint_id];
 }
 
+// [STATE][EVENT][UNITY] Next-navigation uses wrap-around arithmetic so the Unity hint controller stays inside the catalog without invalid indexes.
 size_t HintDatabase::get_next_hint_id() { return m_hint_id < m_loaded_hints.size() - 1 ? m_hint_id + 1 : 0; }
 
+// [STATE][EVENT][UNITY] Previous-navigation also wraps so the “back” action mirrors the same cyclic behavior in Unity.
 size_t HintDatabase::get_prev_hint_id() { return m_hint_id > 0 ? m_hint_id - 1 : m_loaded_hints.size() - 1; }
 
 // [STATE][EVENT][THREAD] Weighted random selection keeps the same hint rotation and ensures no hint is repeated until every eligible one is
@@ -645,6 +647,8 @@ void HintDatabase::set_used(const std::string& id)
         m_used_ids.emplace_back(id);
     }
 }
+// [STATE][THREAD] Resets the in-memory hint cache so the next rotation can start fresh; Unity should clear the persisted IDs in its
+// equivalent storage before the next boot.
 void HintDatabase::clear_used() { m_used_ids.clear(); }
 
 // [INTENT][OPENGL][UNITY] Calculates the left indentation, icon spacing, and base window width so the ImGui layout matches the old warning
@@ -670,6 +674,8 @@ void NotificationManager::HintNotification::count_spaces()
     m_window_width = m_line_height * 25;
 }
 
+// [INTENT][OPENGL][UNITY] Computes multi-byte UTF-8 sequence lengths so the line-break calculations stay consistent with TextMeshPro/GUI
+// Toolkit on Unity.
 static int get_utf8_seq_length(const char* seq, size_t size)
 {
     int           length = 0;
@@ -729,6 +735,7 @@ static int get_utf8_seq_length(const char* seq, size_t size)
     return length;
 }
 
+// [INTENT][STATE][UNITY] Overload forwards string-based offsets into the UTF-8 helper used by word wrapping to keep the Unity port aligned.
 static int get_utf8_seq_length(const std::string& text, size_t pos)
 {
     assert(pos < text.size());

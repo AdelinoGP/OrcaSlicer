@@ -3442,4 +3442,18 @@ This prompt governs **Phase 1 only**.
   - Store WindowMetrics and CheckboxFileDialog state in ScriptableObjects or serialized `PlayerPrefs` entries instead of manual wx stacks.
 - Hazards found: P2=4, P3=5 (DPI/change events, dark mode bridging, modal dialog stack, OS-specific image helpers, macOS inset hacks)
 - Git: annotate: src/slic3r/GUI/GUI_Utils.hpp
-- Next recommended Phase 1 task: T400 annotate: src/slic3r/GUI/HintNotification.cpp
+- Next recommended Phase 1 task: T406 annotate: src/slic3r/GUI/HttpServer.cpp
+
+## Phase 1 - Task T400 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HintNotification.cpp
+- Deliverables: src/slic3r/GUI/HintNotification.cpp
+- Substantive additions: 6 multi-tag annotations covering hint rotation helpers, UTF-8 wrapping utilities, reset/write functions, and browser guards
+- Verification excerpt: // [STATE][EVENT][UNITY] Next-navigation uses wrap-around arithmetic so the Unity hint controller stays inside the catalog without invalid indexes.
+- Unity-impact summary:
+  - Persist the shown-hint list via a ScriptableObject stored under `Application.persistentDataPath` instead of cereal binaries.
+  - Port the ImGui overlay into a UI Toolkit VisualElement (TextMeshPro lines + buttons) and wire `Button.onClick`/`Command` handlers for next/close/hypertext events.
+  - Replace `wxGetApp` hyperlink launches with a Unity confirmation dialog that feeds through `Application.OpenURL`, matching the existing suppress flag.
+- Hazards found: P2=2, P3=1 (cereal persistence, browser warning guard, rand-seed drift)
+- Git: Annotate HintNotification for Unity port
+- Next recommended Phase 1 task: T406 annotate: src/slic3r/GUI/HttpServer.cpp
