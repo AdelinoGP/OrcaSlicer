@@ -3068,13 +3068,14 @@ This prompt governs **Phase 1 only**.
 - Task type: annotate
 - File: src/slic3r/GUI/GUI_ObjectTable.cpp
 - Deliverables: src/slic3r/GUI/GUI_ObjectTable.cpp
-- Substantive additions: 9 targeted annotations describing renderers, column metadata, and event wiring (INTENT/STATE/EVENT/UNITY/PORTING_HAZARD tags)
-- Verification excerpt: // [INTENT] Overlay a lock/undo badge whenever the option cell differs from its baseline so the user can rollback the change explicitly.
+- Substantive additions: 20 targeted INTENT/STATE/EVENT/UNITY/PORTING_HAZARD notes covering the grid model, editors, and dialog wiring
+- Verification excerpt: // [INTENT] Rebuilds the grid model for the current Plater state whenever the object list or presets change.
 - Unity-impact summary:
-  - Mirror the grid column descriptors as `ColumnDefinition` scripts and cell templates in UI Toolkit `ListView` so editors, icons, and resets stay consistent.
-  - Use Unity controllers to detect row selections plus `ListView` cell commits and route them through `ObjectRow.ApplyToModel()` and `MainThreadDispatcher` mirrors of `OnCellValueChanged`.
-- Hazards found: 1 (P2) row-index/order assumption when mapping cell clicks to `ObjectGrid` IDs, so Unity must maintain the same stable ordering.
-- Git: docs(gui): annotate object table
+  - Translate the object table into a UI Toolkit `ListView` with `VisualElement` cells plus a detail panel that mirrors `ObjectTablePanel`.
+  - Replace cell reset icons with `Button` elements and use `ListView.onSelectionChanged` to keep the settings panel aligned.
+  - Keep a `ScriptableObject` list aligned with `m_grid_data` so Unity can maintain stable object->volume mappings across reorders.
+- Hazards found: 1 (P3 row ordering assumption between object and volume entries)
+- Git: annotate GUI_ObjectTable grid flow
 - Next recommended Phase 1 task: T393 annotate: src/slic3r/GUI/GUI_ObjectTable.hpp
 
 ## Phase 1 - Task T383 complete

@@ -1302,6 +1302,7 @@ void ObjectGridTable::update_volume_values_from_object(int row, int col)
     ObjectGridRow*      grid_row      = m_grid_data[row - 1];
     bool                need_refresh  = false;
     DynamicPrintConfig& global_config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
+    // [STATE] When an object-level cell mutates, this walks subsequent volume rows updating cached overrides and keeps the grid in sync.
     if (grid_row->row_type == row_object) {
         int next_row = row + 1;
         while ((next_row - 1) < m_grid_data.size()) {
@@ -1647,6 +1648,9 @@ wxString ObjectGridTable::convert_filament_string(int index, wxString& filament_
 // `ListView` so each `VisualElement` knows its editor type and whether to show a reset button.
 void ObjectGridTable::init_cols(ObjectGrid* object_grid)
 {
+    // [INTENT] Declares editable columns, reset icon placeholders, alignments, and choice lists so the UI knows how to render each cell
+    // type. [UNITY] Column descriptors should map to Unity `ListView` `Column` definitions and decide whether a cell uses `Button`,
+    // `Toggle`, or `Popup` editors.
     const float font_size = 1.5f * wxGetApp().em_unit();
 
     // printable for object
@@ -1751,6 +1755,9 @@ void ObjectGridTable::init_cols(ObjectGrid* object_grid)
 
 void ObjectGridTable::construct_object_configs(ObjectGrid* object_grid)
 {
+    // [INTENT] Rebuilds the grid model for the current Plater state whenever the object list or presets change.
+    // [STATE] Re-populates `m_grid_data`/`m_col_data`, caching the object/volume configs used by the grid cells.
+    // [UNITY] This would map to recomputing a `ScriptableObject` array and refreshing the `ListView` data source.
     // release first
     release_object_configs();
 
@@ -1886,6 +1893,8 @@ void ObjectGridTable::construct_object_configs(ObjectGrid* object_grid)
 
 void ObjectGridTable::SetSelection(int object_id, int volume_id)
 {
+    // [EVENT] Responds to external selection requests so the grid scrolls to the right row and `obj_list` highlights the same volume.
+    // [STATE] Relies on `m_grid_data` indices matching object/volume IDs, so Momentary reordering requires syncing this cache.
     BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(", set selection to object %1% part %2%") % object_id % volume_id;
     // invalid object, skip
     if ((object_id == -1) && (volume_id == -1))
@@ -1907,6 +1916,8 @@ void ObjectGridTable::SetSelection(int object_id, int volume_id)
 
 void ObjectGridTable::reload_object_data(ObjectGridRow* grid_row, const std::string& category, DynamicPrintConfig& global_config)
 {
+    // [INTENT] Refreshes the cached column values when a global group (Quality/Strength/Support/Speed) reset is pushed from the side panel.
+    // [STATE] Copies values from the `ModelConfig` baseline so `grid_row->ori_*` can still compare against user overrides.
     if (category == ObjectGridTable::category_all) {
         grid_row->layer_height = *(
             get_object_config_value<ConfigOptionFloat>(global_config, grid_row->config, m_col_data[col_layer_height]->key));
@@ -1956,6 +1967,9 @@ void ObjectGridTable::reload_part_data(ObjectGridRow*      volume_row,
                                        const std::string&  category,
                                        DynamicPrintConfig& global_config)
 {
+    // [STATE] Keeps part rows tied to their parent object row so Unity can reuse a cached `ObjectRow` when reopening the settings.
+    // [PORTING_HAZARD:P3] This scan assumes object/volume rows immediately follow each other in `m_grid_data`, so a virtualized list must
+    // reestablish that ordering before calling this helper.
     if (category == ObjectGridTable::category_all) {
         volume_row->layer_height     = *(get_volume_config_value<ConfigOptionFloat>(global_config, object_row->config, volume_row->config,
                                                                                     m_col_data[col_layer_height]->key));
@@ -2025,6 +2039,8 @@ void ObjectGridTable::reload_part_data(ObjectGridRow*      volume_row,
 // called by the GUI_ObjectTableSettings, to update the values on the cell, and also update data to plater
 void ObjectGridTable::reload_cell_data(int row, const std::string& category)
 {
+    // [EVENT] Called by the settings panel to refresh cells after a preset or reset button fires.
+    // [UNITY] Map to a `VisualElement` refresh + data binding call so Unity can repaint only affected rows.
     if (row == 0)
         return;
     ObjectGridRow*      grid_row      = m_grid_data[row - 1];
@@ -2066,6 +2082,8 @@ void ObjectGridTable::reload_cell_data(int row, const std::string& category)
 
 void ObjectGridTable::update_row_properties()
 {
+    // [STATE] Keeps the `wxGrid` editors/renderers aligned with the `ObjectGridCol` metadata while rows are shuffled or reloaded.
+    // [PORTING_HAZARD:P3] Unity needs to compensate for `wxGrid`-specific editors; custom MonoBehaviours must handle constraints per column.
     ObjectGrid* grid_table = m_panel->m_object_grid;
     // col 0 no need to update, always uneditable
     for (int col = 1; col < col_speed_perimeter_reset; col++) {
@@ -2149,6 +2167,7 @@ void ObjectGridTable::update_row_properties()
 
 void ObjectGridTable::sort_by_default()
 {
+    // [INTENT] Ensures the object/part rows start alphabetically per plate so users always find the same entry after reopening the dialog.
     compare_row_func sort_func = [](ObjectGridRow* row1, ObjectGridRow* row2) {
         int         plate_1, plate_2;
         std::string row1_plate = row1->plate_index.value;
@@ -2179,6 +2198,7 @@ void ObjectGridTable::sort_by_default()
 
 void ObjectGridTable::sort_row_data(compare_row_func sort_func)
 {
+    // [STATE] Reorders `m_grid_data` while preserving object-to-volume adjacency so UI selection indices remain stable.
     int size = m_grid_data.size();
     if (!size)
         return;
@@ -2219,6 +2239,8 @@ void ObjectGridTable::sort_row_data(compare_row_func sort_func)
 
 void ObjectGridTable::sort_by_col(int col)
 {
+    // [EVENT] Triggered from the column header click handler to toggle ascending/descending orders.
+    // [UNITY] Hook into a `ListView` `ColumnHeaderClicked` event and re-sort the backing collection.
     // handle the sort logic
     if (col == col_name) {
         if (m_sort_col == col) {
@@ -2555,7 +2577,9 @@ wxBEGIN_EVENT_TABLE(ObjectTablePanel, wxPanel)
     , m_plater(platerObj)
     , m_float_validator(2, nullptr, wxNUM_VAL_ZERO_AS_BLANK)
 {
-    // m_bg_colour = wxColour(0xfa, 0xfa, 0xfa);
+    // [INTENT] Hosts the object/part table and settings panel, wiring clipboard shortcuts, sizing constraints, and filament/color caches.
+    // [STATE] Keeps `m_object_grid`, `m_object_grid_table`, and `m_object_settings` in sync so selection in one updates the others.
+    // [UNITY] Translate to a `Canvas` containing a `ScrollView`/`ListView` combo and a `VisualElement` detail pane, binding selection
     m_float_validator.SetRange(0, 100);
     m_bg_colour = wxColour("#FFFFFF");
     // m_hover_colour = wxColour(61, 70, 72);
@@ -2696,6 +2720,8 @@ int ObjectTablePanel::init_filaments_and_colors()
 
 void ObjectTablePanel::load_data()
 {
+    // [INTENT] Initializes the grid geometry once the model and filament metadata are available, then pins column/glyph sizing.
+    // [STATE] Drives `m_object_grid` row/col counts and column label state so the UI never shows stale baseline text.
     int rows, cols;
 
     BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(", enter");
@@ -2962,6 +2988,7 @@ ObjectTablePanel::~ObjectTablePanel()
 
 void ObjectTablePanel::OnCellLeftClick(wxGridEvent& ev)
 {
+    // [EVENT] Routes wxGrid left clicks through the table controller so icon clicks trigger resets while others just forward selection events.
     int row = ev.GetRow();
     int col = ev.GetCol();
 
@@ -2980,6 +3007,7 @@ void ObjectTablePanel::OnCellLeftClick(wxGridEvent& ev)
 
 void ObjectTablePanel::OnRowSize(wxGridSizeEvent& ev)
 {
+    // [EVENT] Maintains dialog size limits when rows resize so the parent dialog clamps to `g_dialog_max_*`.
     wxSize panel_size = get_init_size();
 
     g_dialog_max_width  = (panel_size.GetWidth() > g_max_size_from_parent.GetWidth()) ? g_max_size_from_parent.GetWidth() :
@@ -2996,6 +3024,7 @@ void ObjectTablePanel::OnRowSize(wxGridSizeEvent& ev)
 
 void ObjectTablePanel::OnColSize(wxGridSizeEvent& ev)
 {
+    // [EVENT] Mirrors column resize operations so the dialog clamps width to the stored max (keeps Unity scrollables tidy if columns expand).
     wxSize panel_size = get_init_size();
 
     g_dialog_max_width  = (panel_size.GetWidth() > g_max_size_from_parent.GetWidth()) ? g_max_size_from_parent.GetWidth() :
@@ -3012,6 +3041,7 @@ void ObjectTablePanel::OnColSize(wxGridSizeEvent& ev)
 
 void ObjectTablePanel::OnSelectCell(wxGridEvent& ev)
 {
+    // [EVENT] Synchronizes the side panel/properties view when the grid selection changes so Unity can also show context for the active volume.
     int row = ev.GetRow();
     int col = ev.GetCol();
 
@@ -3030,6 +3060,7 @@ void ObjectTablePanel::OnSelectCell(wxGridEvent& ev)
 
 void ObjectTablePanel::OnCellValueChanged(wxGridEvent& ev)
 {
+    // [EVENT] Mirrors grid cell edit commits so the object settings panel can refresh and Unity can re-evaluate bindings.
     int row = ev.GetRow();
     int col = ev.GetCol();
 
@@ -3053,6 +3084,7 @@ void ObjectTablePanel::OnRangeSelected(wxGridRangeSelectEvent& ev)
 
 wxSize ObjectTablePanel::get_init_size()
 {
+    // [STATE] Mirrors the grid cell/column dimensions so the dialog can enforce a meaningful min/max size and scroll range.
     wxSize size;
     int    width = 0, height = 0;
 
@@ -3084,6 +3116,7 @@ wxSize ObjectTablePanel::get_init_size()
 void ObjectTablePanel::resetAllValuesInSideWindow(
     int row, bool is_object, ModelObject* object, ModelConfig* config, const std::string& category)
 {
+    // [EVENT] Invoked from the reset icon to reroute the reset to the side panel so both widgets stay in sync.
     //
     m_object_settings->resetAllValues(row, is_object, object, config, category);
 }
@@ -3098,6 +3131,8 @@ ObjectTableDialog::ObjectTableDialog(wxWindow* parent, Plater* platerObj, Model*
     , m_model(modelObj)
     , m_plater(platerObj)
 {
+    // [INTENT] Wraps `ObjectTablePanel` inside a resizable dialog, driving sizing hints, event hooking, and focus wiring.
+    // [UNITY] Equivalent to a Unity `EditorWindow`/`IMGUIContainer` that arranges the `ListView` panel and detail sidebar.
 #ifdef __WINDOWS__
     SetDoubleBuffered(true);
 #endif //__WINDOWS__
@@ -3183,6 +3218,7 @@ ObjectTableDialog::~ObjectTableDialog()
 
 void ObjectTableDialog::Popup(int obj_idx, int vol_idx, wxPoint position /*= wxDefaultPosition*/)
 {
+    // [EVENT] Exposes a synchronous modal entry point so legacy callers can open the tab and reuse `ObjectTablePanel` sorting.
     m_obj_panel->sort_by_default();
     m_obj_panel->SetSelection(obj_idx, vol_idx);
 
@@ -3207,6 +3243,7 @@ void ObjectTableDialog::on_sys_color_changed() { Refresh(); }
 
 void ObjectTableDialog::OnClose(wxCloseEvent& evt)
 {
+    // [EVENT] Persists dialog size and tears down the panel on Windows while deferring to the default handler elsewhere.
     this->GetSize(&g_dialog_width, &g_dialog_height);
 
 #ifdef __WINDOWS__
@@ -3264,6 +3301,7 @@ GridCellTextEditor::~GridCellTextEditor() {}
 
 void GridCellTextEditor::Create(wxWindow* parent, wxWindowID id, wxEvtHandler* evtHandler)
 {
+    // [INTENT] Replaces the default cell editor with a themed `TextInput` so the UX matches other dialogs and supports Enter/Escape handling.
     ::TextInput* text_input = new ::TextInput(parent, wxEmptyString, wxEmptyString, wxEmptyString, wxDefaultPosition, wxSize(-1, -1),
                                               wxTE_PROCESS_ENTER);
     m_control               = text_input;
@@ -3276,6 +3314,7 @@ void GridCellTextEditor::SetSize(const wxRect& rect) { wxGridCellTextEditor::Set
 
 void GridCellTextEditor::BeginEdit(int row, int col, wxGrid* grid)
 {
+    // [EVENT] Ensures keyboard shortcuts pre-fill the editor and that Enter/Escape close the control without leaking focus.
     ObjectGridTable*                table    = dynamic_cast<ObjectGridTable*>(grid->GetTable());
     ObjectGridTable::ObjectGridCol* grid_col = table->get_grid_col(col);
     ObjectGridTable::ObjectGridRow* grid_row = table->get_grid_row(row - 1);
