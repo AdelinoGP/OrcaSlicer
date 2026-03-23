@@ -558,3 +558,6 @@
 
 ## Iteration update
 - Completed `T389 annotate: src/slic3r/GUI/GUI_ObjectList.hpp` with event/state/thread/OpenGL/Unity callouts for selection, clipboard commands, drag/drop, loader threading, transform resets, and column caching; recorded the evidence block and lined up `T392` as the next ready file.
+## Iteration plan update
+- Selected task: T395 annotate `src/slic3r/GUI/GUI_ObjectTableSettings.hpp` (key gui:T395 now active).
+- Plan: read the settings header, annotate widget wiring/projected state with the required tags, capture Unity analogs for the grouped checkbox/column selection UI, document hazard areas (wx Freeze/Thaw, manual event propagation), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit just the header+handoff, close the task, and stop for the next iteration.

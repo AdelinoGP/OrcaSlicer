@@ -3200,3 +3200,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3=1 (copy/undo commands rely on wxDataView internal indices so Unity must safeguard selection caches before mutating the model).
 - Git: annotate: src/slic3r/GUI/GUI_ObjectList.hpp
 - Next recommended Phase 1 task: T392 annotate: src/slic3r/GUI/GUI_ObjectTable.cpp
+## Phase 1 - Task T395 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectTableSettings.hpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectTableSettings.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 15 multi-tag annotations clarifying panel state caching, event coupling, and migration hazards
+- Verification excerpt: // [EVENT][INTENT] rebuilds the visible config groups when selection changes so overrides stay in sync with the table.
+- Unity-impact summary:
+  - Panels should morph into UI Toolkit ListView rows bound to ScriptableObject-backed ModelConfig instances, with scrollable grouping replacing wx sizers.
+  - Each ConfigOptionsGroup mirrors a VisualElement group whose hide/show calls map to `VisualElement.style.display`, while reset icons become SpriteComponents.
+- Hazards found: 1 (P3) Windows-only `msw_rescale` DPI tweak needs CanvasScaler instead of manual rescale.
+- Git: Annotate object table settings header
+- Next recommended Phase 1 task: T396 annotate: src/slic3r/GUI/GUI_Preview.cpp
