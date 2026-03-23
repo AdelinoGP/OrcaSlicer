@@ -340,3 +340,5 @@
 ## Iteration plan update
 - Selected task: T359 annotate `src/slic3r/GUI/GLModel.hpp` now that the implementation prioritized the viewport metadata.
 - Plan: mark the runtime task active, read the entire header, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments on the class description, key members (camera matrices, render cache, selection state), and public APIs; add Unity-port hints (e.g., `RenderTexture` ownership, `XR Interaction Toolkit` analogs), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the header, close the task, and then stop for this iteration so the next agent can pick up.
+
+- New plan: start task T353 annotate `src/slic3r/GUI/Gizmos/GLGizmoSVG.hpp`, read the header, insert the full `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations for the class and helpers, append the Phase 1 evidence block, and commit before moving on.

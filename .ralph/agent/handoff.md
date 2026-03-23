@@ -2545,3 +2545,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1, P3=2
 - Git: Document GLModel header for Unity port
 - Next recommended Phase 1 task: T360 annotate: src/slic3r/GUI/GLSelectionRectangle.cpp
+
+## Phase 1 - Task T353 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoSVG.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoSVG.hpp
+- Substantive additions: ~26 architectural annotations covering intent/state/event/thread/OpenGL/Unity/porting guidance
+- Verification excerpt: // [OPENGL] Captures the GLuint handle plus dimensions for the cached SVG preview so `draw_preview()` can rebind without reloading the file
+- Unity-impact summary:
+  - Mirror the SVG panel with a UI Toolkit VisualElement + GraphicRaycaster controller feeding the same MonoBehaviour state.
+  - Replace the preview with a RenderTexture-backed RawImage + Mesh overlay and route the rotate gizmo through a `RotateHandlesController`/MeshCollider combo.
+  - Keep the `EmbossJob` cancel token and selection cache as a CancellationTokenSource/ScriptableObject pair so Unity workers follow the same cancel semantics.
+- Hazards found: P2=1, P3=1
+- Git: Annotate GLGizmoSVG.hpp for Unity port
+- Next recommended Phase 1 task: T354 annotate: src/slic3r/GUI/Gizmos/GLGizmoText.cpp
+
