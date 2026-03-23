@@ -511,3 +511,7 @@
 - Selected task: T333 annotate src/slic3r/GUI/Gizmos/GLGizmoMove.cpp
 - Plan: read the move gizmo implementation, embed the required tags around event hooks, rendering, coordinate state, projection math, and raycast registration, append the evidence block to .ralph/agent/handoff.md, then mark the task done and commit.
 
+
+## Iteration plan (T372 annotate GUI_AuxiliaryList.cpp)
+- Observed that the file already carries many tags but still needs more explicit Unity/porting context at init and teardown, so we can add focused [UNITY] + [PORTING_HAZARD:P3] notes.
+- Plan: add hazard note around wxGetApp dependency, mention Unity model cleanup in the destructor, verify every event and state mention is covered, then append the required handoff evidence block.

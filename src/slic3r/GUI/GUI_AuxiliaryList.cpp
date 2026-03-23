@@ -111,6 +111,7 @@ AuxiliaryList::~AuxiliaryList()
 	// [STATE][THREAD] Disassociate the model and clean it up on the UI thread so bound controls never reference freed data.
 	this->AssociateModel(nullptr);
 	delete m_auxiliary_model;
+	// [UNITY] Unity should dispose of the matching tree controller and cached state so the selection/mode cleanup mirrors the wx teardown.
 }
 
 void AuxiliaryList::init_auxiliary()
@@ -120,6 +121,7 @@ void AuxiliaryList::init_auxiliary()
 	std::string aux_path = encode_path(model.get_auxiliary_file_temp_path().c_str());
 	m_auxiliary_model->Init(aux_path);
 	// [STATE] Model initialization pulls from the Plater auxiliary temp path so Unity needs to mirror that shared path before exposing tree entries.
+	// [PORTING_HAZARD:P3] wxGetApp() is a wxWidgets singleton that Unity lacks; inject the Plater/root controller so the tree still sees the auxiliary temp directory.
 	// [UNITY] Expose the same temp directory (e.g., via a ScriptableObject path provider) before Unity's tree populates so both views share the same source.
 	// [THREAD] This runs on the UI thread because it reads wxGetApp() state and updates the data view before the tree becomes visible.
 }

@@ -3076,3 +3076,16 @@ This prompt governs **Phase 1 only**.
 - Git: Annotate GLGizmoMove manipulator for Unity port
 - Next recommended Phase 1 task: T339 annotate: src/slic3r/GUI/Gizmos/GLGizmoScale.cpp
 
+
+## Phase 1 - Task T372 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Deliverables: src/slic3r/GUI/GUI_AuxiliaryList.cpp, .ralph/agent/scratchpad.md
+- Substantive additions: Added porting hazard guidance for wxGetApp() and explicit Unity teardown notes.
+- Verification excerpt: // [PORTING_HAZARD:P3] wxGetApp() is a wxWidgets singleton that Unity lacks; inject the Plater/root controller so the tree still sees the auxiliary temp directory.
+- Unity-impact summary:
+  - Unity must inject the auxiliary temp path (e.g., via a ScriptableObject) before the tree populates so both views share the same source.
+  - Unity must dispose of the tree controller/cached selection state when the panel tears down to avoid stale references.
+- Hazards found: 1 (P3)
+- Git: Note Unity hazard in AuxiliaryList
+- Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp
