@@ -3707,3 +3707,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3 (main-thread texture loading, ImGui focus/window names, modifier-aware wheel handling, custom popup focus).
 - Git: Annotate IMSlider slider logic for Unity port
 - Next recommended Phase 1 task: T418 annotate: src/slic3r/GUI/IMSlider.hpp
+
+## Phase 1 - Task T418 complete
+- Task type: annotate
+- File: src/slic3r/GUI/IMSlider.hpp
+- Deliverables: src/slic3r/GUI/IMSlider.hpp
+- Substantive additions: 14 multi-tag annotations covering slider intent, range caches, event bindings, render helpers, color themes, and Unity mapping guidance.
+- Verification excerpt: // [OPENGL][THREAD] Draws slider bars, tick icons, and labels on the GL canvas every frame; Unity port should replicate with a RenderTexture overlay and GraphicRaycaster interaction.
+- Unity-impact summary:
+  - Treat the dual-handle slider as a UI Toolkit RangeSlider tied to a ScriptableObject range model so both handles and label overlays stay in sync with preview state.
+  - Rebuild the ImGui context menus, custom go-to-layer dialog, and palette toggles as UI Toolkit `Dropdown`/`PopupWindow` combos backed by UnityEvents while marshaling commands through InputSystem handlers.
+- Hazards found: P3=1 (ImGui/wx popup mixes w/out Unity analog; must rebuild texture/menu lifecycle on main thread).
+- Git: annotate: src/slic3r/GUI/IMSlider.hpp
+- Next recommended Phase 1 task: T419 annotate: src/slic3r/GUI/IMToolbar.cpp
