@@ -470,3 +470,10 @@
 ## Iteration update
 - Completed T382 annotate `src/slic3r/GUI/GUI_Geometry.hpp` with multi-tag thread/event/OpenGL/Unity annotations and captured the shared bitmask hazard.
 - Next focus: T389 annotate `src/slic3r/GUI/GUI_ObjectList.hpp` for the next iteration.
+
+## Iteration plan update
+- Selected task: T389 annotate `src/slic3r/GUI/GUI_ObjectList.hpp` (task-1773880086-f964 now active).
+- Plan: read the header, map the object list lifecycle, selection/dnd state, event hooks, cached data, column layout, GL refresh triggers, and Unity analogs (UI Toolkit `ListView` + `ScrollView`, `VisualElement` binding). Insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments covering the list controller, `wxListCtrl` overrides, drag/click handlers, menu integration, and settings sync. Append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header, flip the task to `[x]` in `.ralph/ralph-tasks.md`, and then stop for this iteration so the next agent can take over.
+## Iteration plan update
+- Selected task: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp` (task-1773880086-6aa6 revived).
+- Plan: expand the existing comments with `[THREAD]`, `[STATE]`, and `[PORTING_HAZARD:P2]` cues around keyboard handling, model init/reload, folder creation, file imports, context menus, drag/drop, double-clicks, and hotkeys so Unity receives explicit lifecycle/state guidance; update `.ralph/agent/handoff.md` with the Phase 1 evidence block, stage/commit the annotated file plus metadata, and keep the task bookkeeping in sync for the next iteration.

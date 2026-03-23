@@ -2966,3 +2966,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=2 (wxDataViewCtrl virtualization + event macros) and P3=2 (Netfabb fix macro, Windows column-edit shim)
 - Git: Annotate GUI_ObjectList for Unity selection
 - Next recommended Phase 1 task: T390 annotate: src/slic3r/GUI/GUI_ObjectSettings.cpp
+
+## Phase 1 - Task T372 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Deliverables: src/slic3r/GUI/GUI_AuxiliaryList.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 9 thread/state/Unity annotations covering keyboard handling, model init/reload, import/delete flows, drag/drop, and context-menu wiring.
+- Verification excerpt: // [EVENT][THREAD][UNITY][STATE][PORTING_HAZARD:P2] File dialogs block the UI thread and hold the folder selection, so Unity should host an async native picker while keeping the folder state stable.
+- Unity-impact summary:
+  1. Mirror the Input System + toolbar/state binding so Unity buttons reuse the same controller hooks for import/delete and hotkeys.
+  2. Treat drag/drop + keyboard deletions as UI thread signals so Unity's DragAndDrop bridge resets and highlights in sync with path/state changes.
+  3. Surface the blocking file dialog and shell launch hazards so Unity switches to async pickers and `Process.Start`/`Application.OpenURL` helpers on the main thread.
+- Hazards found: P2=1 (blocking file dialog), P3=1 (native shell double-click launches)
+- Git: docs: annotate GUI auxiliary list
+- Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp

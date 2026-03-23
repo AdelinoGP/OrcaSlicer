@@ -63,6 +63,7 @@ AuxiliaryList::AuxiliaryList(wxWindow* parent)
 
 	// Keyboard events
 	Bind(wxEVT_CHAR, [this](wxKeyEvent& event) { this->handle_key_event(event); });
+	// [THREAD] Key events run on the UI thread, so Unity's Input System should marshal them before this handler.
 
 	// Button events
 	//m_nf_btn->Bind(wxEVT_BUTTON, &AuxiliaryList::on_create_folder, this, wxID_NEW);
@@ -117,6 +118,7 @@ void AuxiliaryList::init_auxiliary()
 	m_auxiliary_model->Init(aux_path);
 	// [STATE] Model initialization pulls from the Plater auxiliary temp path so Unity needs to mirror that shared path before exposing tree entries.
 	// [UNITY] Expose the same temp directory (e.g., via a ScriptableObject path provider) before Unity's tree populates so both views share the same source.
+	// [THREAD] This runs on the UI thread because it reads wxGetApp() state and updates the data view before the tree becomes visible.
 }
 
 void AuxiliaryList::reload(wxString aux_path)
@@ -130,6 +132,7 @@ void AuxiliaryList::reload(wxString aux_path)
 	}
 	// [STATE] Keep every node expanded right after reload so the UI reflects imports or deletions without manual expansion.
 	// [UNITY] Mirror this refresh pattern in Unity by expanding the TreeView entries immediately so the list matches user expectations.
+	// [THREAD] Expand/Select operations assume the UI thread because wxDataViewCtrl mutations are not thread-safe.
 }
 
 void AuxiliaryList::create_new_folder()
@@ -146,6 +149,7 @@ void AuxiliaryList::create_new_folder()
 	wxDataViewCellMode mode = col->GetRenderer()->GetMode();
 	col->GetRenderer()->SetMode(wxDATAVIEW_CELL_EDITABLE);
 	EditItem(folder_item, col);
+	// [STATE] Selection moves to the new folder and the renderer enters edit mode so Unity can mirror inline rename preparation.
 	col->GetRenderer()->SetMode(mode);
 }
 
@@ -174,7 +178,8 @@ void AuxiliaryList::do_import_file(AuxiliaryModelNode* folder)
 			}
 		}
 	}
-	// [EVENT][THREAD][UNITY] File dialogs block the UI thread; Unity must surface native file pickers and marshal the selection back to this helper.
+	// [EVENT][THREAD][UNITY][STATE][PORTING_HAZARD:P2] File dialogs block the UI thread and hold the folder selection, so Unity should host
+	// an async native picker while keeping the folder state stable.
 }
 
 void AuxiliaryList::on_create_folder(wxCommandEvent& evt)
@@ -257,7 +262,7 @@ void AuxiliaryList::on_context_menu(wxDataViewEvent& evt)
 	}
 
 	PopupMenu(menu);
-	// [EVENT][INTENT][UNITY] Keep context menus aligned with toolbar verbs so Unity can reuse the same helper methods for right-click overlays.
+	// [EVENT][INTENT][UNITY][STATE] Keep context menus aligned with toolbar verbs so Unity can reuse the same helper methods for right-click overlays.
 }
 
 void AuxiliaryList::on_begin_drag(wxDataViewEvent& evt)
@@ -273,7 +278,8 @@ void AuxiliaryList::on_begin_drag(wxDataViewEvent& evt)
 	obj->SetText("Some text");
 	evt.SetDataObject(obj);
 	evt.SetDragFlags(wxDrag_DefaultMove);
-	// [EVENT][STATE][UNITY] Record the dragged item so the drop handler can resolve the source even if the mouse moves outside the tree and so Unity's DragAndDrop layer can track the origin.
+	// [EVENT][STATE][THREAD][UNITY] Record the dragged item so the drop handler can resolve the source even if the mouse moves outside the tree and
+	// so Unity's DragAndDrop layer can track the origin without race conditions.
 }
 
 void AuxiliaryList::on_drop_possible(wxDataViewEvent& evt)
@@ -289,7 +295,7 @@ void AuxiliaryList::on_drop(wxDataViewEvent& evt)
 	Expand(evt.GetItem());
 	Select(m_dragged_item);
 	m_dragged_item = wxDataViewItem(nullptr);
-	// [EVENT][STATE][UNITY] Clear the drag sentinel once the move completes so future drops start fresh and Unity's DragAndDrop state resets.
+	// [EVENT][STATE][THREAD][UNITY] Clear the drag sentinel once the move completes so future drops start fresh and the UI thread-owned state resets before Unity reuses the controller.
 }
 
 void AuxiliaryList::on_editing_started(wxDataViewEvent& evt)
@@ -316,11 +322,11 @@ void AuxiliaryList::on_left_dclick(wxMouseEvent& evt)
 		evt.Skip();
 	}
 }
-// [EVENT][UNITY][PORTING_HAZARD:P3] Double-click launching relies on native shells; Unity should use a cross-platform helper (Process.Start or Application.OpenURL) on the main thread.
-
+// [EVENT][STATE][UNITY][PORTING_HAZARD:P3] Double-click launching relies on native shells; Unity should use a cross-platform helper (Process.Start
+// or Application.OpenURL) on the main thread and guard non-file containers.
 void AuxiliaryList::handle_key_event(wxKeyEvent& evt)
 {
 	if (evt.GetKeyCode() == WXK_DELETE || evt.GetKeyCode() == WXK_BACK)
 		m_auxiliary_model->Delete(this->GetSelection());
-	// [EVENT][STATE][UNITY] Keyboard delete/backspace mirrors the toolbar Delete button so Unity can wire the same hotkeys into this helper via the Input System command map.
-}
+	// [EVENT][STATE][THREAD][UNITY] Keyboard delete/backspace mirrors the toolbar Delete button so Unity can wire the same hotkeys into this helper
+	// via the Input System command map while staying on the UI thread.
