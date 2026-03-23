@@ -831,3 +831,7 @@
 ## Iteration plan update
 - Selected task: T396 annotate `src/slic3r/GUI/GUI_Preview.cpp` (active task-1773880086-a6c0).
 - Plan: inspect the preview pane implementation for camera/navigation state, thumbnail generation, config bindings, and GL refresh loops; sprinkle `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` comments around preview setup, render cache invalidation, event bindings for selection, mouse/keyboard input, and config persistence, describe Unity equivalents (RenderTexture preview camera + UI Toolkit preview controls + Input System) plus hazards (GL context on worker, shared static caches), append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file plus metadata, close T396, and leave the iteration ready for the next task.
+
+## Iteration plan update (current)
+- Selected task: T407 annotate `src/slic3r/GUI/HttpServer.hpp` (ready and unblocked per manifest).
+- Plan: ensure the runtime task is marked `[~]`, read the header thoroughly, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P2]` comments describing server lifecycle, listener ownership, request handler mapping, event dispatcher threading, and config persistence; tie the responsibilities to Unity's `UnityWebRequest`/`NetworkTransport` style module with a dedicated background `Task` queue; append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only `HttpServer.hpp` and the handoff update, close the task, and then stop for this iteration so another agent can continue.

@@ -4056,3 +4056,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3=1 (update_config_values must finish before any worker job reads the ModelConfig snapshot to avoid stale overrides).
 - Git: annotate: src/slic3r/GUI/GUI_ObjectSettings.hpp
 - Next recommended Phase 1 task: T392 annotate: src/slic3r/GUI/GUI_ObjectTable.cpp
+
+## Phase 1 - Task T407 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HttpServer.hpp
+- Deliverables: src/slic3r/GUI/HttpServer.hpp
+- Substantive additions: 6 detailed annotations covering response state, thread dispatch, handler wiring, and Unity mapping requirements
+- Verification excerpt: // [THREAD] Handler callbacks run from the IO thread, so they must hand off to Unity's main thread before touching scene state.
+- Unity-impact summary:
+  - Mirror the macro/static port config with a serialized Unity settings asset so players can adjust the HTTP bridge at runtime.
+  - Replay Response/Session lifecycle via UnityWebRequest + Task-based listeners before dispatching to UI Toolkit.
+  - Replace `url_get_param` with `System.Uri`/`WWWForm` parsing when dealing with international routes.
+- Hazards found: 2 (P3 hard-coded macros, P3 ASCII-only parser)
+- Git: docs: annotate HttpServer.hpp for Unity
+- Next recommended Phase 1 task: T408 annotate: src/slic3r/GUI/I18N.cpp

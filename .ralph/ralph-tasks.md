@@ -325,7 +325,7 @@ Last updated: 2026-03-23T22:50:28Z
 - [x] T404 annotate: src/slic3r/GUI/HMSPanel.cpp
 - [x] T405 annotate: src/slic3r/GUI/HMSPanel.hpp
 - [x] T406 annotate: src/slic3r/GUI/HttpServer.cpp
-- [ ] T407 annotate: src/slic3r/GUI/HttpServer.hpp
+- [x] T407 annotate: src/slic3r/GUI/HttpServer.hpp
 - [x] T408 annotate: src/slic3r/GUI/I18N.cpp
 - [x] T409 annotate: src/slic3r/GUI/I18N.hpp
 - [x] T410 annotate: src/slic3r/GUI/IconManager.cpp
