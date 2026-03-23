@@ -3614,3 +3614,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3) - `load_print_as_fff` relies on the legacy FFF path, so Unity must gate the fallback when G-code-only previews lock the main renderer.
 - Git: annotate: src/slic3r/GUI/GUI_Preview.hpp
 - Next recommended Phase 1 task: T412 annotate: src/slic3r/GUI/ImageDPIFrame.cpp
+
+## Phase 1 - Task T412 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ImageDPIFrame.cpp
+- Deliverables: src/slic3r/GUI/ImageDPIFrame.cpp
+- Substantive additions: 12 attribute-level annotations covering overlay setup, bitmap swapping, timer logic, event bindings, and show/hide lifecycle (INTENT/STATE/EVENT/THREAD/UNITY/PORTING_HAZARD tags)
+- Verification excerpt: // [PORTING_HAZARD:P2] Polling wxGetMousePosition directly is unsafe for background threads; Unity will need to marshal its Input.mousePosition via MainThreadDispatcher.
+- Unity-impact summary:
+  - Recreate the floating DPI preview as a UI Toolkit Panel/VisualElement overlay driven by a Coroutine that monitors Input.mousePosition and toggles visibility rather than relying on wxTimer.
+  - Treat the preview bitmap as a Texture2D asset from a ScriptableObject cache and swap it via Graphics.Blit into the panel's RenderTexture whenever the hint needs refreshing.
+- Hazards found: P2=1 (global mouse polling) P3=1 (wxGetApp/mainframe focus juggling)
+- Git: annotate: src/slic3r/GUI/ImageDPIFrame.cpp
+- Next recommended Phase 1 task: T413 annotate: src/slic3r/GUI/ImageDPIFrame.hpp

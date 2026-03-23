@@ -686,3 +686,7 @@
 ## Iteration plan update - T393
 - Selected task: T393 annotate `src/slic3r/GUI/GUI_ObjectTable.hpp` (task currently open and awaiting completion).
 - Plan: verify `ObjectGrid`, `ObjectGridTable`, `ObjectTablePanel`, and `ObjectTableDialog` declarations expose their intent/state/event scopes, annotate any remaining stateful caches (selection lists, sort column, config caches), describe how `release_object_configs`, `reload_*`, and `reset` flows reconcile with the `DynamicPrintConfig`, and call out the Unity analog (UI Toolkit ListView/ObservableCollection + ScriptableObject-backed config). Highlight porting hazards around wxGrid event macros, custom renderers, and DPI dialog focus, then append the Phase 1 evidence block before marking the task done and stopping for this iteration.
+
+## Iteration plan update - T412
+- Selected task: T412 annotate `src/slic3r/GUI/ImageDPIFrame.cpp` (task-1773880086-20e9 now in progress).
+- Plan: read the DPI frame implementation end-to-end, mark `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments for the image loading pipeline, DPI/zoom caching, toolbar bindings, and popup dialogs; record how the wxScrolledWindow/bitmap upload loop transitions into rendering, note Unity equivalent (UI Toolkit ScrollView + RenderTexture update with asynchronous Texture2D loading), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file, close T412, and then pause for the next iteration.
