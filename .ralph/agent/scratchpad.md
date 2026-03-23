@@ -601,3 +601,7 @@
 ## Iteration update
 - Completed `T396 annotate: src/slic3r/GUI/GUI_Preview.cpp` with multi-tag coverage for View3D/Preview/AssembleView, slider bindings, background scheduling, and Unity guidance; the file has the updated handoff evidence block and task registry marks.
 - Next iteration plan: pick `T397 annotate: src/slic3r/GUI/GUI_Preview.hpp`, ensure headers map the preview state to the GL canvas, outline the slider facts, and continue the Phase 1 pipeline with another small atomic commit.
+
+## Iteration plan update
+- Selected task: T154 annotate `src/slic3r/GUI/AMSSetting.hpp` (task-1773880085-053b just started).
+- Plan: read the header fully, capture the AMS setting panel intent, stateful defaults, combo binding helpers, and config persistence hooks; insert `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD]` annotations that mention any threading or GL calls, highlight the Unity analog (e.g., UI Toolkit VisualElement tree + `ScriptableObject` for AMS presets plus event-driven `Command` bridging), append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header plus handoff metadata, close the task, and then stop for this iteration so the next agent can continue.

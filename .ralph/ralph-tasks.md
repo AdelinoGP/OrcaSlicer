@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-23T14:40:25Z
+Last updated: 2026-03-23T15:21:35Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -72,7 +72,7 @@ Last updated: 2026-03-23T14:40:25Z
 - [x] T151 annotate: src/slic3r/GUI/MsgDialog.cpp
 - [x] T152 annotate: src/slic3r/GUI/AMSMaterialsSetting.hpp
 - [x] T153 annotate: src/slic3r/GUI/AMSSetting.cpp
-- [ ] T154 annotate: src/slic3r/GUI/AMSSetting.hpp
+- [x] T154 annotate: src/slic3r/GUI/AMSSetting.hpp
 - [ ] T155 annotate: src/slic3r/GUI/AmsWidgets.cpp
 - [x] T156 annotate: src/slic3r/GUI/Tab.hpp
 - [ ] T157 annotate: src/slic3r/GUI/Auxiliary.cpp

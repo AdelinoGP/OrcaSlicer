@@ -3348,3 +3348,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=2 (Win32 copy + DPI/font/dark-mode APIs), P3=2 (dialog extras + Linux debugger probe/dark-mode heuristics).
 - Git: Document GUI utility helpers for Unity port
 - Next recommended Phase 1 task: T399 annotate: src/slic3r/GUI/GUI_Utils.hpp
+
+## Phase 1 - Task T154 complete
+- Task type: annotate
+- File: src/slic3r/GUI/AMSSetting.hpp
+- Deliverables: src/slic3r/GUI/AMSSetting.hpp
+- Substantive additions: 9 targeted annotations covering dialog intent, state caches, event wiring, thread guidance, Unity mapping, and hazards (INTENT/STATE/EVENT/THREAD/UNITY/PORTING_HAZARD)
+- Verification excerpt: // [INTENT] Primary AMS dialog that maps MachineObject status into checkboxes, firmware labels, and intro art for the UI.
+- Unity-impact summary:
+  - Recreate the AMS dialog as a UI Toolkit VisualElement with toggles bound to a ScriptableObject AMSConfig, mirroring the `m_checkbox_*` toggles and image hints.
+  - Mirror firmware dropdown handling with a `PopupField` + `ListView` backed by `ObservableCollection<int>` and a `Command` for `DevAmsSystemFirmwareSwitch` updates.
+  - Guard firmware switch lookups with `AsyncOperation`/Task-friendly wrappers so Unity can access the worker-owned `DevAmsSystemFirmwareSwitch` safely.
+- Hazards found: P2=1 (`wxCommandEvent` checkbox handlers and DPI callbacks assume the wxWidgets main thread and manual layout updates; Unity needs synchronous dispatcher support).
+- Git: annotate: src/slic3r/GUI/AMSSetting.hpp
+- Next recommended Phase 1 task: T155 annotate: src/slic3r/GUI/AmsWidgets.cpp
