@@ -820,3 +820,7 @@
 ## Iteration plan update
 - Task: `T392 annotate: src/slic3r/GUI/GUI_ObjectTable.cpp`
 - Plan: read `GUI_ObjectTable.cpp` top-to-bottom to understand how the object grid/table/dialog interact, then insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations around cache management, selection synchronization, `wxGrid` wiring, and event dispatch. After the file-level coverage is complete, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, mark the task done in `.ralph/ralph-tasks.md`, stage/commit the annotated file plus metadata, and stop so the next iteration can continue.
+
+## Iteration plan update
+- Selected task: T396 annotate `src/slic3r/GUI/GUI_Preview.cpp` (active task-1773880086-a6c0).
+- Plan: inspect the preview pane implementation for camera/navigation state, thumbnail generation, config bindings, and GL refresh loops; sprinkle `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` comments around preview setup, render cache invalidation, event bindings for selection, mouse/keyboard input, and config persistence, describe Unity equivalents (RenderTexture preview camera + UI Toolkit preview controls + Input System) plus hazards (GL context on worker, shared static caches), append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file plus metadata, close T396, and leave the iteration ready for the next task.

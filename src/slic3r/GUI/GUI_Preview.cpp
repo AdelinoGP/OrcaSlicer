@@ -40,6 +40,8 @@
 namespace Slic3r {
 namespace GUI {
 
+
+// [INTENT][OPENGL][UNITY] Bridges each wxPanel-based view into GLCanvas3D and documents how Unity should recreate it with a RenderTexture camera plus selection controller.
 View3D::View3D(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process)
     : m_canvas_widget(nullptr)
     , m_canvas(nullptr)
@@ -47,12 +49,16 @@ View3D::View3D(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* c
     init(parent, bed, model, config, process);
 }
 
+
+// [STATE][OPENGL] Dispose the GL canvas/widget so Unity can release RenderTexture references before the panel destruction completes.
 View3D::~View3D()
 {
     delete m_canvas;
     delete m_canvas_widget;
 }
 
+
+// [THREAD][OPENGL] Creates the child GL canvas on the UI thread so OpenGLManager can hand an anti-aliased context to this view.
 bool View3D::init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process)
 {
     if (!Create(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0 /* disable wxTAB_TRAVERSAL */))
@@ -229,6 +235,8 @@ void View3D::render()
         m_canvas->set_as_dirty();
 }
 
+
+// [INTENT][THREAD][UNITY] Builds the preview panel on the UI thread and wires the slicing scheduler so Unity can mirror it with RenderTexture + VisualElement controls.
 Preview::Preview(
     wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config,
     BackgroundSlicingProcess* process, GCodeProcessorResult* gcode_result, std::function<void()> schedule_background_process_func)
@@ -248,6 +256,8 @@ void Preview::update_gcode_result(GCodeProcessorResult* gcode_result)
     return;
 }
 
+
+// [INTENT][OPENGL][THREAD] Builds the preview GL canvas, matches slider background colors, and binds resize handlers so Unity can mirror the RenderTexture pipeline.
 bool Preview::init(wxWindow* parent, Bed3D& bed, Model* model)
 {
     if (!Create(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0 /* disable wxTAB_TRAVERSAL */))
@@ -294,6 +304,8 @@ bool Preview::init(wxWindow* parent, Bed3D& bed, Model* model)
     return true;
 }
 
+
+// [STATE][THREAD] Unbinds events and tears down the GL canvas so Unity can release RenderTexture references before the preview shuts down.
 Preview::~Preview()
 {
     unbind_event_handlers();
@@ -329,6 +341,8 @@ void Preview::set_drop_target(wxDropTarget* target)
 }
 
 //BBS: add only gcode mode
+
+// [INTENT][STATE][UNITY] Picks the FFF or G-code preview path while syncing the background slicing process with RenderTexture creation so Unity matches the native preview state.
 void Preview::load_print(bool keep_z_range, bool only_gcode)
 {
     PrinterTechnology tech = m_process->current_printer_technology();
@@ -339,6 +353,8 @@ void Preview::load_print(bool keep_z_range, bool only_gcode)
 }
 
 //BBS: add only gcode mode
+
+// [EVENT][STATE][UNITY] Triggers a preview reload when the mode toggles so Unity can refresh the RenderTexture and slider indicators.
 void Preview::reload_print(bool only_gcode)
 {
     BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(" %1%: enter")%__LINE__;
@@ -352,17 +368,23 @@ void Preview::reload_print(bool only_gcode)
 }
 
 //BBS: always load shell at preview
+
+// [STATE][OPENGL] Updates the GL shell overlay so Unity can keep the mesh consistent during shell-only previewing.
 void Preview::load_shells(const Print& print, bool force_previewing)
 {
     m_canvas->load_shells(print, force_previewing);
 }
 
 //BBS: always load shell at preview
+
+// [STATE][OPENGL] Clears transient shell overlays before refreshing so Unity can mirror the same overlay reset.
 void Preview::reset_shells()
 {
     m_canvas->reset_shells();
 }
 
+
+// [EVENT][STATE] Responds to MSW DPI/resolution shifts so Unity can adjust legend and slider spacing alongside RenderTexture recreation.
 void Preview::msw_rescale()
 {
     // rescale warning legend on the canvas
@@ -372,12 +394,16 @@ void Preview::msw_rescale()
     reload_print(m_only_gcode);
 }
 
+
+// [EVENT][STATE] Placeholder for system theme changes; Unity can reroute this to its theme manager if needed.
 void Preview::sys_color_changed()
 {
     //TODO
     // m_layers_slider->sys_color_changed();
 }
 
+
+// [EVENT][STATE][THREAD] Handles background tick updates so the preview reloads on the UI thread and Unity can monitor worker ticks through the same scheduler.
 void Preview::on_tick_changed(Type type)
 {
     //if (type == Type::PausePrint) {
@@ -387,11 +413,15 @@ void Preview::on_tick_changed(Type type)
     reload_print(false);
 }
 
+
+// [EVENT][THREAD] Bind the wx size event so the GL canvas refreshes when the preview panel resizes; Unity should register equivalent VisualElement callbacks.
 void Preview::bind_event_handlers()
 {
     this->Bind(wxEVT_SIZE, &Preview::on_size, this);
 }
 
+
+// [EVENT][THREAD] Tear down the size binding to avoid callbacks into destroyed panels, matching Unity listener cleanup.
 void Preview::unbind_event_handlers()
 {
     this->Unbind(wxEVT_SIZE, &Preview::on_size, this);
@@ -420,6 +450,8 @@ void Preview::on_size(wxSizeEvent& evt)
     Refresh();
 }
 
+
+// [STATE][UNITY] Keeps CustomGCode slider ticks inside the active layer range and reprimes the background slicer when ticks disappear so Unity matches slider guards.
 void Preview::check_layers_slider_values(std::vector<CustomGCode::Item>& ticks_from_model, const std::vector<double>& layers_z)
 {
     // All ticks that would end up outside the slider range should be erased.
@@ -459,6 +491,8 @@ static int find_close_layer_idx(const std::vector<double> &zs, double &z, double
     return -1;
 }
 
+
+// [STATE][UNITY] Inspects extruder usage (single vs multi) and drives slider mode/config so Unity's dual-slider UI stays in sync.
 void Preview::update_layers_slider_mode()
 {
     //    true  -> single-extruder printer profile OR
@@ -505,6 +539,8 @@ void Preview::update_layers_slider_mode()
     m_layers_slider->SetModeAndOnlyExtruder(one_extruder_printed_model, only_extruder, can_change_color);
 }
 
+
+// [EVENT][STATE][UNITY] Forwards canvas key input to slider helpers so Unity's InputSystem can replicate hotkeys while keeping the RenderTexture dirty.
 void Preview::update_layers_slider_from_canvas(wxKeyEvent &event)
 {
     if (event.HasModifiers()) {
@@ -527,6 +563,8 @@ void Preview::update_layers_slider_from_canvas(wxKeyEvent &event)
         event.Skip();
 }
 
+
+// [STATE][UNITY][OPENGL] Recomputes slider spans, ticks, and extruder colors so Unity slider bindings and RenderTexture legends stay consistent.
 void Preview::update_layers_slider(const std::vector<double>& layers_z, bool keep_z_range)
 {
     IMSlider *m_layers_slider = m_canvas->get_gcode_viewer().get_layers_slider();
@@ -625,6 +663,8 @@ void Preview::update_layers_slider(const std::vector<double>& layers_z, bool kee
 }
 
 //BBS: add only gcode mode
+
+// [INTENT][PORTING_HAZARD:P3][THREAD][STATE] Drives the legacy FFF preview when no full slicing result exists so Unity can mimic the fallback RenderTexture updates while guarding the mainframe lifecycle.
 void Preview::load_print_as_fff(bool keep_z_range, bool only_gcode)
 {
     if (wxGetApp().mainframe == nullptr || wxGetApp().is_recreating_gui())
@@ -745,6 +785,8 @@ void Preview::load_print_as_fff(bool keep_z_range, bool only_gcode)
     }
 }
 
+
+// [INTENT][OPENGL][UNITY] Builds the assemble-mode view so Unity can spin up a second RenderTexture camera while sharing the same scene data.
 AssembleView::AssembleView(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process)
     : m_canvas_widget(nullptr)
     , m_canvas(nullptr)
@@ -758,6 +800,8 @@ AssembleView::~AssembleView()
     delete m_canvas_widget;
 }
 
+
+// [INTENT][THREAD][OPENGL] Mirrors the preview init but hides selection tools and configures the assemble toolbar so Unity can match the second RenderTexture pipeline.
 bool AssembleView::init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process)
 {
     if (!Create(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0 /* disable wxTAB_TRAVERSAL */))
@@ -808,23 +852,31 @@ bool AssembleView::init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrint
     return true;
 }
 
+
+// [STATE][OPENGL][UNITY] Marks the assemble canvas dirty so the secondary RenderTexture camera stays in sync with slicing data.
 void AssembleView::set_as_dirty()
 {
     if (m_canvas != nullptr)
         m_canvas->set_as_dirty();
 }
 
+
+// [OPENGL][STATE] Forces a GPU draw for the assemble pane so Unity can trigger the second camera refresh synchronously with slicing completion.
 void AssembleView::render()
 {
     if (m_canvas != nullptr)
         m_canvas->set_as_dirty();
 }
 
+
+// [STATE] Exposes whether this view reload is throttled so Unity's scheduler can mirror the same pacing.
 bool AssembleView::is_reload_delayed() const
 {
     return (m_canvas != nullptr) ? m_canvas->is_reload_delayed() : false;
 }
 
+
+// [THREAD][OPENGL] Marshals a scene rebuild request so Unity can refresh the RenderTexture immediately or later depending on the force flag.
 void AssembleView::reload_scene(bool refresh_immediately, bool force_full_scene_refresh)
 {
     if (m_canvas != nullptr) {
@@ -835,6 +887,8 @@ void AssembleView::reload_scene(bool refresh_immediately, bool force_full_scene_
     }
 }
 
+
+// [EVENT][UNITY] Lets toolbar controls orient the assemble camera using the same presets Unity reuses for both views.
 void AssembleView::select_view(const std::string& direction)
 {
     if (m_canvas != nullptr)

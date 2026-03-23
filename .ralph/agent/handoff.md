@@ -3225,6 +3225,20 @@ This prompt governs **Phase 1 only**.
 - Git: annotate: src/slic3r/GUI/GUI_ObjectSettings.hpp
 - Next recommended Phase 1 task: T392 annotate: src/slic3r/GUI/GUI_ObjectTable.cpp
 
+## Phase 1 - Task T396 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Preview.cpp
+- Deliverables: src/slic3r/GUI/GUI_Preview.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 12 targeted annotations covering View3D/Preview/AssembleView canvas wiring, slider state, event bindings, and Unity migration guidance
+- Verification excerpt: // [INTENT][OPENGL][UNITY] Bridges the wxPanel lifetime to GLCanvas3D so this view mirrors model/bed state and can map to a Unity RenderTexture camera + selection controller.
+- Unity-impact summary:
+  - Port the GLCanvas3D creation and toolbar toggles to a RenderTexture camera plus MonoBehaviour selection controller, ensuring the Unity viewport matches the native gizmo handles.
+  - Mirror `IMSlider` range updates and the `L` hotkey via UI Toolkit sliders wired to InputSystem callbacks so slider ranges, ticks, and extruder colors stay synchronized with the preview state.
+  - Preserve the `BackgroundSlicingProcess` guard plus `m_loaded_print` cache with async Tasks/ScriptableObject caches so Unity redraws only when new prints arrive.
+- Hazards found: P2=1 (wxGetApp/mainframe guard), P3=1 (TODO slider show/hide stubs + wx globals)
+- Git: annotate: src/slic3r/GUI/GUI_Preview.cpp
+- Next recommended Phase 1 task: T397 annotate: src/slic3r/GUI/GUI_Preview.hpp
+
 ## Phase 1 - Task T372 complete
 - Task type: annotate
 - File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
