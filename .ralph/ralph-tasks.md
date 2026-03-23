@@ -87,7 +87,7 @@ Last updated: 2026-03-23T22:50:28Z
 - [x] T166 annotate: src/slic3r/GUI/BaseTransparentDPIFrame.hpp
 - [x] T167 annotate: src/slic3r/GUI/BBLStatusBarBind.cpp
 - [x] T168 annotate: src/slic3r/GUI/BBLStatusBarBind.hpp
-- [ ] T169 annotate: src/slic3r/GUI/BBLStatusBar.cpp
+- [x] T169 annotate: src/slic3r/GUI/BBLStatusBar.cpp
 - [ ] T170 annotate: src/slic3r/GUI/BBLStatusBar.hpp
 - [ ] T171 annotate: src/slic3r/GUI/BBLStatusBarPrint.cpp
 - [ ] T172 annotate: src/slic3r/GUI/BBLStatusBarPrint.hpp

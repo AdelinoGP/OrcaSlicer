@@ -195,6 +195,19 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate: src/libvgcode/src/ExtrusionRoles.cpp
 - Next recommended Phase 1 task: T114 annotate: src/libvgcode/src/ExtrusionRoles.hpp
 
+## Phase 1 - Task T169 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BBLStatusBar.cpp
+- Deliverables: src/slic3r/GUI/BBLStatusBar.cpp
+- Substantive additions: 10 annotations covering the BBL status layout, progress gating, busy state, cancellation event, and info visibility guards
+- Verification excerpt: // [INTENT] Expose BBL-specific status, progress, and cancel affordances inside the main frame so print workflow updates stay visible without hijacking the primary preview space.
+- Unity-impact summary:
+  - Map the sizer row to a UI Toolkit `VisualElement` row with `Label`s, `ProgressBar`, and `Button`, ensuring the same visibility toggles occur via bindings.
+  - Mirror the manual show/hide + Layout state machine with a Unity `VisualElement` tree and explicit `style.display` toggles pre/post jobs instead of relying on wxSizer propagation.
+- Hazards found: 1 (P3 layout/show-hide dance must be ported separately).
+- Git: annotate: src/slic3r/GUI/BBLStatusBar.cpp
+- Next recommended Phase 1 task: T170 annotate: src/slic3r/GUI/BBLStatusBar.hpp
+
 ## Phase 1 - Task T392 complete
 - Task type: annotate
 - File: src/slic3r/GUI/GUI_ObjectTable.cpp
