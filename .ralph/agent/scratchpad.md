@@ -525,3 +525,7 @@
 ## Iteration plan update
 - Selected task: T387 annotate `src/slic3r/GUI/GUI_ObjectLayers.hpp`
 - Plan: read the header, capture both the layer model state (active layer, selection caches, visible flags) and the layer list view/event bindings; insert `[INTENT]` comments on the controller structs, `[STATE]` on layer caching and menu sync helpers, `[EVENT]` on wxListCtrl/toolbar button wiring, `[THREAD]` where background updates push to UI, `[OPENGL]` around any GL refresh triggers, and `[UNITY]` guidance for a UI Toolkit `ListView` plus `ScriptableObject` layer model plus `Command` bridging; note any `[PORTING_HAZARD]` (e.g., dual ownership of wxWidgets controls) and append the Phase 1 evidence block before closing the task.
+
+## Iteration update
+- Completed `T393 annotate: src/slic3r/GUI/GUI_ObjectTable.hpp` by adding multi-tag notes across cell renderers/editors, the ObjectGridTable model, the panel, and the dialog plus corresponding Unity/hazard guidance; appended the Phase 1 evidence block and handed off to T394.
+- Next up: pick `T394 annotate: src/slic3r/GUI/GUI_ObjectTableSettings.cpp` after verifying runtime readiness.
