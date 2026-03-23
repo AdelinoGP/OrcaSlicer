@@ -200,6 +200,13 @@
 - Plan: read the file in full, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around the combo box widget initialization, event wiring, preset cache, and render helpers; ensure comments note any asynchronous state, selection caching, or cross-thread hazards, highlight Unity analogs (e.g., UI Toolkit `ListView` with `VisualElement` item renderer plus ScriptableObject preset model), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the single file change, close T153, and then pick the next eligible Phase 1 task afterward.
 
 ## Iteration plan update
+- Selected task: T413 annotate `src/slic3r/GUI/ImageDPIFrame.hpp` as the current focus for this iteration.
+- Plan: read the DPI frame header, weave `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations around the frame lifecycle, DPI delta handling, refresh timer, and layout state, append the mandated evidence block to `.ralph/agent/handoff.md`, stage/commit the header plus handoff, close the runtime task, and keep the manifest moving forward.
+
+## Iteration update
+- Completed T413 by annotating `src/slic3r/GUI/ImageDPIFrame.hpp` with multi-tag guidance over the floating DPI frame intent, visibility/timer events, state caches, and Unity mapping plus hazard notes before appending the evidence block and preparing to commit.
+
+## Iteration plan update
 - Selected task: T347 annotate `src/slic3r/GUI/Gizmos/GLGizmoSimplify.hpp` (runtime task `task-1773880086-2930`).
 - Plan: review the header to map the simplify gizmo API, record intent/state/event/thread/OpenGL/Unity context for each public member (selection modes, worker hooks, GL draw helpers), annotate caches and hazard spots, append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the header, close the task, and then pivot to the next ready entry in the Phase 1 manifest.
 

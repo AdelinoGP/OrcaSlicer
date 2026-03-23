@@ -3627,3 +3627,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (global mouse polling) P3=1 (wxGetApp/mainframe focus juggling)
 - Git: annotate: src/slic3r/GUI/ImageDPIFrame.cpp
 - Next recommended Phase 1 task: T413 annotate: src/slic3r/GUI/ImageDPIFrame.hpp
+
+## Phase 1 - Task T413 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ImageDPIFrame.hpp
+- Deliverables: src/slic3r/GUI/ImageDPIFrame.hpp, .ralph/agent/handoff.md
+- Substantive additions: 8 multi-tag annotations describing the DPI frame intent, event hooks, state caches, timer debounce, and Unity mappings.
+- Verification excerpt: // [STATE] Pixel width of the currently attached image; key for text overlays and metric computations.
+- Unity-impact summary:
+  - Mirror this floating DPI preview as a UI Toolkit Panel/VisualElement holding a Texture2D fed by a ScriptableObject DPI config so scale/title handling stays consistent.
+  - Replace the wxTimer-driven refresh with a main-thread coroutine bound to `Time.deltaTime` and visibility toggles controlled by the panel's `SetActive` state.
+- Hazards found: P2=2 (wxRect DPI hints do not map directly to Unity monitors, and the timer refresh requires UI-thread-only scheduling).
+- Git: annotate: src/slic3r/GUI/ImageDPIFrame.hpp
+- Next recommended Phase 1 task: T414 annotate: src/slic3r/GUI/ImageGrid.cpp
