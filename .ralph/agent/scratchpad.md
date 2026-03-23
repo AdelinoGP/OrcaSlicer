@@ -627,3 +627,7 @@
 ## Iteration plan
 - Current focus: T405 annotate `src/slic3r/GUI/HMSPanel.hpp` (task-1773880086-7ab4 is open).
 - Plan: start the runtime task, read the header fully, annotate class intent, stateful maps, toolbar/event wiring, and Unity/porting tags across helper declarations, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header plus metadata, close the task, and stop this iteration so the next agent can continue.
+
+## Iteration plan update
+- Selected task: T399 annotate `src/slic3r/GUI/GUI_Utils.hpp` (task-1773880086-ecab now open).
+- Plan: start the task, read `GUI_Utils.hpp` top-to-bottom to capture layout helpers, shared state, event wiring, and caching logic; insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations around the layout utilities, event handlers, and helper structs; append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit `GUI_Utils.hpp` plus metadata, close the task, and hand off to the next iteration.

@@ -3429,3 +3429,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (wxHtmlWindow + bitmap caching), P3=1 (wxScrolledWindow virtualization + hyperlink behavior)
 - Git: annotate: src/slic3r/GUI/HMSPanel.hpp
 - Next recommended Phase 1 task: T406 annotate: src/slic3r/GUI/HttpServer.cpp
+
+## Phase 1 - Task T399 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Utils.hpp
+- Deliverables: src/slic3r/GUI/GUI_Utils.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md
+- Substantive additions: 15 multi-tag annotations covering DPI helpers, event guards, dialog stacks, and auxiliary image/DPI utilities
+- Verification excerpt: // [EVENT][THREAD][PORTING_HAZARD:P2] DPI change events fire on the UI thread; the lambda recalculates scale/ font metrics so Unity's canvas scaler or UI Toolkit should reapply `Screen.dpi` adjustments instead.
+- Unity-impact summary:
+  - Map the DPIAware logic to a CanvasScaler/VisualElement watcher paired with `Screen.dpi` change callbacks so fonts and controls rescale automatically.
+  - Replace EventGuard bound handlers with UnityEvent/IDisposable patterns to avoid native callbacks hitting destroyed objects.
+  - Store WindowMetrics and CheckboxFileDialog state in ScriptableObjects or serialized `PlayerPrefs` entries instead of manual wx stacks.
+- Hazards found: P2=4, P3=5 (DPI/change events, dark mode bridging, modal dialog stack, OS-specific image helpers, macOS inset hacks)
+- Git: annotate: src/slic3r/GUI/GUI_Utils.hpp
+- Next recommended Phase 1 task: T400 annotate: src/slic3r/GUI/HintNotification.cpp
