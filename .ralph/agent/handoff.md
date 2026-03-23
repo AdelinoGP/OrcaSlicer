@@ -2845,3 +2845,16 @@ This prompt governs **Phase 1 only**.
 - Git: Annotate GUI auxiliary list for Unity guidance
 - Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp
 
+## Phase 1 - Task T372 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Deliverables: src/slic3r/GUI/GUI_AuxiliaryList.cpp, .ralph/agent/scratchpad.md
+- Substantive additions: 6 event/state/Unity annotations on toolbar import helpers, context menu wiring, drag/drop lifecycle, and double-click hazards to guide Unity wiring.
+- Verification excerpt: `    // [EVENT][STATE][UNITY] Centralize the import workflow so Unity's controller can reuse this entry point when wiring toolbar buttons`.
+- Unity-impact summary:
+  - Documented the shared controller hooks for toolbar/context verbs so the Unity controller reuses the same commands.
+  - Clarified how drag-and-drop records and resets state so Unity's DragAndDrop bridge mirrors the tree updates and input map.
+  - Called out the native double-click hazard so Unity can route launches through `Application.OpenURL`/`Process.Start` on the main thread.
+- Hazards found: 1 (P3 double-click launch reliance on native shells).
+- Git: Document auxiliary list event signals
+- Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp
