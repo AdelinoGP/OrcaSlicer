@@ -24,8 +24,9 @@ AuxiliaryList::AuxiliaryList(wxWindow* parent)
 	m_auxiliary_model = new AuxiliaryModel();
 	// [STATE] The AuxiliaryModel owns canonical auxiliary paths so toolbar/context actions operate on a shared tree.
 	this->AssociateModel(m_auxiliary_model);
+	// [THREAD] Construction runs on the main UI thread so the tree and toolbar wiring stay locked to a single scheduler for Unity's main loop replacement.
 	m_sizer = new wxBoxSizer(wxVERTICAL);
-	// [STATE][UNITY] Store the sizer so Unity"s VisualElement layout can treat this tree + toolbar block as one unit.
+	// [STATE][UNITY] Store the sizer so Unity's VisualElement layout can treat this tree + toolbar block as one unit.
 	m_sizer->Add(this, 1, wxEXPAND | wxALL, 0);
 
 	wxPanel* panel = new wxPanel(parent, wxID_ANY, wxDefaultPosition, wxSize(-1, FromDIP(21)));

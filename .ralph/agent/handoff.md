@@ -2993,3 +2993,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (recursive `update_config_values`/`load_config` combo plus global `wxGetApp()` singletons) + P3=1 (delete buttons and snapshots tied to blocking UI updates and `plater` preview hooks).
 - Git: annotate: src/slic3r/GUI/GUI_ObjectSettings.cpp
 - Next recommended Phase 1 task: T391 annotate: src/slic3r/GUI/GUI_ObjectSettings.hpp
+
+## Phase 1 - Task T372 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Deliverables: src/slic3r/GUI/GUI_AuxiliaryList.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: Added a UI-thread construction note plus refined the Unity mapping so the shared tree/toolbar block keeps consistent selection state and hotkeys.
+- Verification excerpt: // [THREAD] Construction runs on the main UI thread so the tree and toolbar wiring stay locked to a single scheduler for Unity's main loop replacement.
+- Unity-impact summary:
+  - Mirror the tree + toolbar block as a UI Toolkit VisualElement/Toolbar controller pair that initializes on the Unity main thread so bindings stay consistent.
+  - Keep the Input System command map for import/delete/hotkeys tied to the shared selection state so Unity calls the same controller methods.
+  - Surface the blocking file dialog and native launch hazards as asynchronous pickers plus `Process.Start`/`Application.OpenURL` helpers on Unity's main thread.
+- Hazards found: P2=1 (blocking file dialog) + P3=1 (native shell double-click launches)
+- Git: docs: refine GUI auxiliary list annotations
+- Next recommended Phase 1 task: T390 annotate: src/slic3r/GUI/GUI_ObjectSettings.cpp

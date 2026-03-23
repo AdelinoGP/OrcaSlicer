@@ -485,3 +485,7 @@
 ## Iteration plan update
 - Selected task: T390 annotate `src/slic3r/GUI/GUI_ObjectSettings.cpp` (task-1773880086-1203 now open).
 - Plan: review `GUI_ObjectSettings.cpp`, document the object-specific settings panel creation, event wiring, and rendering triggers with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments; highlight caches for selected object, selection filters, timer-based updates, and Unity analogs (UI Toolkit `ListView` + `VisualElement` selection + ScriptableObject settings binder); append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit just this file plus handoff metadata, close T390, and stop for this iteration.
+
+## Iteration plan update
+- Selected task: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp` (task-1773880086-6aa6 active again).
+- Plan: load the complete source, annotate class/method boundaries with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]`, clarifying list model lifecycles, event bindings, selection caches, render triggers, drag/drop flows, and Unity proxies (UI Toolkit `ListView` plus `ListViewController` + `Command` pattern); append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file plus supporting metadata, ensure `.ralph/ralph-tasks.md` marks the task done, then pause for the next iteration.
