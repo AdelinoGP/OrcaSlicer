@@ -3811,3 +3811,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3 palette conversion between `wxColour`/bitmaps and Unity `Texture2D` assets)
 - Git: Annotate GUI_ObjectTable threading/palette hints
 - Next recommended Phase 1 task: T395 annotate: src/slic3r/GUI/GUI_ObjectTableSettings.hpp
+
+## Phase 1 - Task T419 complete
+- Task type: annotate
+- File: src/slic3r/GUI/IMToolbar.cpp
+- Deliverables: src/slic3r/GUI/IMToolbar.cpp
+- Substantive additions: Multi-tag comments on the toolbar item lifecycle, texture upload, stats reset helpers, and return-button initialization to spell out intent/state/event/Unity conversions.
+- Verification excerpt: // [INTENT] Upload the cached RGBA bytes into a freshly created GL texture for ImGui to render.
+- Unity-impact summary:
+  - Build a `Texture2D` cache for each toolbar entry and drive the button list through a UI Toolkit panel + GraphicRaycaster instead of ImGui.
+  - Treat toolbar resets as clearing a `List<ScriptableObject>` buffer and gate rendering through an enabled flag on the controller object.
+  - Load the return icon via Unity's resource pipeline and assign it to a `RawImage` on a Unity button instead of rasterizing SVG on the fly.
+- Hazards found: P2=1, P3=2
+- Git: Annotate IMToolbar toolbar textures
+- Next recommended Phase 1 task: T420 annotate: src/slic3r/GUI/IMToolbar.hpp

@@ -742,3 +742,7 @@
 ## Iteration plan update
 - Selected task: T393 annotate `src/slic3r/GUI/GUI_ObjectTable.hpp` (task state ready).
 - Plan: inspect the header end-to-end, document the `ObjectGrid`, `ObjectGridTable`, `ObjectTablePanel`, and `ObjectTableDialog` interfaces, detail caches (selection, sort, config map), highlight event wiring for `wxGrid`/`wxChoicebook`, note thread/worker assumptions with `wxQueueEvent`, and map to Unity (UI Toolkit `ListView` + `VisualElement` + ScriptableObject for object configs). After commenting, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the file, close the task, and return control for the next iteration.
+
+## Iteration plan update
+- Selected task: T419 annotate `src/slic3r/GUI/IMToolbar.cpp` via `task-1773880086-c6d0` so our next iteration focuses on the interactive toolbar panel.
+- Plan: start the task, read `IMToolbar.cpp` top-to-bottom to capture toolbar layout, icon/button state, event wiring, config persistence, and OpenGL overlays; inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` annotations around initialization, button binding tables, GL icon uploads, and throttle-rich event loops, call out Unity equivalents (e.g., `UI Toolkit Toolbar` with `Command` binding + `Texture2D` atlas refresh), append the mandated Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only the annotated file plus the handoff updates, mark the task done, and then stop so the next agent can continue with the following ready file.

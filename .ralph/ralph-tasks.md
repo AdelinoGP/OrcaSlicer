@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-23T22:45:00Z
+Last updated: 2026-03-23T21:33:37Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -337,7 +337,7 @@ Last updated: 2026-03-23T22:45:00Z
 - [x] T416 annotate: src/slic3r/GUI/ImGuiWrapper.hpp
 - [x] T417 annotate: src/slic3r/GUI/IMSlider.cpp
 - [ ] T418 annotate: src/slic3r/GUI/IMSlider.hpp
-- [ ] T419 annotate: src/slic3r/GUI/IMToolbar.cpp
+- - [x] T419 annotate: src/slic3r/GUI/IMToolbar.cpp
 - [x] T420 annotate: src/slic3r/GUI/IMToolbar.hpp
 - [x] T421 annotate: src/slic3r/GUI/InstanceCheck.cpp
 - [ ] T422 annotate: src/slic3r/GUI/InstanceCheck.hpp
