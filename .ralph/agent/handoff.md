@@ -2740,3 +2740,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3=1 (shared zero-bit semantics for World/Absolute state require the exact mask logic to stay synchronized).
 - Git: Annotate GUI_Geometry.hpp transform state
 - Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp
+
+## Phase 1 - Task T141 complete
+- Task type: annotate
+- File: src/slic3r/GUI/2DBed.cpp
+- Deliverables: src/slic3r/GUI/2DBed.cpp
+- Substantive additions: multi-tag annotations covering grid generation, repaint lifecycle, and coordinate transform helpers so UI state, event flow, and Unity mapping are explicit.
+- Verification excerpt: // [PORTING_HAZARD:P2] Depends on `wxAutoBufferedPaintDC` + `SetBackgroundStyle(wxBG_STYLE_PAINT)` for flicker-free updates, so Unity needs an explicit RenderTexture or double-buffered Canvas to match this behavior.
+- Unity-impact summary:
+  - Replace the buffered paint path with a RenderTexture overlay or UI Toolkit `GraphicRaycaster` controller that respects the same dark-mode colors/background fill and invalidates when `Refresh()` runs.
+  - Mirror the cached `m_scale_factor`/`m_shift` transform and `to_pixels` height inversion via `ScreenToWorldPoint`/`RectTransformUtility` so grid, origin, and crosshair drawing remain aligned in Unity.
+- Hazards found: P2=1 (legacy painting path), P3=1 (coordinate inversion + cached transform needs careful porting)
+- Git: annotate: src/slic3r/GUI/2DBed.cpp
+- Next recommended Phase 1 task: T142 annotate: src/slic3r/GUI/2DBed.hpp

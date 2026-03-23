@@ -400,3 +400,7 @@
 ## Iteration plan update
 - Selected task: T382 annotate `src/slic3r/GUI/GUI_Geometry.hpp`
 - Plan: capture the coordinate/transform flag enum intent, annotate `TransformationType` bit flags with `[STATE]` on mode masks, add `[UNITY]` guidance for equivalent coordinate spaces (Transform component + Local/Parent spaces) and `[PORTING_HAZARD:P3]` for bitwise flag combos, describe minimal event/GL impact, append the Phase 1 evidence block, commit, and move to next ready task.
+
+## Iteration plan update
+- Selected task: T141 annotate: `src/slic3r/GUI/2DBed.cpp`
+- Plan: read the full 2DBed drawing/input file, annotate the view lifecycle, canvas state, selection and view transform caches, event handlers, OpenGL paint path, thread/worker interactions, and Unity analogs (SceneView camera + Input System); include `[INTENT]/[STATE]/[EVENT]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` tags, point out any unclear legacy wxPaint dependencies as `[UNCLEAR]`, append the evidence block, commit, and then exit this iteration so the next agent can continue.

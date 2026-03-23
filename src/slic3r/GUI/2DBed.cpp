@@ -14,6 +14,8 @@
  * [INTENT] Class Bed_2D provides a 2D preview panel for bed visualization.
  * [UNITY] Map to a custom MonoBehaviour using a RenderTexture overlay or
  *         UI Toolkit VisualElement with custom painting capabilities.
+ * [PORTING_HAZARD:P2] wxWidgets relies on manual double buffering (`wxAutoBufferedPaintDC`) and legacy `wxBG_STYLE_PAINT`; Unity needs a
+ * dedicated `RenderTexture` and custom repaint callback to match the same flicker-free redraw semantics.
  */
 namespace Slic3r {
 namespace GUI {
@@ -47,8 +49,9 @@ int Bed_2D::calculate_grid_step(const BoundingBox& bb, const double& scale)
 }
 
 // [INTENT] Generates grid lines.
-// [UNITY] Use UI Toolkit or Shader-based grid rendering.
-// [OPENGL] NO_DIRECT_OPENGL_USED (wxDC only)
+// [UNITY] Emit the grid overlay via a LineRenderer-based mesh or custom shader so UI Toolkit can mimic the axis spacing.
+// [OPENGL] Grid polylines are computed on the CPU and drawn through wxDC instead of native GL; Unity should build the geometry once and
+// reuse it or rely on a shader-based grid to keep GPU usage low.
 std::vector<Polylines> Bed_2D::generate_grid(
     const ExPolygon& poly, const BoundingBox& bb, const Vec2d& origin, const double& step, const double& scale)
 {
@@ -85,7 +88,11 @@ std::vector<Polylines> Bed_2D::generate_grid(
 }
 
 // [INTENT] Repaints the panel (triggered by wxPaintEvent).
+// [EVENT] Bound to `wxEVT_PAINT`; wxWidgets queues this whenever this panel is invalidated.
+// [THREAD] Executes entirely on the main/UI thread because wxDC operations are not thread-safe.
 // [UNITY] Use OnGUI or standard Unity UI update loop.
+// [PORTING_HAZARD:P2] Depends on `wxAutoBufferedPaintDC` + `SetBackgroundStyle(wxBG_STYLE_PAINT)` for flicker-free updates, so Unity needs
+// an explicit RenderTexture or double-buffered `Canvas` to match this behavior.
 void Bed_2D::repaint(const std::vector<Vec2d>& shape)
 {
     wxAutoBufferedPaintDC dc(this);
@@ -96,6 +103,7 @@ void Bed_2D::repaint(const std::vector<Vec2d>& shape)
         return;
     bool is_dark = wxGetApp().dark_mode();
 
+    // [STATE] `m_user_drawn_background` toggles whether we manually fill the background to mimic wxWidgets clearing behavior.
     if (m_user_drawn_background) {
         // On all systems the AutoBufferedPaintDC() achieves double buffering.
         // On MacOS the background is erased, on Windows the background is not erased
@@ -136,6 +144,8 @@ void Bed_2D::repaint(const std::vector<Vec2d>& shape)
 
     m_scale_factor = sfactor;
     m_shift        = Vec2d(shift(0) + cbb.min(0), shift(1) - (cbb.max(1) - ch));
+
+    // [STATE] Cache the scale/shift transform so subsequent `to_pixels` calls reuse the same coordinates until the next repaint.
 
     // ORCA match colors
     ColorRGBA   bed_rgba         = is_dark ? Bed3D::DEFAULT_MODEL_COLOR_DARK : Bed3D::DEFAULT_MODEL_COLOR;
@@ -226,6 +236,7 @@ void Bed_2D::repaint(const std::vector<Vec2d>& shape)
     // ORCA add grid size value as information for large scale beds
     auto  grid_label = wxString::Format(_L("1x1 Grid: %d mm"), step);
     Point draw_bb    = to_pixels(Vec2d(std::min(m_pos(0), bb.min(0)), std::min(m_pos(1), bb.min(1))), ch);
+    // [STATE] Position label follows `m_pos` so the overlay stays near the current origin marker.
     // [STATE] Access to darkModeColor
     dc.SetTextForeground(wxColour(StateColor::darkModeColorFor("#262E30")));
     dc.SetFont(wxFont(10, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL));
@@ -233,6 +244,7 @@ void Bed_2D::repaint(const std::vector<Vec2d>& shape)
 
     // draw current position
     // [EVENT] triggered by repaint (wxPaintEvent)
+    // [STATE] Draw the crosshair only when we have a non-zero bed position captured in `m_pos`.
     if (m_pos != Vec2d(0, 0)) {
         auto pos_px = to_pixels(m_pos, ch);
         dc.SetPen(wxPen(wxColour(200, 0, 0), 2, wxPENSTYLE_SOLID));
@@ -246,6 +258,8 @@ void Bed_2D::repaint(const std::vector<Vec2d>& shape)
 
 // [INTENT] Converts G-code coordinates to pixel coordinates.
 // [UNITY] Use ScreenToWorldPoint or custom coordinate conversion.
+// [STATE] Reads the cached `m_scale_factor`/`m_shift` transform set during the last repaint.
+// [PORTING_HAZARD:P3] Watch Unity's inverted Y-axis (origin is bottom-left vs. wxWidgets' top-down DC) when applying `height - p(1)`.
 Point Bed_2D::to_pixels(const Vec2d& point, int height)
 {
     Vec2d p = point * m_scale_factor + m_shift;
@@ -253,6 +267,8 @@ Point Bed_2D::to_pixels(const Vec2d& point, int height)
 }
 
 // [INTENT] Overload for Point.
+// [STATE] Mirrors the above transform for integer `Point` helpers.
+// [PORTING_HAZARD:P3] The height inversion must stay consistent so overlays stay aligned in Unity.
 Point Bed_2D::to_pixels(const Point& point, int height)
 {
     Point p = point * m_scale_factor + Point(m_shift);
@@ -260,6 +276,9 @@ Point Bed_2D::to_pixels(const Point& point, int height)
 }
 
 // [INTENT] Updates current bed position.
+// [EVENT] Called by bed/selection sync (MainFrame/Bed3D) when the control point moves.
+// [STATE] Stores `m_pos` so the repaint can draw the crosshair and info text at the correct location.
+// [THREAD] Must execute on the UI thread because it calls `Refresh()` on the wxPanel.
 // [UNITY] Trigger UI update.
 void Bed_2D::set_pos(const Vec2d& pos)
 {
