@@ -3863,3 +3863,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 0
 - Git: annotate: GUI auxiliary list comments
 - Next recommended Phase 1 task: T420 annotate: src/slic3r/GUI/IMToolbar.hpp
+
+## Phase 1 - Task T166 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BaseTransparentDPIFrame.hpp
+- Deliverables: src/slic3r/GUI/BaseTransparentDPIFrame.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: Added multi-tag annotations describing show/hide hooks, timer-driven animation state, and Unity port hazards for timers/layout.
+- Verification excerpt: // [EVENT] Primary show hook invoked by parent frames to refresh animation state and restart the fade timer.
+- Unity-impact summary:
+  - Treat the overlay as a CanvasGroup-driven panel so fade/translate choreography happens via RectTransform + CanvasGroup alpha tweens instead of wxTimer steps.
+  - Replace the wxSizer layout with RectTransform + LayoutElement constraints so Unity can reproduce the soft modal overlay sizing.
+- Hazards found: 2 (P3: timer coroutine replacement, P3: layout translation)
+- Git: Annotate BaseTransparentDPIFrame overlay lifecycle
+- Next recommended Phase 1 task: T167 annotate: src/slic3r/GUI/BaseTransparentDPIFrame.cpp

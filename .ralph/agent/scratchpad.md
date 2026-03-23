@@ -761,3 +761,7 @@
 ## Iteration update
 - Actual focus: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp` (task resuming from previous iteration).
 - Adjust plan: read the file end-to-end, confirm tree state/intent, add any missing `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` notes, append Phase 1 evidence to `.ralph/agent/handoff.md`, commit and close the task.
+
+## Iteration plan update - T166
+- Selected task: T166 annotate `src/slic3r/GUI/BaseTransparentDPIFrame.hpp` as the current work item.
+- Plan: confirm the header is complete, add missing `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations around the animation helpers, timer hooks, display state, and helper methods, update `.ralph/ralph-tasks.md` to mark the task `[~]` and later `[x]`, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the single file plus metadata, and close the task before handing off to the next iteration.
