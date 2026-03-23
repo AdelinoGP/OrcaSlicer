@@ -609,3 +609,7 @@
 ## Iteration plan update
 - Selected task: T155 annotate `src/slic3r/GUI/AmsWidgets.cpp` (document the AMS tray virtual list model).
 - Plan: refresh the `TrayListModel` flows to keep the column cache rebuild, unused row counter, TODO fields, and clear/reset hook well documented with `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD:P3]/[UNCLEAR]` guidance; call out Unity's `ListView`/`ObservableCollection` binding, the main-thread constraint of `MachineObject`, and the unresolved saturability/transmittance metrics. Append the Phase 1 evidence block, stage/commit the annotated file plus metadata, flip T155 to `[x]`, and then pause so the next iteration can continue from the updated ready list.
+
+## Iteration plan update
+- Selected task: T404 annotate `src/slic3r/GUI/HMSPanel.cpp`
+- Plan: read the panel, document HTML viewer/HTTP state, selection caches, toolbar/event wiring, scale & layout toggles; annotate each region with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]`, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the updated file and handoff, close T404, then immediately proceed to the next ready task.

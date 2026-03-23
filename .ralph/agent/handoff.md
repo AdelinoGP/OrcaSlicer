@@ -3376,3 +3376,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (`wxCommandEvent` checkbox handlers and DPI callbacks assume the wxWidgets main thread and manual layout updates; Unity needs synchronous dispatcher support).
 - Git: annotate: src/slic3r/GUI/AMSSetting.hpp
 - Next recommended Phase 1 task: T155 annotate: src/slic3r/GUI/AmsWidgets.cpp
+
+## Phase 1 - Task T404 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HMSPanel.cpp
+- Deliverables: src/slic3r/GUI/HMSPanel.cpp
+- Substantive additions: Added multi-tag comments highlighting notify-item state, update lifecycle, hover/click handlers, temp cache, Unity equivalents, and porting hazards for browser/event dispatch.
+- Verification excerpt: // [STATE] `m_scrolledWindow` + `m_top_sizer` keep the layout of appended alerts, while `last_status` guards redundant updates.
+- Unity-impact summary:
+  - Mirror the HMS list with a UI Toolkit ScrollView containing VisualElements per alert and a MonoBehaviour to subscribe to MachineObject events.
+  - Replace `wxLaunchDefaultBrowser` with `Application.OpenURL` and route read-state notifications through a Unity event bus instead of `wxPostEvent`.
+- Hazards found: 2 (P2 cross-thread access to `MachineObject`/`wxGetApp` + reliance on wxEvents; P3 native browser launch per alert).
+- Git: docs: annotate HMSPanel for Unity port
+- Next recommended Phase 1 task: T405 annotate: src/slic3r/GUI/HMSPanel.hpp
