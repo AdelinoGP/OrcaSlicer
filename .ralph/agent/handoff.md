@@ -3468,3 +3468,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3 hazard: Unity must cache translations / handle async locale switches instead of hitting a global wx locale catalog directly.)
 - Git: Annotate I18N translation helper
 - Next recommended Phase 1 task: T409 annotate: src/slic3r/GUI/I18N.hpp
+
+## Phase 1 - Task T406 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HttpServer.cpp
+- Deliverables: src/slic3r/GUI/HttpServer.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md
+- Substantive additions: Added ~17 `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations describing the session parsing loop, OAuth handler, and response builders.
+- Verification excerpt: // [EVENT][THREAD] Queue the first line read so the Asio IO thread parses the HTTP request without blocking the caller.
+- Unity-impact summary:
+  - Unity should host the callback via a `HttpListener`/`UnityWebRequest` off the render thread and marshal responses via `MainThreadDispatcher`.
+  - OAuth handling uses `CallAfter` to hide the login dialog; Unity needs an equivalent main-thread dispatcher to update UI state safely.
+- Hazards found: P2 (wxGetApp cross-thread login update) ×1; P3 (simplistic query parsing) ×1.
+- Git: Annotate HttpServer OAuth flow
+- Next recommended Phase 1 task: T407 annotate: src/slic3r/GUI/HttpServer.hpp
