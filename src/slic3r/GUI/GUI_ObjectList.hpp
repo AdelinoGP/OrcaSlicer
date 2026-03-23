@@ -258,8 +258,15 @@ public:
     ModelObject* object(const int obj_idx) const;
 
     void create_objects_ctrl();
+    // [INTENT] Builds the data view columns, editors, and drag/drop hooks each time the project object set shifts so the list is ready for
+    // user commands. [STATE] Resets column/selection readiness to inform other controllers that the view is initialized. [UNITY] Unity
+    // should configure the UI Toolkit `ListView` columns, item renderers, and drag/drop callbacks from the `SelectionManager` when it
+    // repopulates project data.
     // BBS
     void update_objects_list_filament_column(size_t filaments_count);
+    // [STATE] Keeps the extruder column layout aligned with the global filament count so command handlers reference the correct column
+    // indices. [UNITY] Mirror this by refreshing the ScriptableObject-backed filament palette and letting the `ListView` column renderer
+    // update its colors.
     void update_objects_list_filament_column_when_delete_filament(size_t filament_id, size_t filaments_count, int replace_filament_id = -1);
     void update_filament_colors();
     // show/hide "Extruder" column for Objects List
@@ -403,8 +410,10 @@ public:
                              bool                notify_partplate       = true,
                              bool                do_info_update         = true);
     void add_object_to_list(size_t obj_idx, bool call_selection_changed = true, bool notify_partplate = true, bool do_info_update = true);
-    // Add object's volumes to the list
-    // Return selected items, if add_to_selection is defined
+    // [INTENT] Appends objects/volumes to the view while optionally skipping selection/canvas refreshes so batch imports stay fast.
+    // [STATE] `call_selection_changed` and `notify_partplate` control whether selection caches and the plate panel refresh immediately.
+    // [UNITY] Mirror this by mutating a `VisualElement`-backed `ListView` collection and only triggering `SelectionManager.Refresh` once
+    // per batch. Add object's volumes to the list Return selected items, if add_to_selection is defined
     wxDataViewItemArray add_volumes_to_object_in_list(size_t obj_idx, std::function<bool(const ModelVolume*)> add_to_selection = nullptr);
     // Delete object from the list
     void delete_object_from_list();
@@ -437,6 +446,10 @@ public:
     // The layer range panel is updated even if this function does not change the layer ranges, as the panel update
     // may have been postponed from the "kill focus" event of a text field, if the focus was lost for the "add layer" button.
     // Rather providing the range by a value than by a reference, so that the memory referenced cannot be invalidated.
+    // [INTENT] Insert a new layer range after the current selection while leaving the layer range panel alive so focus is not lost.
+    // [STATE] Keeps the panel reconstruction in lockstep with the `t_layer_height_range` cache so downstream UI commands don't rebuild
+    // mid-stream. [UNITY] Map this to a UI Toolkit `ListView` row insertion backed by a `ScriptableObject` list of layer ranges and trigger
+    // the UI refresh via `MainThreadDispatcher`.
     void     add_layer_range_after_current(const t_layer_height_range current_range);
     wxString can_add_new_range_after_current(t_layer_height_range current_range);
     void     add_layer_item(const t_layer_height_range& range, const wxDataViewItem layers_item, const int layer_idx = -1);
@@ -446,6 +459,10 @@ public:
     // are already planned for them and destroying these widgets leads to crashes at least on OSX.
     // In that case the "add layer" or "remove layer" button handlers are responsible for always rebuilding the panel
     // even if the "add layer" or "remove layer" buttons did not update the layer spans or layer heights.
+    // [STATE] `suppress_ui_update` prevents the add/remove panel from being torn down mid-focus-change, which previously crashed OSX.
+    // [PORTING_HAZARD:P3] Unity must keep the `VisualElement` children alive while deferring the rebuild, otherwise pointer events may race
+    // with the layout. [UNITY] Implement this as a guarded update to the `ListView` layer range rows on a Unity `ScriptableObject`,
+    // postponing a full UI rebuild until after the operation completes via `MainThreadDispatcher`.
     bool edit_layer_range(const t_layer_height_range& range,
                           const t_layer_height_range& new_range,
                           // Don't destroy the panel with the "add layer" or "remove layer" buttons.
@@ -460,6 +477,8 @@ public:
     void set_selected_layers_range_idx(const int range_idx) { m_selected_layers_range_idx = range_idx; }
     void set_selection_mode(SELECTION_MODE mode) { m_selection_mode = mode; }
     void update_selections();
+    // [EVENT] Coalesces selection-change notifications so the GL canvas gets a consistent view before gizmos redraw; Unity should call
+    // `SelectionManager.SyncFromList` after each bulk update.
     // [OPENGL] Pushes selection state to the GL canvas so gizmos stay visible; Unity should synchronize the `SceneSelectionManager` with
     // the list on the render camera thread.
     void update_selections_on_canvas();
@@ -486,6 +505,9 @@ public:
     void update_and_show_object_settings_item();
     void update_settings_item_and_selection(wxDataViewItem item, wxDataViewItemArray& selections);
     void update_object_list_by_printer_technology();
+    // [STATE] Switches column visibility and per-row tooling to match the current printer technology so commands only operate on valid
+    // tooling. [UNITY] Drive column visibility with a `ScriptableObject` `PrinterTechnologyState` that updates the UI Toolkit `ListView`
+    // layout/colors.
     void update_info_items(size_t               obj_idx,
                            wxDataViewItemArray* selections         = nullptr,
                            bool                 added_object       = false,

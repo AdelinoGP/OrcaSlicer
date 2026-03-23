@@ -3944,3 +3944,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3 worker teardown/join must run during shutdown to keep the thread from leaking).
 - Git: Document BoostThreadWorker threading flow
 - Next recommended Phase 1 task: T428 annotate: src/slic3r/GUI/Jobs/BoostThreadWorker.hpp
+
+## Phase 1 - Task T389 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectList.hpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectList.hpp, .ralph/agent/scratchpad.md
+- Substantive additions: Added five multi-tag annotations covering column rebuild, filament column state, batch insert helpers, selection sync, and layer-range/technology state so Unity porters understand when to refresh ListView bindings.
+- Verification excerpt: // [INTENT] Appends objects/volumes to the view while optionally skipping selection/canvas refreshes so batch imports stay fast.
+- Unity-impact summary:
+  - Rebuild the UI Toolkit `ListView` columns, renderers, and drag/drop callbacks via the `SelectionManager` whenever project data changes, mirroring `create_objects_ctrl`.
+  - Emit collection mutations through a `VisualElement` `ListView` plus `SelectionManager.Refresh` when objects/volumes are added so Unity avoids redundant `RenderTexture` redraws.
+  - Guard layer-range edits and column visibility toggles with a ScriptableObject-backed state carrier and `MainThreadDispatcher` to keep the VisualElement tree stable during focus shifts.
+- Hazards found: 1 (P3 VisualElement tree rebuild guard required when the layer panel loses focus or gets rebuilt).
+- Git: annotate: src/slic3r/GUI/GUI_ObjectList.hpp
+- Next recommended Phase 1 task: T391 annotate: src/slic3r/GUI/GUI_ObjectSettings.hpp

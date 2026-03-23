@@ -130,9 +130,10 @@
 - Verification: documentation-only annotation; ensure thread/event/OGL notes are concrete, no runtime test needed.
 
 ## Iteration plan
-- Context: Phase 1 GUI annotation; selecting a Widgets file for today's run.
-- Selected task: T647 annotate `src/slic3r/GUI/Widgets/Button.cpp`.
-- Plan: review the Button implementation, add the mandated `[INTENT]` through `[PORTING_HAZARD]` comments (covering styling state, event handling, rendering, threading, Unity mapping, hazards), append the evidence block to `.ralph/agent/handoff.md`, stage/commit the file, close the task, then pause for the next iteration.
+- Context: Phase 1 GUI annotation; ready tasks available include `src/slic3r/GUI/GUI_ObjectList.hpp` which already has some meta notes but still needs targeted state/event/Unity guidance around the layer/list management helpers.
+- Selected task: T389 annotate `src/slic3r/GUI/GUI_ObjectList.hpp`.
+- Plan: read the header end-to-end, add `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD:P3]` comments where the file currently leaves gaps (insert new guidance near column/table configuration, layer range helpers, and selection update flows), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit just the header plus metadata, close the task, and then pick the next ready file.
+- Verification: confirm tags cover clipboard state, layer manipulation flows, selection/canvas sync, and the Unity equivalents (ListView binding + SelectionManager). 
 
 ## Iteration plan update
 - Selected task: T200 annotate `src/slic3r/GUI/Jobs/SVGFileJob.hpp` for this iteration because it likely contains the job interface wiring that the Unity port will need annotated.
