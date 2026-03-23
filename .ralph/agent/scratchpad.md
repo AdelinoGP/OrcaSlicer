@@ -754,3 +754,10 @@
 ## Iteration plan update
 - Current focus: T383 annotate `src/slic3r/GUI/GUI.hpp`.
 - Plan: read the header end-to-end, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2]` comments for the GUI manager helpers, menu builder, and config caches, highlight Unity equivalents (MenuBar + ScriptableObject config controller) plus hazard notes about wxWidgets ownership rules, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header plus handoff metadata, mark the task closed, and stop for this iteration so the next agent can continue.
+## Iteration plan update
+- Focus: T383 annotate `src/slic3r/GUI/GUI.hpp`
+- Plan: ensure runtime task recorded, read GUI.hpp, augment missing `[UNITY]` guidance and clarity around debugger helpers, update `.ralph/agent/handoff.md` with Phase 1 evidence block, stage/commit GUI.hpp plus metadata, close the task.
+
+## Iteration update
+- Actual focus: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp` (task resuming from previous iteration).
+- Adjust plan: read the file end-to-end, confirm tree state/intent, add any missing `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` notes, append Phase 1 evidence to `.ralph/agent/handoff.md`, commit and close the task.

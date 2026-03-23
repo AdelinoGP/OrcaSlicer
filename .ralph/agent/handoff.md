@@ -3851,3 +3851,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3=1
 - Git: annotate: src/slic3r/GUI/GUI_AuxiliaryList.cpp
 - Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp
+## Phase 1 - Task T372 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Deliverables: src/slic3r/GUI/GUI_AuxiliaryList.cpp, .ralph/agent/handoff.md, .ralph/agent/scratchpad.md
+- Substantive additions: 2 `[UNITY]` clarifications for drag/drop + keyboard wiring
+- Verification excerpt: // [EVENT][THREAD][UNITY] Enable native drag/drop on the UI thread; Unity will need a DragAndDrop bridge that uses this signal for reordering.
+- Unity-impact summary:
+  - Record tree drag-and-drop bridging guidance so a UI Toolkit VisualElement tree + InputSystem bridge can reproduce the reorder interactions.
+  - Lock the Delete-hotkey comment to the selection/cancel logic so Unity's Input System command map and toolbar buttons share the same state guard.
+- Hazards found: 0
+- Git: annotate: GUI auxiliary list comments
+- Next recommended Phase 1 task: T420 annotate: src/slic3r/GUI/IMToolbar.hpp
