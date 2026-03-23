@@ -409,6 +409,20 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: Annotate GLShadersManager header for Unity port
 - Next recommended Phase 1 task: T366 annotate: src/slic3r/GUI/GLTexture.cpp
 
+## Phase 1 - Task T143 complete
+- Task type: annotate
+- File: src/slic3r/GUI/3DBed.cpp
+- Deliverables: src/slic3r/GUI/3DBed.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: ~15 multi-tag annotations covering palette sync, `set_shape`, render flows, fallback geometry, and porting hazards.
+- Verification excerpt: // [INTENT] Normalize bed geometry, extruder bounds, and custom models whenever the build volume changes or the plate is repositioned.
+- Unity-impact summary:
+  - Treat the palette as a ScriptableObject so UI theme managers and render materials share axis colors.
+  - Drive `BuildVolumeConfig` updates through a serialized asset that moves `MeshFilter`/`MeshCollider` transforms and updates the fallback mesh via `Mesh.SetVertices`.
+  - Use the fallback triangle builder as a blueprint for sending `Mesh` data down to Unity when no STL is provided.
+- Hazards found: P2=1 (picking logic removed), P3=2 (global palette singletons, preset detection relying on wx/boost singletons)
+- Git: Annotate 3DBed rendering lifecycle
+- Next recommended Phase 1 task: T144 annotate: src/slic3r/GUI/3DBed.hpp
+
 ### Remaining
 
 - [ ] P0-T006: Main Window Class Identification
@@ -2779,3 +2793,14 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3=2 (sprite swap expectations, pointer-enter/exit event plumbing)
 - Git: annotate: src/slic3r/GUI/Widgets/CheckBox.hpp
 - Next recommended Phase 1 task: T652 annotate: src/slic3r/GUI/Widgets/ComboBox.hpp
+
+## Phase 1 - Task T143 complete
+- Task type: annotate
+- File: src/slic3r/GUI/3DBed.cpp
+- Deliverables: src/slic3r/GUI/3DBed.cpp
+- Substantive additions: 15 multi-tag annotations describing color caches, configuration events, render flows, and Unity hazards for the 3D bed.
+- Verification excerpt: // [INTENT] Entry point invoked from the GL canvas every frame so the 3D bed matches the current camera/mode.
+- Unity-impact summary: 1) Mirror the bed/axis meshes with MeshFilter+MeshRenderer/LineRenderer pairs that update via the main thread; 2) Drive colors from a ScriptableObject palette and rebuild meshes via a dedicated converter service.
+- Hazards found: 1 P2 (wxGetApp/preset bundle reliance) + 3 P3 (global colors, manual GL state, polygon tessellation dependent on libslic3r).
+- Git: Document 3DBed render and state for Unity port
+- Next recommended Phase 1 task: T144 annotate: src/slic3r/GUI/3DBed.hpp

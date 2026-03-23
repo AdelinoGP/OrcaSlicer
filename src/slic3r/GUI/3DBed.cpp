@@ -29,10 +29,14 @@
 
 static const float GROUND_Z = -0.04f;
 
-namespace Slic3r {
-namespace GUI {
+namespace Slic3r { namespace GUI {
 
-bool init_model_from_poly(GLModel &model, const ExPolygon &poly, float z)
+// [INTENT] Convert a 2D printable-area polygon into a `GLModel` mesh so the 3D viewport can show the plate outline.
+// [OPENGL] Triangulate the polygon and pack triangles into the geometry cache that feeds the renderer's VBO/IBO.
+// [THREAD] Runs on the UI/render thread to keep model updates synchronized with `GLCanvas3D::render()`.
+// [UNITY] Unity should replace this with a procedural `Mesh` built via `Mesh.SetVertices`/`SetIndices` on the main loop.
+// [PORTING_HAZARD:P3] Depends on libslic3r triangulation helpers; porting must cover equivalent tessellation logic in C#.
+bool init_model_from_poly(GLModel& model, const ExPolygon& poly, float z)
 {
     if (poly.empty())
         return false;
@@ -42,13 +46,13 @@ bool init_model_from_poly(GLModel &model, const ExPolygon &poly, float z)
         return false;
 
     GLModel::Geometry init_data;
-    init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3T2 };
+    init_data.format = {GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3T2};
     init_data.reserve_vertices(triangles.size());
     init_data.reserve_indices(triangles.size() / 3);
 
     Vec2f min = triangles.front();
     Vec2f max = min;
-    for (const Vec2f &v : triangles) {
+    for (const Vec2f& v : triangles) {
         min = min.cwiseMin(v).eval();
         max = max.cwiseMax(v).eval();
     }
@@ -62,9 +66,9 @@ bool init_model_from_poly(GLModel &model, const ExPolygon &poly, float z)
 
     // vertices + indices
     unsigned int vertices_counter = 0;
-    for (const Vec2f &v : triangles) {
+    for (const Vec2f& v : triangles) {
         const Vec3f p = {v.x(), v.y(), z};
-        init_data.add_vertex(p, (Vec2f)(v - min).cwiseProduct(inv_size).eval());
+        init_data.add_vertex(p, (Vec2f) (v - min).cwiseProduct(inv_size).eval());
         ++vertices_counter;
         if (vertices_counter % 3 == 0)
             init_data.add_triangle(vertices_counter - 3, vertices_counter - 2, vertices_counter - 1);
@@ -176,21 +180,30 @@ const float* GeometryBuffer::get_vertices_data() const
 }
 */
 
+// [INTENT] Bed3D exposes axis/model/grid palettes that every renderer and dialog consumes for consistent theming.
+// [STATE] Stores the default tint and axis colors in global statics so toolbar colors and render passes remain in sync.
+// [EVENT] `GuiColor` editors and theme reload handlers call `update_render_colors()`/`load_render_colors()` to refresh these values.
+// [UNITY] Mirror this palette through a ScriptableObject referenced by both the UI theme controller and the bed renderer materials.
+// [PORTING_HAZARD:P3] Globals assume singleton access via `RenderColor`; Unity needs an injected theme service rather than free-floating statics.
 const float Bed3D::Axes::DefaultStemRadius = 0.5f;
 const float Bed3D::Axes::DefaultStemLength = 25.0f;
-const float Bed3D::Axes::DefaultTipRadius = 2.5f * Bed3D::Axes::DefaultStemRadius;
-const float Bed3D::Axes::DefaultTipLength = 5.0f;
+const float Bed3D::Axes::DefaultTipRadius  = 2.5f * Bed3D::Axes::DefaultStemRadius;
+const float Bed3D::Axes::DefaultTipLength  = 5.0f;
 
 // ORCA make bed colors accessable for 2D bed
-ColorRGBA Bed3D::DEFAULT_MODEL_COLOR             = { 0.3255f, 0.337f, 0.337f, 1.0f };
-ColorRGBA Bed3D::DEFAULT_MODEL_COLOR_DARK        = { 0.255f, 0.255f, 0.283f, 1.0f };
-ColorRGBA Bed3D::DEFAULT_SOLID_GRID_COLOR        = { 0.9f, 0.9f, 0.9f, 1.0f };
-ColorRGBA Bed3D::DEFAULT_TRANSPARENT_GRID_COLOR  = { 0.9f, 0.9f, 0.9f, 0.6f };
+ColorRGBA Bed3D::DEFAULT_MODEL_COLOR            = {0.3255f, 0.337f, 0.337f, 1.0f};
+ColorRGBA Bed3D::DEFAULT_MODEL_COLOR_DARK       = {0.255f, 0.255f, 0.283f, 1.0f};
+ColorRGBA Bed3D::DEFAULT_SOLID_GRID_COLOR       = {0.9f, 0.9f, 0.9f, 1.0f};
+ColorRGBA Bed3D::DEFAULT_TRANSPARENT_GRID_COLOR = {0.9f, 0.9f, 0.9f, 0.6f};
 
 ColorRGBA Bed3D::AXIS_X_COLOR = ColorRGBA::X();
 ColorRGBA Bed3D::AXIS_Y_COLOR = ColorRGBA::Y();
 ColorRGBA Bed3D::AXIS_Z_COLOR = ColorRGBA::Z();
 
+// [INTENT] Push the axis colors into the ImGui-managed palette so GUI controls reference the same constants.
+// [STATE] Copies the RGB values from the statics into `RenderColor::colors` so both render passes and UI editors stay synched.
+// [THREAD] Runs on the main UI thread because ImGui state is not thread-safe.
+// [UNITY] Mirror this by writing palette values into a `ThemeManager` ScriptableObject that feeds the axis material and UI skin.
 void Bed3D::update_render_colors()
 {
     Bed3D::AXIS_X_COLOR = ImGuiWrapper::from_ImVec4(RenderColor::colors[RenderCol_Axis_X]);
@@ -198,6 +211,10 @@ void Bed3D::update_render_colors()
     Bed3D::AXIS_Z_COLOR = ImGuiWrapper::from_ImVec4(RenderColor::colors[RenderCol_Axis_Z]);
 }
 
+// [INTENT] Pull color values back into Bed3D statics when the render palette changes so axis draws stay coherent.
+// [STATE] Reads from `RenderColor::colors` to rehydrate `AXIS_*_COLOR` before the next repaint.
+// [EVENT] Used when theme editors or color pickers write new values into the shared palette.
+// [UNITY] Treat as deserializing from a `ThemeManager` asset before applying to axis `Materials`.
 void Bed3D::load_render_colors()
 {
     RenderColor::colors[RenderCol_Axis_X] = ImGuiWrapper::to_ImVec4(Bed3D::AXIS_X_COLOR);
@@ -205,21 +222,28 @@ void Bed3D::load_render_colors()
     RenderColor::colors[RenderCol_Axis_Z] = ImGuiWrapper::to_ImVec4(Bed3D::AXIS_Z_COLOR);
 }
 
+// [INTENT] Draw the X/Y/Z axes by reusing a shared arrow mesh and the flat shader so viewport orientation is obvious.
+// [STATE] Relies on `m_arrow`, `m_origin`, and axis colors that reflect user preferences.
+// [EVENT] Called from `Bed3D::render` when `show_axes` is true and the build volume is valid.
+// [THREAD] Runs on the GLCanvas render thread because it accesses camera matrices and OpenGL state directly.
+// [OPENGL] Enables depth testing, binds uniforms per axis, and draws the cylinder mesh three times with different transforms.
+// [UNITY] Replace this with a MonoBehaviour that spawns three cone `MeshRenderers` and updates their transforms/materials in the update loop.
 void Bed3D::Axes::render()
 {
     auto render_axis = [this](GLShaderProgram* shader, const Transform3d& transform) {
-        const Camera& camera = wxGetApp().plater()->get_camera();
+        const Camera&      camera      = wxGetApp().plater()->get_camera();
         const Transform3d& view_matrix = camera.get_view_matrix();
         shader->set_uniform("view_model_matrix", view_matrix * transform);
         shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-        //const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * transform.matrix().block(0, 0, 3, 3).inverse().transpose();
-        //shader->set_uniform("view_normal_matrix", view_normal_matrix);
+        // const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * transform.matrix().block(0, 0, 3,
+        // 3).inverse().transpose(); shader->set_uniform("view_normal_matrix", view_normal_matrix);
         m_arrow.render();
     };
 
     if (!m_arrow.is_initialized())
-        //m_arrow.init_from(stilized_arrow(16, DefaultTipRadius, DefaultTipLength, DefaultStemRadius, m_stem_length));
-        m_arrow.init_from(smooth_cylinder(16, /*Radius*/ m_stem_length / 75.f, m_stem_length)); // ORCA use simple cylinder and scale thickness depends on length
+        // m_arrow.init_from(stilized_arrow(16, DefaultTipRadius, DefaultTipLength, DefaultStemRadius, m_stem_length));
+        m_arrow.init_from(smooth_cylinder(16, /*Radius*/ m_stem_length / 75.f,
+                                          m_stem_length)); // ORCA use simple cylinder and scale thickness depends on length
 
     GLShaderProgram* shader = wxGetApp().get_shader("flat"); // ORCA dont use shading to get closer color tone
     if (shader == nullptr)
@@ -228,15 +252,15 @@ void Bed3D::Axes::render()
     glsafe(::glEnable(GL_DEPTH_TEST));
 
     shader->start_using();
-    //shader->set_uniform("emission_factor", 0.0f);
+    // shader->set_uniform("emission_factor", 0.0f);
 
     // x axis
     m_arrow.set_color(AXIS_X_COLOR);
-    render_axis(shader, Geometry::assemble_transform(m_origin, { 0.0, 0.5 * M_PI, 0.0 }));
+    render_axis(shader, Geometry::assemble_transform(m_origin, {0.0, 0.5 * M_PI, 0.0}));
 
     // y axis
     m_arrow.set_color(AXIS_Y_COLOR);
-    render_axis(shader, Geometry::assemble_transform(m_origin, { -0.5 * M_PI, 0.0, 0.0 }));
+    render_axis(shader, Geometry::assemble_transform(m_origin, {-0.5 * M_PI, 0.0, 0.0}));
 
     // z axis
     m_arrow.set_color(AXIS_Z_COLOR);
@@ -247,13 +271,27 @@ void Bed3D::Axes::render()
     glsafe(::glDisable(GL_DEPTH_TEST));
 }
 
-//BBS: add part plate logic
-bool Bed3D::set_shape(const Pointfs& printable_area, const double printable_height, std::vector<Pointfs> extruder_areas, std::vector<double> extruder_heights, const std::string& custom_model, bool force_as_custom,
-    const Vec2d position, bool with_reset)
+// BBS: add part plate logic
+// [INTENT] Normalize bed geometry, extruder bounds, and custom models whenever the build volume changes or the plate is repositioned.
+// [STATE] Refreshes `m_bed_shape`, `m_build_volume`, `m_extruder_shapes`, `m_type`, `m_model_filename`, `m_position`, and associated
+// caches. [EVENT] Triggered from plate initialization, preset switching, or part-plate moves; `force_as_custom` overrides preset detection.
+// [THREAD] Runs on the UI thread because it talks to `wxGetApp().preset_bundle` and Plater singletons.
+// [PORTING_HAZARD:P3] Relies on `boost::filesystem`, `boost::algorithm`, and `wxGetApp`; Unity must hook into `StreamingAssets` or
+// `Resources` for disk models and avoid global singletons. [UNITY] Map to a `BuildVolumeConfig` ScriptableObject writing into a
+// `MeshFilter`/`MeshCollider` and moving the bed `Transform` as needed.
+bool Bed3D::set_shape(const Pointfs&       printable_area,
+                      const double         printable_height,
+                      std::vector<Pointfs> extruder_areas,
+                      std::vector<double>  extruder_heights,
+                      const std::string&   custom_model,
+                      bool                 force_as_custom,
+                      const Vec2d          position,
+                      bool                 with_reset)
 {
     /*auto check_texture = [](const std::string& texture) {
         boost::system::error_code ec; // so the exists call does not throw (e.g. after a permission problem)
-        return !texture.empty() && (boost::algorithm::iends_with(texture, ".png") || boost::algorithm::iends_with(texture, ".svg")) && boost::filesystem::exists(texture, ec);
+        return !texture.empty() && (boost::algorithm::iends_with(texture, ".png") || boost::algorithm::iends_with(texture, ".svg")) &&
+    boost::filesystem::exists(texture, ec);
     };*/
 
     auto check_model = [](const std::string& model) {
@@ -261,16 +299,16 @@ bool Bed3D::set_shape(const Pointfs& printable_area, const double printable_heig
         return !model.empty() && boost::algorithm::iends_with(model, ".stl") && boost::filesystem::exists(model, ec);
     };
 
-    Type type;
+    Type        type;
     std::string model;
     std::string texture;
     if (force_as_custom)
         type = Type::Custom;
     else {
         auto [new_type, system_model, system_texture] = detect_type(printable_area);
-        type = new_type;
-        model = system_model;
-        texture = system_texture;
+        type                                          = new_type;
+        model                                         = system_model;
+        texture                                       = system_texture;
     }
 
     /*std::string texture_filename = custom_texture.empty() ? texture : custom_texture;
@@ -280,21 +318,25 @@ bool Bed3D::set_shape(const Pointfs& printable_area, const double printable_heig
     }*/
 
     std::string model_filename = custom_model.empty() ? model : custom_model;
-    if (! model_filename.empty() && ! check_model(model_filename)) {
+    if (!model_filename.empty() && !check_model(model_filename)) {
         BOOST_LOG_TRIVIAL(error) << "Unable to load bed model: " << model_filename;
         model_filename.clear();
     }
 
-    //BBS: add position related logic
-    if (m_bed_shape == printable_area && m_build_volume.printable_height() == printable_height && m_type == type && m_model_filename == model_filename && position == m_position && m_extruder_shapes == extruder_areas  && m_extruder_heights == extruder_heights)
+    // BBS: add position related logic
+    if (m_bed_shape == printable_area && m_build_volume.printable_height() == printable_height && m_type == type &&
+        m_model_filename == model_filename && position == m_position && m_extruder_shapes == extruder_areas &&
+        m_extruder_heights == extruder_heights)
         // No change, no need to update the UI.
         return false;
 
-    //BBS: add part plate logic, apply position to bed shape
-    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(":current position {%1%,%2%}, new position {%3%, %4%}") % m_position.x() % m_position.y() % position.x() % position.y();
-    m_position = position;
-    m_bed_shape = printable_area;
-    m_extruder_shapes = extruder_areas;
+    // BBS: add part plate logic, apply position to bed shape
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__
+                            << boost::format(":current position {%1%,%2%}, new position {%3%, %4%}") % m_position.x() % m_position.y() %
+                                   position.x() % position.y();
+    m_position         = position;
+    m_bed_shape        = printable_area;
+    m_extruder_shapes  = extruder_areas;
     m_extruder_heights = extruder_heights;
     if ((position(0) != 0) || (position(1) != 0)) {
         Pointfs new_bed_shape;
@@ -311,24 +353,23 @@ bool Bed3D::set_shape(const Pointfs& printable_area, const double printable_heig
             }
             new_extruder_shapes.push_back(new_extruder_shape);
         }
-        m_build_volume = BuildVolume { new_bed_shape, printable_height, new_extruder_shapes, m_extruder_heights };
-    }
-    else
-        m_build_volume = BuildVolume { printable_area, printable_height, m_extruder_shapes, m_extruder_heights };
+        m_build_volume = BuildVolume{new_bed_shape, printable_height, new_extruder_shapes, m_extruder_heights};
+    } else
+        m_build_volume = BuildVolume{printable_area, printable_height, m_extruder_shapes, m_extruder_heights};
     m_type = type;
-    //m_texture_filename = texture_filename;
+    // m_texture_filename = texture_filename;
     m_model_filename = model_filename;
-    //BBS add default bed
+    // BBS add default bed
     m_triangles.reset();
     if (with_reset) {
-        //m_texture.reset();
+        // m_texture.reset();
         m_model.reset();
     }
-    //BBS: add part plate logic, always update model offset
-    update_model_offset();//include m_extended_bounding_box = this->calc_extended_bounding_box();
+    // BBS: add part plate logic, always update model offset
+    update_model_offset(); // include m_extended_bounding_box = this->calc_extended_bounding_box();
 
     // Set the origin and size for rendering the coordinate system axes.
-    m_axes.set_origin({ 0.0, 0.0, static_cast<double>(GROUND_Z) });
+    m_axes.set_origin({0.0, 0.0, static_cast<double>(GROUND_Z)});
     m_axes.set_stem_length(0.1f * static_cast<float>(m_build_volume.bounding_volume().max_size()));
 
     // unregister from picking
@@ -339,19 +380,26 @@ bool Bed3D::set_shape(const Pointfs& printable_area, const double printable_heig
     return true;
 }
 
-//BBS: add api to set position for partplate related bed
+// BBS: add api to set position for partplate related bed
+// [INTENT] Reuse `set_shape` to adjust the bed translation without reloading other configuration pieces.
+// [STATE] Changes `m_position` and triggers `update_model_offset()` through the shared flow.
+// [UNITY] Map to moving the bed root `Transform` or switching between preset offsets on the Unity GameObject.
 void Bed3D::set_position(Vec2d& position)
 {
-    set_shape(m_bed_shape, m_build_volume.printable_height(), m_extruder_shapes, m_extruder_heights, m_model_filename, false, position, false);
+    set_shape(m_bed_shape, m_build_volume.printable_height(), m_extruder_shapes, m_extruder_heights, m_model_filename, false, position,
+              false);
 }
 
+// [INTENT] Choose whether the axes track the world origin or follow the bed position offset.
+// [STATE] Updates `m_axes` origin, affecting subsequent axis renders.
+// [EVENT] Called by UI controls that switch reference frames for orientation helpers.
+// [UNITY] Map to toggling a boolean on the axis helper GameObject so an offset sub-node chooses the origin.
 void Bed3D::set_axes_mode(bool origin)
 {
     if (origin) {
-        m_axes.set_origin({ 0.0, 0.0, static_cast<double>(GROUND_Z) });
-    }
-    else {
-        m_axes.set_origin({ m_position.x(), m_position.y(), static_cast<double>(GROUND_Z) });
+        m_axes.set_origin({0.0, 0.0, static_cast<double>(GROUND_Z)});
+    } else {
+        m_axes.set_origin({m_position.x(), m_position.y(), static_cast<double>(GROUND_Z)});
     }
 }
 
@@ -365,18 +413,36 @@ Point Bed3D::point_projection(const Point& point) const
     return m_polygon.point_projection(point);
 }*/
 
-void Bed3D::on_change_color_mode(bool is_dark)
-{
-    m_is_dark = is_dark;
-}
+// [STATE] Tracks whether the view uses the dark palette so renderers can pick the darker axis/model colors.
+// [EVENT] Toggled by the theme manager when the user flips dark mode.
+void Bed3D::on_change_color_mode(bool is_dark) { m_is_dark = is_dark; }
 
-void Bed3D::render(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor, bool show_axes)
+// [INTENT] Main render entry that sequences axes, system/custom bed variants, and optional overlays.
+// [STATE] Reads `m_scale_factor`, `m_type`, `m_model`, and dark-mode flag so each render path can pick correct shader and colors.
+// [EVENT] Called every frame from `GLCanvas3D::render()` as part of the viewport update.
+// [THREAD] Executes on the GLCanvas thread to keep OpenGL state consistent with the camera.
+// [OPENGL] Enables depth testing, picks shader branches, and disables depth test after drawing.
+// [UNITY] Replace with a MonoBehaviour's `OnRenderObject` or custom render pass that toggles axis helpers and schedules `MeshRenderer` draws.
+void Bed3D::render(GLCanvas3D&        canvas,
+                   const Transform3d& view_matrix,
+                   const Transform3d& projection_matrix,
+                   bool               bottom,
+                   float              scale_factor,
+                   bool               show_axes)
 {
     render_internal(canvas, view_matrix, projection_matrix, bottom, scale_factor, show_axes);
 }
 
-void Bed3D::render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom, float scale_factor,
-    bool show_axes)
+// [INTENT] Helper that handles axis draws, shader bindings, and delegates to the proper system/custom renderer.
+// [STATE] Uses `m_scale_factor`, `m_axes`, and `m_model` color before switching to the specialized draw path.
+// [OPENGL] Wraps the draw in GL depth enables/disables and shares the `flat` shader across bed variants.
+// [UNITY] Map this to a shared render feature that preps material properties before the actual draw call.
+void Bed3D::render_internal(GLCanvas3D&        canvas,
+                            const Transform3d& view_matrix,
+                            const Transform3d& projection_matrix,
+                            bool               bottom,
+                            float              scale_factor,
+                            bool               show_axes)
 {
     m_scale_factor = scale_factor;
 
@@ -387,18 +453,26 @@ void Bed3D::render_internal(GLCanvas3D& canvas, const Transform3d& view_matrix, 
 
     m_model.set_color(m_is_dark ? DEFAULT_MODEL_COLOR_DARK : DEFAULT_MODEL_COLOR);
 
-    switch (m_type)
-    {
-    case Type::System: { render_system(canvas, view_matrix, projection_matrix, bottom); break; }
+    switch (m_type) {
+    case Type::System: {
+        render_system(canvas, view_matrix, projection_matrix, bottom);
+        break;
+    }
     default:
-    case Type::Custom: { render_custom(canvas, view_matrix, projection_matrix, bottom); break; }
+    case Type::Custom: {
+        render_custom(canvas, view_matrix, projection_matrix, bottom);
+        break;
+    }
     }
 
     glsafe(::glDisable(GL_DEPTH_TEST));
 }
 
-//BBS: add partplate related logic
-// Calculate an extended bounding box from axes and current model for visualization purposes.
+// BBS: add partplate related logic
+//  Calculate an extended bounding box from axes and current model for visualization purposes.
+// [INTENT] Build a tight axis-aligned box that covers the bed shape plus axis gizmos to help framing/camera controls.
+// [STATE] Uses `m_build_volume`, axis extents, and current `m_position` offsets when the bed is not origin-aligned.
+// [UNITY] Mirror this with a `Bounds` used by a Unity `CameraController` to frame the bed mesh.
 BoundingBoxf3 Bed3D::calc_printable_bounding_box() const
 {
     BoundingBoxf3 out{m_build_volume.bounding_volume()};
@@ -419,6 +493,9 @@ BoundingBoxf3 Bed3D::calc_printable_bounding_box() const
     return out;
 }
 
+// [INTENT] Merge the printable bounding box with the STL model bounds so framers know the full extents.
+// [STATE] Translates the `m_model` bounding box by `m_model_offset` before merging.
+// [UNITY] Call `Bounds.Encapsulate` with both bed polygons and mesh bounds when adjusting the Unity camera orbit limits.
 BoundingBoxf3 Bed3D::calc_extended_bounding_box() const
 {
     BoundingBoxf3 out;
@@ -433,6 +510,11 @@ BoundingBoxf3 Bed3D::calc_extended_bounding_box() const
 
 // Try to match the print bed shape with the shape of an active profile. If such a match exists,
 // return the print bed model.
+// [INTENT] Match the supplied shape to an active printer preset so system models/textures auto-load.
+// [STATE] Reads `wxGetApp().preset_bundle` and walks parent presets to find a matching `printable_area` polygon.
+// [EVENT] Called every time `set_shape` runs unless `force_as_custom` is true, making it part of the build volume normalization flow.
+// [PORTING_HAZARD:P2] Depends on `PresetBundle` internals and dynamic_casts; Unity needs a serialized preset database or must skip this
+// detection. [UNITY] Should query a serialized `PrinterPreset` asset that maps to an STL mesh stored in `StreamingAssets`.
 std::tuple<Bed3D::Type, std::string, std::string> Bed3D::detect_type(const Pointfs& shape)
 {
     auto bundle = wxGetApp().preset_bundle;
@@ -441,19 +523,20 @@ std::tuple<Bed3D::Type, std::string, std::string> Bed3D::detect_type(const Point
         while (curr != nullptr) {
             if (curr->config.has("printable_area")) {
                 std::string texture_filename, model_filename;
-                if (shape == make_counter_clockwise(dynamic_cast<const ConfigOptionPoints*>(curr->config.option("printable_area"))->values)) {
+                if (shape ==
+                    make_counter_clockwise(dynamic_cast<const ConfigOptionPoints*>(curr->config.option("printable_area"))->values)) {
                     if (curr->is_system)
                         model_filename = PresetUtils::system_printer_bed_model(*curr);
                     else {
-                        auto *printer_model = curr->config.opt<ConfigOptionString>("printer_model");
-                        if (printer_model != nullptr && ! printer_model->value.empty()) {
+                        auto* printer_model = curr->config.opt<ConfigOptionString>("printer_model");
+                        if (printer_model != nullptr && !printer_model->value.empty()) {
                             model_filename = bundle->get_stl_model_for_printer_model(printer_model->value);
                         }
                     }
-                    //std::string model_filename = PresetUtils::system_printer_bed_model(*curr);
-                    //std::string texture_filename = PresetUtils::system_printer_bed_texture(*curr);
+                    // std::string model_filename = PresetUtils::system_printer_bed_model(*curr);
+                    // std::string texture_filename = PresetUtils::system_printer_bed_texture(*curr);
                     if (!model_filename.empty())
-                        return { Type::System, model_filename, texture_filename };
+                        return {Type::System, model_filename, texture_filename};
                 }
             }
 
@@ -461,15 +544,23 @@ std::tuple<Bed3D::Type, std::string, std::string> Bed3D::detect_type(const Point
         }
     }
 
-    return { Type::Custom, {}, {} };
+    return {Type::Custom, {}, {}};
 }
 
+// [INTENT] Guard axis drawing so it only happens when the build volume has been configured.
+// [EVENT] Called from `render_internal` once the scene has valid volume data.
+// [UNITY] Map to enabling/disabling the axis helper GameObject inside Unity's `Update` loop.
 void Bed3D::render_axes()
 {
     if (m_build_volume.valid())
         m_axes.render();
 }
 
+// [INTENT] Draw the system bed model with the `hotbed` shader and optional extruder volume data.
+// [STATE] Operates when `m_type == Type::System`, `m_model` points to an STL file, and optional shared volume data is present.
+// [EVENT] Called from `render_internal` during the normal render pass; does nothing when `bottom` is true.
+// [OPENGL] Configures shader uniforms, toggles depth testing, and leaves textured layers for later.
+// [UNITY] Mirror by feeding `MeshRenderer` property blocks with `print_volume` data and letting a dedicated material handle shading.
 void Bed3D::render_system(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom)
 {
     if (!bottom)
@@ -558,8 +649,8 @@ void Bed3D::render_system(GLCanvas3D& canvas, const Transform3d& view_matrix, co
             if (*vbo_id == 0) {
                 glsafe(::glGenBuffers(1, vbo_id));
                 glsafe(::glBindBuffer(GL_ARRAY_BUFFER, *vbo_id));
-                glsafe(::glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)m_triangles.get_vertices_data_size(), (const GLvoid*)m_triangles.get_vertices_data(), GL_STATIC_DRAW));
-                glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
+                glsafe(::glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)m_triangles.get_vertices_data_size(), (const
+GLvoid*)m_triangles.get_vertices_data(), GL_STATIC_DRAW)); glsafe(::glBindBuffer(GL_ARRAY_BUFFER, 0));
             }
 
             glsafe(::glEnable(GL_DEPTH_TEST));
@@ -587,11 +678,13 @@ void Bed3D::render_system(GLCanvas3D& canvas, const Transform3d& view_matrix, co
 
             if (position_id != -1) {
                 glsafe(::glEnableVertexAttribArray(position_id));
-                glsafe(::glVertexAttribPointer(position_id, 3, GL_FLOAT, GL_FALSE, stride, (GLvoid*)(intptr_t)m_triangles.get_position_offset()));
+                glsafe(::glVertexAttribPointer(position_id, 3, GL_FLOAT, GL_FALSE, stride,
+(GLvoid*)(intptr_t)m_triangles.get_position_offset()));
             }
             if (tex_coords_id != -1) {
                 glsafe(::glEnableVertexAttribArray(tex_coords_id));
-                glsafe(::glVertexAttribPointer(tex_coords_id, 2, GL_FLOAT, GL_FALSE, stride, (GLvoid*)(intptr_t)m_triangles.get_tex_coords_offset()));
+                glsafe(::glVertexAttribPointer(tex_coords_id, 2, GL_FLOAT, GL_FALSE, stride,
+(GLvoid*)(intptr_t)m_triangles.get_tex_coords_offset()));
             }
 
             glsafe(::glDrawArrays(GL_TRIANGLES, 0, (GLsizei)m_triangles.get_vertices_count()));
@@ -617,59 +710,75 @@ void Bed3D::render_system(GLCanvas3D& canvas, const Transform3d& view_matrix, co
     }
 }*/
 
-//BBS: add part plate related logic
+// BBS: add part plate related logic
+// [INTENT] Re-center the STL model and recalc cached bounding boxes whenever the bed geometry changes.
+// [STATE] Moves `m_model_offset`, updates `m_printable_bounding_box`, and resets `m_triangles` so future renders use fresh toy geometry.
+// [UNITY] Mirror this by recalculating the bed `Transform` and updating the cached `Bounds` that Unity cameras reference.
 void Bed3D::update_model_offset()
 {
     // move the model so that its origin (0.0, 0.0, 0.0) goes into the bed shape center and a bit down to avoid z-fighting with the texture quad
-    Vec3d shift = m_build_volume.bounding_volume().center();
-    shift(2) = -0.03;
+    Vec3d shift             = m_build_volume.bounding_volume().center();
+    shift(2)                = -0.03;
     Vec3d* model_offset_ptr = const_cast<Vec3d*>(&m_model_offset);
-    *model_offset_ptr = shift;
-    (*model_offset_ptr)(2) = -0.41 + GROUND_Z;
+    *model_offset_ptr       = shift;
+    (*model_offset_ptr)(2)  = -0.41 + GROUND_Z;
 
     // update extended bounding box
-    const_cast<BoundingBoxf3 &>(m_printable_bounding_box) = calc_printable_bounding_box();
-    const_cast<BoundingBoxf3 &>(m_extended_bounding_box)  = calc_extended_bounding_box();
+    const_cast<BoundingBoxf3&>(m_printable_bounding_box) = calc_printable_bounding_box();
+    const_cast<BoundingBoxf3&>(m_extended_bounding_box)  = calc_extended_bounding_box();
     m_triangles.reset();
 }
 
+// [INTENT] Populate a fallback triangle mesh for the bed polygon so we can render a grid when no STL is available.
+// [STATE] Checks `m_triangles` and only builds once per shape; relies on `m_bed_shape`, offsets, and `m_model_offset`.
+// [EVENT] Called before `render_default` to lazily prepare the vertex buffer.
+// [THREAD] Runs on the GLCanvas thread but constructs geometry via CPU helpers before touching GL.
+// [OPENGL] After constructing vertices it calls `init_model_from_poly` which fills a `GLModel` buffer that later draws via a shader.
+// [UNITY] Unity can mimic this by using `Mesh.SetVertices`/`SetTriangles` with cached `List<Vector3>` data when the STL/model is absent.
 void Bed3D::update_bed_triangles()
 {
     if (m_triangles.is_initialized()) {
         return;
     }
 
-    Vec3d shift = m_extended_bounding_box.center();
-    shift(2) = -0.03;
+    Vec3d shift             = m_extended_bounding_box.center();
+    shift(2)                = -0.03;
     Vec3d* model_offset_ptr = const_cast<Vec3d*>(&m_model_offset);
-    *model_offset_ptr = shift;
-    //BBS: TODO: hack for default bed
+    *model_offset_ptr       = shift;
+    // BBS: TODO: hack for default bed
     BoundingBoxf3 build_volume;
 
-    if (!m_build_volume.valid()) return;
-    auto bed_ext = get_extents(m_bed_shape);
+    if (!m_build_volume.valid())
+        return;
+    auto bed_ext           = get_extents(m_bed_shape);
     (*model_offset_ptr)(0) = m_build_volume.bounding_volume2d().min.x() - bed_ext.min.x();
     (*model_offset_ptr)(1) = m_build_volume.bounding_volume2d().min.y() - bed_ext.min.y();
     (*model_offset_ptr)(2) = -0.41 + GROUND_Z;
 
     std::vector<Vec2d> origin_bed_shape;
     for (size_t i = 0; i < m_bed_shape.size(); i++) {
-         origin_bed_shape.push_back(m_bed_shape[i]);
+        origin_bed_shape.push_back(m_bed_shape[i]);
     }
     std::vector<Vec2d> new_bed_shape; // offset to correct origin
     for (auto point : origin_bed_shape) {
         Vec2d new_point(point.x() + model_offset_ptr->x(), point.y() + model_offset_ptr->y());
         new_bed_shape.push_back(new_point);
     }
-    ExPolygon poly{ Polygon::new_scale(new_bed_shape) };
+    ExPolygon poly{Polygon::new_scale(new_bed_shape)};
     if (!init_model_from_poly(m_triangles, poly, GROUND_Z)) {
         BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ":Unable to update plate triangles\n";
     }
     // update extended bounding box
-    const_cast<BoundingBoxf3 &>(m_printable_bounding_box) = calc_printable_bounding_box();
-    const_cast<BoundingBoxf3 &>(m_extended_bounding_box)  = calc_extended_bounding_box();
+    const_cast<BoundingBoxf3&>(m_printable_bounding_box) = calc_printable_bounding_box();
+    const_cast<BoundingBoxf3&>(m_extended_bounding_box)  = calc_extended_bounding_box();
 }
 
+// [INTENT] Render the STL bed model with the `hotbed` shader, including extruder volume uniforms.
+// [STATE] Loads the model once when the filename changes, updates `m_model_offset`, and keeps the color in sync with `m_is_dark`.
+// [EVENT] Called from `render_system` whenever the bed is active and not rendering from below.
+// [OPENGL] Sets shader uniforms (`view_model`, `projection`, `view_normal`, `print_volume`) before calling `m_model.render()`.
+// [UNITY] Equivalent to using a `MeshFilter`/`SkinnedMeshRenderer` with a custom shader that reads `print_volume` properties via
+// `MaterialPropertyBlock`.
 void Bed3D::render_model(const Transform3d& view_matrix, const Transform3d& projection_matrix)
 {
     if (m_model_filename.empty())
@@ -681,34 +790,34 @@ void Bed3D::render_model(const Transform3d& view_matrix, const Transform3d& proj
         update_model_offset();
 
         // BBS: remove the bed picking logic
-        //register_raycasters_for_picking(m_model.model.get_geometry(), Geometry::assemble_transform(m_model_offset));
+        // register_raycasters_for_picking(m_model.model.get_geometry(), Geometry::assemble_transform(m_model_offset));
     }
 
     if (!m_model.get_filename().empty()) {
-        const Camera &     camera      = wxGetApp().plater()->get_camera();
-        const Transform3d &view_matrix = camera.get_view_matrix();
-        const Transform3d &projection_matrix = camera.get_projection_matrix();
-        GLShaderProgram* shader = wxGetApp().get_shader("hotbed");
+        const Camera&      camera            = wxGetApp().plater()->get_camera();
+        const Transform3d& view_matrix       = camera.get_view_matrix();
+        const Transform3d& projection_matrix = camera.get_projection_matrix();
+        GLShaderProgram*   shader            = wxGetApp().get_shader("hotbed");
         if (shader != nullptr) {
             shader->start_using();
             shader->set_uniform("emission_factor", 0.0f);
             const Transform3d model_matrix = Geometry::assemble_transform(m_model_offset);
-            shader->set_uniform("volume_world_matrix",  model_matrix);
+            shader->set_uniform("volume_world_matrix", model_matrix);
             shader->set_uniform("view_model_matrix", view_matrix * model_matrix);
             shader->set_uniform("projection_matrix", projection_matrix);
-            const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) * model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
+            const Matrix3d view_normal_matrix = view_matrix.matrix().block(0, 0, 3, 3) *
+                                                model_matrix.matrix().block(0, 0, 3, 3).inverse().transpose();
             shader->set_uniform("view_normal_matrix", view_normal_matrix);
             if (m_build_volume.get_extruder_area_count() > 0) {
                 const BuildVolume::BuildSharedVolume& shared_volume = m_build_volume.get_shared_volume();
-                std::array<float, 4>       xy_data       = shared_volume.data;
+                std::array<float, 4>                  xy_data       = shared_volume.data;
                 shader->set_uniform("print_volume.type", shared_volume.type);
                 shader->set_uniform("print_volume.xy_data", xy_data);
                 std::array<float, 2> zs = shared_volume.zs;
                 zs[0]                   = -1;
                 shader->set_uniform("print_volume.z_data", zs);
-            }
-            else {
-                //use -1 ad a invalid type
+            } else {
+                // use -1 ad a invalid type
                 shader->set_uniform("print_volume.type", -1);
             }
             m_model.render();
@@ -717,6 +826,10 @@ void Bed3D::render_model(const Transform3d& view_matrix, const Transform3d& proj
     }
 }
 
+// [INTENT] Render custom beds: draws a saved STL model if available, otherwise defers to `render_default`.
+// [STATE] Falls back to `render_default` when no STL model is specified, and `bottom` can skip the model to keep the preview uncluttered.
+// [EVENT] Called from `render` when `m_type == Type::Custom`.
+// [UNITY] Equivalent to checking if a custom `Mesh` asset exists and either drawing it with a `MeshRenderer` or falling back to the polygon `Mesh`.
 void Bed3D::render_custom(GLCanvas3D& canvas, const Transform3d& view_matrix, const Transform3d& projection_matrix, bool bottom)
 {
     if (m_model_filename.empty()) {
@@ -731,6 +844,10 @@ void Bed3D::render_custom(GLCanvas3D& canvas, const Transform3d& view_matrix, co
         render_texture(bottom, canvas);*/
 }
 
+// [INTENT] Draw a fallback mesh/triangles when no STL model is provided, using dark mode colors and a translucent grid.
+// [STATE] Relies on `m_triangles`, `m_is_dark`, and `m_model` to decide when to draw the triangle batch.
+// [OPENGL] Enables blending/depth/test, conditionally draws the triangle buffer, and resets GL state afterward.
+// [UNITY] Use `MeshRenderer` with a cached mesh and a translucent material to simulate this default bed appearance.
 void Bed3D::render_default(bool bottom, const Transform3d& view_matrix, const Transform3d& projection_matrix)
 {
     // m_texture.reset();
@@ -751,8 +868,9 @@ void Bed3D::render_default(bool bottom, const Transform3d& view_matrix, const Tr
         if (m_model.get_filename().empty() && !bottom) {
             // draw background
             glsafe(::glDepthMask(GL_FALSE));
-            ColorRGBA color = m_is_dark ? DEFAULT_MODEL_COLOR_DARK : DEFAULT_MODEL_COLOR;   // ORCA add dark mode support
-            color = ColorRGBA(color[0] * 0.8f, color[1] * 0.8f,color[2] * 0.8f, color[3]);  // ORCA shift color a darker tone to fix difference between flat / gouraud_light shader
+            ColorRGBA color = m_is_dark ? DEFAULT_MODEL_COLOR_DARK : DEFAULT_MODEL_COLOR; // ORCA add dark mode support
+            color           = ColorRGBA(color[0] * 0.8f, color[1] * 0.8f, color[2] * 0.8f,
+                                        color[3]); // ORCA shift color a darker tone to fix difference between flat / gouraud_light shader
             m_triangles.set_color(color);
             m_triangles.render();
             glsafe(::glDepthMask(GL_TRUE));
@@ -771,7 +889,8 @@ void Bed3D::render_default(bool bottom, const Transform3d& view_matrix, const Tr
     }
 }
 
-// BBS: remove the bed picking logic
+// [PORTING_HAZARD:P2] Picking logic was removed, so Unity must reintroduce a modern `Physics.Raycast` against the bed mesh if interactive
+// selection is needed. BBS: remove the bed picking logic
 /*
 void Bed3D::register_raycasters_for_picking(const GLModel::Geometry& geometry, const Transform3d& trafo)
 {
@@ -792,5 +911,4 @@ void Bed3D::register_raycasters_for_picking(const GLModel::Geometry& geometry, c
     wxGetApp().plater()->canvas3D()->add_raycaster_for_picking(SceneRaycaster::EType::Bed, 0, *m_model.mesh_raycaster, trafo);
 }
 */
-} // GUI
-} // Slic3r
+}} // namespace Slic3r::GUI

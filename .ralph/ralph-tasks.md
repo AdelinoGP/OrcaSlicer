@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-23T04:48:59Z
+Last updated: 2026-03-23T05:13:46Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -60,8 +60,8 @@ Last updated: 2026-03-23T04:48:59Z
 - [x] T139 annotate: src/libvgcode/src/ViewRange.cpp
 - [x] T140 annotate: src/libvgcode/src/ViewRange.hpp
 - [x] T141 annotate: src/slic3r/GUI/2DBed.cpp
-- [ ] T142 annotate: src/slic3r/GUI/2DBed.hpp
-- [ ] T143 annotate: src/slic3r/GUI/3DBed.cpp
+- [x] T142 annotate: src/slic3r/GUI/2DBed.hpp
+- [x] T143 annotate: src/slic3r/GUI/3DBed.cpp
 - [ ] T144 annotate: src/slic3r/GUI/3DBed.hpp
 - [ ] T145 annotate: src/slic3r/GUI/3DScene.cpp
 - [x] T146 annotate: src/slic3r/GUI/3DScene.hpp

@@ -354,6 +354,10 @@
 - Plan: mark the task active, read the header, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around the shader lifecycle, caches, binding helpers, and uniform setters; append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the file, close the task, and then pick the next ready Phase 1 file.
 
 ## Iteration plan update
+- Selected task: T142 annotate `src/slic3r/GUI/2DBed.hpp` as the next goal.
+- Plan: confirm the header matches the already annotated `2DBed.cpp`, read the full file, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations for the view geometry, transform flags, event handlers, and canvas state, append the mandatory evidence block to `.ralph/agent/handoff.md`, update `.ralph/ralph-tasks.md` to `[~]` then `[x]`, commit the annotated header, and then end the iteration so another agent continues.
+
+## Iteration plan update
 - Current focus: T429 annotate `src/slic3r/GUI/Jobs/BusyCursorJob.hpp` (task-1773880086-b972 now active).
 - Plan: read the RAII cursor wrapper plus templated job decorator, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments describing the busy indicator lifecycle, main-thread cursor swaps, and Unity equivalents (e.g., `Cursor.SetCursor` + `AsyncOperation`), append a Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the single-file change, and close the task before selecting the next ready entry.
 - Selected task: T380 annotate `src/slic3r/GUI/GUI_Factories.hpp` (task-1773880086-2264 now active).
@@ -410,3 +414,11 @@
 ## Iteration plan update
 - Selected task: T650 annotate `src/slic3r/GUI/Widgets/CheckBox.hpp`
 - Plan: mark the header as active, add targeted `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD]` comments around the toggle-button state helpers, platform-specific bitmap overrides, and state cache, note the Unity analog (UI Toolkit Toggle + custom theme handling and `Texture2D` state-swapping), append the Phase 1 evidence block, commit, and finish the task for this iteration.
+
+## Iteration plan update
+- Selected task: T143 annotate `src/slic3r/GUI/3DBed.cpp` now that the source file exists.
+- Plan: read the entire implementation to capture bed state, render caches, and GL hook interplay; insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around initialization, color updates, transform helpers, camera interactions, and detection helpers; document the Unity mapping (e.g., `MeshFilter` onset, `RenderTexture` preview, `ScriptableObject` bed metadata), note hazards like `wxGetApp` singletons and manual `gl*` toggles, append the required evidence block to `.ralph/agent/handoff.md`, commit the annotated file, and close the task before spinning up the next ready entry.
+
+## Iteration update
+- Completed T143 annotate `src/slic3r/GUI/3DBed.cpp` with multi-tag coverage of palette sync, `set_shape`, render paths, fallback geometry, and porting hazards.
+- Next recommended focus: T144 annotate `src/slic3r/GUI/3DBed.hpp` so the header explains the same lifecycle/state guidance.
