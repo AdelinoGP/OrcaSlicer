@@ -2366,3 +2366,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1, P3=1
 - Git: Annotate GLGizmos header for Unity port
 - Next recommended Phase 1 task: T346 annotate: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp
+
+## Phase 1 - Task T346 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp; .ralph/agent/scratchpad.md; .ralph/ralph-tasks.md; .ralph/agent/handoff.md
+- Substantive additions: 15 targeted `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments documenting selection gating, worker fluidity, render passes, and Unity replacements.
+- Verification excerpt: // [OPENGL] Draws the simplified preview mesh (and optional wireframe overlay) using gfx shaders from wxApp.
+- Unity-impact summary:
+  - Gate the callback scheduling through a Unity `MainThreadDispatcher` and keep an `ActiveGizmo` enum on the controller so stale `CallAfter` hits never mutate destroyed gizmos.
+  - Replace `std::thread` + `CallAfter` with a Job/CancellationToken pair that reports progress back via `SynchronizationContext.Post`, then swaps meshes through a `MeshFilter` and notifies the preview controller.
+  - Translate the wireframe toggle to an extra `Graphics.DrawMesh` pass or `CommandBuffer` drawing logic instead of using OpenGL polygon mode hacks.
+- Hazards found: P2=2, P3=1
+- Git: Annotate GLGizmoSimplify for Unity port
+- Next recommended Phase 1 task: T347 annotate: src/slic3r/GUI/Gizmos/GLGizmoSimplify.hpp

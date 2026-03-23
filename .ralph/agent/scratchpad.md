@@ -304,3 +304,11 @@
 - 2026-03-22: plan to annotate `src/slic3r/GUI/Gizmos/GLGizmoSeam.cpp` next. Steps: confirm task state, read current file, document intent/state/events/render/thread/Unity concerns, record handoff evidence, commit.
 - 2026-03-22: Annotated `src/slic3r/GUI/Gizmos/GLGizmoSeam.cpp` (GL state, event flow, and Unity mapping notes); next focus is `T344: GLGizmoSeam.hpp`.
 - 2026-03-22: Starting `T344: GLGizmoSeam.hpp` -- read header, collect rendering and event hooks, note Unity mappings, capture handoff details, prepare annotation stub.
+
+## Iteration plan update
+- Selected task: T345 annotate `src/slic3r/GUI/Gizmos/GLGizmos.hpp`.
+- Plan: read the header to document the manager-level intent/state/event bindings, add the standard annotation tags, update handoff, and commit before moving on.
+
+## Iteration plan update
+- Selected task: T346 annotate `src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp` (current focus after warm-up review).
+- Plan: read the simplified gizmo implementation, capture the stateful tool selection, face sampling, and render pipeline hooks, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments across the main lifecycle functions, append the required evidence block to `.ralph/agent/handoff.md`, commit the annotated file, and then keep moving to the next ready task (e.g., T347 for the header).
