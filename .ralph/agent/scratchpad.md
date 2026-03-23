@@ -726,3 +726,11 @@
 ## Iteration plan update
 - Current focus: T161 annotate: `src/slic3r/GUI/AuxiliaryDialog.hpp` to capture the DPI-aware dialog that wraps the auxiliary list, including stateful list ownership and DPI layout adjustments.
 - Plan: read the header, document the dialog intent/state/event flow, highlight the `aux_list` cache/state, note the DPI change override that fires on the UI thread, insert `[UNITY]` guidance (e.g., UI Toolkit `VisualElement` panel with `ListView` plus main-thread dispatcher for DPI metrics), capture any `[PORTING_HAZARD]` around platform DPI/event expectations, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotations plus metadata, and then close the task before handing off the next file (likely `T162 annotate: src/slic3r/GUI/Auxiliary.hpp`).
+
+## Iteration plan update
+- Current focus: T162 annotate: `src/slic3r/GUI/Auxiliary.hpp` (ready/unblocked).
+- Plan: read the header to capture the auxiliary panel intent, stateful `node_cache` stack, event hookups for list/dialog sync and config persistence, DPI handling overrides, `wxArrayString` bindings, and the Unity analog (UI Toolkit `ListView` on a `VisualElement` panel plus a `ScriptableObject` representation of auxiliary material presets) while tagging `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]`; append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file, close T162, and then select the next Phase 1 task for the following iteration.
+
+## Iteration plan update
+- Current focus: T378 annotate: `src/slic3r/GUI/GUI.cpp` (task-1773880086-f3cf now active).
+- Plan: read the implementation thoroughly, annotate the main GUI class lifecycle, event dispatching, thread-aware job queues, GL interactions, config persistence hooks, and Unity analogs (e.g., Scene Manager + UI Toolkit pipeline) with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` tags; append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file, close the task, and then pick the next ready task.

@@ -3758,3 +3758,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 (P2 manual `ImTextureID` ownership, P3 GL texture lifecycle tied to ImGui uploads).
 - Git: Annotate IMToolbar header for Unity migration
 - Next recommended Phase 1 task: T419 annotate: src/slic3r/GUI/IMToolbar.cpp
+
+## Phase 1 - Task T378 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI.cpp
+- Deliverables: src/slic3r/GUI/GUI.cpp
+- Substantive additions: 12 multi-tag helper annotations covering shortcut text, config mutation utilities, dialog helpers, conversion helpers, checklist glue, and desktop shell bridges.
+- Verification excerpt: // [INTENT] Turns a wxComboCtrl into a checklist so multiple boolean flags can share a single dropdown.
+- Unity-impact summary:
+  - Push error dialogs through Unity's `MainThreadDispatcher` and dialog service to match `show_error` semantics.
+  - Mirror `change_opt_value` with a `SettingsModel` ScriptableObject service so every panel updates the shared config uniformly.
+  - Replace desktop folder helpers with `Application.OpenURL`/`Process.Start` while sanitizing environment variables just like AppImage does here.
+- Hazards found: 4 (P1:1, P2:2, P3:1)
+- Git: annotate: src/slic3r/GUI/GUI.cpp
+- Next recommended Phase 1 task: T379 annotate: src/slic3r/GUI/GUI_Factories.cpp

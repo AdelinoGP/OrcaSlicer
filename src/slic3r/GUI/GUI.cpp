@@ -40,6 +40,15 @@ namespace GUI {
 IOPMAssertionID assertionID;
 #endif
 
+// [INTENT] Central utilities for the GUI layer: dialog helpers, config mutators, platform bridges, and error plumbing shared across the
+// wxApp. [STATE] Holds the limited cross-cutting caches (e.g., assertion handle, string prefixes) that do not belong to a single window but
+// any controller may query. [UNITY] Mirror this file with a static Unity UI service (MonoBehaviour + ScriptableObject config store +
+// VisualElement helpers) that exposes the same helpers to downstream panels.
+
+#if __APPLE__
+IOPMAssertionID assertionID;
+#endif
+
 // [INTENT] Prevents system sleep/screensaver during long operations.
 // [UNITY] Use Screen.sleepTimeout = SleepTimeout.NeverSleep;
 void disable_screensaver()
@@ -86,6 +95,9 @@ void break_to_debugger()
 #endif                /* _WIN32 */
 }
 
+// [INTENT] Provide the localized control key label used by menus and buttons on each platform for consistency.
+// [STATE] Caches the prefix string so repeated shortcut markup reuses the same prefix instance instead of re-instantiating it.
+// [UNITY] Replace with a Unity shortcut helper (UI Toolkit `Label` bound to `InputAction.asset` names) while respecting Command vs Ctrl semantics.
 const std::string& shortkey_ctrl_prefix()
 
 {
@@ -99,6 +111,9 @@ const std::string& shortkey_ctrl_prefix()
     return str;
 }
 
+// [INTENT] Surface the alternate modifier key label (Alt/Option) that matches the running platform so the tooltip copy feels native.
+// [STATE] Stores the string once per run to avoid repeated std::string allocations when building UI hints.
+// [UNITY] Mirror this with Unity's input label provider so `KeyCode.LeftAlt` vs `KeyCode.LeftCommand` display correctly in menus.
 const std::string& shortkey_alt_prefix()
 {
     static const std::string str =
@@ -111,7 +126,14 @@ const std::string& shortkey_alt_prefix()
     return str;
 }
 
-// opt_index = 0, by the reason of zero-index in ConfigOptionVector by default (in case only one element)
+// [INTENT] Pushes a user change from the GUI controls into the shared DynamicPrintConfig so the model and the subsequent render/preset
+// logic stay in sync. [STATE] Updates option vectors and caches for enumeration/string/point types that are reused by tabs and preview
+// panels. [EVENT] Called from event handlers tied to sliders, combo boxes, and dialog Apply buttons; it is the destination of those
+// callbacks. [THREAD] Assumes it runs on the main wxWidgets thread because it mutates config state that the UI and renderers assume to be
+// consistent. [UNITY] Replace with a ConfigService MonoBehaviour that accepts `SerializedObject` updates and writes into a
+// `ScriptableObject` `SettingsModel` for all panels. [PORTING_HAZARD:P2] Translating the boost::any + ConfigOption union requires building
+// a versatile converter layer in C# that mirrors the wide enum of option types. opt_index = 0, by the reason of zero-index in
+// ConfigOptionVector by default (in case only one element)
 void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt_key, const boost::any& value, int opt_index /*= 0*/)
 {
     try {
@@ -231,6 +253,10 @@ void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt
     }
 }
 
+// [INTENT] Marshals error reporting back to the GUI thread so asynchronous jobs can report fatal states without racing dialogs.
+// [EVENT] Invoked from background workers, job callbacks, and config validation code when fatal states occur.
+// [THREAD] `CallAfter` guarantees the dialog shows on the main wxWidgets thread, mirroring Unity's main-thread dispatcher requirement.
+// [UNITY] Replace with `MainThreadDispatcher.Instance.Enqueue(() => UIMessage.ShowError(...))` to keep the dialog modal in Unity.
 void show_error(wxWindow* parent, const wxString& message, bool monospaced_font)
 {
     wxGetApp().CallAfter([=] {
@@ -239,6 +265,8 @@ void show_error(wxWindow* parent, const wxString& message, bool monospaced_font)
     });
 }
 
+// [INTENT] Wraps the wxString overload so legacy callers with C strings can reuse the same thread-safe dialog logic.
+// [UNITY] All platform bindings should funnel into the same main-thread dispatcher regardless of string type.
 void show_error(wxWindow* parent, const char* message, bool monospaced_font)
 {
     assert(message);
@@ -247,10 +275,15 @@ void show_error(wxWindow* parent, const char* message, bool monospaced_font)
 
 void show_error_id(int id, const std::string& message)
 {
+    // [INTENT] Useful when async tasks report errors keyed to a window ID instead of direct pointers.
+    // [EVENT] Converts numeric IDs back into wxWindows before reusing the main dialog path.
     auto* parent = id != 0 ? wxWindow::FindWindowById(id) : nullptr;
     show_error(parent, message);
 }
 
+// [INTENT] Presents an informational dialog on the main thread with consistent app naming so user messages never look stale.
+// [EVENT] Called from success paths, config loads, or job completions that want to notify the user before continuing.
+// [UNITY] Replace with UI Toolkit `DialogWindow.ShowAsync` on the main thread while composing `AppName` in code.
 void show_info(wxWindow* parent, const wxString& message, const wxString& title)
 {
     // wxMessageDialog msg_wingow(parent, message, wxString(SLIC3R_APP_NAME " - ") + (title.empty() ? _L("Notice") : title), wxOK |
@@ -260,12 +293,16 @@ void show_info(wxWindow* parent, const wxString& message, const wxString& title)
     msg_wingow.ShowModal();
 }
 
+// [INTENT] C-string helper that defers to the wide-string entry so we never duplicate modal behavior.
 void show_info(wxWindow* parent, const char* message, const char* title)
 {
     assert(message);
     show_info(parent, wxString::FromUTF8(message), title ? wxString::FromUTF8(title) : wxString());
 }
 
+// [INTENT] Shows warning dialogs invoked from validation hooks without disabling the rest of the UI.
+// [EVENT] Used by config loaders or job responses that want to inform users but keep retrying.
+// [UNITY] Use a `ModalWindow` on Unity's UI Toolkit + `IGenericDialogService.ShowWarningAsync` to mirror this behavior.
 void warning_catcher(wxWindow* parent, const wxString& message)
 {
     MessageDialog msg(parent, message, _L("Warning"), wxOK | wxICON_WARNING);
@@ -276,6 +313,12 @@ static wxString bold(const wxString& str) { return wxString::Format("<b>%s</b>",
 
 static wxString bold_string(const wxString& str) { return wxString::Format("<b>\"%s\"</b>", str); };
 
+// [INTENT] Builds the HTML table that lists which configuration entries were rewritten during import/upgrade flows.
+// [STATE] Reads the `ConfigOptionDef` metadata to describe both old and new values, so the fallback preview can render consistent tooltips.
+// [EVENT] Called when preset/config loads complete and the migration path wants to show the user what changed.
+// [UNITY] Map to a Unity `ScrollableText` or `UI Toolkit` `Label` fed by a data object generated from `ConfigOptionDef` so the upgrade
+// popup matches wx behavior. [PORTING_HAZARD:P3] Unity lacks native HTML widgets, so the table string must be converted into stylized text
+// (e.g., `RichTextField`).
 static void add_config_substitutions(const ConfigSubstitutions& conf_substitutions, wxString& changes)
 {
     changes += "<table>";
@@ -350,6 +393,10 @@ static wxString substitution_message(const wxString& changes)
 
 void show_substitutions_info(const PresetsConfigSubstitutions& presets_config_substitutions)
 {
+    // [INTENT] Alerts the user when preset files from newer versions contain fields that were rewritten or dropped.
+    // [STATE] Uses the `changes` HTML to describe what each preset migration touched so users can verify them.
+    // [EVENT] Triggered after config imports finish and a `PresetsConfigSubstitutions` record is created.
+    // [UNITY] Replace with a Unity `Dialog` that binds to a `MigrationSummary` model provided by the translation service.
     wxString changes;
 
     auto preset_type_name = [](Preset::Type type) {
@@ -379,6 +426,8 @@ void show_substitutions_info(const PresetsConfigSubstitutions& presets_config_su
 
 void show_substitutions_info(const ConfigSubstitutions& config_substitutions, const std::string& filename)
 {
+    // [INTENT] Similar migration feedback path for single configuration files.
+    // [UNITY] Unity port should show the same message box but route through a `LocalizationService` + `DialogService`.
     wxString changes = "\n";
     add_config_substitutions(config_substitutions, changes);
 
@@ -388,6 +437,13 @@ void show_substitutions_info(const ConfigSubstitutions& config_substitutions, co
     msg.ShowModal();
 }
 
+// [INTENT] Turns a wxComboCtrl into a checklist so multiple boolean flags can share a single dropdown.
+// [STATE] Holds the per-item flags inside the hidden popup list; `combochecklist_get_flags` reads them back as a bit mask.
+// [EVENT] Binds to wxEVT_* events on the popup to capture when the user toggles selections.
+// [THREAD] Must run on the UI/Main thread since combo control events may fire asynchronously from the render loop.
+// [UNITY] Replace with a UI Toolkit `MultiSelect` `ListView` + `Toggle` rows mapping to ScriptableObject bool array and propagate toggles
+// via `Binding`. [PORTING_HAZARD:P3] The Windows-specific sizing quirks (popup animation and mouse capture) have no direct Unity
+// equivalent, so manual layout adjustments are needed.
 void create_combochecklist(wxComboCtrl* comboCtrl, const std::string& text, const std::string& items)
 {
     if (comboCtrl == nullptr)
@@ -434,6 +490,9 @@ void create_combochecklist(wxComboCtrl* comboCtrl, const std::string& text, cons
     }
 }
 
+// [STATE] Reads the checked state bits from the popup checklist as a bitmask so the owning dialog can save it into its model state.
+// [UNITY] Map this to reading the `ListView.Selection` of toggles in Unity's UI Toolkit and compressing it into the same flag mask the
+// legacy config expects.
 unsigned int combochecklist_get_flags(wxComboCtrl* comboCtrl)
 {
     unsigned int flags = 0;
@@ -449,6 +508,8 @@ unsigned int combochecklist_get_flags(wxComboCtrl* comboCtrl)
     return flags;
 }
 
+// [EVENT] Invoked when a dialog restores saved flags, rechecking the matching entries to keep the UI in sync.
+// [THREAD] Must run on the main thread (wxWidgets) because direct calls mutate combo list state.
 void combochecklist_set_flags(wxComboCtrl* comboCtrl, unsigned int flags)
 {
     wxCheckListBoxComboPopup* popup = wxDynamicCast(comboCtrl->GetPopupControl(), wxCheckListBoxComboPopup);
@@ -459,8 +520,14 @@ void combochecklist_set_flags(wxComboCtrl* comboCtrl, unsigned int flags)
     }
 }
 
+// [INTENT] Exposes the global AppConfig instance to utility functions that cannot rely on a specific window pointer.
+// [STATE] This is a shallow accessor to keep modules from pulling the entire wxApp singleton directly.
+// [UNITY] Replace with `AppState.Instance.Config` in Unity so the ScriptableObject asset stays in sync.
 AppConfig* get_app_config() { return wxGetApp().app_config; }
 
+// [INTENT] Converts UTF-8 strings from the backend into wxStrings that the GUI can show.
+// [STATE] Serves as a key translation point for data flowing from config/preset files into text labels.
+// [UNITY] A Unity port should ensure JSON/UTF-8 strings flow into `string` properties without reshaping.
 wxString from_u8(const std::string& str) { return wxString::FromUTF8(str.c_str()); }
 
 std::string into_u8(const wxString& str)
@@ -478,14 +545,21 @@ wxString from_path(const boost::filesystem::path& path)
 #endif
 }
 
+// [INTENT] Surface platform path conversion helpers so the GUI can feed wxNative paths into backend logic consistently.
+// [UNITY] Replace with `System.IO.Path` helpers + `Application.persistentDataPath` rewriting.
 boost::filesystem::path into_path(const wxString& str) { return boost::filesystem::path(str.wx_str()); }
 
+// [INTENT] Shows the About dialog that summarizes the current app version and build metadata for the user.
+// [UNITY] Map to a Unity `AboutPanel` that reads from `BuildInfo` stored in a ScriptableObject.
 void about()
 {
     AboutDialog dlg;
     dlg.ShowModal();
 }
 
+// [INTENT] Launches the bundled Web/Cloud login flow without stealing the caller's focus.
+// [EVENT] Currently used by menus and machine connect flows that need to ensure authentication state.
+// [UNITY] Replace with a `WebView` panel and coroutine-based `LoginFlow` service that hooks into Unity's `Authentication` module.
 void login()
 {
     // LoginDialog dlg;
@@ -497,8 +571,10 @@ void login()
 
 void desktop_open_datadir_folder()
 {
-    // Execute command to open a file explorer, platform dependent.
-    // FIXME: The const_casts aren't needed in wxWidgets 3.1, remove them when we upgrade.
+    // [INTENT] Launches the native file manager at the user's data directory so they can inspect configs/presets.
+    // [EVENT] Bound to menu entries and toolbar shortcuts for quick access to logs/presets.
+    // [PORTING_HAZARD:P2] Each platform uses different CLI commands and environment sanitization, so Unity must call `Application.OpenURL`
+    // or `Process.Start` equivalents with platform guards.
 
     const auto path = data_dir();
 #ifdef _WIN32
@@ -545,8 +621,10 @@ void desktop_open_datadir_folder()
 
 void desktop_open_any_folder(const std::string& path)
 {
-    // Execute command to open a file explorer, platform dependent.
-    // FIXME: The const_casts aren't needed in wxWidgets 3.1, remove them when we upgrade.
+    // [INTENT] Opens any folder (often after Save/Export) in the platform file manager to show generated artifacts.
+    // [STATE] Normalizes the path to the containing folder so on Linux and AppImage we don't try to open files directly.
+    // [UNITY] Map to `Application.OpenURL` or `System.Diagnostics.Process.Start` after converting to `Application.dataPath` style and
+    // dispatching on the main thread.
 
 #ifdef _WIN32
     const wxString widepath = from_u8(path);
