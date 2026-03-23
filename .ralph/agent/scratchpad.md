@@ -793,3 +793,7 @@
 ## Iteration plan update
 - Selected task: T427 annotate `src/slic3r/GUI/Jobs/BoostThreadWorker.cpp` (task-1773880086-89ec now active).
 - Plan: document the worker thread loop, message dispatch, cancellation flow, and progress binding with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[PORTING_HAZARD:P3]/[UNITY]` comments, call out how the Boost queues marshal through the UI thread, note the Unity analogue (`BackgroundWorker` + `MainThreadDispatcher` with `CancellationToken`), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit `BoostThreadWorker.cpp` plus metadata, close the task, and then pause for the next iteration so another agent can continue.
+
+## Iteration plan update - T395
+- Selected task: T395 annotate `src/slic3r/GUI/GUI_ObjectTableSettings.hpp` (task-1773880086-8f2d now active).
+- Plan: review and enhance the header’s current annotations so every field, helper, and method carries `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD]` context, clarify the ownership of the bitmap resources and `ConfigOptionsGroup` cache, call out Unity equivalents (UI Toolkit ListView + VisualElement per-group controller backed by ScriptableObject configs), note hazards around manual bitmap DPI work and wxWindow parent lifetime, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the header update plus metadata, close T395, and then stop for this iteration.

@@ -2,6 +2,8 @@
 #define slic3r_GUI_ObjectTableSettings_hpp_
 
 #include <memory>
+#include <map>
+#include <string>
 #include <vector>
 #include <wx/panel.h>
 #include "wxExtensions.hpp"
@@ -53,17 +55,20 @@ class ObjectTableSettings : public OTG_Settings
     wxBoxSizer* m_settings_list_sizer{nullptr};
     // [STATE] cached option groups to avoid rebuilding the VisualElement tree from scratch on each update.
     std::vector<std::shared_ptr<ConfigOptionsGroup>> m_og_settings;
+    // [UNITY][PORTING_HAZARD:P2] Unity should treat these as pooled VisualElement templates created from a ScriptableObject config so the
+    // ListView refresh is fast.
 
-    // [STATE] config snapshot currently shown to users, analogous to a ScriptableObject copy that updates UI bindings.
+    // [STATE][UNITY] config snapshot currently shown to users, analogous to a ScriptableObject instance used by a ListView data provider.
     DynamicPrintConfig m_current_config;
-    // [STATE] baseline for comparison to detect overrides and show mixed-value states.
+    // [STATE][PORTING_HAZARD:P3] baseline for comparison to detect overrides; Unity ports must keep this mirror in sync to drive
+    // mixed-value badges.
     DynamicPrintConfig m_origin_config;
     // [STATE] icons for the Reset button states to avoid recalculating on every change.
     ScalableBitmap m_bmp_reset;
     ScalableBitmap m_bmp_reset_focus;
     ScalableBitmap m_bmp_reset_disable;
 
-    // [EVENT][STATE] back-reference to the grid that drives selection changes.
+    // [EVENT][STATE][UNITY] back-reference to the grid that drives selection changes, similar to binding a ListView selection callback.
     ObjectGridTable* m_table{nullptr};
     // [STATE] row index currently represented by the settings panel.
     int m_current_row{0};
@@ -78,23 +83,28 @@ public:
     ObjectTableSettings(wxWindow* parent, ObjectGridTable* table);
     ~ObjectTableSettings() { m_different_map.clear(); }
 
-    // [EVENT][INTENT] rebuilds the visible config groups when selection changes so overrides stay in sync with the table.
+    // [EVENT][INTENT][UNITY] rebuilds the visible config groups when selection changes so overrides stay in sync with the table; parallels
+    // rebuilding the VisualElement tree when a ListView selection changes.
     bool update_settings_list(
         bool is_object, bool is_multiple_selection, ModelObject* object, ModelConfig* config, const std::string& category);
     /* Additional check for override options: Add options, if its needed.
      * Example: if Infill is set to 100%, and Fill Pattern is missed in config_to,
      * we should add sparse_infill_pattern to avoid endless loop in update
      */
-    // [EVENT][UNCLEAR] inserts implied options to prevent recursive rebuilds when dependent values drop out.
+    // [EVENT][PORTING_HAZARD:P3][UNITY] inserts implied options to prevent recursive rebuilds when dependent values drop out, mirroring how
+    // Unity property watchers need guard rails to avoid endless loops.
     bool add_missed_options(ModelConfig* config_to, const DynamicPrintConfig& config_from);
     // return visible count
-    // [INTENT][STATE][EVENT] refreshes visibility tallies for an option group after toggling columns.
+    // [INTENT][STATE][EVENT][UNITY] refreshes visibility tallies for an option group after toggling columns, enabling column-aware
+    // VisualElement updates.
     int update_extra_column_visible_status(ConfigOptionsGroup*                   option_group,
                                            const std::vector<SimpleSettingData>& option_keys,
                                            ModelConfig*                          config);
-    // [EVENT] writes the user-side UI edits back into the ModelConfig.
+    // [EVENT][STATE] writes the user-side UI edits back into the ModelConfig and the cached DynamicPrintConfig, similar to pushing
+    // VisualElement bindings back to a ScriptableObject.
     void update_config_values(bool is_object, ModelObject* object, ModelConfig* config, const std::string& category);
-    // [EVENT][STATE] main entry point for showing or hiding the settings pane for a given row; keeps grid highlight and panel visibility aligned.
+    // [EVENT][STATE][UNITY] main entry point for showing or hiding the settings pane for a given row; toggles VisualElement display and
+    // keeps grid highlight and panel visibility aligned.
     void UpdateAndShow(int                row,
                        const bool         show,
                        bool               is_object,
@@ -102,9 +112,11 @@ public:
                        ModelObject*       object,
                        ModelConfig*       config,
                        const std::string& category);
-    // [EVENT] invoked when a single key changes; propagates the change to caches and the grid.
+    // [EVENT][STATE] invoked when a single key changes; propagates the change to caches and the grid, akin to KeyDown callbacks updating a
+    // ScriptableObject data model.
     void ValueChanged(int row, bool is_object, ModelObject* object, ModelConfig* config, const std::string& category, const std::string& key);
-    // [EVENT][STATE] resets all per-row overrides back to the baseline, mirroring a Unity `Button` command that rewrites the ScriptableObject.
+    // [EVENT][STATE][PORTING_HAZARD:P3][UNITY] resets all per-row overrides back to the baseline, mirroring a Unity `Button` command that
+    // rewrites the ScriptableObject but warning that the bitmap reset icons are manually scaled.
     void resetAllValues(int row, bool is_object, ModelObject* object, ModelConfig* config, const std::string& category);
     // [PORTING_HAZARD:P3][INTENT] only used on Windows for bitmap rescaling; Unity should let CanvasScaler handle DPI instead of manual tweaks.
     void msw_rescale();

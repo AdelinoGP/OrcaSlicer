@@ -3157,6 +3157,20 @@ This prompt governs **Phase 1 only**.
 - Git: annotate: src/slic3r/GUI/GUI_ObjectSettings.cpp
 - Next recommended Phase 1 task: T391 annotate: src/slic3r/GUI/GUI_ObjectSettings.hpp
 
+## Phase 1 - Task T395 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectTableSettings.hpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectTableSettings.hpp, .ralph/agent/handoff.md, .ralph/agent/scratchpad.md
+- Substantive additions: Expanded the cached group/state/bitmap sections with `[UNITY]`/hazard context, clarified the selection-driven config lifecycle, and documented the missing-option guard plus reset hooks for future ports.
+- Verification excerpt: // [EVENT][STATE][UNITY] main entry point for showing or hiding the settings pane for a given row; toggles VisualElement display and keeps grid highlight and panel visibility aligned.
+- Unity-impact summary:
+  - Treat the settings pane as a UI Toolkit ScrollView containing VisualElement groups created from pooled ScriptableObject configs so category sections can open/close without rebuilding every option every time.
+  - Mirror the `m_current_config`/`m_origin_config` snapshots with ScriptableObject clones so Unity can highlight mixed-value states and quickly diff overrides when a multi-selection changes.
+  - Wire resets and visibility toggles through Unity `Button` commands and VisualElement style updates, while letting the CanvasScaler handle DPI instead of manually rescaling bitmaps.
+- Hazards found: 3 (P2=1, P3=2)
+- Git: Annotate GUI_ObjectTableSettings for Unity configuration panel
+- Next recommended Phase 1 task: T396 annotate: src/slic3r/GUI/GUI_Preview.cpp
+
 ## Phase 1 - Task T402 complete
 - Task type: annotate
 - File: src/slic3r/GUI/HMS.cpp
