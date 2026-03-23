@@ -2531,3 +2531,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P1=1, P2=5, P3=1
 - Git: doc: annotate GLModel for Unity
 - Next recommended Phase 1 task: T359 annotate: src/slic3r/GUI/GLModel.hpp
+
+## Phase 1 - Task T359 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GLModel.hpp
+- Deliverables: src/slic3r/GUI/GLModel.hpp; .ralph/agent/scratchpad.md; .ralph/agent/handoff.md; .ralph/ralph-tasks.md
+- Substantive additions: 12 multi-tag annotations clarifying geometry layout, GL handles, threading guards, Unity mesh analogs, and command buffering hazards
+- Verification excerpt: // [OPENGL] `render()` ensures buffers reach the GPU before drawing; `render_instanced` mimics `Graphics.DrawMeshInstanced` by feeding instance data handles.
+- Unity-impact summary:
+  - Replicate GLModel as a Unity `Mesh`/`MeshFilter` plus `MeshRenderer` so CPU color/format state flows through `mesh.vertices`/`mesh.colors` updates.
+  - Render/instanced pathways mirror `Graphics.DrawMesh`/`Graphics.DrawMeshInstanced` (or CommandBuffer) while procedural geometry factories become cached Mesh assets reused by MonoBehaviours.
+  - The `[THREAD]` guard hints at requiring a main-thread dispatcher for geometry loads and explicit `Mesh` caching for selection overlays.
+- Hazards found: P2=1, P3=2
+- Git: Document GLModel header for Unity port
+- Next recommended Phase 1 task: T360 annotate: src/slic3r/GUI/GLSelectionRectangle.cpp

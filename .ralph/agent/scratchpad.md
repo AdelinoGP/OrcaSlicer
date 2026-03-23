@@ -336,3 +336,7 @@
 ## Iteration plan update
 - Selected task: T358 annotate `src/slic3r/GUI/GLModel.cpp` (task-1773880086-284d) to document the model loading/rendering pipeline that supports selection, slicing preview, and entity caching.
 - Plan: start the runtime task, read the full source, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` notes around the GLModel lifecycle methods, selection cache, event handling, and render loops; append the required handoff evidence block, stage/commit the annotated file, and close the task before pausing for the next iteration.
+
+## Iteration plan update
+- Selected task: T359 annotate `src/slic3r/GUI/GLModel.hpp` now that the implementation prioritized the viewport metadata.
+- Plan: mark the runtime task active, read the entire header, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments on the class description, key members (camera matrices, render cache, selection state), and public APIs; add Unity-port hints (e.g., `RenderTexture` ownership, `XR Interaction Toolkit` analogs), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the header, close the task, and then stop for this iteration so the next agent can pick up.
