@@ -3172,3 +3172,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=3 (cereal persistence, OS browser launch guard, `wxGetApp()` singletons), P3=2 (random seed reliance and `open_preferences` button tied to global state).
 - Git: Document hint notification lifecycle for Unity
 - Next recommended Phase 1 task: T401 annotate: src/slic3r/GUI/HintNotification.hpp
+
+## Phase 1 - Task T145 complete
+- Task type: annotate
+- File: src/slic3r/GUI/3DScene.cpp
+- Deliverables: src/slic3r/GUI/3DScene.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: Added multi-tag guidance covering GLVolume state + outline thresholds, collection render passes, extrusion-to-mesh helpers, and geometry-builder thresholds for the Unity port.
+- Verification excerpt: // [INTENT] This TU implements GLVolume / GLVolumeCollection as the core render primitives for the 3D viewport and auxiliary layers.
+- Unity-impact summary:
+  - Map each GLVolume to a Unity GameObject/MeshRenderer pair while caching selection/hover state in a dedicated controller so highlights stay in sync with the current shader.
+  - Recreate the GLVolumeCollection render pass by splitting meshes into opaque/transparent passes and using Unity CommandBuffers to replay the outline/depth render utilized by sinking contours.
+  - Port the thick-line/extrusion entity builder to a MeshBuilder helper so the Unity preview Mesh can be rebuilt from extrusion paths without reimplementing the same vertex math ad-hoc.
+- Hazards found: P2=1 (global `GUI::wxGetApp()` shader/framebuffer assumptions must be untangled before Unity can render the same pass).
+- Git: annotate: src/slic3r/GUI/3DScene.cpp (GLVolume lifecycle notes)
+- Next recommended Phase 1 task: T152 annotate: src/slic3r/GUI/AMSMaterialsSetting.hpp

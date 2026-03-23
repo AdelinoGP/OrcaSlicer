@@ -541,3 +541,13 @@
 ## Iteration plan update
 - Selected task: T400 annotate `src/slic3r/GUI/HintNotification.cpp` (task-1773880086-05a9 now active).
 - Plan: walk through the hint database lifecycle, hypertext handling, and ImGui render/interaction helpers; add `[STATE]` on hint caches and fade state, `[EVENT]` on button callbacks + sig-wired tag checks, `[THREAD]` around file io and random hint selection, `[OPENGL]`/`[UNITY]` guidance for migrating the ImGui driven fade/render layout, highlight `[PORTING_HAZARD:P2]` for persistent cereal serialization + native browser launches, append the Phase 1 evidence block, stage/commit this file, and close the task before pausing for the next iteration.
+
+## Iteration plan update
+- Selected task: T145 annotate `src/slic3r/GUI/3DScene.cpp` (next logical open Phase 1 annotate entry).
+- Plan: mark the runtime task active, read the entire `3DScene.cpp`, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments covering scene lifecycle, viewport content state, selection and gizmo management, GL render dispatch, thread crossovers, and Unity equivalents (e.g., a Unity `Scene` controller handling Camera + RenderTexture + Input System); append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only this file, close the task, and then stop the iteration to let the next agent continue.
+
+## Iteration plan update
+- Selected task: T203 annotate `src/slic3r/GUI/3DScene.cpp` (runtime task `task-1773880086-29d1` is open and reachable).
+- Plan: start the runtime task, parse the full `3DScene.cpp` to capture initialization, camera/view updates, state caches, selection management, event handlers, GL rendering hooks, and hazards; insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around constructors, update loops, interaction helpers, and worker crossovers; append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit `3DScene.cpp`, close the task, and then stop for this iteration so the next agent continues.
+## Iteration update
+- Finalized T145 annotate `src/slic3r/GUI/3DScene.cpp` by adding multi-tag comments around the portal constants, GLVolume/SinkingContours lifecycle, render pass, extrusion geometry builder, and extrusion entity conversions; recorded the evidence block and queued the next Phase 1 suggestion in the handoff before closing the runtime task.
