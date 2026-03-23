@@ -140,7 +140,7 @@ void TrayListModel::update(MachineObject* obj)
 
     std::map<std::string, DevAms*>::iterator           ams_it;
     std::map<std::string, DevAmsTray*>::const_iterator tray_it;
-    int                                                tray_index = 0;
+    int tray_index = 0; // [STATE] Intended to track row numbers but currently unused; keep for future per-row telemetry.
 
     const auto& ams_list = obj->GetFilaSystem()->GetAmsList();
     for (auto ams_it = ams_list.begin(); ams_it != ams_list.end(); ams_it++) {
@@ -165,6 +165,9 @@ void TrayListModel::update(MachineObject* obj)
                     m_snColValues.push_back(sn_text);
                     wxString manufacturer_text = wxString::Format("%s", tray->sub_brands);
                     m_manufacturerColValues.push_back(manufacturer_text);
+                    // [UNCLEAR] The fields below exist inside `DevAmsTray` but the current UX ignores them. Confirm whether they should be
+                    // surfaced. [PORTING_HAZARD:P3] Unity port must decide if saturability/transmittance/smooth data are needed or if they
+                    // can stay unrendered.
                     // TODO:
                     // wxString saturability_text = wxString::Format("%s", tray->saturability);
                     // m_saturabilityColValues.push_back(saturability_text);
@@ -181,8 +184,9 @@ void TrayListModel::update(MachineObject* obj)
 }
 void TrayListModel::clear_data()
 {
-    // [INTENT] Empty every cache before populating new data or when the AMS list disappears so stale rows do not linger in the view.
-    // [STATE] Resets the data model to zero rows for `Reset(0)`.
+    // [EVENT] Called when the AMS view is destroyed or the machine is disconnected to explicitly empty cached rows before asking the view
+    // to refresh. [INTENT] Empty every cache before populating new data or when the AMS list disappears so stale rows do not linger in the
+    // view. [STATE] Resets the data model to zero rows for `Reset(0)`.
     m_titleColValues.clear();
     m_colorColValues.clear();
     m_meterialColValues.clear();

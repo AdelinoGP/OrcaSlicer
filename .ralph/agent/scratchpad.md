@@ -605,3 +605,7 @@
 ## Iteration plan update
 - Selected task: T154 annotate `src/slic3r/GUI/AMSSetting.hpp` (task-1773880085-053b just started).
 - Plan: read the header fully, capture the AMS setting panel intent, stateful defaults, combo binding helpers, and config persistence hooks; insert `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD]` annotations that mention any threading or GL calls, highlight the Unity analog (e.g., UI Toolkit VisualElement tree + `ScriptableObject` for AMS presets plus event-driven `Command` bridging), append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header plus handoff metadata, close the task, and then stop for this iteration so the next agent can continue.
+
+## Iteration plan update
+- Selected task: T155 annotate `src/slic3r/GUI/AmsWidgets.cpp` (document the AMS tray virtual list model).
+- Plan: refresh the `TrayListModel` flows to keep the column cache rebuild, unused row counter, TODO fields, and clear/reset hook well documented with `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD:P3]/[UNCLEAR]` guidance; call out Unity's `ListView`/`ObservableCollection` binding, the main-thread constraint of `MachineObject`, and the unresolved saturability/transmittance metrics. Append the Phase 1 evidence block, stage/commit the annotated file plus metadata, flip T155 to `[x]`, and then pause so the next iteration can continue from the updated ready list.

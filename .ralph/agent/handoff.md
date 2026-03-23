@@ -493,6 +493,20 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: Annotate 3DBed rendering lifecycle
 - Next recommended Phase 1 task: T144 annotate: src/slic3r/GUI/3DBed.hpp
 
+## Phase 1 - Task T155 complete
+- Task type: annotate
+- File: src/slic3r/GUI/AmsWidgets.cpp
+- Deliverables: src/slic3r/GUI/AmsWidgets.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 4 multi-tag notes clarifying GetAttr/GetValue event bindings, the unused row counter, the hidden saturability columns, and the cache-clear lifecycle plus their Unity counterparts.
+- Verification excerpt: // [EVENT] Called when the AMS view is destroyed or the machine is disconnected to explicitly empty cached rows before asking the view to refresh.
+- Unity-impact summary:
+  - Translate the column cache into an `ObservableCollection<TrayViewModel>` that `ListView`/`TreeView` can bind and refresh without copying `wxVariant` payloads.
+  - Move the `TrayListModel` update/clear cycle into a `ScriptableObject` data service on the main thread so Unity can re-populate the list in `ListView.Refresh()` safely.
+  - Decide how to surface saturability/transmittance/smooth values in Unity (or keep them hidden) since the current UX never renders them.
+- Hazards found: P3=1 (wxDataViewVariant caching relies on `wxVariant` coercion and per-column caches that Unity must replicate when restoring selection).
+- Git: annotate AmsWidgets for Unity port
+- Next recommended Phase 1 task: T156 annotate: src/slic3r/GUI/Tab.hpp
+
 ### Remaining
 
 - [ ] P0-T006: Main Window Class Identification
