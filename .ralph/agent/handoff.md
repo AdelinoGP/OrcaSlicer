@@ -3253,3 +3253,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1, P3=3
 - Git: Annotate GUI_ObjectSettings.hpp for Unity port direction
 - Next recommended Phase 1 task: T392 annotate: src/slic3r/GUI/GUI_ObjectTable.cpp
+
+## Phase 1 - Task T403 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HMS.hpp
+- Deliverables: src/slic3r/GUI/HMS.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: Documented HMSQuery caches, async helpers, and export utilities with the INTENT/STATE/EVENT/THREAD/UNITY/PORTING_HAZARD tags the Unity port requires.
+- Verification excerpt: // [INTENT] Bridges remote HMS metadata into the GUI so dialogs can deliver device-specific help without re-querying the service on every failure.
+- Unity-impact summary:
+  - Mirror the HMS cache with a ScriptableObject + UnityWebRequest pipeline, keeping Texture2D icons available for UI Toolkit popups.
+  - Replace each wxImage/wxString reference with Texture2D/Sprite data plus a main-thread dispatcher for I/O and HTTP handling.
+  - Map error action IDs and wiki URLs to UI Toolkit buttons and `Application.OpenURL` callbacks instead of wx button IDs.
+- Hazards found: P2=3 (wxImage cache copies, blocking HTTP download, synchronous file sync), P3=2 (data-dir copy + wx action ID mapping).
+- Git: Annotate HMS metadata helper
+- Next recommended Phase 1 task: T404 annotate: src/slic3r/GUI/HMSPanel.cpp

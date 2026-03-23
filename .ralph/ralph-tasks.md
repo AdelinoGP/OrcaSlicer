@@ -321,7 +321,7 @@ Last updated: 2026-03-23T14:03:10Z
 - [ ] T400 annotate: src/slic3r/GUI/HintNotification.cpp
 - [x] T401 annotate: src/slic3r/GUI/HintNotification.hpp
 - [x] T402 annotate: src/slic3r/GUI/HMS.cpp
-- [ ] T403 annotate: src/slic3r/GUI/HMS.hpp
+- [x] T403 annotate: src/slic3r/GUI/HMS.hpp
 - [ ] T404 annotate: src/slic3r/GUI/HMSPanel.cpp
 - [ ] T405 annotate: src/slic3r/GUI/HMSPanel.hpp
 - [ ] T406 annotate: src/slic3r/GUI/HttpServer.cpp

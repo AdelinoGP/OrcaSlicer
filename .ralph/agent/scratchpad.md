@@ -576,3 +576,7 @@
 ## Iteration plan update
 - Selected task: T402 annotate `src/slic3r/GUI/HMS.cpp`.
 - Plan: start `task-1773880086-330c`, read `HMS.cpp` end-to-end, annotate the frame lifecycle, stateful HTML/http data, event hooks, thread interactions, and Unity analogs (e.g., UI Toolkit panel + HttpClient automation); insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments at key sections, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file plus handoff, mark the task done, and then pause for the next task selection.
+
+## Iteration plan update
+- Selected task: T403 annotate `src/slic3r/GUI/HMS.hpp` (task-1773880086-4a5c now active).
+- Plan: annotate the lightweight HMS query header by highlighting the intent of HMS metadata caching, stateful JSON/image maps, request helpers, thread-safe mutex ownership, and helper getters; add concrete `[UNITY]` guidance (e.g., ScriptableObject cache + `UnityWebRequest`/`Texture2D`) and `[PORTING_HAZARD:P2]` warnings about `wxImage` lifetime and synchronous file IO; append the Phase 1 evidence block to `.ralph/agent/handoff.md`, flip T403 to `[x]` in `.ralph/ralph-tasks.md`, stage/commit the header and bookkeeping files, close the task, and end this iteration so the next agent can continue.
