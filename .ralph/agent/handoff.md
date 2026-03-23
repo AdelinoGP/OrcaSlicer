@@ -2804,3 +2804,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 P2 (wxGetApp/preset bundle reliance) + 3 P3 (global colors, manual GL state, polygon tessellation dependent on libslic3r).
 - Git: Document 3DBed render and state for Unity port
 - Next recommended Phase 1 task: T144 annotate: src/slic3r/GUI/3DBed.hpp
+
+## Phase 1 - Task T386 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectLayers.cpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectLayers.cpp
+- Substantive additions: 14 focused annotations covering the layer-row builder, focus tracking, action buttons, rescale/theme helpers, and editor event handlers.
+- Verification excerpt: // [INTENT] Assemble the height-range list panel so the Selected Object frame exposes both Min/Max Z editors and quick +/- controls.
+- Unity-impact summary:
+  - Recreate the row layout as a UI Toolkit `Grid`/VisualElement list and drive the plus/minus `Button` actions with UnityEvents landing on a `LayerSelectionController`.
+  - Mirror the LayerRangeEditor focus helpers by binding `TextField` controllers to the `LayerRange` DTOs that push selection metadata to a MonoBehaviour-managed preview.
+- Hazards found: P3=1 (system color/theme change events lack a direct Unity analog, so a theme dispatcher is required).
+- Git: Annotate GUI_ObjectLayers for Unity port
+- Next recommended Phase 1 task: T387 annotate: src/slic3r/GUI/GUI_ObjectLayers.hpp

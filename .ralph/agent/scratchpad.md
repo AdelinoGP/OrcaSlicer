@@ -354,6 +354,10 @@
 - Plan: mark the task active, read the header, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around the shader lifecycle, caches, binding helpers, and uniform setters; append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the file, close the task, and then pick the next ready Phase 1 file.
 
 ## Iteration plan update
+- Selected task: T386 annotate `src/slic3r/GUI/GUI_ObjectLayers.cpp` (current runtime task `task-1773880086-b3db`).
+- Plan: finish the layered height editor annotations by inserting `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` comments around the row builder, plus/minus wiring, focus/scene update helpers, and editor event handlers; document DPI/color helpers too, append the required evidence block to `.ralph/agent/handoff.md`, update `.ralph/ralph-tasks.md` to mark T386 done, and commit only this file before ending the iteration.
+- Verification: rely on manual inspection that each block explains state/event context and Unity mapping since this change is documentation-only.
+## Iteration plan update
 - Selected task: T142 annotate `src/slic3r/GUI/2DBed.hpp` as the next goal.
 - Plan: confirm the header matches the already annotated `2DBed.cpp`, read the full file, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations for the view geometry, transform flags, event handlers, and canvas state, append the mandatory evidence block to `.ralph/agent/handoff.md`, update `.ralph/ralph-tasks.md` to `[~]` then `[x]`, commit the annotated header, and then end the iteration so another agent continues.
 
