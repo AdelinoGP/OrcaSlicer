@@ -6,7 +6,7 @@
 #include <boost/nowide/cstdio.hpp>
 #include "nanosvg/nanosvg.h"
 #include "nanosvg/nanosvgrast.h"
-#include "libslic3r/Utils.hpp" // ScopeGuard   
+#include "libslic3r/Utils.hpp" // ScopeGuard
 
 #include "3DScene.hpp" // glsafe
 #include "GL/glew.h"
@@ -18,22 +18,28 @@ using namespace Slic3r::GUI;
 
 namespace priv {
 // set shared pointer to point on bad texture
-static void clear(IconManager::Icons &icons);
+static void                                     clear(IconManager::Icons& icons);
 static const std::vector<std::pair<int, bool>>& get_states(IconManager::RasterType type);
-static void draw_transparent_icon(const IconManager::Icon &icon); // only help function
-}
+static void                                     draw_transparent_icon(const IconManager::Icon& icon); // only help function
+} // namespace priv
 
-IconManager::~IconManager() {
-	priv::clear(m_icons);
-	// release opengl texture is made in ~GLTexture()
+IconManager::~IconManager()
+{
+    // [INTENT][THREAD][OPENGL] Tear down the icon atlas once the manager is destroyed, requiring the caller to stay on the GL/UI thread so
+    // the texture context remains current.
+    priv::clear(m_icons);
+    // release opengl texture is made in ~GLTexture()
 
     if (m_id != 0)
         glsafe(::glDeleteTextures(1, &m_id));
 }
 
 namespace {
-NSVGimage *parse_file(const char * filepath) {
-    FILE *fp = boost::nowide::fopen(filepath, "rb");
+NSVGimage* parse_file(const char* filepath)
+{
+    // [INTENT][PORTING_HAZARD:P3][UNITY] Load the raw SVG bytes via nanosvg so the rasterizer stays self-contained; Unity would instead
+    // cache the parsed `VectorImage`/`SpriteVectorUtils` result.
+    FILE* fp = boost::nowide::fopen(filepath, "rb");
     assert(fp != nullptr);
     if (fp == nullptr)
         return nullptr;
@@ -45,7 +51,7 @@ NSVGimage *parse_file(const char * filepath) {
     fseek(fp, 0, SEEK_SET);
 
     // Note: +1 is for null termination
-    auto data_ptr = std::make_unique<char[]>(size+1);
+    auto data_ptr  = std::make_unique<char[]>(size + 1);
     data_ptr[size] = '\0'; // Must be null terminated.
 
     size_t readed_size = fread(data_ptr.get(), 1, size, fp);
@@ -56,17 +62,19 @@ NSVGimage *parse_file(const char * filepath) {
     return nsvgParse(data_ptr.get(), "px", 96.0f);
 }
 
-void subdata(unsigned char *data, size_t data_stride, const std::vector<unsigned char> &data2, size_t data2_row) {
-    assert(data_stride >= data2_row);
-    for (size_t data2_offset = 0, data_offset = 0; 
-        data2_offset < data2.size();
-        data2_offset += data2_row, data_offset += data_stride)   
-        ::memcpy((void *)(data + data_offset), (const void *)(data2.data() + data2_offset), data2_row);
-}
-}
-
-IconManager::Icons IconManager::init(const InitTypes &input) 
+void subdata(unsigned char* data, size_t data_stride, const std::vector<unsigned char>& data2, size_t data2_row)
 {
+    // [INTENT][STATE] Copy a raster block row-by-row into the atlas buffer while keeping row strides aligned for the eventual OpenGL upload.
+    assert(data_stride >= data2_row);
+    for (size_t data2_offset = 0, data_offset = 0; data2_offset < data2.size(); data2_offset += data2_row, data_offset += data_stride)
+        ::memcpy((void*) (data + data_offset), (const void*) (data2.data() + data2_offset), data2_row);
+}
+} // namespace
+
+IconManager::Icons IconManager::init(const InitTypes& input)
+{
+    // [INTENT][STATE][UNITY] Rasterize `InitType` entries into UV-aligned atlas slots so downstream UI logic has compact UV handles; Unity
+    // would rebuild this as a `Texture2DArray` or `SpriteAtlas` plus cached `Rect` offsets.
     assert(!input.empty());
     if (input.empty())
         return {};
@@ -78,46 +86,53 @@ IconManager::Icons IconManager::init(const InitTypes &input)
     }
 
     int total_surface = 0;
-    for (const InitType &i : input)
+    for (const InitType& i : input)
         total_surface += i.size.x * i.size.y;
-    const int surface_sqrt = (int)sqrt((float)total_surface) + 1;
+    const int surface_sqrt = (int) sqrt((float) total_surface) + 1;
+    // [STATE] Estimating a square footprint keeps the atlas balanced so subsequent rectangle packing stays dense.
 
     // Start packing
     // Pack our extra data rectangles first, so it will be on the upper-left corner of our texture (UV will have small values).
     const int TEX_HEIGHT_MAX = 1024 * 32;
     int width = (surface_sqrt >= 4096 * 0.7f) ? 4096 : (surface_sqrt >= 2048 * 0.7f) ? 2048 : (surface_sqrt >= 1024 * 0.7f) ? 1024 : 512;
+    // [PORTING_HAZARD:P3] Particular width thresholds assume a single GL texture; Unity may need to split very large icon sets into
+    // multiple `Texture2D`s to avoid hitting device limits.
 
-    int num_nodes = width;
+    int                     num_nodes = width;
     std::vector<stbrp_node> nodes(num_nodes);
-    stbrp_context context;
+    stbrp_context           context;
     stbrp_init_target(&context, width, TEX_HEIGHT_MAX, nodes.data(), num_nodes);
 
     ImVector<stbrp_rect> pack_rects;
     pack_rects.resize(input.size());
     memset(pack_rects.Data, 0, (size_t) pack_rects.size_in_bytes());
     for (size_t i = 0; i < input.size(); i++) {
-        const ImVec2 &size = input[i].size;
+        const ImVec2& size = input[i].size;
         assert(size.x > 1);
         assert(size.y > 1);
         pack_rects[i].w = size.x;
         pack_rects[i].h = size.y;
     }
     int pack_rects_res = stbrp_pack_rects(&context, &pack_rects[0], pack_rects.Size);
+    // [INTENT] `stb_rect_pack` happily slices the atlas so each icon knows its UV frame; the `ImVec2` updates below keep the GL tex
+    // coordinates contiguous.
     assert(pack_rects_res == 1);
     if (pack_rects_res != 1)
         return {};
 
     ImVec2 tex_size(width, width);
-    for (const stbrp_rect &rect : pack_rects) {
+    for (const stbrp_rect& rect : pack_rects) {
         float x = rect.x + rect.w;
         float y = rect.y + rect.h;
-        if(x > tex_size.x) tex_size.x = x;
-        if(y > tex_size.y) tex_size.y = y;
+        if (x > tex_size.x)
+            tex_size.x = x;
+        if (y > tex_size.y)
+            tex_size.y = y;
     }
-    
+
     Icons result(input.size());
     for (int i = 0; i < pack_rects.Size; i++) {
-        const stbrp_rect &rect = pack_rects[i];
+        const stbrp_rect& rect = pack_rects[i];
         assert(rect.was_packed);
         if (!rect.was_packed)
             return {};
@@ -130,8 +145,8 @@ IconManager::Icons IconManager::init(const InitTypes &input)
         Icon icon = {input[i].size, tl, br};
         result[i] = std::make_shared<Icon>(std::move(icon));
     }
-        
-    NSVGrasterizer *rast = nsvgCreateRasterizer();
+
+    NSVGrasterizer* rast = nsvgCreateRasterizer();
     assert(rast != nullptr);
     if (rast == nullptr)
         return {};
@@ -149,8 +164,8 @@ IconManager::Icons IconManager::init(const InitTypes &input)
     // Group same filename by sort inputs
     // sort indexes based on comparing values in input
     std::sort(idx.begin(), idx.end(), [&input](size_t i1, size_t i2) { return input[i1].filepath < input[i2].filepath; });
-    for (size_t j: idx) {
-        const InitType &i = input[j];
+    for (size_t j : idx) {
+        const InitType& i = input[j];
         if (i.filepath.empty())
             continue; // no file path only reservation of space for texture
         assert(boost::filesystem::exists(i.filepath));
@@ -160,7 +175,7 @@ IconManager::Icons IconManager::init(const InitTypes &input)
         if (!boost::algorithm::iends_with(i.filepath, ".svg"))
             continue;
 
-        NSVGimage *image = parse_file(i.filepath.c_str());
+        NSVGimage* image = parse_file(i.filepath.c_str());
         assert(image != nullptr);
         if (image == nullptr)
             return {};
@@ -170,15 +185,16 @@ IconManager::Icons IconManager::init(const InitTypes &input)
         float svg_scale = i.size.y / image->height;
         // scale should be same in both directions
         assert(is_approx(svg_scale, i.size.y / image->width));
-                
-        const stbrp_rect &rect = pack_rects[j];
-        int n_pixels = rect.w * rect.h;
+
+        const stbrp_rect&          rect     = pack_rects[j];
+        int                        n_pixels = rect.w * rect.h;
         std::vector<unsigned char> icon_data(n_pixels * channels, {0});
         ::nsvgRasterize(rast, image, 0, 0, svg_scale, icon_data.data(), i.size.x, i.size.y, i.size.x * channels);
-        
+        // [THREAD][UNITY] Rasterizing each SVG is CPU-bound; Unity should offload this to a background job and push the bytes to
+        // `Texture2D.LoadRawTextureData` before the UI uses the atlas.
+
         // makes white or gray only data in icon
-        if (i.type == RasterType::white_only_data || 
-            i.type == RasterType::gray_only_data) {
+        if (i.type == RasterType::white_only_data || i.type == RasterType::gray_only_data) {
             unsigned char value = (i.type == RasterType::white_only_data) ? 255 : 127;
             for (size_t k = 0; k < icon_data.size(); k += channels)
                 if (icon_data[k] != 0 || icon_data[k + 1] != 0 || icon_data[k + 2] != 0) {
@@ -188,12 +204,12 @@ IconManager::Icons IconManager::init(const InitTypes &input)
                 }
         }
 
-        int start_offset = (rect.y*tex_size.x + rect.x) * channels;
-        int data_stride = tex_size.x * channels;
+        int start_offset = (rect.y * tex_size.x + rect.x) * channels;
+        int data_stride  = tex_size.x * channels;
         subdata(data.data() + start_offset, data_stride, icon_data, rect.w * channels);
     }
 
-    if (m_id != 0) 
+    if (m_id != 0)
         glsafe(::glDeleteTextures(1, &m_id));
 
     glsafe(::glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
@@ -202,21 +218,26 @@ IconManager::Icons IconManager::init(const InitTypes &input)
     glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
     glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0));
     glsafe(::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
-    glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei) tex_size.x, (GLsizei) tex_size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE,  (const void*) data.data()));    
+    glsafe(::glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei) tex_size.x, (GLsizei) tex_size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                          (const void*) data.data()));
+    // [OPENGL][UNITY] Uploading the atlas to GL; Unity should mirror this by copying the bytes into `Texture2D` and creating per-icon
+    // `Rect` slices for sprite usage.
 
     // bind no texture
     glsafe(::glBindTexture(GL_TEXTURE_2D, 0));
 
-    for (const auto &i : result)
+    for (const auto& i : result)
         i->tex_id = m_id;
     return result;
 }
 
-std::vector<IconManager::Icons> IconManager::init(const std::vector<std::string> &file_paths, const ImVec2 &size, RasterType type)
+std::vector<IconManager::Icons> IconManager::init(const std::vector<std::string>& file_paths, const ImVec2& size, RasterType type)
 {
+    // [STATE][UNITY] Re-rasterize a uniform size/type grid into `m_icons_texture`; Unity can copy the same texture atlas to a `SpriteAtlas`
+    // and initialize the cached UV pointers once per file.
     assert(!file_paths.empty());
     assert(size.x >= 1);
-    assert(size.x < 256*16);
+    assert(size.x < 256 * 16);
 
     // TODO: remove in future
     if (!m_icons.empty()) {
@@ -234,7 +255,7 @@ std::vector<IconManager::Icons> IconManager::init(const std::vector<std::string>
 
     // state order has to match the enum IconState
     const auto& states = priv::get_states(type);
-        
+
     bool compress  = false;
     bool is_loaded = m_icons_texture.load_from_svg_files_as_sprites_array(file_paths, states, width, compress);
     if (!is_loaded || (size_t) m_icons_texture.get_width() < (states.size() * width) ||
@@ -258,64 +279,72 @@ std::vector<IconManager::Icons> IconManager::init(const std::vector<std::string>
 
     // float beacouse of dividing
     float tex_height = static_cast<float>(m_icons_texture.get_height());
-    float tex_width = static_cast<float>(m_icons_texture.get_width());
+    float tex_width  = static_cast<float>(m_icons_texture.get_width());
 
-    //for (const auto &f: file_paths) {
+    // for (const auto &f: file_paths) {
     for (unsigned f = 0; f < count_files; ++f) {
         // NOTE: there are space between icons
         unsigned start_y = static_cast<unsigned>(f) * (width + 1) + 1;
-        float y1 = start_y / tex_height;
-        float y2 = (start_y + width) / tex_height;
-        Icons file_icons;
+        float    y1      = start_y / tex_height;
+        float    y2      = (start_y + width) / tex_height;
+        Icons    file_icons;
         file_icons.reserve(count);
-        //for (const auto &s : states) {
+        // for (const auto &s : states) {
         for (unsigned j = 0; j < count; ++j) {
             auto icon = std::make_shared<Icon>(def_icon);
             // NOTE: there are space between icons
             unsigned start_x = static_cast<unsigned>(j) * (width + 1) + 1;
-            float x1 = start_x / tex_width;
-            float x2 = (start_x + width) / tex_width;
-            icon->tl = ImVec2(x1, y1);
-            icon->br = ImVec2(x2, y2);
+            float    x1      = start_x / tex_width;
+            float    x2      = (start_x + width) / tex_width;
+            icon->tl         = ImVec2(x1, y1);
+            icon->br         = ImVec2(x2, y2);
             file_icons.push_back(icon);
             m_icons.push_back(std::move(icon));
         }
         result.emplace_back(std::move(file_icons));
     }
-	return result;
+    return result;
 }
 
-void IconManager::release() {
-	BOOST_LOG_TRIVIAL(error) << "Not implemented yet";
+void IconManager::release()
+{
+    // [STATE][UNCLEAR][UNITY] Release reserved icons by resetting the shared pointers; Unity would dispose of the Texture2D/Sprite assets
+    // here as soon as they are unused.
+    BOOST_LOG_TRIVIAL(error) << "Not implemented yet";
 }
 
-void priv::clear(IconManager::Icons &icons) {
+void priv::clear(IconManager::Icons& icons)
+{
+    // [STATE][THREAD] Detach shared icons from the atlas so each consumer can drop its copy safely; keep this on the UI thread whenever it
+    // walks shared pointers.
     std::string message;
-	for (auto &icon : icons) {
-		// Exist more than this instance of shared ptr?
+    for (auto& icon : icons) {
+        // Exist more than this instance of shared ptr?
         long count = icon.use_count();
         if (count != 1) {
-			// in existing icon change texture to non existing one
+            // in existing icon change texture to non existing one
             icon->tex_id = 0;
 
-            std::string descr = 
-				((count > 2) ? (std::to_string(count - 1) + "x") : "") + // count
-				std::to_string(icon->size.x) + "x" + std::to_string(icon->size.y); // resolution
+            std::string descr = ((count > 2) ? (std::to_string(count - 1) + "x") : "") +           // count
+                                std::to_string(icon->size.x) + "x" + std::to_string(icon->size.y); // resolution
             if (message.empty())
                 message = descr;
             else
                 message += ", " + descr;
-		}
-	}
+        }
+    }
 
     if (!message.empty())
-		BOOST_LOG_TRIVIAL(warning) << "There is still used icons(" << message << ").";
+        BOOST_LOG_TRIVIAL(warning) << "There is still used icons(" << message << ").";
 }
 
-const std::vector<std::pair<int, bool>> &priv::get_states(IconManager::RasterType type) {
-    static std::vector<std::pair<int, bool>> color = {std::make_pair(0, false)};
-    static std::vector<std::pair<int, bool>> white = {std::make_pair(1, false)};
-    static std::vector<std::pair<int, bool>> gray = {std::make_pair(2, false)};
+const std::vector<std::pair<int, bool>>& priv::get_states(IconManager::RasterType type)
+{
+    // [STATE][INTENT] Provide ordered state/value tuples so icon consumers iterate in `RasterType` order; Unity can reuse this as `enum
+    // IconState { ... }` + bool flag list when building sprite variations.
+    static std::vector<std::pair<int, bool>> color           = {std::make_pair(0, false)};
+    static std::vector<std::pair<int, bool>> white           = {std::make_pair(1, false)};
+    static std::vector<std::pair<int, bool>> gray            = {std::make_pair(2, false)};
     static std::vector<std::pair<int, bool>> color_wite_gray = {
         std::make_pair(1, false), // Activable
         std::make_pair(0, false), // Hovered
@@ -331,9 +360,10 @@ const std::vector<std::pair<int, bool>> &priv::get_states(IconManager::RasterTyp
     }
 }
 
-void priv::draw_transparent_icon(const IconManager::Icon &icon)
+void priv::draw_transparent_icon(const IconManager::Icon& icon)
 {
-    // Check input
+    // [INTENT][UNITY] Render the first pixel's UV footprint so the hover state can be drawn without additional assets; Unity should swap to
+    // a `Graphic` with alpha blending on the main thread. Check input
     if (!icon.is_valid()) {
         assert(false);
         BOOST_LOG_TRIVIAL(warning) << "Drawing invalid Icon.";
@@ -356,21 +386,22 @@ void priv::draw_transparent_icon(const IconManager::Icon &icon)
 #include "imgui/imgui_internal.h" //ImGuiWindow
 namespace Slic3r::GUI {
 
-void draw(const IconManager::Icon &icon, const ImVec2 &size, const ImVec4 &tint_col, const ImVec4 &border_col)
+void draw(const IconManager::Icon& icon, const ImVec2& size, const ImVec4& tint_col, const ImVec4& border_col)
 {
-    // Check input
+    // [INTENT][EVENT][UNITY] Draw the icon centered on the current line and respect the tint/border so ImGui buttons behave; Unity would
+    // use `UI.Image` with anchored `RectTransform` and a `GraphicRaycaster` event. Check input
     if (!icon.is_valid()) {
         assert(false);
         BOOST_LOG_TRIVIAL(warning) << "Drawing invalid Icon.";
         ImGui::Text("?");
         return;
     }
-    ImTextureID id = (void *)static_cast<intptr_t>(icon.tex_id);
-    const ImVec2 &s  = (size.x < 1 || size.y < 1) ? icon.size : size;
+    ImTextureID   id = (void*) static_cast<intptr_t>(icon.tex_id);
+    const ImVec2& s  = (size.x < 1 || size.y < 1) ? icon.size : size;
 
     // Orca: Align icon center vertically
-    ImGuiWindow  *window      = ImGui::GetCurrentWindow();
-    ImGuiContext &g           = *GImGui;
+    ImGuiWindow*  window      = ImGui::GetCurrentWindow();
+    ImGuiContext& g           = *GImGui;
     float         cursor_y    = window->DC.CursorPos.y;
     float         line_height = ImGui::GetTextLineHeight() + g.Style.FramePadding.y * 2;
     int           offset_y    = (line_height - s.y) / 2; // Make sure its int otherwise it will be pixelated
@@ -382,13 +413,12 @@ void draw(const IconManager::Icon &icon, const ImVec2 &size, const ImVec4 &tint_
     window->DC.CursorPosPrevLine.y = cursor_y;
 }
 
-bool clickable(const IconManager::Icon &icon, const IconManager::Icon &icon_hover)
+bool clickable(const IconManager::Icon& icon, const IconManager::Icon& icon_hover)
 {
-    // check of hover
-    ImGuiWindow *window = ImGui::GetCurrentWindow();
-    float cursor_x = ImGui::GetCursorPosX()
-        - window->DC.GroupOffset.x 
-        - window->DC.ColumnsOffset.x;
+    // [EVENT][STATE] Temporarily draws the hover texture to detect clicks/hover within ImGui; Unity should mirror this via
+    // `PointerEnter`/`PointerExit` events on a `Selectable` `VisualElement`. check of hover
+    ImGuiWindow* window   = ImGui::GetCurrentWindow();
+    float        cursor_x = ImGui::GetCursorPosX() - window->DC.GroupOffset.x - window->DC.ColumnsOffset.x;
     priv::draw_transparent_icon(icon);
     ImGui::SameLine(cursor_x);
     if (ImGui::IsItemHovered()) {
@@ -401,8 +431,10 @@ bool clickable(const IconManager::Icon &icon, const IconManager::Icon &icon_hove
     return ImGui::IsItemClicked();
 }
 
-bool button(const IconManager::Icon &activ, const IconManager::Icon &hover, const IconManager::Icon &disable, bool disabled)
+bool button(const IconManager::Icon& activ, const IconManager::Icon& hover, const IconManager::Icon& disable, bool disabled)
 {
+    // [EVENT][STATE] Join the three icon states into a single helper so menus can toggle between normal/hover/disabled; Unity would drive
+    // this through `Button` transitions or a `Binding` controller.
     if (disabled) {
         draw(disable);
         return false;

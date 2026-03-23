@@ -3117,6 +3117,20 @@ This prompt governs **Phase 1 only**.
 - Git: annotate: src/slic3r/GUI/HMS.cpp
 - Next recommended Phase 1 task: T403 annotate: src/slic3r/GUI/HMS.hpp
 
+## Phase 1 - Task T410 complete
+- Task type: annotate
+- File: src/slic3r/GUI/IconManager.cpp
+- Deliverables: src/slic3r/GUI/IconManager.cpp, .ralph/agent/handoff.md
+- Substantive additions: 13 multi-tag comments detailing atlas packing, SVG rasterization, GL upload, and ImGui draw/click helpers for Unity guidance.
+- Verification excerpt: // [INTENT][STATE][UNITY] Rasterize `InitType` entries into UV-aligned atlas slots so downstream UI logic has compact UV handles; Unity would rebuild this as a `Texture2DArray` or `SpriteAtlas` plus cached `Rect` offsets.
+- Unity-impact summary:
+  - Documented the glyph atlas workflow so Unity can mirror it with `Texture2DArray`/`SpriteAtlas` builds and shared `Rect` metadata.
+  - Described the CPU-side SVG rasterization + `Texture2D.LoadRawTextureData` pattern and main-thread GL upload guards for Unity's async jobs.
+  - Captured ImGui draw/click helpers so Unity can swap to `UI.Image` + `GraphicRaycaster`/`VisualElement` pointer events with consistent hover/disabled states.
+- Hazards found: P3=1 (current atlas width thresholds assume a single GL texture; Unity may need to split icon sets to avoid device limits).
+- Git: annotate: src/slic3r/GUI/IconManager.cpp
+- Next recommended Phase 1 task: T411 annotate: src/slic3r/GUI/IconManager.hpp
+
 ## Phase 1 - Task T391 complete
 - Task type: annotate
 - File: src/slic3r/GUI/GUI_ObjectSettings.hpp

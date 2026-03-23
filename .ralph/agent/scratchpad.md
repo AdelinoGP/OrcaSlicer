@@ -359,6 +359,11 @@
 - Current focus: T157 annotate `src/slic3r/GUI/Auxiliary.cpp` (per ready list and actual file path).
 
 ## Iteration plan update
+- Current focus: T410 annotate `src/slic3r/GUI/IconManager.cpp` (task-1773880086-f0fa active).
+- Plan: read both initialization overloads, the SVG/raster helpers, and the ImGui draw/click helpers; add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments for atlas packing, GL upload, worker-thread rasterization, and UI button wiring; append the Phase 1 evidence block, commit, and close the task before picking the next file.
+- Verification: documentation only, so no runtime tests—rely on reasoning that comments explain Unity replacements and hazards.
+
+## Iteration plan update
 - Selected task: T157 annotate `src/slic3r/GUI/Auxiliary.cpp` (task-1773880086-9a1b, ready and unblocked).
 - Plan: read `Auxiliary.cpp` end-to-end, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` comments for the helper functions, state caches, event hooks, and GL integration, append the required evidence block to `.ralph/agent/handoff.md`, commit the single file, and then stop after closing the task.
 - Plan: read the full source, weave `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` comments through the file/panel lifecycle, note the file-system, designer, and panel dispatch states, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file (and handoff), close the task, and stop for this iteration so the next agent continues.
