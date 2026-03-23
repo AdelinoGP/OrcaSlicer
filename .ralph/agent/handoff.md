@@ -3935,15 +3935,15 @@ This prompt governs **Phase 1 only**.
 ## Phase 1 - Task T408 complete
 - Task type: annotate
 - File: src/slic3r/GUI/I18N.cpp
-- Deliverables: src/slic3r/GUI/I18N.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
-- Substantive additions: Expanded the translation helper comments to cover `wxTranslations` caching, those language-change events, and the Unity localization analog.
-- Verification excerpt: // [STATE] `wxTranslations` caches the catalog lookup per locale, so callers must re-run `L_str` after a language-change event to refresh widget labels.
+- Deliverables: src/slic3r/GUI/I18N.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: Added `[STATE]` guidance describing how `str` doubles as the English key/fallback and a `[PORTING_HAZARD:P3]` note on Unity's ID-centric string tables so porters know to keep the literal aligned.
+- Verification excerpt: // [STATE] `str` is the canonical English key and fallback text stored in the catalog, so keep the literal stable when Unity syncs the translation tables.
 - Unity-impact summary:
-  - Drive localization via `LocalizationSettings.StringDatabase` or a dedicated `LocalizationManager` that caches string tables and re-raises `LocalizeStringEvent` when `SelectedLocale` changes.
-  - Keep translation lookups on Unity's main thread by routing UI labels through a MonoBehaviour that listens for locale-change events instead of calling `wxGetTranslation` directly.
-- Hazards found: 1 (P3: wxLocale + `wxTranslations` caching does not line up with Unity string-table refresh semantics, so explicit cache invalidation is required.)
-- Git: Annotate I18N translation helper
-- Next recommended Phase 1 task: T410 annotate: src/slic3r/GUI/IconManager.cpp
+  - Mirror this helper with Unity's `LocalizedString` + `LocalizationSettings.StringDatabase.GetLocalizedString` call so the localized text is always fetched on the main thread and caches are cleared through `LocalizationSettings.SelectedLocaleChanged`.
+  - Keep a mapping layer that ties the English literal to the Unity string-table entry so ID-based Unity localization remains in sync with the literal keys `wxGetTranslation` expects.
+- Hazards found: 1 (P3: Unity's ID-based string tables and cache invalidation flow differ from wxWidgets' literal-based `wxGetTranslation`, so mismatched literals will break localization or leave stale text unless explicitly tracked.)
+- Git: annotate: src/slic3r/GUI/I18N.cpp
+- Next recommended Phase 1 task: T412 annotate: src/slic3r/GUI/ImageDPIFrame.cpp
 
 ## Phase 1 - Task T427 complete
 - Task type: annotate

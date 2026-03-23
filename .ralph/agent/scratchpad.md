@@ -784,7 +784,7 @@
 
 ## Iteration plan update
 - Selected task: T408 annotate `src/slic3r/GUI/I18N.cpp`
-- Plan: read `I18N.cpp` end-to-end, annotate the translation cache builders, lookup helpers, signal wiring, and file-watcher logic with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` tags, highlight global config dependence and Unity analogs (ScriptableObject string tables + LocalizationSettings refresh), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file plus metadata, mark the task done, and stop this iteration.
+- Plan: confirm `L_str` remains a UTF-8 translation bridge, add `[STATE]` guidance about `str` acting as both the English key and fallback, insert a `[PORTING_HAZARD:P3]` note on Unity's ID-based string tables, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the helper plus metadata, mark the task done, and then pause for the next iteration.
 
 ## Iteration plan update
 - Selected task: T383 annotate `src/slic3r/GUI/GUI.hpp`
