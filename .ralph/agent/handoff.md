@@ -2599,3 +2599,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1, P3=1
 - Git: Annotate GLGizmoSVG.hpp for Unity port
 - Next recommended Phase 1 task: T354 annotate: src/slic3r/GUI/Gizmos/GLGizmoText.cpp
+
+## Phase 1 - Task T362 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GLShader.cpp
+- Deliverables: src/slic3r/GUI/GLShader.cpp
+- Substantive additions: 9 multi-tag annotations outlining shader loading, compile/link lifecycle, uniform caching, and Unity translation guidance (INTENT/STATE/EVENT/THREAD/OPENGL/UNITY/PORTING_HAZARD)
+- Verification excerpt: // [INTENT] GLShaderProgram encapsulates GL program creation/caching so view passes can reuse compiled shaders without leaking GPU handles.
+- Unity-impact summary:
+  - Prebuild GL shader variants as Unity `ShaderVariantCollection` assets and keep the same keyword set in the asset importer so runtime logic only swaps `Material` instances.
+  - Mirror attribute/uniform caching with `MaterialPropertyBlock` lookups and `Shader.PropertyToID` so Unity render loops avoid repeated string-based queries.
+- Hazards found: P2=1 (resources_dir + StreamingAssets path/define ordering), P3=1 (runtime stage creation/linking differs from Unity import pipeline)
+- Git: Annotate GLShader program for Unity port
+- Next recommended Phase 1 task: T363 annotate: src/slic3r/GUI/GLShader.hpp

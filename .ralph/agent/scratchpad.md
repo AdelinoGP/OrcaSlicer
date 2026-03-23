@@ -349,3 +349,7 @@
 ## Iteration plan update
 - Selected task: T361 annotate `src/slic3r/GUI/GLSelectionRectangle.hpp` (runtime task `task-1773880086-6dd1` now active).
 - Plan: read the header thoroughly, document the UI representation of the selection drag rectangle, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around the class purpose, cached states (anchor, current lod rect), event hooks (mouse update, capture), render helpers (OpenGL buffer setup), Unity equivalents (Overlay Canvas + LineRenderer or GL line mesh + Input System), append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only this file, mark the task done, and then pause for the next iteration.
+
+## Iteration plan update
+- Selected task: T362 annotate `src/slic3r/GUI/GLShader.cpp` (next ready entry in the manifest) for this iteration.
+- Plan: start the runtime task, read the shader management implementation to capture intent, program cache state, OpenGL resource lifecycles, event hooks for shader reloads, renderer-thread boundaries, and Unity analogs (e.g., `ShaderVariantCollection` + runtime `RenderPipeline` pass). Insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around constructors, cache lookups, compilation branches, and file-watching signals; append the Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the annotated file, close the task, and then hand off the next eligible ready task for the following iteration.
