@@ -2898,3 +2898,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3 focus/rescale interplay relies on kill-focus guards and system-color hooks that Unity must replicate carefully).
 - Git: annotate: src/slic3r/GUI/GUI_ObjectLayers.hpp
 - Next recommended Phase 1 task: T388 annotate: src/slic3r/GUI/GUI_ObjectList.cpp
+
+## Phase 1 - Task T144 complete
+- Task type: annotate
+- File: src/slic3r/GUI/3DBed.hpp
+- Deliverables: src/slic3r/GUI/3DBed.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 24 multi-tag annotations covering state caches, render helpers, axis/mesh flows, and Unity mapping for bed metadata
+- Verification excerpt: // [OPENGL][THREAD:MAIN][UNITY:RenderTexture + dedicated camera] draws the bed and axes; Unity should replay this via a RenderTexture/composed mesh render job on the main render loop.
+- Unity-impact summary:
+  - Keep the shared color palette synchronized through a ScriptableObject theme asset and hook theme-change events to refresh shared materials.
+  - Preserve render ordering (render -> render_internal -> render_model/custom/default plus axis overlay) so Unity can sequence RenderTexture/MeshFilter draws and axis LineRenderer overlays correctly.
+  - Reuse the mesh-generator pattern (init_model_from_poly, detect_type) as a Unity job/coroutine that feeds MeshFilter + MeshCollider updates with explicit type flags.
+- Hazards found: P2=2 (init_model_from_poly, render_default blend), P3=3 (global color palette statics, GLModel arrow cache, detect_type heuristics)
+- Git: Annotate 3DBed.hpp for Unity port
+- Next recommended Phase 1 task: T145 annotate: src/slic3r/GUI/3DScene.cpp
+

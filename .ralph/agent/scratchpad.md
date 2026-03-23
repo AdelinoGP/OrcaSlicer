@@ -445,3 +445,6 @@
 ## Iteration plan
 - Selected task: T388 annotate `src/slic3r/GUI/GUI_ObjectList.cpp` (gui:T388) because starting T383 collided with the existing T372 entry that shares the same ID, so switching to the next ready panel makes progress while respecting the active task list.
 - Plan: mark T388 active, read the object list implementation thoroughly, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around list lifecycle, selection caching, drag/drop handling, GL refresh triggers, and settings observers; capture Unity analogs (UI Toolkit `ListView` with `ScrollView`, `Command`-style callbacks), note hazards (wx `wxListCtrl` messing with native model), append the evidence block to `.ralph/agent/handoff.md`, stage and commit the single file plus task bookkeeping, close the task, and stop for this iteration so the next agent can take over.
+
+- Plan update: T144 annotate `src/slic3r/GUI/3DBed.hpp`
+- Steps: review boundaries and transform enums, mark state/event/render hooks with [INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD], append Phase 1 evidence block, and commit after updating `.ralph/ralph-tasks.md`.
