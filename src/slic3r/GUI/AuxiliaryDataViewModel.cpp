@@ -3,34 +3,30 @@
 #include "libslic3r/Model.hpp"
 #include "libslic3r/Format/bbs_3mf.hpp"
 
-
 #include <boost/log/trivial.hpp>
 
 #include <wx/log.h>
 
-const static std::array<wxString, 4> s_default_folders = {
-    _L("Model Pictures"),
-    _L("Bill of Materials"),
-    _L("Assembly Guide"),
-    _L("Others")
-};
+// [INTENT][STATE] Seed the workspace auxiliary root with known categories so the ListView always has consistent folders.
+// [UNITY] Mirror this array with a ScriptableObject-backed folder preset list that populates a UI Toolkit TreeView root node.
+const static std::array<wxString, 4> s_default_folders = {_L("Model Pictures"), _L("Bill of Materials"), _L("Assembly Guide"), _L("Others")};
 
-AuxiliaryModel::AuxiliaryModel()
-{
-    m_root = nullptr;
-}
+AuxiliaryModel::AuxiliaryModel() { m_root = nullptr; }
+
+// [STATE] `m_root` and `m_root_dir` hold the in-memory tree and disk path backing the wxDataViewModel nodes shown to the user.
 
 void AuxiliaryModel::Init(wxString aux_path)
 {
-    m_root = new AuxiliaryModelNode();
+    m_root     = new AuxiliaryModelNode();
     m_root_dir = aux_path;
 
+    // [INTENT] Reset any stale auxiliary hierarchy before seeding the default folders.
+    // [THREAD][PORTING_HAZARD:P2] Removing directories synchronously can stall the UI thread if the folder tree is large; consider async cleanup.
     if (wxDirExists(m_root_dir)) {
         fs::path path_to_del(m_root_dir.ToStdWstring());
         try {
             fs::remove_all(path_to_del);
-        }
-        catch (...) {
+        } catch (...) {
             BOOST_LOG_TRIVIAL(error) << "Failed  removing the auxiliary directory " << m_root_dir.c_str();
         }
     }
@@ -40,6 +36,7 @@ void AuxiliaryModel::Init(wxString aux_path)
 
     for (auto folder : s_default_folders)
         CreateFolder(folder);
+    // [STATE] Ensures the tree consistently exposes the same root children so the UI never shows an empty model after an init.
 }
 
 AuxiliaryModel::~AuxiliaryModel()
@@ -48,8 +45,7 @@ AuxiliaryModel::~AuxiliaryModel()
         fs::path path_to_del(m_root_dir.ToStdWstring());
         try {
             fs::remove_all(path_to_del);
-        }
-        catch (...) {
+        } catch (...) {
             BOOST_LOG_TRIVIAL(error) << "Failed  removing the auxiliary directory " << m_root_dir.c_str();
         }
         m_root_dir = "";
@@ -62,11 +58,12 @@ void AuxiliaryModel::Reload(wxString aux_path)
 {
     fs::path new_aux_path(aux_path.ToStdWstring());
 
-    // Clean
+    // [INTENT] Rebuild the auxiliary cache by purging the existing directory before rescanning.
+    // [THREAD][PORTING_HAZARD:P2] This cleanup runs on the UI thread and can block if there are many files, so Unity should offload to a
+    // background task.
     try {
         fs::remove_all(fs::path(m_root_dir.ToStdWstring()));
-    }
-    catch (...) {
+    } catch (...) {
         BOOST_LOG_TRIVIAL(error) << "Failed  removing the auxiliary directory " << m_root_dir.c_str();
     }
 
@@ -77,7 +74,7 @@ void AuxiliaryModel::Reload(wxString aux_path)
     Cleared();
 
     // Create new root.
-    m_root = new AuxiliaryModelNode();
+    m_root     = new AuxiliaryModelNode();
     m_root_dir = aux_path;
 
     // Check new path. If not exist, create a new one.
@@ -87,31 +84,31 @@ void AuxiliaryModel::Reload(wxString aux_path)
         wxDataViewItemArray default_items;
         for (auto folder : s_default_folders) {
             wxString folder_path = aux_path + "\\" + folder;
-            if (fs::exists(folder_path.ToStdWstring())) continue;
+            if (fs::exists(folder_path.ToStdWstring()))
+                continue;
 
             fs::create_directory(folder_path.ToStdWstring());
-            AuxiliaryModelNode *node = new AuxiliaryModelNode(m_root,
-                                                              folder_path,
-                                                              true);
+            AuxiliaryModelNode* node = new AuxiliaryModelNode(m_root, folder_path, true);
             default_items.Add(wxDataViewItem(node));
         }
         ItemsAdded(wxDataViewItem(nullptr), default_items);
         return;
     }
 
-    // Load from new path
-    std::map<fs::path, AuxiliaryModelNode *> dir_cache;
-    fs::directory_iterator iter_end;
-    wxDataViewItemArray items;
+    // [STATE] Loading means we keep a directory cache to attach files after the initial pass so the UI tree keeps folder/file separation.
+    std::map<fs::path, AuxiliaryModelNode*> dir_cache;
+    fs::directory_iterator                  iter_end;
+    wxDataViewItemArray                     items;
     for (fs::directory_iterator iter(new_aux_path); iter != iter_end; iter++) {
-        wxString path = iter->path().generic_wstring();
+        wxString            path = iter->path().generic_wstring();
         AuxiliaryModelNode* node = new AuxiliaryModelNode(m_root, path, fs::is_directory(iter->path()));
         items.Add(wxDataViewItem(node));
 
         if (node->IsContainer()) {
-            dir_cache.insert({ iter->path(), node });
+            dir_cache.insert({iter->path(), node});
         }
     }
+    // [EVENT] Broadcast the refreshed root items so wxDataViewCtrl can render them in one update batch.
     ItemsAdded(wxDataViewItem(nullptr), items);
 
     items.Clear();
@@ -120,8 +117,8 @@ void AuxiliaryModel::Reload(wxString aux_path)
             if (fs::is_directory(iter->path()))
                 continue;
 
-            wxString file_path = iter->path().generic_wstring();
-            AuxiliaryModelNode* file = new AuxiliaryModelNode(dir.second, file_path, false);
+            wxString            file_path = iter->path().generic_wstring();
+            AuxiliaryModelNode* file      = new AuxiliaryModelNode(dir.second, file_path, false);
             items.Add(wxDataViewItem(file));
         }
         ItemsAdded(wxDataViewItem(dir.second), items);
@@ -141,26 +138,27 @@ void AuxiliaryModel::Reload(wxString aux_path)
     ItemsAdded(wxDataViewItem(nullptr), default_items);
 }
 
-int AuxiliaryModel::Compare(const wxDataViewItem& item1, const wxDataViewItem& item2,
-    unsigned int column, bool ascending) const
+// [INTENT][STATE] Keep container rows grouped so directories stay on top, ordering them by human-readable names before falling back to
+// pointer IDs.
+int AuxiliaryModel::Compare(const wxDataViewItem& item1, const wxDataViewItem& item2, unsigned int column, bool ascending) const
 {
     wxASSERT(item1.IsOk() && item2.IsOk());
     // should never happen
 
-    if (IsContainer(item1) && IsContainer(item2))
-    {
+    if (IsContainer(item1) && IsContainer(item2)) {
         wxVariant value1, value2;
         GetValue(value1, item1, 0);
         GetValue(value2, item2, 0);
 
         wxString str1 = value1.GetString();
         wxString str2 = value2.GetString();
-        int res = str1.Cmp(str2);
-        if (res) return res;
+        int      res  = str1.Cmp(str2);
+        if (res)
+            return res;
 
         // items must be different
-        wxUIntPtr litem1 = (wxUIntPtr)item1.GetID();
-        wxUIntPtr litem2 = (wxUIntPtr)item2.GetID();
+        wxUIntPtr litem1 = (wxUIntPtr) item1.GetID();
+        wxUIntPtr litem2 = (wxUIntPtr) item2.GetID();
 
         return litem1 - litem2;
     }
@@ -168,50 +166,39 @@ int AuxiliaryModel::Compare(const wxDataViewItem& item1, const wxDataViewItem& i
     return wxDataViewModel::Compare(item1, item2, column, ascending);
 }
 
-void AuxiliaryModel::GetValue(wxVariant& variant,
-    const wxDataViewItem& item, unsigned int col) const
+void AuxiliaryModel::GetValue(wxVariant& variant, const wxDataViewItem& item, unsigned int col) const
 {
     wxASSERT(item.IsOk());
 
-    AuxiliaryModelNode* node = (AuxiliaryModelNode*)item.GetID();
-    switch (col)
-    {
-    case 0:
-        variant = node->name;
-        break;
+    AuxiliaryModelNode* node = (AuxiliaryModelNode*) item.GetID();
+    // [STATE] Column 0 simply reflects the cached node name, keeping the UI tethered to the path without re-scanning the disk.
+    switch (col) {
+    case 0: variant = node->name; break;
 
-    default:
-        wxLogError("AuxiliaryModel::GetValue: wrong column %d", col);
+    default: wxLogError("AuxiliaryModel::GetValue: wrong column %d", col);
     }
 }
 
-bool AuxiliaryModel::SetValue(const wxVariant& variant,
-    const wxDataViewItem& item, unsigned int col)
+bool AuxiliaryModel::SetValue(const wxVariant& variant, const wxDataViewItem& item, unsigned int col)
 {
     wxASSERT(item.IsOk());
 
-    AuxiliaryModelNode* node = (AuxiliaryModelNode*)item.GetID();
-    switch (col)
-    {
-    case 0:
-        node->name = variant.GetString();
-        return true;
+    AuxiliaryModelNode* node = (AuxiliaryModelNode*) item.GetID();
+    // [EVENT] Editing the name propagates to the node cache so the tree reflects renames instantly without hitting the disk.
+    switch (col) {
+    case 0: node->name = variant.GetString(); return true;
 
-    default:
-        wxLogError("AuxiliaryModel::SetValue: wrong column");
+    default: wxLogError("AuxiliaryModel::SetValue: wrong column");
     }
     return false;
 }
 
-bool AuxiliaryModel::IsEnabled(const wxDataViewItem& item,
-    unsigned int col) const
-{
-    return true;
-}
+bool AuxiliaryModel::IsEnabled(const wxDataViewItem& item, unsigned int col) const { return true; }
 
+// [STATE] Tracking parent relationships keeps the wxDataViewModel hierarchy consistent during moves and renames.
 wxDataViewItem AuxiliaryModel::GetParent(const wxDataViewItem& item) const
 {
-    AuxiliaryModelNode* node = (AuxiliaryModelNode*)item.GetID();
+    AuxiliaryModelNode* node = (AuxiliaryModelNode*) item.GetID();
 
     return wxDataViewItem(GetParent(node));
 }
@@ -223,34 +210,34 @@ bool AuxiliaryModel::IsContainer(const wxDataViewItem& item) const
     if (!item.IsOk())
         return true;
 
-    AuxiliaryModelNode* node = (AuxiliaryModelNode*)item.GetID();
+    AuxiliaryModelNode* node = (AuxiliaryModelNode*) item.GetID();
     return node->IsContainer();
 }
 
 static unsigned int count = 0;
 
-unsigned int AuxiliaryModel::GetChildren(const wxDataViewItem& parent,
-    wxDataViewItemArray& array) const
+unsigned int AuxiliaryModel::GetChildren(const wxDataViewItem& parent, wxDataViewItemArray& array) const
 {
     if (m_root == nullptr)
         return 0;
 
-    AuxiliaryModelNode* node = (AuxiliaryModelNode*)parent.GetID();
-    if (!node)
-    {
+    AuxiliaryModelNode* node = (AuxiliaryModelNode*) parent.GetID();
+    if (!node) {
         node = m_root;
     }
 
+    // [STATE] Each call replenishes the cached count used by the wxDataViewCtrl to size the tree nodes for selection.
     count = node->GetChildren().GetCount();
-    for (unsigned int pos = 0; pos < count; pos++)
-    {
+    for (unsigned int pos = 0; pos < count; pos++) {
         AuxiliaryModelNode* child = node->GetChildren().Item(pos);
-        array.Add(wxDataViewItem((void*)child));
+        array.Add(wxDataViewItem((void*) child));
     }
 
     return count;
 }
 
+// [INTENT][EVENT] Creates or renames the folder node plus the underlying directory, then notifies the wxDataViewCtrl so it can repaint.
+// [PORTING_HAZARD:P3] Deleting existing folders synchronously can drop files without a confirmation dialog if the directory already exists.
 wxDataViewItem AuxiliaryModel::CreateFolder(wxString name)
 {
     wxString folder_name = name;
@@ -274,8 +261,7 @@ wxDataViewItem AuxiliaryModel::CreateFolder(wxString name)
             folder_name = _L("New Folder");
             folder_name << "(" << i << ")";
         }
-    }
-    else {
+    } else {
         for (AuxiliaryModelNode* node : m_root->GetChildren()) {
             if (!node->IsContainer())
                 continue;
@@ -293,8 +279,7 @@ wxDataViewItem AuxiliaryModel::CreateFolder(wxString name)
             bool is_done = fs::remove_all(bfs_path);
             if (!is_done)
                 return wxDataViewItem(nullptr);
-        }
-        catch (...) {
+        } catch (...) {
             BOOST_LOG_TRIVIAL(error) << "Failed  removing the auxiliary directory " << m_root_dir.c_str();
         }
     }
@@ -309,6 +294,11 @@ wxDataViewItem AuxiliaryModel::CreateFolder(wxString name)
     return folder_item;
 }
 
+// [INTENT] Copy user-selected files into the auxiliary cache so the TreeView stays backed by project-local copies.
+// [THREAD][PORTING_HAZARD:P2] `fs::copy_file` happens on the UI thread and can be slow; Unity should offload to a worker and marshal
+// `added_items` back via the main dispatcher. [UNITY] Mirror this flow with a ScriptableObject tree + `FileUtil.CopyFileOrDirectory`, then
+// push updates through a UI Toolkit TreeView via a `MainThreadDispatcher`. [EVENT] `ItemAdded` triggers let wxDataViewCtrl show new nodes
+// immediately.
 wxDataViewItemArray AuxiliaryModel::ImportFile(AuxiliaryModelNode* sel, wxArrayString file_paths)
 {
     if (sel == nullptr) {
@@ -358,8 +348,8 @@ wxDataViewItemArray AuxiliaryModel::ImportFile(AuxiliaryModelNode* sel, wxArrayS
 
 void AuxiliaryModel::Delete(const wxDataViewItem& item)
 {
-    AuxiliaryModelNode* node = (AuxiliaryModelNode*)item.GetID();
-    if (!node)      // happens if item.IsOk()==false
+    AuxiliaryModelNode* node = (AuxiliaryModelNode*) item.GetID();
+    if (!node) // happens if item.IsOk()==false
         return;
 
     bool is_done = false;
@@ -367,12 +357,10 @@ void AuxiliaryModel::Delete(const wxDataViewItem& item)
         fs::path bfs_path((m_root_dir + "\\" + node->name).ToStdWstring());
         try {
             is_done = fs::remove_all(bfs_path);
-        }
-        catch (...) {
+        } catch (...) {
             BOOST_LOG_TRIVIAL(error) << "Failed  removing the auxiliary directory " << m_root_dir.c_str();
         }
-    }
-    else {
+    } else {
         fs::path bfs_path(node->path.ToStdWstring());
         is_done = fs::remove(bfs_path);
     }
@@ -382,6 +370,7 @@ void AuxiliaryModel::Delete(const wxDataViewItem& item)
 
     node->GetParent()->GetChildren().Remove(node);
 
+    // [EVENT] Removing the node must emit a delete event so the wxDataViewCtrl can refresh selection and indent bias.
     Slic3r::put_other_changes();
     wxDataViewItem parent_item = GetParent(item);
     ItemDeleted(parent_item, item);
@@ -390,8 +379,8 @@ void AuxiliaryModel::Delete(const wxDataViewItem& item)
 
 void AuxiliaryModel::MoveItem(const wxDataViewItem& dropped_item, const wxDataViewItem& dragged_item)
 {
-    AuxiliaryModelNode* dropped = (AuxiliaryModelNode*)dropped_item.GetID();
-    AuxiliaryModelNode* dragged = (AuxiliaryModelNode*)dragged_item.GetID();
+    AuxiliaryModelNode* dropped = (AuxiliaryModelNode*) dropped_item.GetID();
+    AuxiliaryModelNode* dragged = (AuxiliaryModelNode*) dragged_item.GetID();
 
     if (dragged == nullptr || dragged->IsContainer())
         return;
@@ -399,11 +388,9 @@ void AuxiliaryModel::MoveItem(const wxDataViewItem& dropped_item, const wxDataVi
     AuxiliaryModelNode* target_folder = nullptr;
     if (dropped == nullptr) {
         target_folder = m_root;
-    }
-    else if (dropped->IsContainer()) {
+    } else if (dropped->IsContainer()) {
         target_folder = dropped;
-    }
-    else {
+    } else {
         target_folder = dropped->GetParent();
     }
 
@@ -415,15 +402,17 @@ void AuxiliaryModel::MoveItem(const wxDataViewItem& dropped_item, const wxDataVi
             return;
     }
 
-    // Generate new path
+    // [UNITY] Unity should mirror this by updating a ScriptableObject folder + asset path and letting the AssetDatabase handle rename in
+    // edit/play mode. [PORTING_HAZARD:P2] Renaming files on the UI thread means the move+copy can block and fail silently if another app
+    // locks the file. Generate new path
     wxString new_path = m_root_dir;
     if (target_folder != m_root)
         new_path += "\\" + target_folder->name;
     new_path += "\\" + dragged->name;
 
     // Perform file movement in file system
-    fs::path bfs_new_path(new_path.ToStdWstring());
-    fs::path bfs_old_path(dragged->path.ToStdWstring());
+    fs::path                  bfs_new_path(new_path.ToStdWstring());
+    fs::path                  bfs_old_path(dragged->path.ToStdWstring());
     boost::system::error_code err;
     fs::rename(bfs_old_path, bfs_new_path, err);
     if (err.failed())
@@ -436,19 +425,20 @@ void AuxiliaryModel::MoveItem(const wxDataViewItem& dropped_item, const wxDataVi
 
     // Notify wxDataViewCtrl to update ui
     Slic3r::put_other_changes();
+    // [EVENT] Reparent events refresh both the old and new folders so selection/cursor visuals move with the file.
     ItemDeleted(old_parent_item, wxDataViewItem(dragged));
     ItemAdded(wxDataViewItem(target_folder == m_root ? nullptr : target_folder), wxDataViewItem(dragged));
 }
 
 bool AuxiliaryModel::IsOrphan(const wxDataViewItem& item)
 {
-    AuxiliaryModelNode* node = (AuxiliaryModelNode*)item.GetID();
+    AuxiliaryModelNode* node = (AuxiliaryModelNode*) item.GetID();
     return node->GetParent() != m_root;
 }
 
 bool AuxiliaryModel::Rename(const wxDataViewItem& item, const wxString& name)
 {
-    AuxiliaryModelNode* node = (AuxiliaryModelNode*)item.GetID();
+    AuxiliaryModelNode* node   = (AuxiliaryModelNode*) item.GetID();
     AuxiliaryModelNode* parent = node->GetParent();
 
     if (node->IsContainer())
@@ -462,9 +452,10 @@ bool AuxiliaryModel::Rename(const wxDataViewItem& item, const wxString& name)
             return false;
     }
 
+    // [PORTING_HAZARD:P2] Renames touch the filesystem directly; Unity should use an async task + dispatcher to avoid locking the UI.
     boost::system::error_code err;
-    fs::path old_path((m_root_dir + "\\" + parent->name + "\\" + node->name).ToStdWstring());
-    fs::path new_path((m_root_dir + "\\" + parent->name + "\\" + name).ToStdWstring());
+    fs::path                  old_path((m_root_dir + "\\" + parent->name + "\\" + node->name).ToStdWstring());
+    fs::path                  new_path((m_root_dir + "\\" + parent->name + "\\" + name).ToStdWstring());
     fs::rename(old_path, new_path, err);
     if (err.failed())
         return false;

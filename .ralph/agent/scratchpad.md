@@ -356,7 +356,8 @@
 - Selected task: T398 annotate `src/slic3r/GUI/GUI_Utils.cpp` (task-1773880086-d4b6 now active).
 
 ## Iteration plan update
-- Current focus: T157 annotate `src/slic3r/GUI/Auxiliary.cpp` (per ready list and actual file path).
+- Selected task: T158 annotate `src/slic3r/GUI/AuxiliaryDataViewModel.cpp` as today's focus.
+- Plan: start work by reviewing the model initialization, folder population, import/delete/move helpers, and data view callbacks; sprinkle the required `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2]` annotations (NOT tagging each line, but covering key state/intent/effects), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file, close T158, and then stop for this iteration.
 
 ## Iteration plan update
 - Current focus: T410 annotate `src/slic3r/GUI/IconManager.cpp` (task-1773880086-f0fa active).

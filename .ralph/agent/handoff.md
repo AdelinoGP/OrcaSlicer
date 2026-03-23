@@ -3586,3 +3586,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (ImGui immediate-mode draw/click dependency requires explicit Unity dispatcher or VisualElement bridging)
 - Git: annotate IconManager header for Unity port
 - Next recommended Phase 1 task: T412 annotate: src/slic3r/GUI/ImageDPIFrame.cpp
+
+## Phase 1 - Task T158 complete
+- Task type: annotate
+- File: src/slic3r/GUI/AuxiliaryDataViewModel.cpp
+- Deliverables: src/slic3r/GUI/AuxiliaryDataViewModel.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 10 multi-tag annotations covering root/init state, reload walking, creation/import/delete/move flows, and Unity correspondence.
+- Verification excerpt: // [UNITY] Mirror this array with a ScriptableObject-backed folder preset list that populates a UI Toolkit TreeView root node.
+- Unity-impact summary:
+  - Keep the auxiliary tree as a serialized ScriptableObject tree + UI Toolkit TreeView so selections, drag/drop, and default folder seeding become deterministic.
+  - Offload every `fs::copy_file`/`fs::rename`/`fs::remove_all` call to background tasks and marshal updates via `MainThreadDispatcher` before firing TreeView events.
+  - Treat the default folder list as a shared preset list so Unity can rehydrate `VisualElement` nodes before the file-system scan completes.
+- Hazards found: P2=4 (init purge, import copies, move renames, rename writes block the UI thread), P3=1 (CreateFolder deletes existing disk content without confirmation).
+- Git: document auxiliary data model
+- Next recommended Phase 1 task: T159 annotate: src/slic3r/GUI/AuxiliaryDataViewModel.hpp
