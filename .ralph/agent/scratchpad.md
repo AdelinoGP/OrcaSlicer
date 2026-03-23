@@ -780,3 +780,11 @@
 ## Iteration plan update
 - Selected task: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp`
 - Plan: revisit the auxiliary tree implementation, document the tree population intent, selection/cursor state caches, context menu wiring, and UI-thread-only delete logic; tag `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` around the node operations, drag/drop, and undo helpers, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated source plus metadata, close T372, and then pause for the next iteration so another agent can continue.
+
+## Iteration plan update
+- Selected task: T408 annotate `src/slic3r/GUI/I18N.cpp`
+- Plan: read `I18N.cpp` end-to-end, annotate the translation cache builders, lookup helpers, signal wiring, and file-watcher logic with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` tags, highlight global config dependence and Unity analogs (ScriptableObject string tables + LocalizationSettings refresh), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file plus metadata, mark the task done, and stop this iteration.
+
+## Iteration plan update
+- Selected task: T383 annotate `src/slic3r/GUI/GUI.hpp`
+- Plan: read the header end-to-end, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2]` comments for the GUI manager helpers, menu builder, and config caches, highlight Unity equivalents (MenuBar + ScriptableObject config controller) plus hazard notes about wxWidgets ownership rules, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header plus handoff metadata, mark the task closed, and stop for this iteration so the next agent can continue.

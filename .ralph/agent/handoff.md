@@ -3917,3 +3917,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3 column/resizing behavior must be replicated to avoid layout drift unless the Unity TreeView controller shares sort/resize state with the toolbar commands)
 - Git: Document auxiliary list layout state
 - Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp
+
+## Phase 1 - Task T408 complete
+- Task type: annotate
+- File: src/slic3r/GUI/I18N.cpp
+- Deliverables: src/slic3r/GUI/I18N.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: Expanded the translation helper comments to cover `wxTranslations` caching, those language-change events, and the Unity localization analog.
+- Verification excerpt: // [STATE] `wxTranslations` caches the catalog lookup per locale, so callers must re-run `L_str` after a language-change event to refresh widget labels.
+- Unity-impact summary:
+  - Drive localization via `LocalizationSettings.StringDatabase` or a dedicated `LocalizationManager` that caches string tables and re-raises `LocalizeStringEvent` when `SelectedLocale` changes.
+  - Keep translation lookups on Unity's main thread by routing UI labels through a MonoBehaviour that listens for locale-change events instead of calling `wxGetTranslation` directly.
+- Hazards found: 1 (P3: wxLocale + `wxTranslations` caching does not line up with Unity string-table refresh semantics, so explicit cache invalidation is required.)
+- Git: Annotate I18N translation helper
+- Next recommended Phase 1 task: T410 annotate: src/slic3r/GUI/IconManager.cpp
