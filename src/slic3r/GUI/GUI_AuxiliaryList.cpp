@@ -179,7 +179,7 @@ void AuxiliaryList::do_import_file(AuxiliaryModelNode* folder)
 
 void AuxiliaryList::on_create_folder(wxCommandEvent& evt)
 {
-	// [EVENT] Toolbar/context buttons route here so Unity can reuse this entry point for the same verbs.
+	// [EVENT][UNITY] Toolbar/context buttons route here so Unity can reuse this entry point for the same verbs.
 	create_new_folder();
 }
 
@@ -200,7 +200,8 @@ void AuxiliaryList::on_import_file(wxCommandEvent& evt)
 	}
 
 	do_import_file(folder_node);
-	// [EVENT][UNITY] Centralize the import workflow so Unity's controller can reuse this entry point when wiring toolbar buttons or menu actions.
+	// [EVENT][STATE][UNITY] Centralize the import workflow so Unity's controller can reuse this entry point when wiring toolbar buttons
+	// or menu actions and keep the selection-based folder target intact.
 }
 
 void AuxiliaryList::on_delete(wxCommandEvent& evt)
@@ -256,7 +257,7 @@ void AuxiliaryList::on_context_menu(wxDataViewEvent& evt)
 	}
 
 	PopupMenu(menu);
-	// [INTENT][UNITY] Keep context menus aligned with toolbar verbs so Unity can reuse the same helper methods for right-click overlays.
+	// [EVENT][INTENT][UNITY] Keep context menus aligned with toolbar verbs so Unity can reuse the same helper methods for right-click overlays.
 }
 
 void AuxiliaryList::on_begin_drag(wxDataViewEvent& evt)
@@ -272,7 +273,7 @@ void AuxiliaryList::on_begin_drag(wxDataViewEvent& evt)
 	obj->SetText("Some text");
 	evt.SetDataObject(obj);
 	evt.SetDragFlags(wxDrag_DefaultMove);
-	// [STATE][UNITY] Record the dragged item so the drop handler can resolve the source even if the mouse moves outside the tree and so Unity's DragAndDrop layer can track the origin.
+	// [EVENT][STATE][UNITY] Record the dragged item so the drop handler can resolve the source even if the mouse moves outside the tree and so Unity's DragAndDrop layer can track the origin.
 }
 
 void AuxiliaryList::on_drop_possible(wxDataViewEvent& evt)
@@ -288,7 +289,7 @@ void AuxiliaryList::on_drop(wxDataViewEvent& evt)
 	Expand(evt.GetItem());
 	Select(m_dragged_item);
 	m_dragged_item = wxDataViewItem(nullptr);
-	// [STATE][UNITY] Clear the drag sentinel once the move completes so future drops start fresh and Unity's DragAndDrop state resets.
+	// [EVENT][STATE][UNITY] Clear the drag sentinel once the move completes so future drops start fresh and Unity's DragAndDrop state resets.
 }
 
 void AuxiliaryList::on_editing_started(wxDataViewEvent& evt)
@@ -315,7 +316,7 @@ void AuxiliaryList::on_left_dclick(wxMouseEvent& evt)
 		evt.Skip();
 	}
 }
-// [EVENT][PORTING_HAZARD:P3] Double-click launching relies on native shells; Unity should use a cross-platform helper (Process.Start or Application.OpenURL) on the main thread.
+// [EVENT][UNITY][PORTING_HAZARD:P3] Double-click launching relies on native shells; Unity should use a cross-platform helper (Process.Start or Application.OpenURL) on the main thread.
 
 void AuxiliaryList::handle_key_event(wxKeyEvent& evt)
 {

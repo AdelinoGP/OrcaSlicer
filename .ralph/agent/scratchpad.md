@@ -434,3 +434,6 @@
 ## Iteration plan update
 - Selected task: T372 annotate: src/slic3r/GUI/GUI_AuxiliaryList.cpp (runtime task task-1773880086-6aa6 is active).
 - Plan: read the source thoroughly, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations at class/method boundaries covering list state, event wiring, caching, render helpers, and Unity equivalents, append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the file, close the task, and then pause for the next iteration.
+
+## Iteration note
+- Attempted to target T383, but `task-1773880086-6aa6` remained tied to T372; picking up T372 as the active work item.
