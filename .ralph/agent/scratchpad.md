@@ -537,3 +537,7 @@
 ## Iteration plan update
 - Selected task: T388 annotate `src/slic3r/GUI/GUI_ObjectList.cpp` (task-1773880086-e361 now active).
 - Plan: verify readiness via `ralph tools task ready`, start the task, read the file top-to-bottom to understand list lifecycle, selection caching, drag/drop, context menu wiring, GL refresh triggers, and settings observers; annotate each major section with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` (add `[UNCLEAR]` where intent is ambiguous), note Unity analogs such as UI Toolkit `ListView` backed by an `ObservableCollection` plus `Command`-style callbacks, highlight hazards like `wxListCtrl` ownership and thread-bound refreshes, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit `GUI_ObjectList.cpp` plus any bookkeeping files, close the task, and stop for this iteration.
+
+## Iteration plan update
+- Selected task: T400 annotate `src/slic3r/GUI/HintNotification.cpp` (task-1773880086-05a9 now active).
+- Plan: walk through the hint database lifecycle, hypertext handling, and ImGui render/interaction helpers; add `[STATE]` on hint caches and fade state, `[EVENT]` on button callbacks + sig-wired tag checks, `[THREAD]` around file io and random hint selection, `[OPENGL]`/`[UNITY]` guidance for migrating the ImGui driven fade/render layout, highlight `[PORTING_HAZARD:P2]` for persistent cereal serialization + native browser launches, append the Phase 1 evidence block, stage/commit this file, and close the task before pausing for the next iteration.

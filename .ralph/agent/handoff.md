@@ -3159,3 +3159,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=2 (global `wxGetApp().plater()` + synchronous `Freeze/Thaw` assumptions), P3=1 (macOS `EVT_LOCK` bitmap dance needs replacement).
 - Git: annotate: src/slic3r/GUI/GUI_ObjectTableSettings.cpp
 - Next recommended Phase 1 task: T395 annotate: src/slic3r/GUI/GUI_ObjectTableSettings.hpp
+
+## Phase 1 - Task T400 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HintNotification.cpp
+- Deliverables: src/slic3r/GUI/HintNotification.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: Added multi-tag guidance for the hint database persistence, tag filtering, navigation logic, and ImGui render path so Unity engineers have explicit state/event/porting notes.
+- Verification excerpt: // [OPENGL][STATE][UNITY] Renders all hint text lines, hypertext, and follow-up text with ImGui while applying fade colors and width wrapping; Unity should mirror this via a custom UI Toolkit overlay plus TextMeshPro layout loops.
+- Unity-impact summary:
+  - Clarified how the HintDatabase persists used IDs, filters hints by mode/tech/material, and selects weighted candidates so Unity can reuse AppConfig/AppPreset metadata and ScriptableObject persistence.
+  - Documented the ImGui overlay mechanics (text layout, close/preferences/documentation buttons, hypertext/tags) so Unity can rebuild the same overlay with VisualElement controls and dispatch callbacks to the same commands.
+- Hazards found: P2=3 (cereal persistence, OS browser launch guard, `wxGetApp()` singletons), P3=2 (random seed reliance and `open_preferences` button tied to global state).
+- Git: Document hint notification lifecycle for Unity
+- Next recommended Phase 1 task: T401 annotate: src/slic3r/GUI/HintNotification.hpp
