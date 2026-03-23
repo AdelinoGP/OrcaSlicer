@@ -196,8 +196,8 @@
 - Completed T314 annotate: `src/slic3r/GUI/Gizmos/GLGizmoCut.hpp`; multi-tag comments now cover intent, state caches, event wiring, OpenGL draw helpers, Unity analogs, and porting hazards; the evidence block is appended and `.ralph/ralph-tasks.md` now marks the task done.
 
 ## Iteration plan update
-- Selected task: T315 annotate `src/slic3r/GUI/Gizmos/GLGizmoEmboss.cpp` (task-1773880086-441c) since the source resides in the ready list and carries important emboss gizmo state/rendering insights for Unity.
-- Plan: start the runtime task, read the entire file, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around emboss state transitions, UI event plumbing, GL draw calls, and Unity migration hints; append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the change, and mark the task done before selecting the next ready entry.
+- Selected task: T153 annotate `src/slic3r/GUI/PresetComboBoxes.cpp` (task-1773880085-efcd is now active for this iteration).
+- Plan: read the file in full, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around the combo box widget initialization, event wiring, preset cache, and render helpers; ensure comments note any asynchronous state, selection caching, or cross-thread hazards, highlight Unity analogs (e.g., UI Toolkit `ListView` with `VisualElement` item renderer plus ScriptableObject preset model), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the single file change, close T153, and then pick the next eligible Phase 1 task afterward.
 
 ## Iteration plan update
 - Selected task: T347 annotate `src/slic3r/GUI/Gizmos/GLGizmoSimplify.hpp` (runtime task `task-1773880086-2930`).

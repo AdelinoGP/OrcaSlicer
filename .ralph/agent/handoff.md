@@ -3280,3 +3280,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 (P2 DPIDialog/DeviceManager lifetime coupling, P3 wx ComboBox/popup focus semantics)
 - Git: Annotate AMS materials setting header for Unity port
 - Next recommended Phase 1 task: T153 annotate: src/slic3r/GUI/AMSSetting.cpp
+
+## Phase 1 - Task T536 complete
+- Task type: annotate
+- File: src/slic3r/GUI/PresetComboBoxes.cpp
+- Deliverables: src/slic3r/GUI/PresetComboBoxes.cpp
+- Substantive additions: 15 inline tags clarifying selection rebuild, AMS color sync, wizard menus, and state caches across combo/list helpers.
+- Verification excerpt: // [INTENT] Rebuilds the dropdown entries by iterating the preset collection, preserving grouping markers, and choosing the correct selection tooltip.
+- Unity-impact summary:
+  - Unity needs a `ListView`/`VisualElement` tree backed by a ScriptableObject preset collection with separators instead of wx label markers.
+  - Wizard/contextual menu targets should be routed through a MonoBehaviour menu controller, and AMS/color dialogs need MainThread dispatchers before firing config events.
+- Hazards found: P1: 1 (GTK ellipsize workaround); P2: 3 (wx label-marker grouping, DeviceManager/connected-printer reliance, MainFrame/Tab coordination).
+- Git: Document PresetComboBoxes for Unity port
+- Next recommended Phase 1 task: T154 annotate: src/slic3r/GUI/AMSSetting.hpp

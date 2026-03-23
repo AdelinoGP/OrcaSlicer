@@ -257,6 +257,10 @@ if (GTK_IS_ENTRY(widget)) {
 #endif
 }
 
+// [INTENT] Updates Filament AMS color info by syncing selected tray data back into the live project config, then bouncing an event to the
+// Plater UI. [THREAD] Marshals the final `wxCommandEvent` onto the main loop via `wxQueueEvent`, so mixers run on the UI thread despite
+// originating from combo operations. [PORTING_HAZARD:P2] Unity will need an event bus/dispatcher (e.g., `MainThreadDispatcher.Enqueue`) to
+// mimic `wxQueueEvent` and keep filament color updates thread-safe.
 int PresetComboBox::update_ams_color()
 {
     if (m_filament_idx < 0)
@@ -410,6 +414,12 @@ wxString PresetComboBox::get_preset_item_name(unsigned int index)
 
 wxString PresetComboBox::get_preset_name(const Preset& preset) { return from_u8(preset.name /* + suffix(preset)*/); }
 
+// [INTENT] Rebuilds the dropdown entries by iterating the preset collection, preserving grouping markers, and choosing the correct
+// selection tooltip. [STATE] Observes `m_show_all`, `m_collection`, and selection markers to decide which entries appear and how they are
+// ordered. [THREAD] Must run on the UI thread (Freeze/Thaw envelope) because it conversely mutates wxComboBox state and marker flags.
+// [UNITY] Unity will need to refresh the `ListView` data source from the shared `PresetScriptableObjectCollection`, insert separators as
+// `Label` elements, and call `ListView.ScrollTo` for `m_last_selected`. [PORTING_HAZARD:P2] Relies on wx-specific label markers,
+// separators, and `Append` style API; Unity will need a custom list renderer with runtime grouping.
 void PresetComboBox::update(std::string select_preset_name)
 {
     Freeze();
@@ -474,16 +484,24 @@ void PresetComboBox::update(std::string select_preset_name)
     Thaw();
 }
 
+// [STATE] Flips the visibility filter so the next `update()` call can show hidden/incompatible presets for debugging or diagnostics.
+// [UNITY] Could map to a `Toggle` bound to `ListView.FilterPredicate` on the ScriptableObject collection.
 void PresetComboBox::show_all(bool show_all)
 {
     m_show_all = show_all;
     update();
 }
 
+// [INTENT] Helper that reuses the preset name currently shown as the selection so the internal lists stay in sync with the UI string.
 void PresetComboBox::update() { this->update(into_u8(this->GetString(this->GetSelection()))); }
 
+// [INTENT] Pulls the selected preset directly from the bundle when external changes (e.g., loading a project) affect which preset is active.
 void PresetComboBox::update_from_bundle() { this->update(m_collection->get_selected_preset().name); }
 
+// [INTENT] Injects connected printer devices from `DeviceManager` into the dropdown so sidebars can select by machine instead of preset
+// name. [STATE] Records the range of added printer items via `m_first_printer_idx` / `m_last_printer_idx` for later selection math.
+// [PORTING_HAZARD:P2] Unity will not have `DeviceManager`, so this logic must be reimplemented via a dedicated DeviceList controller and
+// `IObservableCollection` updates.
 void PresetComboBox::add_connected_printers(std::string selected, bool alias_name)
 {
     DeviceManager* dev = Slic3r::GUI::wxGetApp().getDeviceManager();
@@ -510,6 +528,7 @@ void PresetComboBox::add_connected_printers(std::string selected, bool alias_nam
     m_last_printer_idx = GetCount();
 }
 
+// [STATE] Translates the current combo-box selection into the 0-based index of the connected printer entry, or -1 when outside the printer region.
 int PresetComboBox::selected_connected_printer() const
 {
     if (m_first_printer_idx && m_last_selected >= m_first_printer_idx && m_last_selected < m_last_printer_idx) {
@@ -518,6 +537,9 @@ int PresetComboBox::selected_connected_printer() const
     return -1;
 }
 
+// [INTENT] Adds AMS-managed filament trays with icons, selects the matching entry, and marks AMS-only entries with a `FilamentAMSType` flag.
+// [EVENT] Triggers warnings/logs when a tray id is missing or incompatible.
+// [UNITY] Translate to Unity UI Toolkit `ListView` entries for AMS trays and flag them via a `VisualElement` class state.
 bool PresetComboBox::add_ams_filaments(std::string selected, bool alias_name)
 {
     bool selected_in_ams      = false;
@@ -591,6 +613,7 @@ bool PresetComboBox::add_ams_filaments(std::string selected, bool alias_name)
     return selected_in_ams;
 }
 
+// [STATE] Returns the AMS index when the current selection sits inside the AMS subrange.
 int PresetComboBox::selected_ams_filament() const
 {
     if (m_first_ams_filament && m_last_selected >= m_first_ams_filament && m_last_selected < m_last_ams_filament) {
@@ -599,6 +622,9 @@ int PresetComboBox::selected_ams_filament() const
     return -1;
 }
 
+// [INTENT] Responds to Windows DPI changes by recalculating icon metrics and repainting the combo box.
+// [STATE] Updates `m_em_unit` and cached bitmaps so the icons stay sharp after DPI changes.
+// [UNITY] Unity equivalent: re-layout a `MonoBehaviour` controlling a `CanvasScaler` and regenerate `Sprite` textures when display DPI shifts.
 void PresetComboBox::msw_rescale()
 {
     m_em_unit = em_unit(this);
@@ -614,6 +640,8 @@ void PresetComboBox::msw_rescale()
     update();
 }
 
+// [EVENT] Called when the OS palette toggles (dark/light mode) so the combo box and bitmaps refresh their colors.
+// [UNITY] Map to Unity's `OnSystemColorSchemeChanged` callback, re-apply tinting to a `ScriptableObject` style library.
 void PresetComboBox::sys_color_changed()
 {
     wxGetApp().UpdateDarkUI(this);
@@ -948,6 +976,10 @@ PlaterPresetComboBox::~PlaterPresetComboBox()
 
 static void run_wizard(ConfigWizard::StartPage sp) { wxGetApp().run_wizard(ConfigWizard::RR_USER, sp); }
 
+// [INTENT] Overrides the base selection handler to process wizard markers (Add/Remove) and AMS color updates before letting the combo
+// propagate its event. [EVENT] Uses `wxTheApp->CallAfter` to safely open the config wizard so the combo box remains responsive. [UNITY]
+// Unity port should fire `Dropdown.onValueChanged` and delegate marker handling to a `MenuController` that opens modal dialogs
+// asynchronously.
 void PlaterPresetComboBox::OnSelect(wxCommandEvent& evt)
 {
     auto selected_item = evt.GetSelection();
@@ -992,6 +1024,9 @@ void PlaterPresetComboBox::update_badge_according_flag()
     ShowBadge(ok);
 }
 
+// [INTENT] Transfers focus from the combo to its associated settings tab, ensuring the UI shows the selected preset and syncing selection
+// indices. [PORTING_HAZARD:P2] Tightly bound to `MainFrame`, `Tab`, and `ParamsDialog`; Unity must recreate this coordination with a
+// `UINavigator` that knows about `MainWindow` sectors.
 bool PlaterPresetComboBox::switch_to_tab()
 {
     Tab* tab = wxGetApp().get_tab(m_type);
@@ -1072,6 +1107,8 @@ void PlaterPresetComboBox::change_extruder_color()
     }
 }
 
+// [INTENT] Constructs the Add/Remove presets menu and shows it next to the combo box; runs the associated wizard entry points asynchronously.
+// [STATE] Builds `wxMenuItem`s with `append_menu_item` so each call gets fresh command handlers scoped to this combo-box instance.
 void PlaterPresetComboBox::show_add_menu()
 {
     wxMenu* menu = new wxMenu();
@@ -1084,6 +1121,8 @@ void PlaterPresetComboBox::show_add_menu()
     wxGetApp().plater()->PopupMenu(menu);
 }
 
+// [INTENT] Offers preset editing shortcuts, including color change on Linux and the Print/Filament wizard entries.
+// [UNITY] Replace with a Unity `ContextMenu` prefab that triggers `MenuController.OpenEditDialog` on selection.
 void PlaterPresetComboBox::show_edit_menu()
 {
     wxMenu* menu = new wxMenu();
@@ -1115,6 +1154,11 @@ wxString PlaterPresetComboBox::get_preset_name(const Preset& preset) { return fr
 
 // Only the compatible presets are shown.
 // If an incompatible preset is selected, it is shown as well.
+// [INTENT] Rebuilds the Plater-side preset list as presets change; ensures compatible presets show badges and the AMS color picker stays
+// consistent. [STATE] Reads from `m_collection`, `m_preset_bundle`, and `m_filament_idx` to decide whether to early return (SLA printers,
+// missing filaments) and which icons/tooltips to display. [PORTING_HAZARD:P2] Relies on wx-specific widgets (wxBitmapButton,
+// `SetLabelMarker`), so Unity will need a dedicated `VisualElement` panel with toggles, and a `TMP_InputField` to mimic badges. [OPENGL]
+// Generates color icons with `wxBitmap`, which the Unity port must mirror with `Texture2D` creation plus caching in a `PresetIconCache`.
 void PlaterPresetComboBox::update()
 {
     if (m_type == Preset::TYPE_FILAMENT && (m_preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA ||
@@ -1556,6 +1600,9 @@ TabPresetComboBox::TabPresetComboBox(wxWindow* parent, Preset::Type preset_type)
     PresetComboBox(parent, preset_type, wxSize(20 * wxGetApp().em_unit(), 30 * wxGetApp().em_unit() / 10))
 {}
 
+// [INTENT] Handles the tabbed preset combo selection by triggering wizards for marker items and notifying listeners of real preset changes.
+// [STATE] Keeps `m_last_selected` in sync so repeated selections do not fire redundant config updates.
+// [UNITY] Replace with a UI Toolkit `ListView` selection callback that raises `ConfigWizard` commands on a `MainUIController`.
 void TabPresetComboBox::OnSelect(wxCommandEvent& evt)
 {
     // Under OSX: in case of use of a same names written in different case (like "ENDER" and "Ender")
@@ -1598,6 +1645,10 @@ wxString TabPresetComboBox::get_preset_name(const Preset& preset) { return from_
 // Update the choice UI from the list of presets.
 // If show_incompatible, all presets are shown, otherwise only the compatible presets are shown.
 // If an incompatible preset is selected, it is shown as well.
+// [INTENT] Rebuilds the tab-specific preset list, optionally hiding incompatible presets unless explicitly requested (via
+// `show_incompatible`). [STATE] Recomputes `selected` based on the underlying preset collection, adds separators/markers for project/system
+// groups, and repopulates tooltip text for each entry. [PORTING_HAZARD:P2] This uses `wxWindowUpdateLocker` and low-level `Append` calls
+// that have no direct Unity equivalent unless a custom dropdown control is implemented.
 void TabPresetComboBox::update()
 {
     Freeze();
@@ -1760,6 +1811,9 @@ void TabPresetComboBox::msw_rescale()
     SetSize(sz);
 }
 
+// [INTENT] Sweeps the list to reflect dirty/modified flags after external config edits, updating labels and bitmaps in place without
+// reconstructing the whole list. [STATE] Consults each item marker and toggles text/bmp to show the latest preset name. [THREAD] Runs while
+// the combo is locked via `wxWindowUpdateLocker` to avoid flicker; Unity should throttle similar updates on its main thread.
 void TabPresetComboBox::update_dirty()
 {
     // 1) Update the dirty flag of the current preset.
@@ -1813,6 +1867,8 @@ GUI::CalibrateFilamentComboBox::CalibrateFilamentComboBox(wxWindow* parent) : Pl
 
 GUI::CalibrateFilamentComboBox::~CalibrateFilamentComboBox() {}
 
+// [INTENT] Initializes the calibration combo box from tray metadata, honoring vendor IDs and default colors.
+// [STATE] Stores tray-specific identifiers (`m_filament_id`, `m_tag_uid`, etc.) to keep future color refreshes in sync.
 void GUI::CalibrateFilamentComboBox::load_tray(DynamicPrintConfig& config)
 {
     m_tray_name = config.opt_string("tray_name", 0u);
@@ -1874,6 +1930,9 @@ void GUI::CalibrateFilamentComboBox::load_tray(DynamicPrintConfig& config)
     }
 }
 
+// [INTENT] Rebuilds the calibrator dropdown with only compatible system/user presets so the calibration UI never shows unsupported items.
+// [STATE] Keeps `m_system_presets`/`m_nonsys_presets` maps that map display strings to the preset key for selection callbacks.
+// [UNITY] Mirror by binding a filtered `ListView` to a `ScriptableObject` list of calibration presets plus preview sprites.
 void GUI::CalibrateFilamentComboBox::update()
 {
     if (m_preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA)
@@ -1953,6 +2012,9 @@ void GUI::CalibrateFilamentComboBox::msw_rescale()
         edit_btn->msw_rescale();
 }
 
+// [EVENT] Handles selection of a calibration preset, faking extra `wxCommandEvent`s when disabled markers move selection to the next entry.
+// [PORTING_HAZARD:P3] The manual event reposting assumes wx event semantics; Unity should chain `Dropdown.onValueChanged` through a
+// resolver that enforces selection rules.
 void GUI::CalibrateFilamentComboBox::OnSelect(wxCommandEvent& evt)
 {
     auto marker = reinterpret_cast<Marker>(this->GetClientData(evt.GetSelection()));
