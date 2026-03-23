@@ -623,3 +623,7 @@
 
 ## Iteration plan update - T372
 - Actual task: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp` (task-1773880086-6aa6 now in progress).  Plan: read the entire CPP, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` annotations especially around list lifecycle, selection caches, layout events, drag/drop, keyboard shortcuts, and wxListCtrl interactions; append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the annotated file, close the task, and pause for the next iteration so another agent can continue.
+
+## Iteration plan
+- Current focus: T405 annotate `src/slic3r/GUI/HMSPanel.hpp` (task-1773880086-7ab4 is open).
+- Plan: start the runtime task, read the header fully, annotate class intent, stateful maps, toolbar/event wiring, and Unity/porting tags across helper declarations, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header plus metadata, close the task, and stop this iteration so the next agent can continue.

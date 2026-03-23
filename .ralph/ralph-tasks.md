@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-23T15:21:35Z
+Last updated: 2026-03-23T15:45:16Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -323,7 +323,7 @@ Last updated: 2026-03-23T15:21:35Z
 - [x] T402 annotate: src/slic3r/GUI/HMS.cpp
 - [x] T403 annotate: src/slic3r/GUI/HMS.hpp
 - [x] T404 annotate: src/slic3r/GUI/HMSPanel.cpp
-- [ ] T405 annotate: src/slic3r/GUI/HMSPanel.hpp
+- [x] T405 annotate: src/slic3r/GUI/HMSPanel.hpp
 - [ ] T406 annotate: src/slic3r/GUI/HttpServer.cpp
 - [ ] T407 annotate: src/slic3r/GUI/HttpServer.hpp
 - [ ] T408 annotate: src/slic3r/GUI/I18N.cpp

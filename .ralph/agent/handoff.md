@@ -3416,3 +3416,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 (P2 cross-thread access to `MachineObject`/`wxGetApp` + reliance on wxEvents; P3 native browser launch per alert).
 - Git: docs: annotate HMSPanel for Unity port
 - Next recommended Phase 1 task: T405 annotate: src/slic3r/GUI/HMSPanel.hpp
+
+## Phase 1 - Task T405 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HMSPanel.hpp
+- Deliverables: src/slic3r/GUI/HMSPanel.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md, .ralph/ralph-tasks.md
+- Substantive additions: 11 multi-tag annotations covering row/panel state, update threading, Unity mapping, and porting hazards
+- Verification excerpt: // [THREAD] DeviceManager dispatches update() off the UI thread, so implementations must marshal to the main thread before touching widgets.
+- Unity-impact summary:
+  - Mirror each HMSNotifyItem row as a UI Toolkit VisualElement combined with Images/Text + WebView/UnityWebRequest handling, reusing Texture2D icons instead of wxBitmaps.
+  - Replace the wxScrolledWindow list with a ScrollView/VisualElement stack plus pooling to keep the overlay responsive above the GL viewport.
+- Hazards found: P2=1 (wxHtmlWindow + bitmap caching), P3=1 (wxScrolledWindow virtualization + hyperlink behavior)
+- Git: annotate: src/slic3r/GUI/HMSPanel.hpp
+- Next recommended Phase 1 task: T406 annotate: src/slic3r/GUI/HttpServer.cpp
