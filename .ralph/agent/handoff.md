@@ -3457,3 +3457,14 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=2, P3=1 (cereal persistence, browser warning guard, rand-seed drift)
 - Git: Annotate HintNotification for Unity port
 - Next recommended Phase 1 task: T406 annotate: src/slic3r/GUI/HttpServer.cpp
+## Phase 1 - Task T408 complete
+- Task type: annotate
+- File: src/slic3r/GUI/I18N.cpp
+- Deliverables: src/slic3r/GUI/I18N.cpp
+- Substantive additions: Multi-tag comment block covering the translation helper's intent, locale state, thread ownership, and Unity mapping plus hazard guidance.
+- Verification excerpt: // [INTENT] Central wxWidgets translation helper that insists on UTF-8 input so every call goes through the catalog with strict encoding.
+- Unity-impact summary:
+  - Mirror this helper via Unity's `LocalizationSettings.StringDatabase.GetLocalizedString` or a dedicated `LocalizationManager` so the wxGetTranslation bridge becomes a well-defined service.
+- Hazards found: 1 (P3 hazard: Unity must cache translations / handle async locale switches instead of hitting a global wx locale catalog directly.)
+- Git: Annotate I18N translation helper
+- Next recommended Phase 1 task: T409 annotate: src/slic3r/GUI/I18N.hpp

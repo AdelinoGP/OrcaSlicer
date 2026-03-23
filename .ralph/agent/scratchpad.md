@@ -635,3 +635,8 @@
 ## Iteration plan update
 - Selected task: T400 annotate `src/slic3r/GUI/HintNotification.cpp` (task-1773880086-05a9 now active).
 - Plan: review the hint pool lifecycle, fade/timer state, text construction/HTML rendering, event hooks for dismiss and info buttons, and cross-thread hint loading; annotate critical sections with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2]`, include `[UNCLEAR]` where serial config persistence intent is ambiguous, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit `HintNotification.cpp` plus metadata, close this task, and pause for the next iteration.
+
+## Iteration plan update
+- Selected task: T408 annotate `src/slic3r/GUI/I18N.cpp` (runtime task `task-1773880086-c1af` is open and ready).
+- Plan: start the runtime task, read the file end-to-end, weave `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P2]` annotations through the translation cache builders, lookup helpers, signal hooks, and file reloading sections; call out global config state, highlight Unity equivalents (e.g., `LocalizationSettings` + ScriptableObject string tables with asynchronous refresh), append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file, close the task, and then stop this iteration so another agent can continue.
+- Verification: purely annotation work, so rely on manual review of comments; no automated test run needed.
