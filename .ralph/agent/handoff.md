@@ -3034,3 +3034,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P2) row-index/order assumption when mapping cell clicks to `ObjectGrid` IDs, so Unity must maintain the same stable ordering.
 - Git: docs(gui): annotate object table
 - Next recommended Phase 1 task: T393 annotate: src/slic3r/GUI/GUI_ObjectTable.hpp
+
+## Phase 1 - Task T383 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI.hpp
+- Deliverables: src/slic3r/GUI/GUI.hpp, .ralph/agent/scratchpad.md
+- Substantive additions: Added Unity-aware comments for shortcut prefix caching, cross-thread dialog helpers, substitution diagnostics, and folder-launch adapters.
+- Verification excerpt: // [EVENT][THREAD][UNITY] Routed from validators and CLI error handlers so the message box shows on the UI thread with the preserved font
+- Unity-impact summary:
+  - Align Input System shortcut prefixes with the wx accelerator cache so Unity menus mirror the same hints.
+  - Document main-thread dialog expectations for errors/info and the substitution diagnostics overlay so Unity can reuse a DialogService controller.
+  - Force datadir/Quick Access launches through `Process.Start` via Unity's synchronization context while keeping AppConfig.user_data_dir consistent.
+- Hazards found: P1=1 (accelerator mapping); P2=1 (screensaver suppression); P3=1 (user-data folder launches).
+- Git: Document GUI helper Unity implications
+- Next recommended Phase 1 task: T393 annotate: src/slic3r/GUI/GUI_ObjectTable.hpp

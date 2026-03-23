@@ -36,7 +36,8 @@ bool debugged();
 void break_to_debugger();
 
 // [PORTING_HAZARD:P1] Maps to Unity `Input` system or `EventSystem` mapping strings.
-// [STATE][INTENT] Caches the current accelerator prefixes so menus and tooltips stay synchronized with platform conventions.
+// [STATE][INTENT][UNITY] Caches the current accelerator prefixes so menus and tooltips stay synchronized with platform conventions,
+// mirroring Input System shortcuts.
 extern const std::string& shortkey_ctrl_prefix();
 extern const std::string& shortkey_alt_prefix();
 
@@ -52,25 +53,31 @@ extern void add_menus(wxMenuBar* menu, int event_preferences_changed, int event_
 // [UNITY] Maps to Data-binding (UI Toolkit) or direct property manipulation in a ViewModel pattern.
 void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt_key, const boost::any& value, int opt_index = 0);
 
-// [EVENT][THREAD] Routed from validators and CLI error handlers so the message box shows on the UI thread with the preserved font
-// preference flag. [UNITY] Maps to UI Toolkit/uGUI dialog components or EditorUtility.DisplayDialog (Editor).
+// [EVENT][THREAD][UNITY] Routed from validators and CLI error handlers so the message box shows on the UI thread with the preserved font
+// preference flag; Unity should raise an equivalent VisualElement dialog or `EditorUtility.DisplayDialog` when running in-editor.
 void        show_error(wxWindow* parent, const wxString& message, bool monospaced_font = false);
 void        show_error(wxWindow* parent, const char* message, bool monospaced_font = false);
 inline void show_error(wxWindow* parent, const std::string& message, bool monospaced_font = false)
 {
     show_error(parent, message.c_str(), monospaced_font);
 }
-void        show_error_id(int id, const std::string& message); // For Perl
+// [EVENT][THREAD][UNITY] Shims the Perl callback surface, so Unity must invoke a `DialogService.RaiseFromCode` with the same numeric ID.
+void show_error_id(int id, const std::string& message); // For Perl
+// [EVENT][THREAD][UNITY] Populates info dialogs used by the config wizards; Unity should marshal via main-thread coroutines.
 void        show_info(wxWindow* parent, const wxString& message, const wxString& title = wxString());
 void        show_info(wxWindow* parent, const char* message, const char* title = nullptr);
 inline void show_info(wxWindow* parent, const std::string& message, const std::string& title = std::string())
 {
     show_info(parent, message.c_str(), title.c_str());
 }
-// [EVENT][STATE] Wraps unexpected state so warning dialogs always carry context; Unity can mirror via a `WarningDialog` MonoBehaviour.
+// [EVENT][STATE][THREAD] Wraps unexpected state so warning dialogs always carry context; Unity can mirror via a `WarningDialog`
+// MonoBehaviour that runs on the main thread.
 void warning_catcher(wxWindow* parent, const wxString& message);
-// [STATE] Displays the current substitution stacks for presets/config so Unity can recreate the same merge diagnostics.
+// [STATE][UNITY] Displays the current substitution stacks for presets/config and lets the diagnostics dialog share the same
+// ScriptableObject metadata.
 void show_substitutions_info(const PresetsConfigSubstitutions& presets_config_substitutions);
+// [STATE][UNITY] Reuses the same dialog logic when a file-specific substitution overrides the base, so Unity can lock in the serialized
+// source/target pair for the overlay panel.
 void show_substitutions_info(const ConfigSubstitutions& config_substitutions, const std::string& filename);
 
 // [STATE][EVENT] Builds checkbox list state backed by a bitmask string so Unity can present the same selections without losing contextual
@@ -91,11 +98,14 @@ boost::filesystem::path into_path(const wxString& str);
 
 // [EVENT][INTENT][UNITY] Fired from Help/About menu; Unity will render the same dialogs through a `DialogService` controller.
 extern void about();
+// [EVENT][UNITY] Bridges the legacy login sequence (OAuth tokens and telemetry) so Unity can present the same modal with the existing cloud flows.
 extern void login();
-// [UNITY] Map to Application.OpenURL or System.Diagnostics.Process.Start (OS dependent).
-// [EVENT][THREAD] The folder launch commands are wired to menu shortcuts and must push to the OS process launcher on the UI thread to avoid
-// race conditions.
+// [EVENT][THREAD][UNITY] Launches the saved user data directory (reports, logs, presets); Unity should pool the same path cache and perform
+// the launch on the main thread via `SynchronizationContext.Post` before calling `Process.Start`. [PORTING_HAZARD:P3] Depending on the OS,
+// Unity may lack the exact preset path logic; reusing AppConfig's `user_data_dir` keeps functionality aligned.
 extern void desktop_open_datadir_folder();
+// [EVENT][THREAD] Accepts any arbitrary path (used by Quick Access commands); keep the path resolution and the UI thread launch guard so
+// that Unity can translate it to `Application.OpenURL` safely.
 extern void desktop_open_any_folder(const std::string& path);
 } // namespace GUI
 } // namespace Slic3r

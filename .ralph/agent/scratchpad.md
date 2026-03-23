@@ -479,7 +479,7 @@
 - Plan: expand the existing comments with `[THREAD]`, `[STATE]`, and `[PORTING_HAZARD:P2]` cues around keyboard handling, model init/reload, folder creation, file imports, context menus, drag/drop, double-clicks, and hotkeys so Unity receives explicit lifecycle/state guidance; update `.ralph/agent/handoff.md` with the Phase 1 evidence block, stage/commit the annotated file plus metadata, and keep the task bookkeeping in sync for the next iteration.
 
 ## Iteration plan update
-- Selected task: T383 annotate `src/slic3r/GUI/GUI.hpp` (task-1773880086-6aa6 now in focus).
+- Selected task: T383 annotate `src/slic3r/GUI/GUI.hpp` (task-1773880086-6aa7 now in focus).
 - Plan: read the core GUI namespace header top-to-bottom, add `[INTENT]` for the base GUI manager, `[STATE]` on config maps and panel caches, `[EVENT]` on menu binding and handler helpers, `[THREAD]` on any cross-thread dialog/reporting helpers, `[OPENGL]` where menu choices trigger render refreshes, `[UNITY]` pointers to Main Menu `MenuBar` equivalents and config dialog controllers, and `[PORTING_HAZARD]` for wxWidgets owner-based lifetime assumptions; append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit just the annotated header plus handoff metadata, close T383, and stop so the next iteration can continue.
 
 ## Iteration plan update
@@ -495,3 +495,6 @@
 ## Iteration plan update
 - Current focus: T392 annotate: `src/slic3r/GUI/GUI_ObjectTable.cpp` (task-1773880086-430a now active).
 - Plan: read the implementation fully to capture data table state (column layout, cached selections, config sync), event flows (wxListCtrl events, context menus, drag/drop), threading notices (background model updates), render dependencies (GL refresh triggers when table changes), and Unity mapping (UI Toolkit `ListView` bound to an `ObservableCollection`, `Command`-style callbacks, and custom renderers); annotate each major class/method with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` plus `[UNCLEAR]` where behavior requires follow-up, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the single file before closing the task, then stop to let the next iteration continue.
+## Iteration plan update
+- Selected task: T383 annotate `src/slic3r/GUI/GUI.hpp` (task-1773880086-6aa7 now in focus).
+- Plan: read the core GUI namespace header top-to-bottom, document the helper classes and config/menu state maps with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations, append the Phase 1 evidence block, stage/commit, and close the task before pausing for the next iteration.
