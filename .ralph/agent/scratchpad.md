@@ -588,3 +588,7 @@
 ## Iteration plan update
 - Selected task: T153 annotate `src/slic3r/GUI/AMSSetting.cpp` (runtime task `task-1773880085-efcd` now active).
 - Plan: read `AMSSetting.cpp` end-to-end, annotate the AMS UI setup, config binding, and event handlers with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments, describe the key caches/state machines, highlight Unity replacements (e.g., UI Toolkit VisualElement tree + ScriptableObject cost model), note any cross-thread validation or file IO, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit this file plus metadata, and close the task.
+
+## Iteration plan update
+- Current focus: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp` (task-1773880086-6aa6 active and already started).
+- Plan: read the full source, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` annotations around the list lifecycle, selection caches, layout events, drag/drop handling, and keyboard shortcuts; include `[UNCLEAR]` notes for any ambiguous behavior, append the standard Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only the annotated file plus metadata, close the task, and then stop for this iteration so the next agent can continue.

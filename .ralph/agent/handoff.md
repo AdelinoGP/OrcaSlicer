@@ -3306,3 +3306,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (blocking modal firmware confirmation flow), P3=2 (wxGetApp dark-theme sync and create_scaled_bitmap icon handling).
 - Git: Annotate AMSSetting dialog state flows
 - Next recommended Phase 1 task: T154 annotate: src/slic3r/GUI/AMSSetting.hpp
+
+## Phase 1 - Task T372 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Deliverables: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Substantive additions: Added 10 multi-tag clarifications covering toolbar state, drag/drop caching, context menus, folder creation, key handling, and unity lifecycle guidance.
+- Verification excerpt: // [EVENT][STATE][THREAD][PORTING_HAZARD:P3] Enable drag/drop on the UI thread; the cached `m_dragged_item` must stay valid until the drop completes so Unity's DragAndDrop bridge can mirror that state without racing.
+- Unity-impact summary:
+  - Keep the auxiliary tree/controller paired with Unity VisualElements so selection, editing, and toolbar commands share the same stateful controller that mirrors `m_auxiliary_model`.
+  - Replace blocking `wxFileDialog` imports and native launch helpers with async pickers/`Application.OpenURL` calls that update the shared folder context without freezing the main loop.
+  - Surface toolbar/context drag/drop and hotkey helpers via Unity's Input System + DragAndDrop layer while keeping the delete/import folder state synchronized with the controller.
+- Hazards found: P2=1 (blocking file dialog/auto-launch), P3=4 (wxGetApp singleton/model lifetime, drag sentinel, inline edit-thread coupling, context menu lifetime).
+- Git: Annotate GUI_AuxiliaryList.cpp for Unity port
+- Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp

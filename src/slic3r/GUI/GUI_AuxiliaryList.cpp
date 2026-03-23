@@ -329,6 +329,8 @@ void AuxiliaryList::on_left_dclick(wxMouseEvent& evt)
 }
 // [EVENT][STATE][UNITY][PORTING_HAZARD:P3] Double-click launching relies on native shells; Unity should use a cross-platform helper (Process.Start
 // or Application.OpenURL) on the main thread and guard non-file containers.
+// [PORTING_HAZARD:P2] Double-click launching must confirm the selected node still maps to a file before invoking Process.Start in Unity.
+// [PORTING_HAZARD:P2] Guard stale path references so the launcher doesn't throw when selection data changes mid-drag.
 void AuxiliaryList::handle_key_event(wxKeyEvent& evt)
 {
 	if (evt.GetKeyCode() == WXK_DELETE || evt.GetKeyCode() == WXK_BACK)
