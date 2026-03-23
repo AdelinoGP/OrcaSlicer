@@ -3481,3 +3481,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 (wxGetApp cross-thread login update) ×1; P3 (simplistic query parsing) ×1.
 - Git: Annotate HttpServer OAuth flow
 - Next recommended Phase 1 task: T407 annotate: src/slic3r/GUI/HttpServer.hpp
+## Phase 1 - Task T409 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/I18N.hpp
+- Deliverables: src/slic3r/GUI/I18N.hpp
+- Substantive additions: Added six multi-tag comment blocks clarifying the `_` macros, general translation helpers, plural handling, UTF-8 conversions, context overloads, and the `L_str` converter.
+- Verification excerpt: // [INTENT] Ensure `_()` overloads route through `wxGetTranslation` with consistent UTF-8 handling so every string literal gets localized regardless of encoding.
+- Unity-impact summary:
+  - Map `_`/`_L` macros and `I18N::translate` helpers to Unity `LocalizedString`/`StringTable` lookups plus a localization controller.
+  - Highlight plural/context handling and UTF-8 conversions so Unity can replicate grammar rules and encoded strings with ScriptableObject-backed string tables.
+- Hazards found: 2 P2 (catalog tooling, pluralization strategy) + 1 P3 (context key encoding) migration notes.
+- Git: docs: annotate I18N helpers
+- Next recommended Phase 1 task: T410 annotate: src/slic3r/GUI/IconManager.cpp

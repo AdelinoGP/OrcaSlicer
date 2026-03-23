@@ -327,7 +327,7 @@ Last updated: 2026-03-23T15:56:14Z
 - [x] T406 annotate: src/slic3r/GUI/HttpServer.cpp
 - [ ] T407 annotate: src/slic3r/GUI/HttpServer.hpp
 - [ ] T408 annotate: src/slic3r/GUI/I18N.cpp
-- [ ] T409 annotate: src/slic3r/GUI/I18N.hpp
+- [x] T409 annotate: src/slic3r/GUI/I18N.hpp
 - [ ] T410 annotate: src/slic3r/GUI/IconManager.cpp
 - [ ] T411 annotate: src/slic3r/GUI/IconManager.hpp
 - [ ] T412 annotate: src/slic3r/GUI/ImageDPIFrame.cpp
