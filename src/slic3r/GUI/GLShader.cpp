@@ -267,6 +267,10 @@ void GLShaderProgram::stop_using() const
     glsafe(::glUseProgram(0));
 }
 
+// [INTENT] Expose typed uniform setters so callers treat this shader program like a Unity `Material` or `MaterialPropertyBlock` and avoid
+// raw `glUniform*` calls. [UNITY] Mirrors `Material.SetInt/SetFloat/SetVector/SetMatrix` patterns so a Unity port can forward the same
+// setter calls without tracking individual GL calls. [THREAD] Must be invoked from the GL thread while the program is bound; deferred
+// updates will need a main-thread marshaling layer in Unity.
 void GLShaderProgram::set_uniform(int id, int value) const
 {
     if (id >= 0)

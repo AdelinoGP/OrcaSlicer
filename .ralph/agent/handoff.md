@@ -2604,8 +2604,8 @@ This prompt governs **Phase 1 only**.
 - Task type: annotate
 - File: src/slic3r/GUI/GLShader.cpp
 - Deliverables: src/slic3r/GUI/GLShader.cpp
-- Substantive additions: 9 multi-tag annotations outlining shader loading, compile/link lifecycle, uniform caching, and Unity translation guidance (INTENT/STATE/EVENT/THREAD/OPENGL/UNITY/PORTING_HAZARD)
-- Verification excerpt: // [INTENT] GLShaderProgram encapsulates GL program creation/caching so view passes can reuse compiled shaders without leaking GPU handles.
+- Substantive additions: 9 multi-tag annotations outlining shader loading, compile/link lifecycle, uniform caching, and Unity translation guidance (INTENT/STATE/EVENT/THREAD/OPENGL/UNITY/PORTING_HAZARD) plus a new setter comment that frames these shaders as Material/MaterialPropertyBlock equivalents for Unity.
+- Verification excerpt: // [INTENT] Expose typed uniform setters so callers treat this shader program like a Unity Material or MaterialPropertyBlock and avoid raw glUniform* calls.
 - Unity-impact summary:
   - Prebuild GL shader variants as Unity `ShaderVariantCollection` assets and keep the same keyword set in the asset importer so runtime logic only swaps `Material` instances.
   - Mirror attribute/uniform caching with `MaterialPropertyBlock` lookups and `Shader.PropertyToID` so Unity render loops avoid repeated string-based queries.
