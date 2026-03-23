@@ -357,6 +357,10 @@
 
 ## Iteration plan update
 - Current focus: T157 annotate `src/slic3r/GUI/Auxiliary.cpp` (per ready list and actual file path).
+
+## Iteration plan update
+- Selected task: T157 annotate `src/slic3r/GUI/Auxiliary.cpp` (task-1773880086-9a1b, ready and unblocked).
+- Plan: read `Auxiliary.cpp` end-to-end, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` comments for the helper functions, state caches, event hooks, and GL integration, append the required evidence block to `.ralph/agent/handoff.md`, commit the single file, and then stop after closing the task.
 - Plan: read the full source, weave `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` comments through the file/panel lifecycle, note the file-system, designer, and panel dispatch states, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file (and handoff), close the task, and stop for this iteration so the next agent continues.
 - Plan: read through `GUI_Utils.cpp`, identify major helpers, caching layers, and threading hints, and insert `[INTENT]/[STATE]/[EVENT]/[OPENGL]/[THREAD]/[UNITY]/[PORTING_HAZARD]` comments around each high-impact block; ensure we map menu/toolbar helpers, config propagation, and GL refresh triggers to Unity equivalents (e.g., UI Toolkit `VisualElement` helpers + `ScriptableObject` config bridge) before adding the required Phase 1 evidence block to `.ralph/agent/handoff.md`, staging/committing the annotated file, and closing the task so the next iteration can continue.
 - Verification: rely on careful inspection (doc-only) and confirm comments describe caches, event flows, and Unity migration guidance.

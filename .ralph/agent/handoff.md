@@ -3524,3 +3524,25 @@ This prompt governs **Phase 1 only**.
 - Git: annotate: src/slic3r/GUI/HttpServer.hpp
 - Next recommended Phase 1 task: T408 annotate: src/slic3r/GUI/I18N.cpp
 
+## Phase 1 - Task T157 complete
+
+- Task type: annotate
+
+- File: src/slic3r/GUI/Auxiliary.cpp
+
+- Deliverables: src/slic3r/GUI/Auxiliary.cpp
+
+- Substantive additions: 12 multi-tag comments covering tile intent, folder grid refresh, rename validation, cover/delete lifecycles, and import wiring along with Unity mappings.
+
+- Verification excerpt: // [INTENT] Each tile represents an auxiliary asset with hover/cover/delete affordances, enabling the Files panel to mirror Unity inspector cards.
+
+- Unity-impact summary:
+  - Mirror the `Auxiliary` tiles with UI Toolkit `VisualElement` cards driven by an enum-backed data template and `MouseManipulator` handlers.
+  - Replace wx event binds with `CustomEvent` dispatchers that update a `.ScriptableObject` `AuxiliaryModel` and a `TabView`-backed layout.
+  - Port synchronous thumbnail cover generation to async `Texture2D` loaders and background copy tasks inside Unity's dispatcher queue.
+
+- Hazards found: P2 x3 (native texture handles, synchronous disk writes, platform-specific temp path expectations), P3 x1 (ModelInfo single-thread affinity).
+
+- Git: Annotate Auxiliary panel flows
+
+- Next recommended Phase 1 task: T158 annotate: src/slic3r/GUI/AuxiliaryDataViewModel.cpp
