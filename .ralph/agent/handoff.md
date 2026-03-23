@@ -2765,4 +2765,17 @@ This prompt governs **Phase 1 only**.
   - Translate the templated `BusyCursored<Job>` decorator into a reusable C# wrapper that runs the underlying job and keeps the busy indicator synchronized with worker events.
 - Hazards found: P3: 1 (busy cursor toggles require precise main-thread dispatch to avoid cursor lockups when the worker completes).
 - Git: Annotate BusyCursorJob busy cursor RAII
-- Next recommended Phase 1 task: T430 annotate: src/slic3r/GUI/Jobs/CreateFontNameImageJob.cpp
+-- Next recommended Phase 1 task: T430 annotate: src/slic3r/GUI/Jobs/CreateFontNameImageJob.cpp
+
+## Phase 1 - Task T650 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/CheckBox.hpp
+- Deliverables: src/slic3r/GUI/Widgets/CheckBox.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 8 inline annotations covering intent, state caching, event wiring, Unity mappings, and porting hazards in the CheckBox header.
+- Verification excerpt: // [PORTING_HAZARD:P3] Unity must replace `SetBitmapLabel/Disabled/Current` with manual sprite swaps because there are no direct equivalents.
+- Unity-impact summary:
+  1. Rebuild this as a UI Toolkit Toggle + MonoBehaviour that swaps `Texture2D`/`Sprite` assets for on/half/off as well as focus/disabled cues.
+  2. Mirror the `updateBitmap` hover/focus handling with an EventTrigger/MonoBehaviour pairing that hooks `IPointerEnterHandler`/`IPointerExitHandler`.
+- Hazards found: P3=2 (sprite swap expectations, pointer-enter/exit event plumbing)
+- Git: annotate: src/slic3r/GUI/Widgets/CheckBox.hpp
+- Next recommended Phase 1 task: T652 annotate: src/slic3r/GUI/Widgets/ComboBox.hpp

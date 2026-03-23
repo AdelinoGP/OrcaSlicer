@@ -406,3 +406,7 @@
 ## Iteration plan update
 - Selected task: T141 annotate: `src/slic3r/GUI/2DBed.cpp`
 - Plan: read the full 2DBed drawing/input file, annotate the view lifecycle, canvas state, selection and view transform caches, event handlers, OpenGL paint path, thread/worker interactions, and Unity analogs (SceneView camera + Input System); include `[INTENT]/[STATE]/[EVENT]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` tags, point out any unclear legacy wxPaint dependencies as `[UNCLEAR]`, append the evidence block, commit, and then exit this iteration so the next agent can continue.
+
+## Iteration plan update
+- Selected task: T650 annotate `src/slic3r/GUI/Widgets/CheckBox.hpp`
+- Plan: mark the header as active, add targeted `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD]` comments around the toggle-button state helpers, platform-specific bitmap overrides, and state cache, note the Unity analog (UI Toolkit Toggle + custom theme handling and `Texture2D` state-swapping), append the Phase 1 evidence block, commit, and finish the task for this iteration.
