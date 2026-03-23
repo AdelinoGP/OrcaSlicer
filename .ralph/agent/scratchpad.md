@@ -342,3 +342,7 @@
 - Plan: mark the runtime task active, read the entire header, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments on the class description, key members (camera matrices, render cache, selection state), and public APIs; add Unity-port hints (e.g., `RenderTexture` ownership, `XR Interaction Toolkit` analogs), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the header, close the task, and then stop for this iteration so the next agent can pick up.
 
 - New plan: start task T353 annotate `src/slic3r/GUI/Gizmos/GLGizmoSVG.hpp`, read the header, insert the full `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations for the class and helpers, append the Phase 1 evidence block, and commit before moving on.
+
+## Iteration plan update
+- Selected task: T360 annotate `src/slic3r/GUI/GLSelectionRectangle.cpp` (task-1773880086-5683 now active).
+- Plan: read the selection rectangle implementation, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around drag lifecycle, point containment, and render path; note viewport transforms, shader selection, and GL state toggles plus Unity equivalents (UI overlay camera + LineRenderer), append the required evidence block to `.ralph/agent/handoff.md`, commit the updated file, close the task, and then pause for the next iteration.

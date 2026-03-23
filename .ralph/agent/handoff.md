@@ -2477,6 +2477,19 @@ This prompt governs **Phase 1 only**.
 - Git: annotate: GLGizmoSVG header
 - Next recommended Phase 1 task: T354 annotate: src/slic3r/GUI/Gizmos/GLGizmoText.cpp
 
+## Phase 1 - Task T360 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GLSelectionRectangle.cpp
+- Deliverables: src/slic3r/GUI/GLSelectionRectangle.cpp
+- Substantive additions: 11 multi-tag comments describing drag initiation, containment math, render caching, shader selection, and overlay state for Unity readiness.
+- Verification excerpt: // [INTENT] Draw the in-progress rectangle overlay whenever a drag is active in the viewport.
+- Unity-impact summary:
+  - Map the mouse-down/drag/release flow to a GraphicRaycaster-enabled VisualElement plus Rect intersection logic that mirrors `Camera.WorldToScreenPoint` projections.
+  - Recreate the overlay with a LineRenderer (or UI Toolkit mesh) driven by a RenderTexture/overlay camera while replaying the dash pattern and color via a material.
+- Hazards found: P2=1 (legacy `glLineStipple` usage), P3=2 (camera-projection dependency and compatibility-versus-core shader switching).
+- Git: Annotate GLSelectionRectangle overlay
+- Next recommended Phase 1 task: T361 annotate: src/slic3r/GUI/GLSelectionRectangle.hpp
+
 ## Phase 1 - Task T354 complete
 - Task type: annotate
 - File: src/slic3r/GUI/Gizmos/GLGizmoText.cpp
@@ -2559,4 +2572,3 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1, P3=1
 - Git: Annotate GLGizmoSVG.hpp for Unity port
 - Next recommended Phase 1 task: T354 annotate: src/slic3r/GUI/Gizmos/GLGizmoText.cpp
-
