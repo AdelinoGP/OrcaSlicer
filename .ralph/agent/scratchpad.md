@@ -697,3 +697,6 @@
 ## Iteration plan update - T412
 - Selected task: T412 annotate `src/slic3r/GUI/ImageDPIFrame.cpp` (task-1773880086-20e9 now in progress).
 - Plan: read the DPI frame implementation end-to-end, mark `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments for the image loading pipeline, DPI/zoom caching, toolbar bindings, and popup dialogs; record how the wxScrolledWindow/bitmap upload loop transitions into rendering, note Unity equivalent (UI Toolkit ScrollView + RenderTexture update with asynchronous Texture2D loading), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file, close T412, and then pause for the next iteration.
+## Iteration plan update
+- Selected task: T476 annotate `src/slic3r/GUI/Monitor.hpp` (task-1773880087-eb5b now ready).
+- Plan: read the header to capture MonitorPanel and AddMachinePanel intent, tab/toolbar state, timer/event hooks, and shared machine state; add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around the dialogs, selection cache, refresh timer, and network-status assets; append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header, close the task, and stop this iteration so the next agent can continue.

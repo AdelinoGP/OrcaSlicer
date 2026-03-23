@@ -398,6 +398,19 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: Annotate GUI color helpers for Unity port
 - Next recommended Phase 1 task: T375 annotate: src/slic3r/GUI/GuiColor.hpp
 
+## Phase 1 - Task T476 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Monitor.hpp
+- Deliverables: src/slic3r/GUI/Monitor.hpp
+- Substantive additions: 17 multi-tag comments covering panel/tab intent, state caches, timer events, popup controls, and Unity mapping guidance
+- Verification excerpt: // [INTENT] Host the multi-tab machine status surface (status/media/update/HMS) while keeping shared controls in sync.
+- Unity-impact summary:
+  - Shift the Tabbook stack + printer badge assets into a UI Toolkit TabView coordinating VisualElement panes and sprite atlas-driven icons.
+  - Mirror the `MachineObject`/`last_conn_type` cache with a ScriptableObject machine model that feeds `StatusPanel` + `UpgradePanel` mono controllers.
+- Hazards found: P2=1 (wxTimer cadence tied to wx event loop), P3=1 (SelectMachinePopup transient behavior)
+- Git: Annotate Monitor.hpp
+- Next recommended Phase 1 task: T477 annotate: src/slic3r/GUI/MonitorPage.cpp
+
 ## Phase 1 - Task T372 complete
 - Task type: annotate
 - File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
