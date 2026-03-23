@@ -2753,3 +2753,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (legacy painting path), P3=1 (coordinate inversion + cached transform needs careful porting)
 - Git: annotate: src/slic3r/GUI/2DBed.cpp
 - Next recommended Phase 1 task: T142 annotate: src/slic3r/GUI/2DBed.hpp
+
+## Phase 1 - Task T429 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/BusyCursorJob.hpp
+- Deliverables: src/slic3r/GUI/Jobs/BusyCursorJob.hpp
+- Substantive additions: 3 multi-tag comments describing the RAII cursor guard, busy cursor wrapped process, and finalize forwarding for the Unity port.
+- Verification excerpt: // [INTENT] RAII helper that flips wxWidgets into busy-cursor mode for the duration of a background job.
+- Unity-impact summary:
+  - Unity needs a main-thread dispatcher that wraps `Cursor.SetCursor` or a busy overlay around each `AsyncOperation` so cursor state mirrors the worker lifecycle.
+  - Translate the templated `BusyCursored<Job>` decorator into a reusable C# wrapper that runs the underlying job and keeps the busy indicator synchronized with worker events.
+- Hazards found: P3: 1 (busy cursor toggles require precise main-thread dispatch to avoid cursor lockups when the worker completes).
+- Git: Annotate BusyCursorJob busy cursor RAII
+- Next recommended Phase 1 task: T430 annotate: src/slic3r/GUI/Jobs/CreateFontNameImageJob.cpp

@@ -354,6 +354,8 @@
 - Plan: mark the task active, read the header, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around the shader lifecycle, caches, binding helpers, and uniform setters; append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the file, close the task, and then pick the next ready Phase 1 file.
 
 ## Iteration plan update
+- Current focus: T429 annotate `src/slic3r/GUI/Jobs/BusyCursorJob.hpp` (task-1773880086-b972 now active).
+- Plan: read the RAII cursor wrapper plus templated job decorator, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments describing the busy indicator lifecycle, main-thread cursor swaps, and Unity equivalents (e.g., `Cursor.SetCursor` + `AsyncOperation`), append a Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the single-file change, and close the task before selecting the next ready entry.
 - Selected task: T380 annotate `src/slic3r/GUI/GUI_Factories.hpp` (task-1773880086-2264 now active).
 - Plan: read the header end-to-end, annotate the helper structs and `MenuFactory` layout so every category/icon cache, menu builder, event hookup, and UI state cache is labeled with `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD]` (OpenGL and thread comments where setup crosses platforms); record any hazards and label unresolved assumptions with `[UNCLEAR]`, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit `GUI_Factories.hpp`, and close the task before picking the next ready file.
 - Selected task: T364 annotate `src/slic3r/GUI/GLShadersManager.cpp` with runtime task `task-1773880086-b152`.
