@@ -4107,3 +4107,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3 asynchronous DynamicPrintConfig observers and RenderTexture timing)
 - Git: annotate: src/slic3r/GUI/GUI.hpp
 - Next recommended Phase 1 task: T397 annotate: src/slic3r/GUI/GUI_Preview.hpp
+
+## Phase 1 - Task T397 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Preview.hpp
+- Deliverables: src/slic3r/GUI/GUI_Preview.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 4 new contextual annotations covering the preview coordinator intent, load_print slider sync, shell mesh swaps, and AssembleView render hazard (INTENT/STATE/UNITY/PORTING_HAZARD tags).
+- Verification excerpt: // [INTENT][UNITY] Coordinates the preview canvas, slider widgets, and background slicing state so Unity can treat this as a VisualElement tree compositing a RenderTexture camera, slider bindings, and a scheduler MonoBehaviour.
+- Unity-impact summary:
+  - Mirror the preview panel as UI Toolkit VisualElements + RenderTexture cameras so the existing GL view state can be replayed in Unity.
+  - Treat load_print and slider toggles as ScriptableObject-driven commands that update RenderTexture assets and slider bindings asynchronously.
+  - Keep the assemble-mode RenderTexture in sync with the main preview by sharing the same configuration pipeline (watch the extra GL context).
+- Hazards found: 1 (P3)
+- Git: annotate: src/slic3r/GUI/GUI_Preview.hpp
+- Next recommended Phase 1 task: T398 annotate: src/slic3r/GUI/GUI_Utils.cpp

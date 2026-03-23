@@ -843,3 +843,7 @@
 ## Iteration note
 - Task: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp` (revisited)
 - Plan: confirm the drag/drop state is fully documented, highlight that the placeholder text payload keeps the real item in `m_dragged_item`, point Unity at the same held reference, record the new evidence block, and close the task once those modest edits are committed.
+
+## Iteration plan update
+- Selected task: T397 annotate: src/slic3r/GUI/GUI_Preview.hpp (runtime task task-1773880086-be55) to resolve preview panel state, camera input, GL refresh, and Unity port guidance.
+- Plan: read the header fully, document panel intent, state caches, event bindings, GL callbacks, Unity mappings (RenderTexture + UI Toolkit list), and porting hazards; append the required evidence block to .ralph/agent/handoff.md, stage/commit the single file plus metadata, close the task, and then immediately pick the next eligible Phase 1 file (likely T398 GUI_Utils.cpp) for the following iteration.

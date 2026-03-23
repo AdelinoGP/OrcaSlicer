@@ -103,6 +103,8 @@ private:
     bool init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process);
 };
 
+// [INTENT][UNITY] Coordinates the preview canvas, slider widgets, and background slicing state so Unity can treat this as a VisualElement
+// tree compositing a RenderTexture camera, slider bindings, and a scheduler MonoBehaviour.
 class Preview : public wxPanel
 {
     // [STATE][OPENGL] Mirrors the GLCanvas and renderer owned by the preview pane.
@@ -181,14 +183,16 @@ public:
     void set_drop_target(wxDropTarget* target);
 
     // BBS: add only gcode mode
-    // [INTENT][STATE] Loads the specified print or G-code-only payload, optionally preserving the previous Z-range.
+    // [INTENT][STATE][UNITY] Loads the specified PrintBase or G-code-only payload via a shared configuration model, then updates Unity-side
+    // slider bindings and RenderTexture assets.
     void load_print(bool keep_z_range = false, bool only_gcode = false);
     // [EVENT] Refreshes the current preview when toggling modes.
     void reload_print(bool only_gcode = false);
     // BBS: always load shell at preview
-    // [STATE][OPENGL] Switches meshes to the provided shells for rendering.
+    // [STATE][OPENGL][UNITY] Switches meshes to the provided shells for rendering while Unity can swap MeshFilters or
+    // MeshRenderer.sharedMesh on the RenderTexture camera.
     void load_shells(const Print& print, bool force_previewing = false);
-    // [STATE] Clears transient shell overlays before reloading.
+    // [STATE][UNITY] Clears transient shell overlays so Unity can release mesh instances before reloading.
     void reset_shells();
 
     // [EVENT] Recomputes layout when DPI/resolution changes under MSW.
@@ -238,6 +242,8 @@ private:
 };
 
 // [INTENT][UNITY] Provides the assemble-mode view used after slicing, which Unity can mirror with another RenderTexture + camera pair.
+// [PORTING_HAZARD:P3] Dual canvas ownership and the extra GL context mean Unity must coordinate two RenderTexture cameras instead of
+// relying on wxWidgets splitting contexts.
 class AssembleView : public wxPanel
 {
     // [STATE][OPENGL] Owns a separate GL canvas for assemble preview rendering.
