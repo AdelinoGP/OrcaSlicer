@@ -14,6 +14,8 @@ namespace GUI {
 
 // [INTENT] Begin a Select/Deselect drag when the user presses the mouse down in the viewport.
 // [STATE] Recording `m_state` plus both corners so release logic can perform the right operation.
+// [EVENT] Routed from the GLCanvas3D mouse-down handler before any selection job starts.
+// [UNITY] Hook Unity's Input System `PointerDown` + UI Toolkit `VisualElement` drag overlay so the drag rectangles match.
 void GLSelectionRectangle::start_dragging(const Vec2d& mouse_position, EState state)
 {
     if (is_dragging() || (state == Off))
@@ -26,6 +28,7 @@ void GLSelectionRectangle::start_dragging(const Vec2d& mouse_position, EState st
 
 // [INTENT] Keep the live rectangle corners in sync with the mouse move event while dragging.
 // [EVENT] Called by the mouse move handler bound to the GLCanvas3D capture.
+// [UNITY] Mirror Unity's Input System `PointerMove` + `VisualElement` manipulator updates while the pointer remains down.
 void GLSelectionRectangle::dragging(const Vec2d& mouse_position)
 {
     if (!is_dragging())
@@ -36,6 +39,7 @@ void GLSelectionRectangle::dragging(const Vec2d& mouse_position)
 
 // [INTENT] Determine which 3D points land inside the current drag rectangle after release.
 // [EVENT] Invoked once the drag ends (selection/deselection command) so the GUI can highlight survivors.
+// [THREAD] Runs on the UI thread immediately after pointer release so it can safely read the camera and selection caches.
 // [UNITY] Mirror this logic with `Camera.WorldToScreenPoint` + a `Rect` intersection inside a UI Toolkit drag tracker.
 std::vector<unsigned int> GLSelectionRectangle::contains(const std::vector<Vec3d>& points) const
 {
@@ -59,6 +63,7 @@ std::vector<unsigned int> GLSelectionRectangle::contains(const std::vector<Vec3d
 
 // [EVENT] Called from the mouse-up handler to signal the selection rectangle is done.
 // [STATE] Clearing `m_state` to `Off` stops `render` and lets selection logic evaluate the dragged points.
+// [UNITY] Translate into releasing the Input System pointer capture and hiding the UI Toolkit drag VisualElement.
 void GLSelectionRectangle::stop_dragging()
 {
     if (is_dragging())

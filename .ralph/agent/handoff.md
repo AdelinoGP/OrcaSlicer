@@ -302,6 +302,19 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate SLAImportJob for Unity port
 - Next recommended Phase 1 task: T455 annotate: src/slic3r/GUI/Jobs/SLAImportJob.hpp
 
+## Phase 1 - Task T360 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GLSelectionRectangle.cpp
+- Deliverables: src/slic3r/GUI/GLSelectionRectangle.cpp
+- Substantive additions: 5 multi-tag annotations clarifying drag lifecycle input, camera projection, and Unity mapping (INTENT/STATE/EVENT/THREAD/UNITY)
+- Verification excerpt: // [UNITY] Hook Unity's Input System `PointerDown` + UI Toolkit `VisualElement` drag overlay so the drag rectangles match.
+- Unity-impact summary:
+  - Convert the wx pointer capture + drag-to-select flow into InputSystem `PointerDown/PointerMove/PointerUp` handlers that update a UI Toolkit `VisualElement` overlay and hit-test stage.
+  - Mirror `contains()` using `Camera.WorldToScreenPoint` + Rect intersection in Unity to feed selection controllers without reprojecting on background threads.
+- Hazards found: 0
+- Git: annotate: src/slic3r/GUI/GLSelectionRectangle.cpp
+- Next recommended Phase 1 task: T361 annotate: src/slic3r/GUI/GLSelectionRectangle.hpp
+
 ## Phase 1 - Task T198 complete
 - Task type: annotate
 - File: src/slic3r/GUI/Jobs/SLAImportJob.hpp

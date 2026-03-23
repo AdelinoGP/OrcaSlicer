@@ -346,3 +346,6 @@
 ## Iteration plan update
 - Selected task: T360 annotate `src/slic3r/GUI/GLSelectionRectangle.cpp` (task-1773880086-5683 now active).
 - Plan: read the selection rectangle implementation, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around drag lifecycle, point containment, and render path; note viewport transforms, shader selection, and GL state toggles plus Unity equivalents (UI overlay camera + LineRenderer), append the required evidence block to `.ralph/agent/handoff.md`, commit the updated file, close the task, and then pause for the next iteration.
+## Iteration plan update
+- Selected task: T360 annotate `src/slic3r/GUI/GLSelectionRectangle.cpp` to capture drag/lasso state and GL preview cues before the next agent takes over.
+- Plan: start `task-1773880086-5683`, read the implementation thoroughly, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around lifecycle, input, and render helpers, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the file, close the runtime task, and exit this iteration so the next agent continues.
