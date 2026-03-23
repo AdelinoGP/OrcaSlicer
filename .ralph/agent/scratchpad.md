@@ -682,3 +682,7 @@
 ## Iteration plan update
 - Selected task: T411 annotate `src/slic3r/GUI/IconManager.hpp` (runtime task complete this iteration).
 - Plan: document atlas ownership, shared Icon state, init/release contracts, and ImGui helper bindings with `[INTENT]/[STATE]/[THREAD]/[OPENGL]/[UNITY]/[EVENT]/[PORTING_HAZARD]` tags; capture the evidence block, commit the header, close the task, and queue the next ready item (T412).
+
+## Iteration plan update - T393
+- Selected task: T393 annotate `src/slic3r/GUI/GUI_ObjectTable.hpp` (task currently open and awaiting completion).
+- Plan: verify `ObjectGrid`, `ObjectGridTable`, `ObjectTablePanel`, and `ObjectTableDialog` declarations expose their intent/state/event scopes, annotate any remaining stateful caches (selection lists, sort column, config caches), describe how `release_object_configs`, `reload_*`, and `reset` flows reconcile with the `DynamicPrintConfig`, and call out the Unity analog (UI Toolkit ListView/ObservableCollection + ScriptableObject-backed config). Highlight porting hazards around wxGrid event macros, custom renderers, and DPI dialog focus, then append the Phase 1 evidence block before marking the task done and stopping for this iteration.

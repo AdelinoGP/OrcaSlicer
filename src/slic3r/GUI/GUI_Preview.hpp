@@ -223,11 +223,17 @@ private:
     void check_layers_slider_values(std::vector<CustomGCode::Item>& ticks_from_model, const std::vector<double>& layers_z);
 
     // [STATE] Layer slider helpers invoked after interactive or programmatic camera changes.
+    // [STATE][UNITY] Refreshes the Z range slider range/values when the view or selection changes so Unity's slider binding stays accurate.
     void update_layers_slider(const std::vector<double>& layers_z, bool keep_z_range = false);
+    // [EVENT][STATE] Recomputes slider visibility based on the active preview controls so the correct handles appear.
     void update_layers_slider_mode();
+    // [EVENT][STATE][UNITY] Propagates canvas key events back to the slider ranges; Unity should route InputSystem navigation through the
+    // slider controller.
     void update_layers_slider_from_canvas(wxKeyEvent& event);
     // BBS: add only gcode mode
     // [EVENT][STATE] Forces loading the print via the FFF path for unsupported G-code mode toggles.
+    // [PORTING_HAZARD:P3] This helper leans on the legacy FFF path to keep the canvas writable when G-code preview is limited, so Unity
+    // must guard the same scenario.
     void load_print_as_fff(bool keep_z_range = false, bool only_gcode = false);
 };
 
@@ -256,6 +262,7 @@ public:
     bool is_reload_delayed() const;
     // [THREAD][OPENGL] Forces an immediate or deferred scene rebuild for the assemble canvas.
     void reload_scene(bool refresh_immediately, bool force_full_scene_refresh = false);
+    // [EVENT][UNITY] Mirrors assemble-camera orientation commands so Unity can re-target both RenderTexture cameras with the same presets.
     void select_view(const std::string& direction);
 
 private:

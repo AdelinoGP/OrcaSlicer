@@ -3600,3 +3600,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=4 (init purge, import copies, move renames, rename writes block the UI thread), P3=1 (CreateFolder deletes existing disk content without confirmation).
 - Git: document auxiliary data model
 - Next recommended Phase 1 task: T159 annotate: src/slic3r/GUI/AuxiliaryDataViewModel.hpp
+
+## Phase 1 - Task T397 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Preview.hpp
+- Deliverables: src/slic3r/GUI/GUI_Preview.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 4 slider helper tags plus assemble view event coverage (STATE/UNITY/PORTING_HAZARD annotations to explain slider sync and camera commands).
+- Verification excerpt: // [STATE][UNITY] Refreshes the Z range slider range/values when the view or selection changes so Unity's slider binding stays accurate.
+- Unity-impact summary:
+  - Keep the Z-layer slider and its InputSystem binding mirrored as UI Toolkit VisualElements so slider values stay in sync with preview state.
+  - Funnel canvas navigation events into the slider controller so Unity can match layer navigation without losing the renderer-bound events.
+  - Apply the assemble-view direction command to the secondary RenderTexture camera rig to match the dual-view control model.
+- Hazards found: 1 (P3) - `load_print_as_fff` relies on the legacy FFF path, so Unity must gate the fallback when G-code-only previews lock the main renderer.
+- Git: annotate: src/slic3r/GUI/GUI_Preview.hpp
+- Next recommended Phase 1 task: T412 annotate: src/slic3r/GUI/ImageDPIFrame.cpp
