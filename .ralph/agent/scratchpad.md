@@ -354,6 +354,10 @@
 
 ## Iteration plan update
 - Selected task: T398 annotate `src/slic3r/GUI/GUI_Utils.cpp` (task-1773880086-d4b6 now active).
+
+## Iteration plan update
+- Current focus: T157 annotate `src/slic3r/GUI/Auxiliary.cpp` (per ready list and actual file path).
+- Plan: read the full source, weave `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` comments through the file/panel lifecycle, note the file-system, designer, and panel dispatch states, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file (and handoff), close the task, and stop for this iteration so the next agent continues.
 - Plan: read through `GUI_Utils.cpp`, identify major helpers, caching layers, and threading hints, and insert `[INTENT]/[STATE]/[EVENT]/[OPENGL]/[THREAD]/[UNITY]/[PORTING_HAZARD]` comments around each high-impact block; ensure we map menu/toolbar helpers, config propagation, and GL refresh triggers to Unity equivalents (e.g., UI Toolkit `VisualElement` helpers + `ScriptableObject` config bridge) before adding the required Phase 1 evidence block to `.ralph/agent/handoff.md`, staging/committing the annotated file, and closing the task so the next iteration can continue.
 - Verification: rely on careful inspection (doc-only) and confirm comments describe caches, event flows, and Unity migration guidance.
 - Plan: mark the task active, read the header, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around the shader lifecycle, caches, binding helpers, and uniform setters; append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the file, close the task, and then pick the next ready Phase 1 file.
@@ -361,6 +365,10 @@
 ## Iteration plan update
 - Selected task: T383 annotate `src/slic3r/GUI/GUI.hpp` (per the latest ready list and unify direction).
 - Plan: mark the runtime task active, read the header fully, add `[INTENT]` on the GUI namespace helpers, `[STATE]` on the config/menu caches, `[EVENT]` on menu binding and handler scaffolding, `[THREAD]` on cross-thread dialog helpers, `[OPENGL]` on menu-driven render refresh hooks, `[UNITY]` guidance for MainMenu/MenuBar replacements plus config dialog controllers, and `[PORTING_HAZARD:P2]` notes where wxWidgets lifetime assumptions conflict with Unity; append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the annotated file, close the task, and stop after this single atomic change.
+
+## Iteration plan update
+- Current focus: T407 annotate `src/slic3r/GUI/HttpServer.hpp` (newly started runtime task `task-1773880086-a9d9`).
+- Plan: read the header to capture server initialization, request handlers, state caches, and cross-thread helpers; add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations for the server lifecycle, connection pool, event dispatcher, and config coupling, document any hazard around blocking sockets or synchronous IO, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the header plus any updates, close the task, and then pause per the single-task rule.
 
 ## Iteration plan update
 - Selected task: T390 annotate `src/slic3r/GUI/GUI_ObjectSettings.cpp` (since T383 is already documented per the registry; this run will keep the steady momentum).

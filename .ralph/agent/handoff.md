@@ -3508,3 +3508,19 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3=2 (context menu/main-thread menu rebuild + delete-thread coupling).
 - Git: docs: annotate GUI Auxiliary list
 - Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp
+
+
+## Phase 1 - Task T407 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HttpServer.hpp
+- Deliverables: src/slic3r/GUI/HttpServer.hpp
+- Substantive additions: 9 annotations covering intent, state, event callbacks, thread handling, and Unity mapping across the HTTP bridge.
+- Verification excerpt: // [INTENT] Hosts a tiny loop-back HTTP broker so GUI panels can react to local requests.
+- Unity-impact summary:
+  - Replace the local boost::asio listener with a `UnityWebRequest` controller + `MainThreadDispatcher` to keep callbacks on the main loop.
+  - Route UI commands through a delegate (`set_request_handler`) wired to Unity `UnityEvent` or `Action<string>` to mimic the boost handler hook.
+  - Mirror `Response` subclasses with `UnityWebRequest` results and interpretable redirect/html payload builders.
+- Hazards found: 1 (P2 thread transition between boost::thread and Unity's managed main thread.)
+- Git: annotate: src/slic3r/GUI/HttpServer.hpp
+- Next recommended Phase 1 task: T408 annotate: src/slic3r/GUI/I18N.cpp
+
