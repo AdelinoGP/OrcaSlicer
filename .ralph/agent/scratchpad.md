@@ -489,3 +489,5 @@
 ## Iteration plan update
 - Selected task: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp` (task-1773880086-6aa6 active again).
 - Plan: load the complete source, annotate class/method boundaries with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]`, clarifying list model lifecycles, event bindings, selection caches, render triggers, drag/drop flows, and Unity proxies (UI Toolkit `ListView` plus `ListViewController` + `Command` pattern); append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file plus supporting metadata, ensure `.ralph/ralph-tasks.md` marks the task done, then pause for the next iteration.
+
+- Iteration update: Completed T391 annotate `src/slic3r/GUI/GUI_ObjectSettings.hpp`, recorded the inability to configure CMake (no `CMakeLists.txt`), and prepared the next plan to pick T392 once runtime tasks and manifest align.

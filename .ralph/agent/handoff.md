@@ -2994,6 +2994,20 @@ This prompt governs **Phase 1 only**.
 - Git: annotate: src/slic3r/GUI/GUI_ObjectSettings.cpp
 - Next recommended Phase 1 task: T391 annotate: src/slic3r/GUI/GUI_ObjectSettings.hpp
 
+## Phase 1 - Task T391 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectSettings.hpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectSettings.hpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md, .ralph/agent/scratchpad.md
+- Substantive additions: 8 multi-tag annotations covering OG_Settings lifecycle, ObjectSettings override list state, event bindings, and Unity mapping notes.
+- Verification excerpt: // [INTENT] Drives the per-object setting UI exposed in the Object tab, building/updating groups based on each ModelConfig submitted from the selection.
+- Unity-impact summary:
+  - OG_Settings becomes a MonoBehaviour-managed VisualElement tree (Canvas + GraphicRaycaster) that toggles the same show/hide lifecycle around ConfigOptionsGroup clones.
+  - Rebuild ObjectSettings as a UI Toolkit ListView/ScrollView that instantiates per-object override cards with ScriptableObject-backed config data and inline delete icons.
+  - Keep `add_missed_options` as a validator that runs before writing overrides to ScriptableObjects so Unity never misses dependent fields during auto-updates.
+- Hazards found: 0
+- Git: annotate: src/slic3r/GUI/GUI_ObjectSettings.hpp
+- Next recommended Phase 1 task: T392 annotate: src/slic3r/GUI/GUI_ObjectTable.cpp
+
 ## Phase 1 - Task T372 complete
 - Task type: annotate
 - File: src/slic3r/GUI/GUI_AuxiliaryList.cpp

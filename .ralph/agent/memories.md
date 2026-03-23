@@ -46,6 +46,70 @@
 
 ## Fixes
 
+### mem-1774268687-da18
+> failure: cmd=cmake -S . -B build -DCMAKE_BUILD_TYPE=Release, error=source directory does not contain CMakeLists.txt, next=verify build instructions or skip build for this repo
+<!-- tags: tooling, build | created: 2026-03-23 -->
+
+### mem-1774054791-9e67
+> failure: cmd=read src/slic3r/GUI/Files/SVG.hpp, error=File not found, next=confirm manifest entry is stale or remove task
+<!-- tags: gui, missing-file | created: 2026-03-21 -->
+
+### mem-1774054728-14ba
+> failure: cmd=read src/slic3r/GUI/Files/SVG.cpp, error=File not found, next=confirm manifest or mark gui:T201 blocked
+<!-- tags: gui, missing-file | created: 2026-03-21 -->
+
+### mem-1774054659-a328
+> failure: cmd=read src/slic3r/GUI/Jobs/SVGFileJob.hpp, error=File not found, next=confirm manifest or mark gui:T200 blocked
+<!-- tags: gui, missing-file | created: 2026-03-21 -->
+
+### mem-1774053407-7791
+> failure: cmd=read src/slic3r/GUI/Jobs/SVGFileJob.cpp, error=File not found, next=verify actual SVG job files or mark gui:T199 blocked
+<!-- tags: gui, missing-file | created: 2026-03-21 -->
+
+### mem-1774050430-757b
+> failure: cmd=read src/slic3r/GUI/Jobs/RotoptJob.hpp, error=File not found, next=align tasks to RotoptimizeJob files
+<!-- tags: gui, missing-file | created: 2026-03-20 -->
+
+### mem-1774050410-47df
+> failure: cmd=read src/slic3r/GUI/Jobs/RotoptJob.cpp, error=File not found, next=confirm whether the job renamed to Rotoptimize or document blocker
+<!-- tags: gui, missing-file | created: 2026-03-20 -->
+
+### mem-1774050367-c43a
+> failure: cmd=read src/slic3r/GUI/Jobs/MedialAxisJob.hpp, error=File not found, next=check if header exists elsewhere or mark T194 blocked
+<!-- tags: gui, missing-file | created: 2026-03-20 -->
+
+### mem-1774047878-3f83
+> failure: cmd=read src/slic3r/GUI/Jobs/LightJob.hpp, error=File not found, next=check for renamed LightJob classes or mark gui:T192 blocked
+<!-- tags: gui, missing-file | created: 2026-03-20 -->
+
+### mem-1774047667-757c
+> failure: cmd=read src/slic3r/GUI/Jobs/MedialAxisJob.cpp, error=File not found, next=confirm path or mark gui:T193 as blocked
+<!-- tags: gui, missing-file | created: 2026-03-20 -->
+
+### mem-1774047571-33c9
+> failure: cmd=read src/slic3r/GUI/Jobs/LightJob.cpp, error=File not found, next=confirm actual path or mark gui:T191 as blocked
+<!-- tags: gui, missing-file | created: 2026-03-20 -->
+
+### mem-1774047463-8c02
+> failure: cmd=read src/slic3r/GUI/Jobs/JobList.hpp, error=File not found, next=confirm correct path or raise blocker
+<!-- tags: gui, missing-file | created: 2026-03-20 -->
+
+### mem-1774045921-8109
+> failure: cmd=read src/slic3r/GUI/Jobs/JobList.cpp, error=File not found, next=confirm if JobList exists elsewhere or mark gui JobList task as failed
+<!-- tags: gui, missing-file | created: 2026-03-20 -->
+
+### mem-1774045479-639a
+> failure: cmd=read src/slic3r/GUI/Jobs/Job.cpp, error=File not found, next=confirm whether Job.cpp exists elsewhere or adjust tasks
+<!-- tags: gui, missing-file | created: 2026-03-20 -->
+
+### mem-1774045265-c455
+> failure: cmd=read src/slic3r/GUI/Jobs/EmbossUpdateJob.hpp, error=File not found, next=check if header exists in repo or update manifest
+<!-- tags: gui, missing-file | created: 2026-03-20 -->
+
+### mem-1774045174-d236
+> failure: cmd=read src/slic3r/GUI/Jobs/EmbossUpdateJob.cpp, error=File not found, next=confirm file path or task manifest and either create skip entry or locate actual file
+<!-- tags: gui, missing-file | created: 2026-03-20 -->
+
 ### mem-1773994151-0897
 > failure: cmd=read src/slic3r/GUI/PalmTree.hpp, error=File not found. task-1773880086-94d5 failed.
 <!-- tags: gui, missing-file | created: 2026-03-20 -->
