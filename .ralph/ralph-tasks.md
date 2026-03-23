@@ -588,7 +588,7 @@ Last updated: 2026-03-23T16:40:00Z
 - [x] T667 annotate: src/slic3r/GUI/Widgets/Label.cpp
 - [ ] T668 annotate: src/slic3r/GUI/Widgets/LabeledStaticBox.cpp
 - [ ] T669 annotate: src/slic3r/GUI/Widgets/LabeledStaticBox.hpp
-- [ ] T670 annotate: src/slic3r/GUI/Widgets/Label.hpp
+- [x] T670 annotate: src/slic3r/GUI/Widgets/Label.hpp
 - [ ] T671 annotate: src/slic3r/GUI/Widgets/PopupWindow.cpp
 - [ ] T672 annotate: src/slic3r/GUI/Widgets/PopupWindow.hpp
 - [ ] T673 annotate: src/slic3r/GUI/Widgets/ProgressBar.cpp

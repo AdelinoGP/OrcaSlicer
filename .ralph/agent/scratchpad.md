@@ -707,3 +707,7 @@
 ## Iteration plan update
 - Selected task: T414 annotate `src/slic3r/GUI/ImageGrid.cpp`.
 - Plan: read `ImageGrid.cpp` end-to-end, document the grid layout lifecycle, selection state, texture caching, rendering hooks, and mouse/keyboard wiring; insert `[INTENT]/[STATE]/[EVENT]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around the tile generation, refresh timers, deferred image loads, and input dispatch, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only the annotated file plus metadata, mark the task done, and then stop for the next iteration so another agent can continue.
+
+## Iteration plan update
+- Selected task: T670 annotate `src/slic3r/GUI/Widgets/Label.hpp` for this run because it is a compact header that centralizes font/link behavior Unity must reproduce precisely.
+- Plan: confirm the header exists, read it top-to-bottom, insert `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD]` comments describing Label intent, font cache state, mouse/hover handling, layout macros, and any config bindings; note thread/GL dependencies if present, append the Phase 1 evidence block plus Unity impact summary to `.ralph/agent/handoff.md`, stage/commit `Label.hpp` along with handoff metadata, close the task, and then pause so the next agent continues.

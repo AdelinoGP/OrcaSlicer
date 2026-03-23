@@ -3680,3 +3680,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (DownloadCheckFiles blocks while scanning storage), P3=2 (manual alpha/shadow bitmap builders and custom button blending need Texture2D Shader replacements)
 - Git: Annotate ImageGrid layout
 - Next recommended Phase 1 task: T417 annotate: src/slic3r/GUI/IMSlider.cpp
+
+
+## Phase 1 - Task T670 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/Label.hpp
+- Deliverables: src/slic3r/GUI/Widgets/Label.hpp, .ralph/agent/handoff.md, .ralph/ralph-tasks.md
+- Substantive additions: 7 targeted annotations covering macro flags, constructor/state intent, event sizing, font cache, and Unity mapping.
+- Verification excerpt: // [INTENT][STATE] Consolidates wxStaticText into a consistent font/cursor helper so the GUI always draws with the shared font palette and hyperlink semantics.
+- Unity-impact summary:
+  - Reuse a ScriptableObject-backed `FontLibrary` of `TMP_FontAsset`s to mirror the shared `Head_*`/`Body_*` presets and avoid runtime font regeneration.
+  - Replace the LB_* flags with `TextMeshProUGUI` + `EventTrigger` pointer handlers so hover/highlight and wrapped text flow via Unity's InputSystem instead of manually tunneling mouse events.
+- Hazards found: 1 (P3 manual wrap measurement helper replicating `wxDC` vs Unity auto-wrapping semantics).
+- Git: annotate: src/slic3r/GUI/Widgets/Label.hpp
+- Next recommended Phase 1 task: T671 annotate: src/slic3r/GUI/Widgets/PopupWindow.cpp
