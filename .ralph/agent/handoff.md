@@ -396,6 +396,19 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: Annotate GLGizmoBase picking hooks
 - Next recommended Phase 1 task: T310 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.hpp
 
+## Phase 1 - Task T365 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GLShadersManager.hpp
+- Deliverables: src/slic3r/GUI/GLShadersManager.hpp
+- Substantive additions: 6 multi-tag annotations covering shader cache state, GL-threaded init/shutdown lifecycles, lookup helpers, Unity mapping, and porting hazards.
+- Verification excerpt: // [INTENT] Warm every known shader so viewport rendering can bind programs without per-frame compilation.
+- Unity-impact summary:
+  - Warm the cache with a ScriptableObject-backed ShaderVariantCollection and call ShaderVariantCollection.WarmUp() before the RenderPipeline camera draws.
+  - Mirror `get_shader`/`get_current_shader` with a MonoBehaviour-managed Dictionary<string, Shader> plus MaterialPropertyBlock state so Unity knows what to bind before Graphics.DrawMesh.
+- Hazards found: P2=2 (init/shutdown ordering on the GL thread and explicit Material disposal before RenderPipeline teardown)
+- Git: Annotate GLShadersManager header for Unity port
+- Next recommended Phase 1 task: T366 annotate: src/slic3r/GUI/GLTexture.cpp
+
 ### Remaining
 
 - [ ] P0-T006: Main Window Class Identification

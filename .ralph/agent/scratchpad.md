@@ -365,3 +365,7 @@
 ## Iteration plan update
 - Selected task: T362 annotate `src/slic3r/GUI/GLShader.cpp` (runtime task `task-1773880086-284d`).
 - Plan: start the task, read the shader management source end-to-end, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around program lifecycle, caching, reload watchers, and GL thread boundaries, include Unity mapping for `ShaderVariantCollection` + `RenderPipeline` passes, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the single file, close the task, then pause for the next iteration.
+
+## Iteration plan update
+- Selected task: T365 annotate `src/slic3r/GUI/GLShadersManager.hpp` (next ready manifest entry for shader utilities).
+- Plan: read the header to capture the manager's intent and stateful shader cache, annotate the vector ownership, init/shutdown lifecycle, lookup helpers, GL context hints, Unity equivalents (e.g., `ShaderVariantCollection` + `RenderPipeline` helper MonoBehaviour managing cached `Shader` assets), and porting hazards around single-context lifetime; append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header, close the task, and then defer to the next ready Phase 1 file (likely `T366 annotate: src/slic3r/GUI/GLTexture.cpp`).
