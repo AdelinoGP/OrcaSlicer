@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-23T21:22:21Z
+Last updated: 2026-03-23T22:45:00Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -80,7 +80,7 @@ Last updated: 2026-03-23T21:22:21Z
 - [x] T159 annotate: src/slic3r/GUI/AuxiliaryDataViewModel.hpp
 - [x] T160 annotate: src/slic3r/GUI/AuxiliaryDialog.cpp
 - [x] T161 annotate: src/slic3r/GUI/AuxiliaryDialog.hpp
-- [ ] T162 annotate: src/slic3r/GUI/Auxiliary.hpp
+- [x] T162 annotate: src/slic3r/GUI/Auxiliary.hpp
 - [x] T163 annotate: src/slic3r/GUI/BackgroundSlicingProcess.cpp
 - [x] T164 annotate: src/slic3r/GUI/BackgroundSlicingProcess.hpp
 - [ ] T165 annotate: src/slic3r/GUI/BaseTransparentDPIFrame.cpp

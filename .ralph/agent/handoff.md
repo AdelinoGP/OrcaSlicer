@@ -451,6 +451,19 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate GUI_ObjectList for Unity port
 - Next recommended Phase 1 task: T395 annotate: src/slic3r/GUI/GUI_ObjectTableSettings.hpp
 
+## Phase 1 - Task T162 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Auxiliary.hpp
+- Deliverables: src/slic3r/GUI/Auxiliary.hpp
+- Substantive additions: 7 multi-tag annotations covering AuxFolder enums, AuFile/AuFolderPanel intent/state/event flows, DesignerPanel inputs, and the parent AuxiliaryPanel caches.
+- Verification excerpt: // [INTENT] Represents an auxiliary gallery card that can be hovered, renamed, set as cover, or deleted.
+- Unity-impact summary:
+  - Recreate each `AuxiliaryFolderType` tab as a UI Toolkit TabView with ScrollView-backed VisualElements, keeping folder-specific ObservableCollections in sync with the ScriptableObject folder model.
+  - Translate `AuFile` tiles, hover states, rename inputs, and delete/cover buttons into VisualElement cards with Pointer/Click handlers and a shared Texture2D pipeline so Unity can mimic the grid layout without wxWrapSizer.
+- Hazards found: 1 (P2 reliance on wxWrapSizer/wxTabbook layout logic that Unity must replace with explicit layout controllers).
+- Git: annotate: src/slic3r/GUI/Auxiliary.hpp
+- Next recommended Phase 1 task: T165 annotate: src/slic3r/GUI/BaseTransparentDPIFrame.cpp
+
 ## Phase 1 - Task T397 complete
 - Task type: annotate
 - File: src/slic3r/GUI/GUI_Preview.hpp

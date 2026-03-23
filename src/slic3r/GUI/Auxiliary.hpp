@@ -53,8 +53,8 @@
 #define AUFILE_GREY200 wxColour(248, 248, 248)
 #define AUFILE_BRAND wxColour(0, 150, 136)
 #define AUFILE_BRAND_TRANSPARENT wxColour("#E5F0EE") // ORCA color with %10 opacity
-//#define AUFILE_PICTURES_SIZE wxSize(FromDIP(300), FromDIP(300))
-//#define AUFILE_PICTURES_PANEL_SIZE wxSize(FromDIP(300), FromDIP(340))
+// #define AUFILE_PICTURES_SIZE wxSize(FromDIP(300), FromDIP(300))
+// #define AUFILE_PICTURES_PANEL_SIZE wxSize(FromDIP(300), FromDIP(340))
 #define AUFILE_PICTURES_SIZE wxSize(FromDIP(168), FromDIP(168))
 #define AUFILE_PICTURES_PANEL_SIZE wxSize(FromDIP(168), FromDIP(208))
 #define AUFILE_SIZE wxSize(FromDIP(168), FromDIP(168))
@@ -62,6 +62,8 @@
 #define AUFILE_TEXT_HEIGHT FromDIP(40)
 #define AUFILE_ROUNDING FromDIP(5)
 
+// [INTENT] Enumerates the named auxiliary folders/tabs that the UI scaffolding drives.
+// [UNITY] Each enum value becomes a TabView + ScrollView pairing in UI Toolkit backed by a scriptable folder definition.
 enum AuxiliaryFolderType {
     MODEL_PICTURE,
     BILL_OF_MATERIALS,
@@ -72,50 +74,63 @@ enum AuxiliaryFolderType {
     AddFileButton,
 };
 
-const static std::array<wxString, 5> s_default_folders = {("Model Pictures"), ("Bill of Materials"), ("Assembly Guide"), ("Others"), (".thumbnails")};
-
+// [STATE] Default auxiliary folders mirror the remaining legacy tabs used when metadata is absent.
+const static std::array<wxString, 5> s_default_folders = {("Model Pictures"), ("Bill of Materials"), ("Assembly Guide"), ("Others"),
+                                                          (".thumbnails")};
 
 enum ValidationType { Valid, NoValid, Warning };
 
 namespace Slic3r { namespace GUI {
 
+// [INTENT] Represents an auxiliary gallery card that can be hovered, renamed, set as cover, or deleted.
+// [STATE] Tracks hover/cover flags, the canvas bitmaps, rename text, and the underlying file path for each tile.
+// [EVENT] Hooks paint and mouse events so the UI thread responds to clicks and drags; Unity will map them to Pointer events.
+// [PORTING_HAZARD:P2] Relies on wxWrapSizer painting which requires a custom RenderTexture pass in Unity.
+// [UNITY] Re-implement as a UI Toolkit VisualElement card with a 2D texture for previews and Interactable buttons.
 class AuFile : public wxPanel
 {
 public:
     AuxiliaryFolderType m_type;
     bool                m_hover{false};
     bool                m_cover{false};
-    wxStaticText*       m_text_name {nullptr};
-    ::TextInput*        m_input_name {nullptr};
-    fs::path m_file_path;
-    wxString m_add_file;
-    wxString m_file_name;
-    wxString cover_text_left;
-    wxString cover_text_right;
-    wxString cover_text_cover;
-    ScalableBitmap m_file_bitmap;
-    ScalableBitmap m_file_cover;
-    ScalableBitmap m_file_edit_mask;
-    ScalableBitmap m_file_delete;
-    wxStaticBitmap* m_file_exit_rename;
+    wxStaticText*       m_text_name{nullptr};
+    ::TextInput*        m_input_name{nullptr};
+    fs::path            m_file_path;
+    wxString            m_add_file;
+    wxString            m_file_name;
+    wxString            cover_text_left;
+    wxString            cover_text_right;
+    wxString            cover_text_cover;
+    ScalableBitmap      m_file_bitmap;
+    ScalableBitmap      m_file_cover;
+    ScalableBitmap      m_file_edit_mask;
+    ScalableBitmap      m_file_delete;
+    wxStaticBitmap*     m_file_exit_rename;
 
     ScalableBitmap m_bitmap_excel;
     ScalableBitmap m_bitmap_pdf;
     ScalableBitmap m_bitmap_txt;
 
 public:
-    AuFile(wxWindow *parent, fs::path file_path, wxString file_name, AuxiliaryFolderType type, wxWindowID id = wxID_ANY, const wxPoint &pos = wxDefaultPosition, const wxSize &size = wxDefaultSize, long style = wxTAB_TRAVERSAL);
+    AuFile(wxWindow*           parent,
+           fs::path            file_path,
+           wxString            file_name,
+           AuxiliaryFolderType type,
+           wxWindowID          id    = wxID_ANY,
+           const wxPoint&      pos   = wxDefaultPosition,
+           const wxSize&       size  = wxDefaultSize,
+           long                style = wxTAB_TRAVERSAL);
     void enter_rename_mode();
     void exit_rename_mode();
-    void OnPaint(wxPaintEvent &evt);
-    void PaintBackground(wxDC &dc);
-    void OnEraseBackground(wxEraseEvent &evt);
-    void PaintForeground(wxDC &dc);
-    void on_mouse_enter(wxMouseEvent &evt);
-    void on_mouse_leave(wxMouseEvent &evt);
+    void OnPaint(wxPaintEvent& evt);
+    void PaintBackground(wxDC& dc);
+    void OnEraseBackground(wxEraseEvent& evt);
+    void PaintForeground(wxDC& dc);
+    void on_mouse_enter(wxMouseEvent& evt);
+    void on_mouse_leave(wxMouseEvent& evt);
     void on_input_enter(wxCommandEvent& evt);
-    void on_dclick(wxMouseEvent &evt);
-    void on_mouse_left_up(wxMouseEvent &evt);
+    void on_dclick(wxMouseEvent& evt);
+    void on_mouse_left_up(wxMouseEvent& evt);
 
     void on_set_cover();
     void on_set_delete();
@@ -127,29 +142,32 @@ public:
     ~AuFile();
 };
 
+// [INTENT] Simple holder that pairs file paths with their `AuFile` panel for quick lookup.
 class AuFiles
 {
 public:
     wxString path;
-    AuFile * file;
+    AuFile*  file;
 };
 
-WX_DEFINE_ARRAY(AuFiles *, AuFilesHash);
+WX_DEFINE_ARRAY(AuFiles*, AuFilesHash);
 
+// [INTENT] Aggregates a scrollable list of `AuFile` tiles for each folder type, plus add/delete controls.
+// [STATE] Retains the wrap sizer, delete button, and cached file array so the panel can rebuild quickly.
+// [EVENT] Emits auxiliary import/delete events to the parent panel, which can trigger disk IO.
+// [PORTING_HAZARD:P3] Depends on wxWrapSizer + wxScrollWindow semantics that must be re-implemented with UI Toolkit ScrollView.
+// [UNITY] Model as a ScrollView containing VisualElement cards and buttons bound to AsyncCommand handlers.
 class AuFolderPanel : public wxPanel
 {
 public:
-    AuFolderPanel(wxWindow *          parent,
+    AuFolderPanel(wxWindow*           parent,
                   AuxiliaryFolderType type,
                   wxWindowID          id    = wxID_ANY,
-                  const wxPoint &     pos   = wxDefaultPosition,
-                  const wxSize &      size  = wxDefaultSize,
+                  const wxPoint&      pos   = wxDefaultPosition,
+                  const wxSize&       size  = wxDefaultSize,
                   long                style = wxTAB_TRAVERSAL);
-     ~AuFolderPanel();
+    ~AuFolderPanel();
 
-
-
-    
     void clear();
     void update_cover();
     void update(std::vector<fs::path> paths);
@@ -157,54 +175,63 @@ public:
 
 public:
     AuxiliaryFolderType m_type;
-    wxScrolledWindow *  m_scrolledWindow{nullptr};
-    wxWrapSizer *       m_gsizer_content{nullptr};
-    //AuFile *            m_button_add{nullptr};
-    Button *            m_button_del{nullptr};
-    AuFile *            m_big_button_add{ nullptr };
-    AuFilesHash         m_aufiles_list;
+    wxScrolledWindow*   m_scrolledWindow{nullptr};
+    wxWrapSizer*        m_gsizer_content{nullptr};
+    // AuFile *            m_button_add{nullptr};
+    Button*     m_button_del{nullptr};
+    AuFile*     m_big_button_add{nullptr};
+    AuFilesHash m_aufiles_list;
 
-    void on_add(wxMouseEvent& event);
-    void on_delete(wxCommandEvent &event);
+    void on_add(wxMouseEvent& event);      // [EVENT] Requests the parent panel to import the hovered folder.
+    void on_delete(wxCommandEvent& event); // [EVENT] Signals a delete request for the focused AuFile.
 };
 
+// [INTENT] Captures designer metadata fields (designer name, model title, description, license) that sit beside the folder panes.
+// [STATE] Keeps text controls for each metadata field and a license combo for vendor data.
+// [EVENT] Input handlers propagate updates back to the project via `on_input_enter_*` and `on_select_license`.
+// [UNITY] Translate into a UI Toolkit VisualElement form with bound TextFields and a DropdownButton.
 class DesignerPanel : public wxPanel
 {
 public:
-    DesignerPanel(wxWindow *          parent,
+    DesignerPanel(wxWindow*           parent,
                   AuxiliaryFolderType type,
                   wxWindowID          id    = wxID_ANY,
-                  const wxPoint &     pos   = wxDefaultPosition,
-                  const wxSize &      size  = wxDefaultSize,
+                  const wxPoint&      pos   = wxDefaultPosition,
+                  const wxSize&       size  = wxDefaultSize,
                   long                style = wxTAB_TRAVERSAL);
     ~DesignerPanel();
 
-    ::TextInput*        m_input_designer {nullptr};
-    ::TextInput*        m_input_model_name {nullptr};
-    wxTextCtrl*         m_input_description {nullptr};
-    ComboBox*           m_combo_license {nullptr};
-    bool Show(bool show) override;
-    void                init_license_list();
-    void                on_input_enter_designer(wxCommandEvent &evt);
-    void                on_input_enter_model(wxCommandEvent &evt);
-    void                on_input_enter_description(wxCommandEvent &evt);
-    void                on_select_license(wxCommandEvent& evt);
-    void                update_info();
-    void                msw_rescale();
+    ::TextInput* m_input_designer{nullptr};
+    ::TextInput* m_input_model_name{nullptr};
+    wxTextCtrl*  m_input_description{nullptr};
+    ComboBox*    m_combo_license{nullptr};
+    bool         Show(bool show) override;
+    void         init_license_list();
+    void         on_input_enter_designer(wxCommandEvent& evt);
+    void         on_input_enter_model(wxCommandEvent& evt);
+    void         on_input_enter_description(wxCommandEvent& evt);
+    void         on_select_license(wxCommandEvent& evt);
+    void         update_info();
+    void         msw_rescale();
 };
 
-
+// [INTENT] Combines folder tabs, designer metadata, and device side tools into the auxiliary content workspace.
+// [STATE] Holds folder panels, path caches, and bitmap icons that reload when the auxiliary root directory changes.
+// [EVENT] Hooks EVT_AUXILIARY_* commands (import, update cover/delete/rename, done) so other components can trigger refreshes.
+// [THREAD] `Reload` and `update_*` must execute on the UI thread because they mutate wx widgets after background file scanning.
+// [UNITY] Port to a TabView of VisualElements where each panel binds to ObservableCollections of AuxFileModel.
+// [PORTING_HAZARD:P2] Relies on wxTabbook and wxWrapSizer; migrating will need custom resizing logic in Unity’s LayoutElements.
 class AuxiliaryPanel : public wxPanel
 {
 private:
-    Tabbook *m_tabpanel = {nullptr};
-    wxSizer *m_main_sizer = {nullptr};
+    Tabbook* m_tabpanel   = {nullptr};
+    wxSizer* m_main_sizer = {nullptr};
 
-    AuFolderPanel *m_pictures_panel= {nullptr};
-    AuFolderPanel *m_bill_of_materials_panel= {nullptr};
-    AuFolderPanel *m_assembly_panel= {nullptr};
-    AuFolderPanel *m_others_panel= {nullptr};
-    DesignerPanel * m_designer_panel= {nullptr};
+    AuFolderPanel* m_pictures_panel          = {nullptr};
+    AuFolderPanel* m_bill_of_materials_panel = {nullptr};
+    AuFolderPanel* m_assembly_panel          = {nullptr};
+    AuFolderPanel* m_others_panel            = {nullptr};
+    DesignerPanel* m_designer_panel          = {nullptr};
 
     /* images */
     wxBitmap  m_signal_strong_img;
@@ -213,28 +240,35 @@ private:
     wxBitmap  m_signal_no_img;
     wxBitmap  m_printer_img;
     wxBitmap  m_arrow_img;
-    wxWindow *create_side_tools();
+    wxWindow* create_side_tools();
 
 public:
-    AuxiliaryPanel(wxWindow *parent, wxWindowID id = wxID_ANY, const wxPoint &pos = wxDefaultPosition, const wxSize &size = wxDefaultSize, long style = wxTAB_TRAVERSAL);
+    AuxiliaryPanel(wxWindow*      parent,
+                   wxWindowID     id    = wxID_ANY,
+                   const wxPoint& pos   = wxDefaultPosition,
+                   const wxSize&  size  = wxDefaultSize,
+                   long           style = wxTAB_TRAVERSAL);
     ~AuxiliaryPanel();
     void init_bitmap();
     void init_tabpanel();
 
-    void Split(const std::string &src, const std::string &separator, std::vector<std::string> &dest);
+    void Split(const std::string& src, const std::string& separator, std::vector<std::string>& dest);
 
     void msw_rescale();
-    void on_size(wxSizeEvent &event);
+    void on_size(wxSizeEvent& event);
     bool Show(bool show);
 
     // core logic
-    std::map<std::string, std::vector<fs::path>>    m_paths_list;
-    wxString                                        m_root_dir;
-    void                                            init_auxiliary();
-    void                                            create_folder(wxString name = wxEmptyString);
-    std::string                                     replaceSpace(std::string s, std::string ts, std::string ns);
-    void                                            on_import_file(wxCommandEvent &event);
-    void                                            Reload(wxString aux_path, std::map<std::string, std::vector<json>> paths);
+    // [STATE] Maps folder keys to their current filesystem entries so the UI can rebuild without rescanning.
+    std::map<std::string, std::vector<fs::path>> m_paths_list;
+    // [STATE] Root directory for auxiliary assets; saved with the project and used by watching services.
+    wxString    m_root_dir;
+    void        init_auxiliary();
+    void        create_folder(wxString name = wxEmptyString);
+    std::string replaceSpace(std::string s, std::string ts, std::string ns);
+    void        on_import_file(wxCommandEvent& event);
+    // [EVENT] Called after disk watchers gather new metadata; rebuilds `m_paths_list` and refreshes panels.
+    void Reload(wxString aux_path, std::map<std::string, std::vector<json>> paths);
 
     void update_all_panel();
     void update_all_cover();
