@@ -3825,3 +3825,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1, P3=2
 - Git: Annotate IMToolbar toolbar textures
 - Next recommended Phase 1 task: T420 annotate: src/slic3r/GUI/IMToolbar.hpp
+
+## Phase 1 - Task T723 complete
+- Task type: annotate
+- File: src/slic3r/Utils/ASCIIFolding.hpp
+- Deliverables: src/slic3r/Utils/ASCIIFolding.hpp
+- Substantive additions: Documented the ASCII folding helpers with `[INTENT]/[STATE]/[UNITY]/[PORTING_HAZARD]` tags so the Unity port knows when filenames/hardcoded buffers change.
+- Verification excerpt: // [UNITY][PORTING_HAZARD:P2] Unity's `char` is UTF-16 while `wchar_t` size varies per platform; porters need to treat the buffer as a `Span<char>`/`StringBuilder` and guard against surrogate pairs that may expand into two `wchar_t`s on Windows.
+- Unity-impact summary:
+  - Keep accent stripping synchronous on the main thread via a `StringNormalization` helper that runs before any file name is committed.
+  - Mirror the `is_convert_for_filename` switch with a `Normalizer` flag so Unity uses the same symbol/whitespace replacements as the wxWidgets version.
+- Hazards found: 2 (P2:1, P3:1)
+- Git: Annotate ASCIIFolding ASCII helpers
+- Next recommended Phase 1 task: T724 annotate: src/slic3r/Utils/AstroBox.cpp
