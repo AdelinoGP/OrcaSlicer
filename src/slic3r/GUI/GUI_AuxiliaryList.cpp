@@ -276,6 +276,8 @@ void AuxiliaryList::on_begin_drag(wxDataViewEvent& evt)
     obj->SetText("Some text");
     evt.SetDataObject(obj);
     evt.SetDragFlags(wxDrag_DefaultMove);
+    // [STATE][PORTING_HAZARD:P3][UNITY] The actual file node lives in `m_dragged_item`, so the wxTextDataObject text is just boilerplate.
+    // Unity must therefore mirror this stateful reference instead of relying on the drag payload string to know what is moving.
     // [EVENT][STATE][THREAD][UNITY] Record the dragged item so the drop handler can resolve the source even if the mouse moves outside the
     // tree and so Unity's DragAndDrop layer can track the origin without race conditions.
 }

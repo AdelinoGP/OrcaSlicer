@@ -839,3 +839,7 @@
 ## Iteration plan update (current)
 - Selected task: T383 annotate `src/slic3r/GUI/GUI.hpp` (current iteration).
 - Plan: mark the runtime task active, read the entire header, annotate the GUI namespace helpers, config/menu caches, toolbar, and preview coordination with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2]` tags; call out Unity equivalents (MenuBar + `ScriptableObject` config controllers + RenderTexture preview glue), note wxWidgets ownership/dispatcher hazards, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the single annotated header plus the handoff update, close T383, and then stop so the next agent can continue.
+
+## Iteration note
+- Task: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp` (revisited)
+- Plan: confirm the drag/drop state is fully documented, highlight that the placeholder text payload keeps the real item in `m_dragged_item`, point Unity at the same held reference, record the new evidence block, and close the task once those modest edits are committed.

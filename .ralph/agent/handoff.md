@@ -383,6 +383,18 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate: src/slic3r/GUI/GUI_Preview.cpp
 - Next recommended Phase 1 task: T397 annotate: src/slic3r/GUI/GUI_Preview.hpp
 
+## Phase 1 - Task T372 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Deliverables: src/slic3r/GUI/GUI_AuxiliaryList.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: Added a focused note clarifying that the drag payload is staged via `m_dragged_item`, not the placeholder text, so Unity can carry the same target reference during drop workflows.
+- Verification excerpt: // [STATE][PORTING_HAZARD:P3][UNITY] The actual file node lives in `m_dragged_item`, so the wxTextDataObject text is just boilerplate.
+- Unity-impact summary:
+  - Unity must hold the dragged `AuxiliaryModelNode` reference separately because the textual payload contains no actionable path.
+- Hazards found: 1 (P3 placeholder drag payload requires explicit state mirroring in Unity)
+- Git: Annotate AuxiliaryList drag flow
+- Next recommended Phase 1 task: T397 annotate: src/slic3r/GUI/GUI_Preview.hpp
+
 ## Phase 1 - Task T390 complete
 - Task type: annotate
 - File: src/slic3r/GUI/GUI_ObjectSettings.cpp
