@@ -858,7 +858,6 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - [ ] T719 annotate: src/slic3r/GUI/wxExtensions.cpp
 - [ ] T720 annotate: src/slic3r/GUI/wxExtensions.hpp
 - [ ] T721 annotate: src/slic3r/GUI/wxMediaCtrl2.cpp
-- [ ] T722 annotate: src/slic3r/Utils/ASCIIFolding.cpp
 - [ ] T723 annotate: src/slic3r/Utils/ASCIIFolding.hpp
 - [ ] T724 annotate: src/slic3r/Utils/AstroBox.cpp
 - [ ] T725 annotate: src/slic3r/Utils/AstroBox.hpp
@@ -2650,3 +2649,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 3 (P2=1, P3=2)
 - Git: Annotate GLShadersManager shader cache
 - Next recommended Phase 1 task: T365 annotate: src/slic3r/GUI/GLShadersManager.hpp
+## Phase 1 - Task T722 complete
+- Task type: annotate
+- File: src/slic3r/Utils/ASCIIFolding.cpp
+- Deliverables: src/slic3r/Utils/ASCIIFolding.cpp, .ralph/agent/scratchpad.md
+- Substantive additions: Added `[INTENT]/[STATE]/[UNITY]/[PORTING_HAZARD]` comments covering the pointer helper, iterator bridge, UTF-8 normalization, and filename sanitation logic.
+- Verification excerpt: // [PORTING_HAZARD:P2] This hard-coded Windows invalid-character set + nul sentinel is platform-specific; Unity should rely on `Path.GetInvalidFileNameChars()`.
+- Unity-impact summary:
+  - Mirror normalization with `Encoding.UTF8.GetString(...).Normalize(NormalizationForm.FormKD)` and `StringBuilder` before folding back to ASCII.
+  - Replace the regex/backslash sanitization block with `Path.GetInvalidFileNameChars()`, `Regex.Replace`, and `Path.Combine`/`DirectorySeparatorChar` so Unity paths stay cross-platform.
+- Hazards found: P2:1, P3:1
+- Git: annotate: src/slic3r/Utils/ASCIIFolding.cpp
+- Next recommended Phase 1 task: T723 annotate: src/slic3r/Utils/ASCIIFolding.hpp
