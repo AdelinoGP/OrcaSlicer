@@ -3770,5 +3770,5 @@ This prompt governs **Phase 1 only**.
   - Mirror `change_opt_value` with a `SettingsModel` ScriptableObject service so every panel updates the shared config uniformly.
   - Replace desktop folder helpers with `Application.OpenURL`/`Process.Start` while sanitizing environment variables just like AppImage does here.
 - Hazards found: 4 (P1:1, P2:2, P3:1)
-- Git: annotate: src/slic3r/GUI/GUI.cpp
+- Git: Annotate GUI.cpp utilities for Unity port
 - Next recommended Phase 1 task: T379 annotate: src/slic3r/GUI/GUI_Factories.cpp
