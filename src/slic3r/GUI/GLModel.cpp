@@ -25,6 +25,9 @@
 namespace Slic3r {
 namespace GUI {
 
+// [INTENT]/[STATE]/[THREAD]/[UNITY]/[PORTING_HAZARD:P2] GLModel owns vertex/index buffers, bounding box state, and render flags so GUI layers can push selected artifacts into 3DScene; the logic assumes the UI/GL context thread owns these buffers, so Unity must mirror it with a MeshFilter/MeshRenderer pair that updates meshes on the main thread instead of juggling VAO/VBO lifetimes.
+
+
 #if ENABLE_SMOOTH_NORMALS
 static void smooth_normals_corner(const TriangleMesh& mesh, std::vector<stl_normal>& normals)
 {
@@ -405,6 +408,7 @@ bool GLModel::Geometry::has_tex_coord(const Format& format)
     };
 }
 
+// [INTENT]/[STATE]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2] Populate the model cache from a pre-built Geometry blob, keep bounding box state in sync, and defer the actual GL upload until render() triggers send_to_gpu(); Unity should feed the MeshFilter/MeshRenderer with Mesh vertices/triangles and call Mesh.RecalculateBounds instead of manually merging boxes.
 void GLModel::init_from(Geometry&& data)
 {
     if (is_initialized()) {
@@ -517,6 +521,7 @@ void GLModel::init_from(const Polygons& polygons, float z)
     }
 }
 
+// [EVENT]/[INTENT]/[UNITY] Triggered after the GUI file-picker/staged import event chooses a `.stl`; keep this on the main thread so Unity can hook its file-dialog callback into an async Task that converts the STL into Mesh vertices before calling MeshFilter.sharedMesh.
 bool GLModel::init_from_file(const std::string& filename)
 {
     if (!boost::filesystem::exists(filename))
@@ -540,6 +545,7 @@ bool GLModel::init_from_file(const std::string& filename)
     return true;
 }
 
+// [OPENGL]/[THREAD]/[STATE]/[PORTING_HAZARD:P2] Release the VAO/VBO/IBO handles and clear cached geometry so reuse (reset + init) follows the GL context life-cycle; the Unity port will need to clear meshes/material references instead of deleting GL handles manually.
 void GLModel::reset()
 {
     // release gpu memory
@@ -601,6 +607,7 @@ void GLModel::render(GLShaderProgram* shader)
     render(std::make_pair<size_t, size_t>(0, indices_count()), shader);
 }
 
+// [OPENGL]/[THREAD]/[STATE]/[UNITY]/[PORTING_HAZARD:P2] Issue attribute bindings, send cached data to GPU if needed, and call glDrawElements; this mirrors Unity's Graphics.DrawMesh/CommandBuffer path but requires explicit shader attribute lookups and range gating for selection highlights.
 void GLModel::render(const std::pair<size_t, size_t>& range, GLShaderProgram* shader)
 {
     if (m_render_disabled)
@@ -690,6 +697,7 @@ void GLModel::render(const std::pair<size_t, size_t>& range, GLShaderProgram* sh
 #endif // !SLIC3R_OPENGL_ES
 }
 
+// [OPENGL]/[THREAD]/[STATE]/[UNITY]/[PORTING_HAZARD:P2] Mirrors GL instanced draw paths that require a special `_instanced` shader, per-instance buffers, and cached model info; Unity should leverage `Graphics.DrawMeshInstanced` or `DrawMeshInstancedIndirect` with prepared Matrix4x4 arrays instead of manual VAO/VBO binding.
 void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instances_count)
 {
     if (instances_vbo == 0 || instances_count == 0)
@@ -779,6 +787,7 @@ void GLModel::render_instanced(unsigned int instances_vbo, unsigned int instance
 #endif // !SLIC3R_OPENGL_ES
 }
 
+// [OPENGL]/[THREAD]/[STATE]/[PORTING_HAZARD:P1] Upload the cached vertex/index lists to VBO/IBO, convert the indices down to UBYTE/USHORT when vertex count permits, and zero out the client copy; Unity does not expose raw GL buffer handles, so this step becomes Mesh.SetVertices/SetTriangles with manual index size packing in C# if needed.
 bool GLModel::send_to_gpu()
 {
     if (m_render_data.vbo_id > 0 || m_render_data.ibo_id > 0) {
@@ -870,6 +879,7 @@ inline bool all_vertices_inside(const GLModel::Geometry& geometry, Fn fn)
     return true;
 }
 
+// [INTENT]/[UNITY]/[PORTING_HAZARD:P3] Compute whether every vertex sits inside the selected BuildVolume (rectangle/circle/convex) to gate view-layer errors; Unity will need to compare Mesh.bounds against the printer Bounds or use Collider overlap tests instead of iterating individual vertices.
 bool contains(const BuildVolume& volume, const GLModel& model, bool ignore_bottom)
 {
     static constexpr const double epsilon = BuildVolume::BedEpsilon;
@@ -906,6 +916,7 @@ bool contains(const BuildVolume& volume, const GLModel& model, bool ignore_botto
     }
 }
 
+// [INTENT]/[UNITY] These geometry factory helpers build gizmo primitives (arrows, torus, cylinders, etc.) so the GUI can reuse them for overlays; Unity should cache similar Mesh assets (or compute them once via Mesh.SetVertices/SetTriangles) and bind them to MeshFilters instead of rebuilding raw floats per frame.
 GLModel::Geometry stilized_arrow(unsigned int resolution, float tip_radius, float tip_height, float stem_radius, float stem_height)
 {
     resolution = std::max<unsigned int>(4, resolution);

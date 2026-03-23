@@ -276,7 +276,7 @@ Last updated: 2026-03-23T03:20:00Z
 - [x] T355 annotate: src/slic3r/GUI/Gizmos/GLGizmoText.hpp
 - [x] T356 annotate: src/slic3r/GUI/GLCanvas3D.cpp
 - [ ] T357 annotate: src/slic3r/GUI/GLCanvas3D.hpp
-- [ ] T358 annotate: src/slic3r/GUI/GLModel.cpp
+- [x] T358 annotate: src/slic3r/GUI/GLModel.cpp
 - [ ] T359 annotate: src/slic3r/GUI/GLModel.hpp
 - [ ] T360 annotate: src/slic3r/GUI/GLSelectionRectangle.cpp
 - [ ] T361 annotate: src/slic3r/GUI/GLSelectionRectangle.hpp

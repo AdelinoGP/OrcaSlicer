@@ -2517,3 +2517,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=2 (legacy constructor/event wiring, wx events), P3=4 (color-mode icon swaps, tooltip overlay placement, GL texture uploads, depth-sorted label windows)
 - Git: annotate: document GLCanvas3D canvas lifecycle
 - Next recommended Phase 1 task: T357 annotate: src/slic3r/GUI/GLCanvas3D.hpp
+
+## Phase 1 - Task T358 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GLModel.cpp
+- Deliverables: src/slic3r/GUI/GLModel.cpp
+- Substantive additions: 7 targeted `[INTENT]/[STATE]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments covering buffer lifecycle, GPU upload, render range gating, instanced draws, and helper geometry factories.
+- Verification excerpt: // [OPENGL]/[THREAD]/[STATE]/[UNITY]/[PORTING_HAZARD:P2] Issue attribute bindings, send cached data to GPU if needed, and call glDrawElements; this mirrors Unity's Graphics.DrawMesh/CommandBuffer path but requires explicit shader attribute lookups and range gating for selection highlights.
+- Unity-impact summary:
+  - GLModel owns explicit VAO/VBO/IBO state plus a bounding box cache, so Unity must mirror it with MeshFilter/MeshRenderer updates executed via the main-thread dispatcher.
+  - Render/instanced paths map to `Graphics.DrawMesh`/`Graphics.DrawMeshInstanced` (or CommandBuffer) instead of direct glDrawElements, and the shader lookup must match the `_instanced` naming convention or Unity will drop attributes.
+  - Geometry factories (arrows, torus, sphere, etc.) become cached Mesh assets that a MonoBehaviour can reuse instead of rebuilding raw float buffers per frame.
+- Hazards found: P1=1, P2=5, P3=1
+- Git: doc: annotate GLModel for Unity
+- Next recommended Phase 1 task: T359 annotate: src/slic3r/GUI/GLModel.hpp
