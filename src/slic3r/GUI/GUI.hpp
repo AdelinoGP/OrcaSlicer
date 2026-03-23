@@ -21,7 +21,8 @@ class wxTopLevelWindow;
 
 namespace Slic3r {
 
-// [INTENT] Namespace providing global UI-related helper functions, platform-specific shortcuts, and string conversion utilities.
+// [INTENT][UNITY] Namespace providing global UI-related helper functions, platform-specific shortcuts, menu/toolbar wiring, and GL/preview
+// coordination so Unity’s MainMenu + RenderTexture controllers can hook into the same helpers.
 namespace GUI {
 
 // [PORTING_HAZARD:P2] No direct equivalent; requires native plugin for OS-level power management.
@@ -44,13 +45,15 @@ extern const std::string& shortkey_alt_prefix();
 // [STATE][UNITY] Exposes the singleton `AppConfig` pointer so both legacy and Unity pipes read from the same serialized settings model.
 extern AppConfig* get_app_config();
 
-// [EVENT][UNITY] Registers the wxMenuBar entries and preference/language command IDs so Unity can layer a UI Toolkit menu tree with the
-// same event hooks.
+// [EVENT][OPENGL][UNITY] Registers the wxMenuBar entries, preference/language command IDs, and GL preview refresh hooks so Unity can layer
+// a UI Toolkit menu tree and trigger RenderTexture updates when the menu structure changes.
 extern void add_menus(wxMenuBar* menu, int event_preferences_changed, int event_language_change);
 
 // [STATE][EVENT][THREAD] Mutates `DynamicPrintConfig` caches and emits option-change handlers while running on the UI thread before slicing
 // workers read the new value.
 // [UNITY] Maps to Data-binding (UI Toolkit) or direct property manipulation in a ViewModel pattern.
+// [PORTING_HAZARD:P3] Option observers assume `DynamicPrintConfig` is updated synchronously on the main thread and the preview refresh
+// time-sensitive, so Unity must guard against multi-threaded mutation while keeping RenderTexture updates in sync.
 void change_opt_value(DynamicPrintConfig& config, const t_config_option_key& opt_key, const boost::any& value, int opt_index = 0);
 
 // [EVENT][THREAD][UNITY] Routed from validators and CLI error handlers so the message box shows on the UI thread with the preserved font
@@ -73,20 +76,23 @@ inline void show_info(wxWindow* parent, const std::string& message, const std::s
 // [EVENT][STATE][THREAD] Wraps unexpected state so warning dialogs always carry context; Unity can mirror via a `WarningDialog`
 // MonoBehaviour that runs on the main thread.
 void warning_catcher(wxWindow* parent, const wxString& message);
-// [STATE][UNITY] Displays the current substitution stacks for presets/config and lets the diagnostics dialog share the same
-// ScriptableObject metadata.
+// [STATE][THREAD][UNITY] Displays the current substitution stacks for presets/config on the UI thread and lets the diagnostics dialog share
+// the same ScriptableObject metadata.
 void show_substitutions_info(const PresetsConfigSubstitutions& presets_config_substitutions);
-// [STATE][UNITY] Reuses the same dialog logic when a file-specific substitution overrides the base, so Unity can lock in the serialized
-// source/target pair for the overlay panel.
+// [STATE][THREAD][UNITY] Reuses the same dialog logic when a file-specific substitution overrides the base, so Unity can lock in the
+// serialized source/target pair for the overlay panel while keeping the update on the UI thread.
 void show_substitutions_info(const ConfigSubstitutions& config_substitutions, const std::string& filename);
 
-// [STATE][EVENT] Builds checkbox list state backed by a bitmask string so Unity can present the same selections without losing contextual
-// text. [UNITY] Reimplement as UI Toolkit Checkbox list dialogs.
+// [STATE][EVENT][THREAD] Builds checkbox list state backed by a bitmask string so Unity can present the same selections without losing
+// contextual text. Unity must run this on the main thread (matching wxWidgets) and reimplement as UI Toolkit Checkbox list dialogs with the
+// same bitmask semantics.
 void create_combochecklist(wxComboCtrl* comboCtrl, const std::string& text, const std::string& items);
 
 // [STATE] Reads the checkbox bitmask so other parts of the UI know which entries remain checked.
+// [THREAD] The caller assumes this runs on the GUI thread to avoid wxComboCtrl races.
 unsigned int combochecklist_get_flags(wxComboCtrl* comboCtrl);
 // [STATE] Writes the checkbox bitmask when the caller updates the combo selection.
+// [THREAD] Must execute on the UI thread to keep wxComboCtrl in a safe state.
 void combochecklist_set_flags(wxComboCtrl* comboCtrl, unsigned int flags);
 
 // [INTENT] Keeps a single conversion boundary between wxString and UTF-8 so other UI helpers rely on consistent encoding.

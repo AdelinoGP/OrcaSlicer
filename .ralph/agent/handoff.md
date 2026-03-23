@@ -4082,3 +4082,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 (P3 hard-coded macros, P3 ASCII-only parser)
 - Git: docs: annotate HttpServer.hpp for Unity
 - Next recommended Phase 1 task: T408 annotate: src/slic3r/GUI/I18N.cpp
+## Phase 1 - Task T383 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI.hpp
+- Deliverables: src/slic3r/GUI/GUI.hpp
+- Substantive additions: 5 targeted annotations clarifying the GUI namespace intent, menu/OpenGL refresh hooks, thread-bound config helpers, Unity replacements, and porting hazards.
+- Verification excerpt: // [EVENT][OPENGL][UNITY] Registers the wxMenuBar entries, preference/language command IDs, and GL preview refresh hooks so Unity can layer a UI Toolkit menu tree and trigger RenderTexture updates when the menu structure changes.
+- Unity-impact summary:
+  - Keep the main menu/toolbar wiring aligned by reusing the same helper IDs and option-change dispatch so Unity can feed VisualElement menus that refresh the same RenderTexture preview pipeline.
+  - Dual-run menu/config helpers expose a single AppConfig pointer, so ported panels can share a ScriptableObject config controller instead of duplicating state.
+  - Guard `change_opt_value` with a Unity dispatcher/`SynchronizationContext` to avoid races while marshaling previews triggered by DynamicPrintConfig changes.
+- Hazards found: 1 (P3 asynchronous DynamicPrintConfig observers and RenderTexture timing)
+- Git: annotate: src/slic3r/GUI/GUI.hpp
+- Next recommended Phase 1 task: T397 annotate: src/slic3r/GUI/GUI_Preview.hpp
