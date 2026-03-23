@@ -38,10 +38,17 @@ BaseTransparentDPIFrame::BaseTransparentDPIFrame(wxWindow*         parent,
                !wxCAPTION | !wxCLOSE_BOX | wxBORDER_NONE)
     , m_timed_disappearance_mode(disappearance_mode)
 {
-    // SetBackgroundStyle(wxBackgroundStyle::wxBG_STYLE_TRANSPARENT);
+    // [INTENT] Compose a semi‑transparent overlay dialog that sizes to its message text and exposes confirm/cancel actions with clarity.
+    // [STATE] Keep cached sizers, label, buttons, and disappearance mode so later animation helpers know what to fade or move.
+    // [EVENT] Button clicks, close events, and enter/leave hooks all originate here to feed the animation lifecycle methods.
+    // [UNITY] Unity port should implement this as a CanvasGroup overlay MonoBehaviour (Canvas + GraphicRaycaster) with TextMeshPro/Label
+    // elements that animate alpha via DOTween or coroutines. [PORTING_HAZARD:P3] wx transparencies and manual text measurement (wxDC)
+    // depend on native window paint behavior; in Unity, recreate the measurement with TextGenerator and handle GraphicRaycaster layering
+    // explicitly. SetBackgroundStyle(wxBackgroundStyle::wxBG_STYLE_TRANSPARENT);
     SetTransparent(m_init_transparent);
     SetBackgroundColour(wxColour(23, 25, 22, 128));
-    // Adaptive Frame Width
+    // [OPENGL] No custom GL draw calls here; rely on wxWidgets alpha blending so Unity can keep this inside UI Toolkit without extra GPU
+    // resources. Adaptive Frame Width
     wxClientDC dc(parent);
     wxSize     msg_sz = dc.GetMultiLineTextExtent(ok_text);
     auto       ratio  = msg_sz.GetX() / (float) win_width;
@@ -101,6 +108,10 @@ BaseTransparentDPIFrame::BaseTransparentDPIFrame(wxWindow*         parent,
     Fit();
 
     if (m_timed_disappearance_mode != DisappearanceMode::None) {
+        // [STATE] Enable the hidden animation timer so periodic ticks can drive gradual disappearance and movement.
+        // [THREAD] The wxTimer runs on the main GUI thread; Unity needs to mimic this with a coroutine or Update loop that checks local
+        // timers on the main thread to avoid race conditions. [PORTING_HAZARD:P3] With a 20ms granularity timer we may load the UI thread;
+        // Unity should throttle by using deltaTime-based Lerp or `yield return null` rather than setting alpha every 20ms.
         init_timer();
         Bind(wxEVT_TIMER, &BaseTransparentDPIFrame::on_timer, this);
         Bind(wxEVT_ENTER_WINDOW, [this](auto& e) {
@@ -129,6 +140,9 @@ BaseTransparentDPIFrame::~BaseTransparentDPIFrame() {}
 
 bool BaseTransparentDPIFrame::Show(bool show)
 {
+    // [STATE] Show/Hide controls for the timer so the animation task only runs while the overlay is visible.
+    // [EVENT] Called by wx to show the window; Unity equivalent is toggling a VisualElement's `SetDisplay` and managing a coroutine lifecycle.
+    // [UNITY] Mirror this by setting `CanvasGroup.alpha` to 1/0 and starting/stopping a coroutine that updates the overlay every frame.
     if (show) {
         m_finish_text->SetForegroundColour(wxColour(255, 255, 255, 255));
         if (m_refresh_timer) {
@@ -145,6 +159,9 @@ bool BaseTransparentDPIFrame::Show(bool show)
 
 void BaseTransparentDPIFrame::on_full_screen(IntEvent& e)
 {
+    // [STATE] Some platforms require always-on-top policy during fullscreen to keep this overlay visible.
+    // [PORTING_HAZARD:P3] Unity's fullscreen mode cannot easily mimic wx's `wxSTAY_ON_TOP`; consider managing UI layers or rendering to a
+    // separate overlay camera.
 #ifdef __APPLE__
     SetWindowStyleFlag(GetWindowStyleFlag() | wxSTAY_ON_TOP);
 #endif
@@ -152,18 +169,22 @@ void BaseTransparentDPIFrame::on_full_screen(IntEvent& e)
 
 void BaseTransparentDPIFrame::on_dpi_changed(const wxRect& suggested_rect)
 {
+    // [EVENT] DPI notifications trigger a size update on the buttons to prevent blurry assets when screen scaling changes.
+    // [UNITY] Unity would rely on a CanvasScaler or recalculating RectTransform size + TextMeshPro font size when the `Screen.dpi` changes.
     m_button_ok->Rescale();
     m_button_cancel->Rescale();
 }
 
 void BaseTransparentDPIFrame::on_show()
 {
+    // [EVENT] External callers request this overlay to appear; we raise it and bring its owning window forward.
     Show();
     Raise();
 }
 
 void BaseTransparentDPIFrame::on_hide()
 {
+    // [STATE] Hiding resets the timer and restores the main frame visibility so the application regains focus.
     if (m_refresh_timer) {
         m_refresh_timer->Stop();
     }
@@ -178,12 +199,16 @@ void BaseTransparentDPIFrame::clear_timer_count() { m_timer_count = 0; }
 
 void BaseTransparentDPIFrame::init_timer()
 {
+    // [STATE] Own a wxTimer tied to this frame so we can stop/start ticks without racing other windows.
+    // [THREAD] The timer always fires on wxWidgets' main UI thread; Unity analog is a coroutine scheduled on the main thread to change transparency.
     m_refresh_timer = new wxTimer();
     m_refresh_timer->SetOwner(this);
 }
 
 void BaseTransparentDPIFrame::calc_step_transparent()
 {
+    // [STATE] Helper caches size and alpha deltas for the gradual disappearance path so per-tick adjustments stay consistent.
+    // [UNITY] Unity should precompute Vector3/Color deltas and rely on `Time.deltaTime` rather than fixed 20ms ticks that wxTimer uses.
     m_max_size         = GetSize();
     m_step_size.x      = GetSize().x / m_time_gradual_and_scale;
     m_step_size.y      = GetSize().y / m_time_gradual_and_scale;
@@ -192,8 +217,13 @@ void BaseTransparentDPIFrame::calc_step_transparent()
 
 void BaseTransparentDPIFrame::on_close() { Destroy(); }
 
+// [EVENT] Platform close event funnels through here so the frame tears down itself instead of leaving dangling references.
+
 // [INTENT] Core animation logic: processes the timer events to drive the gradual disappearance and movement of the frame.
 // [UNITY] Replace with a DOTween/LeanTween sequence or an AnimationController transition.
+// [THREAD] wxTimer fires on the main GUI thread; Unity needs to marshal these updates through Update/Coroutine to avoid threading issues.
+// [PORTING_HAZARD:P2] This frame relies on fixed 20ms ticks and manual `SetTransparent` updates; Unity should linearly interpolate with
+// `deltaTime` to avoid choppy animation when the frame rate fluctuates.
 void BaseTransparentDPIFrame::on_timer(wxTimerEvent& event)
 {
     if (m_timed_disappearance_mode == DisappearanceMode::TimedDisappearance && m_display_stage == 0) {
@@ -215,6 +245,8 @@ void BaseTransparentDPIFrame::on_timer(wxTimerEvent& event)
 
 void BaseTransparentDPIFrame::call_start_gradual_disappearance() // for ok or cancel button
 {
+    // [EVENT] Triggered by confirm/cancel actions to begin the fade-out sequence once the user commits.
+    // [STATE] Protects against repeat clicks by invalidating `m_enter_window_valid` and moving to stage 1.
     if (m_enter_window_valid) {
         m_enter_window_valid = false;
         m_display_stage      = 1;
@@ -225,6 +257,8 @@ void BaseTransparentDPIFrame::call_start_gradual_disappearance() // for ok or ca
 
 void BaseTransparentDPIFrame::restart()
 {
+    // [STATE] Reset animation stage, transparency, and timer count so the frame can reappear with the same behavior.
+    // [UNITY] Reinitialize CanvasGroup alpha and restart coroutine-based animation to mimic this behavior.
     m_display_stage      = 0;
     m_enter_window_valid = true;
     SetTransparent(m_init_transparent);
@@ -235,12 +269,15 @@ void BaseTransparentDPIFrame::restart()
 }
 void BaseTransparentDPIFrame::start_gradual_disappearance()
 {
+    // [STATE] Calculate deltas once before the animation run to keep sizing/alpha consistent during the disappearance.
     clear_timer_count();
     // hide_all();
     calc_step_transparent();
 }
 void BaseTransparentDPIFrame::set_target_pos_and_gradual_disappearance(wxPoint pos)
 {
+    // [STATE] Prepare the frame to move towards `pos` before fading out so the overlay can slide away instead of only shrinking.
+    // [UNITY] Cache the destination so Unity's RectTransform.lerp + CanvasGroup.alpha coroutine can follow the same path.
     m_move_to_target_gradual_disappearance = true;
     m_target_pos                           = pos;
     m_start_pos                            = GetScreenPosition();
@@ -250,6 +287,8 @@ void BaseTransparentDPIFrame::set_target_pos_and_gradual_disappearance(wxPoint p
 
 void BaseTransparentDPIFrame::begin_gradual_disappearance()
 {
+    // [STATE] Fade alpha out in fixed steps before fully hiding so this helper can reuse the cached deltas.
+    // [UNITY] Mirror this by tweening CanvasGroup.alpha with LeanTween or DOTween to avoid manual per-step SetTransparent calls.
     if (m_timer_count <= m_time_gradual_and_scale - 1) {
         auto transparent = m_init_transparent - m_timer_count * m_step_transparent;
         SetTransparent(transparent < 0 ? 0 : transparent);
@@ -262,6 +301,8 @@ void BaseTransparentDPIFrame::begin_gradual_disappearance()
 
 void BaseTransparentDPIFrame::begin_move_to_target_and_gradual_disappearance()
 {
+    // [INTENT] Animate both position and transparency toward the target simultaneously for smoother dismissal.
+    // [UNITY] Combine RectTransform translation (via tween) with CanvasGroup alpha adjustments so Unity can imitate the slide-&-fade.
     if (m_timer_count <= m_time_move) {
         if (m_timer_count <= m_time_move - 1) {
             auto pos = wxPoint(m_start_pos.x + m_timer_count * m_step_pos.x, m_start_pos.y + m_timer_count * m_step_pos.y);
@@ -286,6 +327,9 @@ void BaseTransparentDPIFrame::begin_move_to_target_and_gradual_disappearance()
 
 void BaseTransparentDPIFrame::show_sizer(wxSizer* sizer, bool show)
 {
+    // [INTENT] Recursively toggle each child window so dialogs and their nested controls can hide/show without extra flags.
+    // [STATE] This ensures recursive visibility state matches the desired `show` flag before layout refresh.
+    // [UNITY] Unity port should traverse VisualElement hierarchies and call `SetEnabled`/`SetDisplay` similarly to keep layout consistent.
     wxSizerItemList items = sizer->GetChildren();
     for (wxSizerItemList::iterator it = items.begin(); it != items.end(); ++it) {
         wxSizerItem* item = *it;
@@ -298,10 +342,16 @@ void BaseTransparentDPIFrame::show_sizer(wxSizer* sizer, bool show)
     }
 }
 
-void BaseTransparentDPIFrame::hide_all() { show_sizer(m_sizer_main, false); }
+void BaseTransparentDPIFrame::hide_all()
+{
+    // [EVENT] Used when we need to temporarily hide the entire frame before restarting animations.
+    show_sizer(m_sizer_main, false);
+}
 
+// [EVENT] Base hooks for subclasses to respond to confirm/cancel; does nothing by default so derived dialogs can override safely.
 void BaseTransparentDPIFrame::deal_ok() {}
 
+// [EVENT] Closed by the cancel control; override when custom cleanup or state rollback is required.
 void BaseTransparentDPIFrame::deal_cancel() {}
 
 }} // namespace Slic3r::GUI

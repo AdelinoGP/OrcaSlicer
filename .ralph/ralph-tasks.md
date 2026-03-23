@@ -83,7 +83,7 @@ Last updated: 2026-03-23T22:45:00Z
 - [x] T162 annotate: src/slic3r/GUI/Auxiliary.hpp
 - [x] T163 annotate: src/slic3r/GUI/BackgroundSlicingProcess.cpp
 - [x] T164 annotate: src/slic3r/GUI/BackgroundSlicingProcess.hpp
-- [ ] T165 annotate: src/slic3r/GUI/BaseTransparentDPIFrame.cpp
+- [x] T165 annotate: src/slic3r/GUI/BaseTransparentDPIFrame.cpp
 - [ ] T166 annotate: src/slic3r/GUI/BaseTransparentDPIFrame.hpp
 - [ ] T167 annotate: src/slic3r/GUI/BBLStatusBarBind.cpp
 - [ ] T168 annotate: src/slic3r/GUI/BBLStatusBarBind.hpp

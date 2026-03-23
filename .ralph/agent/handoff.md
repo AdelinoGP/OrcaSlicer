@@ -451,6 +451,19 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate GUI_ObjectList for Unity port
 - Next recommended Phase 1 task: T395 annotate: src/slic3r/GUI/GUI_ObjectTableSettings.hpp
 
+## Phase 1 - Task T165 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BaseTransparentDPIFrame.cpp
+- Deliverables: src/slic3r/GUI/BaseTransparentDPIFrame.cpp
+- Substantive additions: Multi-tag guidance for overlay layout, timer-driven disappearance, recursive sizer toggles, and Unity replacements for the CanvasGroup/Coroutine animation lifecycle.
+- Verification excerpt: // [INTENT] Compose a semi-transparent overlay dialog that sizes to its message text and exposes confirm/cancel actions with clarity.
+- Unity-impact summary:
+  - Rebuild this overlay as a CanvasGroup+GraphicRaycaster panel that animates alpha/position via DOTween/LeanTween coroutines instead of wxTimer ticks.
+  - Use UI Toolkit VisualElements for the icon/text layout so the label, buttons, and recursive sizer hiding stay in sync with Resize events.
+- Hazards found: 2 (P2 fixed-interval timer logic, P3 wx transparency/enter/leave nuances)
+- Git: annotate BaseTransparentDPIFrame overlay comments
+- Next recommended Phase 1 task: T166 annotate: src/slic3r/GUI/BaseTransparentDPIFrame.hpp
+
 ## Phase 1 - Task T162 complete
 - Task type: annotate
 - File: src/slic3r/GUI/Auxiliary.hpp

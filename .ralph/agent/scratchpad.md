@@ -200,6 +200,10 @@
 - Plan: read the file in full, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around the combo box widget initialization, event wiring, preset cache, and render helpers; ensure comments note any asynchronous state, selection caching, or cross-thread hazards, highlight Unity analogs (e.g., UI Toolkit `ListView` with `VisualElement` item renderer plus ScriptableObject preset model), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the single file change, close T153, and then pick the next eligible Phase 1 task afterward.
 
 ## Iteration plan update
+- Selected task: T165 annotate `src/slic3r/GUI/BaseTransparentDPIFrame.cpp` to continue making progress from the ready manifest.
+- Plan: read the full CPP, identify the transparent DPI-aware frame lifecycle, event wiring, GL rendering hooks, context menus, and worker communication; insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations that explain the frame's role, state flags, event bindings, sizing/scale adjustments, and cross-thread hazards, append the Phase 1 evidence block with Unity impact notes to `.ralph/agent/handoff.md`, stage/commit the annotated file plus metadata, close T165, and stop after this single duty so the next iteration can continue with another task.
+
+## Iteration plan update
 - Selected task: T413 annotate `src/slic3r/GUI/ImageDPIFrame.hpp` as the current focus for this iteration.
 - Plan: read the DPI frame header, weave `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations around the frame lifecycle, DPI delta handling, refresh timer, and layout state, append the mandated evidence block to `.ralph/agent/handoff.md`, stage/commit the header plus handoff, close the runtime task, and keep the manifest moving forward.
 
