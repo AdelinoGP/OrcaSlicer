@@ -398,6 +398,19 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: Annotate GUI color helpers for Unity port
 - Next recommended Phase 1 task: T375 annotate: src/slic3r/GUI/GuiColor.hpp
 
+## Phase 1 - Task T372 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Deliverables: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Substantive additions: 2 targeted annotations (INTENT/UNITY context-menu builder plus PORTING_HAZARD drop-state reset guidance)
+- Verification excerpt: // [INTENT][UNITY] Compose this context menu so Unity can offer the same verbs via its right-click overlay and re-use the existing handlers.
+- Unity-impact summary:
+  - Keep the wx context-menu verbs aligned with Unity's right-click overlay so the same handlers and command IDs can be reused via a VisualElement or Canvas overlay.
+  - Reset the drag sentinel on the UI thread and drop completion so Unity's DragAndDrop bridge never reuses stale `m_dragged_item` references.
+- Hazards found: 1 (P2 stale drag-state reference if the sentinel is not reset before the next drop)
+- Git: annotate: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp
+
 ## Phase 1 - Task T338 complete
 - Task type: annotate
 - File: src/slic3r/GUI/Gizmos/GLGizmoRotate.hpp

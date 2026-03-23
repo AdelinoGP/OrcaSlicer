@@ -223,6 +223,7 @@ void AuxiliaryList::on_delete(wxCommandEvent& evt)
 void AuxiliaryList::on_context_menu(wxDataViewEvent& evt)
 {
 	wxMenu* menu = new wxMenu();
+	// [INTENT][UNITY] Compose this context menu so Unity can offer the same verbs via its right-click overlay and re-use the existing handlers.
 	wxDataViewItem item = evt.GetItem();
 	AuxiliaryModelNode* node = (AuxiliaryModelNode*)item.GetID();
 	if (node == nullptr) {
@@ -300,7 +301,7 @@ void AuxiliaryList::on_drop(wxDataViewEvent& evt)
 	Expand(evt.GetItem());
 	Select(m_dragged_item);
 	m_dragged_item = wxDataViewItem(nullptr);
-	// [EVENT][STATE][THREAD][UNITY] Clear the drag sentinel once the move completes so future drops start fresh and the UI thread-owned state resets before Unity reuses the controller.
+	// [EVENT][STATE][THREAD][UNITY][PORTING_HAZARD:P2] Clear the drag sentinel once the move completes so future drops start fresh, avoid stale references, and teach Unity to reset its drag state before the next drop.
 }
 
 void AuxiliaryList::on_editing_started(wxDataViewEvent& evt)

@@ -613,3 +613,9 @@
 ## Iteration plan update
 - Selected task: T404 annotate `src/slic3r/GUI/HMSPanel.cpp`
 - Plan: read the panel, document HTML viewer/HTTP state, selection caches, toolbar/event wiring, scale & layout toggles; annotate each region with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]`, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the updated file and handoff, close T404, then immediately proceed to the next ready task.
+
+## Iteration plan update - T383
+- Current focus: T383 annotate `src/slic3r/GUI/GUI.hpp` (task-1773880086-6aa6).  Read the header, add multi-tag annotations for config sprites, menu wiring, main frame helpers, and cross-thread dialogs, note Unity translations for the main menu/toolbar + config service, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the annotated header, close the task, and stop this iteration so the next agent can continue along the manifest.
+
+## Iteration plan update - T372
+- Actual task: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp` (task-1773880086-6aa6 now in progress).  Plan: read the entire CPP, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` annotations especially around list lifecycle, selection caches, layout events, drag/drop, keyboard shortcuts, and wxListCtrl interactions; append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the annotated file, close the task, and pause for the next iteration so another agent can continue.
