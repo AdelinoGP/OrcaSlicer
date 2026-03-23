@@ -677,3 +677,7 @@
 ## Iteration plan update
 - Selected task: T410 annotate `src/slic3r/GUI/IconManager.cpp` (task-1773880086-f0fa now in focus).
 - Plan: read the file to decode atlas packing, bitmap caching, GL upload, and wx event wiring; insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments covering sprite construction, lazy icon loading, ImGui/toolbar usage, worker threading, and hazard around shared `wxBitmap` ownership; append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file, close the task, and stop so the next agent can continue.
+
+## Iteration plan update
+- Selected task: T411 annotate `src/slic3r/GUI/IconManager.hpp` (runtime task complete this iteration).
+- Plan: document atlas ownership, shared Icon state, init/release contracts, and ImGui helper bindings with `[INTENT]/[STATE]/[THREAD]/[OPENGL]/[UNITY]/[EVENT]/[PORTING_HAZARD]` tags; capture the evidence block, commit the header, close the task, and queue the next ready item (T412).

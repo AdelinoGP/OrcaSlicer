@@ -3573,3 +3573,16 @@ This prompt governs **Phase 1 only**.
 - Git: Annotate Auxiliary panel flows
 
 - Next recommended Phase 1 task: T158 annotate: src/slic3r/GUI/AuxiliaryDataViewModel.cpp
+
+## Phase 1 - Task T411 complete
+- Task type: annotate
+- File: src/slic3r/GUI/IconManager.hpp
+- Deliverables: src/slic3r/GUI/IconManager.hpp
+- Substantive additions: 8 multi-tag annotations covering atlas ownership, RasterType intent, init lifecycle, release state, draw/click/button events, and Unity mapping (INTENT/STATE/THREAD/OPENGL/UNITY/EVENT/PORTING_HAZARD)
+- Verification excerpt: // [INTENT] Owns the shared GPU atlas for all svgs/icons used by ImGui widgets.
+- Unity-impact summary:
+  - Convert the icon atlas into Unity Texture2D/SpriteAtlas pairs so the same UV rects can be reused by Graphics/UI Toolkit widgets.
+  - Replace ImGui draw/click/button helpers with UI Toolkit Image/Button + Sprite swap logic on the main thread, using InputSystem hover/click events.
+- Hazards found: P2=1 (ImGui immediate-mode draw/click dependency requires explicit Unity dispatcher or VisualElement bridging)
+- Git: annotate IconManager header for Unity port
+- Next recommended Phase 1 task: T412 annotate: src/slic3r/GUI/ImageDPIFrame.cpp
