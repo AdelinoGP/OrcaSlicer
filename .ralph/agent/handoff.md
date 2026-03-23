@@ -2871,3 +2871,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3: header-only helpers may be dropped by the managed build if no direct reference exists)
 - Git: Annotate GUI geometry translation unit
 - Next recommended Phase 1 task: T382 annotate: src/slic3r/GUI/GUI_Geometry.hpp
+
+## Phase 1 - Task T387 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectLayers.hpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectLayers.hpp
+- Substantive additions: 8 targeted annotations covering intent, state, event flow, and Unity/porting guidance for the layer-height inspector.
+- Verification excerpt: // [INTENT] Object-specific layer-height inspector that keeps text edits, plus/minus buttons, and the 3D preview synchronized for the current model object.
+- Unity-impact summary:
+  - Rebuild this as a LayerHeightPanel MonoBehaviour that owns InputFields/Buttons tied to a shared LayerConfig ScriptableObject so Unity mirrors the same object-specific data and event wiring.
+  - Map the PlusMinusButton focus/Submit interactions through Unity's InputSystem/GraphicRaycaster pipeline and hook the preview updates into the PreviewController that drives the RenderTexture camera overlay.
+- Hazards found: 1 (P3 focus/rescale interplay relies on kill-focus guards and system-color hooks that Unity must replicate carefully).
+- Git: annotate: src/slic3r/GUI/GUI_ObjectLayers.hpp
+- Next recommended Phase 1 task: T388 annotate: src/slic3r/GUI/GUI_ObjectList.cpp

@@ -441,3 +441,7 @@
 ## Iteration plan update
 - Selected task: T381 annotate: src/slic3r/GUI/GUI_Geometry.cpp (task-1773880086-3b67)
 - Plan: Confirm the TU already contains the necessary intent/state/event tags, expand the comment block to mention GL and thread mapping, update `.ralph/agent/handoff.md` with the evidence block, stage/commit the metadata, and close the task before moving to the next Phase 1 item.
+
+## Iteration update
+- Completed T387 annotate `src/slic3r/GUI/GUI_ObjectLayers.hpp` by adding layered intent/state/event comments plus Unity/porting guidance for the editor widgets and focus/rescale helpers.
+- Next target: T388 annotate `src/slic3r/GUI/GUI_ObjectList.cpp` so the object list panel receives matching lifecycle annotations before moving on.
