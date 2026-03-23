@@ -314,9 +314,9 @@ Last updated: 2026-03-23T14:40:25Z
 - [ ] T393 annotate: src/slic3r/GUI/GUI_ObjectTable.hpp
 - [x] T394 annotate: src/slic3r/GUI/GUI_ObjectTableSettings.cpp
 - [ ] T395 annotate: src/slic3r/GUI/GUI_ObjectTableSettings.hpp
-- [ ] T396 annotate: src/slic3r/GUI/GUI_Preview.cpp
+- [x] T396 annotate: src/slic3r/GUI/GUI_Preview.cpp
 - [ ] T397 annotate: src/slic3r/GUI/GUI_Preview.hpp
-- [ ] T398 annotate: src/slic3r/GUI/GUI_Utils.cpp
+- [x] T398 annotate: src/slic3r/GUI/GUI_Utils.cpp
 - [ ] T399 annotate: src/slic3r/GUI/GUI_Utils.hpp
 - [ ] T400 annotate: src/slic3r/GUI/HintNotification.cpp
 - [x] T401 annotate: src/slic3r/GUI/HintNotification.hpp

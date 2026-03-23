@@ -351,6 +351,11 @@
 
 ## Iteration plan update
 - Selected task: T363 annotate `src/slic3r/GUI/GLShader.hpp` to capture shader program intent/state/render bindings for the Unity migration.
+
+## Iteration plan update
+- Selected task: T398 annotate `src/slic3r/GUI/GUI_Utils.cpp` (task-1773880086-d4b6 now active).
+- Plan: read through `GUI_Utils.cpp`, identify major helpers, caching layers, and threading hints, and insert `[INTENT]/[STATE]/[EVENT]/[OPENGL]/[THREAD]/[UNITY]/[PORTING_HAZARD]` comments around each high-impact block; ensure we map menu/toolbar helpers, config propagation, and GL refresh triggers to Unity equivalents (e.g., UI Toolkit `VisualElement` helpers + `ScriptableObject` config bridge) before adding the required Phase 1 evidence block to `.ralph/agent/handoff.md`, staging/committing the annotated file, and closing the task so the next iteration can continue.
+- Verification: rely on careful inspection (doc-only) and confirm comments describe caches, event flows, and Unity migration guidance.
 - Plan: mark the task active, read the header, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around the shader lifecycle, caches, binding helpers, and uniform setters; append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the file, close the task, and then pick the next ready Phase 1 file.
 
 ## Iteration plan update
@@ -592,3 +597,7 @@
 ## Iteration plan update
 - Current focus: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp` (task-1773880086-6aa6 active and already started).
 - Plan: read the full source, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` annotations around the list lifecycle, selection caches, layout events, drag/drop handling, and keyboard shortcuts; include `[UNCLEAR]` notes for any ambiguous behavior, append the standard Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only the annotated file plus metadata, close the task, and then stop for this iteration so the next agent can continue.
+
+## Iteration update
+- Completed `T396 annotate: src/slic3r/GUI/GUI_Preview.cpp` with multi-tag coverage for View3D/Preview/AssembleView, slider bindings, background scheduling, and Unity guidance; the file has the updated handoff evidence block and task registry marks.
+- Next iteration plan: pick `T397 annotate: src/slic3r/GUI/GUI_Preview.hpp`, ensure headers map the preview state to the GL canvas, outline the slider facts, and continue the Phase 1 pipeline with another small atomic commit.

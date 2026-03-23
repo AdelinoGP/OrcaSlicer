@@ -343,6 +343,20 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: Annotate SLAImportJob view for Unity port
 - Next recommended Phase 1 task: T199 annotate: src/slic3r/GUI/Jobs/SVGFileJob.cpp
 
+## Phase 1 - Task T396 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Preview.cpp
+- Deliverables: src/slic3r/GUI/GUI_Preview.cpp, .ralph/agent/handoff.md, .ralph/ralph-tasks.md
+- Substantive additions: 13 targeted annotations covering View3D/Preview/AssembleView canvas setup, slider state, event bindings, and Unity migration guidance
+- Verification excerpt: // [INTENT][STATE] Build the native canvas, keep it on the UI thread, and record the GLCanvas3D instance that owns selection/gizmo state for reuse by derived panels.
+- Unity-impact summary:
+  - Map the GL canvas creation and toolbar toggles to a RenderTexture-backed camera plus a MonoBehaviour-driven InputSystem bridge for selection/gizmo state.
+  - Translate `IMSlider` range/legend syncing and the `L` key handler to UI Toolkit sliders wired to InputSystem callbacks and ScriptableObject preview state.
+  - Mirror the `BackgroundSlicingProcess` guard + `m_loaded_print` cache with async Tasks/ScriptableObject caches so Unity can re-render only when new prints arrive.
+- Hazards found: P2=1 (wxGetApp/mainframe/global guard coupling), P3=1 (placeholder slider show/hide stubs and `wxGetApp` singletons that must be refactored)
+- Git: annotate: src/slic3r/GUI/GUI_Preview.cpp
+- Next recommended Phase 1 task: T397 annotate: src/slic3r/GUI/GUI_Preview.hpp
+
 ## Phase 1 - Task T390 complete
 - Task type: annotate
 - File: src/slic3r/GUI/GUI_ObjectSettings.cpp
@@ -3320,3 +3334,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (blocking file dialog/auto-launch), P3=4 (wxGetApp singleton/model lifetime, drag sentinel, inline edit-thread coupling, context menu lifetime).
 - Git: Annotate GUI_AuxiliaryList.cpp for Unity port
 - Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp
+
+## Phase 1 - Task T398 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Utils.cpp
+- Deliverables: src/slic3r/GUI/GUI_Utils.cpp
+- Substantive additions: ~15 multi-tag annotations covering Win32 helpers, DPI/font/dark-mode heuristics, dialog extras, window metrics, image prep, and Linux debugger detection.
+- Verification excerpt: `// [INTENT] Keep GUI copy flows deterministic by handling Win32 copy errors without relying on CopyFile's exception path.`
+- Unity-impact summary:
+  - Guides hardware event decoding into Unity `UnityEvent`s so FileSystemWatcher/InputSystem observers can refresh device lists.
+  - Captures DPI, font scaling, and dark-mode heuristics so Unity ports can rely on `Screen.dpi` and theme controllers instead of Win32 APIs.
+  - Documents window metrics, dialog helpers, and image prep routines for Unity `RectTransform` and `Texture2D` workflows.
+- Hazards found: P2=2 (Win32 copy + DPI/font/dark-mode APIs), P3=2 (dialog extras + Linux debugger probe/dark-mode heuristics).
+- Git: Document GUI utility helpers for Unity port
+- Next recommended Phase 1 task: T399 annotate: src/slic3r/GUI/GUI_Utils.hpp
