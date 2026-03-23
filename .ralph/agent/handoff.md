@@ -2661,3 +2661,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2:1, P3:1
 - Git: annotate: src/slic3r/Utils/ASCIIFolding.cpp
 - Next recommended Phase 1 task: T723 annotate: src/slic3r/Utils/ASCIIFolding.hpp
+
+## Phase 1 - Task T375 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GuiColor.hpp
+- Deliverables: src/slic3r/GUI/GuiColor.hpp
+- Substantive additions: Added three multi-tag comments clarifying the palette distance state, conversion utilities, and distance metrics for UI handlers.
+- Verification excerpt: // [INTENT][STATE] Keeps the palette entry id and the last computed distance from the currently inspected color so UI matching dialogs can rank candidates.
+- Unity-impact summary:
+  - Mirror the palette state in a ScriptableObject + GraphicRaycaster-driven controller so color pickers stay in sync with the native palette cache.
+  - Treat `convert_to_wxColour`/`convert_to_rgba` as `Color` assigners that feed Unity `Color` + `ColorUtility.ToHtmlStringRGBA` on selection events.
+- Hazards found: P2=1, P3=1 (gamma-space assumptions and wxColour-to-RGBA mapping differences)
+- Git: Annotate GuiColor conversions
+- Next recommended Phase 1 task: T377 annotate: src/slic3r/GUI/GUI_Colors.hpp

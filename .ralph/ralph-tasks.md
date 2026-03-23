@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-23T04:07:21Z
+Last updated: 2026-03-23T07:46:00Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -293,7 +293,7 @@ Last updated: 2026-03-23T04:07:21Z
 - [ ] T372 annotate: src/slic3r/GUI/GUI_AuxiliaryList.cpp
 - [x] T373 annotate: src/slic3r/GUI/GUI_AuxiliaryList.hpp
 - [x] T374 annotate: src/slic3r/GUI/GuiColor.cpp
-- [ ] T375 annotate: src/slic3r/GUI/GuiColor.hpp
+- [x] T375 annotate: src/slic3r/GUI/GuiColor.hpp
 - [x] T376 annotate: src/slic3r/GUI/GUI_Colors.cpp
 - [ ] T377 annotate: src/slic3r/GUI/GUI_Colors.hpp
 - [ ] T378 annotate: src/slic3r/GUI/GUI.cpp

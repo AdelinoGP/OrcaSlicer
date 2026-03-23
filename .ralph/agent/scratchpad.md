@@ -373,3 +373,6 @@
 ## Iteration plan update
 - Selected task: T723 annotate `src/slic3r/Utils/ASCIIFolding.hpp` for the next iteration.
 - Plan: read the header to capture the ASCII folding API, insert `[INTENT]/[STATE]/[UNITY]/[PORTING_HAZARD]` comments that explain normalization contracts, pointer/iterator overloads, and filename sanitization expectations, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the header, mark the task done, and then pass control to the next ready task.
+## Iteration plan update - T375
+- Objective: Annotate `src/slic3r/GUI/GuiColor.hpp` with full intent/state/event/thread/OpenGL/Unity/porting-hazard tags focusing on color definitions, caching, and usage signals.
+- Plan: scan entire header, note color constants, lazy loading helpers, and UI bindings; insert multi-tag comments near enums, static helpers, and accessor methods; ensure Unity equivalent references (ScriptableObject palette, ThemeManager); append evidence block after committing; next task will continue the prioritized manifest order.
