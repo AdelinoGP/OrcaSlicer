@@ -459,3 +459,14 @@
 ## Iteration plan update
 - Selected task: T383 annotate `src/slic3r/GUI/GUI.hpp` so the core namespace helpers also document the UI intent, state, and event responsibilities.
 - Plan: finish a read-through of the header, add the missing `[STATE]`, `[EVENT]`, `[THREAD]`, and `[INTENT]` tags around the config accessor, menu wiring, config mutation helper, error/report dialogs, and folder launch helpers; append the phase evidence block to `.ralph/agent/handoff.md`, flip T383 to `[x]`, commit the annotated file plus handoff, and leave the next ready header for the next iteration.
+
+## Iteration plan update
+- This iteration: keep T383 active, open `src/slic3r/GUI/GUI.hpp`, document the namespace helper class intent, stateful maps, menu bindings, and wx event wiring with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` tags so Unity counterparts know how to wire MainMenu, config dialogs, and cross-thread updates; after annotating append the required Phase 1 evidence block, commit the file and handoff, then stop so the next agent can resume with another file.
+
+## Iteration plan update
+- Selected task: T382 annotate `src/slic3r/GUI/GUI_Geometry.hpp` to document the transformation flags, event helpers, and render hooks that drive the viewport geometry utilities.
+- Plan: read the header top-to-bottom, annotate key enums, structs, and inline helpers with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` notes describing coordinate systems, shared state, event clients (selection, drag), GL flag dependencies, and Unity analogs (Transform components, UI Toolkit drag overlay); append evidence block to `.ralph/agent/handoff.md`, commit changes, close T382, and then stop for this iteration.
+
+## Iteration update
+- Completed T382 annotate `src/slic3r/GUI/GUI_Geometry.hpp` with multi-tag thread/event/OpenGL/Unity annotations and captured the shared bitmask hazard.
+- Next focus: T389 annotate `src/slic3r/GUI/GUI_ObjectList.hpp` for the next iteration.

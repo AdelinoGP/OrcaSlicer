@@ -11,7 +11,8 @@ enum class ECoordinatesType : unsigned char { World = 0, Instance, Local };
 
 // [INTENT] Maintain a transformation-mode bitmask describing coordinate space, relative/absolute toggles, and group behavior so UI
 // manipulators share the same context. [UNITY] Mirror this mask with a MonoBehaviour that tracks `TransformSpace` (World/Local),
-// `isRelative`, and `groupIndependent` flags.
+// `isRelative`, and `groupIndependent` flags. [THREAD] Manipulators mutate this bitmask through wxWidgets event callbacks on the UI thread
+// while the render loop reads it so we avoid cross-thread races.
 class TransformationType
 {
 public:
@@ -77,6 +78,9 @@ public:
     void set_independent() { this->add(Independent); }
 
     // [STATE] These setters keep the bitmask consistent so downstream rendering/selection logic reads the same coordinate and group flags.
+    // [EVENT] Toggle events (toolbar buttons, hotkeys, context menu picks) call these helpers so the change propagates to gizmo/selection
+    // controllers and the render pipeline together.
+    // [UNITY] Wire the toggles to UI Toolkit `Toggle` callbacks inside a shared MonoBehaviour before issuing `Transform` adjustments.
 
     // [STATE] Accessors that let the canvas controller branch on the active coordinate, relativity, and group modes.
     bool world() const { return !this->has(Instance) && !this->has(Local); }
@@ -92,11 +96,11 @@ private:
     void remove(Enum v) { m_value = Enum((unsigned int) m_value & (~(unsigned int) v)); }
 
     // [STATE] Current flag combination; [PORTING_HAZARD:P3] coordinate/relativity/group bits share a single mask, so Unity must keep all
-    // bits aligned.
+    // bits aligned. [OPENGL] The GL render loop reads this mask to configure which matrix stack and axis the drawing code uses for gizmos.
     Enum m_value;
 };
 
-} // namespace Slic3r
 } // namespace GUI
+} // namespace Slic3r
 
 #endif // slic3r_GUI_Geometry_hpp_

@@ -423,6 +423,19 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: Annotate GUI object list for Unity port
 - Next recommended Phase 1 task: T389 annotate: src/slic3r/GUI/GUI_ObjectList.hpp
 
+## Phase 1 - Task T382 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Geometry.hpp
+- Deliverables: src/slic3r/GUI/GUI_Geometry.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 4 multi-tag annotations covering thread/event/Unity/OpenGL guidance for the transformation helpers
+- Verification excerpt: // [EVENT] Toggle events (toolbar buttons, hotkeys, context menu picks) call these helpers so the change propagates to gizmo/selection
+- Unity-impact summary:
+  - Document how wxWidgets toggle events map to Unity UI Toolkit toggles + MonoBehaviour state updates.
+  - Call out GL matrix configuration that depends on the stored bitmask so Unity renderers keep axis alignment in sync.
+- Hazards found: 1 (P3 coordinate/relativity/group bitmask sharing)
+- Git: annotate: src/slic3r/GUI/GUI_Geometry.hpp
+- Next recommended Phase 1 task: T389 annotate: src/slic3r/GUI/GUI_ObjectList.hpp
+
 ## Phase 1 - Task T143 complete
 - Task type: annotate
 - File: src/slic3r/GUI/3DBed.cpp
