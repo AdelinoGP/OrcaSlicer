@@ -20,6 +20,8 @@ AuxiliaryList::AuxiliaryList(wxWindow* parent) : wxDataViewCtrl(parent, wxID_ANY
     wxDataViewTextRenderer* tr = new wxDataViewTextRenderer("string", wxDATAVIEW_CELL_INERT);
     wxDataViewColumn* column0  = new wxDataViewColumn("", tr, 0, 200, wxALIGN_LEFT, wxDATAVIEW_COL_SORTABLE | wxDATAVIEW_COL_RESIZABLE);
     this->AppendColumn(column0);
+    // [STATE][UNITY][PORTING_HAZARD:P3] Single-column sorting and resizing keep the explorer focused on names; Unity's TreeView should expose
+    // a corresponding column and drive sorting state from the controller so the UI stays in sync with wx's `wxDataViewCtrl` defaults.
 
     m_auxiliary_model = new AuxiliaryModel();
     // [STATE] The AuxiliaryModel owns canonical auxiliary paths so toolbar/context actions operate on a shared tree.
@@ -32,7 +34,8 @@ AuxiliaryList::AuxiliaryList(wxWindow* parent) : wxDataViewCtrl(parent, wxID_ANY
 
     wxPanel* panel = new wxPanel(parent, wxID_ANY, wxDefaultPosition, wxSize(-1, FromDIP(21)));
     // [INTENT] Host an inline toolbar row under the explorer so Add/Open/Delete stay visually tied to the tree.
-    // panel->SetBackgroundColour(*wxLIGHT_GREY);
+    // [STATE][UNITY] The panel height uses DPI-scaled metrics so Unity should adjust the toolbar container size using `Screen.dpi` or
+    // `CanvasScaler` to keep the 21-DIP spacing. panel->SetBackgroundColour(*wxLIGHT_GREY);
 
 #if 0
 	wxBitmap if_bitmap = create_scaled_bitmap("import_file.png", nullptr, FromDIP(21));

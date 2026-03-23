@@ -776,3 +776,7 @@
 
 ## Iteration update
 - Completed T167 annotate `src/slic3r/GUI/BBLStatusBarBind.cpp` by adding multi-tag guidance for the gauge/percent layout, busy/cancel toggles, DPI rescale hooks, event-loop yielding, and Unity analogs; appended the evidence block and marked the task done.
+
+## Iteration plan update
+- Selected task: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp`
+- Plan: revisit the auxiliary tree implementation, document the tree population intent, selection/cursor state caches, context menu wiring, and UI-thread-only delete logic; tag `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` around the node operations, drag/drop, and undo helpers, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated source plus metadata, close T372, and then pause for the next iteration so another agent can continue.

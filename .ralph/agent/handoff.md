@@ -3904,3 +3904,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 3 (P2 textures still use ImGui/GL handles, P3 toolbar font scaling/RectTransform alignment, P3 manual return Texture2D lifecycle)
 - Git: annotate: src/slic3r/GUI/IMToolbar.hpp
 - Next recommended Phase 1 task: T421 annotate: src/slic3r/GUI/InstanceCheck.cpp
+
+## Phase 1 - Task T372 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Deliverables: src/slic3r/GUI/GUI_AuxiliaryList.cpp, .ralph/agent/scratchpad.md
+- Substantive additions: 2 layout annotations covering the single-column tree and DPI-scaled toolbar panel state (INTENT/STATE/UNITY/PORTING_HAZARD)
+- Verification excerpt: // [STATE][UNITY][PORTING_HAZARD:P3] Single-column sorting and resizing keep the explorer focused on names; Unity's TreeView should expose a corresponding column and drive sorting state from the controller so the UI stays in sync with wx's `wxDataViewCtrl` defaults.
+- Unity-impact summary:
+  - Mirror the single-column tree/resizing semantics using a UI Toolkit TreeView + ScriptableObject selection binder so the Unity tree honors the same sort and column width heuristics.
+  - Keep the toolbar panel height DPI-scaled (FromDIP-based) by applying `Screen.dpi` adjustments or a CanvasScaler, ensuring Unity retains the same density-independent spacing around Import/Open/Delete buttons.
+- Hazards found: 1 (P3 column/resizing behavior must be replicated to avoid layout drift unless the Unity TreeView controller shares sort/resize state with the toolbar commands)
+- Git: Document auxiliary list layout state
+- Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp
