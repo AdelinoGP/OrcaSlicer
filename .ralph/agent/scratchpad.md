@@ -384,3 +384,9 @@
 ## Iteration update
 - Completed T377 annotate `src/slic3r/GUI/GUI_Colors.hpp` with intent/state/OpenGL/Unity comments on the shared palette indices, cached color array, and `GetRenderColName` helper; appended the Phase 1 evidence block and marked the task done.
 - Next target: T379 annotate `src/slic3r/GUI/GUI_Factories.cpp` as the subsequent Phase 1 work item.
+## Iteration plan update - T379
+- Focus: annotate `src/slic3r/GUI/GUI_Factories.cpp` to capture factory registration, event wiring, and OpenGL helper state needed for Unity porting.
+- Plan: mark runtime task active, read the implementation for `GUI_Factories`, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments on factory methods, lifecycle hooks, and caching helpers, note any unclear sections as `[UNCLEAR]`, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, update `.ralph/ralph-tasks.md`, commit, and close the task before handing off to the next ready entry.
+## Iteration update - T379
+- Added `[INTENT]/[STATE]/[EVENT]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations for the settings maps, bundle builder, GL menu helpers, plate workflow, selection utilities, and filament dialog so the Unity port has explicit guidance.
+- Documented the stringhell suggestion branch and noted the `auto rotate` TODO with an `[UNCLEAR]` hypothesis, flagged the menu-setup hazards, and appended the required handoff evidence block.

@@ -76,6 +76,7 @@ static SettingsFactory::Bundle FREQ_SETTINGS_BUNDLE_SLA =
 };
 
 //BBS: add setting data for table
+// [INTENT][STATE][UNITY][PORTING_HAZARD:P3] Maps object-setting categories to prioritized option keys so the parameter table knows how to group controls; Unity should mirror this with ScriptableObject metadata so the same sections and order are preserved at runtime.
 std::map<std::string, std::vector<SimpleSettingData>>  SettingsFactory::OBJECT_CATEGORY_SETTINGS=
 {
     { L("Quality"), {{"layer_height", "",1},
@@ -100,6 +101,7 @@ std::map<std::string, std::vector<SimpleSettingData>>  SettingsFactory::OBJECT_C
                     }}
 };
 
+// [STATE][INTENT][UNITY][PORTING_HAZARD:P2] Part-category option data captures the order of ironing/strength rows so the part tab can render consistent sections and Unity can copy this layout into a serialized list.
 std::map<std::string, std::vector<SimpleSettingData>>  SettingsFactory::PART_CATEGORY_SETTINGS=
 {
     { L("Quality"), {{"ironing_type", "",8},{"ironing_flow", "",9},{"ironing_spacing", "",10},{"ironing_inset", "", 11},{"bridge_flow", "",11},{"make_overhang_printable", "",11},{"bridge_density", "", 1}
@@ -117,6 +119,7 @@ std::map<std::string, std::vector<SimpleSettingData>>  SettingsFactory::PART_CAT
                     }}
 };
 
+// [INTENT][EVENT][UNITY][PORTING_HAZARD:P3] Enumerates which config keys to expose based on printer technology so the settings menu reflects only relevant options; Unity should run the equivalent filter on its preset service and keep the special-case removal of `layer_height` for SLA in sync.
 std::vector<std::string> SettingsFactory::get_options(const bool is_part)
 {
     if (printer_technology() == ptSLA) {
@@ -215,6 +218,7 @@ std::map<std::string, std::vector<SimpleSettingData>> SettingsFactory::get_all_v
 }
 
 
+// [INTENT][STATE][UNITY][PORTING_HAZARD:P2] Builds the final menu bundle from the current dynamic config, enforcing category filters that Unity will need to reproduce when it constructs the parameter tree so no stale options slip in.
 SettingsFactory::Bundle SettingsFactory::get_bundle(const DynamicPrintConfig* config, bool is_object_settings, bool is_layer_settings/* = false*/)
 {
     auto opt_keys = config->keys();
@@ -566,6 +570,7 @@ wxMenu* MenuFactory::append_submenu_add_handy_model(wxMenu* menu, ModelVolumeTyp
                 // Suggest to change settings for stringhell
                 // This serves as mini tutorial for new users
                 if (is_stringhell) {
+                    // [THREAD][EVENT] Marshals the suggestion dialog back to the UI thread after the async model load so Unity's main-thread dispatcher can run the same prompt.
                     wxGetApp().CallAfter([=] {
                         DynamicPrintConfig* m_config = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
 
@@ -595,6 +600,7 @@ wxMenu* MenuFactory::append_submenu_add_handy_model(wxMenu* menu, ModelVolumeTyp
 
     return sub_menu;
 }
+// [INTENT][OPENGL][UNITY][PORTING_HAZARD:P2] Couples the context menu to the GL gizmo manager so Unity can mirror the same context-sensitive additions through its RenderTexture canvas and InputSystem raycast hooks.
 static void append_menu_itemm_add_(const wxString& name, GLGizmosManager::EType gizmo_type, wxMenu *menu, ModelVolumeType type, bool is_submenu_item) {
     auto add_ = [type, gizmo_type](const wxCommandEvent & /*unnamed*/) {
         const GLCanvas3D *canvas = plater()->canvas3D();
@@ -1628,6 +1634,7 @@ void MenuFactory::create_plate_menu()
         [](wxCommandEvent&) {
             PartPlate* plate = plater()->get_partplate_list().get_selected_plate();
             assert(plate);
+            // [UNCLEAR] BBS TODO calls the existing auto-rotate path but the deeper intent is ambiguous—Unity might need routing through the preparer state machine or a dedicated job.
             //BBS TODO call auto rotate for current plate
             plater()->set_prepare_state(Job::PREPARE_STATE_MENU);
             plater()->orient();
@@ -1873,6 +1880,7 @@ wxMenu* MenuFactory::assemble_multi_selection_menu()
 
 
 //PS
+// [STATE][INTENT][UNITY] Tracks menu items for instance counts (increase/decrease/copy) so the UI can stay synchronized with `plater()->instancing` limits; Unity should keep similar cached menu references to toggle enabled state from its SelectionController.
 void MenuFactory::append_menu_items_instance_manipulation(wxMenu* menu)
 {
     MenuType type = menu == &m_object_menu ? mtObjectFFF : mtObjectSLA;
@@ -1898,6 +1906,7 @@ wxMenu *MenuFactory::filament_action_menu(int active_filament_menu_id) {
 
 
 //BBS: add partplate related logic
+// [INTENT][STATE][PORTING_HAZARD:P2][UNITY] Constructs the plate-specific menu so every plate command (select, arrange, rotate) can reach `PartPlate` and `Job::PREPARE_STATE_MENU`; Unity will need a PlateMenuController MonoBehaviour that shares the `PartPlate` state ribbon and queues the same model/job transitions.
 wxMenu* MenuFactory::plate_menu()
 {
     append_menu_item_locked(&m_plate_menu);
@@ -2044,6 +2053,7 @@ void MenuFactory::append_menu_item_per_object_process(wxMenu* menu)
         m_parent);
 }
 
+// [INTENT][UNITY][PORTING_HAZARD:P3] Recreates the "Edit in Parameter Table" entry so the parameter table is invoked exactly when object/volume selection aligns; Unity can mirror this via a MonoBehaviour that bridges the selection model to the settings panel while keeping the same enablement guards.
 void MenuFactory::append_menu_item_per_object_settings(wxMenu* menu)
 {
     const std::vector<wxString> names = { _L("Edit in Parameter Table"), _L("Edit print parameters for a single object") };
@@ -2064,6 +2074,7 @@ void MenuFactory::append_menu_item_per_object_settings(wxMenu* menu)
         }, m_parent);
 }
 
+// [STATE][UNITY][PORTING_HAZARD:P2] Dynamically rebuilds the filament submenu so the UI maps to current filament presets and selection; Unity should reuse this logic in the filament panel controller to avoid stale presets.
 void MenuFactory::append_menu_item_change_filament(wxMenu* menu)
 {
     const std::vector<wxString> names = { _L("Change Filament"), _L("Set Filament for selected items") };

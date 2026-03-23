@@ -2686,3 +2686,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3 (palette order must stay synced between the enum, `RenderColor::colors`, and any Unity equivalent).
 - Git: Annotate GUI color palette header
 - Next recommended Phase 1 task: T379 annotate: src/slic3r/GUI/GUI_Factories.cpp
+
+## Phase 1 - Task T379 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Factories.cpp
+- Deliverables: src/slic3r/GUI/GUI_Factories.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 11 `[INTENT]/[STATE]/[EVENT]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments clarifying settings bundles, the GL gizmo menu wiring, plate menu/state actions, and filament/parameter table hooks for the Unity migration.
+- Verification excerpt: // [INTENT][STATE][UNITY][PORTING_HAZARD:P3] Maps object-setting categories to prioritized option keys so the parameter table knows how to group controls; Unity should mirror this with ScriptableObject metadata so the same sections and order are preserved at runtime.
+- Unity-impact summary:
+  - ScriptableObject-backed metadata must mirror the `SettingsFactory` category maps so the new Unity inspector can render the same groups and priorities.
+  - The GL menu comments call out how `append_menu_itemm_add_`, plate menus, and filament dialogs rely on `GLGizmosManager`/`PartPlate`, guiding implementation through a RenderTexture+InputSystem-driven controller.
+  - Parameter table, filament selection, and auto-rotate hazards highlight spots where Unity needs direct `Selection` and `PartPlate` state access instead of ad-hoc `wxMenu` hooks.
+- Hazards found: P2=5, P3=3
+- Git: Annotate GUI factories for Unity port
+- Next recommended Phase 1 task: T380 annotate: src/slic3r/GUI/GUI_Factories.hpp
