@@ -397,6 +397,20 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: Annotate GLGizmoRotate header
 - Next recommended Phase 1 task: T339 annotate: src/slic3r/GUI/Gizmos/GLGizmoScale.cpp
 
+## Phase 1 - Task T388 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectList.cpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectList.cpp, .ralph/agent/scratchpad.md, .ralph/agent/tasks.jsonl
+- Substantive additions: 12 targeted multi-tag comments covering filament sync, clipboard flows, selection/drag hooks, printer-tech refreshes, and mesh-loading helpers.
+- Verification excerpt: // [INTENT] Reconcile every object/volume `extruder` setting when filament stocks change so UI and scene remain synchronized.
+- Unity-impact summary:
+  - Mirror the filament/extruder cache updates with a `FilamentProfile` service that raises UnityEvents before modifying RenderTexture previews.
+  - Replace drag/drop and context-menu logic with UI Toolkit `ListView`/`TreeView` commands plus Input System `DragEvent` signals feeding a `SceneSelectionController`.
+  - Model the settings clipboard plus modifier loaders as `ScriptableObject` payloads consumed by async importers and repaint the VisualElement tree once loaded.
+- Hazards found: P2=2 (drag/drop relies on wxDataViewCtrl columns, commit reorder swaps `m_objects` vector directly; selection-to-GL bridging is tightly coupled to `GLCanvas3D`).
+- Git: annotate GUI_ObjectList for Unity port
+- Next recommended Phase 1 task: T395 annotate: src/slic3r/GUI/GUI_ObjectTableSettings.hpp
+
 ## Phase 1 - Task T309 complete
 - Task type: annotate
 - File: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp

@@ -55,8 +55,8 @@ wxDEFINE_EVENT(EVT_PARTPLATE_LIST_PLATE_SELECT, IntEvent);
 static PrinterTechnology printer_technology() { return wxGetApp().preset_bundle->printers.get_selected_preset().printer_technology(); }
 
 // [INTENT] Access the current canvas selection so list logic stays in sync with the 3D view hit test state.
-// [STATE] The selection is owned by whichever `GLCanvas3D` is active, so Unity should align this with the focused `SceneViewController` selection cache.
-// [UNITY] Translate to an Input System raycast result bound to whichever `SceneView` or `AssembleView` camera is active.
+// [STATE] The selection is owned by whichever `GLCanvas3D` is active, so Unity should align this with the focused `SceneViewController`
+// selection cache. [UNITY] Translate to an Input System raycast result bound to whichever `SceneView` or `AssembleView` camera is active.
 static const Selection& scene_selection()
 {
     // BBS AssembleView canvas has its own selection
@@ -666,6 +666,12 @@ ModelConfig& ObjectList::get_item_config(const wxDataViewItem& item) const
                              (*m_objects)[obj_idx]->config;
 }
 
+// [INTENT] Reconcile every object/volume `extruder` setting when filament stocks change so UI and scene remain synchronized.
+// [STATE] Toggles `m_prevent_update_filament_in_config` and mutates each config+list entry while refreshing the canvas.
+// [EVENT] Triggered by `FilamentManager` notifications and user-driven deletions; marshals the change back to `Plater`/`GLCanvas3D`.
+// [THREAD] Runs on the main thread with direct config edits; the Unity port must marshal this work to its main loop to avoid data races.
+// [UNITY] Implement via a `FilamentProfile` service pushing `ObservableCollection` updates and invoking `SceneGraph` refresh commands.
+// [PORTING_HAZARD:P3] There is no direct equivalent of `wxGetApp()`/`Plater` in Unity, so expose the shared state through a dedicated manager.
 void ObjectList::update_filament_values_for_items(const size_t filaments_count)
 {
     for (size_t i = 0; i < m_objects->size(); ++i) {
@@ -712,6 +718,11 @@ void ObjectList::update_filament_values_for_items(const size_t filaments_count)
     wxGetApp().plater()->update();
 }
 
+// [INTENT] Keep the extruder assignments coherent when a filament spool is deleted, shifting references to fallback IDs.
+// [STATE] Navigates each object/volume config, wipes stale `support_filament` keys, and writes replacement values.
+// [EVENT] Hooks into filament deletion dialogs, then forces UI and GL canvas updates for each affected object.
+// [UNITY] Mirror with a `FilamentInventory` command that reindexes `ScriptableObject` settings and triggers a repaint.
+// [PORTING_HAZARD:P3] Unity must explicitly manage the stitched state; there is no `filaments_cnt()` shortcut.
 void ObjectList::update_filament_values_for_items_when_delete_filament(const size_t filament_id, const int replace_id)
 {
     int replace_filament_id = replace_id == -1 ? 1 : (replace_id + 1);
@@ -1232,6 +1243,10 @@ void ObjectList::paste_layers_into_list()
 #endif // no __WXOSX__
 }
 
+// [INTENT] Cache user-configured settings into a local clipboard so dialogs can reapply them to other objects/layers.
+// [STATE] Relies on `m_clipboard` to remember config bundles and selection type metadata, keeping the UI sync with clipboard contents.
+// [EVENT] Invoked from keyboard commands or menu actions; must emit clipboard-ready state to the Unity command bus.
+// [UNITY] Implement via a `SettingsClipboard` service that clones `ScriptableObject` values and exposes an `ICommand` to `Paste`.
 void ObjectList::copy_settings_to_clipboard()
 {
     wxDataViewItem item = GetSelection();
@@ -1257,6 +1272,9 @@ void ObjectList::copy_settings_to_clipboard()
     m_clipboard.set_type(ItemType(m_objects_model->GetItemType(item) | itSettings));
 }
 
+// [STATE] Guards against incompatible clipboard payloads, ensuring only matching node types receive restored configs.
+// [INTENT] Prevent paste operations until the destination selection matches the stored clipboard payload.
+// [UNITY] Mirror with a typed `SelectionClipboard` predicate that checks `ISettings` compatibility before enabling paste actions.
 bool GUI::ObjectList::can_paste_settings_into_list()
 {
     wxDataViewItemArray sels;
@@ -1266,6 +1284,10 @@ bool GUI::ObjectList::can_paste_settings_into_list()
     return m_clipboard.get_type() == (m_objects_model->GetItemType(sels.front()) | itSettings);
 }
 
+// [INTENT] Applies cached settings to the current selection, handling custom keys, extruders, and clipboard state.
+// [THREAD] Runs on the main thread and mutates configs directly, so Unity must schedule this through its UI dispatcher.
+// [PORTING_HAZARD:P3] wx `DynamicPrintConfig` and `SettingsFactory` bundles are tightly coupled to the legacy config system; Unity needs a
+// thin adapter to replicate them.
 void ObjectList::paste_settings_into_list()
 {
     wxDataViewItemArray sels;
@@ -1688,6 +1710,9 @@ void ObjectList::increase_instances() { wxGetApp().plater()->increase_instances(
 void ObjectList::decrease_instances() { wxGetApp().plater()->decrease_instances(1); }
 
 #ifndef __WXOSX__
+// [EVENT] Converts global keyboard accelerators into list commands (copy/paste, delete, filament switches).
+// [STATE] Checks `filaments_count()` to enable extruder shortcuts and guards `m_prevent_list_events` during bulk ops.
+// [UNITY] Replace with Input System `ShortcutManager` commands that dispatch to `ToolbarController`/`SelectionController`.
 void ObjectList::key_event(wxKeyEvent& event)
 {
     // if (event.GetKeyCode() == WXK_TAB)
@@ -2163,6 +2188,12 @@ void ObjectList::load_part(ModelObject& model_object, std::vector<ModelVolume*>&
     }
 }
 */
+// [INTENT] Import molodified volumes (STL/STEP) relative to the currently selected object, keeping modifiers aligned to the selection.
+// [EVENT] Triggered by toolbar/menu commands and selection drag-drop; uses `ProgressDialog` + `wxBusyCursor` so Unity must profile this as
+// a blocking IO path. [STATE] Relies on `scene_selection()`, `ModelObject` transforms, and `input_files`, then updates `added_volumes` and
+// the UI tree. [UNITY] Map to an async asset loader that feeds `Mesh`/`GameObject` creation via `Task` + `MainThreadDispatcher`, with a
+// `ModalProgressOverlay`. [PORTING_HAZARD:P2] Step/ mesh reading uses platform-specific dialogs and ensures, so Unity needs a
+// cross-platform importer pipeline.
 void ObjectList::load_modifier(const wxArrayString&       input_files,
                                ModelObject&               model_object,
                                std::vector<ModelVolume*>& added_volumes,
@@ -2337,6 +2368,11 @@ static TriangleMesh create_mesh(const std::string& type_name, const BoundingBoxf
     return mesh;
 }
 
+// [INTENT] Generate built-in primitives (cube, cylinder, sphere, etc.) anchored to the current selection so modals stay in sync.
+// [STATE] Captures `scene_selection()`, `ModelObject` transforms, and triggers selection update + gizmo toggles once the primitive lands.
+// [OPENGL] Nudges `GLCanvas3D` by scheduling selection updates and `selection_changed()` to refresh `SceneRaycaster` hits.
+// [UNITY] Mirror with an `AssetBuilder` controlled by `SelectionController`, spawning meshes and pushing `SceneGraph` updates.
+// [PORTING_HAZARD:P3] Unity primitives must follow the same coordinate offsets; manual offset math is brittle and needs testing.
 void ObjectList::load_generic_subobject(const std::string& type_name, const ModelVolumeType type)
 {
     // BBS: single snapshot
@@ -2789,6 +2825,12 @@ bool ObjectList::del_subobject_from_object(const int obj_idx, const int idx, con
     return true;
 }
 
+// [INTENT] Subdivide a selected part or object into separate volumes/objects, coordinating undo snapshots and UI refreshes.
+// [STATE] Touches `Selection`, `ModelVolume::split`, and stored `obj_idx` contexts to keep the tree consistent.
+// [EVENT] Fires when the user chooses Split from the context menu; ensures part selection and GL updates reflect the new geometry.
+// [UNITY] Implement as a `MeshSplitter` command that adjusts the `SceneGraph` and pushes `Selection` refresh events.
+// [PORTING_HAZARD:P2] Relying on `DynamicPrintConfig` and `TriangleMesh` manipulations while `GLCanvas3D` is active is brittle in Unity
+// where mesh data is splitted asynchronously.
 void ObjectList::split()
 {
     const auto item    = GetSelection();
@@ -2845,6 +2887,12 @@ void ObjectList::split()
     update_info_items(obj_idx);
 }
 
+// [INTENT] Drive the object/part merging workflows that combine selections either into a multipart object or collapse parts inside one
+// object. [STATE] Governs snapshot names, `m_selection_mode`, and uses `object_idxs` to keep the list/scene consistent after merge. [EVENT]
+// Called from toolbar/menu commands; keeps `m_prevent_list_events` toggled during batch operations to avoid flicker. [OPENGL] After
+// merging, the GL scene is reloaded (`update_selections_on_canvas()`) to reflect the new geometry ordering. [UNITY] Replace with a command
+// that mutates the `SceneGraph` + `ModelObject` structures, then pushes updates via `SceneUpdateQueue`. [PORTING_HAZARD:P2] The conversion
+// copies raw transformations and settings; Unity must ensure `RenderTexture` previews stay in sync with new geometry.
 void ObjectList::merge(bool to_multipart_object)
 {
     wxBusyCursor wait;
@@ -4795,6 +4843,13 @@ void ObjectList::update_selections()
     }
 }
 
+// [INTENT] Push every sidebar selection into the 3D canvas selection set to keep scene, gizmos, and UI in sync.
+// [STATE] Reads `scene_selection()`, tracks `Selection::EMode`, and manipulates `volume_idxs` before scheduling add/remove operations.
+// [EVENT] Responds to selection_changed() plus external context menu actions; posts `EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS` when needed.
+// [OPENGL] Schedules `GLCanvas3D::render()` and toggles gizmo visibility to reflect the new selection set.
+// [UNITY] Map to a `SelectionController` that updates the `SceneGraph` and triggers `RenderTexture` refresh events.
+// [PORTING_HAZARD:P2] The combination of wx selection and `selection.add_volumes()` is tied to `GLCanvas3D`; Unity must re-implement the
+// selection logic for its own view pipeline.
 void ObjectList::update_selections_on_canvas()
 {
     auto        canvas_type = wxGetApp().plater()->get_current_canvas3D()->get_canvas_type();
@@ -5508,6 +5563,11 @@ void ObjectList::update_settings_item_and_selection(wxDataViewItem item, wxDataV
     }
 }
 
+// [INTENT] Rebuilds the object list tree when printer tech switches so features like layers/supports match the capabilities.
+// [STATE] Probes `printer_technology()`, updates info/settings nodes, and toggles columns such as support/color/sink icons.
+// [EVENT] Called from `PrinterManager` events and manifest switches; replays selections to minimize focus jumps.
+// [UNITY] Replace with a `PrinterProfileObserver` that rebuilds the `VisualElement` tree, toggles contextual menu items, and refreshes
+// scene overlays.
 void ObjectList::update_object_list_by_printer_technology()
 {
     m_prevent_canvas_selection_update = true;
@@ -6300,6 +6360,10 @@ void ObjectList::update_printable_state(int obj_idx, int instance_idx)
     m_objects_model->SetPrintableState(printable, obj_idx, instance_idx);
 }
 
+// [INTENT] Flip the printable flag for selected object(s)/instance(s) and update both `m_objects_model` and the `GLCanvas3D` preview.
+// [STATE] Updates `m_selection_mode`, `obj_idxs`, and ensures undo snapshots capture the toggle action.
+// [EVENT] Called from keyboard shortcut/context menu; posts notifications to `Plater` (and `notification_manager()` through selection
+// updates). [UNITY] Map to a `SelectionController` command that toggles `SceneGraph` `Renderable` visibility + `Material` overlays.
 void ObjectList::toggle_printable_state()
 {
     wxDataViewItemArray sels;

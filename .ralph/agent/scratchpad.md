@@ -533,3 +533,7 @@
 ## Iteration plan update
 - Selected task: T394 annotate `src/slic3r/GUI/GUI_ObjectTableSettings.cpp` (runtime task `task-1773880086-7731`).
 - Plan: start the task, add the required multi-tag annotations around the reset buttons, config group builder, visibility toggles, and config propagation loops; highlight Unity equivalents (UI Toolkit settings panel, ScriptableObject-backed `ModelConfig`) and any porting hazards (wx event capture, manual `Freeze/Thaw`, macOS lock events); append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the file, update `.ralph/ralph-tasks.md`, and close the task before stopping for this iteration.
+
+## Iteration plan update
+- Selected task: T388 annotate `src/slic3r/GUI/GUI_ObjectList.cpp` (task-1773880086-e361 now active).
+- Plan: verify readiness via `ralph tools task ready`, start the task, read the file top-to-bottom to understand list lifecycle, selection caching, drag/drop, context menu wiring, GL refresh triggers, and settings observers; annotate each major section with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` (add `[UNCLEAR]` where intent is ambiguous), note Unity analogs such as UI Toolkit `ListView` backed by an `ObservableCollection` plus `Command`-style callbacks, highlight hazards like `wxListCtrl` ownership and thread-bound refreshes, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit `GUI_ObjectList.cpp` plus any bookkeeping files, close the task, and stop for this iteration.
