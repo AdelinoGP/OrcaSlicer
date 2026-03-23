@@ -200,6 +200,10 @@
 - Plan: start the runtime task, read the entire file, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around emboss state transitions, UI event plumbing, GL draw calls, and Unity migration hints; append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the change, and mark the task done before selecting the next ready entry.
 
 ## Iteration plan update
+- Selected task: T347 annotate `src/slic3r/GUI/Gizmos/GLGizmoSimplify.hpp` (runtime task `task-1773880086-2930`).
+- Plan: review the header to map the simplify gizmo API, record intent/state/event/thread/OpenGL/Unity context for each public member (selection modes, worker hooks, GL draw helpers), annotate caches and hazard spots, append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the header, close the task, and then pivot to the next ready entry in the Phase 1 manifest.
+
+## Iteration plan update
 - Selected task: T341 annotate `src/slic3r/GUI/Gizmos/GLGizmosCommon.cpp` (task-1773880086-9ee5) as the current focus.
 - Plan: read the implementation to capture the shared gizmo helpers, event plumbing, and render utilities; add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` notes at module-level helpers and cross-gizmo utilities, append the mandatory handoff evidence block, git commit, and close the runtime task once done before moving to the next unblocked file.
 

@@ -2380,3 +2380,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=2, P3=1
 - Git: Annotate GLGizmoSimplify for Unity port
 - Next recommended Phase 1 task: T347 annotate: src/slic3r/GUI/Gizmos/GLGizmoSimplify.hpp
+
+## Phase 1 - Task T347 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoSimplify.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoSimplify.hpp; .ralph/ralph-tasks.md; .ralph/agent/scratchpad.md
+- Substantive additions: ~12 focused `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments tying the simplification API, worker flow, render cache, and Unity mapping together.
+- Verification excerpt: // [STATE] Preserves the user's simplification wishlist so the worker can resume exactly the same criteria after a rerender.
+- Unity-impact summary:
+  - Mirror the simplifier UI with a MonoBehaviour controller that wires InputSystem events into a `SimplifyJob` job and swaps meshes via a `MeshFilter` + `MeshRenderer` on the main thread.
+  - Translate the localized window layout/tooltip measurements into UI Toolkit VisualElements refreshed from a ScriptableObject-backed translation table.
+- Hazards found: 1 (P3: cancellation exception must propagate back to Unity's job/async system on the main thread or mesh state stays inconsistent)
+- Git: Annotate GLGizmoSimplify.hpp
+- Next recommended Phase 1 task: T348 annotate: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp
