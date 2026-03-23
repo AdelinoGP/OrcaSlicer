@@ -851,3 +851,7 @@
 ## Iteration plan update
 - Selected task: T412 annotate `src/slic3r/GUI/ImageDPIFrame.cpp` (runtime task task-1773880086-20e9 now active).
 - Plan: confirm the overlay timer, bitmap swapping, and hide/show flow already carry [STATE]/[EVENT] coverage, add missing Unity/porting guidance near the DPI handler and timer guards, log the evidence block in `.ralph/agent/handoff.md`, stage/commit the annotated source plus metadata, close T412, and then pass control to the next ready task.
+
+## Iteration plan update
+- Selected task: T398 annotate `src/slic3r/GUI/GUI_Utils.cpp` (task-1773880086-d4b6 in progress).
+- Plan: read the utility helpers, document intent/state/event/thread/OpenGL/Unity mapping for config sync, bitmap caches, and GL texture uploads, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file plus handoff update, close the task, and end the iteration as required.

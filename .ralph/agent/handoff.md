@@ -4135,3 +4135,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 0
 - Git: annotate: src/slic3r/GUI/ImageDPIFrame.cpp
 - Next recommended Phase 1 task: T417 annotate: src/slic3r/GUI/IMSlider.cpp
+
+## Phase 1 - Task T398 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Utils.cpp
+- Deliverables: src/slic3r/GUI/GUI_Utils.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: added multi-tag guidance for the utility namespace intent, window/geometry helpers, threaded image loaders, and dialog stack state (INTENT/STATE/THREAD/UNITY/OPENGL/PORTING_HAZARD tags).
+- Verification excerpt: // [THREAD] Should run on a worker thread to avoid blocking the UI; Unity should use async texture loading helpers instead of blocking the GameThread.
+- Unity-impact summary:
+  - Capture the dialog-stack behavior with a dedicated `DialogManager` MonoBehaviour plus a `ScriptableObject` focus stack to match the wxWidgets ordering and modal constraints.
+  - Mirror the DPI/font helpers with a singleton `DisplayMetrics` asset that caches screen metrics and font scaling before icons resize their textures.
+  - Treat image generation/resizing as background `Task`s that feed finished `Texture2D` instances to the UI Toolkit `ImageElement` via the main-thread dispatcher.
+- Hazards found: 1 (P3 reliance on `wxImage`/Win32 DPI calls—implement equivalent Unity helpers or native plugins).
+- Git: doc: annotate GUI_Utils utilities
+- Next recommended Phase 1 task: T399 annotate: src/slic3r/GUI/GUI_Utils.hpp

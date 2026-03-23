@@ -24,6 +24,11 @@
 
 namespace Slic3r { namespace GUI {
 
+// [INTENT] Centralize shared helpers for dialog plumbing, DPI helpers, and ancillary file utilities that the GUI layer consumes.
+// [STATE] The module owns global caches such as `dialogStack` and Win32 handles so the rest of the UI can reuse consistent metric data.
+// [UNITY] Unity should split these helpers into dedicated `MonoBehaviour` utilities backed by `ScriptableObject` state containers while
+// keeping UI work on the main thread.
+
 #ifdef _WIN32
 // [INTENT] Publish HID and volume attach/detach wxEvents so the GUI can rebuild device lists when Windows hardware changes occur.
 // [THREAD] These events run on the wx main thread; the Unity port must marshal equivalent FileSystemWatcher/InputSystem callbacks via the
@@ -114,6 +119,7 @@ __finished:
 
 // [INTENT] Walk the parent chain to find the owning top-level window for geometry and modality helpers.
 // [UNITY] Equivalent to traversing `transform.parent` until a `Canvas` or custom `WindowController` is reached.
+// [THREAD] Walks the wx hierarchy on the UI thread; Unity must mirror this on the main thread before rescheduling dialog work.
 wxTopLevelWindow* find_toplevel_parent(wxWindow* window)
 {
     for (; window != nullptr; window = window->GetParent()) {
@@ -127,8 +133,8 @@ wxTopLevelWindow* find_toplevel_parent(wxWindow* window)
 
 // [INTENT] Wait until the top-level window geometry settles before running `callback`, since different platforms deliver `wxEVT_SHOW` at
 // different times. [EVENT] Binds to `wxEVT_SHOW` and `CallAfter` when necessary to guarantee the callback runs on a stable frame, mimicking
-// Unity's `OnEnable` + layout cycle. [PORTING_HAZARD:P3] Linux defers geometry via `CallAfter`, so Unity should guard against asynchronous
-// layout updates as well.
+// Unity's `OnEnable` + layout cycle. [STATE] Ensures geometry-related state (size/position) is stable before the callback mutates layout.
+// [PORTING_HAZARD:P3] Linux defers geometry via `CallAfter`, so Unity should guard against asynchronous layout updates as well.
 void on_window_geometry(wxTopLevelWindow* tlw, std::function<void()> callback)
 {
 #ifdef _WIN32
@@ -464,8 +470,9 @@ TaskTimer::~TaskTimer()
 
 /* Image Generator */
 // [INTENT] Load PNG/BMP/JPG textures via `wxImage` so GUI panes can render thumbnails and icons.
-// [UNITY] Unity should use `Texture2D.LoadImage` or `Resources.Load` once the bytes are available.
-// [PORTING_HAZARD:P3] Depends on wxImage handlers; replace with cross-platform Texture2D helpers in Unity.
+// [THREAD] Should run on a worker thread to avoid blocking the UI; Unity should use async texture loading helpers instead of blocking the
+// GameThread. [UNITY] Unity should use `Texture2D.LoadImage` or `Resources.Load` once the bytes are available. [PORTING_HAZARD:P3] Depends
+// on wxImage handlers; replace with cross-platform Texture2D helpers in Unity.
 bool load_image(const std::string& filename, wxImage& image)
 {
     bool result = true;
@@ -485,7 +492,9 @@ bool load_image(const std::string& filename, wxImage& image)
 
 // [INTENT] Resize/crop provided images to the requested size for thumbnails and textures used by the GUI.
 // [OPENGL] Prepares PNG RGBA data so GL textures can be updated without blocking render frames.
+// [THREAD] Runs on worker threads in wxWidgets; Unity should offload the conversion to background tasks before touching the render loop.
 // [UNITY] Unity should convert these into `Texture2D` assets via `Resize`, `Crop`, or `RenderTexture` helpers instead of this wxImage path.
+// [PORTING_HAZARD:P3] Relies on wxImage handlers; porters must reimplement the resizing logic with Unity `Texture2D` operations.
 bool generate_image(const std::string& filename, wxImage& image, wxSize img_size, int method)
 {
     wxInitAllImageHandlers();
@@ -531,6 +540,7 @@ bool generate_image(const std::string& filename, wxImage& image, wxSize img_size
 }
 
 // [STATE] Tracks the stack of modal dialogs so the GUI can navigate the chain when closing or re-focusing windows.
+// [THREAD] Muted from the UI thread; Unity's dialog manager should serialize stack operations on the main thread as well.
 // [UNITY] Unity should replicate this via a `DialogManager` that queues GameObjects and restores focus order.
 std::deque<wxDialog*> dialogStack;
 
