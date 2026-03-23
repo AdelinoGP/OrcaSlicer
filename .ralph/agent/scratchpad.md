@@ -769,3 +769,10 @@
 ## Iteration plan update
 - Current focus: T420 annotate `src/slic3r/GUI/IMToolbar.hpp` (runtime task `task-1773880086-dd6c`).
 - Plan: read the header fully, document toolbar state caches, action binding tables, icon resource ownership, and event wiring with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` tags; note how button IDs map to wxMenu commands, how icon atlases are cached, and how toolbar visibility/state toggles persist across config; append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only the annotated header plus metadata, close the task, and then pause so the next agent can continue after this single-file change.
+
+## Iteration plan update
+- Selected task: T167 annotate `src/slic3r/GUI/BBLStatusBarBind.cpp` now that the project has the file in the manifest list and we need to document the BBL-specific status plumbing.
+- Plan: mark T167 as `[~] ACTIVE` in `.ralph/ralph-tasks.md`, read `BBLStatusBarBind.cpp` end to end, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations that clarify how the custom status bar integrates with job rows, canvases, and the BBL auto-heating flow, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated source plus metadata, close the task, and then stop this iteration so the next agent can continue with another ready file.
+
+## Iteration update
+- Completed T167 annotate `src/slic3r/GUI/BBLStatusBarBind.cpp` by adding multi-tag guidance for the gauge/percent layout, busy/cancel toggles, DPI rescale hooks, event-loop yielding, and Unity analogs; appended the evidence block and marked the task done.

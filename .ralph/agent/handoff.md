@@ -398,6 +398,20 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: Annotate GUI color helpers for Unity port
 - Next recommended Phase 1 task: T375 annotate: src/slic3r/GUI/GuiColor.hpp
 
+## Phase 1 - Task T167 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BBLStatusBarBind.cpp
+- Deliverables: src/slic3r/GUI/BBLStatusBarBind.cpp
+- Substantive additions: 16 contextual annotations describing gauge layout, busy/cancel state, DPI scaling, event loop yield handling, and Unity mapping tags (INTENT/STATE/EVENT/THREAD/UNITY/PORTING_HAZARD/UNCLEAR)
+- Verification excerpt: // [INTENT] Bridge this BBL-specific status overlay into the ProgressIndicator contract so downloads/prints show a dedicated gauge row.
+- Unity-impact summary:
+  - Mirror the gauge + percent label row using a UI Toolkit VisualElement row with a ProgressBar, Label, and Button so the BBL overlay stays anchored at the bottom.
+  - Replace `wxEventLoopBase::YieldFor` with an async MainThreadDispatcher pump and guard cancel button visibility with Unity-safe null checks instead of unchecked references.
+  - Honor the `FromDIP` scaling by driving sizes from a CanvasScaler-equivalent so the Unity status row matches desktop DPI behavior.
+- Hazards found: P2=2, P3=2
+- Git: annotate: src/slic3r/GUI/BBLStatusBarBind.cpp
+- Next recommended Phase 1 task: T168 annotate: src/slic3r/GUI/BBLStatusBar.hpp
+
 ## Phase 1 - Task T476 complete
 - Task type: annotate
 - File: src/slic3r/GUI/Monitor.hpp
@@ -3890,4 +3904,3 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 3 (P2 textures still use ImGui/GL handles, P3 toolbar font scaling/RectTransform alignment, P3 manual return Texture2D lifecycle)
 - Git: annotate: src/slic3r/GUI/IMToolbar.hpp
 - Next recommended Phase 1 task: T421 annotate: src/slic3r/GUI/InstanceCheck.cpp
-
