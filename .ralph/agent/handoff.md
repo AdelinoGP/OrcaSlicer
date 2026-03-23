@@ -2927,6 +2927,19 @@ This prompt governs **Phase 1 only**.
 - Git: annotate: src/slic3r/GUI/GUI_ObjectLayers.hpp
 - Next recommended Phase 1 task: T388 annotate: src/slic3r/GUI/GUI_ObjectList.cpp
 
+## Phase 1 - Task T393 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectTable.hpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectTable.hpp, .ralph/agent/handoff.md
+- Substantive additions: Added `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD]` guidance for the grid editors, renderers, table model, panel, and dialog so Unity can mirror selection, reset, and config flows.
+- Verification excerpt: // [INTENT] Bridge ModelConfig/ModelVolume data with wxGrid cells, keep column metadata and value copies synchronized, and answer selection/sort requests.
+- Unity-impact summary:
+  - Documented renderer/editor pairings as UI Toolkit ListView templates backed by `VisualElement` cell controllers and ScriptableObject column definitions.
+  - Mapped the ObjectTablePanel dialog/resizable layout to a UI Toolkit overlay plus MonoBehaviour controller that preserves filament palettes and reset workflows.
+- Hazards found: P2=2 (wxGrid event wiring + ConfigOption/Global DynamicPrintConfig coupling) + P3=4 (custom renderers/editors rely on wxGrid lifecycle and selection range macros)
+- Git: annotate: src/slic3r/GUI/GUI_ObjectTable.hpp
+- Next recommended Phase 1 task: T394 annotate: src/slic3r/GUI/GUI_ObjectTableSettings.cpp
+
 ## Phase 1 - Task T144 complete
 - Task type: annotate
 - File: src/slic3r/GUI/3DBed.hpp
