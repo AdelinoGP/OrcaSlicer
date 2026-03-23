@@ -3021,3 +3021,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (blocking file dialog) + P3=1 (native shell double-click launches)
 - Git: docs: refine GUI auxiliary list annotations
 - Next recommended Phase 1 task: T390 annotate: src/slic3r/GUI/GUI_ObjectSettings.cpp
+
+## Phase 1 - Task T392 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectTable.cpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectTable.cpp
+- Substantive additions: 9 targeted annotations describing renderers, column metadata, and event wiring (INTENT/STATE/EVENT/UNITY/PORTING_HAZARD tags)
+- Verification excerpt: // [INTENT] Overlay a lock/undo badge whenever the option cell differs from its baseline so the user can rollback the change explicitly.
+- Unity-impact summary:
+  - Mirror the grid column descriptors as `ColumnDefinition` scripts and cell templates in UI Toolkit `ListView` so editors, icons, and resets stay consistent.
+  - Use Unity controllers to detect row selections plus `ListView` cell commits and route them through `ObjectRow.ApplyToModel()` and `MainThreadDispatcher` mirrors of `OnCellValueChanged`.
+- Hazards found: 1 (P2) row-index/order assumption when mapping cell clicks to `ObjectGrid` IDs, so Unity must maintain the same stable ordering.
+- Git: docs(gui): annotate object table
+- Next recommended Phase 1 task: T393 annotate: src/slic3r/GUI/GUI_ObjectTable.hpp
