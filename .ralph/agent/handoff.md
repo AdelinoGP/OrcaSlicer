@@ -3772,3 +3772,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 4 (P1:1, P2:2, P3:1)
 - Git: Annotate GUI.cpp utilities for Unity port
 - Next recommended Phase 1 task: T379 annotate: src/slic3r/GUI/GUI_Factories.cpp
+
+## Phase 1 - Task T393 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectTable.hpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectTable.hpp
+- Substantive additions: Added `[THREAD]` guidance for ObjectGrid/ObjectGridTable/ObjectTablePanel/ObjectTableDialog lifecycles and documented the filament palette cache state so Unity knows how to bind the list data and color icons.
+- Verification excerpt: // [THREAD] wxGrid callbacks always run on the main wxWidgets UI thread, so any object/model updates from background slicing must be marshaled back before mutating this grid.
+- Unity-impact summary:
+  - Treat the grid/table lifecycle as UI-thread-only and expose a dispatcher that queues background `Plater` updates before repainting the `ListView`/VisualElement tree.
+  - Share the filament name/color palette via a ScriptableObject asset so Unity can render the same bitmap chips or Texture2D swatches used by the attribute column.
+- Hazards found: 1 (P3 palette conversion between `wxColour`/bitmaps and Unity `Texture2D` assets)
+- Git: Annotate GUI_ObjectTable threading/palette hints
+- Next recommended Phase 1 task: T395 annotate: src/slic3r/GUI/GUI_ObjectTableSettings.hpp

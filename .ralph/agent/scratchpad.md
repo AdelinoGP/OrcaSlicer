@@ -734,3 +734,7 @@
 ## Iteration plan update
 - Current focus: T378 annotate: `src/slic3r/GUI/GUI.cpp` (task-1773880086-f3cf now active).
 - Plan: read the implementation thoroughly, annotate the main GUI class lifecycle, event dispatching, thread-aware job queues, GL interactions, config persistence hooks, and Unity analogs (e.g., Scene Manager + UI Toolkit pipeline) with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` tags; append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file, close the task, and then pick the next ready task.
+
+## Iteration plan update
+- Selected task: T393 annotate `src/slic3r/GUI/GUI_ObjectTable.hpp` (task state ready).
+- Plan: inspect the header end-to-end, document the `ObjectGrid`, `ObjectGridTable`, `ObjectTablePanel`, and `ObjectTableDialog` interfaces, detail caches (selection, sort, config map), highlight event wiring for `wxGrid`/`wxChoicebook`, note thread/worker assumptions with `wxQueueEvent`, and map to Unity (UI Toolkit `ListView` + `VisualElement` + ScriptableObject for object configs). After commenting, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the file, close the task, and return control for the next iteration.

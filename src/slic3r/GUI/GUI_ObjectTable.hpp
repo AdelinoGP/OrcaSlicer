@@ -222,6 +222,8 @@ public:
 // [INTENT] Extend wxGrid to expose ModelConfig fields while keeping clipboard, selection, and key events in sync.
 // [STATE] Tracks `m_selected_block`, `input_string`, and cell data so keyboard navigation remains consistent with column counts.
 // [EVENT] OnCellLeftClick/OnRangeSelected and the key handlers translate user interaction back into ObjectGridTable operations.
+// [THREAD] wxGrid callbacks always run on the main wxWidgets UI thread, so any object/model updates from background slicing must be
+// marshaled back before mutating this grid.
 // [UNITY] Replace with UI Toolkit ListView that reports DragSelect/Click events and Keyboard events through a `ListViewController`
 // MonoBehaviour. [PORTING_HAZARD:P2] wxGrid event macros and text paste handlers have no direct Unity equivalent, requiring a custom
 // focus/focus-lost pipeline. ObjectGrid for the param setting table
@@ -281,7 +283,9 @@ private:
 // [INTENT] Bridge ModelConfig/ModelVolume data with wxGrid cells, keep column metadata and value copies synchronized, and answer
 // selection/sort requests. [STATE] Owns `m_grid_data` (per-object rows), `m_col_data` (column metadata), `m_selected_cells`, `m_sort_col`,
 // and `m_current_row/m_current_col` so UI state survives reloads. [EVENT] Provides callbacks such as OnCellLeftClick, OnRangeSelected,
-// OnCellValueChanged, and reload/selection helpers that respond to UI interactions and model updates. [UNITY] Equivalent to a UI Toolkit
+// OnCellValueChanged, and reload/selection helpers that respond to UI interactions and model updates. [THREAD] All of this table state
+// is maintained on the UI thread because the `wxGridTableBase` contract is not thread-safe; dispatchers must queue events for any background
+// config refresh before calling these helpers. [UNITY] Equivalent to a UI Toolkit
 // ListView bound to an `ObservableCollection<ObjectRowViewModel>` plus a controller that mirrors sorting, selection, and config resets.
 // [PORTING_HAZARD:P2] Deep coupling with `ConfigOption*` fields and `DynamicPrintConfig` means the Unity port must replicate config
 // ownership to avoid race conditions when multiple tables mutate shared state.
@@ -556,9 +560,10 @@ private:
 // [INTENT] Layout the grid, search field, reset buttons, and filament metadata while bridging to ObjectGridTable reloads.
 // [STATE] Range selection bounds, cached filament names/colors, current row/col, and DPI-aware UI elements govern state updates.
 // [EVENT] Exposes OnCellLeftClick, OnRangeSelected, OnCellValueChanged, and OnSize events to keep the grid/table responsive to user tweaks.
-// [UNITY] A UI Toolkit scrollable Panel with a ListView and side controls bound via a MonoBehaviour controller mirrors this structure.
-// [PORTING_HAZARD:P2] wxPanel uses `wxDECLARE_EVENT_TABLE` macros and custom bitmaps (ScalableButton) that need explicit porting to Unity's
-// event system and sprite assets. the main panel
+// [THREAD] The panel runs entirely on the wxWidgets UI thread, so any resets triggered by background model updates must marshal through
+// `wxQueueEvent` or similar before touching these controls. [UNITY] A UI Toolkit scrollable Panel with a ListView and side controls bound
+// via a MonoBehaviour controller mirrors this structure. [PORTING_HAZARD:P2] wxPanel uses `wxDECLARE_EVENT_TABLE` macros and custom bitmaps
+// (ScalableButton) that need explicit porting to Unity's event system and sprite assets. the main panel
 class ObjectTablePanel : public wxPanel
 {
 public:
@@ -597,6 +602,10 @@ public:
     // set ObjectGridTable as friend
     friend class ObjectGridTable;
 
+    // [STATE] m_filaments_name/colors keep the icon column palette in sync with the filaments drop-down and color cache so rows
+    // can present the same index-based color chips. [UNITY] Store the palette in a ScriptableObject alongside Texture2D chips and expose it
+    // to a VisualElement `ListView` cell template. [PORTING_HAZARD:P3] Unity uses Texture2D while wxWidgets uses `wxColour`, so color
+    // metadata must be converted before rendering.
     std::vector<wxString> m_filaments_name;
     std::vector<wxColour> m_filaments_colors;
     int                   m_filaments_count{1};
@@ -644,9 +653,11 @@ private:
 // [INTENT] Show object table in a popup dialog, manage DPI/resizing, and propagate key events so multi-object edits happen via dialog
 // controls. [STATE] Stores popup dimensions, DPI-aware sizer, title text, and pointers to the panel/model/plater for re-use across popups.
 // [EVENT] OnClose, OnText, OnSize, and `on_dpi_changed`/`on_sys_color_changed` ensure the dialog stays responsive when the app changes
-// scaling or theme. [UNITY] Replace with a UI Toolkit overlay window (Floating VisualElement) that hosts the `ObjectTablePanel` equivalent
-// and uses `RenderTexture` or `Screen Space Overlay` to appear modal. [PORTING_HAZARD:P2] The dialog currently relies on wxWidgets
-// lifecycle + DPIDialog hooks, so the Unity port must manage modal focus and DPI scaling manually.
+// scaling or theme. [THREAD] The popup lifecycle is bound to the wxWidgets UI thread and DPI notifications already target that thread,
+// so any backend refresh must dispatch to the UI thread before touching `ObjectTableDialog`. [UNITY] Replace with a UI Toolkit overlay
+// window (Floating VisualElement) that hosts the `ObjectTablePanel` equivalent and uses `RenderTexture` or `Screen Space Overlay` to
+// appear modal. [PORTING_HAZARD:P2] The dialog currently relies on wxWidgets lifecycle + DPIDialog hooks, so the Unity port must
+// manage modal focus and DPI scaling manually.
 class ObjectTableDialog : public GUI::DPIDialog
 {
     const int POPUP_WIDTH  = FromDIP(512);
