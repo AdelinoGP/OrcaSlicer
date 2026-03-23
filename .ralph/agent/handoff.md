@@ -3293,3 +3293,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P1: 1 (GTK ellipsize workaround); P2: 3 (wx label-marker grouping, DeviceManager/connected-printer reliance, MainFrame/Tab coordination).
 - Git: Document PresetComboBoxes for Unity port
 - Next recommended Phase 1 task: T154 annotate: src/slic3r/GUI/AMSSetting.hpp
+
+## Phase 1 - Task T153 complete
+- Task type: annotate
+- File: src/slic3r/GUI/AMSSetting.cpp
+- Deliverables: src/slic3r/GUI/AMSSetting.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: Added 25 INTENT/STATE/EVENT/THREAD/UNITY/PORTING_HAZARD tags covering AMS panel layout, toggle wiring, and firmware-state handling for the Unity port.
+- Verification excerpt: // [STATE] m_obj is the authoritative MachineObject backing the current dialog row so every toggle can query device capabilities.
+- Unity-impact summary:
+  - Mirror the header/toggle layout with a UI Toolkit VisualElement tree bound to a ScriptableObject `AMSSettingsModel`, wiring Toggle/ComboBox callbacks to command handlers.
+  - Replace blocking MessageDialog confirmations with async modal overlays and swap `create_scaled_bitmap`/dark-theme hooks with theme-aware Sprite swaps in Unity.
+- Hazards found: P2=1 (blocking modal firmware confirmation flow), P3=2 (wxGetApp dark-theme sync and create_scaled_bitmap icon handling).
+- Git: Annotate AMSSetting dialog state flows
+- Next recommended Phase 1 task: T154 annotate: src/slic3r/GUI/AMSSetting.hpp

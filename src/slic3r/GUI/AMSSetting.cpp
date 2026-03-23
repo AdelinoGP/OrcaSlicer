@@ -14,17 +14,21 @@
 
 namespace Slic3r { namespace GUI {
 
-AMSSetting::AMSSetting(wxWindow *parent, wxWindowID id, const wxPoint &pos, const wxSize &size, long style)
+AMSSetting::AMSSetting(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size, long style)
     : DPIDialog(parent, id, wxEmptyString, pos, size, style)
 {
+    // [INTENT] use a DPI-aware dialog container so AMS toggles honor scaling and parent z-order while staying modal.
     create();
+    // [PORTING_HAZARD:P3] touches wxGetApp for dark-theme sync; Unity should route theme changes via a shared UI service instead of global
+    // app singletons.
     wxGetApp().UpdateDlgDarkUI(this);
 }
 AMSSetting::~AMSSetting() {}
 
 void AMSSetting::create()
 {
-    wxBoxSizer *m_sizer_main;
+    // [INTENT] Compose the AMS settings rows: header, toggles, tips, and icon preview while keeping sizer references for Show/Hide updates.
+    wxBoxSizer* m_sizer_main;
     m_sizer_main = new wxBoxSizer(wxVERTICAL);
     SetBackgroundColour(*wxWHITE);
 
@@ -32,45 +36,50 @@ void AMSSetting::create()
     m_static_ams_settings->SetFont(::Label::Head_14);
     m_static_ams_settings->SetForegroundColour(AMS_SETTING_GREY800);
 
-
     m_panel_body = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(-1, -1), wxTAB_TRAVERSAL);
     m_panel_body->SetBackgroundColour(*wxWHITE);
-    wxBoxSizer *m_sizerl_body = new wxBoxSizer(wxVERTICAL);
+    // [UNITY] In Unity this panel would become a UI Toolkit VisualElement tree with Labels/Toggles bound to a shared
+    // ScriptableObject-backed AMSSettingsModel.
+    wxBoxSizer* m_sizerl_body = new wxBoxSizer(wxVERTICAL);
 
     m_ams_type = new AMSSettingTypePanel(m_panel_body, this);
+    // [STATE] Hide until a MachineObject with firmware-switching data calls UpdateByObj.
     m_ams_type->Show(false);
 
-    //m_ams_arrange_order = new AMSSettingArrangeAMSOrder(m_panel_body);
-    //m_ams_arrange_order->Show(false);
+    // m_ams_arrange_order = new AMSSettingArrangeAMSOrder(m_panel_body);
+    // m_ams_arrange_order->Show(false);
 
     m_panel_Insert_material = new wxPanel(m_panel_body, wxID_ANY, wxDefaultPosition, wxSize(-1, -1), wxTAB_TRAVERSAL);
     m_panel_Insert_material->SetBackgroundColour(*wxWHITE);
     wxBoxSizer* m_sizer_main_Insert_material = new wxBoxSizer(wxVERTICAL);
+    // [STATE] Tip lines default to hidden; on_insert_material_read toggles their visibility slices to explain current detection state.
 
     // checkbox area 1
-    wxBoxSizer *m_sizer_Insert_material  = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* m_sizer_Insert_material  = new wxBoxSizer(wxHORIZONTAL);
     m_checkbox_Insert_material_auto_read = new ::CheckBox(m_panel_Insert_material);
     m_checkbox_Insert_material_auto_read->Bind(wxEVT_TOGGLEBUTTON, &AMSSetting::on_insert_material_read, this);
+    // [EVENT] Toggle wired to on_insert_material_read; the Unity port should hook Toggle.onValueChanged to async Command dispatch on the
+    // main thread.
     m_sizer_Insert_material->Add(m_checkbox_Insert_material_auto_read, 0, wxALIGN_CENTER_VERTICAL);
 
     m_sizer_Insert_material->Add(0, 0, 0, wxLEFT, 12);
 
-    m_title_Insert_material_auto_read = new wxStaticText(m_panel_Insert_material, wxID_ANY, _L("Insertion update"),
-                                                         wxDefaultPosition, wxDefaultSize, 0);
+    m_title_Insert_material_auto_read = new wxStaticText(m_panel_Insert_material, wxID_ANY, _L("Insertion update"), wxDefaultPosition,
+                                                         wxDefaultSize, 0);
 
     m_title_Insert_material_auto_read->SetFont(::Label::Head_13);
     m_title_Insert_material_auto_read->SetForegroundColour(AMS_SETTING_GREY800);
     m_title_Insert_material_auto_read->Wrap(AMS_SETTING_BODY_WIDTH);
     m_sizer_Insert_material->Add(m_title_Insert_material_auto_read, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_LEFT, 0);
 
-    wxBoxSizer *m_sizer_Insert_material_tip = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* m_sizer_Insert_material_tip = new wxBoxSizer(wxHORIZONTAL);
     m_sizer_Insert_material_tip_inline      = new wxBoxSizer(wxVERTICAL);
     m_sizer_Insert_material_tip->Add(0, 0, 0, wxLEFT, 10);
 
     // tip line1
     m_tip_Insert_material_line1 = new Label(m_panel_Insert_material,
-        _L("The AMS will automatically read the filament information when inserting a new Bambu Lab filament. This takes about 20 seconds.")
-    );
+                                            _L("The AMS will automatically read the filament information when inserting a new Bambu Lab "
+                                               "filament. This takes about 20 seconds."));
     m_tip_Insert_material_line1->SetFont(::Label::Body_13);
     m_tip_Insert_material_line1->SetForegroundColour(AMS_SETTING_GREY700);
     m_tip_Insert_material_line1->SetSize(wxSize(AMS_SETTING_BODY_WIDTH, -1));
@@ -80,8 +89,8 @@ void AMSSetting::create()
 
     // tip line2
     m_tip_Insert_material_line2 = new Label(m_panel_Insert_material,
-        _L("Note: if a new filament is inserted during printing, the AMS will not automatically read any information until printing is completed.")
-    );
+                                            _L("Note: if a new filament is inserted during printing, the AMS will not automatically read "
+                                               "any information until printing is completed."));
     m_tip_Insert_material_line2->SetFont(::Label::Body_13);
     m_tip_Insert_material_line2->SetForegroundColour(AMS_SETTING_GREY700);
     m_tip_Insert_material_line2->SetSize(wxSize(AMS_SETTING_BODY_WIDTH, -1));
@@ -91,8 +100,8 @@ void AMSSetting::create()
 
     // tip line3
     m_tip_Insert_material_line3 = new Label(m_panel_Insert_material,
-        _L("When inserting a new filament, the AMS will not automatically read its information, leaving it blank for you to enter manually.")
-    );
+                                            _L("When inserting a new filament, the AMS will not automatically read its information, "
+                                               "leaving it blank for you to enter manually."));
     m_tip_Insert_material_line3->SetFont(::Label::Body_13);
     m_tip_Insert_material_line3->SetForegroundColour(AMS_SETTING_GREY700);
     m_tip_Insert_material_line3->SetSize(wxSize(AMS_SETTING_BODY_WIDTH, -1));
@@ -107,26 +116,27 @@ void AMSSetting::create()
     m_panel_Insert_material->SetSizer(m_sizer_main_Insert_material);
 
     // checkbox area 2
-    wxBoxSizer *m_sizer_starting = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* m_sizer_starting  = new wxBoxSizer(wxHORIZONTAL);
     m_checkbox_starting_auto_read = new ::CheckBox(m_panel_body);
     m_checkbox_starting_auto_read->Bind(wxEVT_TOGGLEBUTTON, &AMSSetting::on_starting_read, this);
+    // [EVENT] Start-of-day toggle uses the same command flow; Unity should keep the handler on the UI thread before hitting the printer
+    // command queue.
     m_sizer_starting->Add(m_checkbox_starting_auto_read, 0, wxALIGN_CENTER_VERTICAL);
     m_sizer_starting->Add(0, 0, 0, wxLEFT, 12);
-    m_title_starting_auto_read = new wxStaticText(m_panel_body, wxID_ANY, _L("Power on update"), wxDefaultPosition,wxDefaultSize, 0);
+    m_title_starting_auto_read = new wxStaticText(m_panel_body, wxID_ANY, _L("Power on update"), wxDefaultPosition, wxDefaultSize, 0);
     m_title_starting_auto_read->SetFont(::Label::Head_13);
     m_title_starting_auto_read->SetForegroundColour(AMS_SETTING_GREY800);
     m_title_starting_auto_read->Wrap(AMS_SETTING_BODY_WIDTH);
     m_sizer_starting->Add(m_title_starting_auto_read, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_LEFT, 0);
 
-    wxBoxSizer *m_sizer_starting_tip = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* m_sizer_starting_tip = new wxBoxSizer(wxHORIZONTAL);
     m_sizer_starting_tip->Add(0, 0, 0, wxLEFT, 10);
 
     // tip line
     m_sizer_starting_tip_inline = new wxBoxSizer(wxVERTICAL);
 
-    m_tip_starting_line1 = new Label(m_panel_body,
-        _L("The AMS will automatically read the information of inserted filament on start-up. It will take about 1 minute. The reading process will roll the filament spools.")
-    );
+    m_tip_starting_line1 = new Label(m_panel_body, _L("The AMS will automatically read the information of inserted filament on start-up. "
+                                                      "It will take about 1 minute. The reading process will roll the filament spools."));
     m_tip_starting_line1->SetFont(::Label::Body_13);
     m_tip_starting_line1->SetForegroundColour(AMS_SETTING_GREY700);
     m_tip_starting_line1->SetSize(wxSize(AMS_SETTING_BODY_WIDTH, -1));
@@ -134,18 +144,19 @@ void AMSSetting::create()
     m_sizer_starting_tip_inline->Add(m_tip_starting_line1, 0, wxEXPAND, 0);
 
     m_tip_starting_line2 = new Label(m_panel_body,
-        _L("The AMS will not automatically read information from inserted filament during startup and will continue to use the information recorded before the last shutdown.")
-    );
+                                     _L("The AMS will not automatically read information from inserted filament during startup and will "
+                                        "continue to use the information recorded before the last shutdown."));
     m_tip_starting_line2->SetFont(::Label::Body_13);
     m_tip_starting_line2->SetForegroundColour(AMS_SETTING_GREY700);
     m_tip_starting_line2->SetSize(wxSize(AMS_SETTING_BODY_WIDTH, -1));
     m_tip_starting_line2->Wrap(AMS_SETTING_BODY_WIDTH);
-    m_sizer_starting_tip_inline->Add(m_tip_starting_line2, 0, wxEXPAND,0);
+    // [STATE] Startup tips are swapped based on the starting read toggle so users see the active narrative chunks.
+    m_sizer_starting_tip_inline->Add(m_tip_starting_line2, 0, wxEXPAND, 0);
     m_sizer_starting_tip->Add(m_sizer_starting_tip_inline, 1, wxALIGN_CENTER, 0);
 
     // checkbox area 3
     wxBoxSizer* m_sizer_remain = new wxBoxSizer(wxHORIZONTAL);
-    m_checkbox_remain = new ::CheckBox(m_panel_body);
+    m_checkbox_remain          = new ::CheckBox(m_panel_body);
     m_checkbox_remain->Bind(wxEVT_TOGGLEBUTTON, &AMSSetting::on_remain, this);
     m_sizer_remain->Add(m_checkbox_remain, 0, wxALIGN_CENTER_VERTICAL);
     m_sizer_remain->Add(0, 0, 0, wxLEFT, 12);
@@ -154,8 +165,6 @@ void AMSSetting::create()
     m_title_remain->SetForegroundColour(AMS_SETTING_GREY800);
     m_title_remain->Wrap(AMS_SETTING_BODY_WIDTH);
     m_sizer_remain->Add(m_title_remain, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_LEFT, 0);
-
-
 
     wxBoxSizer* m_sizer_remain_tip = new wxBoxSizer(wxHORIZONTAL);
     m_sizer_remain_tip->Add(0, 0, 0, wxLEFT, 10);
@@ -173,7 +182,7 @@ void AMSSetting::create()
 
     // checkbox area 4
     wxBoxSizer* m_sizer_switch_filament = new wxBoxSizer(wxHORIZONTAL);
-    m_checkbox_switch_filament = new ::CheckBox(m_panel_body);
+    m_checkbox_switch_filament          = new ::CheckBox(m_panel_body);
     m_checkbox_switch_filament->Bind(wxEVT_TOGGLEBUTTON, &AMSSetting::on_switch_filament, this);
     m_sizer_switch_filament->Add(m_checkbox_switch_filament, 0, wxALIGN_CENTER_VERTICAL);
     m_sizer_switch_filament->Add(0, 0, 0, wxLEFT, 12);
@@ -183,17 +192,15 @@ void AMSSetting::create()
     m_title_switch_filament->Wrap(AMS_SETTING_BODY_WIDTH);
     m_sizer_switch_filament->Add(m_title_switch_filament, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_LEFT, 0);
 
-
-
     wxBoxSizer* m_sizer_switch_filament_tip = new wxBoxSizer(wxHORIZONTAL);
     m_sizer_switch_filament_tip->Add(0, 0, 0, wxLEFT, 10);
 
     // tip line
     m_sizer_switch_filament_inline = new wxBoxSizer(wxVERTICAL);
 
-    m_tip_switch_filament_line1 = new Label(m_panel_body,
-        _L("AMS will continue to another spool with matching filament properties automatically when current filament runs out.")
-    );
+    m_tip_switch_filament_line1 =
+        new Label(m_panel_body,
+                  _L("AMS will continue to another spool with matching filament properties automatically when current filament runs out."));
     m_tip_switch_filament_line1->SetFont(::Label::Body_13);
     m_tip_switch_filament_line1->SetForegroundColour(AMS_SETTING_GREY700);
     m_tip_switch_filament_line1->SetSize(wxSize(AMS_SETTING_BODY_WIDTH, -1));
@@ -201,11 +208,9 @@ void AMSSetting::create()
     m_sizer_switch_filament_inline->Add(m_tip_switch_filament_line1, 0, wxEXPAND, 0);
     m_sizer_switch_filament_tip->Add(m_sizer_switch_filament_inline, 1, wxALIGN_CENTER, 0);
 
-
-
     // checkbox area 5
     wxBoxSizer* m_sizer_air_print = new wxBoxSizer(wxHORIZONTAL);
-    m_checkbox_air_print = new ::CheckBox(m_panel_body);
+    m_checkbox_air_print          = new ::CheckBox(m_panel_body);
     m_checkbox_air_print->Bind(wxEVT_TOGGLEBUTTON, &AMSSetting::on_air_print_detect, this);
     m_sizer_air_print->Add(m_checkbox_air_print, 0, wxTOP, 1);
     m_sizer_air_print->Add(0, 0, 0, wxLEFT, 12);
@@ -221,9 +226,8 @@ void AMSSetting::create()
     // tip line
     auto m_sizer_air_print_inline = new wxBoxSizer(wxVERTICAL);
 
-    m_tip_air_print_line = new Label(m_panel_body,
-        _L("Detects clogging and filament grinding, halting printing immediately to conserve time and filament.")
-    );
+    m_tip_air_print_line =
+        new Label(m_panel_body, _L("Detects clogging and filament grinding, halting printing immediately to conserve time and filament."));
     m_tip_air_print_line->SetFont(::Label::Body_13);
     m_tip_air_print_line->SetForegroundColour(AMS_SETTING_GREY700);
     m_tip_air_print_line->SetSize(wxSize(AMS_SETTING_BODY_WIDTH, -1));
@@ -235,18 +239,20 @@ void AMSSetting::create()
     m_title_air_print->Hide();
     m_tip_air_print_line->Hide();
 
-
     // panel img
     wxPanel* m_panel_img = new wxPanel(m_panel_body, wxID_ANY, wxDefaultPosition, wxDefaultSize);
     m_panel_img->SetBackgroundColour(AMS_SETTING_GREY200);
-    wxBoxSizer *m_sizer_img = new wxBoxSizer(wxVERTICAL);
+    wxBoxSizer* m_sizer_img = new wxBoxSizer(wxVERTICAL);
     m_am_img = new wxStaticBitmap(m_panel_img, wxID_ANY, create_scaled_bitmap("ams_icon", nullptr, 126), wxDefaultPosition, wxDefaultSize);
+    // [PORTING_HAZARD:P3] Bitmap creation is tied to wx's `create_scaled_bitmap` and theme state; Unity should preload Sprite variants via
+    // Addressables and swap them through theme-aware service.
     m_sizer_img->Add(m_am_img, 0, wxALIGN_CENTER | wxTOP, 26);
     m_sizer_img->Add(0, 0, 0, wxTOP, 18);
     m_panel_img->SetSizer(m_sizer_img);
     m_panel_img->Layout();
     m_sizer_img->Fit(m_panel_img);
 
+    // [STATE] Remain block hides/shows based on `MachineObject::is_support_update_remain` and `update_remain_mode`.
     m_sizer_remain_block = new wxBoxSizer(wxVERTICAL);
     m_sizer_remain_block->Add(m_sizer_remain, 0, wxEXPAND | wxTOP, FromDIP(8));
     m_sizer_remain_block->Add(0, 0, 0, wxTOP, 8);
@@ -255,7 +261,7 @@ void AMSSetting::create()
 
     m_sizerl_body->AddSpacer(FromDIP(12));
     m_sizerl_body->Add(m_ams_type, 0, wxEXPAND | wxTOP | wxBOTTOM, FromDIP(12));
-    //m_sizerl_body->Add(m_ams_arrange_order, 0, wxEXPAND | wxTOP | wxBOTTOM, FromDIP(12));    
+    // m_sizerl_body->Add(m_ams_arrange_order, 0, wxEXPAND | wxTOP | wxBOTTOM, FromDIP(12));
     m_sizerl_body->Add(m_panel_Insert_material, 0, wxEXPAND | wxTOP, FromDIP(12));
     m_sizerl_body->Add(m_sizer_starting, 0, wxEXPAND | wxTOP, FromDIP(12));
     m_sizerl_body->Add(m_sizer_starting_tip, 0, wxEXPAND | wxTOP, FromDIP(12));
@@ -285,6 +291,9 @@ void AMSSetting::create()
 void AMSSetting::UpdateByObj(MachineObject* obj)
 {
     this->m_obj = obj;
+    // [STATE] m_obj is the authoritative MachineObject backing the current dialog row so every toggle can query device capabilities.
+    // [THREAD] This runs on the main GUI thread; Unity must also marshal selection changes onto the Unity main thread before updating
+    // VisualElements.
     if (!obj) {
         this->Show(false);
         return;
@@ -293,7 +302,7 @@ void AMSSetting::UpdateByObj(MachineObject* obj)
     update_ams_img(obj);
 
     m_ams_type->Update(obj);
-    //m_ams_arrange_order->Update(obj);
+    // m_ams_arrange_order->Update(obj);
     update_insert_material_read_mode(obj);
     m_sizer_remain_block->Show(obj->is_support_update_remain);
     update_starting_read_mode(obj->GetFilaSystem()->IsDetectOnPowerupEnabled());
@@ -301,7 +310,7 @@ void AMSSetting::UpdateByObj(MachineObject* obj)
     update_switch_filament(obj->GetFilaSystem()->IsAutoRefillEnabled());
     update_air_printing_detection(obj);
 
-    update_firmware_switching_status();// on fila_firmware_switch
+    update_firmware_switching_status(); // on fila_firmware_switch
 }
 
 void AMSSetting::update_firmware_switching_status()
@@ -318,9 +327,12 @@ void AMSSetting::update_firmware_switching_status()
     if (m_switching == fila_firmware_switch->IsSwitching()) {
         return;
     }
+    // [STATE] Track firmware switching so the UI can disable all checkboxes while the upgrade is in flight.
     m_switching = fila_firmware_switch->IsSwitching();
 
     // BFS: Update all children
+    // [THREAD] This manipulates the wx widget tree on the main thread; the Unity port should traverse VisualElement hierarchy before
+    // enabling/disabling bindings.
     auto children = GetChildren();
     while (!children.IsEmpty()) {
         auto win = children.front();
@@ -331,8 +343,7 @@ void AMSSetting::update_firmware_switching_status()
             continue;
         }
 
-        if (dynamic_cast<wxStaticText*>(win) != nullptr ||
-            dynamic_cast<CheckBox*>(win) != nullptr) {
+        if (dynamic_cast<wxStaticText*>(win) != nullptr || dynamic_cast<CheckBox*>(win) != nullptr) {
             win->Enable(!m_switching);
         }
 
@@ -363,12 +374,13 @@ void AMSSetting::update_insert_material_read_mode(MachineObject* obj)
         }
 
         std::string extra_ams_str = (boost::format("ams_f1/%1%") % 0).str();
-        auto extra_ams_it = obj->module_vers.find(extra_ams_str);
+        auto        extra_ams_it  = obj->module_vers.find(extra_ams_str);
         if (extra_ams_it != obj->module_vers.end()) {
             update_insert_material_read_mode(setting.value(), extra_ams_it->second.sw_ver);
         } else {
             update_insert_material_read_mode(setting.value(), "");
         }
+        // [STATE] Panel visibility derives from both capability flags and firmware version support.
     }
 }
 
@@ -382,8 +394,7 @@ void AMSSetting::update_insert_material_read_mode(bool selected, std::string ver
         m_tip_Insert_material_line2->Hide();
         m_tip_Insert_material_line3->Hide();
         m_panel_Insert_material->Hide();
-    }
-    else {
+    } else {
         m_panel_Insert_material->Show();
         m_checkbox_Insert_material_auto_read->SetValue(selected);
         m_checkbox_Insert_material_auto_read->Show();
@@ -392,8 +403,7 @@ void AMSSetting::update_insert_material_read_mode(bool selected, std::string ver
             m_tip_Insert_material_line1->Show();
             m_tip_Insert_material_line2->Show();
             m_tip_Insert_material_line3->Hide();
-        }
-        else {
+        } else {
             m_tip_Insert_material_line1->Hide();
             m_tip_Insert_material_line2->Hide();
             m_tip_Insert_material_line3->Show();
@@ -403,6 +413,7 @@ void AMSSetting::update_insert_material_read_mode(bool selected, std::string ver
     m_sizer_Insert_material_tip_inline->Layout();
     Layout();
     Fit();
+    // [STATE] Force relayout so tip rows and panel heights stay consistent after checkbox state changes.
 }
 
 void AMSSetting::update_ams_img(MachineObject* obj_)
@@ -412,16 +423,16 @@ void AMSSetting::update_ams_img(MachineObject* obj_)
     }
 
     std::string ams_icon_str = DevPrinterConfigUtil::get_printer_ams_img(obj_->printer_type);
-    if (auto ams_switch = obj_->GetFilaSystem()->GetAmsFirmwareSwitch().lock();
-        ams_switch->GetCurrentFirmwareIdxSel() == 1) {
-        ams_icon_str = "ams_icon";// A series support AMS
+    if (auto ams_switch = obj_->GetFilaSystem()->GetAmsFirmwareSwitch().lock(); ams_switch->GetCurrentFirmwareIdxSel() == 1) {
+        ams_icon_str = "ams_icon"; // A series support AMS
     }
 
     // transfer to dark mode icon
-    if (wxGetApp().dark_mode()&& ams_icon_str=="extra_icon") {
+    if (wxGetApp().dark_mode() && ams_icon_str == "extra_icon") {
         ams_icon_str += "_dark";
     }
 
+    // [STATE] Cache the last AMS icon name so repeated calls avoid redundant bitmap creation.
     if (ams_icon_str != m_ams_img_name) {
         m_am_img->SetBitmap(create_scaled_bitmap(ams_icon_str, nullptr, 126));
         m_am_img->Refresh();
@@ -450,8 +461,7 @@ void AMSSetting::update_remain_mode(bool selected)
         m_title_remain->Show();
         m_tip_remain_line1->Show();
         Layout();
-    }
-    else {
+    } else {
         m_checkbox_remain->Hide();
         m_title_remain->Hide();
         m_tip_remain_line1->Hide();
@@ -476,10 +486,9 @@ void AMSSetting::update_switch_filament(bool selected)
     m_checkbox_switch_filament->SetValue(selected);
 }
 
-
 void AMSSetting::update_air_printing_detection(MachineObject* obj)
 {
-    if(!obj) {
+    if (!obj) {
         return;
     }
 
@@ -496,9 +505,10 @@ void AMSSetting::update_air_printing_detection(MachineObject* obj)
     m_checkbox_air_print->SetValue(obj->ams_air_print_status);
 }
 
-void AMSSetting::on_insert_material_read(wxCommandEvent &event)
+void AMSSetting::on_insert_material_read(wxCommandEvent& event)
 {
-    // send command
+    // [EVENT] User toggles insert-material auto-read; keep tip visibility aligned while sending printer commands.
+    // [THREAD] command_ams_user_settings travels to printer worker threads so keep UI changes on this main thread before call.
     if (m_checkbox_Insert_material_auto_read->GetValue()) {
         // checked
         m_tip_Insert_material_line1->Show();
@@ -513,8 +523,8 @@ void AMSSetting::on_insert_material_read(wxCommandEvent &event)
     m_checkbox_Insert_material_auto_read->SetValue(event.GetInt());
 
     bool start_read_opt = m_checkbox_starting_auto_read->GetValue();
-    bool tray_read_opt = m_checkbox_Insert_material_auto_read->GetValue();
-    bool remain_opt = m_checkbox_remain->GetValue();
+    bool tray_read_opt  = m_checkbox_Insert_material_auto_read->GetValue();
+    bool remain_opt     = m_checkbox_remain->GetValue();
 
     m_obj->command_ams_user_settings(start_read_opt, tray_read_opt, remain_opt);
 
@@ -525,8 +535,10 @@ void AMSSetting::on_insert_material_read(wxCommandEvent &event)
     event.Skip();
 }
 
-void AMSSetting::on_starting_read(wxCommandEvent &event)
+void AMSSetting::on_starting_read(wxCommandEvent& event)
 {
+    // [EVENT] Power-on toggle reuses the aggregated command and keeps tips aligned for the user state.
+    // [THREAD] The same printer worker path is hit, so change VisualElements first and then call the command on the next frame.
     if (m_checkbox_starting_auto_read->GetValue()) {
         // checked
         m_tip_starting_line1->Show();
@@ -540,7 +552,7 @@ void AMSSetting::on_starting_read(wxCommandEvent &event)
 
     bool start_read_opt = m_checkbox_starting_auto_read->GetValue();
     bool tray_read_opt  = m_checkbox_Insert_material_auto_read->GetValue();
-    bool remain_opt = m_checkbox_remain->GetValue();
+    bool remain_opt     = m_checkbox_remain->GetValue();
 
     m_obj->command_ams_user_settings(start_read_opt, tray_read_opt, remain_opt);
 
@@ -553,15 +565,17 @@ void AMSSetting::on_starting_read(wxCommandEvent &event)
 
 void AMSSetting::on_remain(wxCommandEvent& event)
 {
+    // [EVENT] Remaining-capacity toggle feeds into the same user settings payload.
     bool start_read_opt = m_checkbox_starting_auto_read->GetValue();
-    bool tray_read_opt = m_checkbox_Insert_material_auto_read->GetValue();
-    bool remain_opt = m_checkbox_remain->GetValue();
+    bool tray_read_opt  = m_checkbox_Insert_material_auto_read->GetValue();
+    bool remain_opt     = m_checkbox_remain->GetValue();
     m_obj->command_ams_user_settings(start_read_opt, tray_read_opt, remain_opt);
     event.Skip();
 }
 
 void AMSSetting::on_switch_filament(wxCommandEvent& event)
 {
+    // [EVENT] Filament-backup toggle triggers a dedicated command without extra UI work, so keep it main-thread safe.
     bool switch_filament = m_checkbox_switch_filament->GetValue();
     m_obj->command_ams_switch_filament(switch_filament);
     event.Skip();
@@ -569,12 +583,13 @@ void AMSSetting::on_switch_filament(wxCommandEvent& event)
 
 void AMSSetting::on_air_print_detect(wxCommandEvent& event)
 {
+    // [EVENT] Air-print detection toggle tells the printer to halt for clogging; this reuses the same pattern.
     bool air_print_detect = m_checkbox_air_print->GetValue();
     m_obj->command_ams_air_print_detect(air_print_detect);
     event.Skip();
 }
 
-void AMSSetting::on_dpi_changed(const wxRect &suggested_rect)
+void AMSSetting::on_dpi_changed(const wxRect& suggested_rect)
 {
     if (!m_ams_img_name.empty()) {
         m_am_img->SetBitmap(create_scaled_bitmap(m_ams_img_name, nullptr, 126));
@@ -582,8 +597,7 @@ void AMSSetting::on_dpi_changed(const wxRect &suggested_rect)
     }
 }
 
-AMSSettingTypePanel::AMSSettingTypePanel(wxWindow* parent, AMSSetting* setting_dlg)
-    : wxPanel(parent), m_setting_dlg(setting_dlg)
+AMSSettingTypePanel::AMSSettingTypePanel(wxWindow* parent, AMSSetting* setting_dlg) : wxPanel(parent), m_setting_dlg(setting_dlg)
 {
     CreateGui();
 }
@@ -597,6 +611,7 @@ AMSSettingTypePanel::~AMSSettingTypePanel()
 
 void AMSSettingTypePanel::CreateGui()
 {
+    // [INTENT] Build the firmware selector row with a ComboBox and animated status icon so switching state is immediately visible.
     wxBoxSizer* h_sizer = new wxBoxSizer(wxHORIZONTAL);
 
     Label* title = new Label(this, ::Label::Head_13, _L("AMS Type"));
@@ -605,13 +620,16 @@ void AMSSettingTypePanel::CreateGui()
     m_type_combobox = new ComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(240, -1), 0, nullptr, wxCB_READONLY);
     m_type_combobox->SetMinSize(wxSize(240, -1));
     m_type_combobox->Bind(wxEVT_COMBOBOX, &AMSSettingTypePanel::OnAmsTypeChanged, this);
+    // [EVENT] ComboBox change event fires OnAmsTypeChanged; Unity should route via VisualElement `ListView` selection change to a
+    // confirmation dialog.
 
     m_switching_tips = new Label(this, ::Label::Body_14);
     m_switching_tips->SetBackgroundColour(*wxWHITE);
     m_switching_tips->Show(false);
 
-    std::vector<std::string> list{ "ams_rfid_1", "ams_rfid_2", "ams_rfid_3", "ams_rfid_4" };
+    std::vector<std::string> list{"ams_rfid_1", "ams_rfid_2", "ams_rfid_3", "ams_rfid_4"};
     m_switching_icon = new AnimaIcon(this, wxID_ANY, list, "refresh_printer", 100);
+    // [UNITY] Translating the spinner to Unity means swapping an Animated Sprite or looping `AnimationClip` while the firmware upgrade is running.
     m_switching_icon->SetMinSize(wxSize(FromDIP(20), FromDIP(20)));
 
     h_sizer->Add(title, 0);
@@ -631,8 +649,9 @@ void AMSSettingTypePanel::Update(const MachineObject* obj)
         return;
     }
 
+    // [STATE] Cache the weak_ptr so OnAmsTypeChanged can interrupt firmware switching commands without owning the system outright.
     m_ams_firmware_switch = obj->GetFilaSystem()->GetAmsFirmwareSwitch();
-    auto ptr = m_ams_firmware_switch.lock();
+    auto ptr              = m_ams_firmware_switch.lock();
     if (!ptr) {
         Show(false);
         return;
@@ -643,10 +662,10 @@ void AMSSettingTypePanel::Update(const MachineObject* obj)
         return;
     }
 
-    if (ptr->IsSwitching())  {
+    if (ptr->IsSwitching()) {
         int display_percent = obj->get_upgrade_percent();
         if (display_percent == 100 || display_percent == 0) {
-            display_percent = 1;// special case, sometimes it's switching but percent is 0 or 100
+            display_percent = 1; // special case, sometimes it's switching but percent is 0 or 100
         }
         const auto& tips = _L("Switching") + " " + wxString::Format("%d%%", display_percent);
         m_switching_tips->SetLabel(tips);
@@ -655,11 +674,11 @@ void AMSSettingTypePanel::Update(const MachineObject* obj)
         m_switching_icon->Show(true);
         m_type_combobox->Show(false);
     } else {
-        int current_idx = ptr->GetCurrentFirmwareIdxSel();
+        int  current_idx   = ptr->GetCurrentFirmwareIdxSel();
         auto ams_firmwares = ptr->GetSuppotedFirmwares();
         if (m_ams_firmwares != ams_firmwares || m_ams_firmware_current_idx != current_idx) {
             m_ams_firmware_current_idx = current_idx;
-            m_ams_firmwares = ams_firmwares;
+            m_ams_firmwares            = ams_firmwares;
 
             m_type_combobox->Clear();
             for (auto ams_firmware : m_ams_firmwares) {
@@ -672,7 +691,7 @@ void AMSSettingTypePanel::Update(const MachineObject* obj)
             m_type_combobox->SetSelection(m_ams_firmware_current_idx);
         }
 
-        if(m_switching_icon->IsPlaying()) {
+        if (m_switching_icon->IsPlaying()) {
             m_switching_icon->Stop();
         }
 
@@ -687,6 +706,7 @@ void AMSSettingTypePanel::Update(const MachineObject* obj)
 
 void AMSSettingTypePanel::OnAmsTypeChanged(wxCommandEvent& event)
 {
+    // [EVENT] Firmware combo selection leads to a confirmation + firmware update flow.
     auto part = m_ams_firmware_switch.lock();
     if (!part) {
         event.Skip();
@@ -698,11 +718,12 @@ void AMSSettingTypePanel::OnAmsTypeChanged(wxCommandEvent& event)
         event.Skip();
         return;
     }
-   
+
     auto obj_ = part->GetFilaSystem()->GetOwner();
     if (obj_) {
-        if (obj_->is_in_printing() || obj_->is_in_upgrading())  {
-            MessageDialog dlg(this, _L("The printer is busy and cannot switch AMS type."), SLIC3R_APP_NAME + _L("Info"), wxOK | wxICON_INFORMATION);
+        if (obj_->is_in_printing() || obj_->is_in_upgrading()) {
+            MessageDialog dlg(this, _L("The printer is busy and cannot switch AMS type."), SLIC3R_APP_NAME + _L("Info"),
+                              wxOK | wxICON_INFORMATION);
             dlg.ShowModal();
             m_type_combobox->SetSelection(part->GetCurrentFirmwareIdxSel());
             return;
@@ -710,19 +731,23 @@ void AMSSettingTypePanel::OnAmsTypeChanged(wxCommandEvent& event)
 
         auto ext = obj_->GetExtderSystem()->GetCurrentExtder();
         if (ext && ext->HasFilamentInExt()) {
-            MessageDialog dlg(this, _L("Please unload all filament before switching."), SLIC3R_APP_NAME + _L("Info"), wxOK | wxICON_INFORMATION);
+            MessageDialog dlg(this, _L("Please unload all filament before switching."), SLIC3R_APP_NAME + _L("Info"),
+                              wxOK | wxICON_INFORMATION);
             dlg.SetButtonLabel(wxID_OK, _L("Confirm"));
             dlg.ShowModal();
             m_type_combobox->SetSelection(part->GetCurrentFirmwareIdxSel());
             if (m_setting_dlg) {
                 m_setting_dlg->EndModal(wxID_OK);
             }
-            
+
             return;
         }
 
-        MessageDialog dlg(this, _L("AMS type switching needs firmware update, taking about 30s. Switch now?"), SLIC3R_APP_NAME + _L("Info"), wxOK | wxCANCEL | wxICON_INFORMATION);
+        MessageDialog dlg(this, _L("AMS type switching needs firmware update, taking about 30s. Switch now?"), SLIC3R_APP_NAME + _L("Info"),
+                          wxOK | wxCANCEL | wxICON_INFORMATION);
         dlg.SetButtonLabel(wxID_OK, _L("Confirm"));
+        // [PORTING_HAZARD:P2] Modal dialog blocks while waiting for user input; Unity should open a non-blocking overlay and await
+        // completion via async Task.
         int rtn = dlg.ShowModal();
         if (rtn != wxID_OK) {
             m_type_combobox->SetSelection(part->GetCurrentFirmwareIdxSel());

@@ -584,3 +584,7 @@
 ## Iteration plan update
 - Selected task: T152 annotate `src/slic3r/GUI/AMSMaterialsSetting.hpp` (new work).
 - Plan: read the header to understand the AMS material property definitions and UI wiring, inject `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD]` comments around property caches, combo box bindings, and panel helpers, document thread boundaries or config persistence if present, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit this header plus metadata, and close the task before handing off to the next iteration.
+
+## Iteration plan update
+- Selected task: T153 annotate `src/slic3r/GUI/AMSSetting.cpp` (runtime task `task-1773880085-efcd` now active).
+- Plan: read `AMSSetting.cpp` end-to-end, annotate the AMS UI setup, config binding, and event handlers with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments, describe the key caches/state machines, highlight Unity replacements (e.g., UI Toolkit VisualElement tree + ScriptableObject cost model), note any cross-thread validation or file IO, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit this file plus metadata, and close the task.
