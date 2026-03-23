@@ -2953,3 +2953,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (platform-specific screensaver/folder launches), P1=1 (accelerator prefix cache tied to wx accelerator format)
 - Git: annotate: src/slic3r/GUI/GUI.hpp
 - Next recommended Phase 1 task: T389 annotate: src/slic3r/GUI/GUI_ObjectList.hpp
+
+## Phase 1 - Task T389 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectList.hpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectList.hpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 14 multi-tag comments covering selection state, drag/drop clipboard caching, OpenGL selection sync, and Unity event mapping.
+- Verification excerpt: // [OPENGL] Pushes selection state to the GL canvas so gizmos stay visible; Unity should synchronize the `SceneSelectionManager` with the list on the render camera thread.
+- Unity-impact summary:
+  - Replace the wxDataView-driven selection model with a UI Toolkit ListView bound to a SelectionManager MonoBehaviour that also drives the GL gizmo overlays.
+  - Rebuild the clipboard/drag state, plate notifications, and mesh-error tooltips as explicit VisualElement events with UnityEvent handlers to keep the canvas/viewer in sync.
+- Hazards found: P2=2 (wxDataViewCtrl virtualization + event macros) and P3=2 (Netfabb fix macro, Windows column-edit shim)
+- Git: Annotate GUI_ObjectList for Unity selection
+- Next recommended Phase 1 task: T390 annotate: src/slic3r/GUI/GUI_ObjectSettings.cpp

@@ -38,6 +38,8 @@ typedef std::map<t_layer_height_range, ModelConfig> t_layer_config_ranges;
 
 // Manifold mesh may contain self-intersections, so we want to always allow fixing the mesh.
 #define FIX_THROUGH_NETFABB_ALWAYS 1
+// [PORTING_HAZARD:P3] This macro couples the list to the Netfabb fixer, which may not exist in Unity; plan to gate the feature behind an
+// async service or remove it.
 
 namespace GUI {
 struct ObjectVolumeID
@@ -46,10 +48,16 @@ struct ObjectVolumeID
     ModelVolume* volume{nullptr};
 };
 
+// [INTENT] Pairs the pointer to an owning `ModelObject` and its nested `ModelVolume` so selection data can feed detail panels.
+// [UNITY] Translate this into a `struct ObjectVolumeID` DTO that flows through UI Toolkit `ListView` binding callbacks and the selection
+// `MonoBehaviour`.
 typedef Event<ObjectVolumeID> ObjectSettingEvent;
+// [EVENT] Dispatched when the list signals a specific object/volume selection; Unity should hook this into `SelectionManager.OnSelectionChanged`.
 
 class PartPlate;
 
+// [EVENT] Custom selection events emitted by the object list; Unity should rewire them to `UnityEvent` or `C#` delegates in the selection
+// controller. [PORTING_HAZARD:P2] wxWidgets event macros lack a direct analogue in DOTS/Unity, so replicate the event registration manually.
 wxDECLARE_EVENT(EVT_OBJ_LIST_OBJECT_SELECT, SimpleEvent);
 wxDECLARE_EVENT(EVT_PARTPLATE_LIST_PLATE_SELECT, IntEvent);
 class BitmapComboBox;
@@ -78,7 +86,13 @@ struct MeshErrorsInfo
     std::string warning_icon_name;
 };
 
-// [UNITY] Use Unity's TreeView or ListView UI Toolkit components.
+// [INTENT] Captures mesh repair feedback so the UI can display tooltips/icons; Unity needs a shared error data model to drive overlay badges.
+
+// [UNITY] Use Unity's TreeView or ListView UI Toolkit components, binding to a ScriptableObject-backed selection controller.
+// [INTENT] Manages the object+volume list UI, routes selection changes to the manipulate arena, and keeps the layout/config sync in step
+// with undo/redo.
+// [PORTING_HAZARD:P2] Deep ties to `wxDataViewCtrl` column editing, `wxBitmap` caching, and `wxVariant` event streams mean Unity must
+// re-implement the data view entirely.
 class ObjectList : public wxDataViewCtrl
 {
 public:
@@ -90,6 +104,9 @@ public:
         smSettings  = 8,  // used for undo/redo
         smLayerRoot = 16, // used for undo/redo
     };
+
+    // [STATE] Bitmask tracks whether the list is presenting volumes, instances, layers, or settings roots; Unity must mirror this state in
+    // its SelectionMode enum to keep UI commands aligned.
 
     enum OBJECT_ORGANIZE_TYPE {
         ortByPlate  = 0,
@@ -117,9 +134,15 @@ public:
         DynamicPrintConfig    m_config_cache;
     };
 
+    // [STATE] Clipboard caches undo-friendly layer ranges and dynamic configs to replay paste/clone operations; Unity needs a cached DTO
+    // for clipboard access on the main thread.
+
 private:
     SELECTION_MODE m_selection_mode{smUndef};
     int            m_selected_layers_range_idx{-1};
+
+    // [STATE] Guards which segments of the tree are live for user actions (layers, instances, volumes); this must stay in sync with the
+    // Unity SelectionMode state machine.
 
     Clipboard m_clipboard;
 
@@ -162,34 +185,49 @@ private:
 
     } m_dragged_data;
 
+    // [STATE] Drag context caches object/sub-object ids while the drag is active; Unity's DragAndDrop event handlers must mirror this to
+    // accept drops safely.
+
     // [STATE] Data binding model. [UNITY] Replace with custom DataProvider / Controller.
     ObjectDataViewModel*       m_objects_model{nullptr};
     ModelConfig*               m_config{nullptr};
     std::vector<ModelObject*>* m_objects{nullptr};
     size_t                     m_variable_layer_obj_num = 0;
 
+    // [STATE] Track selected object indices so command handlers like delete/copy/clone can work without re-querying the view; Unity should
+    // hold this in a shared SelectionState object.
+
     BitmapComboBox* m_extruder_editor{nullptr};
+
+    // [STATE] Locked extruder-edit controls hold the UI state while the selection drives the underlying ModelConfig; Unity must lock its UI
+    // Toolkit `PopupField` while the shared config is updating.
 
     std::vector<wxBitmap*> m_bmp_vector;
 
-    int  m_selected_object_id  = -1;
-    bool m_prevent_list_events = false; // We use this flag to avoid circular event handling Select()
-                                        // happens to fire a wxEVT_LIST_ITEM_SELECTED on OSX, whose event handler
-                                        // calls this method again and again and again
+    int  m_selected_object_id = -1;
+    bool m_prevent_list_events =
+        false; // [EVENT] Guard prevents recursive `wxEVT_LIST_ITEM_SELECTED`; Unity will need the same guard when using
+               // `ListView.onSelectionChanged` to avoid feedback loops. We use this flag to avoid circular event handling Select() happens
+               // to fire a wxEVT_LIST_ITEM_SELECTED on OSX, whose event handler calls this method again and again and again
     bool m_prevent_list_manipulation = false;
 
     bool m_prevent_update_filament_in_config = false; // We use this flag to avoid updating of the extruder value in config
                                                       // during updating of the extruder count.
 
-    bool m_prevent_canvas_selection_update = false; // This flag prevents changing selection on the canvas. See function
-                                                    // update_settings_items - updating canvas selection is undesirable,
-                                                    // because it would turn off the gizmos (mainly a problem for the SLA gizmo)
+    bool m_prevent_canvas_selection_update =
+        false; // [OPENGL] Prevents selection changes that would toggle canvas gizmos/GL overlays (SLA
+               // fix). Unity's input bridge must similarly gate the `RenderTexture` overlay selection
+               // update. This flag prevents changing selection on the canvas. See function update_settings_items
+               // - updating canvas selection is undesirable, because it would turn off the gizmos
+               // (mainly a problem for the SLA gizmo)
 
     wxDataViewItem m_last_selected_item{nullptr};
 
 #ifdef __WXMSW__
     // Workaround for entering the column editing mode on Windows. Simulate keyboard enter when another column of the active line is selected.
     int m_last_selected_column = -1;
+    // [PORTING_HAZARD:P3] Windows-specific column edit shim requires per-column focus tracking; Unity's ListView needs a similar focus
+    // controller if column editing is supported.
 #endif /* __MSW__ */
 
 #if 0
@@ -258,8 +296,12 @@ public:
                                         const int vol_idx            = -1,
                                         wxString* sidebar_info       = nullptr,
                                         int*      non_manifold_edges = nullptr) const;
+    // [OPENGL][UNITY] Mesh error metadata drives tooltip overlays in the canvas so Unity should show badges on the RenderTexture when these
+    // values are non-empty.
     MeshErrorsInfo get_mesh_errors_info(wxString* sidebar_info = nullptr, int* non_manifold_edges = nullptr);
     void           set_tooltip_for_item(const wxPoint& pt);
+    // [OPENGL] Called during pointer motion to show mesh warnings on the GL canvas; Unity needs to drive tooltips with `PointerEventData`
+    // over the viewport.
 
     void selection_changed();
     void show_context_menu(const bool evt_context_menu);
@@ -268,6 +310,8 @@ public:
     void key_event(wxKeyEvent& event);
 #endif /* __WXOSX__ */
 
+    // [EVENT] Clipboard/manipulation commands invoked by toolbar buttons or menu actions; Unity should expose them through a
+    // `CommandPalette` or `InputAction` set.
     void copy();
     void paste();
     void cut();
@@ -298,7 +342,8 @@ public:
     void load_generic_subobject(const std::string& type_name, const ModelVolumeType type);
     void load_shape_object(const std::string& type_name);
     void load_mesh_object(const TriangleMesh& mesh, const wxString& name, bool center = true);
-    // BBS
+    // [THREAD] Mesh loading can be triggered by file dialogs and may block; Unity should perform the heavy work on a background task and
+    // then queue UI updates back to the main thread. BBS
     void switch_to_object_process();
     bool del_object(const int obj_idx, bool refresh_immediately = true);
     void del_subobject_item(wxDataViewItem& item);
@@ -405,6 +450,8 @@ public:
     void set_selected_layers_range_idx(const int range_idx) { m_selected_layers_range_idx = range_idx; }
     void set_selection_mode(SELECTION_MODE mode) { m_selection_mode = mode; }
     void update_selections();
+    // [OPENGL] Pushes selection state to the GL canvas so gizmos stay visible; Unity should synchronize the `SceneSelectionManager` with
+    // the list on the render camera thread.
     void update_selections_on_canvas();
     void select_item(const wxDataViewItem& item);
     void select_item(std::function<wxDataViewItem()> get_item);
@@ -456,6 +503,8 @@ public:
     void msw_rescale();
     void sys_color_changed();
 
+    // [THREAD] Called on the UI thread after undo/redo work finishes so the canvas/list state stays consistent; Unity must marshal this
+    // through `MainThreadDispatcher`.
     void update_after_undo_redo();
     // update printable state for item from objects model
     void update_printable_state(int obj_idx, int instance_idx);
@@ -475,6 +524,8 @@ public:
     void notify_instance_updated(int obj_idx);
     void object_config_options_changed(const ObjectVolumeID& ov_id);
     void printable_state_changed(const std::vector<ObjectVolumeID>& ov_ids);
+    // [EVENT] Plate notifications keep the list/sheet in sync with the `PartPlate` controller; Unity should route them through a
+    // `PlateManager` singleton so the UI state stays consistent.
 
     // search objectlist
     void assembly_plate_object_name();
@@ -482,9 +533,12 @@ public:
 
 private:
 #ifdef __WXOSX__
+    // [PORTING_HAZARD:P2] OSX-specific accelerator table; Unity has no direct equivalent so remap shortcuts through `InputSystem` and
+    // localized keymaps.
     //    void OnChar(wxKeyEvent& event);
     wxAcceleratorTable m_accel;
 #endif /* __WXOSX__ */
+    // [EVENT] Pops menu from the object list; Unity should forward this to a `VisualElement` context menu service.
     void OnContextMenu(wxDataViewEvent& event);
     void list_manipulation(const wxPoint& mouse_pos, bool evt_context_menu = false);
 
