@@ -2503,3 +2503,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3=1 (wxString-based localization map is tied to wxWidgets lifetime semantics)
 - Git: annotate: GLGizmoText.hpp
 - Next recommended Phase 1 task: T356 annotate: src/slic3r/GUI/GLCanvas3D.cpp
+
+## Phase 1 - Task T356 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GLCanvas3D.cpp
+- Deliverables: src/slic3r/GUI/GLCanvas3D.cpp; .ralph/ralph-tasks.md; .ralph/agent/scratchpad.md
+- Substantive additions: 10 multi-tag annotations covering canvas lifecycle, config/event propagation, ImGui overlays, GL texture updates, and Unity mapping guidance.
+- Verification excerpt: // [INTENT] Owns the 3D viewport, camera, toolbars, and gizmo overlays that compose the main canvas.
+- Unity-impact summary:
+  - Model the canvas as a MonoBehaviour pairing a RenderTexture camera with UI Toolkit toolbars, labels, and gizmo controllers that mirror the wx toolbars and selection state.
+  - Replace the custom wx events/post_event calls with UnityEvents/delegates routed through a main-thread dispatcher so background slicing jobs can safely post updates.
+  - Rebuild the variable-layer-height texture and overlay widgets using RenderTexture/ComputeBuffer updates plus UI Toolkit overlays anchored to toolbar geometry.
+- Hazards found: P2=2 (legacy constructor/event wiring, wx events), P3=4 (color-mode icon swaps, tooltip overlay placement, GL texture uploads, depth-sorted label windows)
+- Git: annotate: document GLCanvas3D canvas lifecycle
+- Next recommended Phase 1 task: T357 annotate: src/slic3r/GUI/GLCanvas3D.hpp

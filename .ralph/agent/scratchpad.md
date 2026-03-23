@@ -327,3 +327,8 @@
 ## Iteration update
 - Completed T355 annotate src/slic3r/GUI/Gizmos/GLGizmoText.hpp with multi-tag annotations for intent/state/event/OpenGL/Unity hazards.
 - Next focus: T356 annotate src/slic3r/GUI/GLCanvas3D.cpp to continue Phase 1 AI-guided coverage.
+
+## Iteration plan update
+- Selected task: T356 annotate `src/slic3r/GUI/GLCanvas3D.cpp` as the current focus to capture the main viewport lifecycle, input integration, and GL hook interplay with the GUI.
+- Plan: start the runtime task, read the source end-to-end, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments at constructors, frame update methods, input handlers, shader setup, and camera controls; include Unity mapping references such as `RenderTexture` previews + `GraphicRaycaster` bridging, and highlight hazards like multi-context GL calls and asynchronous load steps. After annotating, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the file, close the task, and then halt for this iteration because only one atomic task is permitted.
+- Verification: confirm comments describe UI state (camera, selection), event wiring for mouse/keyboard, thread boundaries for GL worker invocations, OpenGL resource lifetimes, Unity equivalents (Custom render pipeline components + Input System), and porting hazards (context switches, legacy GL fixed-function dependencies).

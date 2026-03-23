@@ -262,6 +262,11 @@ void GLCanvas3D::LayersEditing::show_tooltip_information(const GLCanvas3D&      
     ImGui::PopStyleVar(2);
 }
 
+// [INTENT] Renders the ImGui popup that controls variable layer height tweaks, exposing adaptive quality, smoothing, and tip interactions.
+// [EVENT] Button presses post wx events (`EVT_GLCANVAS_ADAPTIVE_LAYER_HEIGHT_PROFILE`, `EVT_GLCANVAS_RESET_LAYER_HEIGHT_PROFILE`, etc.) to
+// the canvas so the worker thread updates profiles asynchronously. [UNITY] Rebuild this as a UI Toolkit overlay Window tied to RenderTexture
+// preview + Input System binds; use UnityEvents to trigger backend adjustments. [PORTING_HAZARD:P3] WxWidgets-to-ImGui layering and manual
+// tooltip placement relies on precise toolbar coordinates; Unity needs Canvas/Panel anchors to mimic these offsets reliably.
 void GLCanvas3D::LayersEditing::render_variable_layer_height_dialog(const GLCanvas3D& canvas)
 {
     if (!m_enabled)
@@ -704,6 +709,11 @@ void GLCanvas3D::LayersEditing::smooth_layer_height_profile(GLCanvas3D& canvas, 
     wxGetApp().obj_list()->update_info_items(last_object_id);
 }
 
+// [INTENT] Builds/updates the GPU texture that encodes the variable layer height profile used by the shader overlays.
+// [OPENGL] Uploads two mip levels via `glTexSubImage2D` and `glTexImage2D`, mirroring Unity's need for RenderTexture + Graphics.Blit or
+// ComputeBuffer fills. [THREAD] Triggers from UI events but protects with `m_layers_texture.valid` to avoid redundant uploads while the
+// texture is being regenerated. [PORTING_HAZARD:P3] Unity cannot call `glTexSubImage2D` directly in C#; implement a ComputeShader or
+// `Texture2D.SetPixelData` update on the main thread.
 void GLCanvas3D::LayersEditing::generate_layer_height_texture()
 {
     this->update_slicing_parameters();
@@ -767,6 +777,13 @@ const Point GLCanvas3D::Mouse::Drag::Invalid_2D_Point(INT_MAX, INT_MAX);
 const Vec3d GLCanvas3D::Mouse::Drag::Invalid_3D_Point(DBL_MAX, DBL_MAX, DBL_MAX);
 const int   GLCanvas3D::Mouse::Drag::MoveThresholdPx = 5;
 
+// [INTENT] Renders the floating info panels for each visible model instance while respecting selection priority and camera transforms.
+// [STATE] Uses `sorted_instances`, current camera view matrix, and cached bounding boxes so the overlays stay aligned with owners even
+// during rapid camera motion. [EVENT] Requests extra frames if window size is still resolving, ensuring the info windows don't disappear
+// while ImGui auto-fits. [OPENGL] Runs after the 3D scene render so the overlays always appear on top and uses ImGui draw commands tied to
+// the view matrix conversion. [UNITY] Replace with world-space UI Canvas panels driven by a `CameraInfoWindowController` MonoBehaviour that
+// listens to selection changes and sorts panels by depth. [PORTING_HAZARD:P3] WxWidgets/ImGui rely on `GLVolumeCollection` ordering for
+// z-sorting; Unity must emulate `ModelInstance` depth ordering (e.g., `Renderer.sortingOrder`).
 void GLCanvas3D::Labels::render(const std::vector<const ModelInstance*>& sorted_instances) const
 {
     if (!m_enabled || !is_shown() || m_canvas.get_gizmos_manager().is_running())
@@ -1055,6 +1072,9 @@ void GLCanvas3D::SequentialPrintClearance::render()
     shader->stop_using();
 }
 
+// [EVENT] Registers every custom wx event the canvas uses so toolbars, selection, and background workers stay decoupled; Unity will need an
+// analogous C# event set (UnityEvent/Action) and InputSystem actions. [PORTING_HAZARD:P2] WxWidgets `wxDEFINE_EVENT` macro wiring must be
+// translated to Unity's event system (e.g., C# delegates combined with `Update`/`OnGUI` hooks).
 wxDEFINE_EVENT(EVT_GLCANVAS_SCHEDULE_BACKGROUND_PROCESS, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_OBJECT_SELECT, SimpleEvent);
 wxDEFINE_EVENT(EVT_GLCANVAS_PLATE_NAME_CHANGE, SimpleEvent);
@@ -1104,6 +1124,10 @@ const double GLCanvas3D::DefaultCameraZoomToBoxMarginFactor   = 1.25;
 const double GLCanvas3D::DefaultCameraZoomToBedMarginFactor   = 2.00;
 const double GLCanvas3D::DefaultCameraZoomToPlateMarginFactor = 1.25;
 
+// [INTENT] Hydrates arrange/rotation heuristics from the user config so object spacing behavior matches saved preferences.
+// [STATE] Writes into `m_arrange_settings_*` for the active printer technology, recording distance thresholds, rotation toggles, and
+// avoidance flags. [UNITY] Mirror this via a ScriptableObject that serializes arrange presets and feeds a shared manager that Unity UI can
+// tweak with sliders.
 void GLCanvas3D::load_arrange_settings()
 {
     std::string dist_fff_str = wxGetApp().app_config->get("arrange", "min_object_distance_fff");
@@ -1151,6 +1175,9 @@ void GLCanvas3D::load_arrange_settings()
     m_arrange_settings_fff_seq_print.is_seq_print = true;
 }
 
+// [STATE] Returns the correct arrange settings variant based on the runtime printer technology and sequence mode (FFF vs. SLA, sequential
+// vs. simultaneous). This keeps object spacing consistent as the user toggles tech or print order contexts. [UNITY] In Unity port,
+// encapsulate this logic in a runtime manager that switches ScriptableObject data and notifies CanvasController listeners.
 GLCanvas3D::ArrangeSettings& GLCanvas3D::get_arrange_settings()
 {
     PrinterTechnology ptech = current_printer_technology();
@@ -1179,6 +1206,14 @@ int GLCanvas3D::GetHoverId()
 
 PrinterTechnology GLCanvas3D::current_printer_technology() const { return m_process->current_printer_technology(); }
 
+// [INTENT] Owns the 3D viewport, camera, toolbars, and gizmo overlays that compose the main canvas.
+// [STATE] Tracks toolbar instances, gizmo controller, selection state, camera helpers, and overlay flags so the render path can respect
+// user mode (assemble/object view, label visibility, background toggle). [EVENT] Timer owners and toolbars emit wx events that feed into
+// the main event loop for marquee renders, tooltip updates, and mode switching. [THREAD] Runs solely on the wx main thread; cross-thread
+// work is posted back via `post_event`/SimpleEvent and the BackgroundSlicingProcess queue. [UNITY] Model this as a MonoBehaviour that owns
+// a RenderTexture camera plus UI Toolkit toolbar/label controllers and ties into Unity's Input System for selection gestures.
+// [PORTING_HAZARD:P2] WxWidgets toolbars, gizmo textures, and GL selection rely on wx frame/lifecycle order; Unity needs a dedicated
+// lifecycle manager to avoid dangling event hooks.
 GLCanvas3D::GLCanvas3D(wxGLCanvas* canvas, Bed3D& bed)
     : m_canvas(canvas)
     , m_context(nullptr)
@@ -1245,12 +1280,23 @@ GLCanvas3D::~GLCanvas3D()
     m_sel_plate_toolbar.del_stats_item();
 }
 
+// [EVENT] Marshals `wxEvent`s onto the canvas window so background components can safely trigger UI updates via SimpleEvent.
+// [THREAD] Called from worker threads but always posts back to the wx main thread; Unity needs a similar dispatcher (e.g.,
+// `UnityMainThreadDispatcher`) when using background jobs.
 void GLCanvas3D::post_event(wxEvent&& event)
 {
     event.SetEventObject(m_canvas);
     wxPostEvent(m_canvas, event);
 }
 
+// [INTENT] Bootstraps GLCanvas3D by locking GL state, initializing toolbars/gizmos, and wiring selection/render helpers so the view can
+// paint frames immediately. [OPENGL] Clears depth/color, enables depth test/cull/blend (and optional multisampling) before any draw path
+// runs, mirroring Unity's RenderPipeline setup and GPU state cache. [STATE] Guards re-entrancy with `m_initialized`, toggles label/slope
+// visibility, and populates `m_layers_editing`, `m_gizmos`, and `m_selection` caches. [THREAD] Assumes main-thread invocation but posts to
+// background workers via SimpleEvent after initialization for asynchronous slicing states. [UNITY] Map to a Unity MonoBehaviour Awake +
+// Start that configures a Camera component, toolbars (UI Toolkit) and interacts with a RenderPipeline asset rather than raw GL calls.
+// [PORTING_HAZARD:P2] OpenGL configuration here relies on `glsafe` wrappers and arbitrary shader names; Unity needs a dedicated
+// shader/resource manager to avoid mismatch.
 bool GLCanvas3D::init()
 {
     if (m_initialized)
@@ -1316,6 +1362,12 @@ bool GLCanvas3D::init()
     return true;
 }
 
+// [INTENT] Propagates color-mode toggles through the bed, gcode view, labels, notifications, and toolbar icons so the entire 3D canvas
+// respects dark/light themes. [STATE] Flips `m_is_dark`, marks toolbar/gizmo textures dirty when `reinit` is true, and keeps ImGui,
+// notification, and slider widgets in sync with the current palette. [EVENT] Relies on config change events and posts reload cascades
+// (_switch_toolbars_icon_filename) to refresh SVG icons. [UNITY] Switch to a ScriptableObject-backed theme manager that updates camera
+// background, UI Toolkit stylesheet, and Sprite/Texture references at runtime. [PORTING_HAZARD:P3] WxWidgets-specific SVG icon dirty flags
+// don't exist in Unity; you need a dedicated texture rebuild step or dynamic sprite atlas swap.
 void GLCanvas3D::on_change_color_mode(bool is_dark, bool reinit)
 {
     m_is_dark = is_dark;
@@ -9525,7 +9577,7 @@ Vec3d GLCanvas3D::_mouse_to_bed_3d(const Point& mouse_pos) { return mouse_ray(mo
 // this->reload_scene(true, true)
 // the two functions are quite different:
 // 1) This function only loads objects, for which the step slaposSliceSupports already finished. Therefore objects outside of the print bed
-// never load. 2) This function loads object mesh with the relative scaling correction (the "relative_correction" parameter) was applied, 	  therefore
+// never load. 2) This function loads object mesh with the relative scaling correction (the "relative_correction" parameter) was applied,
 // the mesh may be slightly larger or smaller than the mesh shown in the 3D scene.
 void GLCanvas3D::_load_sla_shells()
 {
