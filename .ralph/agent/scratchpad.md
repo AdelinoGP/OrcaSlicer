@@ -580,3 +580,7 @@
 ## Iteration plan update
 - Selected task: T403 annotate `src/slic3r/GUI/HMS.hpp` (task-1773880086-4a5c now active).
 - Plan: annotate the lightweight HMS query header by highlighting the intent of HMS metadata caching, stateful JSON/image maps, request helpers, thread-safe mutex ownership, and helper getters; add concrete `[UNITY]` guidance (e.g., ScriptableObject cache + `UnityWebRequest`/`Texture2D`) and `[PORTING_HAZARD:P2]` warnings about `wxImage` lifetime and synchronous file IO; append the Phase 1 evidence block to `.ralph/agent/handoff.md`, flip T403 to `[x]` in `.ralph/ralph-tasks.md`, stage/commit the header and bookkeeping files, close the task, and end this iteration so the next agent can continue.
+
+## Iteration plan update
+- Selected task: T152 annotate `src/slic3r/GUI/AMSMaterialsSetting.hpp` (new work).
+- Plan: read the header to understand the AMS material property definitions and UI wiring, inject `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD]` comments around property caches, combo box bindings, and panel helpers, document thread boundaries or config persistence if present, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit this header plus metadata, and close the task before handing off to the next iteration.

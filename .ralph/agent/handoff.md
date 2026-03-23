@@ -3267,3 +3267,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=3 (wxImage cache copies, blocking HTTP download, synchronous file sync), P3=2 (data-dir copy + wx action ID mapping).
 - Git: Annotate HMS metadata helper
 - Next recommended Phase 1 task: T404 annotate: src/slic3r/GUI/HMSPanel.cpp
+
+## Phase 1 - Task T152 complete
+- Task type: annotate
+- File: src/slic3r/GUI/AMSMaterialsSetting.hpp
+- Deliverables: src/slic3r/GUI/AMSMaterialsSetting.hpp
+- Substantive additions: 17 multi-tag annotations covering the color picker rows, palette popup state, AMS slot metadata cache, and Unity/porting guidance across the dialog interface.
+- Verification excerpt: // [INTENT] Dialog that wires DeviceManager AMS slots to UI controls so users can edit colour/temperature metadata, run resets, and save settings.
+- Unity-impact summary:
+  - Map the `ColorPicker` swatches to UI Toolkit VisualElements within a ListView and expose selection/highlight state through UnityEvents.
+  - Upgrade the AMS dialog to a VisualElement overlay backed by a ScriptableObject `AMSProfile`, matching `Popup`/`update` flows with UI Toolkit layout + canvas scaling.
+- Hazards found: 2 (P2 DPIDialog/DeviceManager lifetime coupling, P3 wx ComboBox/popup focus semantics)
+- Git: Annotate AMS materials setting header for Unity port
+- Next recommended Phase 1 task: T153 annotate: src/slic3r/GUI/AMSSetting.cpp

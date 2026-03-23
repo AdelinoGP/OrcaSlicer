@@ -70,7 +70,7 @@ Last updated: 2026-03-23T14:03:10Z
 - [x] T149 annotate: src/slic3r/GUI/KBShortcutsDialog.cpp
 - [x] T150 annotate: src/slic3r/GUI/KBShortcutsDialog.hpp
 - [x] T151 annotate: src/slic3r/GUI/MsgDialog.cpp
-- [ ] T152 annotate: src/slic3r/GUI/AMSMaterialsSetting.hpp
+- [x] T152 annotate: src/slic3r/GUI/AMSMaterialsSetting.hpp
 - [ ] T153 annotate: src/slic3r/GUI/AMSSetting.cpp
 - [ ] T154 annotate: src/slic3r/GUI/AMSSetting.hpp
 - [ ] T155 annotate: src/slic3r/GUI/AmsWidgets.cpp
