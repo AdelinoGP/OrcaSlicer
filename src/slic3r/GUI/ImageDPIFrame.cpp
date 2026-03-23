@@ -75,7 +75,10 @@ ImageDPIFrame::ImageDPIFrame()
     init_timer();
 }
 
-ImageDPIFrame::~ImageDPIFrame() {}
+ImageDPIFrame::~ImageDPIFrame()
+{
+    // [STATE] Base DPIFrame handles the timer/child destruction, so no extra cleanup is necessary; Unity would stop its coroutine via OnDisable.
+}
 
 bool ImageDPIFrame::Show(bool show)
 {
@@ -88,6 +91,7 @@ void ImageDPIFrame::set_bitmap(const wxBitmap& bit_map)
     if (&bit_map && bit_map.IsOk()) {
         // [STATE] Refresh the preview texture while preserving the sizer layout so the overlay remains steady.
         m_bitmap->SetBitmap(bit_map);
+        // [UNITY] Mirror this by uploading a Texture2D and assigning it to a VisualElement Image/RawImage before calling SetTexture.
     }
 }
 
@@ -105,6 +109,7 @@ void ImageDPIFrame::on_dpi_changed(const wxRect& suggested_rect)
     // [UNCLEAR] DPI change hook currently stubs out rescaling; the intent is to refresh the overlay when monitor scaling shifts.
     // m_image->Rescale();
     // m_bitmap->Rescale();
+    // [UNITY] Unity would recompute RectTransform scaling via a CanvasScaler/Display listener since wxRect hints are unavailable.
 }
 
 void ImageDPIFrame::sys_color_changed()
@@ -157,6 +162,7 @@ void ImageDPIFrame::on_show()
     if (m_refresh_timer) {
         m_timer_count = 0;
         m_refresh_timer->Start(ANIMATION_REFRESH_INTERVAL);
+        // [UNITY] Start a coroutine/InvokeRepeating that checks Input.mousePosition and accumulates delta-time until the overlay expires.
     }
 }
 
@@ -175,6 +181,5 @@ void ImageDPIFrame::on_hide()
             wxGetApp().mainframe->Raise();
         }
     }
-}
 } // namespace GUI
 } // namespace Slic3r

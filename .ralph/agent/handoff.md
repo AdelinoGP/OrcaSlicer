@@ -4121,3 +4121,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3)
 - Git: annotate: src/slic3r/GUI/GUI_Preview.hpp
 - Next recommended Phase 1 task: T398 annotate: src/slic3r/GUI/GUI_Utils.cpp
+
+## Phase 1 - Task T412 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ImageDPIFrame.cpp
+- Deliverables: src/slic3r/GUI/ImageDPIFrame.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: added Unity mapping guidance around bitmap swaps, the DPI hint callback, the coroutine-backed timer, and destructor cleanup.
+- Verification excerpt: // [UNITY] Update a Texture2D bound to a VisualElement Image/RawImage via the main-thread dispatcher before calling SetTexture.
+- Unity-impact summary:
+  - Mirror the preview bitmap refresh by copying Texture2D data into a UI Toolkit ImageElement before swapping the displayed texture.
+  - Drive show/hide timing with a coroutine that matches the 20 ms cadence while polling Input.mousePosition so the overlay hides when the cursor drifts.
+  - Recompute RectTransform bounds whenever `Screen.dpi`/CanvasScaler updates occur since Unity lacks wxRect hints.
+- Hazards found: 0
+- Git: annotate: src/slic3r/GUI/ImageDPIFrame.cpp
+- Next recommended Phase 1 task: T417 annotate: src/slic3r/GUI/IMSlider.cpp

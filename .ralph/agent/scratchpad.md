@@ -847,3 +847,7 @@
 ## Iteration plan update
 - Selected task: T397 annotate: src/slic3r/GUI/GUI_Preview.hpp (runtime task task-1773880086-be55) to resolve preview panel state, camera input, GL refresh, and Unity port guidance.
 - Plan: read the header fully, document panel intent, state caches, event bindings, GL callbacks, Unity mappings (RenderTexture + UI Toolkit list), and porting hazards; append the required evidence block to .ralph/agent/handoff.md, stage/commit the single file plus metadata, close the task, and then immediately pick the next eligible Phase 1 file (likely T398 GUI_Utils.cpp) for the following iteration.
+
+## Iteration plan update
+- Selected task: T412 annotate `src/slic3r/GUI/ImageDPIFrame.cpp` (runtime task task-1773880086-20e9 now active).
+- Plan: confirm the overlay timer, bitmap swapping, and hide/show flow already carry [STATE]/[EVENT] coverage, add missing Unity/porting guidance near the DPI handler and timer guards, log the evidence block in `.ralph/agent/handoff.md`, stage/commit the annotated source plus metadata, close T412, and then pass control to the next ready task.
