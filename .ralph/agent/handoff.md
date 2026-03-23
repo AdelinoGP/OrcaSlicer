@@ -2727,3 +2727,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3=1 (Unity must avoid dropping header-only helpers because this TU demonstrates there are no physical symbols but the header provides necessary functionality.)
 - Git: annotate GUI_Geometry.cpp
 - Next recommended Phase 1 task: T382 annotate: src/slic3r/GUI/GUI_Geometry.hpp
+
+## Phase 1 - Task T382 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Geometry.hpp
+- Deliverables: src/slic3r/GUI/GUI_Geometry.hpp
+- Substantive additions: 6 multi-tag annotations highlighting the coordinate enum intent, transformation bitmask state helpers, option selectors, and Unity mapping (INTENT/STATE/UNITY/PORTING_HAZARD)
+- Verification excerpt: // [PORTING_HAZARD:P3] Shares the zero value with `World`, so detecting 'absolute' relies on Relative being cleared instead of a dedicated flag.
+- Unity-impact summary:
+  - Mirror the bitmask with a MonoBehaviour/SO trio that records current `TransformSpace`, `isRelative`, and `groupIndependent` flags so Unity manipulators can answer the same queries.
+  - Treat `ECoordinatesType` as a small enum used by the Unity InputSystem + Transform bridge (World vs Local vs Parent space) instead of relying on wxWidgets event semantics.
+- Hazards found: P3=1 (shared zero-bit semantics for World/Absolute state require the exact mask logic to stay synchronized).
+- Git: Annotate GUI_Geometry.hpp transform state
+- Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp

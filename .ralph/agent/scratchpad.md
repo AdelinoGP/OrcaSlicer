@@ -396,3 +396,7 @@
 ## Iteration plan update
 - Selected task: T381 annotate: src/slic3r/GUI/GUI_Geometry.cpp (task-1773880086-3b67, key gui:T381)
 - Plan: read the implementation, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments covering geometry construction, selection state, event wiring, GL usage, Unity equivalents (MeshFilter+MeshCollider plus Input System raycasts), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, commit, and finish the task.
+
+## Iteration plan update
+- Selected task: T382 annotate `src/slic3r/GUI/GUI_Geometry.hpp`
+- Plan: capture the coordinate/transform flag enum intent, annotate `TransformationType` bit flags with `[STATE]` on mode masks, add `[UNITY]` guidance for equivalent coordinate spaces (Transform component + Local/Parent spaces) and `[PORTING_HAZARD:P3]` for bitwise flag combos, describe minimal event/GL impact, append the Phase 1 evidence block, commit, and move to next ready task.
