@@ -2913,3 +2913,16 @@ This prompt governs **Phase 1 only**.
 - Git: Annotate 3DBed.hpp for Unity port
 - Next recommended Phase 1 task: T145 annotate: src/slic3r/GUI/3DScene.cpp
 
+## Phase 1 - Task T148 complete
+- Task type: annotate
+- File: src/slic3r/GUI/AboutDialog.hpp
+- Deliverables: src/slic3r/GUI/AboutDialog.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: Added Unity mapping for the modal dialog/clipboard wiring, labeled the duplicate definitions as porting hazards, and documented the button ID/state wiring for the copy/show controls.
+- Verification excerpt: // [UNITY] Modal VisualElement tree (UIDocument) with ScrollView labels for the about text, a Canvas panel for the logo image, and Buttons wired through a controller MonoBehaviour.
+- Unity-impact summary:
+  - Rebuild the About dialog as a UI Toolkit modal window where the ScrollView's HTML text is rendered through a Markdown-capable VisualElement, the logo uses a `Texture2D` controller, and Buttons route through a dedicated MonoBehaviour.
+  - Keep the copy/copyright buttons as explicit Button references (not arbitrary IDs) so Unity can reuse `Button.onClick` for copy-to-clipboard via `GUIUtility.systemCopyBuffer` and for launching the copyright list dialog.
+  - Treat the duplicate header definitions as a single canonical dialog and only port the annotated block so Unity avoids conflicting class declarations.
+- Hazards found: 1 (P3: duplicate declarations add confusion that Unity must resolve before porting)
+- Git: Annotate AboutDialog.hpp for Unity port
+- Next recommended Phase 1 task: T145 annotate: src/slic3r/GUI/3DScene.cpp

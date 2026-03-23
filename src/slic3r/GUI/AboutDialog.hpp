@@ -62,6 +62,8 @@ private:
 };
 
 // [INTENT] The main About dialog.
+// [UNITY] Modal VisualElement tree (UIDocument) with ScrollView labels for the about text, a Canvas panel for the logo image, and Buttons
+// wired through a controller MonoBehaviour.
 class AboutDialog : public DPIDialog
 {
     // [STATE] Scalable bitmap for the logo.
@@ -72,8 +74,9 @@ class AboutDialog : public DPIDialog
     wxHtmlWindow* m_html;
     // [STATE] Static bitmap for the logo.
     wxStaticBitmap* m_logo;
-    int             m_copy_rights_btn_id{wxID_ANY};
-    int             m_copy_version_btn_id{wxID_ANY};
+    // [STATE] Button IDs used for hooking copy/show commands; Unity will keep direct Button references in a dialog controller.
+    int m_copy_rights_btn_id{wxID_ANY};
+    int m_copy_version_btn_id{wxID_ANY};
 
 public:
     AboutDialog();
@@ -89,9 +92,11 @@ private:
     // [EVENT] Handles copyright button click.
     void onCopyrightBtn(wxEvent&);
     // [EVENT] Handles copy to clipboard click.
+    // [UNITY] Map to `GUIUtility.systemCopyBuffer` or `Clipboard.SetText` after the user taps a UI Toolkit button.
     void onCopyToClipboard(wxEvent&);
 };
 
+// [PORTING_HAZARD:P3] Duplicate declaration of CopyrightsDialog mirrors the definition above; only the annotated copy should be ported.
 class CopyrightsDialog : public DPIDialog
 {
 public:
@@ -123,6 +128,7 @@ private:
     wxString get_html_text();
 };
 
+// [PORTING_HAZARD:P3] Duplicate declaration of AboutDialog mirrors the annotated version; Unity should keep only the top definition.
 class AboutDialog : public DPIDialog
 {
     ScalableBitmap  m_logo_bitmap;

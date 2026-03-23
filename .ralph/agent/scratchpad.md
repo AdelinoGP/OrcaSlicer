@@ -448,3 +448,10 @@
 
 - Plan update: T144 annotate `src/slic3r/GUI/3DBed.hpp`
 - Steps: review boundaries and transform enums, mark state/event/render hooks with [INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD], append Phase 1 evidence block, and commit after updating `.ralph/ralph-tasks.md`.
+
+## Iteration plan update
+- Selected task: T148 annotate `src/slic3r/GUI/AboutDialog.hpp` (task-1773880085-7e39 now active).
+- Plan: read the dialog header, explain layout state, menu/sizer wiring, and event hooks; insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around dialog initialization, control binding, and translation handling; document the Unity equivalent (Canvas + UI Toolkit dialog, ScriptableObject for text), append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the header, and close the task before continuing.
+
+## Iteration update
+- Completed T148 annotate `src/slic3r/GUI/AboutDialog.hpp`: annotated the dialog layout, button ID wiring, Unity mapping, clipboard handling, and duplicate block hazard; appended the evidence block and marked the task done before progressing to T145.
