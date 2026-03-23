@@ -13,12 +13,20 @@ using namespace std::literals;
 
 namespace Slic3r {
 
+// [INTENT][OPENGL][UNITY] build the shader catalog during GL context initialization so renderers can pull named programs; in Unity this
+// resembles prewarming a ShaderVariantCollection + RenderPipeline pass list.
+// [STATE] `m_shaders` becomes the single owner of GLShaderProgram lifetimes, so init must leave it empty on failure and repopulate it
+// for consistent reuse.
+// [THREAD] this initialization executes on the main GL thread tied to the wxWidgets context because creating GL objects requires
+// that context to be current.
 std::pair<bool, std::string> GLShadersManager::init()
 {
     std::string error;
 
     auto append_shader = [this, &error](const std::string& name, const GLShaderProgram::ShaderFilenames& filenames,
-        const std::initializer_list<std::string_view> &defines = {}) {
+                                        const std::initializer_list<std::string_view>& defines = {}) {
+        // [STATE][OPENGL][PORTING_HAZARD:P2] insert a placeholder into `m_shaders` before compilation and drop it if init_from_files fails,
+        // keeping the cache coherent for renderers that expect the named program to exist.
         m_shaders.push_back(std::make_unique<GLShaderProgram>());
         if (!m_shaders.back()->init_from_files(name, filenames, defines)) {
             error += name + "\n";
@@ -35,51 +43,61 @@ std::pair<bool, std::string> GLShadersManager::init()
 
 #if SLIC3R_OPENGL_ES
     const std::string prefix = "ES/";
+    // [STATE][PORTING_HAZARD:P3] GLES builds require the ES shader directory and lack geometry shaders, so Unity GLES profiles must keep
+    // similar path variants and avoid geometry-stage expectations.
     // used to render wireframed triangles
-    valid &= append_shader("wireframe", { prefix + "wireframe.vs", prefix + "wireframe.fs" });
+    valid &= append_shader("wireframe", {prefix + "wireframe.vs", prefix + "wireframe.fs"});
 #else
+    // [STATE][OPENGL][UNITY] choosing 140 vs 110 GLSL sources reflects the GL feature level; Unity should match this by toggling
+    // ShaderVariantCollection keywords or shader passes for each tier.
     const std::string prefix = GUI::wxGetApp().is_gl_version_greater_or_equal_to(3, 1) ? "140/" : "110/";
 #endif // SLIC3R_OPENGL_ES
     // imgui shader
-    valid &= append_shader("imgui", { prefix + "imgui.vs", prefix + "imgui.fs" });
+    valid &= append_shader("imgui", {prefix + "imgui.vs", prefix + "imgui.fs"});
     // basic shader, used to render all what was previously rendered using the immediate mode
-    valid &= append_shader("flat", { prefix + "flat.vs", prefix + "flat.fs" });
+    valid &= append_shader("flat", {prefix + "flat.vs", prefix + "flat.fs"});
     // basic shader with plane clipping, used to render volumes in picking pass
-    valid &= append_shader("flat_clip", { prefix + "flat_clip.vs", prefix + "flat_clip.fs" });
+    valid &= append_shader("flat_clip", {prefix + "flat_clip.vs", prefix + "flat_clip.fs"});
     // basic shader for textures, used to render textures
-    valid &= append_shader("flat_texture", { prefix + "flat_texture.vs", prefix + "flat_texture.fs" });
+    valid &= append_shader("flat_texture", {prefix + "flat_texture.vs", prefix + "flat_texture.fs"});
     // used to render 3D scene background
-    valid &= append_shader("background", { prefix + "background.vs", prefix + "background.fs" });
+    valid &= append_shader("background", {prefix + "background.vs", prefix + "background.fs"});
 #if SLIC3R_OPENGL_ES
     // used to render dashed lines
-    valid &= append_shader("dashed_lines", { prefix + "dashed_lines.vs", prefix + "dashed_lines.fs" });
+    valid &= append_shader("dashed_lines", {prefix + "dashed_lines.vs", prefix + "dashed_lines.fs"});
 #else
     if (GUI::OpenGLManager::get_gl_info().is_core_profile())
         // used to render thick and/or dashed lines
-        valid &= append_shader("dashed_thick_lines", { prefix + "dashed_thick_lines.vs", prefix + "dashed_thick_lines.fs", prefix + "dashed_thick_lines.gs" });
+        valid &= append_shader("dashed_thick_lines",
+                               {prefix + "dashed_thick_lines.vs", prefix + "dashed_thick_lines.fs", prefix + "dashed_thick_lines.gs"});
 #endif // SLIC3R_OPENGL_ES
     // used to render bed axes and model, selection hints, gcode sequential view marker model, preview shells, options in gcode preview
-    valid &= append_shader("gouraud_light", { prefix + "gouraud_light.vs", prefix + "gouraud_light.fs" });
-    //used to render thumbnail
-    valid &= append_shader("thumbnail", { prefix + "thumbnail.vs", prefix + "thumbnail.fs"});
+    valid &= append_shader("gouraud_light", {prefix + "gouraud_light.vs", prefix + "gouraud_light.fs"});
+    // used to render thumbnail
+    valid &= append_shader("thumbnail", {prefix + "thumbnail.vs", prefix + "thumbnail.fs"});
     // used to render printbed
-    valid &= append_shader("printbed", { prefix + "printbed.vs", prefix + "printbed.fs" });
+    valid &= append_shader("printbed", {prefix + "printbed.vs", prefix + "printbed.fs"});
     valid &= append_shader("hotbed", {prefix + "hotbed.vs", prefix + "hotbed.fs"});
     // used to render options in gcode preview
+    // [STATE][UNITY] only enable the instanced light shader when the runtime advertises GL 3.3+ so Unity can gate the instanced pass on
+    // shader keywords and DrawMeshInstanced.
     if (GUI::wxGetApp().is_gl_version_greater_or_equal_to(3, 3)) {
-        valid &= append_shader("gouraud_light_instanced", { prefix + "gouraud_light_instanced.vs", prefix + "gouraud_light_instanced.fs" });
+        valid &= append_shader("gouraud_light_instanced", {prefix + "gouraud_light_instanced.vs", prefix + "gouraud_light_instanced.fs"});
     }
 
     // used to render objects in 3d editor
-    valid &= append_shader("gouraud", { prefix + "gouraud.vs", prefix + "gouraud.fs" }
+    // [EVENT][UNITY] this `gouraud` program is bound during every object render call; Unity would hook a shared Material and call
+    // `Graphics.DrawMesh` from the same controller.
+    valid &= append_shader("gouraud", {prefix + "gouraud.vs", prefix + "gouraud.fs"}
 #if ENABLE_ENVIRONMENT_MAP
-        , { "ENABLE_ENVIRONMENT_MAP"sv }
+                           ,
+                           {"ENABLE_ENVIRONMENT_MAP"sv}
 #endif // ENABLE_ENVIRONMENT_MAP
-        );
+    );
     // used to render variable layers heights in 3d editor
-    valid &= append_shader("variable_layer_height", { prefix + "variable_layer_height.vs", prefix + "variable_layer_height.fs" });
+    valid &= append_shader("variable_layer_height", {prefix + "variable_layer_height.vs", prefix + "variable_layer_height.fs"});
     // used to render highlight contour around selected triangles inside the multi-material gizmo
-    valid &= append_shader("mm_contour", { prefix + "mm_contour.vs", prefix + "mm_contour.fs" });
+    valid &= append_shader("mm_contour", {prefix + "mm_contour.vs", prefix + "mm_contour.fs"});
     // Used to render painted triangles inside the multi-material gizmo. Triangle normals are computed inside fragment shader.
     // For Apple's on Arm CPU computed triangle normals inside fragment shader using dFdx and dFdy has the opposite direction.
     // Because of this, objects had darker colors inside the multi-material gizmo.
@@ -87,24 +105,33 @@ std::pair<bool, std::string> GLShadersManager::init()
     // Since macOS 12 (Monterey), this issue with the opposite direction on Apple's Arm CPU seems to be fixed, and computed
     // triangle normals inside fragment shader have the right direction.
     if (platform_flavor() == PlatformFlavor::OSXOnArm && wxPlatformInfo::Get().GetOSMajorVersion() < 12)
-        valid &= append_shader("mm_gouraud", { prefix + "mm_gouraud.vs", prefix + "mm_gouraud.fs" }, { "FLIP_TRIANGLE_NORMALS"sv });
+        valid &= append_shader("mm_gouraud", {prefix + "mm_gouraud.vs", prefix + "mm_gouraud.fs"}, {"FLIP_TRIANGLE_NORMALS"sv});
     else
-        valid &= append_shader("mm_gouraud", { prefix + "mm_gouraud.vs", prefix + "mm_gouraud.fs" });
+        valid &= append_shader("mm_gouraud", {prefix + "mm_gouraud.vs", prefix + "mm_gouraud.fs"});
 
-    return { valid, error };
+    // [EVENT][PORTING_HAZARD:P3] report success/failure upstream so the GUI startup can block or warn when essential shaders (e.g., object
+    // rendering) failed to link; Unity must propagate shader compile errors out of its build pipeline.
+    return {valid, error};
 }
 
+// [STATE][THREAD][UNITY] clear the cached shader programs when the GL context is destroyed so the next context can rebuild them cleanly;
+// Unity should release recorded `Material`/`Shader` references here.
 void GLShadersManager::shutdown()
 {
     m_shaders.clear();
 }
 
+// [EVENT][STATE] render passes request named programs each frame (3DScene, Gizmos, thumbnails), so the manager must resolve the cached
+// pointer without re-linking.
 GLShaderProgram* GLShadersManager::get_shader(const std::string& shader_name)
 {
-    auto it = std::find_if(m_shaders.begin(), m_shaders.end(), [&shader_name](std::unique_ptr<GLShaderProgram>& p) { return p->get_name() == shader_name; });
+    auto it = std::find_if(m_shaders.begin(), m_shaders.end(),
+                           [&shader_name](std::unique_ptr<GLShaderProgram>& p) { return p->get_name() == shader_name; });
     return (it != m_shaders.end()) ? it->get() : nullptr;
 }
 
+// [THREAD][OPENGL][PORTING_HAZARD:P3] querying the current bound program must happen on the GL thread, mirroring Unity's need to keep
+// `Material`/`Shader` usage on the render thread.
 GLShaderProgram* GLShadersManager::get_current_shader()
 {
     GLint id = 0;
@@ -112,9 +139,9 @@ GLShaderProgram* GLShadersManager::get_current_shader()
     if (id == 0)
         return nullptr;
 
-    auto it = std::find_if(m_shaders.begin(), m_shaders.end(), [id](std::unique_ptr<GLShaderProgram>& p) { return static_cast<GLint>(p->get_id()) == id; });
+    auto it = std::find_if(m_shaders.begin(), m_shaders.end(),
+                           [id](std::unique_ptr<GLShaderProgram>& p) { return static_cast<GLint>(p->get_id()) == id; });
     return (it != m_shaders.end()) ? it->get() : nullptr;
 }
 
 } // namespace Slic3r
-

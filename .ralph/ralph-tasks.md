@@ -282,7 +282,7 @@ Last updated: 2026-03-23T03:20:00Z
 - [ ] T361 annotate: src/slic3r/GUI/GLSelectionRectangle.hpp
 - [ ] T362 annotate: src/slic3r/GUI/GLShader.cpp
 - [x] T363 annotate: src/slic3r/GUI/GLShader.hpp
-- [ ] T364 annotate: src/slic3r/GUI/GLShadersManager.cpp
+- [x] T364 annotate: src/slic3r/GUI/GLShadersManager.cpp
 - [ ] T365 annotate: src/slic3r/GUI/GLShadersManager.hpp
 - [ ] T366 annotate: src/slic3r/GUI/GLTexture.cpp
 - [x] T367 annotate: src/slic3r/GUI/GLTexture.hpp

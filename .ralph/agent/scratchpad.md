@@ -352,6 +352,10 @@
 ## Iteration plan update
 - Selected task: T363 annotate `src/slic3r/GUI/GLShader.hpp` to capture shader program intent/state/render bindings for the Unity migration.
 - Plan: mark the task active, read the header, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around the shader lifecycle, caches, binding helpers, and uniform setters; append the required evidence block to `.ralph/agent/handoff.md`, stage/commit the file, close the task, and then pick the next ready Phase 1 file.
+
+## Iteration plan update
+- Selected task: T364 annotate `src/slic3r/GUI/GLShadersManager.cpp` with runtime task `task-1773880086-b152`.
+- Plan: start the task, read the shader manager implementation, annotate the program cache, loader/responder events, GL resource lifetime, and Unity mapping (e.g., `ShaderVariantCollection` + RenderPipeline hook) using `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]`; append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the file, close the task, and continue with the next ready entry.
 - Plan: read the header thoroughly, document the UI representation of the selection drag rectangle, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments around the class purpose, cached states (anchor, current lod rect), event hooks (mouse update, capture), render helpers (OpenGL buffer setup), Unity equivalents (Overlay Canvas + LineRenderer or GL line mesh + Input System), append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only this file, mark the task done, and then pause for the next iteration.
 
 ## Iteration plan update

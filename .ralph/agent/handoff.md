@@ -2625,3 +2625,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (PORTING_HAZARD:P2)
 - Git: document: annotate GLShader program intent for Unity port
 - Next recommended Phase 1 task: T364 annotate: src/slic3r/GUI/GLShadersManager.cpp
+## Phase 1 - Task T364 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GLShadersManager.cpp
+- Deliverables: src/slic3r/GUI/GLShadersManager.cpp
+- Substantive additions: 6 multi-tag annotations covering init caching, shader selection, Unity equivalents, and cleanup hazards
+- Verification excerpt: // [INTENT][OPENGL][UNITY] build the shader catalog during GL context initialization so renderers can pull named programs; in Unity this resembles prewarming a ShaderVariantCollection + RenderPipeline pass list.
+- Unity-impact summary:
+  - Prewarm a ShaderVariantCollection/RenderPipeline pass list so Unity renderers can request named programs safely across GL tiers.
+  - Mirror the per-pass `Graphics.DrawMesh` binding pattern and release Material/Shader references when the context resets via `shutdown`.
+- Hazards found: 3 (P2=1, P3=2)
+- Git: Annotate GLShadersManager shader cache
+- Next recommended Phase 1 task: T365 annotate: src/slic3r/GUI/GLShadersManager.hpp
