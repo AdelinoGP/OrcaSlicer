@@ -79,7 +79,7 @@ Last updated: 2026-03-23T16:40:00Z
 - [x] T158 annotate: src/slic3r/GUI/AuxiliaryDataViewModel.cpp
 - [x] T159 annotate: src/slic3r/GUI/AuxiliaryDataViewModel.hpp
 - [x] T160 annotate: src/slic3r/GUI/AuxiliaryDialog.cpp
-- [ ] T161 annotate: src/slic3r/GUI/AuxiliaryDialog.hpp
+- [x] T161 annotate: src/slic3r/GUI/AuxiliaryDialog.hpp
 - [ ] T162 annotate: src/slic3r/GUI/Auxiliary.hpp
 - [x] T163 annotate: src/slic3r/GUI/BackgroundSlicingProcess.cpp
 - [x] T164 annotate: src/slic3r/GUI/BackgroundSlicingProcess.hpp

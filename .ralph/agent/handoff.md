@@ -3732,3 +3732,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 (1×P2, 1×P3)
 - Git: Annotate AuxiliaryDialog
 - Next recommended Phase 1 task: T161 annotate: src/slic3r/GUI/AuxiliaryDialog.hpp
+
+## Phase 1 - Task T161 complete
+- Task type: annotate
+- File: src/slic3r/GUI/AuxiliaryDialog.hpp
+- Deliverables: src/slic3r/GUI/AuxiliaryDialog.hpp
+- Substantive additions: 4 targeted annotations (INTENT, STATE, UNITY, PORTING_HAZARD) that frame the DPI dialog intent, list ownership, and Unity equivalence.
+- Verification excerpt: // [UNITY] Map to a UI Toolkit `VisualElement` panel whose `ListView` is driven by a ScriptableObject-backed list model and resizes via `RectTransform` updates.
+- Unity-impact summary:
+  - Recreate the auxiliary dialog as a UI Toolkit panel with a `ListView` managed by a MonoBehaviour controller so selection and scroll state mirror the wx `AuxiliaryList`.
+  - Observe Unity `Display`/`Screen` DPI changes on the main thread and refresh the panel layout via `MainThreadDispatcher` instead of allowing background DPI events to mutate UI.
+- Hazards found: 2 (P2 main-thread DPI dispatch, P3 per-monitor scaling mismatch)
+- Git: annotate: AuxiliaryDialog.hpp
+- Next recommended Phase 1 task: T162 annotate: src/slic3r/GUI/Auxiliary.hpp

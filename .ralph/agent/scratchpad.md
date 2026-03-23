@@ -721,3 +721,7 @@
 ## Iteration plan
 - Task: T160 annotate: src/slic3r/GUI/AuxiliaryDialog.cpp
 - Plan: read the dialog implementation end-to-end, sprinkle [INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:?] annotations across constructor wiring, UI layout, list bindings, and Save/Cancel flow, capture config persistence and background job hooks, append the Phase 1 evidence block to .ralph/agent/handoff.md, stage/commit the annotated file plus metadata, close the task.
+
+## Iteration plan update
+- Current focus: T161 annotate: `src/slic3r/GUI/AuxiliaryDialog.hpp` to capture the DPI-aware dialog that wraps the auxiliary list, including stateful list ownership and DPI layout adjustments.
+- Plan: read the header, document the dialog intent/state/event flow, highlight the `aux_list` cache/state, note the DPI change override that fires on the UI thread, insert `[UNITY]` guidance (e.g., UI Toolkit `VisualElement` panel with `ListView` plus main-thread dispatcher for DPI metrics), capture any `[PORTING_HAZARD]` around platform DPI/event expectations, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotations plus metadata, and then close the task before handing off the next file (likely `T162 annotate: src/slic3r/GUI/Auxiliary.hpp`).
