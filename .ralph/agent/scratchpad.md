@@ -392,3 +392,7 @@
 ## Iteration update - T379
 - Added `[INTENT]/[STATE]/[EVENT]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations for the settings maps, bundle builder, GL menu helpers, plate workflow, selection utilities, and filament dialog so the Unity port has explicit guidance.
 - Documented the stringhell suggestion branch and noted the `auto rotate` TODO with an `[UNCLEAR]` hypothesis, flagged the menu-setup hazards, and appended the required handoff evidence block.
+
+## Iteration plan update
+- Selected task: T381 annotate: src/slic3r/GUI/GUI_Geometry.cpp (task-1773880086-3b67, key gui:T381)
+- Plan: read the implementation, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments covering geometry construction, selection state, event wiring, GL usage, Unity equivalents (MeshFilter+MeshCollider plus Input System raycasts), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, commit, and finish the task.

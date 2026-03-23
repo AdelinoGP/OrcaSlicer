@@ -2713,4 +2713,17 @@ This prompt governs **Phase 1 only**.
   3. Filament submenu state needs a persistent `MenuController` dataset to avoid duplicated allocations.
 - Hazards found: P2 (dynamic wxWidgets menu rebuilds require careful Unity rehydration of commands).
 - Git: Annotate GUI menu helpers
-- Next recommended Phase 1 task: T381 annotate: src/slic3r/GUI/GUI_Geometry.cpp
+- Next recommended Phase 1 task: T382 annotate: src/slic3r/GUI/GUI_Geometry.hpp
+
+## Phase 1 - Task T381 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Geometry.cpp
+- Deliverables: src/slic3r/GUI/GUI_Geometry.cpp
+- Substantive additions: 3 targeted annotations (INTENT, UNITY, PORTING_HAZARD:P3) documenting the empty translation unit intent and Unity placeholder
+- Verification excerpt: // [INTENT] Provides a translation-unit anchor for the header-only geometry helpers so the linker still emits a GUI module even though all logic lives inline in `GUI_Geometry.hpp`.
+- Unity-impact summary:
+  - Treat the geometry helpers as a C# static partial class or assembly module so the Unity build still compiles the same logic without needing a dedicated empty translation unit.
+  - Document the build anchor so the Unity port includes any header-only helpers via shared scripts tied to that namespace instead of relying on an empty source file.
+- Hazards found: P3=1 (Unity must avoid dropping header-only helpers because this TU demonstrates there are no physical symbols but the header provides necessary functionality.)
+- Git: annotate GUI_Geometry.cpp
+- Next recommended Phase 1 task: T382 annotate: src/slic3r/GUI/GUI_Geometry.hpp
