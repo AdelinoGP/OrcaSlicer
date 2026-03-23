@@ -3720,3 +3720,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3=1 (ImGui/wx popup mixes w/out Unity analog; must rebuild texture/menu lifecycle on main thread).
 - Git: annotate: src/slic3r/GUI/IMSlider.hpp
 - Next recommended Phase 1 task: T419 annotate: src/slic3r/GUI/IMToolbar.cpp
+## Phase 1 - Task T160 complete
+- Task type: annotate
+- File: src/slic3r/GUI/AuxiliaryDialog.cpp
+- Deliverables: src/slic3r/GUI/AuxiliaryDialog.cpp
+- Substantive additions: 6 targeted annotations (INTENT, STATE, EVENT, PORTING_HAZARD, UNITY, THREAD) covering layout and DPI behaviors
+- Verification excerpt: // [INTENT] Hosts the AuxiliaryList view inside a DPI-aware dialog so the list can focus/create/remove auxiliary objects without touching other panels.
+- Unity-impact summary:
+  - Host the AuxiliaryList in a Canvas/Panel backed by a UI Toolkit ListView/ScrollView while preserving the 80x50 em layout rhythm.
+  - Drive DPI adjustments via CanvasScaler scaleFactor updates and RectTransform resizing to mirror wx's DPIDialog override.
+- Hazards found: 2 (1×P2, 1×P3)
+- Git: Annotate AuxiliaryDialog
+- Next recommended Phase 1 task: T161 annotate: src/slic3r/GUI/AuxiliaryDialog.hpp

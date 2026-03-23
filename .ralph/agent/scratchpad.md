@@ -718,3 +718,6 @@
 ## Iteration plan update
 - Selected task: T417 annotate `src/slic3r/GUI/IMSlider.cpp` (task-1773880086-9900 now active).
 - Plan: read the slider implementation, highlight throttle/value binding, event hookups, OpenGL painting, and config persistence; add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` comments around the custom painting, slider caching, event dispatch, and high-frequency updates, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file plus metadata, mark the task done, then stop this iteration so the next agent can continue.
+## Iteration plan
+- Task: T160 annotate: src/slic3r/GUI/AuxiliaryDialog.cpp
+- Plan: read the dialog implementation end-to-end, sprinkle [INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:?] annotations across constructor wiring, UI layout, list bindings, and Save/Cancel flow, capture config persistence and background job hooks, append the Phase 1 evidence block to .ralph/agent/handoff.md, stage/commit the annotated file plus metadata, close the task.
