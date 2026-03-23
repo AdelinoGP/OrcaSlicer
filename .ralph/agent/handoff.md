@@ -3653,3 +3653,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=2 (wxRect DPI hints do not map directly to Unity monitors, and the timer refresh requires UI-thread-only scheduling).
 - Git: annotate: src/slic3r/GUI/ImageDPIFrame.hpp
 - Next recommended Phase 1 task: T414 annotate: src/slic3r/GUI/ImageGrid.cpp
+
+## Phase 1 - Task T159 complete
+- Task type: annotate
+- File: src/slic3r/GUI/AuxiliaryDataViewModel.hpp
+- Deliverables: src/slic3r/GUI/AuxiliaryDataViewModel.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: Added multi-tag comments describing node lifecycle, CRUD helpers, Unity parallels, and the `wxDataViewModel` overrides so the tree state/state transitions are explicit.
+- Verification excerpt: // [PORTING_HAZARD:P2] Synchronous `boost::filesystem` calls drive every folder/import/delete helper, so Unity needs to run these on background workers and marshal the results back to the main dispatcher.
+- Unity-impact summary:
+  - Rebuild the auxiliary tree as a ScriptableObject-backed hierarchy bound to a UI Toolkit TreeView so Unity can replicate the same folder ordering and selection behavior.
+  - Funnel CRUD helpers through async disk tasks plus a MainThreadDispatcher so Unity updates the TreeView after copying/renaming/deleting files.
+- Hazards found: P2=2 (blocking boost::filesystem cleanup and reload workflows)
+- Git: annotate: src/slic3r/GUI/AuxiliaryDataViewModel.hpp
+- Next recommended Phase 1 task: T160 annotate: src/slic3r/GUI/AuxiliaryDialog.cpp

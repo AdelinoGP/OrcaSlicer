@@ -700,3 +700,6 @@
 ## Iteration plan update
 - Selected task: T476 annotate `src/slic3r/GUI/Monitor.hpp` (task-1773880087-eb5b now ready).
 - Plan: read the header to capture MonitorPanel and AddMachinePanel intent, tab/toolbar state, timer/event hooks, and shared machine state; add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around the dialogs, selection cache, refresh timer, and network-status assets; append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header, close the task, and stop this iteration so the next agent can continue.
+## Iteration plan update
+- Observed `T158 annotate: src/slic3r/GUI/AuxiliaryDataViewModel.cpp` is already closed in the task log/handoff but still marked `[~]` in `.ralph/ralph-tasks.md`; will reconcile that flag before moving on.
+- Selected `T159 annotate: src/slic3r/GUI/AuxiliaryDataViewModel.hpp` as this iteration's work item; plan to annotate node/model declarations with `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD]` guidance, update tasks/hand off metadata, and capture the completion evidence block before committing.
