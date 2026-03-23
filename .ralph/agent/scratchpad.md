@@ -561,3 +561,7 @@
 ## Iteration plan update
 - Selected task: T395 annotate `src/slic3r/GUI/GUI_ObjectTableSettings.hpp` (key gui:T395 now active).
 - Plan: read the settings header, annotate widget wiring/projected state with the required tags, capture Unity analogs for the grouped checkbox/column selection UI, document hazard areas (wx Freeze/Thaw, manual event propagation), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit just the header+handoff, close the task, and stop for the next iteration.
+
+## Iteration plan update
+- Current focus: T391 annotate `src/slic3r/GUI/GUI_ObjectSettings.hpp` (task-1773880086-29f9 active again).
+- Plan: refresh the header to cover both the legacy `NEW_OBJECT_SETTING` branch and the newer fallback, add missing `[STATE]`/`[EVENT]`/`[UNITY]`/`[PORTING_HAZARD]` tags around the branch toggle, tab/list caches, and config helpers, detail `update_config_values()` intent, note a Unity mapping (VisualElement + ScriptableObject controller), append the Phase 1 evidence block, stage/commit this header and handoff, and then stop so the next agent can pick up another file.

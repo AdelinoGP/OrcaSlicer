@@ -3212,3 +3212,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3) Windows-only `msw_rescale` DPI tweak needs CanvasScaler instead of manual rescale.
 - Git: Annotate object table settings header
 - Next recommended Phase 1 task: T396 annotate: src/slic3r/GUI/GUI_Preview.cpp
+
+## Phase 1 - Task T391 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectSettings.hpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectSettings.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: Added lifecycle/state notes for OG_Settings, detailed the NEW_OBJECT_SETTING branch flows, and documented event/Unity guidance for update/config/rescale hooks.
+- Verification excerpt: // [EVENT] Rebuilds or refreshes the override group list whenever selection or overrides mutate.
+- Unity-impact summary:
+  - Map the shared `OG_Settings` helper to a VisualElement/ScrollView controller that keeps option groups alive while swapping in new data.
+  - Treat `ObjectSettings` as either a sizer-backed ListView or a TabView controller depending on the `NEW_OBJECT_SETTING` macro, mirroring both flows with Unity equivalents.
+  - Gate DPI and color refresh helpers through Unity theme/CanvasScaler hooks instead of relying on wxWidgets messages.
+- Hazards found: P2=1, P3=3
+- Git: Annotate GUI_ObjectSettings.hpp for Unity port direction
+- Next recommended Phase 1 task: T392 annotate: src/slic3r/GUI/GUI_ObjectTable.cpp
