@@ -57,25 +57,34 @@ class ObjectSettings
 #if !NEW_OBJECT_SETTING
     // [STATE] Vertical stack that owns each runtime-created ConfigOptionsGroup row.
     wxBoxSizer* m_settings_list_sizer{nullptr};
+    // [UNITY] Replace this stacked wxSizer with a ScrollView/ListView plus pooled VisualElements for each override row.
     // [STATE] Cache of active ConfigOptionsGroups matching each object override.
     std::vector<std::shared_ptr<ConfigOptionsGroup>> m_og_settings;
 
     // [STATE] Delete button bitmaps reused when removing overrides from the list.
     ScalableBitmap m_bmp_delete;
+    // [UNITY] Convert these to shared Sprite/Texture2D assets to avoid per-row bitmap recreation in Unity.
     ScalableBitmap m_bmp_delete_focus;
+    // [UNITY] Focus-state sprite that the Unity toggle uses when the button is hovered or pressed.
 #else
     // [STATE] TabPrintModel parent so VisualElement reparenting can happen on tab switches.
     wxWindow* m_parent;
+    // [EVENT] Updated as soon as the TabPrintModel rebinds, keeping the override VisualElement attached to the active tab.
+    // [UNITY] TabView SelectionChanged callbacks must mirror this reparenting for the active override editor.
     // [STATE] Tracks the TabPrintModel that supplies the currently selected object selection.
     TabPrintModel* m_tab_active;
+    // [EVENT] Listens for TabPrintModel selection changes so the controller knows which overrides to show.
+    // [UNITY] Mirror this as a TabView controller that swaps VisualElements/data when the active tab changes.
     // [UNITY] Mirror as a TabView controller that swaps VisualElements whenever the selected TabPrintModel changes.
 #endif
 
 public:
     ObjectSettings(wxWindow* parent);
+    // [EVENT] Instantiated whenever the Object/Part tab panel is built or reattached so Unity can replicate that lifecycle.
     ~ObjectSettings() {}
 
     // [EVENT] Rebuilds or refreshes the override group list whenever selection or overrides mutate.
+    // [THREAD] Must stay on the wxWidgets UI thread because it touches sizers and owned windows.
     bool update_settings_list();
     /* Additional check for override options: Add options, if its needed.
      * Example: if Infill is set to 100%, and Fill Pattern is missed in config_to,
@@ -86,6 +95,8 @@ public:
     bool add_missed_options(ModelConfig* config_to, const DynamicPrintConfig& config_from);
     // [INTENT] Synchronizes UI override state back into the supplied ModelConfig so slicing respects the latest changes.
     // [UNITY] Equivalent to writing into a ScriptableObject-backed ModelConfig and invoking `MarkDirtyRepaint`.
+    // [THREAD] Called on the UI thread immediately before slicing so no background job races against this data flush.
+    // [PORTING_HAZARD:P3] Unity needs to ensure override writes complete before any worker job reads the cached ModelConfig snapshot.
     void update_config_values(ModelConfig* config);
     // [EVENT] Shows/hides the override pane without reconstructing the sizer tree so tabs can toggle visibility quickly.
     void UpdateAndShow(const bool show);

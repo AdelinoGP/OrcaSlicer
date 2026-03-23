@@ -3989,3 +3989,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 (P2: dash uniform knobs, P3: pixel-to-clip conversion).
 - Git: Document GL selection rectangle overlay
 - Next recommended Phase 1 task: T361 annotate: src/slic3r/GUI/GLSelectionRectangle.hpp
+
+## Phase 1 - Task T391 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_ObjectSettings.hpp
+- Deliverables: src/slic3r/GUI/GUI_ObjectSettings.hpp
+- Substantive additions: 8 targeted annotations clarifying Unity layout, delete-icon caching, tab reparenting, and thread/hazard guidance.
+- Verification excerpt: // [UNITY] Replace this stacked wxSizer with a ScrollView/ListView plus pooled VisualElements for each override row.
+- Unity-impact summary:
+  - Replace the stacked sizer/list path with a ScrollView/ListView of pooled VisualElements while the ConfigOptionsGroup controller swaps children on demand.
+  - Cache the delete button sprites as shared Sprite/Texture2D assets and drive hover/focus states through the button controller rather than rebuilding wx bitmaps.
+  - Mirror the TabPrintModel reparenting and event wiring as TabView selection callbacks that swap the active VisualElements and keep `update_settings_list`/`update_config_values` on the main thread.
+- Hazards found: P3=1 (update_config_values must finish before any worker job reads the ModelConfig snapshot to avoid stale overrides).
+- Git: annotate: src/slic3r/GUI/GUI_ObjectSettings.hpp
+- Next recommended Phase 1 task: T392 annotate: src/slic3r/GUI/GUI_ObjectTable.cpp

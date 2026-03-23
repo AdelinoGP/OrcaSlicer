@@ -812,3 +812,7 @@
 - Task: T360 annotate `src/slic3r/GUI/GLSelectionRectangle.cpp` (switching targets due to canonical task queue).
 - Understanding: selection rectangle overlays the GL viewport, holding selection corners and drawing helpers triggered by mouse events; critical to map to Unity as an overlay that mirrors zoomed coordinates.
 - Plan: review the CPP, annotate key class/methods with [INTENT]/[STATE]/[EVENT]/[OPENGL]/[UNITY]/[PORTING_HAZARD], note thread assumptions, log conflict between runtime and static task lists in `.ralph/agent/handoff.md`, update `.ralph/ralph-tasks.md` states, stage/commit, append evidence, close task.
+
+## Iteration plan update - T383 (current)
+- Selected task: `T383 annotate: src/slic3r/GUI/GUI.hpp` from the ready queue after confirming the header remains active and unannotated.
+- Plan: mark the runtime task `[~]` active, read `GUI.hpp` fully, annotate the menu/toolbar setup, preview panel lifecycles, config caches, and helper bridges with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2]` comments, describe Unity analogs (MenuBar + ScriptableObject config + RenderTexture preview) and wxWidgets ownership hazards, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only the updated files, close `T383`, and pause so the next agent can continue after this single atomic change.
