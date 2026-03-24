@@ -4220,6 +4220,20 @@ This prompt governs **Phase 1 only**.
 ## Phase 1 - Task T400 complete
 - Task type: annotate
 - File: src/slic3r/GUI/HintNotification.cpp
+- Deliverables: src/slic3r/GUI/HintNotification.cpp
+- Substantive additions: Added Unity-friendly guidance for hypertext action routing, next-tip arrow queuing, and documentation/hint retrieval so the overlay stays scripted.
+- Verification excerpt: // [INTENT][STATE][EVENT][UNITY][PORTING_HAZARD:P3] Build `HintData` for every hypertext action (links, settings, preferences) so the overlay stays interactive; Unity must replay this dispatch map through a UI Toolkit command layer while keeping the callbacks on the main thread.
+- Unity-impact summary:
+  - Documented the hypertext-to-command map so Unity can replay each link/preference action using VisualElement buttons plus a command dispatcher.
+  - Highlighted the next-tip arrow and retrieval path as a main-thread sequence so Unity’s `MainThreadDispatcher` keeps hint rotations serialized.
+  - Called out the documentation link guard and `Application.OpenURL` requirement so Unity preserves the anti-phishing workflow before launching external browsers.
+- Hazards found: 1 P2 (documentation launch guard), 2 P3 (hypertext dispatch + main-thread retrieval queue)
+- Git: Annotate hint notification logic
+- Next recommended Phase 1 task: T401 annotate: src/slic3r/GUI/HintNotification.hpp
+
+## Phase 1 - Task T400 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HintNotification.cpp
 - Deliverables: src/slic3r/GUI/HintNotification.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
 - Substantive additions: Highlighted serialization/tag/filter intent plus the random seed hazard in `init_random_hint_id` so Unity porters understand when to move the logic into managed random-state helpers.
 - Verification excerpt: // [STATE][THREAD][PORTING_HAZARD:P3] Seeds the random hint cursor so the order feels fresh; Unity can mirror this with `System.Random` seeded on startup to keep `m_hint_id` deterministic while avoiding CRT `rand` drift by owning the seed on the main thread.

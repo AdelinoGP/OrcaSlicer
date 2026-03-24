@@ -1013,3 +1013,6 @@
 ## Iteration update
 - Task: T177 annotate `src/slic3r/GUI/BedShapeDialog.cpp`
 - Work: Tagged the option builder, panel setup, event bindings, preview canvas, and file loaders with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` notes; finalized the Phase 1 evidence block plus staged/committed the header and handoff metadata.
+## Iteration plan update
+- Current iteration plan: start `T400 annotate: src/slic3r/GUI/HintNotification.cpp` (runtime task `task-1773880086-05a9`).
+- Plan: read `HintNotification.cpp`, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P3]` annotations around the notification queue, timer pacing, UI binding, and cancel/hide helper flows; mention Unity analogs (UI Toolkit VisualElement list + `DispatcherTimer` + main-thread dispatcher) and hazard notes about wxTimer ownership plus cross-thread queueing. After annotating, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file plus metadata, close T400, and stop this iteration so the next agent can continue.

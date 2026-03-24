@@ -442,7 +442,9 @@ void HintDatabase::load_hints_from_file(const boost::filesystem::path& path)
                 weight = (size_t) std::max(1, std::atoi(dict["weight"].c_str()));
             }
 
-            // create HintData
+            // [INTENT][STATE][EVENT][UNITY][PORTING_HAZARD:P3] Build `HintData` for every hypertext action (links, settings, preferences)
+            // so the overlay stays interactive; Unity must replay this dispatch map through a UI Toolkit `VisualElement` button command
+            // layer while keeping the callbacks on the main thread.
             if (dict.find("hypertext_type") != dict.end()) {
                 // link to internet
                 if (dict["hypertext_type"] == "link") {
@@ -1085,7 +1087,8 @@ void NotificationManager::HintNotification::render_preferences_button(ImGuiWrapp
     // preferences button is in place of minimize button
     m_minimize_b_visible = true;
 }
-// [EVENT][STATE][UNITY] Drives the "next tip" arrow so Unity can wire the equivalent button to `retrieve_data` and show the current hint index.
+// [EVENT][STATE][THREAD][UNITY][PORTING_HAZARD:P3] Drives the "next tip" arrow while leaving the ImGui input handling on the UI thread so
+// Unity must also marshal the VisualElement callback through its main dispatcher before calling `retrieve_data`.
 void NotificationManager::HintNotification::render_right_arrow_button(
     ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y)
 {
@@ -1182,14 +1185,16 @@ void NotificationManager::HintNotification::render_documentation_button(
     ImGui::PopStyleColor(5);
 }
 
-// [EVENT][PORTING_HAZARD:P2] Wraps the link launcher so Unity can reuse the same guard and telemetry before calling `Application.OpenURL`.
+// [EVENT][PORTING_HAZARD:P2][UNITY] Wraps the link launcher so Unity can reuse the same guard and telemetry before calling
+// `Application.OpenURL`, ensuring the call stays on the main thread.
 void NotificationManager::HintNotification::open_documentation()
 {
     if (!m_documentation_link.empty()) {
         launch_browser_if_allowed(m_documentation_link);
     }
 }
-// [STATE][EVENT][THREAD][UNITY] Pulls the next hint, wires callbacks/tags, and updates the notification state machine so Unity mimics the
+// [STATE][EVENT][THREAD][UNITY][PORTING_HAZARD:P3] Pulls the next hint, wires callbacks/tags, and updates the notification state machine so
+// Unity keeps the queue on a main dispatcher and does not re-enter the overlay mid-transition.
 // same sequencing.
 void NotificationManager::HintNotification::retrieve_data(bool new_hint /* = true*/)
 {
