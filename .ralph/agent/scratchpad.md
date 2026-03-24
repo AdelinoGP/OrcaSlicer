@@ -1106,3 +1106,8 @@
 - Documented the tick-change notification flag and custom G-code insert path with [EVENT]/[PORTING_HAZARD:P3] so Unity knows to keep those paths on the main thread.
 ## Iteration plan update - T428 annotate src/slic3r/GUI/Jobs/BoostThreadWorker.hpp
 - Focus on the header's purpose, state bits, event wiring, and thread ownership; annotate each section with [INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P2] and call out the Unity task/pool analogue plus the hazards of boost::thread lifecycle. After editing, append the mandated evidence block and confirm the task closing steps.
+
+## Iteration plan update - T430 annotate src/slic3r/GUI/Jobs/CreateFontNameImageJob.cpp
+- Selected Phase 1 work: T430 annotate `src/slic3r/GUI/Jobs/CreateFontNameImageJob.cpp` from the ready-task list and make sure it has the required EV tags noted in the manifest.
+- Plan: 1) mark T430 active in `.ralph/ralph-tasks.md`, 2) read the job to capture font selection state, raster scaling, and GL upload steps, 3) inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments covering the cancellation bridge, ambient fallback text, ExPolygon rasterization, SLA encoding, and finalize texture writes, 4) append the Phase 1 evidence block to `.ralph/agent/handoff.md`, and 5) stage/commit the updated files before closing the task.
+- Verification approach: manual review only; the change is documentation-focused so no automated tests are required.

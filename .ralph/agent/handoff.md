@@ -4844,3 +4844,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (worker updates wxProgressIndicator and job state from boost::thread without UI-thread marshaling)
 - Git: Annotate BoostThreadWorker for Unity port
 - Next recommended Phase 1 task: T430 annotate: src/slic3r/GUI/Jobs/CreateFontNameImageJob.cpp
+## Phase 1 - Task T430 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/CreateFontNameImageJob.cpp
+- Deliverables: src/slic3r/GUI/Jobs/CreateFontNameImageJob.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 11 targeted annotations covering job intent, cancellation guarding, raster math, GL uploads, and Unity mapping hints.
+- Verification excerpt: // [OPENGL] writes the job result into a shared texture atlas row; `yoffset` ties the slot to the job index.
+- Unity-impact summary:
+  - Replace the Emboss+SLA raster pipeline with a deterministic CPU path (e.g., a GlyphStore + compute shader or custom `Texture2D` processing) before handing the byte array to Unity.
+  - Marshal the worker `CreateFontImageJob::process` work through `Task.Run`/JobSystem and then do the `Texture2D.LoadRawTextureData` + `Apply` calls on the main thread, followed by a `Camera.Render`/Canvas invalidation.
+- Hazards found: P2=1 (GL atlas upload must stay on Unity main thread), P3=1 (Emboss + SLA rasterizers require a compatible CPU replacement).
+- Git: Annotate CreateFontNameImageJob for Unity port
+- Next recommended Phase 1 task: task-1773880086-e8e3 T431 annotate: src/slic3r/GUI/Jobs/CreateFontNameImageJob.hpp
