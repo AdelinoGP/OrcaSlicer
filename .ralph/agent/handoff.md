@@ -4452,3 +4452,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P2 global `wxLocale` access is not worker-safe)
 - Git: Annotate I18N translation helpers
 - Next recommended Phase 1 task: T410 annotate: src/slic3r/GUI/IconManager.cpp
+
+## Phase 1 - Task T425 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/BindJob.cpp
+- Deliverables: src/slic3r/GUI/Jobs/BindJob.cpp
+- Substantive additions: 6 multi-tag annotations covering progress updates, timezone tracking, agent callbacks, UI events, and failure propagation for the bind workflow.
+- Verification excerpt: // [EVENT] It wraps `wxPostEvent` so the UI can bind `EVT_BIND_UPDATE_MESSAGE` and refresh its progress bar on the main thread.
+- Unity-impact summary:
+  - Implement the bind workflow as a `UnityWebRequest` coroutine that reports progress through a `BindJobController` MonoBehaviour and `MainThreadDispatcher`.
+  - Mirror success/failure events as UnityEvents that toggle the device list/notification panel and log any Bambu error codes before clearing the queue.
+  - Treat the timezone/SSDP metadata as serialized ScriptableObject properties so Unity can replay the same HTTP headers when binding.
+- Hazards found: P3 (cross-thread event lifetimes + dispatch guard, timezone offset parity differences)
+- Git: Document BindJob event flow
+- Next recommended Phase 1 task: T426 annotate: src/slic3r/GUI/Jobs/BindJob.hpp
