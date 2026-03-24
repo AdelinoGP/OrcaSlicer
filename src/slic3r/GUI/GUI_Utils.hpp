@@ -49,15 +49,14 @@ inline int hex_to_int(const char c)
                                     -1;
 }
 
+// [INTENT][STATE][UNITY] Normalizes palette identifiers into RGBA floats so widget style caches remain deterministic; Unity can run
+// the same normalization before writing to `ColorUtility.TryParseHtmlString` or `Color32` fields for theme transitions.
 static ColorRGBA decode_color_to_float_array(const std::string color)
 {
     ColorRGBA ret = ColorRGBA::BLACK();
     decode_color(color, ret);
     return ret;
 }
-
-// [INTENT][STATE][UNITY] Utility that normalizes color edits into a float array used by widget style caches; Unity ports can
-// reuse this when populating `Color` and `Color32` fields from string identifiers before applying theme overrides.
 
 // [INTENT][THREAD][PORTING_HAZARD:P3] Copy helpers are used from UI entry points (e.g., installers, exports) so errors are surfaced
 // immediately; Unity will need to marshal file operations back to the main thread and show an overlay.
@@ -92,6 +91,8 @@ void on_window_geometry(wxTopLevelWindow* tlw, std::function<void()> callback);
 // `Display.main.systemHeight` conversions.
 enum { DPI_DEFAULT = 96 };
 
+// [STATE][THREAD][UNITY] Provides the DPI scale used to size fonts and icons; Unity ports would read
+// `Screen.dpi`/`CanvasScaler.referenceDpi` on the main thread before laying out UI elements at runtime.
 int           get_dpi_for_window(const wxWindow* window);
 wxFont        get_default_font_for_dpi(const wxWindow* window, int dpi);
 inline wxFont get_default_font(const wxWindow* window) { return get_default_font_for_dpi(window, get_dpi_for_window(window)); }
@@ -515,6 +516,8 @@ public:
     std::string serialize() const;
 };
 
+// [INTENT][STATE][UNITY] Serializes window bounds and maximized state so configs can persist geometry; Unity would mirror this via a
+// `SerializedObject` inspector or `PlayerPrefs` bridge that records RectTransform settings every time the window moves.
 std::ostream& operator<<(std::ostream& os, const WindowMetrics& metrics);
 
 inline int hex_digit_to_int(const char c)

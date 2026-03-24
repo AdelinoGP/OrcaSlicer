@@ -4507,3 +4507,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 0
 - Git: annotate ImageDPIFrame tooltip for Unity
 - Next recommended Phase 1 task: T423 annotate: src/slic3r/GUI/Jobs/ArrangeJob.cpp
+
+## Phase 1 - Task T399 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Utils.hpp
+- Deliverables: src/slic3r/GUI/GUI_Utils.hpp
+- Substantive additions: 3 inline comments describing color normalization, DPI scale queries, and WindowMetrics serialization with Unity mapping intent
+- Verification excerpt: // [STATE][THREAD][UNITY] Provides the DPI scale used to size fonts and icons; Unity ports would read `Screen.dpi`/`CanvasScaler.referenceDpi` on the main thread before laying out UI elements at runtime.
+- Unity-impact summary:
+  - Clarify how string-based color decoding should feed `ColorUtility`/`Color32` fields when theming Unity widgets.
+  - Document why `get_dpi_for_window` and `WindowMetrics` tie into main-thread DPI/CanvasScaler logic so resizing logic can be ported safely.
+  - Surface the streaming helper so Unity ports know to persist window geometry via serialized RectTransform data.
+- Hazards found: none new (existing P3 notes still apply)
+- Git: Document GUI_Utils helpers for Unity port
+- Next recommended Phase 1 task: T400 annotate: src/slic3r/GUI/HintNotification.cpp
