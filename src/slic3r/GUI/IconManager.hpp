@@ -76,7 +76,9 @@ public:
     /// <param name="input">Define files and its size with rasterization</param>
     /// <returns>Rasterized icons stored on GPU,
     /// Same size and order as input, each item of vector is set of texture in order by RasterType</returns>
-    /// [THREAD] Uploads happen on the GL/context thread before these shared_ptrs are relayed to ImGui widgets.
+    /// [INTENT] Build the shared atlas group before any ImGui widgets request icons so each caller can hold a shared_ptr without touching
+    /// GLContexts. [UNITY] Unity would create a SpriteAtlas ScriptableObject holding Texture2D copies, then expose Sprite handles to UI
+    /// Toolkit images. [THREAD] Uploads happen on the GL/context thread before these shared_ptrs are relayed to ImGui widgets.
     Icons init(const InitTypes& input);
 
     /// <summary>
@@ -89,7 +91,10 @@ public:
     /// together color, white and gray = RasterType::color | RasterType::white_only_data | RasterType::gray_only_data</param>
     /// <returns>Rasterized icons stored on GPU,
     /// Same size and order as file_paths, each item of vector is set of texture in order by RasterType</returns>
-    /// [THREAD] Bulk variant reuses the same GLTexture and exposes staggered icon groups through Icons vectors.
+    /// [INTENT] Batch uploads multiple files with the same layout so plug-ins can enumerate icons consistently, and AtlasVersion tracks
+    /// compatibility with legacy ImGui renderer code. [PORTING_HAZARD:P3] Unity lacks the immediate-mode upload hook; a background texture
+    /// loader must enqueue onto the main thread before binding. [THREAD] Bulk variant reuses the same GLTexture and exposes staggered icon
+    /// groups through Icons vectors.
     VIcons init(const std::vector<std::string>& file_paths, const ImVec2& size, RasterType type = RasterType::color);
 
     /// <summary>
@@ -97,10 +102,13 @@ public:
     /// May change texture and position of icons.
     /// </summary>
     /// [STATE] Clears m_icons and invalidates tex_id so any stale shared_ptr detects the texture is gone.
+    /// [THREAD] Must run on the GL thread because release mutates GPU resources and m_icons_texture.
     void release();
 
 private:
     // [OPENGL] GPU texture atlas where all icons share a single GLTexture resource.
+    // [UNITY] In Unity this would be a Texture2D + SpriteAtlas pair owned by a ScriptableObject manager that can drop the AssetBundle when
+    // destroyed.
     GLTexture m_icons_texture;
 
     // [STATE] Incremented whenever init/release reorganizes the atlas. Tracks atlas version for cache invalidation.

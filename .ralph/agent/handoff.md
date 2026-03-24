@@ -4766,3 +4766,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3 synchronous SVG file I/O + release timing currently tied to the GL thread)
 - Git: annotate: src/slic3r/GUI/IconManager.cpp
 - Next recommended Phase 1 task: T411 annotate: src/slic3r/GUI/IconManager.hpp
+
+## Phase 1 - Task T411 complete
+- Task type: annotate
+- File: src/slic3r/GUI/IconManager.hpp
+- Deliverables: src/slic3r/GUI/IconManager.hpp
+- Substantive additions: 3 Unity-context comments clarifying init and release flows along with a ScriptableObject texture mapping note.
+- Verification excerpt: "[UNITY] Unity would create a SpriteAtlas ScriptableObject holding Texture2D copies, then expose Sprite handles to UI Toolkit images."
+- Unity-impact summary:
+  - Atlas uploads now explain SpriteAtlas/Texture2D ownership.
+  - Release warns about GL-thread-only cleanup, guiding a Unity main-thread dispatcher.
+- Hazards found: 1×PORTING_HAZARD:P3 (bulk texture upload needs main-thread queue)
+- Git: Annotate IconManager for Unity port
+- Next recommended Phase 1 task: T414 annotate: src/slic3r/GUI/ImageGrid.cpp
