@@ -4450,5 +4450,5 @@ This prompt governs **Phase 1 only**.
   - Unity must keep `LocalizationSettings.StringDatabase` lookups on the main thread and refresh `ScriptableObject` caches when `CultureInfo` swaps occur so the ported macros stay thread-safe.
   - Narrow string helpers should map to `LocalizedString.Value` reads and avoid caching stale translations by re-querying the `StringTable` after locale changes.
 - Hazards found: 1 (P2 global `wxLocale` access is not worker-safe)
-- Git: <pending>
+- Git: Annotate I18N translation helpers
 - Next recommended Phase 1 task: T410 annotate: src/slic3r/GUI/IconManager.cpp
