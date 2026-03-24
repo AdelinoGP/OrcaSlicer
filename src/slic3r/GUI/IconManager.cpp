@@ -37,8 +37,8 @@ IconManager::~IconManager()
 namespace {
 NSVGimage* parse_file(const char* filepath)
 {
-    // [INTENT][PORTING_HAZARD:P3][UNITY] Load the raw SVG bytes via nanosvg so the rasterizer stays self-contained; Unity would instead
-    // cache the parsed `VectorImage`/`SpriteVectorUtils` result.
+    // [INTENT][PORTING_HAZARD:P3][THREAD][UNITY] Load the raw SVG bytes via nanosvg so the rasterizer stays self-contained; Unity would
+    // schedule a background job to parse into a `VectorImage`/`SpriteVectorUtils` result before touching the main texture atlas.
     FILE* fp = boost::nowide::fopen(filepath, "rb");
     assert(fp != nullptr);
     if (fp == nullptr)
@@ -320,6 +320,7 @@ void IconManager::release()
 {
     // [STATE][UNCLEAR][UNITY][PORTING_HAZARD:P3] Placeholder for freeing `m_icons_texture` and shared icon handles; Unity must replicate
     // this by unloading the `Texture2D`/`SpriteAtlas` so the GPU texture does not leak.
+    // [EVENT] Intentionally triggered by GUI teardown or a manual atlas reset so the GL context is guaranteed still current before freeing.
     BOOST_LOG_TRIVIAL(error) << "Not implemented yet";
 }
 
@@ -327,6 +328,8 @@ void priv::clear(IconManager::Icons& icons)
 {
     // [STATE][THREAD][PORTING_HAZARD:P2] Tear down shared icon pointers before calling GL delete so Unity ports can release on the main
     // thread without leaking texture handles.
+    // [UNITY] Unity would replicate this by clearing cached `Sprite`/`Texture2D` references and calling `Resources.UnloadAsset` before
+    // the owning MonoBehaviour `OnDestroy` executes.
     std::string message;
     for (auto& icon : icons) {
         // Exist more than this instance of shared ptr?

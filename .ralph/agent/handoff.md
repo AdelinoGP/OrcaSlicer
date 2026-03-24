@@ -4752,3 +4752,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=2 (scaling metadata, DPI awareness) P3=5 (Windows text-change suppression, placeholder bitmap manipulation, style mapping, rescale reappend, DPI rebuild loop)
 - Git: annotate: src/slic3r/GUI/BitmapComboBox.cpp
 - Next recommended Phase 1 task: T184 annotate: src/slic3r/GUI/BitmapComboBox.hpp
+
+## Phase 1 - Task T410 complete
+- Task type: annotate
+- File: src/slic3r/GUI/IconManager.cpp
+- Deliverables: src/slic3r/GUI/IconManager.cpp
+- Substantive additions: Added three multi-tag notes covering parse-file/thread hazards, release-event timing, and Unity texture release mirroring.
+- Verification excerpt: // [INTENT][PORTING_HAZARD:P3][THREAD][UNITY] Load the raw SVG bytes via nanosvg so the rasterizer stays self-contained; Unity would schedule a background job to parse into a `VectorImage`/`SpriteVectorUtils` result before touching the main texture atlas.
+- Unity-impact summary:
+  - Treat the SVG parsing as an async job/coroutine so Unity does not block the GL thread while warming up vector sprites.
+  - Mirror the `IconManager::release` hook as part of the owning MonoBehaviour’s `OnDestroy` (or UI shutdown handler) so the main-thread dispatcher can guard the texture release.
+  - Clear cached `Sprite`/`Texture2D` handles and call `Resources.UnloadAsset` right before the MonoBehaviour master that owns the atlas is destroyed to avoid dangling references.
+- Hazards found: 1 (P3 synchronous SVG file I/O + release timing currently tied to the GL thread)
+- Git: annotate: src/slic3r/GUI/IconManager.cpp
+- Next recommended Phase 1 task: T411 annotate: src/slic3r/GUI/IconManager.hpp
