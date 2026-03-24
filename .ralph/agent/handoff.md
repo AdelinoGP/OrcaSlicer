@@ -4856,6 +4856,19 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (GL atlas upload must stay on Unity main thread), P3=1 (Emboss + SLA rasterizers require a compatible CPU replacement).
 - Git: Annotate CreateFontNameImageJob for Unity port
 - Next recommended Phase 1 task: T432 annotate: src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.cpp
+## Phase 1 - Task T418 complete
+- Task type: annotate
+- File: src/slic3r/GUI/IMSlider.hpp
+- Deliverables: src/slic3r/GUI/IMSlider.hpp
+- Substantive additions: 3 targeted annotations documenting the area tolerance helper, the color-change detector, and tooltip event routing for Unity.
+- Verification excerpt: /* [INTENT] Guard the slider against tiny area fluctuations that would otherwise produce duplicate ticks when calculator precision diverges; [PORTING_HAZARD:P3] Unity must honor the same epsilon() when comparing mesh areas so tick spacing stays aligned with the native preview. */
+- Unity-impact summary:
+  - Preserve the epsilon-based area comparison so Unity tick draws align with the wxWidgets/ImGui preview, reusing the same tolerance when judging layer area equivalence.
+  - Mirror the color-change scan as a VisualElement event that replays `check_overhangs` gating and triggers slider tick edits via Unity's ContextualMenuManager analog.
+  - Route tooltip calls through Unity's VisualElement `TooltipManager`/overlay so slider hover states stay in sync with the ImGui pointer and tick menu highlights.
+- Hazards found: P3=2 (epsilon tolerance + break_condition semantics for color-change detection)
+- Git: Annotate IMSlider header for Unity port
+- Next recommended Phase 1 task: task-1773880086-c6d0 (T419 annotate: src/slic3r/GUI/IMToolbar.cpp)
 
 ## Phase 1 - Task T432 complete
 - Task type: annotate

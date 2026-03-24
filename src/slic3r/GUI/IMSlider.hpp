@@ -23,9 +23,16 @@ namespace GUI {
  */
 constexpr double epsilon() { return 0.0011; }
 
+/* [INTENT] Guard the slider against tiny area fluctuations that would otherwise produce duplicate ticks when calculator precision
+ * diverges; [PORTING_HAZARD:P3] Unity must honor the same epsilon() when comparing mesh areas so tick spacing stays aligned with
+ * the native preview. */
 bool equivalent_areas(const double& bottom_area, const double& top_area);
 
 // return true if color change was detected
+/* [INTENT] Walk the layer stack to flag extruder/color transitions remapped to tick creation, [EVENT] so the slider's
+ * popup menus can highlight the affected layer, and [UNITY] expose the same data via the VisualElement event router that backs
+ * the tick context menu; [PORTING_HAZARD:P3] keep the break_condition lambda semantics untouched since Unity will replicate the
+ * `check_overhangs` gating logic in its ViewModel. */
 bool check_color_change(PrintObject* object,
                         size_t       frst_layer_id,
                         size_t       layers_cnt,
@@ -197,6 +204,8 @@ protected:
     void draw_custom_label_block(const ImVec2 anchor, Type type);
     void draw_ticks(const ImRect& slideable_region);
     void draw_tick_on_mouse_position(const ImRect& slideable_region);
+    // [EVENT][UNITY] Tooltips feed the overlay and ImGui context hints; Unity should hook this into its VisualElement
+    // tooltip dispatcher so slider hover states match the ImGui tracking in the designer portal.
     void show_tooltip(const TickCode& tick);      // menu
     void show_tooltip(const std::string tooltip); // menu
     bool vertical_slider(const char*     str_id,
