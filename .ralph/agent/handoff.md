@@ -3236,6 +3236,20 @@ This prompt governs **Phase 1 only**.
 - Git: annotate: src/slic3r/GUI/HMS.cpp
 - Next recommended Phase 1 task: T403 annotate: src/slic3r/GUI/HMS.hpp
 
+## Phase 1 - Task T426 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/BindJob.hpp
+- Deliverables: src/slic3r/GUI/Jobs/BindJob.hpp
+- Substantive additions: Dual comments describing the job state fields, event wiring, thread expectations, and Unity bindings for the `BindJobController` dispatcher.
+- Verification excerpt: // [EVENT] Optional callback invoked after the success event so controllers can log, close dialogs, or trigger follow-on actions.
+- Unity-impact summary:
+  - Position `BindJobController` as the Unity coroutine owner that tracks the same serial/IP/sec-link state and surfaces events to UI Toolkit listeners.
+  - Replace `wxPostEvent` plus EVT_* macros with dispatcher-driven `UnityEvent<(code,data)>` callbacks so progress/fail/success is serialized on the main thread.
+  - Treat `set_event_handle` as a dispatcher guard that mirrors Unity's `VisualElement` lifecycle to avoid posting to destroyed windows.
+- Hazards found: 1 P3 (wxWindow lifetime + cross-thread posting without dispatcher guards)
+- Git: Annotate BindJob header for Unity port
+- Next recommended Phase 1 task: T428 annotate: src/slic3r/GUI/Jobs/BoostThreadWorker.hpp
+
 ## Phase 1 - Task T410 complete
 - Task type: annotate
 - File: src/slic3r/GUI/IconManager.cpp

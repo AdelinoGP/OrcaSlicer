@@ -1032,3 +1032,8 @@
 ## Iteration plan update
 - Selected task: T402 annotate src/slic3r/GUI/HMS.cpp (runtime task task-1773880086-330c active now).
 - Plan: read HMS.cpp fully, insert [INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2] comments around cache sync, action/button resolution, image handling, and wiki fetch flows, append the Phase 1 evidence block to .ralph/agent/handoff.md, commit the single file, close the task, and stop for this iteration.
+
+## Iteration plan update
+- Current focus: T426 annotate `src/slic3r/GUI/Jobs/BindJob.hpp` because the header owns the event wiring + job fields the Unity port must mirror.
+- Plan: start `task-1773880086-71f8`, read the header, annotate class intent/state/threads/events, add `[UNITY]`/`[PORTING_HAZARD]` notes for the dispatcher and boost filesystem references, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the file, and close the task.
+- Verification: ensure comments cover action/event hooks, ui threading via `wxWindow`, `BindJobController` analogue, and hazards about boost::filesystem/promises.
