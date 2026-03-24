@@ -199,6 +199,10 @@
 ## Iteration update
 - Completed T314 annotate: `src/slic3r/GUI/Gizmos/GLGizmoCut.hpp`; multi-tag comments now cover intent, state caches, event wiring, OpenGL draw helpers, Unity analogs, and porting hazards; the evidence block is appended and `.ralph/ralph-tasks.md` now marks the task done.
 
+## Iteration update
+- Completed T182 annotate: `src/slic3r/GUI/BitmapCache.hpp` by adding multi-tag guidance for cache intent/state, PNG/SVG loaders, color parsing, RGBA upload, and GL texture creation plus Unity mapping/hazard notes.
+- Next plan: pick `T183 annotate: src/slic3r/GUI/BitmapComboBox.cpp` or the next available Phase 1 entry with an existing file, annotate it with the full tag set, append the evidence block, and keep walking the ready manifest.
+
 ## Iteration plan update
 - Selected task: T153 annotate `src/slic3r/GUI/PresetComboBoxes.cpp` (task-1773880085-efcd is now active for this iteration).
 - Plan: read the file in full, inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around the combo box widget initialization, event wiring, preset cache, and render helpers; ensure comments note any asynchronous state, selection caching, or cross-thread hazards, highlight Unity analogs (e.g., UI Toolkit `ListView` with `VisualElement` item renderer plus ScriptableObject preset model), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the single file change, close T153, and then pick the next eligible Phase 1 task afterward.
@@ -1053,3 +1057,16 @@
 ## HttpServer Annotation Plan
 - Goal: annotate src/slic3r/GUI/HttpServer.cpp with [INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD] notes focused on listener lifecycle, request dispatch, worker threading, response caching, and Unity port equivalents.
 - Steps: read file, add comments around listener setup, worker threads, request/response flow, locks, and hazard areas, update handoff entry, stage/commit, close task.
+
+## Iteration plan update
+- Task: T409 annotate `src/slic3r/GUI/I18N.hpp`
+- Plan: read the header fully (macros, helper namespace, translation variants), insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P2]` notes for the locale cache, `wxLocale` accessor, `_` macro helpers, and plural/context helpers, highlight Unity equivalents (ScriptableObject string tables + `LocalizationSettings`/`LocalizedString` wrappers) plus hazards (global locale state, synchronous reloads, absent pluralization), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit `I18N.hpp` plus handoff metadata, close T409, and then pause this iteration as required.
+
+## Iteration plan update
+- Selected task: T183 annotate `src/slic3r/GUI/BitmapComboBox.cpp` as the immediate focus for Phase 1 coverage; the runtime manifest entry is ready and the file handles selection + bitmap rendering that Unity will need documented.
+- Plan: `ralph tools task start task-<id>` once we locate the T183 runtime task, read `BitmapComboBox.cpp` end-to-end, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations around the constructor state, OnAddBitmap/Append paint overrides, MSW owner-draw path, background drawing, and rescale retries so the combo box’s cache/invalidation/selection behavior is clear; append the evidence block, stage/commit the annotated source, close T183, and stop after this single atomic task so the next iteration can continue.
+
+## Iteration update
+- Completed T183 annotate `src/slic3r/GUI/BitmapComboBox.cpp`: injected `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` notes across the constructor setup, bitmap sizing helpers, owner-draw painting, Windows-specific highlight handling, and DPI rescale path; the new comments call out Unity equivalents for VisualElement templates, pseudo-state styling, and DPI reconcilers.
+- Added the Phase 1 evidence block, refreshed `.ralph/ralph-tasks.md`/`.ralph/agent/handoff.md`, closed runtime task `task-1773880086-5dfb`, and committed as `Annotate BitmapComboBox for Unity port`.
+- Next recommended Phase 1 task: T184 annotate `src/slic3r/GUI/BitmapComboBox.hpp` so the header’s state declarations match the new tagging.

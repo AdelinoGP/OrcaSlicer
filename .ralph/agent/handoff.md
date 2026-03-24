@@ -4725,3 +4725,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (request handler needs main-thread marshaling)
 - Git: annotate HttpServer request thread hazards
 - Next recommended Phase 1 task: T407 annotate: src/slic3r/GUI/HttpServer.hpp
+
+## Phase 1 - Task T183 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BitmapComboBox.cpp
+- Deliverables: src/slic3r/GUI/BitmapComboBox.cpp
+- Substantive additions: Added eight multi-tag annotations spanning constructor intent, bitmap sizing, owner-draw painting, Windows owner-draw plumbing, background styling, and DPI rescale recovery.
+- Verification excerpt: // [EVENT] Owner-draw callback that paints the cached bitmap and text for each entry so the selection rectangle matches the measured size.
+- Unity-impact summary:
+  - Treat this as a UI Toolkit `ListView` template where the first imported sprite defines the VisualElement height, with a MonoBehaviour keeping text/image pairs in sync.
+  - Drive selection highlights via VisualElement pseudo-state styles instead of the low-level WM_DRAWITEM/GDI mix the current code depends on.
+- Hazards found: P2=2 (scaling metadata, DPI awareness) P3=5 (Windows text-change suppression, placeholder bitmap manipulation, style mapping, rescale reappend, DPI rebuild loop)
+- Git: annotate: src/slic3r/GUI/BitmapComboBox.cpp
+- Next recommended Phase 1 task: T184 annotate: src/slic3r/GUI/BitmapComboBox.hpp
