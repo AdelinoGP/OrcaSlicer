@@ -23,8 +23,15 @@
 
 namespace Slic3r { namespace GUI {
 
-BedShape::BedShape(const Pointfs& points) { m_build_volume = {points, 0.f, {}, {}}; }
+BedShape:: // [INTENT] Construct the BedShape state, holding the build volume and shape type.
+           // [STATE] `m_build_volume` stores the raw points and volume type for the printer profile.
+    BedShape(const Pointfs& points)
+{
+    m_build_volume = {points, 0.f, {}, {}};
+}
 
+// [INTENT] Return a human-readable label for a given parameter (Size, Origin, Diameter).
+// [UNITY] Use a lookup `Dictionary<Parameter, string>` or `Localization` entry for the UI labels.
 static std::string get_option_label(BedShape::Parameter param)
 {
     switch (param) {
@@ -84,6 +91,8 @@ void BedShape::append_option_line(ConfigOptionsGroupShp optgroup, Parameter para
     optgroup->append_single_option_line({def, std::move(key)});
 }
 
+// [INTENT] Return the display name for a page type (Rectangle, Circular, Custom).
+// [UNITY] Use a `Localization` table to look up the display name.
 wxString BedShape::get_name(PageType type)
 {
     switch (type) {
@@ -96,6 +105,8 @@ wxString BedShape::get_name(PageType type)
     return {};
 }
 
+// [INTENT] Infer the `PageType` from the current `m_build_volume.type()`.
+// [UNITY] Use `ScriptableObject` or a data structure holding the shape definition to infer the UI page.
 BedShape::PageType BedShape::get_page_type()
 {
     switch (m_build_volume.type()) {
@@ -110,6 +121,8 @@ BedShape::PageType BedShape::get_page_type()
     return PageType::Rectangle;
 }
 
+// [INTENT] Generate a formatted string summarizing the current shape and its parameters for tooltips or log files.
+// [UNITY] Use `string.Format` or `string interpolation` on the `BedShapeSettings` data structure.
 wxString BedShape::get_full_name_with_params()
 {
     wxString out = _L("Shape") + ": " + get_name(this->get_page_type());
@@ -129,6 +142,8 @@ wxString BedShape::get_full_name_with_params()
     return out;
 }
 
+// [INTENT] Apply the current `m_build_volume` configuration to the `ConfigOptionsGroup` so UI elements stay synced.
+// [UNITY] Use a `BindingUpdater` or data-binding system to sync the `BedShapeSettings` to UI Toolkit `VisualElement` properties.
 void BedShape::apply_optgroup_values(ConfigOptionsGroupShp optgroup)
 {
     switch (m_build_volume.type()) {
