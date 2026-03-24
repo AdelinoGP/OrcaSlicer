@@ -5,6 +5,7 @@ _Generated: 2026-03-20 07:11:02 UTC_
 ## Task reconciliation
 - `.ralph/ralph-tasks.md` currently tracks Phase 1 entries through T186 (mostly earlier GUI widgets), but the runtime `ralph tools task list` and the supplied `<ready-tasks>` manifest now describe tasks starting at T187 (Jobs/Job.cpp and later). We'll treat the runtime task list as the canonical manifest for the current work and document these differences in this handoff log going forward.
 - Noting a discrepancy observed right away: the provided `<ready-tasks>` list still surfaces `T383 annotate: src/slic3r/GUI/GUI.hpp` as pending, yet `.ralph/ralph-tasks.md` marks it `[x]` and the header already contains the multi-tag annotations. We'll consider the registry/handoff state authoritative and proceed with downstream tasks such as `T390` to keep Phase 1 progressing.
+- Additional mismatch: the ready manifest still lists `T414 annotate: src/slic3r/GUI/ImageGrid.cpp` even though `.ralph/ralph-tasks.md` shows it `[x]`. We'll keep following the registry and focus on the next open entry (currently `T177` onward) while noting this stale entry in the log.
 
 ## Git Context
 
@@ -3852,6 +3853,20 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=2 (wxRect DPI hints do not map directly to Unity monitors, and the timer refresh requires UI-thread-only scheduling).
 - Git: annotate: src/slic3r/GUI/ImageDPIFrame.hpp
 - Next recommended Phase 1 task: T414 annotate: src/slic3r/GUI/ImageGrid.cpp
+
+## Phase 1 - Task T421 complete
+- Task type: annotate
+- File: src/slic3r/GUI/InstanceCheck.cpp
+- Deliverables: src/slic3r/GUI/InstanceCheck.cpp
+- Substantive additions: 4 focused annotations covering the single-instance handshake state, event wiring, main-thread posting, and DBus listener hazard.
+- Verification excerpt: // [STATE] `hashed_path`, `lock_name`, and the optional lock file capture the single-instance identity so lock/unlock happens deterministically per binary and version.
+- Unity-impact summary:
+  - Map the bootstrap lock/handshake to an `InstanceGate` MonoBehaviour holding a native Mutex and raising events when another instance is detected.
+  - Keep the message handler events on Unity’s main thread via `MainThreadDispatcher` so models/downloads load safely.
+  - Turn the Linux DBus listener into a native plugin `Task` that watches `m_stop` and marshals callbacks into Unity’s event bus.
+- Hazards found: P2=1 (DBus listener requires native plugin) P3=1 (lockfile/mutex logic must align with Unity’s cross-platform Mutex semantics)
+- Git: Annotate InstanceCheck for Unity port
+- Next recommended Phase 1 task: T422 annotate: src/slic3r/GUI/InstanceCheck.hpp
 
 ## Phase 1 - Task T159 complete
 - Task type: annotate

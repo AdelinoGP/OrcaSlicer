@@ -300,6 +300,14 @@ static bool send_message(const std::string& message_text, const std::string& ver
 #endif //__APPLE__/__linux__
 } // namespace instance_check_internal
 
+// [STATE] `hashed_path`, `lock_name`, and the optional lock file capture the single-instance identity so lock/unlock happens
+// deterministically per binary and version. [EVENT] The function either finishes the handshake by notifying another instance or returns
+// `true` so the current startup flow aborts before the GUI version spins up its windows. [THREAD] Called on the primary thread during app
+// startup; it may block on mutex/lockfile creation, so Unity needs an async `Task` that waits for the mutex while keeping the main loop
+// responsive via `async/await`. [UNITY] Mirror this logic with a global `InstanceGate` MonoBehaviour that inspects
+// `Application.persistentDataPath`, holds a `Mutex`, and raises `OnAnotherInstance` events via `UnityEvent`. [PORTING_HAZARD:P2] Native
+// lockfiles/DBus names rely on platform-specific APIs; Unity ports must provide equivalent plugins (NativePlugin for Win, Named Pipes/Unix
+// domain sockets for Linux/Mac) and treat failure as fatal.
 bool instance_check(int argc, char** argv, bool app_config_single_instance)
 {
     std::size_t hashed_path;
@@ -376,6 +384,10 @@ wxDEFINE_EVENT(EVT_LOAD_MODEL_OTHER_INSTANCE, LoadFromOtherInstanceEvent);
 wxDEFINE_EVENT(EVT_START_DOWNLOAD_OTHER_INSTANCE, StartDownloadOtherInstanceEvent);
 wxDEFINE_EVENT(EVT_INSTANCE_GO_TO_FRONT, InstanceGoToFrontEvent);
 
+// [EVENT] Register callback handler and subscribe to platform messages so other-instance events flow into `m_callback_evt_handler`.
+// [THREAD] Executed on the GUI thread during MainFrame initialization; ensures `m_initialized` tracks the subscription so shutdown can join
+// the worker thread before MainFrame destruction. [UNITY] Map to a singleton controller that registers native plugin callbacks, raising C#
+// events through `MainThreadDispatcher`.
 void OtherInstanceMessageHandler::init(wxEvtHandler* callback_evt_handler)
 {
     assert(!m_initialized);
@@ -428,13 +440,14 @@ void OtherInstanceMessageHandler::handle_message(const std::string& message)
             downloads.emplace_back(*it);
     }
     if (!paths.empty()) {
-        // wxEvtHandler* evt_handler = wxGetApp().plater(); //assert here?
-        // if (evt_handler) {
+        // [EVENT] Notify the main application to queue the requested models so the UI can load them on the main thread.
+        // [THREAD] `wxPostEvent` safely bridges from the DBus worker thread to the GUI thread.
         wxPostEvent(m_callback_evt_handler,
                     LoadFromOtherInstanceEvent(GUI::EVT_LOAD_MODEL_OTHER_INSTANCE, std::vector<boost::filesystem::path>(std::move(paths))));
-        //}
     }
     if (!downloads.empty()) {
+        // [STATE] Download URLs carry the payload for the `StartDownloadOtherInstanceEvent`, ensuring the downloader knows the source.
+        // [EVENT] Queue the download events so the GUI spinner and status bar refresh from the main thread.
         wxPostEvent(m_callback_evt_handler, StartDownloadOtherInstanceEvent(GUI::EVT_START_DOWNLOAD_OTHER_INSTANCE,
                                                                             std::vector<std::string>(std::move(downloads))));
     }
@@ -514,6 +527,10 @@ static DBusHandlerResult handle_dbus_object_message(DBusConnection* connection, 
 }
 } // namespace MessageHandlerDBusInternal
 
+// [THREAD] Dedicated Linux/DBus listener thread; loops with `dbus_connection_read_write_dispatch` and polls `m_stop` so the worker can exit
+// cleanly. [PORTING_HAZARD:P2] Unity lacks a built-in DBus client, so ports must rely on a native plugin or cross-platform async IO service
+// to mimic this listener. [UNITY] Replace with a Unity `Task` that wraps `DBusConnection` via a native plugin, dispatching back to
+// `MainThreadDispatcher` when data arrives.
 void OtherInstanceMessageHandler::listen()
 {
     DBusConnection*      conn;

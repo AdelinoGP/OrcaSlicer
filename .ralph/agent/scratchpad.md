@@ -1078,3 +1078,17 @@
 ## Iteration plan update
 - Selected task: T407 annotate `src/slic3r/GUI/HttpServer.hpp` as today's focus because the ready manifest lists it and it drives HTTP listener state Unity ports must understand.
 - Plan: mark runtime task `task-1773880086-a9d9` active, read the header end-to-end, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P2]` notes covering listener lifecycle, request handler wiring, worker/thread ownership, shared caches, and porting hazards such as synchronous sockets; append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only the annotated header plus metadata, close the task, and stop for this iteration to allow the next agent to continue.
+
+## Iteration plan update
+- Selected task: T411 annotate `src/slic3r/GUI/IconManager.hpp` (runtime task `task-1773880086-093a`).
+- Plan: read the header to capture icon cache lifecycle, manager state, event wiring, thread safety, and Unity mapping; insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` comments near the manager class, icon lookup helpers, and owner references; append the mandated evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header plus metadata, close the task, and stop so the next iteration can resume.
+- Verification: documentation-only edit; no runtime tests required, but confirm comments explain the main icon cache invariants and porting hazards.
+
+
+## Iteration update
+- Completed T411 annotate: src/slic3r/GUI/IconManager.hpp with new multi-tag guidance for the init/release flows and Unity-mapped atlas ownership; appended the Phase 1 evidence block and committed the file.
+- Next plan: pick the next ready Phase 1 task (e.g., T414 annotate `src/slic3r/GUI/ImageGrid.cpp`) on the next iteration.
+
+## Iteration update
+- Completed T421 annotate `src/slic3r/GUI/InstanceCheck.cpp`, capturing cross-instance bootstrap state, event posting to wx, and the Linux DBus listener threading while mapping hazards to Unity equivalents.
+- Next plan: start `T422 annotate: src/slic3r/GUI/InstanceCheck.hpp` to document the header-level event declarations, state flags, and platform-specific hooks alongside Unity port guidance.
