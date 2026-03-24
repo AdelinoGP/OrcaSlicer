@@ -1070,3 +1070,7 @@
 - Completed T183 annotate `src/slic3r/GUI/BitmapComboBox.cpp`: injected `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` notes across the constructor setup, bitmap sizing helpers, owner-draw painting, Windows-specific highlight handling, and DPI rescale path; the new comments call out Unity equivalents for VisualElement templates, pseudo-state styling, and DPI reconcilers.
 - Added the Phase 1 evidence block, refreshed `.ralph/ralph-tasks.md`/`.ralph/agent/handoff.md`, closed runtime task `task-1773880086-5dfb`, and committed as `Annotate BitmapComboBox for Unity port`.
 - Next recommended Phase 1 task: T184 annotate `src/slic3r/GUI/BitmapComboBox.hpp` so the header’s state declarations match the new tagging.
+
+## Iteration plan update
+- Selected task: T407 annotate `src/slic3r/GUI/HttpServer.hpp` as today's focus because the ready manifest lists it and it drives HTTP listener state Unity ports must understand.
+- Plan: mark runtime task `task-1773880086-a9d9` active, read the header end-to-end, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P2]` notes covering listener lifecycle, request handler wiring, worker/thread ownership, shared caches, and porting hazards such as synchronous sockets; append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only the annotated header plus metadata, close the task, and stop for this iteration to allow the next agent to continue.

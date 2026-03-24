@@ -4,6 +4,7 @@
 #include <iostream>
 #include <mutex>
 #include <stack>
+#include <sstream>
 
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
@@ -12,6 +13,8 @@
 #include <boost/thread.hpp>
 #include <string>
 #include <set>
+#include <functional>
+#include <map>
 #include <memory>
 #include <utility>
 
@@ -82,6 +85,7 @@ public:
 
 // [INTENT] Hosts a tiny loop-back HTTP broker so GUI panels can react to local requests.
 // [UNITY] Map this logic to a Unity `UnityWebRequest` handler + `MainThreadDispatcher` for marshaling callbacks.
+// [STATE] Active binding port; Unity must sync this with serialized configuration before starting the listener.
 class HttpServer
 {
     boost::asio::ip::port_type port;
@@ -96,6 +100,8 @@ public:
     public:
         virtual ~Response()                                   = default;
         virtual void write_response(std::stringstream& ssOut) = 0;
+        // [THREAD] Concrete response objects live on the IO worker thread until the write completes; Unity must keep payload buffers alive
+        // until MainThreadDispatcher flushes finish.
     };
 
     class ResponseNotFound : public Response
@@ -114,6 +120,7 @@ public:
         ResponseRedirect(const std::string& location) : location_str(location) {}
         ~ResponseRedirect() override = default;
         void write_response(std::stringstream& ssOut) override;
+        // [STATE] Captures the redirect target so Unity can reroute via `UnityWebRequestAsyncOperation`.
     };
 
     class ResponseHtml : public Response
@@ -124,6 +131,7 @@ public:
         explicit ResponseHtml(std::string html) : html(std::move(html)) {}
         ~ResponseHtml() override = default;
         void write_response(std::stringstream& ssOut) override;
+        // [UNITY] Map this to writing a `TextAsset` or serialized HTML string via UnityWebRequest download handlers.
     };
 
     HttpServer(boost::asio::ip::port_type port = LOCALHOST_PORT);
@@ -137,13 +145,18 @@ public:
 
     bool is_started() { return start_http_server; }
     // [EVENT] kicks off the async listener thread.
+    // [PORTING_HAZARD:P2] `start` must avoid racing with `stop`; Unity should guard with a CancellationToken so the worker task never
+    // restarts while shutting down.
     void start();
     // [EVENT][THREAD] cancels the IO context and joins the worker.
+    // [PORTING_HAZARD:P2] `stop` must wait for all outstanding `session`s, or Unity may leak sockets and keep the port bound.
     void stop();
     void set_port(boost::asio::ip::port_type new_port) { port = new_port; }
     // [STATE][THREAD] Changing the listener port must be serialized through the GUI dispatcher so the ASIO acceptor sees a consistent value.
     boost::asio::ip::port_type get_port() const { return port; }
     // [EVENT] GUI layers inject their handler here; Unity will map this to an `Action<string, Response>` bound to the port selector.
+    // [PORTING_HAZARD:P2] Because handlers run on the IO thread, Unity must wrap this delegate so it never touches scene state without
+    // marshaling back to the main thread.
     void set_request_handler(const std::function<std::shared_ptr<Response>(const std::string&)>& m_request_handler);
     // [THREAD] Handler callbacks run from the IO thread, so they must hand off to Unity's main thread before touching scene state.
 
@@ -179,6 +192,7 @@ private:
     // [INTENT] Represents a single TCP session; request parsing occurs here before the HttpServer response pipeline.
     // [THREAD] Owned by the ASIO IO thread and must marshal parsed events back to the GUI thread.
     // [UNITY] The Unity port should pair each socket with a `Task`/`UdpClient` wrapper and `MainThreadDispatcher` to forward parsed routes.
+    // [PORTING_HAZARD:P2] Session lifetime balloons if a handler never completes; Unity needs cancellation tokens to cut off leaked requests.
 
     // [STATE] Owning pointer to the asio acceptor/session manager; this is allocated once per server instance.
     std::unique_ptr<IOServer> server_{nullptr};

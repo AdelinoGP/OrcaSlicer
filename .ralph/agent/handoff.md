@@ -4726,6 +4726,20 @@ This prompt governs **Phase 1 only**.
 - Git: annotate HttpServer request thread hazards
 - Next recommended Phase 1 task: T407 annotate: src/slic3r/GUI/HttpServer.hpp
 
+## Phase 1 - Task T407 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HttpServer.hpp
+- Deliverables: src/slic3r/GUI/HttpServer.hpp
+- Substantive additions: 7 targeted `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` notes on responses, the worker thread, IOServer/session lifetimes, and handler wiring.
+- Verification excerpt: `// [PORTING_HAZARD:P2] Because handlers run on the IO thread, Unity must wrap this delegate so it never touches scene state without marshaling back to the main thread.`
+- Unity-impact summary:
+  - Host the HTTP listener as a Unity `Task`/`Coroutine` that owns the `UnityWebRequest` and `MainThreadDispatcher` bridges.
+  - Translate each response subclass into a Unity callback that writes to `UnityWebRequestAsyncOperation` before the UI thread accesses scene state.
+  - Mirror the session/IOServer lifetime with `AsyncOperationHandle` or `CancellationToken` so sockets drop when Unity shuts down.
+- Hazards found: P2=3 (handler thread race, start/stop reentry, session lifetime + cancellation) P3=1 (ASCII-only query parser)
+- Git: Annotate HttpServer for Unity port
+- Next recommended Phase 1 task: T410 annotate: src/slic3r/GUI/IconManager.cpp
+
 ## Phase 1 - Task T183 complete
 - Task type: annotate
 - File: src/slic3r/GUI/BitmapComboBox.cpp
