@@ -1050,3 +1050,6 @@
 ## Iteration plan update
 - Selected task: T181 annotate `src/slic3r/GUI/BitmapCache.cpp`, which holds the shared bitmap cache used by multiple GUI panels.
 - Plan: read the CPP completely, sprinkle `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2]` comments covering the cache lifecycle, worker uploads, UI invalidations, and config hooks; note the Unity analog (Texture2D atlas manager + `Addressables`-style async loader + main-thread dispatcher) and hazards (wxBitmap lifetimes, blocking disk reads), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit just the annotated source plus metadata, mark T181 done, and then stop this iteration.
+## HttpServer Annotation Plan
+- Goal: annotate src/slic3r/GUI/HttpServer.cpp with [INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD] notes focused on listener lifecycle, request dispatch, worker threading, response caching, and Unity port equivalents.
+- Steps: read file, add comments around listener setup, worker threads, request/response flow, locks, and hazard areas, update handoff entry, stage/commit, close task.

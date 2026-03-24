@@ -4699,3 +4699,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=3, P3=2
 - Git: Annotate BitmapCache caching flow
 - Next recommended Phase 1 task: T182 annotate: src/slic3r/GUI/BitmapCache.hpp
+## Phase 1 - Task T406 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HttpServer.cpp
+- Deliverables: src/slic3r/GUI/HttpServer.cpp
+- Substantive additions: 2 thread/Unity annotations around request dispatch and acceptor lifecycle
+- Verification excerpt: // [THREAD][UNITY][PORTING_HAZARD:P2] `m_request_handler` executes on the HTTP thread; any wx state it touches must be marshaled back via `CallAfter`/`MainThreadDispatcher` so the render thread isn't mutated directly.
+- Unity-impact summary:
+  - Run the HttpServer listener inside a dedicated Unity Task or HttpListener thread and dispatch UI updates through a MainThreadDispatcher to avoid render-thread races.
+  - Keep response buffers alive until the async write callback fires so UnityWebRequest flushes don't drop their payloads.
+- Hazards found: P2=1 (request handler needs main-thread marshaling)
+- Git: annotate HttpServer request thread hazards
+- Next recommended Phase 1 task: T407 annotate: src/slic3r/GUI/HttpServer.hpp

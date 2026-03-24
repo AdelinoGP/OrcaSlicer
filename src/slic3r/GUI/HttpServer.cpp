@@ -103,12 +103,17 @@ void session::read_next_line()
                     }
 
                     const std::string url_str = Http::url_decode(headers.get_url());
-                    const auto        resp    = server.server.m_request_handler(url_str);
+                    // [THREAD][UNITY][PORTING_HAZARD:P2] `m_request_handler` executes on the HTTP thread; any wx state it touches must be
+                    // marshaled back via `CallAfter`/`MainThreadDispatcher` so the render thread isn't mutated directly. Unity should pair
+                    // this handler with a Task that posts UI updates through a dispatcher before touching shared state.
+                    const auto        resp = server.server.m_request_handler(url_str);
                     std::stringstream ssOut;
                     resp->write_response(ssOut);
                     std::shared_ptr<std::string> str = std::make_shared<std::string>(ssOut.str());
                     async_write(socket, boost::asio::buffer(str->c_str(), str->length()),
                                 [this, self, str](const boost::beast::error_code& e, std::size_t s) {
+                                    // [STATE] Capture `str` until the write callback runs so the buffer stays alive; Unity ports likewise
+                                    // must retain the upload result until the HTTP pipeline flush completes.
                                     std::cout << "done" << std::endl;
                                     server.stop(self);
                                 });
@@ -178,6 +183,9 @@ void HttpServer::start()
         set_current_thread_name("http_server");
         server_ = std::make_unique<IOServer>(*this);
         server_->acceptor.listen();
+
+        // [STATE] The acceptor keeps the socket bound for the thread's lifetime; restarting the server must rebind the same port or cleanly
+        // signal the Unity listener to release it.
 
         server_->do_accept();
 
