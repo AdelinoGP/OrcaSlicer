@@ -4403,3 +4403,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3)
 - Git: annotate: src/slic3r/GUI/HMSPanel.hpp
 - Next recommended Phase 1 task: T406 annotate: src/slic3r/GUI/HttpServer.cpp
+
+## Phase 1 - Task T176 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/BBLTopbar.hpp
+- Deliverables: src/slic3r/GUI/BBLTopbar.hpp, .ralph/agent/scratchpad.md
+- Substantive additions: 7 annotations covering intent, event wiring, state caches, and Unity guidance.
+- Verification excerpt: // [INTENT] Top-of-window toolbar that owns menu dropdowns, window controls, publish/undo/redo, and the model store button so the frame behaves like the legacy main UI bar.
+- Unity-impact summary: 1) Port toolbar as a UI Toolkit VisualElement tree driven by a MonoBehaviour controller with dropdown menus; 2) Keep publish/undo/redo toggles and icons in a shared ScriptableObject-backed state container; 3) Track restored window rect + popup guards inside the controller to emulate wx event ordering.
+- Hazards found: P2:1, P3:1
+- Git: Annotate BBLTopbar header for Unity port
+- Next recommended Phase 1 task: T177 annotate: src/slic3r/GUI/BedShapeDialog.cpp

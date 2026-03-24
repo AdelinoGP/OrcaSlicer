@@ -950,3 +950,7 @@
 ## Iteration update - T405
 - Added Unity mapping and porting hazard comments around HMSPanel row handling, visibility toggling, and acknowledgment clearing so downstream agents understand the scroll-plus-HTML behavior.
 - Logged the iteration plan and kept the `ralph` task started so the next run can pick up at T406.
+
+## Iteration plan 2026-03-24T01:35:00.174937
+- Task: T176 annotate BBLTopbar.hpp
+- Plan: read header, document toolbar layout, states, event wiring, Unity mappings, commit with new annotations.
