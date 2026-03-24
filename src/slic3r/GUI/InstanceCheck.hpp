@@ -21,13 +21,14 @@ namespace Slic3r {
 // checks for other running instances and sends them argv,
 // if there is --single-instance argument or AppConfig is set to single_instance=1
 // returns true if this instance should terminate
-// [INTENT] Gate single-instance enforcement before the main GUI comes up.
-// [STATE] `argc/argv` and `app_config_single_instance` choose the lockfile path, handshake port, and early-exit result.
-// [EVENT] Duplicate-instance data is routed through the events declared below (load models/downloads/front requests).
-// [THREAD] This runs before the UI thread spins up and may block on named mutexes or filesystem locks.
-// [UNITY] Map to a singleton MonoBehaviour that registers `Application.wantsToQuit`, maintains a named `Mutex`, and uses
-// `MainThreadDispatcher` for messaging. [PORTING_HAZARD:P3] Platform IPC uses OS-specific lockfiles/named pipes; Unity needs a unified
-// cross-platform Mutex/lock-file watcher plus a dispatcher for incoming data.
+// [INTENT] Gate single-instance enforcement before the main GUI comes up. This function is called very early in startup to decide if this
+// process should continue or pass its arguments to an existing instance and then exit. This function is called very early in startup to
+// decide if this process should continue or pass its arguments to an existing instance and then exit. [STATE] `argc/argv` and
+// `app_config_single_instance` choose the lockfile path, handshake port, and early-exit result. [EVENT] Duplicate-instance data is routed
+// through the events declared below (load models/downloads/front requests). [THREAD] This runs before the UI thread spins up and may block
+// on named mutexes or filesystem locks. [UNITY] Map to a singleton MonoBehaviour that registers `Application.wantsToQuit`, maintains a
+// named `Mutex`, and uses `MainThreadDispatcher` for messaging. [PORTING_HAZARD:P3] Platform IPC uses OS-specific lockfiles/named pipes;
+// Unity needs a unified cross-platform Mutex/lock-file watcher plus a dispatcher for incoming data.
 bool instance_check(int argc, char** argv, bool app_config_single_instance);
 // [EVENT] When another instance claims the lock/calls back we fire the load/download/front events above.
 
@@ -63,7 +64,9 @@ wxDECLARE_EVENT(EVT_INSTANCE_GO_TO_FRONT, InstanceGoToFrontEvent);
 // [THREAD] Events reroute from platform callbacks onto the UI thread before invoking frame methods.
 
 // [INTENT] Handles incoming messages from other instances
-// [PORTING_HAZARD:P3] Platform-specific IPC (D-Bus, Win32, Cocoa). Needs a custom native plugin for Unity.
+// [UNITY] This entire class and its platform-specific implementations will need to be replaced by a native C# or C++ plugin for Unity that
+// handles the low-level OS IPC. The plugin would then raise C# events that the Unity application can subscribe to. [PORTING_HAZARD:P3]
+// Platform-specific IPC (D-Bus, Win32, Cocoa). Needs a custom native plugin for Unity.
 class OtherInstanceMessageHandler
 {
 public:
@@ -94,7 +97,8 @@ private:
     // [STATE] Initialization status
     bool m_initialized{false};
     // [STATE] Callback handler for events
-    // [UNITY] Needs a C# event handler or UnityEvent
+    // [UNITY] In Unity, this would be replaced by C# events (e.g., `public event Action<string> OnMessageReceived;`) or `UnityEvent`
+    // instances that other scripts can subscribe to. The native plugin would invoke these events.
     wxEvtHandler* m_callback_evt_handler{nullptr};
 
 #ifdef BACKGROUND_MESSAGE_LISTENER
