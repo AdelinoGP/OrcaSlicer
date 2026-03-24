@@ -4270,3 +4270,26 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 P3 (platform IPC lockfiles/named pipes for Windows/Linux; Cocoa listener plugin teardown for macOS)
 - Git: Annotate InstanceCheck for Unity port (T422)
 - Next recommended Phase 1 task: T425 annotate: src/slic3r/GUI/Jobs/BindJob.cpp
+
+## Phase 1 - Task T401 complete
+
+- Task type: annotate
+
+- File: src/slic3r/GUI/HintNotification.hpp
+
+- Deliverables: src/slic3r/GUI/HintNotification.hpp, .ralph/agent/scratchpad.md
+
+- Substantive additions: 9 annotation comments covering Unity mapping, thread context, and state cache hazards
+
+- Verification excerpt: // [STATE][EVENT][THREAD][UNITY] Queries `HintDatabase` to refresh the displayed `HintData` on the UI thread and pushes updates back into ImGui; Unity should serialize the same call through a `MainThreadDispatcher` before mutating VisualElements.
+
+- Unity-impact summary:
+  - Captured the HintDatabase singleton as a ScriptableObject-initialized catalog with main-thread navigation helpers.
+  - Documented VisualElement/GraphicRaycaster parallels for the notification window layout and arrow button wiring.
+  - Highlighted MainThreadDispatcher gating for tag caches and documentation links to keep Unity consistent.
+
+- Hazards found: 1 P2, 1 P3
+
+- Git: annotate: src/slic3r/GUI/HintNotification.hpp
+
+- Next recommended Phase 1 task: T402 annotate: src/slic3r/GUI/HMS.cpp

@@ -893,3 +893,12 @@
 ## Iteration plan update
 - Selected task: T422 annotate `src/slic3r/GUI/InstanceCheck.hpp` (key gui:T422).
 - Plan: mark the runtime task active, read `InstanceCheck.hpp`, clarify how `InstanceCheck` tracks the single-instance enforcement state, annotate the command table bindings, toolbar/notify hints, and synchronization hooks with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P3]` tags, explain the Unity analog (singleton MonoBehaviour + `Application.wantsToQuit` override + messaging) and highlight hazards around wx ownership and named mutex lifetime, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header plus metadata, and close T422 before stopping for this iteration.
+
+## Iteration plan update
+- Selected task: T383 annotate: src/slic3r/GUI/GUI.hpp.
+- Plan: read header fully, annotate manager helpers/menu builder/toolbar/config caches with [INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2] context, record Unity analogs (MenuBar + ScriptableObject configs + RenderTexture preview) and wx ownership hazards, append Phase 1 evidence to .ralph/agent/handoff.md, stage+commit the header plus metadata, mark the task done, and stop this iteration.
+
+## Iteration plan correction
+- Updated focus: T401 annotate: src/slic3r/GUI/HintNotification.hpp to avoid duplication/conflict with T372/T383 IDs.
+- Plan: read the hint notification header, annotate non-trivial constructors, state, events, and helper widgets with [INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P3]; mention how notifications queue through wxTimer and highlight Unity analogs (UI Toolkit VisualElement, C# timer + dispatcher).
+- After finishing annotations, append evidence block to .ralph/agent/handoff.md, stage and commit only the header plus metadata, close the task, and stop this iteration.

@@ -32,7 +32,9 @@ enum class HintDataNavigation {
 
 // [EVENT] Commands that drive the hint carousel from buttons/hooks so Unity can mirror the same verbs in its UI Toolkit overlay.
 
-// [INTENT][STATE][THREAD] Singleton that loads hint metadata, tracks which IDs were shown, and answers navigation calls on the UI thread.
+// [INTENT][STATE][THREAD][UNITY] Singleton that loads hint metadata, tracks which IDs were shown, and answers navigation calls on the UI
+// thread; Unity can replace this with a `RuntimeInitializeOnLoadMethod` that populates a `ScriptableObject` `HintCatalog` and exposes
+// UI-thread navigation helpers.
 class HintDatabase
 {
 public:
@@ -63,14 +65,18 @@ public:
     }
     // resets m_initiailized to false and writes used if was initialized
     // used when reloading in runtime - like change language
+    // [EVENT][THREAD][PORTING_HAZARD:P3][UNITY] Clears cached hint state when the user changes language/settings; Unity should expose a
+    // `HintCatalog.Reset` method triggered from the Settings controller before rebuilding the notification panel.
     void uninit();
+    // [EVENT][THREAD] Rebuilds the hint caches after a reload, so the UI is guaranteed to observe fresh data when `get_hint` runs again.
     void reinit();
 
 private:
     void init();
     // [STATE][PORTING_HAZARD:P3] Seeds the random cursor via `rand()` so Unity should mimic this with `Random.state` to keep order stable.
     void init_random_hint_id();
-    // [INTENT][PORTING_HAZARD:P2] Parses hints.ini via boost::property_tree; Unity must mirror the file format in managed code (JSON/XML).
+    // [INTENT][PORTING_HAZARD:P2][UNITY] Parses hints.ini via boost::property_tree; Unity should load the equivalent TextAsset and
+    // deserialize it into a ScriptableObject-backed catalog (JSON/XML) so the filtering code works the same.
     void load_hints_from_file(const boost::filesystem::path& path);
     bool is_used(const std::string& id);
     void set_used(const std::string& id);
@@ -79,12 +85,12 @@ private:
     size_t                   get_next_hint_id();
     size_t                   get_prev_hint_id();
     size_t                   get_random_next();
-    size_t                   m_hint_id; // [STATE] cursor pointing into m_loaded_hints so navigation updates stay predictable
-    bool                     m_initialized{false};
+    size_t                   m_hint_id;            // [STATE] cursor pointing into m_loaded_hints so navigation updates stay predictable
+    bool                     m_initialized{false}; // [STATE] marks whether the hints have been parsed so callers know caches are usable
     std::vector<HintData>    m_loaded_hints;
-    bool                     m_sorted_hints{false};
+    bool                     m_sorted_hints{false}; // [STATE] ensures weight-sorted hints are only recomputed when the list changes
     std::vector<std::string> m_used_ids;
-    bool                     m_used_ids_loaded{false};
+    bool                     m_used_ids_loaded{false}; // [STATE] signals the persisted "used" set is available before deduping
 };
 // [INTENT][UNITY] Floating Did-You-Know notification that draws via ImGui and can be replaced in Unity with a Canvas overlay + GraphicRaycaster
 class NotificationManager::HintNotification : public NotificationManager::PopNotification
@@ -121,7 +127,8 @@ protected:
     // [EVENT][PORTING_HAZARD:P3][UNITY] Preferences button proxies the minimize slot, so Unity should drive its Settings panel through a
     // `Command` router.
     void render_preferences_button(ImGuiWrapper& imgui, const float win_pos_x, const float win_pos_y);
-    // [EVENT] Right/left arrow control that flips hint navigation; keep Unity's buttons bound to `open_next`/`open_prev`.
+    // [EVENT][UNITY] Right/left arrow control that flips hint navigation; keep Unity's `Button.onClick` bound to `open_next`/`open_prev`
+    // and update the VisualElement text before the next frame.
     void render_right_arrow_button(
         ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y);
     // [EVENT][PORTING_HAZARD:P2] Documentation button launches a browser; Unity must show its own confirmation before calling `Application.OpenURL`.
@@ -129,10 +136,11 @@ protected:
         ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y);
     // [OPENGL] Displays the notification icon texture; Unity can layer this onto a `VisualElement` background image.
     void render_logo(ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y);
-    // [STATE][EVENT] Queries `HintDatabase` to refresh the displayed `HintData` and respects `new_hint` to honor navigation.
+    // [STATE][EVENT][THREAD][UNITY] Queries `HintDatabase` to refresh the displayed `HintData` on the UI thread and pushes updates back
+    // into ImGui; Unity should serialize the same call through a `MainThreadDispatcher` before mutating VisualElements.
     void retrieve_data(bool new_hint = true);
-    // [PORTING_HAZARD:P2][EVENT] Bridge to `wxGetApp()`'s browser warning dialog; Unity must not call `Application.OpenURL` without a
-    // confirmation overlay.
+    // [PORTING_HAZARD:P2][EVENT][UNITY] Bridge to `wxGetApp()`'s browser warning dialog; Unity must dispatch through `MainThreadDispatcher`
+    // to show a confirmation overlay before calling `Application.OpenURL` so the same warning gating exists.
     void open_documentation();
 
     bool                      m_has_hint_data{false}; // [STATE] tracks whether the latest hint has been fully cached for rendering
@@ -141,8 +149,8 @@ protected:
     std::string               m_enabled_tags;         // [STATE] hints only trigger when these tags pass
     bool                      m_runtime_disable;      // [STATE] mirrors HintData runtime_disable to gate tag reevaluation per click
     std::string               m_documentation_link;   // [STATE] stored so the documentation button knows whether to render
-    float                     m_close_b_y{0};
-    float                     m_close_b_w{0};
+    float                     m_close_b_y{0}; // [STATE] caches close-button Y coordinate so hover detection uses consistent geometry
+    float                     m_close_b_w{0}; // [STATE] caches width to throttle repeated close instructions while the button is hovered
     // hover of buttons
     long m_docu_hover_time{0};  // [STATE] tooltip hover timer for the documentation button
     long m_prefe_hover_time{0}; // [STATE] tooltip hover timer for the preferences button
