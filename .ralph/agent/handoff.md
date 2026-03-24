@@ -4361,3 +4361,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 0
 - Git: Annotate HMSPanel events for Unity port
 - Next recommended Phase 1 task: task-1773880086-7ab4 (T405 annotate: src/slic3r/GUI/HMSPanel.hpp)
+
+## Phase 1 - Task T175 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BBLTopbar.cpp
+- Deliverables: src/slic3r/GUI/BBLTopbar.cpp
+- Substantive additions: 12 annotations covering toolbar intent, state caching, event wiring, and porting guidance for the top chrome row.
+- Verification excerpt: // [EVENT] Bind all toolbar interactions (menus, window controls, publish) before it becomes interactive.
+- Unity-impact summary:
+  - Replace the wxAuiToolBar plus Bitmaps with a UI Toolkit VisualElement row and a MonoBehaviour command dispatcher that plays the same File/Publish/undo/redo window-control roles.
+  - Mirror the platform drag/popup logic with Unity InputSystem pointer handling plus a MainThreadDispatcher that drives window maximize/iconize/close and the Publish agent flow.
+- Hazards found: 3 (P2 window-drag port, P3 fullscreen + publish gating requiring native bridge)
+- Git: annotate: src/slic3r/GUI/BBLTopbar.cpp
+- Next recommended Phase 1 task: T176 annotate: src/slic3r/GUI/BBLTopbar.hpp
+

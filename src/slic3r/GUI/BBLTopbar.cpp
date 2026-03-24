@@ -21,6 +21,14 @@
 #define TOPBAR_TITLE_WIDTH  300
 
 using namespace Slic3r;
+// [INTENT] Render the chrome-level toolbar that exposes File/Publish actions, undo/redo,
+//          window controls, and navigation state so Unity can mirror it as a shared
+//          `VisualElement` with a command dispatcher.
+// [UNITY] Replace with a UI Toolkit `VisualElement` + `Button` row wired to a
+//          MonoBehaviour that talks to the `Plater` controller, `MainFrame` analog,
+//          and `StatusService` via ScriptableObject commands.
+// [PORTING_HAZARD:P2] The toolbar embeds raw `wxFrame` calls (maximize/restore) plus
+//          GTK/Windows-specific drag behavior that needs a `MainThreadDispatcher` bridge.
 
 enum CUSTOM_ID
 {
@@ -35,7 +43,11 @@ enum CUSTOM_ID
     ID_TOOL_BAR = 3200,
     ID_AMS_NOTEBOOK,
 };
+// [STATE] Custom IDs keep the toolbar/mode controls separate from other wxAuiToolBar items.
 
+// [INTENT] BBLTopbarArt overrides the toolbar visuals to keep the OrcaSlicer color language.
+// [UNITY] Replace with a UI Toolkit stylesheet + sprite icons managed by the MonoBehaviour controller.
+// [PORTING_HAZARD:P3] Custom hover/checked rendering means Unity must duplicate the hover highlight states manually.
 class BBLTopbarArt : public wxAuiDefaultToolBarArt
 {
 public:
@@ -199,6 +211,7 @@ BBLTopbar::BBLTopbar(wxWindow* pwin, wxFrame* parent)
 void BBLTopbar::Init(wxFrame* parent) 
 {
     SetArtProvider(new BBLTopbarArt());
+// [STATE] track the parent frame and popup guards so dropdowns stay synchronized with menu toggles.
     m_frame = parent;
     m_skip_popup_file_menu = false;
     m_skip_popup_dropdown_menu = false;
@@ -306,6 +319,7 @@ void BBLTopbar::Init(wxFrame* parent)
 
     int client_w = parent->GetClientSize().GetWidth();
     this->SetSize(client_w, m_toolbar_h);
+// [EVENT] Bind all toolbar interactions (menus, window controls, publish) before it becomes interactive.
 
     this->Bind(wxEVT_MOTION, &BBLTopbar::OnMouseMotion, this);
     this->Bind(wxEVT_MOUSE_CAPTURE_LOST, &BBLTopbar::OnMouseCaptureLost, this);
@@ -334,6 +348,7 @@ BBLTopbar::~BBLTopbar()
     m_file_menu = nullptr;
 }
 
+// [EVENT] File menu tap delegates to MainFrame/Plater for load/save routines.
 void BBLTopbar::OnOpenProject(wxAuiToolBarEvent& event)
 {
     MainFrame* main_frame = dynamic_cast<MainFrame*>(m_frame);
@@ -341,6 +356,7 @@ void BBLTopbar::OnOpenProject(wxAuiToolBarEvent& event)
     plater->load_project();
 }
 
+// [STATE] Publish button visibility is toggled based on agent/login state.
 void BBLTopbar::show_publish_button(bool show)
 {
     this->EnableTool(m_publish_item->GetId(), show);
@@ -403,6 +419,8 @@ void BBLTopbar::OnModelStoreClicked(wxAuiToolBarEvent& event)
     //GUI::wxGetApp().load_url(wxString(wxGetApp().app_config->get_web_host_url() + MODEL_STORE_URL));
 }
 
+// [EVENT] Hitting Publish routes through the agent to show the publish dialog/website.
+// [PORTING_HAZARD:P3] Agent gating and `wxGetApp().open_publish_page_dialog()` expect async state, so Unity must ensure the login token is ready before enabling the button.
 void BBLTopbar::OnPublishClicked(wxAuiToolBarEvent& event)
 {
     if (!wxGetApp().getAgent()) {
@@ -469,6 +487,7 @@ void BBLTopbar::UpdateToolbarWidth(int width)
     this->SetSize(width, m_toolbar_h);
 }
 
+// [STATE] Rebuild toolbar bitmaps at the current DPI so Unity commands can swap in scaled sprites.
 void BBLTopbar::Rescale() {
     int em = em_unit(this);
     wxAuiToolBarItem* item;
@@ -534,6 +553,7 @@ void BBLTopbar::OnIconize(wxAuiToolBarEvent& event)
     m_frame->Iconize();
 }
 
+// [PORTING_HAZARD:P3] Full-screen/maximize touches native APIs so Unity must wrap window state changes in its platform layer.
 void BBLTopbar::OnFullScreen(wxAuiToolBarEvent& event)
 {
 #ifdef __WXGTK__
@@ -631,6 +651,7 @@ void BBLTopbar::OnCalibToolItem(wxAuiToolBarEvent &evt)
     tb->SetToolSticky(evt.GetId(), false);
 }
 
+// [PORTING_HAZARD:P2] Mouse down reimplements window dragging via native APIs, so Unity needs InputSystem + OS-specific drag fences.
 void BBLTopbar::OnMouseLeftDown(wxMouseEvent& event)
 {
     wxPoint mouse_pos = ::wxGetMousePosition();
@@ -672,6 +693,7 @@ void BBLTopbar::OnMouseLeftUp(wxMouseEvent& event)
     event.Skip();
 }
 
+// [STATE] Mouse drag updates `m_delta` so the toolbar and frame position stay coherent.
 void BBLTopbar::OnMouseMotion(wxMouseEvent& event)
 {
     wxPoint mouse_pos = ::wxGetMousePosition();
@@ -705,6 +727,7 @@ void BBLTopbar::OnMouseCaptureLost(wxMouseCaptureLostEvent& event)
 {
 }
 
+// [STATE] Track whether the next popup invocation should be silenced to avoid duplicate menus.
 void BBLTopbar::OnMenuClose(wxMenuEvent& event)
 {
     wxAuiToolBarItem* item = this->FindToolByCurrentPosition();
@@ -716,6 +739,7 @@ void BBLTopbar::OnMenuClose(wxMenuEvent& event)
     }
 }
 
+// [UNITY] Unity port can replicate this helper with `VisualElement.WorldToLocal` + `Raycast` to know which button is hovered.
 wxAuiToolBarItem* BBLTopbar::FindToolByCurrentPosition()
 {
     wxPoint mouse_pos = ::wxGetMousePosition();

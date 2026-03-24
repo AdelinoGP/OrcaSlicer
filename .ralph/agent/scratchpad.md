@@ -931,3 +931,8 @@
 ## Iteration plan update
 - Task: T404 annotate src/slic3r/GUI/HMSPanel.cpp
 - Plan: review panel implementation, annotate state/event/hazards, record evidence, close task, stop for iteration.
+
+## Iteration plan update
+- Task: T175 annotate `src/slic3r/GUI/BBLTopbar.cpp`
+- Understanding: BBLTopbar wires the top-of-window command bar, exposes printer/slice status, and dispatches navigation actions that must map to Unity Navigation/Action controllers.
+- Plan: annotate event/state/porting info in `BBLTopbar.cpp`, log Phase 1 evidence to `.ralph/agent/handoff.md`, stage/commit changes, close the task, then continue with the next ready file.
