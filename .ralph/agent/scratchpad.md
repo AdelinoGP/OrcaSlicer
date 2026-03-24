@@ -885,3 +885,7 @@
 ## Iteration plan update
 - Selected task: T173 annotate `src/slic3r/GUI/BBLStatusBarSend.cpp`
 - Plan: mark the runtime task active, read `BBLStatusBarSend.cpp` end-to-end, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` annotations around the custom send-status indicators, cancel/retry button hooks, gauge state handling, `wxQueueEvent` dispatches, and network callback resilience; note Unity analogs (UI Toolkit VisualElement panel + `UnityWebRequest` background worker marshaled back via `MainThreadDispatcher`) and hazard notes about wx event ownership. Record the evidence block in `.ralph/agent/handoff.md`, stage/commit the annotated source plus metadata, close T173, and then end this iteration.
+
+## Iteration plan update
+- Selected task: T422 annotate `src/slic3r/GUI/InstanceCheck.hpp` (key gui:T422).
+- Plan: mark the runtime task active, read `InstanceCheck.hpp`, clarify how `InstanceCheck` tracks the single-instance enforcement state, annotate the command table bindings, toolbar/notify hints, and synchronization hooks with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P3]` tags, explain the Unity analog (singleton MonoBehaviour + `Application.wantsToQuit` override + messaging) and highlight hazards around wx ownership and named mutex lifetime, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header plus metadata, and close T422 before stopping for this iteration.

@@ -4258,4 +4258,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1x P3 (wxQueueEvent requires owning parent handlers).
 - Git: Annotate BBL send status bar interactions
 - Next recommended Phase 1 task: T174 annotate: src/slic3r/GUI/BBLStatusBarSend.hpp
-- Next recommended Phase 1 task: T174 annotate: src/slic3r/GUI/BBLStatusBarSend.hpp
+## Phase 1 - Task T422 complete
+- Task type: annotate
+- File: src/slic3r/GUI/InstanceCheck.hpp
+- Deliverables: src/slic3r/GUI/InstanceCheck.hpp
+- Substantive additions: Added `[STATE]/[THREAD]/[UNITY]/[PORTING_HAZARD]` guidance around the single-instance handshake, event payloads, and platform listener worker states.
+- Verification excerpt: `// [INTENT] Gate single-instance enforcement before the main GUI comes up.`
+- Unity-impact summary:
+  - Maps the global guard to a singleton `Application.wantsToQuit`/named `Mutex` MonoBehaviour plus MainThreadDispatcher.
+  - Documents how the Linux D-Bus listener and macOS callback plugin keep message flow synchronized with the UI thread.
+- Hazards found: 2 P3 (platform IPC lockfiles/named pipes for Windows/Linux; Cocoa listener plugin teardown for macOS)
+- Git: Annotate InstanceCheck for Unity port (T422)
+- Next recommended Phase 1 task: T425 annotate: src/slic3r/GUI/Jobs/BindJob.cpp
