@@ -26,6 +26,9 @@ namespace Slic3r { namespace GUI {
 using ArrangePolygon = arrangement::ArrangePolygon;
 
 // Cache the wti info
+// [INTENT] Wraps WipeTowerInfo for arrangement logic.
+// [UNITY] Needs a dedicated MonoBehaviour for wipe tower visualization and collision box calculation.
+// [PORTING_HAZARD:P2] Directly references GLCanvas3D::WipeTowerInfo, which is coupled to OpenGL state.
 class WipeTower : public GLCanvas3D::WipeTowerInfo
 {
 public:
