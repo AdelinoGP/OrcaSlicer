@@ -872,3 +872,8 @@
 - Selected task: T456 annotate `src/slic3r/GUI/Jobs/ThreadSafeQueue.hpp`.
 - Understanding: this SPSC queue shields the GUI/Jobs workers from race conditions with condition-variable notification and optional blocking waits; the port needs the same safe crossing semantics so Unity's worker threads and the main thread stay in sync.
 - Plan: annotate the template and helpers for [INTENT]/[STATE]/[THREAD]/[PORTING_HAZARD]/[UNITY] coverage, highlight how push/consume honor the UI worker boundary, call out the optional timeout/flag bits, add the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the header plus metadata, close T456, and then stop this iteration so the next agent can continue.
+
+## Iteration plan update
+- Selected task: T171 annotate `src/slic3r/GUI/BBLStatusBarPrint.cpp` (our active work item this run).
+- Understanding: the print-mode status bar mirrors print progress, error handling, and cancel control via custom wxPanel, gauge, link, and button widgets that Unity must reproduce with Canvas elements plus a controller syncing job state.
+- Plan: read the cpp top-to-bottom, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P3]` comments around panel construction, progress/cancel state, error-link toggles, and the UI-thread-only `Yield` call; capture how `EVT_SHOW_ERROR_INFO` and `wxQueueEvent` provide cross-panel notifications, note the Unity analog (UI Toolkit `VisualElement` + `ListView` with `MainThreadDispatcher`), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit this cpp plus metadata, close T171, and then stop so the next agent can continue.

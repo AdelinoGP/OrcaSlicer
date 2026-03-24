@@ -3852,6 +3852,20 @@ This prompt governs **Phase 1 only**.
 - Git: annotate: src/slic3r/GUI/IMSlider.hpp
 - Next recommended Phase 1 task: T419 annotate: src/slic3r/GUI/IMToolbar.cpp
 
+## Phase 1 - Task T171 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BBLStatusBarPrint.cpp
+- Deliverables: src/slic3r/GUI/BBLStatusBarPrint.cpp
+- Substantive additions: 8 multi-tag annotations for the constructor layout, cancel/error wiring, gauge/busy visibility, stop/start flows, callback binding, update_status yield, and reset logic.
+- Verification excerpt: // [STATE][EVENT][UNITY][PORTING_HAZARD:P3] Cancel button flips `m_was_cancelled`, then calls `m_cancel_cb_fina` on the UI thread; Unity would hook a `Button.OnClick` to a `CancellationTokenSource`, so the handler must stay alive while the VisualElement is animated/hidden.
+- Unity-impact summary:
+  - Rebuild the print status bar as a VisualElement tree containing Label, ProgressBar, percent tag, error link, and Cancel Button, obeying the existing DPI/FromDIP sizing.
+  - Marshal cancel and error link events through Unity's main-thread dispatcher (e.g., `MainThreadDispatcher.Enqueue`) so a `PrintProgressController` MonoBehaviour can react without tearing.
+  - Keep gauge/busy updates on the main thread and use Unity's layout invalidation instead of calling `Layout` directly while resetting state on stop_busy/reset.
+- Hazards found: 3 (P3: cancel callback lifetime, wxQueueEvent error dispatch, explicit `YieldFor` call demands main-thread handling).
+- Git: annotate: src/slic3r/GUI/BBLStatusBarPrint.cpp
+- Next recommended Phase 1 task: T172 annotate: src/slic3r/GUI/BBLStatusBarPrint.hpp
+
 ## Phase 1 - Task T456 complete
 - Task type: annotate
 - File: src/slic3r/GUI/Jobs/ThreadSafeQueue.hpp
