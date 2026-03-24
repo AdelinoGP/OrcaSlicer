@@ -4807,3 +4807,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 3 (P2 synchronous DownloadCheckFiles rerun, P3 manual alpha/gradient ramps, P3 shadow border drawing)
 - Git: Annotate ImageGrid for Unity port
 - Next recommended Phase 1 task: task-1773880086-9900 T417 annotate: src/slic3r/GUI/IMSlider.cpp
+
+## Phase 1 - Task T413 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ImageDPIFrame.hpp
+- Deliverables: src/slic3r/GUI/ImageDPIFrame.hpp, .ralph/agent/handoff.md
+- Substantive additions: 2 lifecycle annotations (THREAD teardown note, PORTING_HAZARD timer cleanup reminder)
+- Verification excerpt: // [THREAD] Tear-down runs on the GUI thread so timers and wxStaticBitmap cleanup happen before destruction;
+- Unity-impact summary:
+  - Mirror the destructor in MonoBehaviour.OnDestroy so coroutines stop and Texture2D references are released safely.
+  - Cancel the refresh coroutine before hiding/destroying so Unity textures are never written after the frame is gone.
+- Hazards found: 1 (P3 timer event binding continues firing until the timer is unbound)
+- Git: Annotate ImageDPIFrame lifecycle
+- Next recommended Phase 1 task: T417 annotate: src/slic3r/GUI/IMSlider.cpp

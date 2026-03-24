@@ -14,6 +14,8 @@ class ImageDPIFrame : public Slic3r::GUI::DPIFrame
 {
 public:
     ImageDPIFrame();
+    // [THREAD] Tear-down runs on the GUI thread so timers and wxStaticBitmap cleanup happen before destruction;
+    // Unity would mirror this in MonoBehaviour.OnDestroy by stopping coroutines and releasing Texture2D references.
     ~ImageDPIFrame() override;
     // [EVENT] Respond to dpi events dispatched from the shared DPI frame when monitor scale shifts.
     void on_dpi_changed(const wxRect& suggested_rect) override;
@@ -52,6 +54,8 @@ private:
     wxStaticText* m_title;
     // [THREAD] wxTimer is tied to the main GUI thread; Unity needs its own scheduler around `Coroutine`/`InvokeRepeating` so texture
     // uploads don't race.
+    // [PORTING_HAZARD:P3] wxTimer keeps firing until the event binding is removed; Unity must cancel its coroutine when the frame hides or
+    // destroys to avoid writing to dead textures or leaking UI references.
     wxTimer* m_refresh_timer{nullptr};
     // [STATE] Incremental counter used to debounce refreshes; in Unity, store as float delta until the next `Update` cycle.
     float m_timer_count = 0;
