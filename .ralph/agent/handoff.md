@@ -1170,3 +1170,17 @@ Continue the previous work. Remaining tasks (418):
 
 Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Port Preparation## Phase BoundaryThis prompt governs **Phase 1 only**.- Phase 0 is already complete.- Do **not** revisit Phase 0...
 ```
+
+## Phase 1 - Task T177 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BedShapeDialog.cpp
+- Deliverables: src/slic3r/GUI/BedShapeDialog.cpp
+- Substantive additions: Annotations covering intent, state, and Unity-porting strategy for BedShape methods.
+- Verification excerpt: // [INTENT] Return a human-readable label for a given parameter (Size, Origin, Diameter).
+- Unity-impact summary: 
+    - BedShape parameters need a  or data-binding system.
+    - wxWidgets dialogs need UI Toolkit equivalents (TabView/ScrollView).
+    - Modal file dialogues need async implementation.
+- Hazards found: 3 (P3) - file IO blocking, manual dark mode/theme toggling, wxSimplebook replacement.
+- Git: Annotate BedShapeDialog.cpp
+- Next recommended Phase 1 task: T180 annotate: src/slic3r/GUI/BindDialog.hpp
