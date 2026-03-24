@@ -4820,3 +4820,14 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3 timer event binding continues firing until the timer is unbound)
 - Git: Annotate ImageDPIFrame lifecycle
 - Next recommended Phase 1 task: T417 annotate: src/slic3r/GUI/IMSlider.cpp
+
+## Phase 1 - Task T417 complete
+- Task type: annotate
+- File: src/slic3r/GUI/IMSlider.cpp
+- Deliverables: src/slic3r/GUI/IMSlider.cpp
+- Substantive additions: three inline comments clarifying slider value cache sharing, new-print fingerprint state, and tick-change event hazards.
+- Verification excerpt: // [EVENT] Flags that `m_tick_change_event_type` needs dispatching next time the toolbar/menu polls for changes.
+- Unity-impact summary: 1) Shared Z-position arrays should live in a TickRegistry ScriptableObject; 2) tick-change notifications become UnityEvents so menus and overlays stay in sync; 3) main-thread dispatcher must guard custom G-code edits to protect the shared tick set.
+- Hazards found: 2×PORTING_HAZARD:P3 (shared tick cache and custom tick edits require UI thread coordination).
+- Git: Annotate IMSlider slider state/event signals
+- Next recommended Phase 1 task: T418 annotate: src/slic3r/GUI/IMSlider.hpp

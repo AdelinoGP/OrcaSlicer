@@ -209,6 +209,8 @@ void IMSlider::SetMaxValue(const int max_value)
 
 void IMSlider::SetSliderValues(const std::vector<double>& values) { m_values = values; }
 
+// [STATE] Persist the slice-generated Z positions so every helper can resolve ticks to heights without re-slicing per frame.
+// [UNITY] Push this array into a shared TickRegistry ScriptableObject so multiple RangeSlider controllers stay synchronized.
 Info IMSlider::GetTicksValues() const
 {
     Info                            custom_gcode_per_print_z;
@@ -354,6 +356,8 @@ void IMSlider::SetModeAndOnlyExtruder(const bool is_one_extruder_printed_model, 
 
 void IMSlider::SetExtruderColors(const std::vector<std::string>& extruder_colors) { m_extruder_colors = extruder_colors; }
 
+// [STATE] Tracks the fingerprint of the current print objects so the slider can detect when it must refresh ticks.
+// [THREAD] Called from the UI/render loop, so Unity should keep the matching fingerprint on its main thread dispatcher.
 bool IMSlider::IsNewPrint()
 {
     const Print& print = GUI::wxGetApp().plater()->fff_print();
@@ -368,12 +372,17 @@ bool IMSlider::IsNewPrint()
     return true;
 }
 
+// [EVENT] Flags that `m_tick_change_event_type` needs dispatching next time the toolbar/menu polls for changes.
+// [STATE] `m_is_need_post_tick_changed_event` prevents duplicate notifications when multiple ticks mutate in a single frame.
+// [PORTING_HAZARD:P3] Unity must invoke this from the main thread because the underlying tick set shares state with the render loop.
 void IMSlider::post_ticks_changed_event(Type type)
 {
     m_tick_change_event_type          = type;
     m_is_need_post_tick_changed_event = true;
 }
 
+// [EVENT] Inserts or swaps the custom G-code tick at the current selection and then emits a tick-change event.
+// [PORTING_HAZARD:P3] Must run on the UI thread because `m_ticks.ticks` lacks locking while the overlay renderer reads it.
 void IMSlider::add_custom_gcode(std::string custom_gcode)
 {
     if (m_selection == ssUndef)

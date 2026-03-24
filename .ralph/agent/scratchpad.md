@@ -1094,3 +1094,13 @@
 - Next plan: start `T422 annotate: src/slic3r/GUI/InstanceCheck.hpp` to document the header-level event declarations, state flags, and platform-specific hooks alongside Unity port guidance.
 ## Iteration plan - T414 annotate ImageGrid.cpp
 - Goal: analyze grid drawing zoom helpers and overlay events so Unity port knows caching/state/events, then add tags and evidence entry
+
+
+## Iteration plan update - T413 annotate src/slic3r/GUI/ImageDPIFrame.hpp
+- Objective: capture `ImageDPIFrame` intent/state/event/comment tags for Unity port.
+- Approach: read header top-to-bottom, add [INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P2] notes around macros, frame layout, DPI/theme hooks, and timer loops.
+- Stake: append Phase 1 evidence to `.ralph/agent/handoff.md`, stage/commit updated files, close task T413 before moving on.
+
+## Iteration update - T417 annotate src/slic3r/GUI/IMSlider.cpp
+- Added [STATE]/[UNITY] comments so tick height arrays flow through a shared TickRegistry ScriptableObject and GC detection occurs when prints change.
+- Documented the tick-change notification flag and custom G-code insert path with [EVENT]/[PORTING_HAZARD:P3] so Unity knows to keep those paths on the main thread.
