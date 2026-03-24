@@ -4439,3 +4439,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3: stale references if reload is mistimed)
 - Git: annotate: AuxiliaryList reload state
 - Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp
+
+## Phase 1 - Task T409 revisit
+- Task type: annotate
+- File: src/slic3r/GUI/I18N.hpp
+- Deliverables: src/slic3r/GUI/I18N.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 2 annotations clarifying thread ownership of the translation macros and the UTF-8 glue to emphasize `wxLocale`'s UI-thread affinity.
+- Verification excerpt: // [THREAD][STATE][PORTING_HAZARD:P2] These macros and helpers reference the global `wxLocale` catalog that lives on the main UI thread; Unity ports must marshal locale swaps across a `LocalizationSettings` controller and avoid touching the `CultureInfo` cache from background workers.
+- Unity-impact summary:
+  - Unity must keep `LocalizationSettings.StringDatabase` lookups on the main thread and refresh `ScriptableObject` caches when `CultureInfo` swaps occur so the ported macros stay thread-safe.
+  - Narrow string helpers should map to `LocalizedString.Value` reads and avoid caching stale translations by re-querying the `StringTable` after locale changes.
+- Hazards found: 1 (P2 global `wxLocale` access is not worker-safe)
+- Git: <pending>
+- Next recommended Phase 1 task: T410 annotate: src/slic3r/GUI/IconManager.cpp

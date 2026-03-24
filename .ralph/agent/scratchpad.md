@@ -961,3 +961,13 @@
 ## Iteration note
 - Task: T372 annotate src/slic3r/GUI/GUI_AuxiliaryList.cpp
 - Update: Documented the reload cache hazard so downstream Unity ports know to drop TreeView references before repopulating.
+
+## Iteration plan update - T383 (current)
+- Selected task: `T383 annotate: src/slic3r/GUI/GUI.hpp` (per the ready manifest and previous plan bets).
+- Plan: mark the runtime task active, read the header carefully, add any missing `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2]` guidance for the namespace helpers (config accessors, menu/toolbar wiring, preview coordination, and dialog-level helpers), call out the Unity equivalents (MenuBar + ScriptableObject-backed config controller + RenderTexture-based preview) plus wx ownership hazards (wxMenu/GL context lifetime), append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the updated header plus handoff metadata, close T383, and then stop this iteration so another agent can continue.
+- Verification: inspect the header to ensure every helper includes the tag coverage and the handoff entry captures the intent/state summary.
+
+## Iteration plan update - T409 (current)
+- Selected task: `T409 annotate: src/slic3r/GUI/I18N.hpp` to document translation helpers with explicit Unity guidance.
+- Plan: mark runtime task `task-1773880086-d8ea` active, read the header from top to bottom (macros, helper namespace, translation variants), and insert any missing `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P2]` comments—especially around `_` macros, context-aware catalog helpers, and `L_str` since they impact global locale state and cross-thread translation caches. Note Unity analogs (ScriptableObject string tables, `LocalizationSettings`, `LocalizedString` wrappers) plus hazards (lack of pluralization support, synchronous `wxLocale` refresh) and capture verification in the evidence block appended to `.ralph/agent/handoff.md`. Stage/commit `I18N.hpp` plus the handoff update, close the task, and finish the iteration so the next agent can continue.
+- Verification: confirm the new notes explain why each helper shares the global `wxLocale` state, point to a Unity equivalent, and mention the pluralization hazard.

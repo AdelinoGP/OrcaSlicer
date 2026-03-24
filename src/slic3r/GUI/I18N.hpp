@@ -31,6 +31,9 @@
 #define _CHB(s) wxGetTranslation(wxString(s, wxConvUTF8)).utf8_str()
 #endif /* _CHB */
 
+// [THREAD][STATE][PORTING_HAZARD:P2] These macros and helpers reference the global `wxLocale` catalog that lives on the main UI thread; Unity
+// ports must marshal locale swaps across a `LocalizationSettings` controller and avoid touching the `CultureInfo` cache from background workers.
+
 // [INTENT] Keep `_`/`_L`/`_CTX` macros routed through the same I18N helpers so every call-site hits the catalog-aware translation pipeline.
 // [UNITY] Replace these with `LocalizedString` instances backed by a ScriptableObject-based `StringTable` cache and pulled through
 // `LocalizationSettings.StringDatabase`. [PORTING_HAZARD:P2] wxWidgets uses `xgettext` plus `wxLocale` and `.po` catalogs; Unity migration
@@ -81,6 +84,8 @@ inline wxString translate(const wxString& s, const wxString& plural, unsigned in
 // [INTENT] Offer UTF-8 `std::string` counterparts so code that needs narrow strings can reuse the same catalog state without repeating
 // conversion logic. [UNITY] Equivalent to calling `LocalizedString.GetLocalizedString` and reading the `LocalizedString.Value` from a
 // `StringTable` asset that feeds `LocalizationSettings`.
+// [STATE][THREAD][PORTING_HAZARD:P2] The UTF-8 helpers mirror the same `wxLocale` cache but drop to narrow strings; they assume the global
+// locale is stable, so Unity must publish the same `CultureInfo` change via the main thread and keep cached `StringTable` lookups in sync.
 inline std::string translate_utf8(const char* s) { return wxGetTranslation(wxString(s, wxConvUTF8)).ToUTF8().data(); }
 inline std::string translate_utf8(const wchar_t* s) { return wxGetTranslation(s).ToUTF8().data(); }
 inline std::string translate_utf8(const std::string& s) { return wxGetTranslation(wxString(s.c_str(), wxConvUTF8)).ToUTF8().data(); }
