@@ -678,6 +678,10 @@
 
 ## Iteration plan update
 - Selected task: T155 annotate `src/slic3r/GUI/AmsWidgets.cpp` (document the AMS tray virtual list model).
+
+## Iteration plan update
+- Selected task: T419 annotate `src/slic3r/GUI/IMToolbar.cpp`
+- Plan: read the toolbar builder, event table, and layout helpers; add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations across toolbar creation, button state, and command dispatch, update `.ralph/agent/handoff.md` with the evidence block once done, commit the annotated file plus handoff metadata, close the task, and stop for this iteration.
 - Plan: refresh the `TrayListModel` flows to keep the column cache rebuild, unused row counter, TODO fields, and clear/reset hook well documented with `[INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD:P3]/[UNCLEAR]` guidance; call out Unity's `ListView`/`ObservableCollection` binding, the main-thread constraint of `MachineObject`, and the unresolved saturability/transmittance metrics. Append the Phase 1 evidence block, stage/commit the annotated file plus metadata, flip T155 to `[x]`, and then pause so the next iteration can continue from the updated ready list.
 
 ## Iteration plan update

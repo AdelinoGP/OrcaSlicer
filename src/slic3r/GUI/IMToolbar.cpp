@@ -12,6 +12,10 @@
 
 namespace Slic3r {
 namespace GUI {
+// [INTENT] Glue `ImGui` toolbar controls to the viewport command set so the ImGui overlay mirrors the wx toolbar.
+// [STATE] `IMToolbar` owns a list of `IMToolbarItem` instances plus the optional stats icon representing the toolbar model.
+// [EVENT] Each frame `ImGuiWrapper` will ask this module to rebuild the button row based on the saved items.
+// [UNITY] Unity would replace this with a Canvas + GraphicRaycaster paired with a MonoBehaviour that spawns `Button` prefabs per entry.
 IMToolbarItem::~IMToolbarItem()
 {
     // [INTENT] Tear down the GPU handle when the toolbar item owner is deleted so the GL context stays clean.
@@ -56,7 +60,9 @@ void IMToolbar::del_all_item()
 {
     // [INTENT] Explicitly destroy every toolbar item so switching configurations doesn’t leak icon textures.
     // [STATE] Clears the owning vector and resets pointers, mirroring a reset of the toolbar model in Unity.
+    // [EVENT] Triggered when the toolbar configuration changes or the viewport overlay is rebuilt.
     // [THREAD] Must run on the UI thread while no render pass is sampling the items array.
+    // [UNITY] Unity will instead clear the prefab list, release associated `Texture2D`s, and let GC handle references.
     // [PORTING_HAZARD:P3] Unity will rely on GC-managed collections rather than manual `delete`.
     for (int i = 0; i < m_items.size(); i++) {
         delete m_items[i];
@@ -69,7 +75,10 @@ void IMToolbar::del_stats_item()
 {
     // [INTENT] Dispose of the shared stats entry when the stats overlay is hidden from the toolbar model.
     // [STATE] Nulls the pointer so subsequent checks know the stats texture is unavailable.
+    // [EVENT] Triggered after the stats overlay hides or the toolbar refreshes its entries.
     // [THREAD] Should reside on the UI thread because GL texture cleanup happens below when the item is destroyed.
+    // [UNITY] Unity would simply disable the stats button GameObject and release the cached `Texture2D` via `Destroy`.
+    // [PORTING_HAZARD:P3] Shared pointer ownership across overlays makes the cleanup order delicate during Unity porting.
     delete m_all_plates_stats_item;
     m_all_plates_stats_item = nullptr;
 }
@@ -79,6 +88,8 @@ void IMToolbar::set_enabled(bool enable)
     // [EVENT] Invoked by GUI panels to gate whether the toolbar should participate in the render pass.
     // [STATE] Tracks whether toolbar drawing remains active and resets the `is_render_finish` flag when we disable.
     // [UNITY] Equivalent to enabling/disabling the toolbar GameObject or CanvasGroup in Unity.
+    // [THREAD] Must run on the UI thread because it flips the render flag observed by `render()`.
+    // [PORTING_HAZARD:P3] Unity needs to serialize this state through a controller MonoBehaviour to avoid race conditions when toggling a Canvas.
     m_enabled = enable;
     if (!m_enabled)
         is_render_finish = false;

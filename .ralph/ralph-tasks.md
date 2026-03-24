@@ -337,7 +337,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [x] T416 annotate: src/slic3r/GUI/ImGuiWrapper.hpp
 - [x] T417 annotate: src/slic3r/GUI/IMSlider.cpp
 - [x] T418 annotate: src/slic3r/GUI/IMSlider.hpp
-- - [x] T419 annotate: src/slic3r/GUI/IMToolbar.cpp
+- [x] T419 annotate: src/slic3r/GUI/IMToolbar.cpp
 - [x] T420 annotate: src/slic3r/GUI/IMToolbar.hpp
 - [x] T421 annotate: src/slic3r/GUI/InstanceCheck.cpp
 - [x] T422 annotate: src/slic3r/GUI/InstanceCheck.hpp

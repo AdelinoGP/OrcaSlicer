@@ -4907,3 +4907,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 (P3: custom paint relies on wxDC events; P3: icon/color cache needs explicit TMP_FontAsset/StyleSheet equivalents).
 - Git: Annotate static line widget for Unity port
 - Next recommended Phase 1 task: T705 annotate: src/slic3r/GUI/Widgets/StepCtrl.cpp
+
+## Phase 1 - Task T419 complete
+- Task type: annotate
+- File: src/slic3r/GUI/IMToolbar.cpp
+- Deliverables: src/slic3r/GUI/IMToolbar.cpp
+- Substantive additions: 6 targeted annotations clarifying texture lifecycle, toolbar resets, and Unity equivalents.
+- Verification excerpt: // [UNITY] Unity would replace this with a Canvas + GraphicRaycaster paired with a MonoBehaviour that spawns `Button` prefabs per entry.
+- Unity-impact summary:
+  - Move the ImGui toolbar into a Canvas-based layout with prefab buttons whose `Texture2D` sprites are managed via a controller MonoBehaviour.
+  - Reflect the stats button lifecycle and `set_enabled` gating by toggling GameObject/CanvasGroup visibility instead of manually deleting `IMToolbarItem` instances.
+- Hazards found: 5 (P2=1, P3=4)
+- Git: Annotate IMToolbar for Unity port
+- Next recommended Phase 1 task: T420 annotate: src/slic3r/GUI/IMToolbar.hpp
