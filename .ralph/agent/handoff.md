@@ -4657,3 +4657,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 (P2 reliance on `wxGetApp()` singleton configuration, P3 blocking filesystem copies and writes on the main thread)
 - Git: annotate: src/slic3r/GUI/HMS.cpp
 - Next recommended Phase 1 task: T403 annotate: src/slic3r/GUI/HMS.hpp
+## Phase 1 - Task T404 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/HMSPanel.cpp
+- Deliverables: src/slic3r/GUI/HMSPanel.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 3 new Unity/porting comments clarifying the scrolled container ownership, HMS reset event, and monitor status gating.
+- Verification excerpt: `// [STATE] The scrolled container owns the HMS rows so it can carry scroll position and focus while rows refresh.`
+- Unity-impact summary:
+  - VisualElement template + ScrollView list for HMS rows with button hover hints.
+  - Event bus alignment so the monitor can handle `EVT_ALREADY_READ_HMS` via MainThreadDispatcher.
+  - MonitorStatusEvent analog toggling the HMS list from Unity's `MonitorController`.
+- Hazards found: 2 (P2 event bus/global query coupling, P3 browser-launch main-thread requirement).
+- Git: Annotate HMSPanel for Unity guidance
+- Next recommended Phase 1 task: T405 annotate: src/slic3r/GUI/HMSPanel.hpp

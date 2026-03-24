@@ -183,6 +183,7 @@ HMSPanel::HMSPanel(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wx
 
     m_scrolledWindow = new wxScrolledWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxVSCROLL);
     m_scrolledWindow->SetScrollRate(5, 5);
+    // [STATE] The scrolled container owns the HMS rows so it can carry scroll position and focus while rows refresh.
 
     m_top_sizer = new wxBoxSizer(wxVERTICAL);
 
@@ -225,6 +226,7 @@ void HMSPanel::delete_hms_panels()
 void HMSPanel::clear_hms_tag()
 {
     // [STATE] Reset the temporary tracker so subsequent updates re-show previously seen alerts if needed.
+    // [EVENT] Called from the monitoring reset flow when the current HMS cache needs to be abandoned before new data arrives.
     temp_hms_list.clear();
 }
 
@@ -283,6 +285,7 @@ void HMSPanel::show_status(int status)
 {
     // [STATE] Track `last_status` so repeated status flags don't cause redundant panel clears or Layout calls.
     // [EVENT] Invoked from Monitor status callbacks so we only re-layout when the status bitmask changes.
+    // [THREAD] Monitor status events arrive on the UI thread; guard against concurrent clears by gatekeeping `last_status`.
     if (last_status == status)
         return;
     last_status = status;
