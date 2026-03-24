@@ -975,3 +975,9 @@
 - Selected task: T425 annotate: src/slic3r/GUI/Jobs/BindJob.cpp (runtime task task-1773880086-5a07 now active).
 - Plan: read the job implementation, document intent/state/event/thread/OpenGL/Unity/porting hazard info across the progress update wiring, status events, network binding helpers, DeviceManager notification, and background callback handling.
 - After the annotations are in place, append the required evidence block to `.ralph/agent/handoff.md`, stage/commit only `src/slic3r/GUI/Jobs/BindJob.cpp`, close the task, and leave verification notes indicating this is documentation-only work.
+## Iteration plan - T383 annotate src/slic3r/GUI/GUI.hpp (current)
+- First iteration: read GUI manager header, annotate manager/menu/toolbar/preview helpers with [INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2], capture Unity mappings (MenuBar + ScriptableObject config + RenderTexture preview) and wx lifespan hazards, add evidence block to `.ralph/agent/handoff.md`, stage/commit header plus metadata, close task after verification, and then continue with next Phase 1 file.
+## Iteration plan
+- Task: T176 annotate `src/slic3r/GUI/BBLTopbar.hpp`
+- Understand toolbar construction, state bits, and porting expectations before annotating intent/state/event/thread/opengl/unity tags.
+- Plan: read header fully, annotate with required tags, update `.ralph/agent/handoff.md` with evidence, stage + commit, close T176, and stop for next iteration.

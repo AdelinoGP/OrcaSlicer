@@ -17,9 +17,12 @@ class BBLTopbar : public wxAuiToolBar
 public:
     BBLTopbar(wxWindow* pwin, wxFrame* parent);
     BBLTopbar(wxFrame* parent);
+    // [INTENT][THREAD] Bind event handlers, menu ownership, and layout helpers to the parent frame from the UI thread.
     void Init(wxFrame* parent);
     ~BBLTopbar();
+    // [STATE][UNITY] Cache the measured toolbar width so Unity layouts (VisualElement toolbar + layoutData) can keep button spacing consistent.
     void UpdateToolbarWidth(int width);
+    // [STATE][UNITY] DPI-aware spacing refresh that mirrors Unity's CanvasScaler-based resizing when the system scale changes.
     void Rescale();
     // [EVENT][THREAD] Called by wxWidgets on the UI thread whenever a toolbar button changes frame state.
     void OnIconize(wxAuiToolBarEvent& event);
@@ -37,6 +40,7 @@ public:
     void OnMouseCaptureLost(wxMouseCaptureLostEvent& event);
     void OnMenuClose(wxMenuEvent& event);
     void OnOpenProject(wxAuiToolBarEvent& event);
+    // [STATE][UNITY] Toggle between publish icons/labels so Unity can swap `Button` sprites and maintain the same enabled/disabled semantics.
     void show_publish_button(bool show);
     void OnSaveProject(wxAuiToolBarEvent& event);
     void OnUndo(wxAuiToolBarEvent& event);
@@ -44,27 +48,39 @@ public:
     void OnModelStoreClicked(wxAuiToolBarEvent& event);
     void OnPublishClicked(wxAuiToolBarEvent& event);
 
-    // [STATE] Helpers managing dropdown ownership, text, and frame size metadata that live alongside the toolbar items.
+    // [STATE][UNITY] Helpers keep the dropdown owner, title, and frame metadata synchronized so Unity can anchor menus to the matching
+    // VisualElement.
     wxAuiToolBarItem* FindToolByCurrentPosition();
 
+    // [STATE][EVENT][UNITY] File and dropdown menus are owned here so their assertions about window state are centralized; Unity will
+    // reproduce this via `ToolbarMenu` assets bound to shared command data.
     void    SetFileMenu(wxMenu* file_menu);
     void    AddDropDownSubMenu(wxMenu* sub_menu, const wxString& title);
     void    AddDropDownMenuItem(wxMenuItem* menu_item);
     wxMenu* GetTopMenu();
     wxMenu* GetCalibMenu();
-    void    SetTitle(wxString title);
-    void    SetMaximizedSize();
-    void    SetWindowSize();
+    // [STATE][UNITY] Title captions are mirrored in Unity with `Label` elements bound to ScriptableObject data (player name, project name).
+    void SetTitle(wxString title);
+    // [STATE] Track the maximized rectangle to restore window geometry and keep Unity's layout data in sync.
+    void SetMaximizedSize();
+    // [STATE] Apply the stored toolbar window dimensions before layout adjustments (map to keeping `RectTransform` default sizes in Unity).
+    void SetWindowSize();
 
+    // [STATE][UNITY] Undo/redo enablement mirrors the command stack state; Unity should toggle `Button.interactable` on the main thread.
     void EnableUndoRedoItems();
+    // [STATE][UNITY] Keep the toolbar buttons visually disabled when no undo/redo is available.
     void DisableUndoRedoItems();
 
+    // [STATE] Snapshot the frame geometry before layout shifts so toggling maximize/minimize works reliably in the Unity port.
     void SaveNormalRect();
 
+    // [STATE][UNITY] Conditionally render the calibration button and platform menu; Unity would add/remove the VisualElement via class toggling.
     void ShowCalibrationButton(bool show = true);
 
 protected:
 #ifdef __WIN32__
+    // [THREAD][PORTING_HAZARD:P3] Windows message hook for toolbar drag/double-click handling runs on the UI thread; Unity must
+    // re-interpret these gestures with `PointerDown/PointerUp` events.
     WXLRESULT MSWWindowProc(WXUINT nMsg, WXWPARAM wParam, WXLPARAM lParam) override;
 #endif
 
@@ -86,7 +102,7 @@ private:
     wxAuiToolBarItem* m_account_item;
     wxAuiToolBarItem* m_model_store_item;
 
-    // [STATE] Publish/undo/redo/calc items rely on the mutable active project state.
+    // [STATE][UNITY] Publish/undo/redo/calc items rely on the mutable active project state and translate to Unity `Button` command bindings.
 
     wxAuiToolBarItem* m_publish_item;
     wxAuiToolBarItem* m_undo_item;
@@ -102,7 +118,7 @@ private:
     wxBitmap window_bitmap;
 
     int m_toolbar_h;
-    // [STATE] Popup guards keep the toolbar from re-opening menus while one is closing.
+    // [STATE][EVENT] Popup guards keep the toolbar from re-opening menus while one is closing, avoiding duplicate event loops.
     bool m_skip_popup_file_menu;
     bool m_skip_popup_dropdown_menu;
     bool m_skip_popup_calib_menu;

@@ -383,6 +383,7 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate: src/slic3r/GUI/GUI_Preview.cpp
 - Next recommended Phase 1 task: T397 annotate: src/slic3r/GUI/GUI_Preview.hpp
 
+
 ## Phase 1 - Task T372 complete
 - Task type: annotate
 - File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
@@ -4466,3 +4467,30 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3 (cross-thread event lifetimes + dispatch guard, timezone offset parity differences)
 - Git: Document BindJob event flow
 - Next recommended Phase 1 task: T426 annotate: src/slic3r/GUI/Jobs/BindJob.hpp
+
+## Phase 1 - Task T383 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI.hpp
+- Deliverables: src/slic3r/GUI/GUI.hpp
+- Substantive additions: 4 annotations strengthening the GUI namespace intent/state, combo checklist bitmask persistence, and the UTF-8/path conversion boundary (STATE/EVENT/UNITY/PORTING_HAZARD tags)
+- Verification excerpt: // [STATE][EVENT][UNITY] Tracks the shared menu/tool caches, GL preview timers, and config change emitters so a single Unity controller can mirror wxMenuBar lifetime events and keep RenderTexture refreshes aligned.
+- Unity-impact summary:
+  - Root GUI helpers now describe the shared menu/previews controller mirroring Unity's MainMenu + RenderTexture sync loop.
+  - Combo checklist helpers map to UI Toolkit toggle lists bound to ScriptableObject bitmasks, highlighting the need to preserve option ordering.
+  - Encoding/path helpers call out reusing `System.Text.Encoding.UTF8` and `System.IO.Path` so Unity keeps the same normalization surface, avoiding hidden divergences.
+- Hazards found: 2 (P3 bitmask order vs. persisted string drift, P3 encoding/path normalization mismatch)
+- Git: annotate: src/slic3r/GUI/GUI.hpp
+- Next recommended Phase 1 task: T410 annotate: src/slic3r/GUI/IconManager.cpp
+## Phase 1 - Task T176 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/BBLTopbar.hpp
+- Deliverables: src/slic3r/GUI/BBLTopbar.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: Added lifecycle/state/Unity notes around initialization, layout scaling, menu anchors, undo/redo toggles, and the Windows message hazard.
+- Verification excerpt: `// [STATE][UNITY] Cache the measured toolbar width so Unity layouts (VisualElement toolbar + layoutData) can keep button spacing consistent.`
+- Unity-impact summary:
+  - Map the toolbar layout and dropdown anchoring to a UI Toolkit `Toolbar` VisualElement tree driven by a MonoBehaviour.
+  - Mirror publish/undo/redo button state changes and popup menus with Unity `Button`/`ToolbarMenu` bindings.
+- Hazards found: 1 (P3 Windows message hook needs explicit Input gesture handling)
+- Git: Clarify BBLTopbar toolbar state for Unity port
+- Next recommended Phase 1 task: T177 annotate: src/slic3r/GUI/BedShapeDialog.cpp
