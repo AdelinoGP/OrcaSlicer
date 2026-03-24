@@ -4602,4 +4602,18 @@ This prompt governs **Phase 1 only**.
   - Map DPI notifications to `Display.onDpiChanged` and re-layout the UI Toolkit window, matching the wxSimplebook resizing hooks.
 - Hazards found: 1 (P3: wxSimplebook/DPI resizing must be rewritten because Unity has no equivalent layout auto-resizing)
 - Git: Annotate BedShape dialog header for Unity port
-- Next recommended Phase 1 task: T179 annotate: src/slic3r/GUI/BindDialog.cpp
+- Next recommended Phase 1 task: T180 annotate: src/slic3r/GUI/BindDialog.hpp
+
+## Phase 1 - Task T179 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BindDialog.cpp
+- Deliverables: src/slic3r/GUI/BindDialog.cpp
+- Substantive additions: ~15 multi-tag annotations covering the PIN entry UI, consent/error toggles, BindJob lifecycle, avatar loading, and the unbind flow
+- Verification excerpt: // [THREAD] Avatar downloads run asynchronously via Slic3r::Http and stash the image on the main thread via `CallAfter`; Unity should use `UnityWebRequestTexture` + `MainThreadDispatcher`.
+- Unity-impact summary:
+  - Surface the PIN entry dialog as a UI Toolkit VisualElement form with six `TextField`s that auto-advance, plus wiki/error toggles and confirm/cancel bindings.
+  - Capture the BindJob -> PlaterWorker handoff so Unity's async `UnityWebRequest` coroutine pushes status updates through a MonoBehaviour dispatcher and success/failure events.
+  - Document the unbind path, DeviceManager cleanup, and avatar refresh coroutines so Unity mirrors logout state and texture loading without leaking cached machine objects.
+- Hazards found: P2:3 (Simplebook layout + DPI resizes, BindJob worker-thread handshake, DeviceManager global cleanup), P3:4 (per-digit focus handling, error toggle cursor state, avatar `CallAfter`, async unbind guard)
+- Git: Annotate BindDialog for Unity port
+- Next recommended Phase 1 task: T180 annotate: src/slic3r/GUI/BindDialog.hpp

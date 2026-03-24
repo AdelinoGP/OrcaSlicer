@@ -97,7 +97,7 @@ Last updated: 2026-03-24T01:11:17Z
 - [x] T176 annotate: src/slic3r/GUI/BBLTopbar.hpp
 - [ ] T177 annotate: src/slic3r/GUI/BedShapeDialog.cpp
 - [x] T178 annotate: src/slic3r/GUI/BedShapeDialog.hpp
-- [ ] T179 annotate: src/slic3r/GUI/BindDialog.cpp
+- [x] T179 annotate: src/slic3r/GUI/BindDialog.cpp
 - [ ] T180 annotate: src/slic3r/GUI/BindDialog.hpp
 - [ ] T181 annotate: src/slic3r/GUI/BitmapCache.cpp
 - [ ] T182 annotate: src/slic3r/GUI/BitmapCache.hpp
