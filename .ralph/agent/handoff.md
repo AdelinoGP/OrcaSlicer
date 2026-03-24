@@ -4855,4 +4855,16 @@ This prompt governs **Phase 1 only**.
   - Marshal the worker `CreateFontImageJob::process` work through `Task.Run`/JobSystem and then do the `Texture2D.LoadRawTextureData` + `Apply` calls on the main thread, followed by a `Camera.Render`/Canvas invalidation.
 - Hazards found: P2=1 (GL atlas upload must stay on Unity main thread), P3=1 (Emboss + SLA rasterizers require a compatible CPU replacement).
 - Git: Annotate CreateFontNameImageJob for Unity port
-- Next recommended Phase 1 task: task-1773880086-e8e3 T431 annotate: src/slic3r/GUI/Jobs/CreateFontNameImageJob.hpp
+- Next recommended Phase 1 task: T432 annotate: src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.cpp
+## Phase 1 - Task T431 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/CreateFontNameImageJob.hpp
+- Deliverables: src/slic3r/GUI/Jobs/CreateFontNameImageJob.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 10 multi-tag annotations covering `FontImageData` state, atlas placement, cancel tokens, worker lifecycle, GL uploads, and Unity dispatcher guidance.
+- Verification excerpt: // [THREAD] Runs on the JobManager's background worker thread; must check ctl/cancel and avoid touching wxWidgets.
+- Unity-impact summary:
+  - Map each `FontImageData` slot to a Texture2D/RenderTexture atlas entry driven by a ScriptableObject registry in Unity.
+  - Route `process()` via Task.Run/JobSystem and enqueue the `finalize()` work on UnityMainThreadDispatcher so Texture2D.LoadRawTextureData/Apply happen on the main thread.
+- Hazards found: P2=1 (GL atlas upload must stay on the GUI/main thread), P3=1 (font file throttling currently tied to raw wx file handles that Unity must emulate).
+- Git: Annotate CreateFontNameImageJob header for Unity port
+- Next recommended Phase 1 task: T432 annotate: src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.cpp

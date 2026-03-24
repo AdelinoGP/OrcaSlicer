@@ -1111,3 +1111,6 @@
 - Selected Phase 1 work: T430 annotate `src/slic3r/GUI/Jobs/CreateFontNameImageJob.cpp` from the ready-task list and make sure it has the required EV tags noted in the manifest.
 - Plan: 1) mark T430 active in `.ralph/ralph-tasks.md`, 2) read the job to capture font selection state, raster scaling, and GL upload steps, 3) inject `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments covering the cancellation bridge, ambient fallback text, ExPolygon rasterization, SLA encoding, and finalize texture writes, 4) append the Phase 1 evidence block to `.ralph/agent/handoff.md`, and 5) stage/commit the updated files before closing the task.
 - Verification approach: manual review only; the change is documentation-focused so no automated tests are required.
+
+## Iteration plan update - T431 annotate src/slic3r/GUI/Jobs/CreateFontNameImageJob.hpp
+- Plan: read the header, insert multi-tag annotations explaining `FontImageData` state, worker cancellation tokens, GL texture finalization, and Unity mapping, note thread boundaries plus porting hazards, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the header, update `.ralph/ralph-tasks.md` to mark T431 done, close the runtime task, and then stop for this iteration so the next agent picks up another ready job.
