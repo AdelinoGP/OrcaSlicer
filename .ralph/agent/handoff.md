@@ -4229,3 +4229,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 3 (P3 multi-extruder locking, P3 scale/tick alignment, P3 context-menu wiring)
 - Git: annotate: src/slic3r/GUI/IMSlider.hpp
 - Next recommended Phase 1 task: T419 annotate: src/slic3r/GUI/IMToolbar.cpp
+
+## Phase 1 - Task T172 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BBLStatusBarPrint.hpp
+- Deliverables: src/slic3r/GUI/BBLStatusBarPrint.hpp
+- Substantive additions: 12 multi-tag annotations covering the print-status overlay intent, layout/gauge state, cancel wiring, error link, and porting hazards.
+- Verification excerpt: // [INTENT][UNITY][PORTING_HAZARD:P3] Print-only overlay that reuses the ProgressIndicator base while exposing BBL-specific gauge, error link, and cancel controls; Unity needs a Canvas/VisualElement layout with ProgressBar + Button + MainThreadDispatcher hooks to mirror this flow instead of wxWidgets event loops.
+- Unity-impact summary:
+  - Documented the VisualElement/Canvas layout (gauge, percent label, cancel button, error link) so Unity can reconstruct the row with ProgressBar + Button binding.
+  - Clarified how the cancel callbacks, busy/percent helpers, and error link route through MainThreadDispatcher, matching Unity UI Toolkit + CancellationToken equivalents instead of wx events.
+  - Highlighted the Windows-only DPI rescale and custom EVT_SHOW_ERROR_INFO event so Unity ports know to replace them with CanvasScaler settings and a dedicated event bus.
+- Hazards found: 1 (P3: custom wxCommandEvent + msw_rescale dependency must be swapped for Unity-friendly dispatching/DPI handling).
+- Git: chore: annotate BBLStatusBarPrint.hpp
+- Next recommended Phase 1 task: T173 annotate: src/slic3r/GUI/BBLStatusBarSend.cpp

@@ -90,7 +90,7 @@ Last updated: 2026-03-23T22:50:28Z
 - [x] T169 annotate: src/slic3r/GUI/BBLStatusBar.cpp
 - [x] T170 annotate: src/slic3r/GUI/BBLStatusBar.hpp
 - [x] T171 annotate: src/slic3r/GUI/BBLStatusBarPrint.cpp
-- [ ] T172 annotate: src/slic3r/GUI/BBLStatusBarPrint.hpp
+- [x] T172 annotate: src/slic3r/GUI/BBLStatusBarPrint.hpp
 - [ ] T173 annotate: src/slic3r/GUI/BBLStatusBarSend.cpp
 - [ ] T174 annotate: src/slic3r/GUI/BBLStatusBarSend.hpp
 - [ ] T175 annotate: src/slic3r/GUI/BBLTopbar.cpp
