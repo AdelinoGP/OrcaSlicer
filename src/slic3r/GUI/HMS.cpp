@@ -399,6 +399,10 @@ wxString HMSQuery::_query_hms_msg(const string& dev_id_type, const string& long_
 bool HMSQuery::_is_internal_error(const string& dev_id_type, const string& error_code, const string& lang_code)
 {
     // [INTENT] Mark certain errors as "internal" so UI layers skip extra HMS dialog processing.
+    // [STATE] The cache in `m_hms_info_jsons` drives this boolean so once a dev_id/error pair is flagged, the UI avoids extra dialogs.
+    // [UNITY] Unity should expose this as `HmsService.IsInternalError(devId, errorCode)` backed by the cached dictionary before showing HMS
+    // guidance. [PORTING_HAZARD:P3] The hex-string path assumes zero-padded `sprintf` output; replicate that formatting when translating
+    // the print error conversion.
     init_hms_info(dev_id_type);
     auto iter = m_hms_info_jsons.find(dev_id_type);
     if (iter == m_hms_info_jsons.end()) {
@@ -438,6 +442,10 @@ bool HMSQuery::_is_internal_error(const string& dev_id_type, const string& error
 wxString HMSQuery::_query_error_msg(const std::string& dev_id_type, const std::string& error_code, const std::string& lang_code)
 {
     // [INTENT] Look up a localized error message using cached device maps; fall back to logging when the lang_code is missing.
+    // [STATE] Relies on the warmed `m_hms_info_jsons` cache so repeated error queries stay fast and predictable across lang choices.
+    // [UNITY] Unity should provide `HmsService.GetErrorMessage(devId, code)` that wraps this dictionary and returns a `string` for UI
+    // labels. [PORTING_HAZARD:P2] Mirrors a `nlohmann::json` structure (device_error/lang/ecode) so the port must preserve the same
+    // hierarchy or the lookup silently fails.
     init_hms_info(dev_id_type);
     auto iter = m_hms_info_jsons.find(dev_id_type);
     if (iter == m_hms_info_jsons.end()) {
@@ -485,6 +493,10 @@ wxString HMSQuery::_query_error_image_action(const std::string& dev_id_type,
 {
     // [INTENT] Fetch the HMS button actions and optional image for a device error so UI can render suggested fixes.
     // [STATE] Reads `m_hms_action_jsons`, which is refreshed in `init_hms_info`, so the cache must be warmed prior to calling this.
+    // [EVENT] Fills `button_action` so the higher-level widget can show actionable buttons alongside the image.
+    // [UNITY] Port this as `HmsService.GetActionImage` that returns a `Sprite` plus a `List<int>` for Unity UI buttons and optionally runs
+    // `MainThreadDispatcher` updates. [PORTING_HAZARD:P3] The `json` structure (data/ecode/device/actions/image) must stay aligned;
+    // stripping any key may drop an action silently.
     init_hms_info(dev_id_type);
 
     auto iter = m_hms_action_jsons.find(dev_id_type);
@@ -519,6 +531,9 @@ wxString HMSQuery::_query_error_image_action(const std::string& dev_id_type,
 bool HMSQuery::is_internal_error(const MachineObject* obj, int print_error)
 {
     // [INTENT] Hex-encode `print_error` before delegating to `_is_internal_error`, keeping the API convenient for print-error callers.
+    // [EVENT] Invoked by print-error reporting so the UI can guard against duplicate dialogs.
+    // [UNITY] Wrap in `HmsService.ReportPrintError` and dispatch results via `UnityMainThreadDispatcher` before showing HMS hints.
+    // [PORTING_HAZARD:P3] The synchronous `sprintf` assumes an 8-digit hex string; keep the format stable if the error space grows.
     char buf[32];
     ::sprintf(buf, "%08X", print_error);
     std::string lang_code = HMSQuery::hms_language_code();
@@ -526,6 +541,9 @@ bool HMSQuery::is_internal_error(const MachineObject* obj, int print_error)
 }
 
 // [INTENT] Convert a print error to localized text so UI layers can label errors without hardcoding mappings.
+// [EVENT] Called directly by print error dialogs so the returned string can populate the HMS hint label.
+// [UNITY] Map this to `HmsService.QueryPrintError` and cache the string in a ScriptableObject keyed by device and hex error.
+// [PORTING_HAZARD:P3] Synchronous `sprintf` + `json` lookups run on the caller thread; Unity should reuse cached `HmsInfo` to prevent UI blocks.
 wxString HMSQuery::query_print_error_msg(const MachineObject* obj, int print_error)
 {
     if (!obj) {
@@ -539,6 +557,10 @@ wxString HMSQuery::query_print_error_msg(const MachineObject* obj, int print_err
 }
 
 // [INTENT] Provide a dev_id-based variant for contexts where no MachineObject pointer is available (e.g., launchers or logs).
+// [EVENT] Used by log analysis or background checks where the UI still needs the localized error tip.
+// [UNITY] Mirror this call with a lightweight helper that passes the stored dev_id string through Unity's `HmsService` APIs.
+// [PORTING_HAZARD:P3] Reuses the same `sprintf` path as the MachineObject overload so keep their formatting in sync to avoid mismatched
+// cache keys.
 wxString HMSQuery::query_print_error_msg(const std::string& dev_id, int print_error)
 {
     char buf[32];
@@ -550,6 +572,12 @@ wxString HMSQuery::query_print_error_msg(const std::string& dev_id, int print_er
 wxString HMSQuery::query_print_image_action(const MachineObject* obj, int print_error, std::vector<int>& button_action)
 {
     // [INTENT] Retrieve HMS action images + button IDs so dialogs can show visual guidance and actionable steps.
+    // [STATE] Reads both `m_hms_action_jsons` and the `stealth_mode` flag to decide whether an image is safe to show.
+    // [EVENT] Feeds image names and `button_action` codes back to the caller so the UI can render the HMS suggestions immediately.
+    // [UNITY] Unity should return a `Sprite` plus `List<int>` and handle `stealth_mode` via `PlayerPrefs` before presenting online-hosted
+    // assets.
+    // [PORTING_HAZARD:P3] This path assumes `wxGetApp().app_config` exists and that image names resolve to local files; Unity must
+    // guard against null configs and missing textures.
     if (!obj) {
         return wxEmptyString;
     }
@@ -567,6 +595,10 @@ wxString HMSQuery::query_print_image_action(const MachineObject* obj, int print_
 wxImage HMSQuery::query_image_from_local(const wxString& image_name)
 {
     // [INTENT] Return cached HMS images from the local folder; `m_hms_local_images` lazily caches the directory contents.
+    // [STATE] Maintains a dictionary of already loaded `wxImage` objects so the same texture is reused across different UI hints.
+    // [UNITY] Unity should map this to a `Dictionary<string, Texture2D>` that reads `Application.persistentDataPath/hms` once per image.
+    // [PORTING_HAZARD:P3] `wxImage` semantics differ from Unity textures, so guard against missing files and make sure the cache stays in
+    // sync with disk.
     if (image_name.empty() || image_name.Contains("http")) {
         return wxImage();
     }
@@ -593,6 +625,8 @@ wxImage HMSQuery::query_image_from_local(const wxString& image_name)
 void HMSQuery::clear_hms_info()
 {
     // [STATE] Reset all in-memory HMS caches, typically triggered when device selections change or the service resets.
+    // [THREAD] Guarded by `m_hms_mutex` so clearing happens without data races against download threads.
+    // [UNITY] Unity should clear its cached dictionaries and timestamps during similar configuration changes (e.g., `HmsService.ClearCache`).
     std::unique_lock unique_lock(m_hms_mutex);
     m_hms_info_jsons.clear();
     m_hms_action_jsons.clear();
@@ -603,6 +637,8 @@ void HMSQuery::init_hms_info(const std::string& dev_type_id)
 {
     // [STATE] Guarded by `m_hms_mutex`, this routine primes local caches, copies static data, and throttles cloud downloads via
     // `m_cloud_hms_last_update_time`. [THREAD] Uses `std::unique_lock` to protect concurrent accesses from UI and background status checks.
+    // [UNITY] Equivalent to a Unity `HmsService.InitInfo` that copies StreamingAssets and keeps a `Dictionary<string, json>` cache.
+    // [PORTING_HAZARD:P2] Relies on `time(nullptr)` to gate downloads (1 minute/1 day), so maintain the same cooldown logic when porting.
     std::unique_lock unique_lock(m_hms_mutex);
     if (package_dev_id_types.count(dev_type_id) != 0) {
         /*the local one only load once*/
@@ -648,6 +684,10 @@ std::string get_hms_wiki_url(std::string error_code)
 {
     // [INTENT] Build the online HMS wiki link for the current error/device so the UI can offer a "Learn More" action.
     // [STATE] Reads the selected machine to add the device identifier when available.
+    // [EVENT] Invoked when the user taps the HMS "Learn More" button, so the returned URL drives `wxLaunchDefaultBrowser`/Unity
+    // `Application.OpenURL`. [UNITY] Unity should compose the same URL and call `Application.OpenURL` on the main thread, storing it in
+    // `HmsService.LastWikiUrl`. [PORTING_HAZARD:P3] Relies on `wxGetApp()` and `MachineObject` APIs, so Unity must port the same getters
+    // before invoking this helper.
     AppConfig* config = wxGetApp().app_config;
     if (!config)
         return "";
@@ -676,7 +716,11 @@ std::string get_hms_wiki_url(std::string error_code)
 std::string get_error_message(int error_code)
 {
     // [INTENT] Query the remote HMS API for a localized error string and code display.
-    // [THREAD] Uses `Slic3r::Http` synchronously; Unity should map this to an async UnityWebRequest that updates UI on completion.
+    // [STATE] Pulls `hms_host` and language from `AppConfig` so the resulting string matches the selected device/settings.
+    // [EVENT] Triggered when an error report needs textual context, so the returned string drives the HMS label or notification text.
+    // [UNITY] Port this to `HmsService.FetchErrorMessage` using `UnityWebRequest` with a callback that updates the UI dispatcher.
+    // [PORTING_HAZARD:P3] The synchronous `Http` call and `std::sprintf` assumption mean Unity must honor timeouts and avoid blocking the
+    // main thread. [THREAD] Uses `Slic3r::Http` synchronously; Unity should map this to an async UnityWebRequest that updates UI on completion.
     if (wxGetApp().app_config->get_stealth_mode())
         return "";
 

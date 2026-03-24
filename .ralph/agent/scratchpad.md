@@ -902,3 +902,8 @@
 - Updated focus: T401 annotate: src/slic3r/GUI/HintNotification.hpp to avoid duplication/conflict with T372/T383 IDs.
 - Plan: read the hint notification header, annotate non-trivial constructors, state, events, and helper widgets with [INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P3]; mention how notifications queue through wxTimer and highlight Unity analogs (UI Toolkit VisualElement, C# timer + dispatcher).
 - After finishing annotations, append evidence block to .ralph/agent/handoff.md, stage and commit only the header plus metadata, close the task, and stop this iteration.
+
+## Iteration update
+- Task: T402 annotate src/slic3r/GUI/HMS.cpp
+- Understanding: HMS.cpp already documents C++ logic for HMS cache sync, but a handful of helpers still need explicit [STATE]/[UNITY]/[PORTING_HAZARD] guidance so Unity ports know when to cache and poll.
+- Plan: extend comments around internal error detection, localized string lookups, action button resolution, image caching, and wiki/error fetching to cover the missing tags, then log the handoff evidence block and mark the task done.

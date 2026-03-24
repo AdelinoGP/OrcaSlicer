@@ -4293,3 +4293,17 @@ This prompt governs **Phase 1 only**.
 - Git: annotate: src/slic3r/GUI/HintNotification.hpp
 
 - Next recommended Phase 1 task: T402 annotate: src/slic3r/GUI/HMS.cpp
+
+## Phase 1 - Task T402 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HMS.cpp
+- Deliverables: src/slic3r/GUI/HMS.cpp
+- Substantive additions: 11 new [STATE]/[UNITY]/[PORTING_HAZARD] clarifications around error lookups, caching, and download throttling flows
+- Verification excerpt: // [UNITY] Unity should expose this as `HmsService.IsInternalError(devId, errorCode)` backed by the cached dictionary before showing HMS guidance.
+- Unity-impact summary:
+  - Port HMS caches to ScriptableObject/Dictionary combos and expose service methods for error text/image/action lookups.
+  - Mirror the wiki/error fetchers via UnityWebRequest and wire them through `MainThreadDispatcher` for UI dialogs and "Learn More" buttons.
+  - Keep the throttled download + persistent data copy flow in sync with Unity's persistentDataPath and StreamingAssets bridges.
+- Hazards found: P2=2, P3=6
+- Git: Annotate HMS helper guidance
+- Next recommended Phase 1 task: T403 annotate: src/slic3r/GUI/HMS.hpp
