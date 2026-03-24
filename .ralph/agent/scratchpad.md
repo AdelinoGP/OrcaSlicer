@@ -1001,3 +1001,7 @@
 - Selected task: T177 annotate: src/slic3r/GUI/BedShapeDialog.cpp
 - Understanding: the BedShapeDialog orchestration centers on combo-box-driven bed selection plus custom sliders/settings that drive printer bed geometry state; porting into Unity requires mapping combo/tree interactions, validation events, and preview updates to the canvas controller.
 - Plan: read `BedShapeDialog.cpp` fully, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations at the dialog setup, state caches, event handlers, worker callbacks, and preview refresh points to guide Unity Canvas + VisualElement replacements; append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file plus metadata, close T177, and end the iteration.
+
+## Iteration update
+- Task: T177 annotate `src/slic3r/GUI/BedShapeDialog.cpp`
+- Work: Tagged the option builder, panel setup, event bindings, preview canvas, and file loaders with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` notes; finalized the Phase 1 evidence block plus staged/committed the header and handoff metadata.
