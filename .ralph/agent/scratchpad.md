@@ -996,3 +996,8 @@
 ## Iteration plan update
 - Current focus: T397 annotate `src/slic3r/GUI/GUI_Preview.hpp`.
 - Plan: start runtime task `task-1773880086-be55`, read the header end-to-end, insert annotations covering preview intent, GL state, event wiring, and Unity mapping, append Phase 1 evidence, and commit before stopping so the next agent can continue.
+
+## Iteration plan update
+- Selected task: T177 annotate: src/slic3r/GUI/BedShapeDialog.cpp
+- Understanding: the BedShapeDialog orchestration centers on combo-box-driven bed selection plus custom sliders/settings that drive printer bed geometry state; porting into Unity requires mapping combo/tree interactions, validation events, and preview updates to the canvas controller.
+- Plan: read `BedShapeDialog.cpp` fully, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations at the dialog setup, state caches, event handlers, worker callbacks, and preview refresh points to guide Unity Canvas + VisualElement replacements; append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file plus metadata, close T177, and end the iteration.

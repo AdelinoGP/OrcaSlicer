@@ -4534,3 +4534,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: none new (existing P3 notes still apply)
 - Git: Document GUI_Utils helpers for Unity port
 - Next recommended Phase 1 task: T400 annotate: src/slic3r/GUI/HintNotification.cpp
+
+## Phase 1 - Task T177 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BedShapeDialog.cpp
+- Deliverables: src/slic3r/GUI/BedShapeDialog.cpp, .ralph/agent/scratchpad.md
+- Substantive additions: 12 multi-tag annotations covering the option book layout, event bindings, preview refresh, and file-import hazards.
+- Verification excerpt: // [EVENT] Sync combo selection to the simple book and refresh geometry whenever the user switches pages.
+- Unity-impact summary:
+  - Port the combo book/tab layout to UI Toolkit VisualElements (Dropdown + TabView) backed by a `BedShapeController` MonoBehaviour and ScriptableObject settings.
+  - Rebuild the preview canvas around a RenderTexture/`IMGUIContainer` that redraws `m_shape` and shares the same update trigger as the wx paint handler.
+  - Replace the modal `wxFileDialog`/`boost::filesystem` checks with async Unity `FileBrowser.OpenFilePanel` calls and `MainThreadDispatcher`-marshaled validation for textures/models.
+- Hazards found: P3:2 (blocking file dialogs + `boost::filesystem` calls on the UI thread).
+- Git: annotate: src/slic3r/GUI/BedShapeDialog.cpp
+- Next recommended Phase 1 task: T178 annotate: src/slic3r/GUI/BedShapeDialog.hpp
