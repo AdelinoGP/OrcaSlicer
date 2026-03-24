@@ -4389,3 +4389,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2:2 (native window drag and toolbar event ordering), P3:2 (publish gating + GTK/Win fullscreen APIs)
 - Git: Annotate BBL top bar semantics
 - Next recommended Phase 1 task: T176 annotate: src/slic3r/GUI/BBLTopbar.hpp
+
+## Phase 1 - Task T405 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HMSPanel.hpp
+- Deliverables: src/slic3r/GUI/HMSPanel.hpp
+- Substantive additions: 5 focused Unity/porting annotations covering row list skew, visibility binding, DPI hook, and ack clearing.
+- Verification excerpt: // [UNITY] Equivalent to enqueuing a ListView binding and adding the resulting VisualElement to a ScrollView in Unity.
+- Unity-impact summary:
+  - Use UI Toolkit ListView bindings + ScrollView content to mimic append/delete behavior and keep Texture2D severity icons pooled.
+  - Toggle the VisualElement root's display style whenever `Show()` is called so the render overlay controller can refresh the RenderTexture.
+  - Treat `clear_hms_tag()` as a ScriptableObject flag flip to prevent redundant popups until new alerts arrive.
+- Hazards found: 1 (P3)
+- Git: annotate: src/slic3r/GUI/HMSPanel.hpp
+- Next recommended Phase 1 task: T406 annotate: src/slic3r/GUI/HttpServer.cpp

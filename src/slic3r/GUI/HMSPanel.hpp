@@ -71,8 +71,10 @@ protected:
 
     void append_hms_panel(const std::string& dev_id, DevHMSItem& item);
     // [EVENT] Handles each incoming HMS item by instantiating a row and scheduling it inside the scrolled area.
+    // [UNITY] Equivalent to enqueuing a ListView binding and adding the resulting VisualElement to a ScrollView in Unity.
     void delete_hms_panels();
     // [INTENT] Tears down rows before rebuilding so stale widgets do not leak prior severity states.
+    // [UNITY] Release pooled VisualElements before re-populating so the ScriptableObject cache stays in sync.
 
 public:
     HMSPanel(wxWindow*      parent,
@@ -83,9 +85,11 @@ public:
     ~HMSPanel();
 
     void msw_rescale() {}
+    // [PORTING_HAZARD:P3] Windows-only DPI hook; Unity should rely on Canvas Scaler/resolution independence instead of this stub.
 
     bool Show(bool show = true) override;
     // [EVENT] Called by surrounding tabs/menu actions to toggle visibility; may require invalidating the GL preview when the overlay changes.
+    // [UNITY] Mirror by toggling the VisualElement root's display style and telling the overlay controller to refresh its RenderTexture.
 
     // [THREAD] DeviceManager dispatches update() off the UI thread, so implementations must marshal to the main thread before touching widgets.
     void update(MachineObject* obj_);
@@ -95,6 +99,7 @@ public:
 
     // [EVENT] Explicit user action to clear any currently shown HMS tag.
     void clear_hms_tag();
+    // [UNITY] Maps to clearing an acknowledgment flag on a ScriptableObject so the Notification Panel knows not to reopen automatically.
 
     MachineObject* obj{nullptr};
     // [STATE] Currently observed machine whose HMS data populates the list.

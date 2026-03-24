@@ -941,3 +941,12 @@
 - Selected task: T175 annotate `src/slic3r/GUI/BBLTopbar.cpp` (runtime task `task-1773880086-add1`).
 - Plan: read the topbar implementation, annotate the button layout, status label state, command wiring, event callbacks, and GL preview hooks with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` tags revealing menu/toolbar coordination plus Unity equivalents (UI Toolkit toolbar + C# controller + RenderTexture refresh).
 - After annotating, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit just the modified file(s), close T175, and stop for this iteration so the next agent can continue.
+
+## Iteration plan update - T405
+- Task: annotate src/slic3r/GUI/HMSPanel.hpp with Unity-port context for HMS readback UI.
+- Approach: inspect header, document panel layout state, event bindings, service callbacks, and list Unity/porting hazards before annotating fields and methods.
+- Post-work: add Phase 1 evidence entry, update task state, commit the single change, note any derived lessons for subsequent iterations.
+
+## Iteration update - T405
+- Added Unity mapping and porting hazard comments around HMSPanel row handling, visibility toggling, and acknowledgment clearing so downstream agents understand the scroll-plus-HTML behavior.
+- Logged the iteration plan and kept the `ralph` task started so the next run can pick up at T406.
