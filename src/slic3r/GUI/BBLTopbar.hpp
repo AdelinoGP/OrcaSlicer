@@ -19,6 +19,8 @@ public:
     BBLTopbar(wxFrame* parent);
     // [INTENT][THREAD] Bind event handlers, menu ownership, and layout helpers to the parent frame from the UI thread.
     void Init(wxFrame* parent);
+    // [INTENT][THREAD] Tear down dropdown menus and event sinks on destruction so dangling callbacks are cleared; Unity should dispose the
+    // VisualElement toolbar on the main thread and unbind MonoBehaviour events before destroying the window.
     ~BBLTopbar();
     // [STATE][UNITY] Cache the measured toolbar width so Unity layouts (VisualElement toolbar + layoutData) can keep button spacing consistent.
     void UpdateToolbarWidth(int width);
@@ -108,15 +110,19 @@ private:
     wxAuiToolBarItem* m_undo_item;
     wxAuiToolBarItem* m_redo_item;
     wxAuiToolBarItem* m_calib_item;
+    // [STATE][UNITY] Dedicated maximize/restore tool item helps the Unity toolbar swap the correct `Button` sprite when the window state changes.
     wxAuiToolBarItem* maximize_btn;
 
     // [STATE] Publish button bitmaps that are swapped depending on whether publish is available.
     wxBitmap m_publish_bitmap;
     wxBitmap m_publish_disable_bitmap;
 
+    // [STATE][UNITY][PORTING_HAZARD:P3] Cached bitmaps for the native maximize/restore controls; Unity must mirror these as
+    // `Sprite`/`Texture2D` assets and manage their lifetime to prevent leaking GPU handles when buttons rebind.
     wxBitmap maximize_bitmap;
     wxBitmap window_bitmap;
 
+    // [STATE] Last measured toolbar height used when switching between icon-only and full-width layouts for the Unity toolbar height animation.
     int m_toolbar_h;
     // [STATE][EVENT] Popup guards keep the toolbar from re-opening menus while one is closing, avoiding duplicate event loops.
     bool m_skip_popup_file_menu;

@@ -389,6 +389,10 @@
 - Plan: start work by reviewing the model initialization, folder population, import/delete/move helpers, and data view callbacks; sprinkle the required `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2]` annotations (NOT tagging each line, but covering key state/intent/effects), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file, close T158, and then stop for this iteration.
 
 ## Iteration plan update
+- Selected task: T176 annotate `src/slic3r/GUI/BBLTopbar.hpp` (runtime task `task-1773880086-???` now planned). 
+- Plan: start the task, read the header to understand top bar toolbar layout, command wiring, status label state, and GL preview hooks; add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` comments for each non-trivial section, mention the Unity analog (UI Toolkit toolbar + VisualElement controller + RenderTexture preview) and hazard notes around wx event ownership, append the required Phase 1 evidence block, commit the header plus handoff update, close T176, and stop for this iteration so the next task can proceed.
+
+## Iteration plan update
 - Current focus: T410 annotate `src/slic3r/GUI/IconManager.cpp` (task-1773880086-f0fa active).
 - Plan: read both initialization overloads, the SVG/raster helpers, and the ImGui draw/click helpers; add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments for atlas packing, GL upload, worker-thread rasterization, and UI button wiring; append the Phase 1 evidence block, commit, and close the task before picking the next file.
 - Verification: documentation only, so no runtime tests—rely on reasoning that comments explain Unity replacements and hazards.

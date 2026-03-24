@@ -4513,14 +4513,15 @@ This prompt governs **Phase 1 only**.
 
 - Task type: annotate
 - File: src/slic3r/GUI/BBLTopbar.hpp
-- Deliverables: src/slic3r/GUI/BBLTopbar.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
-- Substantive additions: Added lifecycle/state/Unity notes around initialization, layout scaling, menu anchors, undo/redo toggles, and the Windows message hazard.
-- Verification excerpt: `// [STATE][UNITY] Cache the measured toolbar width so Unity layouts (VisualElement toolbar + layoutData) can keep button spacing consistent.`
+- Deliverables: src/slic3r/GUI/BBLTopbar.hpp
+- Substantive additions: Added annotations covering destructor cleanup, maximize button state, icon caching, and toolbar height memory so Unity can mirror layout signals.
+- Verification excerpt: // [INTENT][THREAD] Tear down dropdown menus and event sinks on destruction so dangling callbacks are cleared; Unity should dispose the VisualElement toolbar on the main thread and unbind MonoBehaviour events before destroying the window.
 - Unity-impact summary:
-  - Map the toolbar layout and dropdown anchoring to a UI Toolkit `Toolbar` VisualElement tree driven by a MonoBehaviour.
-  - Mirror publish/undo/redo button state changes and popup menus with Unity `Button`/`ToolbarMenu` bindings.
-- Hazards found: 1 (P3 Windows message hook needs explicit Input gesture handling)
-- Git: Clarify BBLTopbar toolbar state for Unity port
+  - Port the top bar to a UI Toolkit `Toolbar` VisualElement tree driven by a MonoBehaviour and keep the dropdowns tied to shared command data.
+  - Dispose toolbar visuals on the main thread before tearing down the MonoBehaviour so dangling handlers are never invoked.
+  - Treat maximize/restore button sprites as pooled `Texture2D`/`Sprite` assets that swap when the state toggles, mirroring the cached `wxBitmaps`.
+- Hazards found: P3 x1 (manual layout/sprite lifetime mismatch versus `wxAuiToolBar` defaults)
+- Git: Annotate BBLTopbar header for Unity hints
 - Next recommended Phase 1 task: T177 annotate: src/slic3r/GUI/BedShapeDialog.cpp
 
 ## Phase 1 - Task T412 complete
