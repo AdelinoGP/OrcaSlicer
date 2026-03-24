@@ -4176,6 +4176,19 @@ This prompt governs **Phase 1 only**.
 - Git: annotate: src/slic3r/GUI/GUI_Utils.hpp
 - Next recommended Phase 1 task: T400 annotate: src/slic3r/GUI/HintNotification.cpp
 
+## Phase 1 - Task T400 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HintNotification.cpp
+- Deliverables: src/slic3r/GUI/HintNotification.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: Highlighted serialization/tag/filter intent plus the random seed hazard in `init_random_hint_id` so Unity porters understand when to move the logic into managed random-state helpers.
+- Verification excerpt: // [STATE][THREAD][PORTING_HAZARD:P3] Seeds the random hint cursor so the order feels fresh; Unity can mirror this with `System.Random` seeded on startup to keep `m_hint_id` deterministic while avoiding CRT `rand` drift by owning the seed on the main thread.
+- Unity-impact summary:
+  - Persist shown hint IDs through a ScriptableObject or `PlayerPrefs` pair and replay them from `Application.persistentDataPath` instead of cereal binary archives.
+  - Drive the hint overlay with UI Toolkit `VisualElement`s (text blocks + link buttons) plus a GraphicRaycaster so the same tag checks and hypertext callbacks remain on the main thread.
+- Hazards found: 2 (P2 hyperlink guard, P3 rand/seeding drift)
+- Git: annotate: src/slic3r/GUI/HintNotification.cpp
+- Next recommended Phase 1 task: T401 annotate: src/slic3r/GUI/HintNotification.hpp
+
 ## Phase 1 - Task T170 complete
 - Task type: annotate
 - File: src/slic3r/GUI/BBLStatusBar.hpp

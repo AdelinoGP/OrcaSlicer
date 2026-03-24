@@ -684,6 +684,10 @@
 - Verification: purely annotation work, so rely on manual review of comments; no automated test run needed.
 
 ## Iteration plan update
+- Current focus: T171 annotate `src/slic3r/GUI/BBLStatusBarPrint.cpp` (ready and unblocked in the manifest).
+- Plan: read the entire CPP, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` comments covering panel layout, stateful progress indicators, cancel handling, event wiring for error info toggles, worker/UI bridging (e.g., `wxQueueEvent`), and Unity replacements (panel w/ `Canvas`, `Button`, `GraphicRaycaster`, and coroutine-safe progress updates); append the Phase 1 evidence block to `.ralph/agent/handoff.md`, commit only this file plus metadata, close the task, and then stop so the next iteration can continue.
+
+## Iteration plan update
 - Selected task: T406 annotate `src/slic3r/GUI/HttpServer.cpp` (current ready entry from the manifest).
 - Plan: start the runtime task, read `HttpServer.cpp` completely, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments covering the server lifecycle, request handling, config/state bridges, worker threading, and GL/GUI hooks; note Unity equivalents (background `UnityWebRequest` manager + `MainThreadDispatcher` mocks) and any hazards around blocking HTTP sockets; append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit just `HttpServer.cpp` plus any updated metadata, mark the task done, and then stop for this iteration so the next agent can continue.
 

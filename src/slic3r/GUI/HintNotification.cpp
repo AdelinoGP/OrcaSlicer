@@ -328,8 +328,8 @@ void HintDatabase::init()
     m_initialized = true;
     init_random_hint_id();
 }
-// [STATE][THREAD] Seeds the random hint cursor so the order feels fresh; Unity can mirror this with `System.Random` seeded on startup to
-// keep `m_hint_id` deterministic.
+// [STATE][THREAD][PORTING_HAZARD:P3] Seeds the random hint cursor so the order feels fresh; Unity can mirror this with `System.Random`
+// seeded on startup to keep `m_hint_id` deterministic while avoiding CRT `rand` drift by owning the seed on the main thread.
 void HintDatabase::init_random_hint_id()
 {
     srand(time(NULL));
