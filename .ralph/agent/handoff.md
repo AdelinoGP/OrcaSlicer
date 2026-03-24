@@ -4415,3 +4415,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2:1, P3:1
 - Git: Annotate BBLTopbar header for Unity port
 - Next recommended Phase 1 task: T177 annotate: src/slic3r/GUI/BedShapeDialog.cpp
+## Phase 1 - Task T406 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HttpServer.cpp
+- Deliverables: src/slic3r/GUI/HttpServer.cpp
+- Substantive additions: 2 targeted concurrency/Unity guidance annotations for body draining and handler swapping on the IO thread
+- Verification excerpt: // [STATE][UNCLEAR][THREAD] Reads but discards the body into a throwaway buffer on the IO thread; content-length is not respected, so bodies are currently ignored and the worker just drops whatever is left to keep the pipeline idle.
+- Unity-impact summary:
+  - Drain the declared `Content-Length` in Unity's HttpListener/UnityWebRequest or cancel the read before reusing the socket to avoid polluted request buffers.
+  - Marshal request-handler swaps through the main-thread dispatcher so the background worker never dereferences a stale delegate.
+- Hazards found: 1 (P3 handler race when swapping `m_request_handler` without synchronization)
+- Git: annotate: src/slic3r/GUI/HttpServer.cpp
+- Next recommended Phase 1 task: T409 annotate: src/slic3r/GUI/I18N.hpp

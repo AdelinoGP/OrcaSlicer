@@ -69,7 +69,10 @@ void session::read_body()
 {
     auto self(shared_from_this());
 
-    // [STATE][UNCLEAR] Reads but discards the body into a throwaway buffer; content-length is not respected, so bodies are currently ignored.
+    // [STATE][UNCLEAR][THREAD] Reads but discards the body into a throwaway buffer on the IO thread; content-length is not respected, so
+    // bodies are currently ignored and the worker just drops whatever is left to keep the pipeline idle. [UNITY] Unity's
+    // HttpListener/UnityWebRequest must still drain the declared Content-Length (or cancel) before reusing the socket so Reactors do not
+    // see trailing bytes on the next request.
     int                                nbuffer = 1000;
     std::shared_ptr<std::vector<char>> bufptr  = std::make_shared<std::vector<char>>(nbuffer);
     async_read(socket, boost::asio::buffer(*bufptr, nbuffer),
@@ -199,6 +202,8 @@ void HttpServer::stop()
 void HttpServer::set_request_handler(const std::function<std::shared_ptr<Response>(const std::string&)>& request_handler)
 {
     // [STATE] Point the server to the current request handler (default is the BBL auth flow, but tests or other features may override).
+    // [THREAD][PORTING_HAZARD:P3] Worker threads capture this function pointer without synchronization while the main thread can swap it,
+    // so ports should persist it through a concurrent-safe container or marshal the setter via the dispatcher to avoid races.
     this->m_request_handler = request_handler;
 }
 
