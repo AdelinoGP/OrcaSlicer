@@ -981,3 +981,10 @@
 - Task: T176 annotate `src/slic3r/GUI/BBLTopbar.hpp`
 - Understand toolbar construction, state bits, and porting expectations before annotating intent/state/event/thread/opengl/unity tags.
 - Plan: read header fully, annotate with required tags, update `.ralph/agent/handoff.md` with evidence, stage + commit, close T176, and stop for next iteration.
+
+## Iteration plan update
+- Selected task: T412 annotate `src/slic3r/GUI/ImageDPIFrame.cpp` (ready manifest shows it outstanding even though many annotations already exist).
+- Plan: reinforce the overlay commentary by adding `[UNITY]` guidance for the close binding and title toggles plus `[THREAD]` notes for the DPI, theme, and timer callbacks so Unity porters know to keep the tooltip coroutine on the main thread; after editing append the Phase 1 evidence block in `.ralph/agent/handoff.md`, stage/commit the modified source, close the task, and hand off control.
+
+## Iteration update
+- Added `[UNITY]`/`[THREAD]` annotations near the close event, title update, theme refresh, DPI-change skeleton, and timer loop so the streaming overlay's UI thread behavior and Unity replacements (VisualElement + coroutine) are clear. Appended the evidence block, updated the registry, and committed the file.

@@ -15,7 +15,8 @@
 using namespace Slic3r;
 using namespace Slic3r::GUI;
 
-namespace Slic3r { namespace GUI {
+namespace Slic3r {
+namespace GUI {
 // [STATE] polling cadence for the overlay timer so the frame remains responsive but does not hog UI events.
 #define ANIMATION_REFRESH_INTERVAL 20
 // [INTENT] Build a lightweight DPI preview overlay that tracks the cursor and provides contextual imagery to the main frame.
@@ -68,6 +69,7 @@ ImageDPIFrame::ImageDPIFrame()
     wxGetApp().UpdateDarkUI(this); // ORCA fix white bg on dark mode
 
     // [EVENT] Closing the frame simply triggers hide so the cached bitmap survives until the timer destroys it.
+    // [UNITY] Unity maps this to a VisualElement tooltip listener that invokes Hide through a MonoBehaviour controller.
     Bind(wxEVT_CLOSE_WINDOW, [this](auto& e) { on_hide(); });
     SetSizer(m_sizer_main);
     Layout();
@@ -98,6 +100,7 @@ void ImageDPIFrame::set_bitmap(const wxBitmap& bit_map)
 void ImageDPIFrame::set_title(const wxString& title)
 {
     // [STATE] Titles can be toggled without re-creating controls because the overlay often reuses the same frame for multiple hints.
+    // [UNITY] Mirror this by binding the text/visibility to a ScriptableObject-backed label so Unity can toggle without rebuilding the tree.
     m_title->Show(!title.empty());
     if (!title.empty())
         m_title->SetLabel(title);
@@ -110,11 +113,13 @@ void ImageDPIFrame::on_dpi_changed(const wxRect& suggested_rect)
     // m_image->Rescale();
     // m_bitmap->Rescale();
     // [UNITY] Unity would recompute RectTransform scaling via a CanvasScaler/Display listener since wxRect hints are unavailable.
+    // [THREAD] DPI change notifications arrive on the main UI thread so the overlay can re-layout safely.
 }
 
 void ImageDPIFrame::sys_color_changed()
 {
     // [EVENT] Theme refresh events reroute to the app-level helper so the overlay respects dark-mode palettes.
+    // [UNITY] Hook into Unity's `ThemeManager` events or a ScriptableObject palette and call `UpdateDarkUI` equivalent on the panel.
     wxGetApp().UpdateDarkUI(this);
 }
 
@@ -129,6 +134,8 @@ void ImageDPIFrame::init_timer()
 void ImageDPIFrame::on_timer(wxTimerEvent& event)
 {
     // [EVENT] Periodic timer keeps the overlay queued with mouse movement updates so the hint hides automatically when the cursor drifts.
+    // [THREAD] wxTimer callbacks execute on the UI thread, which means the overlay can touch controls directly; Unity should run an
+    // `Update` coroutine on the main thread instead.
     if (!IsShown()) {              // after 1s  to show Frame
         if (m_timer_count >= 20) { // ORCA show frame faster to maatch time with tooltips
             Show();

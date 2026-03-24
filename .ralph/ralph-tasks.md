@@ -330,7 +330,7 @@ Last updated: 2026-03-24T01:11:17Z
 - [x] T409 annotate: src/slic3r/GUI/I18N.hpp
 - [x] T410 annotate: src/slic3r/GUI/IconManager.cpp
 - [x] T411 annotate: src/slic3r/GUI/IconManager.hpp
-- [ ] T412 annotate: src/slic3r/GUI/ImageDPIFrame.cpp
+- [x] T412 annotate: src/slic3r/GUI/ImageDPIFrame.cpp
 - [x] T413 annotate: src/slic3r/GUI/ImageDPIFrame.hpp
 - [x] T414 annotate: src/slic3r/GUI/ImageGrid.cpp
 - [x] T415 annotate: src/slic3r/GUI/ImGuiWrapper.cpp

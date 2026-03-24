@@ -4494,3 +4494,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3 Windows message hook needs explicit Input gesture handling)
 - Git: Clarify BBLTopbar toolbar state for Unity port
 - Next recommended Phase 1 task: T177 annotate: src/slic3r/GUI/BedShapeDialog.cpp
+
+## Phase 1 - Task T412 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ImageDPIFrame.cpp
+- Deliverables: src/slic3r/GUI/ImageDPIFrame.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 5 targeted annotations covering close handling, timer threading, title toggles, theme refresh, and DPI hooks (UNITY + THREAD tags)
+- Verification excerpt: // [UNITY] Unity maps this to a VisualElement tooltip listener that invokes Hide through a MonoBehaviour controller.
+- Unity-impact summary:
+  - Replace the close binding with a VisualElement tooltip action hooked via a MonoBehaviour to keep popup state in sync with shared settings.
+  - Rebuild the timer-driven hide/show cadence as a main-thread coroutine that checks Input.mousePosition instead of polling `wxGetMousePosition`.
+- Hazards found: 0
+- Git: annotate ImageDPIFrame tooltip for Unity
+- Next recommended Phase 1 task: T423 annotate: src/slic3r/GUI/Jobs/ArrangeJob.cpp
