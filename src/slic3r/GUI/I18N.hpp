@@ -31,8 +31,9 @@
 #define _CHB(s) wxGetTranslation(wxString(s, wxConvUTF8)).utf8_str()
 #endif /* _CHB */
 
-// [THREAD][STATE][PORTING_HAZARD:P2] These macros and helpers reference the global `wxLocale` catalog that lives on the main UI thread; Unity
-// ports must marshal locale swaps across a `LocalizationSettings` controller and avoid touching the `CultureInfo` cache from background workers.
+// [THREAD][STATE][EVENT][PORTING_HAZARD:P2] These macros and helpers reference the global `wxLocale` catalog that lives on the main UI
+// thread; locale-change `EVT_MENU`/`EVT_UPDATE_UI` handlers rebuild these strings, so Unity must marshal locale swaps through a
+// `LocalizationSettings` controller and avoid touching the `CultureInfo` cache from background workers.
 
 // [INTENT] Keep `_`/`_L`/`_CTX` macros routed through the same I18N helpers so every call-site hits the catalog-aware translation pipeline.
 // [UNITY] Replace these with `LocalizedString` instances backed by a ScriptableObject-based `StringTable` cache and pulled through
@@ -53,6 +54,8 @@ namespace Slic3r { namespace GUI {
 // inside a ScriptableObject. [PORTING_HAZARD:P2] Porting must recreate the catalog tooling: extracting strings in edit-time, storing them
 // in Unity assets, and controlling locale switching outside of `wxLocale`.
 namespace I18N {
+// [EVENT] UI panels re-run these helpers inside `EVT_MENU`, `EVT_UPDATE_UI`, and `wxCommandEvent` paint paths, so the wrappers must stay
+// stateless and safe for repeated translation calls triggered by menu/toolbar redraws.
 // [INTENT] Ensure `_()` overloads route through `wxGetTranslation` with consistent UTF-8 handling so every string literal gets localized
 // regardless of encoding. [STATE] Each call reflects the global `wxLocale` catalog, making locale switches transparent to UI components.
 // [UNITY] Implement this via `LocalizedString` lookups against `StringTable` assets plus a `LocalizationController` MonoBehaviour that
@@ -118,8 +121,10 @@ inline std::string translate_utf8(const wxString& s, const wxString& plural, uns
 
 // [INTENT] Provide context-aware wrappers so identical source strings in different dialogs produce the right translation via `wxLocale` and
 // context. [STATE] Older wx versions ignore the context, so `_wxGetTranslation_ctx` gracefully drops it while newer versions pass it along
-// to the catalog. [PORTING_HAZARD:P3] Unity keys are usually unique, so encode the context inside the key (for example
-// `Preview.Actions.Zoom`) or maintain separate tables per context.
+// to the catalog. [EVENT] Context helpers are bound to menu/menu-bar and dialog assembly events so they can override global string ids when
+// the same literal repeats, and Unity should bake the context name into the `StringTable` key or maintain per-dialog tables.
+// [PORTING_HAZARD:P3] Unity keys are usually unique, so encode the context inside the key (for example `Preview.Actions.Zoom`) or maintain
+// separate tables per context.
 
 inline wxString translate(const char* s, const char* ctx) { return _wxGetTranslation_ctx(wxString(s, wxConvUTF8), ctx); }
 inline wxString translate(const wchar_t* s, const char* ctx) { return _wxGetTranslation_ctx(s, ctx); }
@@ -143,7 +148,10 @@ inline std::string translate_utf8(const wxString& s, const char* ctx) { return _
 } // namespace I18N
 
 // [INTENT] Convert a translated `std::string` to `wxString` so callers can keep using wxWidgets APIs without duplicating encoding logic.
-// [UNITY] The Unity counterpart would take a `LocalizedString.Value` and feed it to UI Toolkit or TMP controls as a plain `string`.
+// [STATE] This helper reflects whichever locale is currently bound to `wxLocale`, so downstream code can treat it as transient bridging
+// state. [THREAD] `wxString` creation must run on the UI thread because it relies on `wxLocale` lifetime and needs `wxWidgets` event loop
+// guarantees. [UNITY] The Unity counterpart would take a `LocalizedString.Value` and feed it to UI Toolkit or TMP controls as a plain
+// `string`.
 wxString L_str(const std::string& str);
 
 } // namespace GUI

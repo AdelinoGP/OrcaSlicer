@@ -4509,17 +4509,18 @@ This prompt governs **Phase 1 only**.
 - Git: annotate: AuxiliaryList reload state
 - Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp
 
-## Phase 1 - Task T409 revisit
+## Phase 1 - Task T409 complete
 - Task type: annotate
 - File: src/slic3r/GUI/I18N.hpp
 - Deliverables: src/slic3r/GUI/I18N.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
-- Substantive additions: 2 annotations clarifying thread ownership of the translation macros and the UTF-8 glue to emphasize `wxLocale`'s UI-thread affinity.
-- Verification excerpt: // [THREAD][STATE][PORTING_HAZARD:P2] These macros and helpers reference the global `wxLocale` catalog that lives on the main UI thread; Unity ports must marshal locale swaps across a `LocalizationSettings` controller and avoid touching the `CultureInfo` cache from background workers.
+- Substantive additions: 3 targeted annotations covering locale-update events, context-aware translations, and the UI-thread bridge for `L_str`.
+- Verification excerpt: // [EVENT] UI panels re-run these helpers inside `EVT_MENU`, `EVT_UPDATE_UI`, and `wxCommandEvent` paint paths, so the wrappers must stay stateless and safe for repeated translation calls triggered by menu/toolbar redraws.
 - Unity-impact summary:
-  - Unity must keep `LocalizationSettings.StringDatabase` lookups on the main thread and refresh `ScriptableObject` caches when `CultureInfo` swaps occur so the ported macros stay thread-safe.
-  - Narrow string helpers should map to `LocalizedString.Value` reads and avoid caching stale translations by re-querying the `StringTable` after locale changes.
-- Hazards found: 1 (P2 global `wxLocale` access is not worker-safe)
-- Git: Annotate I18N translation helpers
+  - Keep translation lookups inside a `LocalizationSettings.StringDatabase` helper and repaint VisualElements via `MainThreadDispatcher` whenever `CultureInfo` swaps, matching the `wxLocale` refresh events.
+  - Encode contexts into the string keys (for example `Preview.Actions.Zoom`) so Unity can share `LocalizedString` entries without relying on `wxLocale` context parameters.
+  - Bridge `L_str` to Unity UI Toolkit text fields by reading `LocalizedString.Value` on the main thread before sending strings to TMP/`Label` components to avoid stale `wxString` conversions.
+- Hazards found: P2=2 (global `wxLocale` access, missing plural pipeline) P3=1 (context-encoded key management)
+- Git: annotate: src/slic3r/GUI/I18N.hpp
 - Next recommended Phase 1 task: T410 annotate: src/slic3r/GUI/IconManager.cpp
 
 ## Phase 1 - Task T425 complete
@@ -4699,6 +4700,19 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=3, P3=2
 - Git: Annotate BitmapCache caching flow
 - Next recommended Phase 1 task: T182 annotate: src/slic3r/GUI/BitmapCache.hpp
+## Phase 1 - Task T182 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BitmapCache.hpp
+- Deliverables: src/slic3r/GUI/BitmapCache.hpp
+- Substantive additions: Added 13 multi-tag annotations covering class intent, cache state, SVG/PNG loaders, color parsing, and GL texture uploads.
+- Verification excerpt: // [INTENT] Centralized store for themed wxBitmaps so GUI widgets share Retina-aware textures and generated overlays.
+- Unity-impact summary:
+  - Model the cache as a `Dictionary<string, Texture2D>` plus a pooling MonoBehaviour that resizes/reuses textures on the Unity main thread.
+  - Translate the PNG + Vector Graphics loaders into Addressables/Unity Vector Graphics calls that push results through a dispatcher and cache by metadata.
+  - Encapsulate the GL texture upload path (`load_from_svg_file_change_color`) in a Texture2D/CommandBuffer helper so ImGui can keep using the texture ID.
+- Hazards found: P2=2 (blocking PNG disk reads, raw GL texture uploads) P3=2 (color replacement string hacks + hex parsing assumptions)
+- Git: annotate: src/slic3r/GUI/BitmapCache.hpp
+- Next recommended Phase 1 task: T183 annotate: src/slic3r/GUI/BitmapComboBox.cpp
 ## Phase 1 - Task T406 complete
 - Task type: annotate
 - File: src/slic3r/GUI/HttpServer.cpp
