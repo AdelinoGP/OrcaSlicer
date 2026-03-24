@@ -4471,12 +4471,13 @@ This prompt governs **Phase 1 only**.
 - Task type: annotate
 - File: src/slic3r/GUI/Jobs/BindJob.cpp
 - Deliverables: src/slic3r/GUI/Jobs/BindJob.cpp
-- Substantive additions: 6 multi-tag annotations covering progress updates, timezone tracking, agent callbacks, UI events, and failure propagation for the bind workflow.
-- Verification excerpt: // [EVENT] It wraps `wxPostEvent` so the UI can bind `EVT_BIND_UPDATE_MESSAGE` and refresh its progress bar on the main thread.
+- Substantive additions: 7 multi-tag annotations covering progress updates, timezone tracking, agent callbacks, UI events, failure propagation, and the finalize hook exception handling so Unity mirrors the worker lifecycle safely.
+- Verification excerpt: // [INTENT] Mirror the job framework finalize hook so completion paths log or rethrow any worker exception without leaking.
 - Unity-impact summary:
   - Implement the bind workflow as a `UnityWebRequest` coroutine that reports progress through a `BindJobController` MonoBehaviour and `MainThreadDispatcher`.
   - Mirror success/failure events as UnityEvents that toggle the device list/notification panel and log any Bambu error codes before clearing the queue.
   - Treat the timezone/SSDP metadata as serialized ScriptableObject properties so Unity can replay the same HTTP headers when binding.
+  - Add a `BindJobController` completion handler that rethrows or logs exceptions on the dispatcher so Unity surfaces finalize-time failures like wxWidgets does.
 - Hazards found: P3 (cross-thread event lifetimes + dispatch guard, timezone offset parity differences)
 - Git: Document BindJob event flow
 - Next recommended Phase 1 task: T426 annotate: src/slic3r/GUI/Jobs/BindJob.hpp

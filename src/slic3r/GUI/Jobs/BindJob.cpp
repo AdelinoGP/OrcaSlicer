@@ -153,6 +153,10 @@ void BindJob::process(Ctl& ctl)
     return;
 }
 
+// [INTENT] Mirror the job framework finalize hook so completion paths log or rethrow any worker exception without leaking.
+// [THREAD] Called back once the worker finishes; UI updates should already be delivered via posted events before this runs.
+// [UNITY] Equivalent to the coroutine `BindJobController` invoking a final `TaskCompletionSource` response on the main dispatcher.
+// [PORTING_HAZARD:P3] Unity needs to keep its async binder from swallowing exceptions during grounded tear-downs even when canceling.
 void BindJob::finalize(bool canceled, std::exception_ptr& eptr)
 {
     try {
