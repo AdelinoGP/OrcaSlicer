@@ -353,6 +353,10 @@
 - Selected task: T359 annotate `src/slic3r/GUI/GLModel.hpp` now that the implementation prioritized the viewport metadata.
 
 ## Current iteration plan
+ 
+## Iteration plan update
+- Selected task: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp` (runtime task `task-1773880086-6aa6` now active after the accidental start).
+- Plan: review the existing annotations, fill gaps around context menu state, drag/drop sentinel info, and folder selection caching; ensure `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` tags explicitly cover the missing import/delete helper flows, note any platform hazards, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the updated source plus metadata, mark task done, and stop for this iteration.
 - Selected task: T169 annotate `src/slic3r/GUI/BBLStatusBar.cpp` (just activated).
 - Plan: read the status bar implementation to capture UI intent, state caches, event flow, OpenGL/GL paint hooks, thread dependencies, and Unity analogs (e.g., `Canvas`-based HUD + `MainThreadDispatcher`).
 - After annotating, add the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the single-file change, close the task, and prepare the next ready Phase 1 file for the following iteration.

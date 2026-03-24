@@ -52,6 +52,8 @@ AuxiliaryList::AuxiliaryList(wxWindow* parent) : wxDataViewCtrl(parent, wxID_ANY
     m_of_btn  = new wxButton(panel, wxID_OPEN, _("Open File"));
     m_del_btn = new wxButton(panel, wxID_DELETE, _L("Delete"));
     // [STATE][UNITY] Keep toolbar actions centralized so Unity buttons can map to the same commands on a shared controller.
+    // [STATE][PORTING_HAZARD:P3][UNITY] The wxID_* command constants tie into accelerator tables elsewhere, so Unity must keep its Input
+    // System bindings aligned with these verbs to avoid split behavior between toolbar buttons and keyboard shortcuts.
 
     wxBoxSizer* hsizer = new wxBoxSizer(wxHORIZONTAL);
     // hsizer->Add(m_nf_btn, 0, wxRIGHT, 5);
@@ -61,6 +63,8 @@ AuxiliaryList::AuxiliaryList(wxWindow* parent) : wxDataViewCtrl(parent, wxID_ANY
     panel->SetSizer(hsizer);
 
     m_sizer->Add(panel, 0, wxEXPAND | wxALL, 5);
+    // [STATE][EVENT] Docking the toolbar panel into the sizer keeps spacing deterministic so Unity can swim a VisualElement row under the
+    // tree at the same height.
 
     EnableDragSource(wxDF_UNICODETEXT);
     EnableDropTarget(wxDF_UNICODETEXT);
