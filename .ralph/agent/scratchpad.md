@@ -957,3 +957,7 @@
 ## Iteration plan update
 - Selected task: T406 annotate `src/slic3r/GUI/HttpServer.cpp` (current runtime task `task-1773880086-9299`).
 - Plan: review the asynchronous HTTP listener flow to confirm the comments cover intent, state, thread/event boundaries, Unity mapping, and porting hazards; add the missing worker/body/handler concurrency notes we just inserted; after verifying the annotations, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only `src/slic3r/GUI/HttpServer.cpp`, close the task, and stop for the next iteration so the handoff continues orderly.
+
+## Iteration note
+- Task: T372 annotate src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Update: Documented the reload cache hazard so downstream Unity ports know to drop TreeView references before repopulating.

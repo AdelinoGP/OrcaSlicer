@@ -4427,3 +4427,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3 handler race when swapping `m_request_handler` without synchronization)
 - Git: annotate: src/slic3r/GUI/HttpServer.cpp
 - Next recommended Phase 1 task: T409 annotate: src/slic3r/GUI/I18N.hpp
+
+## Phase 1 - Task T372 revisit
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Deliverables: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Substantive additions: 1 targeted reload annotation that explains how the tree resets and why Unity must drop cached nodes first.
+- Verification excerpt: // [STATE][PORTING_HAZARD:P3][UNITY] Reload invalidates every node reference, so Unity must drop cached TreeView nodes before re-populating, otherwise it risks stale selection or leaks when the wx model rebuilds.
+- Unity-impact summary:
+  - Drop TreeView caches/selection before calling this reload helper so Unity never holds stale `AuxiliaryModelNode` references.
+- Hazards found: 1 (P3: stale references if reload is mistimed)
+- Git: annotate: AuxiliaryList reload state
+- Next recommended Phase 1 task: T383 annotate: src/slic3r/GUI/GUI.hpp

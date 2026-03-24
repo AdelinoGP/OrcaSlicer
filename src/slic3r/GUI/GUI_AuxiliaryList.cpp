@@ -147,6 +147,8 @@ void AuxiliaryList::init_auxiliary()
 void AuxiliaryList::reload(wxString aux_path)
 {
     m_auxiliary_model->Reload(aux_path);
+    // [STATE][PORTING_HAZARD:P3][UNITY] Reload invalidates every node reference, so Unity must drop cached TreeView nodes before
+    // re-populating, otherwise it risks stale selection or leaks when the wx model rebuilds.
 
     wxDataViewItemArray items;
     m_auxiliary_model->GetChildren(wxDataViewItem(nullptr), items);
