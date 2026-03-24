@@ -1104,3 +1104,5 @@
 ## Iteration update - T417 annotate src/slic3r/GUI/IMSlider.cpp
 - Added [STATE]/[UNITY] comments so tick height arrays flow through a shared TickRegistry ScriptableObject and GC detection occurs when prints change.
 - Documented the tick-change notification flag and custom G-code insert path with [EVENT]/[PORTING_HAZARD:P3] so Unity knows to keep those paths on the main thread.
+## Iteration plan update - T428 annotate src/slic3r/GUI/Jobs/BoostThreadWorker.hpp
+- Focus on the header's purpose, state bits, event wiring, and thread ownership; annotate each section with [INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P2] and call out the Unity task/pool analogue plus the hazards of boost::thread lifecycle. After editing, append the mandated evidence block and confirm the task closing steps.

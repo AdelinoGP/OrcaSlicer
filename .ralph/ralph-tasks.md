@@ -346,7 +346,7 @@ Last updated: 2026-03-24T03:37:14Z
 - [x] T425 annotate: src/slic3r/GUI/Jobs/BindJob.cpp
 - [x] T426 annotate: src/slic3r/GUI/Jobs/BindJob.hpp
 - [x] T427 annotate: src/slic3r/GUI/Jobs/BoostThreadWorker.cpp
-- [ ] T428 annotate: src/slic3r/GUI/Jobs/BoostThreadWorker.hpp
+- [x] T428 annotate: src/slic3r/GUI/Jobs/BoostThreadWorker.hpp
 - [x] T429 annotate: src/slic3r/GUI/Jobs/BusyCursorJob.hpp
 - [ ] T430 annotate: src/slic3r/GUI/Jobs/CreateFontNameImageJob.cpp
 - [ ] T431 annotate: src/slic3r/GUI/Jobs/CreateFontNameImageJob.hpp

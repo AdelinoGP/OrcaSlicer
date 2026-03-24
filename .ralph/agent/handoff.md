@@ -4831,3 +4831,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2×PORTING_HAZARD:P3 (shared tick cache and custom tick edits require UI thread coordination).
 - Git: Annotate IMSlider slider state/event signals
 - Next recommended Phase 1 task: T418 annotate: src/slic3r/GUI/IMSlider.hpp
+## Phase 1 - Task T428 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/BoostThreadWorker.hpp
+- Deliverables: src/slic3r/GUI/Jobs/BoostThreadWorker.hpp
+- Substantive additions: 15 annotation comments explaining queue state, event flow, Unity mapping, and thread ownership
+- Verification excerpt: // [UNITY] Replace with a background Task/JobSystem worker combined with a UnityMainThreadDispatcher MonoBehaviour (or SynchronizationContext) to marshal status updates, `ProgressIndicator` mimic, and `std::promise` callbacks onto the main loop.
+- Unity-impact summary:
+  - Worker queue + ProgressIndicator updates map to a Task/JobSystem background worker plus a UnityMainThreadDispatcher bridge.
+  - Main-thread callbacks and status messages align with UnityMainThreadDispatcher enqueued delegates that resolve TaskCompletionSource futures for UI updates.
+- Hazards found: P2=1 (worker updates wxProgressIndicator and job state from boost::thread without UI-thread marshaling)
+- Git: Annotate BoostThreadWorker for Unity port
+- Next recommended Phase 1 task: T430 annotate: src/slic3r/GUI/Jobs/CreateFontNameImageJob.cpp
