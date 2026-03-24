@@ -1037,3 +1037,7 @@
 - Current focus: T426 annotate `src/slic3r/GUI/Jobs/BindJob.hpp` because the header owns the event wiring + job fields the Unity port must mirror.
 - Plan: start `task-1773880086-71f8`, read the header, annotate class intent/state/threads/events, add `[UNITY]`/`[PORTING_HAZARD]` notes for the dispatcher and boost filesystem references, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, commit the file, and close the task.
 - Verification: ensure comments cover action/event hooks, ui threading via `wxWindow`, `BindJobController` analogue, and hazards about boost::filesystem/promises.
+
+## Iteration plan update
+- Current focus: T403 annotate `src/slic3r/GUI/HMS.hpp` (runtime task `task-1773880086-4a5c`).
+- Plan: read the header end-to-end, identify HMS cache holders, action map helpers, toolbar attachment points, status helpers, and wiki/image fetch helpers; add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P2]` annotations explaining cached asset ownership, button/event wiring, icon lookup, and service polling so the Unity port knows when to cache or refresh, note any hazards around timer-driven sync and failure handling, append the required Phase 1 evidence block to `.ralph/agent/handoff.md` after annotations, stage/commit just the header plus handoff metadata, close T403, and stop for this iteration so another agent can continue with the next task.

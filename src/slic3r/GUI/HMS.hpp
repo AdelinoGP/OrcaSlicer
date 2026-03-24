@@ -59,6 +59,7 @@ public:
 
 public:
     // [INTENT] Clears cached JSON/images/language data when the active device or error context switches.
+    // [THREAD] Acquire `m_hms_mutex` while draining the caches so background downloads and UI dialogs cannot read half-evicted data.
     // [UNITY] Clear the ScriptableObject cache and fire an event that UI Toolkit dialogs can observe to refresh their localized text.
     void clear_hms_info();
 
@@ -67,18 +68,21 @@ public:
     wxString query_hms_msg(const MachineObject* obj, const std::string& long_error_code);
     wxString query_hms_msg(const std::string& dev_id, const std::string& long_error_code);
 
-    bool is_internal_error(const MachineObject* obj,
-                           int print_error); // [EVENT] determines whether monitoring dialogs freeze or show hints. [UNITY] Mirror with a
-                                             // Unity `DiagnosticService` that flags fatal errors.
-    wxString query_print_error_msg(const MachineObject* obj,
-                                   int                  print_error); // [STATE] reuses cached JSON for the message text. [UNITY] Drive a
-                                                     // `LocalizedStringEvent` in UI Toolkit using the same JSON data.
+    // [EVENT] determines whether monitoring dialogs freeze or show hints.
+    // [STATE] reads `m_hms_info_jsons` under `m_hms_mutex` so fatal vs recoverable states stay stable as new bundles arrive.
+    // [THREAD] The UI thread and worker downloads both call this function, so the mutex ensures the cache is in a known state.
+    // [PORTING_HAZARD:P2] Unity must replicate the detection logic in a `DiagnosticService` to avoid toggling hints mid-download.
+    bool is_internal_error(const MachineObject* obj, int print_error);
+    // [STATE] reuses cached JSON for the message text and only refreshes when a new bundle merge finishes.
+    // [THREAD] Lock `m_hms_mutex` before reading so localization requests do not race the downloader.
+    // [UNITY] Drive a `LocalizedStringEvent` in UI Toolkit using the same JSON data.
+    wxString query_print_error_msg(const MachineObject* obj, int print_error);
     wxString query_print_error_msg(const std::string& dev_id, int print_error);
-    wxString query_print_image_action(
-        const MachineObject* obj,
-        int                  print_error,
-        std::vector<int>& button_action); // [EVENT] returns action button ids so UI can render clickable tips. [UNITY] Map each action ID
-                                          // to a UI Toolkit `Button` + `ClickEvent` pair.
+    // [EVENT] returns action button ids so UI can render clickable tips; callers pass an integer vector to surface the mapped buttons.
+    // [STATE] The caller-owned `button_action` vector mirrors the cached JSON order so Unity can rehydrate the same button layout.
+    // [PORTING_HAZARD:P3] Unity must translate the numeric IDs into `UnityEvent`/`VisualElement` callbacks instead of wx command IDs.
+    // [UNITY] Map each action ID to a UI Toolkit `Button` + `ClickEvent` pair (or `Command` pattern) so the layout matches the original hints.
+    wxString query_print_image_action(const MachineObject* obj, int print_error, std::vector<int>& button_action);
 
     // [STATE][PORTING_HAZARD:P3] Local icon lookup against stored wxImages; Unity must load the same atlas/sprites via Addressables.
     // [UNITY] Load the same textures through Addressables or `Resources.Load<Texture2D>` and cache them in a `Dictionary<string, Sprite>`.
@@ -128,14 +132,20 @@ private:
 };
 
 // [INTENT] Records the version of the local HMS bundle so the Unity importer can detect stale metadata.
+// [STATE] The version counter guards downloads so we only refresh when the asset changes.
+// [PORTING_HAZARD:P3] Unity has to keep the ScriptableObject copy in sync with the cached JSON to avoid stale information.
 // [UNITY] Surface the version on a `ScriptableObject` asset so the Unity loader can compare it to the embedded data.
 int get_hms_info_version(std::string& version);
 
 // [INTENT] Returns the knowledge-base URL for a given HMS code so GUI panels can link into the help center.
+// [EVENT] Invoked by help buttons, so the Unity adapter must raise a `VisualElement` click event that calls `Application.OpenURL`.
 // [UNITY] Feed this URL into `Application.OpenURL` for UI Toolkit dialogs wired to the help button.
+// [PORTING_HAZARD:P3] Help URLs must be resolved off the main thread before dispatching to Unity's UI to prevent blocking.
 std::string get_hms_wiki_url(std::string code);
 
 // [EVENT] Provides fallback error text when no HMS entry exists for the requested code.
+// [STATE] The fallback map lives in the localization catalog and must stay aligned with `get_error_message` outputs.
+// [PORTING_HAZARD:P3] Unity needs to track missing-code telemetry instead of relying on wxWidgets defaults.
 // [UNITY] The fallback text should be stored in a Unity `LocalizationTable` entry used by dialog tooltips.
 std::string get_error_message(int error_code);
 

@@ -180,7 +180,6 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Hazards found: 0
 - Git: annotate: src/slic3r/GUI/BaseTransparentDPIFrame.hpp
 - Next recommended Phase 1 task: T167 annotate: src/slic3r/GUI/BBLStatusBarBind.cpp
-
 ## Phase 1 - Task T113 complete
 - Task type: annotate
 - File: src/libvgcode/src/ExtrusionRoles.cpp
@@ -3235,6 +3234,20 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=2 (wxGetApp singleton + reliance on `Slic3r::Http`/JSON schema), P3=1 (hard-coded dev_id prefix mapping)
 - Git: annotate: src/slic3r/GUI/HMS.cpp
 - Next recommended Phase 1 task: T403 annotate: src/slic3r/GUI/HMS.hpp
+
+## Phase 1 - Task T403 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HMS.hpp
+- Deliverables: src/slic3r/GUI/HMS.hpp
+- Substantive additions: multi-tag notes for cache invalidation, fatal-error detection, action button mapping, version tracking, wiki lookup, and fallback text.
+- Verification excerpt: // [EVENT] determines whether monitoring dialogs freeze or show hints.
+- Unity-impact summary:
+  - Surface HMS bundles via a caching `ScriptableObject` that powers the UI Toolkit `LocalizationTable` and `Sprite` icons.
+  - Run downloads/fallback logic through `UnityWebRequest` coroutines + `CancellationTokenSource`, then marshal diagnostics back to the main thread.
+  - Map help/wiki links and fallback error strings to `VisualElement` click handlers that call `Application.OpenURL` or localized tooltips.
+- Hazards found: 1 (P2 asynchronous cache detection requiring a Unity `DiagnosticService` to avoid toggling hints mid-download)
+- Git: Annotate HMS header for Unity port
+- Next recommended Phase 1 task: T428 annotate: src/slic3r/GUI/Jobs/BoostThreadWorker.hpp
 
 ## Phase 1 - Task T426 complete
 - Task type: annotate
