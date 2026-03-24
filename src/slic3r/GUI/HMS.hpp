@@ -27,6 +27,8 @@ namespace GUI {
 
 // [STATE] These constants define the names of bundled JSON assets and query tags that the Unity importer will need to mirror (e.g.,
 // Addressable labels or StreamingAssets paths).
+// [UNITY] Make these the same string constants stored in a `ScriptableObject` so Unity can reference them when loading localization bundles
+// or Addressables.
 #define HMS_INFO_FILE "hms.json"
 #define QUERY_HMS_INFO "query_hms_info"
 #define QUERY_HMS_ACTION "query_hms_action"
@@ -37,14 +39,19 @@ class HMSQuery
 {
 protected:
     std::unordered_map<string, json>
-        m_hms_info_jsons; // [STATE] caches HMS info JSON per device prefix so repeated errors reuse the same bundle.
-    std::unordered_map<string, json> m_hms_action_jsons; // [STATE] caches HMS action JSON keyed by device prefix for each inquiry.
+        m_hms_info_jsons; // [STATE] caches HMS info JSON per device prefix so repeated errors reuse the same bundle. [UNITY] Mirror this as
+                          // a Dictionary<string, TextAsset> that drives localized data stored in a `ScriptableObject`.
+    std::unordered_map<string, json>
+        m_hms_action_jsons; // [STATE] caches HMS action JSON keyed by device prefix for each inquiry. [UNITY] Use the same Dictionary to
+                            // populate Unity events that synthesize button descriptions.
     std::unordered_map<wxString, wxImage>
-        m_hms_local_images; // [STATE][PORTING_HAZARD:P2] stores wxImage icons that Unity must translate to Texture2D/Sprite via Addressables.
+        m_hms_local_images;         // [STATE][PORTING_HAZARD:P2] stores wxImage icons that Unity must translate to Texture2D/Sprite via
+                                    // Addressables, so keep the same key names for sprite lookups.
     mutable std::mutex m_hms_mutex; // [THREAD] guards caches when UI panels and background lookups run in parallel.
 
     std::unordered_map<string, time_t>
-        m_cloud_hms_last_update_time; // [STATE] tracks the last cloud refresh per device type to throttle backend calls.
+        m_cloud_hms_last_update_time; // [STATE] tracks the last cloud refresh per device type to throttle backend calls. [UNITY] Use
+                                      // DateTime/Stopwatch based throttling around UnityWebRequest coroutines.
 
 public:
     HMSQuery() {}
@@ -52,21 +59,29 @@ public:
 
 public:
     // [INTENT] Clears cached JSON/images/language data when the active device or error context switches.
+    // [UNITY] Clear the ScriptableObject cache and fire an event that UI Toolkit dialogs can observe to refresh their localized text.
     void clear_hms_info();
 
     // [EVENT] Called by UI error handlers to map MachineObject or device-id + error-code into localized guidance.
+    // [UNITY] Equivalent to `LocalizationTable.GetLocalizedString` followed by a `VisualElement` update on the main thread.
     wxString query_hms_msg(const MachineObject* obj, const std::string& long_error_code);
     wxString query_hms_msg(const std::string& dev_id, const std::string& long_error_code);
 
-    bool     is_internal_error(const MachineObject* obj,
-                               int                  print_error); // [EVENT] determines whether monitoring dialogs freeze or show hints.
-    wxString query_print_error_msg(const MachineObject* obj, int print_error); // [STATE] reuses cached JSON for the message text.
+    bool is_internal_error(const MachineObject* obj,
+                           int print_error); // [EVENT] determines whether monitoring dialogs freeze or show hints. [UNITY] Mirror with a
+                                             // Unity `DiagnosticService` that flags fatal errors.
+    wxString query_print_error_msg(const MachineObject* obj,
+                                   int                  print_error); // [STATE] reuses cached JSON for the message text. [UNITY] Drive a
+                                                     // `LocalizedStringEvent` in UI Toolkit using the same JSON data.
     wxString query_print_error_msg(const std::string& dev_id, int print_error);
-    wxString query_print_image_action(const MachineObject* obj,
-                                      int                  print_error,
-                                      std::vector<int>& button_action); // [EVENT] returns action button ids so UI can render clickable tips.
+    wxString query_print_image_action(
+        const MachineObject* obj,
+        int                  print_error,
+        std::vector<int>& button_action); // [EVENT] returns action button ids so UI can render clickable tips. [UNITY] Map each action ID
+                                          // to a UI Toolkit `Button` + `ClickEvent` pair.
 
     // [STATE][PORTING_HAZARD:P3] Local icon lookup against stored wxImages; Unity must load the same atlas/sprites via Addressables.
+    // [UNITY] Load the same textures through Addressables or `Resources.Load<Texture2D>` and cache them in a `Dictionary<string, Sprite>`.
     wxImage query_image_from_local(const wxString& image_name);
 
 public:
@@ -75,40 +90,53 @@ public:
 
 private:
     // [INTENT] Ensures the JSON bundle for a given device type exists by loading/copying/downloading it so queries can proceed offline.
+    // [UNITY] Kick off an async Addressables/TextAsset load before a dialog attempts to read the data.
     void init_hms_info(const std::string& dev_type_id);
     // [PORTING_HAZARD:P3] Moves resources from the bundled data dir into the user's local area; Unity needs StreamingAssets + persistent
     // data equivalents.
+    // [UNITY] Copy `StreamingAssets` JSON to `Application.persistentDataPath` (or use Addressables) if the bundle is missing.
     void copy_from_data_dir_to_local();
     // [THREAD][PORTING_HAZARD:P2] Hits the HMS service to refresh JSON by hms_type and dev_id_type; Unity should run this in a coroutine
     // with cancellation.
+    // [UNITY] Mirror with `UnityWebRequest` coroutines + `CancellationTokenSource` so the UI thread remains responsive.
     int download_hms_related(const std::string& hms_type, const std::string& dev_id_type, json* receive_json);
     // [STATE] Reads disk copies of the HMS JSON into the in-memory maps.
+    // [UNITY] Parse `TextAsset` contents fetched from `StreamingAssets` or `Addressables` before deserializing to `Dictionary`.
     int load_from_local(const std::string& hms_type, const std::string& dev_id_type, json* receive_json, std::string& version_info);
     // [STATE][PORTING_HAZARD:P3] Persists merged JSON back to disk, including language/version metadata.
+    // [UNITY] Use `File.WriteAllText(Path.Combine(Application.persistentDataPath, ...))` and update the `ScriptableObject` copy.
     int save_to_local(std::string lang, std::string hms_type, std::string dev_id_type, json save_json);
     // [STATE] Resolves the file path for a given HMS type/language combination for reuse in Unity assets.
+    // [UNITY] Build the path with `Application.streamingAssetsPath` so Unity logs can locate the same bundle.
     std::string get_hms_file(std::string hms_type, std::string lang = std::string("en"), std::string dev_id_type = "");
 
     // [STATE] Helper that translates a `MachineObject` into the serial-prefix key used by the cache maps.
+    // [UNITY] Pull the key from Unity's `PrinterDevice` metadata before hitting the `Dictionary`.
     string get_dev_id_type(const MachineObject* obj) const;
     // [STATE] Reads from the cached maps and fallback language strings to return dialog text.
+    // [UNITY] The fallback logic should feed into Unity's `Localization` package to keep text consistent.
     wxString _query_hms_msg(const string& dev_id_type, const string& long_error_code, const string& lang_code = std::string("en"));
 
-    bool     _is_internal_error(const string& dev_id_type, const string& long_error_code, const string& lang_code = std::string("en"));
+    bool _is_internal_error(const string& dev_id_type, const string& long_error_code, const string& lang_code = std::string("en"));
+    // [UNITY] Hook into Unity's `DiagnosticService` to suppress or surface errors uniquely on the main thread.
     wxString _query_error_msg(const string&      dev_id_type,
                               const std::string& long_error_code,
                               const std::string& lang_code = std::string("en"));
     // [PORTING_HAZARD:P3] Converts codes into button/action hints for wx dialogs; Unity must map these IDs to Button callbacks.
+    // [UNITY] Map hints to `[UnityEvent]`/`VisualElement` button callbacks provided by a `HmsActionController`.
     wxString _query_error_image_action(const string& dev_id_type, const std::string& long_error_code, std::vector<int>& button_action);
 };
 
 // [INTENT] Records the version of the local HMS bundle so the Unity importer can detect stale metadata.
+// [UNITY] Surface the version on a `ScriptableObject` asset so the Unity loader can compare it to the embedded data.
 int get_hms_info_version(std::string& version);
 
 // [INTENT] Returns the knowledge-base URL for a given HMS code so GUI panels can link into the help center.
+// [UNITY] Feed this URL into `Application.OpenURL` for UI Toolkit dialogs wired to the help button.
 std::string get_hms_wiki_url(std::string code);
 
 // [EVENT] Provides fallback error text when no HMS entry exists for the requested code.
+// [UNITY] The fallback text should be stored in a Unity `LocalizationTable` entry used by dialog tooltips.
 std::string get_error_message(int error_code);
 
 } // namespace GUI

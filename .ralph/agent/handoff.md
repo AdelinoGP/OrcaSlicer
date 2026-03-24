@@ -4307,3 +4307,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=2, P3=6
 - Git: Annotate HMS helper guidance
 - Next recommended Phase 1 task: T403 annotate: src/slic3r/GUI/HMS.hpp
+## Phase 1 - Task T403 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/HMS.hpp
+- Deliverables: src/slic3r/GUI/HMS.hpp
+- Substantive additions: Added Unity-aware guidance to the HMS cache, query helpers, IO methods, and fallback helpers so the service layer can be replicated as a `ScriptableObject` + `UnityWebRequest` stack.
+- Verification excerpt: `// [PORTING_HAZARD:P3] Converts codes into button/action hints for wx dialogs; Unity must map these IDs to Button callbacks.`
+- Unity-impact summary:
+  - `ScriptableObject` cache + LocalizationTable bridge for HMS JSON bundles.
+  - `UnityWebRequest` coroutine + Addressable texture guidance for cloud downloads and icon lookups.
+  - StreamingAssets/persistent data pairing for JSON caches and fallback URL helpers.
+- Hazards found: P2 (blocking wxImage + network downloads), P3 (StreamingAssets copy, VisualElement action mapping).
+- Git: pending
+- Next recommended Phase 1 task: T404 annotate: src/slic3r/GUI/HMSPanel.cpp
