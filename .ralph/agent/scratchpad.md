@@ -36,6 +36,8 @@
 - Verification: confirm annotations mention event wiring, worker/GUI boundaries, OpenGL/resources, Unity translation (e.g., Job System, Coroutine), and porting hazards (threading, job lifecycle).
 
 ## Iteration plan update
+- Selected task: T405 annotate `src/slic3r/GUI/HMSPanel.hpp` (runtime task `task-1773880086-7ab4` now active given the ready manifest focus).
+- Plan: read the header thoroughly, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P2]` annotations for the panel row state, HMS data refresh, event wiring, and any UI thread bindings, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header plus metadata, close T405, and stop after this single atomic change so the next iteration resumes another ready task.
 - Completed `T114 annotate: src/libvgcode/src/ExtrusionRoles.hpp` with multi-tag comments that explain role timing storage, thread assumptions, and Unity mapping; updated `.ralph/ralph-tasks.md` to `[x]` and appended the evidence block for the file.
 - Next focus: begin `T115 annotate: src/libvgcode/src/GCodeInputData.cpp` once `ralph tools task ready` confirms it is primary, and ensure the annotation touches parser state, GL data flows, threading, Unity translation, and hazards before committing.
 - Current iteration plan: select `T447 annotate: src/slic3r/GUI/Jobs/PrintJob.hpp`, verify header exists, capture PrintJob state/event/GL/threading semantics, layer `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` comments, append evidence block to `.ralph/agent/handoff.md`, and commit the change before closing the task.

@@ -2160,6 +2160,20 @@ This prompt governs **Phase 1 only**.
 - Git: Enhance GUI AuxiliaryList annotations for Unity port
 - Next recommended Phase 1 task: T373 annotate: src/slic3r/GUI/GUI_AuxiliaryList.hpp
 
+## Phase 1 - Task T405 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HMSPanel.hpp
+- Deliverables: src/slic3r/GUI/HMSPanel.hpp
+- Substantive additions: 6 targeted annotations covering HMS row intent, cached state, event wiring, scrolling lifecycle, Unity mapping, and porting hazards
+- Verification excerpt: // [STATE] Scroll area that hosts each HMSNotifyItem row; in Unity this is a ScrollView with pooled items.
+- Unity-impact summary:
+  - Translate each HMS row into a UI Toolkit VisualElement entry backed by Texture2D severity icons and hyperlink callbacks.
+  - Mirror `Show(bool)` and `clear_hms_tag()` by toggling VisualElement display styles and ScriptableObject acknowledgment flags, ensuring a render refresh of the overlay camera.
+  - Replace wxHtmlWindow hyperlinks/WebView adapters with either UnityWebRequest-based hyperlink dispatch or a dedicated WebView+Texture2D bridge treated as a porting hazard.
+- Hazards found: P2=1 (wxHtmlWindow + bitmap assets), P3=1 (wxScrolledWindow virtualization/hyperlink dependency)
+- Git: annotate: src/slic3r/GUI/HMSPanel.hpp
+- Next recommended Phase 1 task: T406 annotate: src/slic3r/GUI/HttpServer.cpp
+
 ## Phase 1 - Task T373 complete
 - Task type: annotate
 - File: src/slic3r/GUI/GUI_AuxiliaryList.hpp
