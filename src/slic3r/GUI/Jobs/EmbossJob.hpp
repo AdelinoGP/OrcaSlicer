@@ -37,6 +37,8 @@ namespace Slic3r::GUI::Emboss {
 /// <summary>
 /// Base data hold data for create emboss shape
 /// </summary>
+/// [INTENT] Base class for embossing parameters (e.g., text, SVG, height).
+/// [UNITY] Replace with a ScriptableObject class that stores geometry and emboss settings, and can be serialized and passed to worker jobs.
 class DataBase
 {
 public:
@@ -121,6 +123,7 @@ using DataBasePtr = std::unique_ptr<DataBase>;
 /// Hold neccessary data to update embossed text object in job
 /// </summary>
 /// [INTENT] Keep track of the existing volume handle plus undo state so updates can be replayed on the same slice-model entry.
+/// [UNITY] Represents the DTO for an update operation, linking the new Emboss shape definition to the existing volume GUID in the Unity scene.
 struct DataUpdate
 {
     // Hold data about shape
@@ -198,6 +201,7 @@ struct SurfaceVolumeData
 /// <summary>
 /// Hold neccessary data to update embossed text object in job
 /// </summary>
+/// [UNITY] Similar to DataUpdate but for surface-based operations; requires mapping to Unity surface mesh generation jobs.
 struct UpdateSurfaceVolumeData : public DataUpdate, public SurfaceVolumeData
 {};
 
