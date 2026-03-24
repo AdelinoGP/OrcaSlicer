@@ -3851,6 +3851,19 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3=1 (ImGui/wx popup mixes w/out Unity analog; must rebuild texture/menu lifecycle on main thread).
 - Git: annotate: src/slic3r/GUI/IMSlider.hpp
 - Next recommended Phase 1 task: T419 annotate: src/slic3r/GUI/IMToolbar.cpp
+
+## Phase 1 - Task T456 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/ThreadSafeQueue.hpp
+- Deliverables: src/slic3r/GUI/Jobs/ThreadSafeQueue.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md, .ralph/ralph-tasks.md
+- Substantive additions: 7 inline annotations clarifying the SPSC intent, blocking consumer flow, non-blocking drain, producer signaling, and Unity queue mapping.
+- Verification excerpt: // [INTENT][THREAD] Blocks until data arrives or the optional timeout expires, then dispatches `fn` outside the lock.
+- Unity-impact summary:
+  - Implement the queue with a `Channel<T>`/`ChannelReader<T>` plus a `SemaphoreSlim` wait so Unity can preserve the optional timeout/flag semantics without touching the GL thread.
+  - Replace `push`/`consume_one` with `ChannelWriter.TryWrite` + `ChannelReader.TryRead` or `ConcurrentQueue.TryDequeue` guarded by `ManualResetEventSlim` to mimic the notify/wait handshake.
+- Hazards found: P3=1 (timed `condition_variable::wait_for` and pop flag semantics must be recreated safely on Unity without deadlocking the main thread).
+- Git: annotate ThreadSafeQueue queue (T456)
+- Next recommended Phase 1 task: T457 annotate: src/slic3r/GUI/Jobs/UpgradeNetworkJob.cpp
 ## Phase 1 - Task T160 complete
 - Task type: annotate
 - File: src/slic3r/GUI/AuxiliaryDialog.cpp

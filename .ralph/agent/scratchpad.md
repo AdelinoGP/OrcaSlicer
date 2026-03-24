@@ -863,3 +863,8 @@
 ## Iteration plan update - T418 (current)
 - Selected task: T418 annotate `src/slic3r/GUI/IMSlider.hpp`.
 - Plan: read the slider header top-to-bottom, document slider state, event bindings, and config persistence with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` tags, highlight the UI range/callback wiring plus throttle of mouse drag to avoid jitter, note Unity analog (UI Toolkit Slider + Slider.ValueChanged event + serialized ScriptableObject settings), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only `IMSlider.hpp` plus metadata, close T418, and pause so the next iteration can take over.
+
+## Iteration plan update
+- Selected task: T456 annotate `src/slic3r/GUI/Jobs/ThreadSafeQueue.hpp`.
+- Understanding: this SPSC queue shields the GUI/Jobs workers from race conditions with condition-variable notification and optional blocking waits; the port needs the same safe crossing semantics so Unity's worker threads and the main thread stay in sync.
+- Plan: annotate the template and helpers for [INTENT]/[STATE]/[THREAD]/[PORTING_HAZARD]/[UNITY] coverage, highlight how push/consume honor the UI worker boundary, call out the optional timeout/flag bits, add the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the header plus metadata, close T456, and then stop this iteration so the next agent can continue.
