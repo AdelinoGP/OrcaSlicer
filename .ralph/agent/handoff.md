@@ -4149,3 +4149,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3 reliance on `wxImage`/Win32 DPI calls—implement equivalent Unity helpers or native plugins).
 - Git: doc: annotate GUI_Utils utilities
 - Next recommended Phase 1 task: T399 annotate: src/slic3r/GUI/GUI_Utils.hpp
+
+## Phase 1 - Task T170 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BBLStatusBar.hpp
+- Deliverables: src/slic3r/GUI/BBLStatusBar.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md
+- Substantive additions: multi-tag annotations for gauge layout, error/cancel callbacks, and busy state plus Unity mapping notes on the panel/slider/button trio
+- Verification excerpt: // [EVENT][THREAD] Called by slicer jobs on the GUI thread to update the gauge (negative values show pulse) so Unity can dispatch via `UnityMainThreadDispatcher` before mutating the slider.
+- Unity-impact summary:
+  - Mirror the panel as a VisualElement `Panel` with a slider, labels, and cancel `Button` bound through `MainThreadDispatcher` to keep job progress consistent.
+  - Map busy mode toggles to spinner visibility and gate button interaction via `Button.interactable`, matching `start_busy`/`stop_busy`.
+- Hazards found: 1×P2 (error info routing) + 1×P3 (legacy wxPanel cheat)
+- Git: Annotate BBL Status Bar
+- Next recommended Phase 1 task: T171 annotate: src/slic3r/GUI/BBLStatusBarPrint.cpp

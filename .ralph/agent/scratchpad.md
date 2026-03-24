@@ -855,3 +855,7 @@
 ## Iteration plan update
 - Selected task: T398 annotate `src/slic3r/GUI/GUI_Utils.cpp` (task-1773880086-d4b6 in progress).
 - Plan: read the utility helpers, document intent/state/event/thread/OpenGL/Unity mapping for config sync, bitmap caches, and GL texture uploads, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file plus handoff update, close the task, and end the iteration as required.
+
+## Iteration plan update
+- Selected task: T170 annotate `src/slic3r/GUI/BBLStatusBar.hpp` (current iteration).
+- Plan: add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations around the gauge/button/label fields and helpers, describe busy/cancel state, note Unity mapping to VisualElement toolbar, append the evidence block to `.ralph/agent/handoff.md`, commit the header plus metadata, close T170, and then stop for the next iteration as required by the Phase 1 loop.
