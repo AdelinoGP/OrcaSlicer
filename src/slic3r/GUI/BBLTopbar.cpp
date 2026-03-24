@@ -357,6 +357,7 @@ void BBLTopbar::OnOpenProject(wxAuiToolBarEvent& event)
 }
 
 // [STATE] Publish button visibility is toggled based on agent/login state.
+// [UNITY] Mirror this by binding the `Button.interactable` flag to your login/agent `ScriptableObject` so the UI disables itself before the token arrives.
 void BBLTopbar::show_publish_button(bool show)
 {
     this->EnableTool(m_publish_item->GetId(), show);
@@ -384,6 +385,7 @@ void BBLTopbar::OnRedo(wxAuiToolBarEvent& event)
     plater->redo();
 }
 
+// [STATE] Called when the Plater history stack changes so the toolbar button availability mirrors execute/undo state.
 void BBLTopbar::EnableUndoRedoItems()
 {
     this->EnableTool(m_undo_item->GetId(), true);
@@ -392,6 +394,7 @@ void BBLTopbar::EnableUndoRedoItems()
     Refresh();
 }
 
+// [STATE] Disable undo/redo when the history is empty so Unity can grey out or hide the buttons.
 void BBLTopbar::DisableUndoRedoItems()
 {
     this->EnableTool(m_undo_item->GetId(), false);
@@ -400,6 +403,7 @@ void BBLTopbar::DisableUndoRedoItems()
     Refresh();
 }
 
+// [STATE] Cache the normal window rectangle so full-screen toggles can restore the prior layout.
 void BBLTopbar::SaveNormalRect()
 {
     m_normalRect = m_frame->GetRect();
@@ -421,6 +425,8 @@ void BBLTopbar::OnModelStoreClicked(wxAuiToolBarEvent& event)
 
 // [EVENT] Hitting Publish routes through the agent to show the publish dialog/website.
 // [PORTING_HAZARD:P3] Agent gating and `wxGetApp().open_publish_page_dialog()` expect async state, so Unity must ensure the login token is ready before enabling the button.
+// [THREAD] Runs on the main UI thread but touches the asynchronous agent/login token, so Unity must marshal back to main before spawning UI.
+// [UNITY] Map this to a UI Toolkit `Button` bound to a `PublishDialogController` that only becomes interactable when the login data is ready.
 void BBLTopbar::OnPublishClicked(wxAuiToolBarEvent& event)
 {
     if (!wxGetApp().getAgent()) {
@@ -462,6 +468,8 @@ wxMenu* BBLTopbar::GetCalibMenu()
     return &m_calib_menu;
 }
 
+// [STATE] The title label is ellipsized to fit the toolbar width so Unity can mirror the tooltip plus label text.
+// [UNITY] Replace with a `Label` VisualElement whose `text` and `tooltip` stay synced to the `ScriptableObject` selection context.
 void BBLTopbar::SetTitle(wxString title)
 {
     wxGCDC dc(this);
@@ -472,22 +480,27 @@ void BBLTopbar::SetTitle(wxString title)
     this->Refresh();
 }
 
+// [STATE] Update the maximize button glyph after toggling so Unity can choose the correct sprite.
 void BBLTopbar::SetMaximizedSize()
 {
     maximize_btn->SetBitmap(maximize_bitmap);
 }
 
+// [STATE] Switch to the restored window glyph so the Unity toolbar matches the window state.
 void BBLTopbar::SetWindowSize()
 {
     maximize_btn->SetBitmap(window_bitmap);
 }
 
+// [STATE] Keeps the toolbar width synced with the frame so Unity can adjust its layout bounds in tandem with the window.
 void BBLTopbar::UpdateToolbarWidth(int width)
 {
     this->SetSize(width, m_toolbar_h);
 }
 
 // [STATE] Rebuild toolbar bitmaps at the current DPI so Unity commands can swap in scaled sprites.
+// [OPENGL] Those scaled bitmaps translate into GPU textures, so the port must refresh the RenderTexture/sprite cache on DPI jumps.
+// [UNITY] Regenerate the VisualElement sprite atlas or swap style classes when DPI changes instead of assuming automatic scaling.
 void BBLTopbar::Rescale() {
     int em = em_unit(this);
     wxAuiToolBarItem* item;
@@ -554,6 +567,7 @@ void BBLTopbar::OnIconize(wxAuiToolBarEvent& event)
 }
 
 // [PORTING_HAZARD:P3] Full-screen/maximize touches native APIs so Unity must wrap window state changes in its platform layer.
+// [UNITY] The Unity port should drive `Screen.fullScreen`/`Display.main` via a `WindowStateController` MonoBehaviour and cache the prior Rect.
 void BBLTopbar::OnFullScreen(wxAuiToolBarEvent& event)
 {
 #ifdef __WXGTK__
@@ -600,6 +614,7 @@ void BBLTopbar::OnMouseLeftDClock(wxMouseEvent& mouse)
     OnFullScreen(evt);
 }
 
+// [EVENT] Pop the file menu while the skip guard prevents the close handler from re-triggering the dropdown.
 void BBLTopbar::OnFileToolItem(wxAuiToolBarEvent& evt)
 {
     wxAuiToolBar* tb = static_cast<wxAuiToolBar*>(evt.GetEventObject());
@@ -617,6 +632,7 @@ void BBLTopbar::OnFileToolItem(wxAuiToolBarEvent& evt)
     tb->SetToolSticky(evt.GetId(), false);
 }
 
+// [EVENT] Show the dropdown navigation menu and refresh the skip guard to avoid immediate reopen.
 void BBLTopbar::OnDropdownToolItem(wxAuiToolBarEvent& evt)
 {
     wxAuiToolBar* tb = static_cast<wxAuiToolBar*>(evt.GetEventObject());
@@ -634,6 +650,7 @@ void BBLTopbar::OnDropdownToolItem(wxAuiToolBarEvent& evt)
     tb->SetToolSticky(evt.GetId(), false);
 }
 
+// [EVENT] Show the calibration menu and reuse the skip flag so repeated clicks inside the menu keep it open until the user leaves.
 void BBLTopbar::OnCalibToolItem(wxAuiToolBarEvent &evt)
 {
     wxAuiToolBar *tb = static_cast<wxAuiToolBar *>(evt.GetEventObject());
@@ -652,6 +669,7 @@ void BBLTopbar::OnCalibToolItem(wxAuiToolBarEvent &evt)
 }
 
 // [PORTING_HAZARD:P2] Mouse down reimplements window dragging via native APIs, so Unity needs InputSystem + OS-specific drag fences.
+// [UNITY] Drive this with a `WindowDragController` MonoBehaviour that gathers pointer events and calls into the native window handle.
 void BBLTopbar::OnMouseLeftDown(wxMouseEvent& event)
 {
     wxPoint mouse_pos = ::wxGetMousePosition();

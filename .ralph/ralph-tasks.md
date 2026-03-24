@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-24T00:56:04Z
+Last updated: 2026-03-24T01:11:17Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -93,7 +93,7 @@ Last updated: 2026-03-24T00:56:04Z
 - [x] T172 annotate: src/slic3r/GUI/BBLStatusBarPrint.hpp
 - [x] T173 annotate: src/slic3r/GUI/BBLStatusBarSend.cpp
 - [x] T174 annotate: src/slic3r/GUI/BBLStatusBarSend.hpp
-- [ ] T175 annotate: src/slic3r/GUI/BBLTopbar.cpp
+- [x] T175 annotate: src/slic3r/GUI/BBLTopbar.cpp
 - [ ] T176 annotate: src/slic3r/GUI/BBLTopbar.hpp
 - [ ] T177 annotate: src/slic3r/GUI/BedShapeDialog.cpp
 - [ ] T178 annotate: src/slic3r/GUI/BedShapeDialog.hpp

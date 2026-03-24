@@ -4375,3 +4375,17 @@ This prompt governs **Phase 1 only**.
 - Git: annotate: src/slic3r/GUI/BBLTopbar.cpp
 - Next recommended Phase 1 task: T176 annotate: src/slic3r/GUI/BBLTopbar.hpp
 
+
+## Phase 1 - Task T175 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BBLTopbar.cpp
+- Deliverables: src/slic3r/GUI/BBLTopbar.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md
+- Substantive additions: Added multi-tag state/event/Unity notes around the topbar buttons, window controls, and publish gating so downstream ports know what to mirror.
+- Verification excerpt: // [STATE] Publish button visibility is toggled based on agent/login state.
+- Unity-impact summary:
+  - Documented the toolbar as a UI Toolkit VisualElement row wired to a ScriptableObject command dispatcher.
+  - Clarified window drag/maximize/fullscreen semantics for a WindowStateController and InputSystem bridge.
+  - Highlighted DPI-rescale + publish button enablement so Sprite/STATE binding stays in sync.
+- Hazards found: P2:2 (native window drag and toolbar event ordering), P3:2 (publish gating + GTK/Win fullscreen APIs)
+- Git: Annotate BBL top bar semantics
+- Next recommended Phase 1 task: T176 annotate: src/slic3r/GUI/BBLTopbar.hpp

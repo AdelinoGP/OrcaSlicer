@@ -936,3 +936,8 @@
 - Task: T175 annotate `src/slic3r/GUI/BBLTopbar.cpp`
 - Understanding: BBLTopbar wires the top-of-window command bar, exposes printer/slice status, and dispatches navigation actions that must map to Unity Navigation/Action controllers.
 - Plan: annotate event/state/porting info in `BBLTopbar.cpp`, log Phase 1 evidence to `.ralph/agent/handoff.md`, stage/commit changes, close the task, then continue with the next ready file.
+
+## Iteration plan update
+- Selected task: T175 annotate `src/slic3r/GUI/BBLTopbar.cpp` (runtime task `task-1773880086-add1`).
+- Plan: read the topbar implementation, annotate the button layout, status label state, command wiring, event callbacks, and GL preview hooks with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` tags revealing menu/toolbar coordination plus Unity equivalents (UI Toolkit toolbar + C# controller + RenderTexture refresh).
+- After annotating, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit just the modified file(s), close T175, and stop for this iteration so the next agent can continue.
