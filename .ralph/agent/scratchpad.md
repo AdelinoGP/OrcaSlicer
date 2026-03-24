@@ -859,3 +859,7 @@
 ## Iteration plan update
 - Selected task: T170 annotate `src/slic3r/GUI/BBLStatusBar.hpp` (current iteration).
 - Plan: add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations around the gauge/button/label fields and helpers, describe busy/cancel state, note Unity mapping to VisualElement toolbar, append the evidence block to `.ralph/agent/handoff.md`, commit the header plus metadata, close T170, and then stop for the next iteration as required by the Phase 1 loop.
+
+## Iteration plan update - T418 (current)
+- Selected task: T418 annotate `src/slic3r/GUI/IMSlider.hpp`.
+- Plan: read the slider header top-to-bottom, document slider state, event bindings, and config persistence with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` tags, highlight the UI range/callback wiring plus throttle of mouse drag to avoid jitter, note Unity analog (UI Toolkit Slider + Slider.ValueChanged event + serialized ScriptableObject settings), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only `IMSlider.hpp` plus metadata, close T418, and pause so the next iteration can take over.

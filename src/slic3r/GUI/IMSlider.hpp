@@ -94,7 +94,11 @@ public:
     void SetSliderAlternateValues(const std::vector<double>& values) { m_alternate_values = values; }
 
     Info GetTicksValues() const;
+    // [STATE][EVENT][UNITY] Accepts TickCode metadata from the slicing engine so Unity can mirror the same overlays and tooltip commands.
     void SetTicksValues(const Info& custom_gcode_per_print_z);
+    // [STATE][UNITY][PORTING_HAZARD:P3] Cache per-layer durations (plus the aggregate total) to keep tick tooltips and time overlays
+    // synchronized; porters should expose this data via a UI Toolkit `VisualElement` list bound to a ScriptableObject timeline model
+    // without altering the original time scaling.
     void SetLayersTimes(const std::vector<float>& layers_times, float total_time);
     void SetLayersTimes(const std::vector<double>& layers_times);
 
@@ -109,11 +113,18 @@ public:
     Mode GetManipulationMode() const { return m_mode; }
     // [UNCLEAR] Enables multi-extruder preview by locking slider interactions to one extruder, but the exact interplay with color change
     // locking is inherited from legacy wizard logic.
+    // [STATE][PORTING_HAZARD:P3] `m_only_extruder` acts as a viewport clamp that Unity ports must enforce when the preview is limited to a
+    // single extruder to avoid misaligned slider handles.
     void SetModeAndOnlyExtruder(const bool is_one_extruder_printed_model, const int only_extruder, bool can_change_color);
+    // [STATE][UNITY] Stores the preview colors for each extruder so Unity can tint tick bands consistently with ImGui's legend.
     void SetExtruderColors(const std::vector<std::string>& extruder_colors);
 
+    // [STATE] Flagged when a new slicing job replaces the preview so textures and cached ticks can refresh; mirror this by resetting the
+    // VisualElement data source upon new print start.
     bool IsNewPrint();
 
+    // [STATE][UNITY] Flips the disabled visual style so a Unity `RenderTexture` overlay can add an `is-disabled` class when preview data is
+    // missing or restricted.
     void set_render_as_disabled(bool value) { m_render_as_disabled = value; }
     bool is_rendering_as_disabled() const { return m_render_as_disabled; }
 
@@ -152,11 +163,14 @@ public:
     Type get_post_tick_event_type() { return m_tick_change_event_type; }
 
     float m_scale = 1.0;
-    // [STATE] Scale controls the pixel density for ImGui drawing; Unity should mirror this scale when rendering tick bands.
+    // [STATE] Scale controls the pixel density for ImGui drawing; Unity should mirror this scale when rendering tick bands;
+    // [PORTING_HAZARD:P3] the same multiplier must drive both the slider track and tick-label math so overlay geometry stays aligned.
     void set_scale(float scale = 1.0);
-    // [STATE] Toggles between light/dark palettes affecting tick icons and tooltip legibility.
+    // [STATE] Toggles between light/dark palettes affecting tick icons and tooltip legibility; [UNITY] porters should flip a UI Toolkit
+    // class list and swap tint colors in a `StyleSheet` to match the ImGui toggle.
     void on_change_color_mode(bool is_dark);
-    // [STATE] Right-click menu availability toggles the contextual tick editing UX.
+    // [STATE][EVENT] Right-click menu availability toggles the contextual tick editing UX and gates the context menu so Unity's
+    // `ContextualMenuManager` mirrors when tick editing should be available.
     void set_menu_enable(bool enable = true) { m_menu_enable = enable; }
 
 protected:
@@ -169,11 +183,14 @@ protected:
     bool horizontal_slider(const char* str_id, int* v, int v_min, int v_max, const ImVec2& size, float scale = 1.0);
     void render_go_to_layer_dialog();                              // menu
     void render_input_custom_gcode(std::string custom_gcode = ""); // menu
-    // [EVENT] Draws the context menu entry that exposes tick editing commands via ImGui popups.
+    // [EVENT][UNITY][PORTING_HAZARD:P3] Draws the context menu entry that exposes tick editing commands via ImGui popups; Unity needs to
+    // hook its `ContextualMenuManager` so menu commands map back to the slider data.
     void render_menu();
-    // [EVENT] Adds the "Create Tick" submenu anchored to the slider for fast adjustments.
+    // [EVENT][UNITY] Adds the "Create Tick" submenu anchored to the slider for fast adjustments; port this submenu into a UI Toolkit menu
+    // anchored to the slider thumb.
     void render_add_menu(); // menu
-    // [EVENT] Paints the tick edit submenu triggered by right-clicking an existing tick, bound to TickCode data.
+    // [EVENT][UNITY] Paints the tick edit submenu triggered by right-clicking an existing tick, bound to TickCode data so Unity can
+    // replicate the editor in a VisualElement popup.
     void render_edit_menu(const TickCode& tick); // menu
     void draw_background_and_groove(const ImRect& bg_rect, const ImRect& groove);
     void draw_colored_band(const ImRect& groove, const ImRect& slideable_region);
@@ -237,6 +254,8 @@ private:
     bool           m_is_spiral_vase           = false;
 
     /* BBS slider images */
+    // [OPENGL][STATE][UNITY] GPU texture handles for the slider badges/toggles; Unity should map them to cached `Sprite` assets and apply
+    // them to the `VisualElement` background states, keeping separate idle/hover variants.
     void* m_one_layer_on_id;
     void* m_one_layer_on_hover_id;
     void* m_one_layer_off_id;
@@ -271,7 +290,9 @@ private:
     std::vector<double>      m_layers_values;
     std::vector<std::string> m_extruder_colors;
     // [STATE] Prevents color mode toggling when the preview action is locked by the active profile.
-    bool        m_can_change_color;
+    bool m_can_change_color;
+    // [STATE] Stores the last printed object indices string used for menu tooltips, keeping tick edits mapped to the correct objects in
+    // both wxWidgets and Unity menus.
     std::string m_print_obj_idxs;
     // [THREAD] Flag bubbled from background tasks to drive tick-change event posting.
     bool m_is_need_post_tick_changed_event{false};
@@ -279,6 +300,8 @@ private:
 
     std::vector<double> m_alternate_values;
 
+    // [STATE][EVENT] Buffers the menu text for custom G-code and the Go-to-layer input so Unity's text fields can preserve typed values
+    // while menus stay open.
     char m_custom_gcode[1024] = {0}; // menu
     char m_layer_number[64]   = {0}; // menu
 };

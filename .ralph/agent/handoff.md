@@ -4175,3 +4175,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1×P2 (error info routing) + 1×P3 (legacy wxPanel cheat)
 - Git: Annotate BBL Status Bar
 - Next recommended Phase 1 task: T171 annotate: src/slic3r/GUI/BBLStatusBarPrint.cpp
+
+## Phase 1 - Task T418 complete
+- Task type: annotate
+- File: src/slic3r/GUI/IMSlider.hpp
+- Deliverables: src/slic3r/GUI/IMSlider.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: documented tick/time caches, context menu wiring, icon atlas handles, extruder locking, and menu buffers with `[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD]` tags for the slider overlay.
+- Verification excerpt: // [STATE][UNITY][PORTING_HAZARD:P3] Cache per-layer durations (plus the aggregate total) to keep tick tooltips and time overlays synchronized;
+- Unity-impact summary:
+  - Surface per-layer durations via a UI Toolkit `VisualElement` list bound to a ScriptableObject timeline asset so tick labels track the same history as ImGui.
+  - Recreate the ImGui context menus with Unity's `ContextualMenuManager` while preserving tick metadata bindings and command routing.
+  - Swap the slider badge textures for cached `Sprite`/`Texture2D` assets and apply the same state logic to the VisualElement background states.
+- Hazards found: 3 (P3 multi-extruder locking, P3 scale/tick alignment, P3 context-menu wiring)
+- Git: annotate: src/slic3r/GUI/IMSlider.hpp
+- Next recommended Phase 1 task: T419 annotate: src/slic3r/GUI/IMToolbar.cpp
