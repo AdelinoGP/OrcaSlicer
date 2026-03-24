@@ -208,6 +208,19 @@ _Generated: 2026-03-20 07:11:02 UTC_
 - Git: annotate: src/slic3r/GUI/BBLStatusBar.cpp
 - Next recommended Phase 1 task: T170 annotate: src/slic3r/GUI/BBLStatusBar.hpp
 
+## Phase 1 - Task T397 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Preview.hpp
+- Deliverables: src/slic3r/GUI/GUI_Preview.hpp
+- Substantive additions: Added thread/Unity clarifications for View3D rotation/render, Preview load/slider handling, and the assemble view buffers
+- Verification excerpt: // [THREAD][OPENGL][UNITY] Schedules a GL draw from the main thread.
+- Unity-impact summary:
+  - Treat both preview and assemble panes as RenderTexture cameras with UI Toolkit controls sync'ing slider state
+  - Anchor camera rotation/selection helpers to Unity's main-thread dispatcher before invoking RenderTexture updates
+- Hazards found: 1 (P3 main-thread GL context and dual RenderTexture coordination)
+- Git: annotate: src/slic3r/GUI/GUI_Preview.hpp
+- Next recommended Phase 1 task: T398 annotate: src/slic3r/GUI/GUI_Utils.cpp
+
 ## Phase 1 - Task T392 complete
 - Task type: annotate
 - File: src/slic3r/GUI/GUI_ObjectTable.cpp

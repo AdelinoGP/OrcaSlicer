@@ -988,3 +988,11 @@
 
 ## Iteration update
 - Added `[UNITY]`/`[THREAD]` annotations near the close event, title update, theme refresh, DPI-change skeleton, and timer loop so the streaming overlay's UI thread behavior and Unity replacements (VisualElement + coroutine) are clear. Appended the evidence block, updated the registry, and committed the file.
+
+## Iteration plan update
+- Current focus: T399 annotate `src/slic3r/GUI/GUI_Utils.hpp` as the editable target for this run.
+- Plan: start runtime task `task-1773880086-ecab`, read the header fully, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P2]` annotations explaining the utility functions' UI and GL handoffs plus any config hooks, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the header plus metadata, close the task, and stop for this iteration.
+
+## Iteration plan update
+- Current focus: T397 annotate `src/slic3r/GUI/GUI_Preview.hpp`.
+- Plan: start runtime task `task-1773880086-be55`, read the header end-to-end, insert annotations covering preview intent, GL state, event wiring, and Unity mapping, append Phase 1 evidence, and commit before stopping so the next agent can continue.

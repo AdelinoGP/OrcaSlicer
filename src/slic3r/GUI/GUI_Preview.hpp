@@ -66,6 +66,8 @@ public:
     void plates_count_changed();
 
     // [EVENT][UNITY] Rotates to a preset direction; Unity ports can hook this into Camera rigs or dropdowns.
+    // [THREAD][PORTING_HAZARD:P3] Runs on the UI thread to keep the GL context valid.
+    // Unity must also marshal to the main thread before rotating cameras.
     void select_view(const std::string& direction);
 
     // BBS
@@ -96,7 +98,8 @@ public:
 
     // [THREAD][OPENGL] Forces the view to rebuild, coordinating worker results with the UI thread.
     void reload_scene(bool refresh_immediately, bool force_full_scene_refresh = false);
-    // [OPENGL][UNITY] Schedules a GL draw; Unity ports will hook RenderTexture updates instead.
+    // [THREAD][OPENGL][UNITY] Schedules a GL draw from the main thread.
+    // Unity ports will hook RenderTexture updates instead while honoring main-thread ownership.
     void render();
 
 private:
@@ -178,6 +181,7 @@ public:
     // [EVENT][STATE] Reacts to bed changes published by other UI modules.
     void bed_shape_changed();
     // [EVENT][UNITY] Mirrors view selection commands, which Unity should map to camera routines.
+    // [THREAD] Invoked on the UI thread to keep camera and slider meshes synchronized with the GL canvas.
     void select_view(const std::string& direction);
     // [EVENT][THREAD] Updates the drop target used for drag/drop; Unity should expose the same capability through InputSystem drop hooks.
     void set_drop_target(wxDropTarget* target);
@@ -185,6 +189,7 @@ public:
     // BBS: add only gcode mode
     // [INTENT][STATE][UNITY] Loads the specified PrintBase or G-code-only payload via a shared configuration model, then updates Unity-side
     // slider bindings and RenderTexture assets.
+    // [THREAD] Must run on the UI thread after background slicing finishes so Unity can update meshes and sliders safely.
     void load_print(bool keep_z_range = false, bool only_gcode = false);
     // [EVENT] Refreshes the current preview when toggling modes.
     void reload_print(bool only_gcode = false);
@@ -228,11 +233,14 @@ private:
 
     // [STATE] Layer slider helpers invoked after interactive or programmatic camera changes.
     // [STATE][UNITY] Refreshes the Z range slider range/values when the view or selection changes so Unity's slider binding stays accurate.
+    // [THREAD] Called from UI callbacks that respond to camera/selection updates before background tasks run.
     void update_layers_slider(const std::vector<double>& layers_z, bool keep_z_range = false);
     // [EVENT][STATE] Recomputes slider visibility based on the active preview controls so the correct handles appear.
+    // [THREAD] Executes on the UI thread since it mutates slider widgets directly.
     void update_layers_slider_mode();
     // [EVENT][STATE][UNITY] Propagates canvas key events back to the slider ranges; Unity should route InputSystem navigation through the
     // slider controller.
+    // [THREAD] This response must stay on the UI thread to avoid race conditions with the renderer.
     void update_layers_slider_from_canvas(wxKeyEvent& event);
     // BBS: add only gcode mode
     // [EVENT][STATE] Forces loading the print via the FFF path for unsupported G-code mode toggles.
@@ -259,9 +267,10 @@ public:
     wxGLCanvas* get_wxglcanvas() { return m_canvas_widget; }
     GLCanvas3D* get_canvas3d() { return m_canvas; }
 
-    // [STATE] Marks this canvas dirty so the renderer refreshes the assemble view.
+    // [STATE][UNITY] Marks this canvas dirty so the renderer refreshes the assemble view, mirroring a RenderTexture camera dirty flag.
+    // [THREAD] Called on the UI thread before enqueueing the draw command to keep GL ownership sane.
     void set_as_dirty();
-    // [OPENGL] Triggers GPU draws for this pane.
+    // [OPENGL][UNITY] Triggers GPU draws for this pane while Unity would dispatch a RenderTexture camera refresh feed.
     void render();
 
     // [STATE] Queries the reload throttle for this view.
