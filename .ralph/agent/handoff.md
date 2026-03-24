@@ -4319,5 +4319,5 @@ This prompt governs **Phase 1 only**.
   - `UnityWebRequest` coroutine + Addressable texture guidance for cloud downloads and icon lookups.
   - StreamingAssets/persistent data pairing for JSON caches and fallback URL helpers.
 - Hazards found: P2 (blocking wxImage + network downloads), P3 (StreamingAssets copy, VisualElement action mapping).
-- Git: pending
+- Git: 3ac3aed2f3 (Clarify HMS Unity porting guidance)
 - Next recommended Phase 1 task: T404 annotate: src/slic3r/GUI/HMSPanel.cpp
