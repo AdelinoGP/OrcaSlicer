@@ -4671,3 +4671,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 2 (P2 event bus/global query coupling, P3 browser-launch main-thread requirement).
 - Git: Annotate HMSPanel for Unity guidance
 - Next recommended Phase 1 task: T405 annotate: src/slic3r/GUI/HMSPanel.hpp
+
+## Phase 1 - Task T181 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BitmapCache.cpp
+- Deliverables: src/slic3r/GUI/BitmapCache.cpp
+- Substantive additions: ~14 inline `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` notes covering cache lifecycle, PNG/SVG loads, RGBA builder, color parsing, and GL uploads.
+- Verification excerpt: `// [INTENT] Populate or resize the shared bitmap entry so every GUI widget reuses the same backend storage instead of reallocating.`
+- Unity-impact summary:
+  - Texture2D cache analog with Addressables/resizing to reuse `m_map` entries.
+  - Vector Graphics/Sprite generation mapped for SVG/Bitmap loads and color overrides.
+  - GL texture creation path documented for ImGui + manual uploads.
+- Hazards found: P2=3, P3=2
+- Git: Annotate BitmapCache caching flow
+- Next recommended Phase 1 task: T182 annotate: src/slic3r/GUI/BitmapCache.hpp

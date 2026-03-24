@@ -1044,3 +1044,7 @@
 ## Iteration plan update - T404
 - Task: annotate src/slic3r/GUI/HMSPanel.cpp for Unity port readiness.
 - Plan: reinforce the panel/item state/event comments, highlight thread and porting hazards, and keep the Lambda/FAQ workflow clear for Unity event bus.
+
+## Iteration plan update
+- Selected task: T181 annotate `src/slic3r/GUI/BitmapCache.cpp`, which holds the shared bitmap cache used by multiple GUI panels.
+- Plan: read the CPP completely, sprinkle `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2]` comments covering the cache lifecycle, worker uploads, UI invalidations, and config hooks; note the Unity analog (Texture2D atlas manager + `Addressables`-style async loader + main-thread dispatcher) and hazards (wxBitmap lifetimes, blocking disk reads), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit just the annotated source plus metadata, mark T181 done, and then stop this iteration.
