@@ -103,7 +103,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [x] T182 annotate: src/slic3r/GUI/BitmapCache.hpp
 - [x] T183 annotate: src/slic3r/GUI/BitmapComboBox.cpp
 - [ ] T184 annotate: src/slic3r/GUI/BitmapComboBox.hpp
-- [ ] T185 annotate: src/slic3r/GUI/BonjourDialog.cpp
+- [x] T185 annotate: src/slic3r/GUI/BonjourDialog.cpp
 - [ ] T186 annotate: src/slic3r/GUI/BonjourDialog.hpp
 - [ ] T187 annotate: src/slic3r/GUI/calib_dlg.cpp
 - [ ] T188 annotate: src/slic3r/GUI/calib_dlg.hpp
@@ -622,7 +622,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [ ] T701 annotate: src/slic3r/GUI/Widgets/StaticGroup.cpp
 - [ ] T702 annotate: src/slic3r/GUI/Widgets/StaticGroup.hpp
 - [ ] T703 annotate: src/slic3r/GUI/Widgets/StaticLine.cpp
-- [ ] T704 annotate: src/slic3r/GUI/Widgets/StaticLine.hpp
+- [x] T704 annotate: src/slic3r/GUI/Widgets/StaticLine.hpp
 - [ ] T705 annotate: src/slic3r/GUI/Widgets/StepCtrl.cpp
 - [ ] T706 annotate: src/slic3r/GUI/Widgets/StepCtrl.hpp
 - [ ] T707 annotate: src/slic3r/GUI/Widgets/SwitchButton.cpp

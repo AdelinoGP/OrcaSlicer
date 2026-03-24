@@ -1120,3 +1120,11 @@
 
 ## Iteration plan update - T418 annotate src/slic3r/GUI/IMSlider.hpp
 - Plan: confirm the header's existing annotations, then add targeted [INTENT]/[EVENT]/[PORTING_HAZARD] guidance for the area comparison helpers, color-change detector, and tooltip rendering hooks so the Unity overlay and tick menu behavior are crystal; append the required Phase 1 evidence block, stage/commit the header, and close T418 before stopping.
+
+## Iteration plan update
+- Selected task: T704 annotate `src/slic3r/GUI/Widgets/StaticLine.hpp` (runtime task `task-1773880088-4ba6` now active).
+- Plan: read the header fully, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P3]` annotations describing how the static line monitors parent size, maintains its cached icon/color state, handles paint and measure events, and which Unity UI Toolkit/API primitives correspond; append the mandated Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only this header plus metadata, close the task, and stop this iteration so the next file can be handled.
+
+## Iteration plan update
+- Selected task: T185 annotate `src/slic3r/GUI/BonjourDialog.cpp` (runtime task `task-1773880086-8a77` now active).
+- Plan: read the dialog source fully, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` annotations that cover discovery/lookup state, timer/event handling, and cross-thread worker communication, update `.ralph/agent/handoff.md` with the Phase 1 evidence block, stage/commit only the annotated file, close the runtime task, and stop for this iteration so the next agent can continue the next file.

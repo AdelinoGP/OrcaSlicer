@@ -4895,3 +4895,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (GL atlas upload must stay on the GUI/main thread), P3=1 (font file throttling currently tied to raw wx file handles that Unity must emulate).
 - Git: Annotate CreateFontNameImageJob header for Unity port
 - Next recommended Phase 1 task: T432 annotate: src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.cpp
+## Phase 1 - Task T704 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/StaticLine.hpp
+- Deliverables: src/slic3r/GUI/Widgets/StaticLine.hpp
+- Substantive additions: Added a dozen inline annotations covering intent/state/event/Unity mapping for the separator widget’s layout, DPI, and paint helpers.
+- Verification excerpt: // [INTENT] Draws the separator line used between option rows so layout adheres to a shared thickness/icon scheme.
+- Unity-impact summary:
+  - Divider logic must turn into a VisualElement background/icon pair keyed by a shared StyleSheet rather than wxWidgets painting.
+  - Paint/measure handlers map to UI Toolkit layout callbacks driven by the parent rect instead of `wxPaintEvent`.
+- Hazards found: 2 (P3: custom paint relies on wxDC events; P3: icon/color cache needs explicit TMP_FontAsset/StyleSheet equivalents).
+- Git: Annotate static line widget for Unity port
+- Next recommended Phase 1 task: T705 annotate: src/slic3r/GUI/Widgets/StepCtrl.cpp
