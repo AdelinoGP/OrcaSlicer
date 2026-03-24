@@ -3469,6 +3469,19 @@ This prompt governs **Phase 1 only**.
 - Git: Annotate HMS metadata helper
 - Next recommended Phase 1 task: T404 annotate: src/slic3r/GUI/HMSPanel.cpp
 
+## Phase 1 - Task T174 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BBLStatusBarSend.hpp
+- Deliverables: src/slic3r/GUI/BBLStatusBarSend.hpp
+- Substantive additions: 14 multi-tag annotations clarifying the send progress row, cancel callback ownership, inline error states, and Unity migration notes.
+- Verification excerpt: // [INTENT] Host the send-progress UI row inside the BBL status bar, exposing gauge/cancel controls and error badges tied to the send pipeline.
+- Unity-impact summary:
+  - Replace the wxGauge/Label/Button row with a UI Toolkit VisualElement containing `ProgressBar`, `TextMeshPro` labels, and a cancel `Button` driven by a MonoBehaviour controller.
+  - Surface inline error info through UI Toolkit toasts or VisualElement popups that reuse `CancellationTokenSource` semantics instead of wx events.
+- Hazards found: P2=2, P3=2
+- Git: Annotate BBL send status header
+- Next recommended Phase 1 task: T175 annotate: src/slic3r/GUI/BBLTopbar.cpp
+
 ## Phase 1 - Task T152 complete
 - Task type: annotate
 - File: src/slic3r/GUI/AMSMaterialsSetting.hpp
