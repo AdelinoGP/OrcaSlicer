@@ -927,3 +927,7 @@
 ## Iteration plan update
 - Selected task: T174 annotate `src/slic3r/GUI/BBLStatusBarSend.hpp` (runtime task `task-1773880086-94d5` now active).
 - Plan: read the send status bar header, mark the gauge/cancel state, progress callbacks, and error panel helpers with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` tags, spell out Unity mapping for the VisualElement row plus cancellation tokens, record evidence in `.ralph/agent/handoff.md`, stage/commit the annotated header and metadata, close the task, and exit this iteration.
+
+## Iteration plan update
+- Task: T404 annotate src/slic3r/GUI/HMSPanel.cpp
+- Plan: review panel implementation, annotate state/event/hazards, record evidence, close task, stop for iteration.

@@ -4347,3 +4347,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3:1 (double-click event routing interference).
 - Git: annotate: src/slic3r/GUI/GUI_AuxiliaryList.cpp
 - Next recommended Phase 1 task: T404 annotate: src/slic3r/GUI/HMSPanel.cpp
+
+## Phase 1 - Task T404 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HMSPanel.cpp
+- Deliverables: src/slic3r/GUI/HMSPanel.cpp, .ralph/agent/handoff.md
+- Substantive additions: Added Unity mapping and event-thread guidance for insert/delete/status paths (4 targeted comments)
+- Verification excerpt: // [UNITY] Bind this insertion to a UI Toolkit `ListView` whose `itemsSource` is an ObservableList<HMSAlert>` owned by `MonitorController`.
+- Unity-impact summary:
+  - ScrollView append mapped to UI Toolkit ListView behavior needed for MonitorController.
+  - `temp_hms_list` duplication mirrors a C# dictionary for VisualElement reuse.
+  - Status gating emits MonitorStatusEvent on the MainThreadDispatcher instead of repeated wx layout.
+- Hazards found: 0
+- Git: Annotate HMSPanel events for Unity port
+- Next recommended Phase 1 task: task-1773880086-7ab4 (T405 annotate: src/slic3r/GUI/HMSPanel.hpp)

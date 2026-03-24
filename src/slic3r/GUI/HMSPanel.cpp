@@ -204,6 +204,8 @@ void HMSPanel::append_hms_panel(const std::string& dev_id, DevHMSItem& item)
     wxString msg = wxGetApp().get_hms_query()->query_hms_msg(dev_id, item.get_long_error_code());
     if (!msg.empty()) {
         // [STATE] Skip placeholder alerts and reuse the cache entry to keep the scroll list stable.
+        // [EVENT] Called from `update()` in reaction to Monitor-derived events; never invoke from background threads.
+        // [UNITY] Bind this insertion to a UI Toolkit `ListView` whose `itemsSource` is an ObservableList<HMSAlert>` owned by `MonitorController`.
         HMSNotifyItem* notify_item = new HMSNotifyItem(dev_id, m_scrolledWindow, item);
         m_top_sizer->Add(notify_item, 0, wxALIGN_CENTER_HORIZONTAL);
     } else {
@@ -216,6 +218,7 @@ void HMSPanel::append_hms_panel(const std::string& dev_id, DevHMSItem& item)
 void HMSPanel::delete_hms_panels()
 {
     // [STATE] Tearing down children before a refresh avoids stale panels hanging around the ScrollWindow.
+    // [UNITY] Hook this cleanup to the UI Toolkit ScrollView `Clear()` path to release recycled VisualElement instances.
     m_scrolledWindow->DestroyChildren();
 }
 
@@ -236,6 +239,8 @@ void HMSPanel::update(MachineObject* obj)
         this->Freeze();
         delete_hms_panels();
         wxString hms_text;
+        // [UNITY] Keep `temp_hms_list` mirrored as a `Dictionary<int, HMSItemData>` in the `HMSPanelController` so VisualElement reuse
+        // calculations stay deterministic.
         for (auto item : obj->GetHMS()->GetHMSItems()) {
             if (wxGetApp().get_hms_query()) {
                 auto key  = item.get_long_error_code();
@@ -277,9 +282,12 @@ void HMSPanel::update(MachineObject* obj)
 void HMSPanel::show_status(int status)
 {
     // [STATE] Track `last_status` so repeated status flags don't cause redundant panel clears or Layout calls.
+    // [EVENT] Invoked from Monitor status callbacks so we only re-layout when the status bitmask changes.
     if (last_status == status)
         return;
     last_status = status;
+
+    // [UNITY] Mirror this event in Unity via a `MonitorStatusEvent` dispatched on the `MainThreadDispatcher`, toggling the HMS list visibility.
 
     if (((status & (int) MonitorStatus::MONITOR_DISCONNECTED) != 0) || ((status & (int) MonitorStatus::MONITOR_DISCONNECTED_SERVER) != 0) ||
         ((status & (int) MonitorStatus::MONITOR_CONNECTING) != 0) || ((status & (int) MonitorStatus::MONITOR_NO_PRINTER) != 0)) {
