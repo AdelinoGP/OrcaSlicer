@@ -909,3 +909,17 @@
 - Task: T402 annotate src/slic3r/GUI/HMS.cpp
 - Understanding: HMS.cpp already documents C++ logic for HMS cache sync, but a handful of helpers still need explicit [STATE]/[UNITY]/[PORTING_HAZARD] guidance so Unity ports know when to cache and poll.
 - Plan: extend comments around internal error detection, localized string lookups, action button resolution, image caching, and wiki/error fetching to cover the missing tags, then log the handoff evidence block and mark the task done.
+
+## Iteration plan update
+- Selected task: T383 annotate `src/slic3r/GUI/GUI.hpp`.
+- Plan: read the header end-to-end, layer `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2]` annotations around the GUI manager helpers, menus, toolbars, GL preview coordination, and config caches, note Unity analogs (MenuBar + ScriptableObject config controllers + RenderTexture preview) plus wx ownership hazards, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only the header plus metadata, close the task, and then pause for handoff.
+
+## Iteration plan update
+- Verification: confirm the added comments describe state/event flows, thread boundaries, and porting hazards so downstream Unity porters have concrete behavior notes.
+
+## Iteration plan update
+- Actual selected task: T372 annotate `src/slic3r/GUI/GUI_AuxiliaryList.cpp` (task-1773880086-6aa6), since the runtime task was started.
+- Plan: read the file end-to-end, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD]` comments covering tree/canvas state, drag/drop payload, context-menu wiring, DPI/scale caches, and Unity equivalents (UI Toolkit `TreeView` selection manager + serialized ScriptableObject buffers). Append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the updated file plus metadata, close the task, and stop for this iteration.
+
+## Iteration plan update
+- Verification: ensure added comments highlight ownership of tree controls, state caches, and worker interactions plus porting hazards (DPI scaling, manual bitmaps, event ordering) so the Unity port has clear mappings.

@@ -105,6 +105,9 @@ AuxiliaryList::AuxiliaryList(wxWindow* parent) : wxDataViewCtrl(parent, wxID_ANY
     // Mouse events
     wxWindow* win = this->GetMainWindow();
     win->Bind(wxEVT_LEFT_DCLICK, &AuxiliaryList::on_left_dclick, this);
+    // [EVENT][THREAD][PORTING_HAZARD:P3][UNITY] The main window, not the control itself, listens for double-click so the handler fires
+    // before other focusable controls swallow it; Unity must register a pre-processing pointer listener on the overlay camera (or Input
+    // System) so the event arrives even when other UI elements are active.
 
     Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, [this](wxDataViewEvent& event) {
         wxDataViewItem      sel_item = event.GetItem();

@@ -4321,3 +4321,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 (blocking wxImage + network downloads), P3 (StreamingAssets copy, VisualElement action mapping).
 - Git: 3ac3aed2f3 (Clarify HMS Unity porting guidance)
 - Next recommended Phase 1 task: T404 annotate: src/slic3r/GUI/HMSPanel.cpp
+
+## Phase 1 - Task T372 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Deliverables: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Substantive additions: 1 new `[EVENT][THREAD][PORTING_HAZARD:P3][UNITY]` comment clarifying the main-window double-click binding and its Unity Input System equivalent.
+- Verification excerpt: `// [EVENT][THREAD][PORTING_HAZARD:P3][UNITY] The main window, not the control itself, listens for double-click so the handler fires before other focusable controls are active; Unity must register a pre-processing pointer listener on the overlay camera (or Input System) so the event arrives even when other UI elements are active.`
+- Unity-impact summary:
+  - Outline how Unity must route double-clicks through the overlay camera or Input System before `GraphicRaycaster` consumes them.
+  - Remind the port to keep the main window listener aligned with the tree so focus doesn’t skip the handler.
+- Hazards found: P3:1 (double-click event routing interference).
+- Git: annotate: src/slic3r/GUI/GUI_AuxiliaryList.cpp
+- Next recommended Phase 1 task: T404 annotate: src/slic3r/GUI/HMSPanel.cpp
