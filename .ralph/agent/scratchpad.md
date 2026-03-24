@@ -1114,3 +1114,6 @@
 
 ## Iteration plan update - T431 annotate src/slic3r/GUI/Jobs/CreateFontNameImageJob.hpp
 - Plan: read the header, insert multi-tag annotations explaining `FontImageData` state, worker cancellation tokens, GL texture finalization, and Unity mapping, note thread boundaries plus porting hazards, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the header, update `.ralph/ralph-tasks.md` to mark T431 done, close the runtime task, and then stop for this iteration so the next agent picks up another ready job.
+
+## Iteration plan update - T432 annotate src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.cpp
+- Plan: document the job that renders the bold/italic font textures by reading the source, tagging the worker lifecycle with [INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2], highlight how font style image data is produced and cached, note the cancellation/event bridge back to the renderer (Unity would use Texture2D + AsyncGPU readback), append the Phase 1 evidence block once annotated, stage/commit just this source plus metadata, close T432, and then stop for this iteration.

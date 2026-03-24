@@ -350,7 +350,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [x] T429 annotate: src/slic3r/GUI/Jobs/BusyCursorJob.hpp
 - [x] T430 annotate: src/slic3r/GUI/Jobs/CreateFontNameImageJob.cpp
 - [x] T431 annotate: src/slic3r/GUI/Jobs/CreateFontNameImageJob.hpp
-- [ ] T432 annotate: src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.cpp
+- [x] T432 annotate: src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.cpp
 - [ ] T433 annotate: src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.hpp
 - [x] T434 annotate: src/slic3r/GUI/Jobs/EmbossJob.cpp
 - [x] T435 annotate: src/slic3r/GUI/Jobs/EmbossJob.hpp

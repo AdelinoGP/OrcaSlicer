@@ -4856,6 +4856,20 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1 (GL atlas upload must stay on Unity main thread), P3=1 (Emboss + SLA rasterizers require a compatible CPU replacement).
 - Git: Annotate CreateFontNameImageJob for Unity port
 - Next recommended Phase 1 task: T432 annotate: src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.cpp
+
+## Phase 1 - Task T432 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.cpp
+- Deliverables: src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.cpp
+- Substantive additions: 12 inline annotations capturing worker state, UV layouts, GL uploads, and Unity guidance.
+- Verification excerpt: // [THREAD] finalize runs back on the UI/GL thread after the worker completes so it can safely talk to OpenGL.
+- Unity-impact summary:
+  - Atlas generation mirrors a main-thread `Texture2D` construction with `SetPixels`/`Apply` instead of raw GL calls.
+  - The finalizer must be marshaled through `MainThreadDispatcher.Enqueue` before issuing GPU APIs.
+  - Repaint uses `RenderTexture`/camera render or `Canvas.ForceUpdateCanvases()` instead of `schedule_extra_frame`.
+- Hazards found: P2=1 (GL upload must run on the main/GL thread), P3=1 (wx canvas repaint hook lacks a Unity equivalent).
+- Git: Annotate CreateFontStyleImagesJob for Unity port
+- Next recommended Phase 1 task: T433 annotate: src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.hpp
 ## Phase 1 - Task T431 complete
 - Task type: annotate
 - File: src/slic3r/GUI/Jobs/CreateFontNameImageJob.hpp
