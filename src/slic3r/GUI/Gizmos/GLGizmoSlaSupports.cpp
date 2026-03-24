@@ -34,6 +34,7 @@ GLGizmoSlaSupports::GLGizmoSlaSupports(GLCanvas3D& parent, const std::string& ic
 
 bool GLGizmoSlaSupports::on_init()
 {
+    // [STATE] Register the shortcut and localized labels that the ImGui input window later reuses for sliders, buttons, and tooltips.
     m_shortcut_key = WXK_CONTROL_L;
 
     m_desc["head_diameter"]    = _L("Head diameter") + ": ";
@@ -54,6 +55,7 @@ bool GLGizmoSlaSupports::on_init()
 
 void GLGizmoSlaSupports::set_sla_support_data(ModelObject* model_object, const Selection& selection)
 {
+    // [STATE] Refresh model-specific caches and restore supports visibility whenever the active object or selection changes so the gizmo reflects the newly focused SLA part.
     if (! m_c->selection_info())
         return;
 
@@ -77,6 +79,7 @@ void GLGizmoSlaSupports::set_sla_support_data(ModelObject* model_object, const S
 
 void GLGizmoSlaSupports::on_render()
 {
+    // [OPENGL] Draw blend-enabled support glyphs, selection rect, and clipping planes each frame; [STATE] relies on cached cone/sphere/cylinder meshes so the GPU doesn't reinitialize every update, and [UNITY] this would map to a `MonoBehaviour` issuing `Graphics.DrawMesh` while mirroring the clipping plane state via a `MeshRenderer` shader.
     if (!m_cone.is_initialized())
         m_cone.init_from(its_make_cone(1.0, 1.0, double(PI) / 12.0));
     if (!m_sphere.is_initialized())
@@ -110,6 +113,7 @@ void GLGizmoSlaSupports::on_render()
 
 void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
 {
+    // [INTENT] Paint support point glyphs by walking either the auto-generated cache or the manual editing cache, coloring by hover/selection and respecting clipping; [OPENGL] this loop configures shader uniforms and toggles front-face winding for left-handed volumes, [STATE] toggles between `m_editing_cache` and `m_normal_cache`, and [UNITY] it maps to a Unity `MonoBehaviour` updating `Graphics.DrawMesh` with per-instance matrices and a shared material.
     const size_t cache_size = m_editing_mode ? m_editing_cache.size() : m_normal_cache.size();
 
     const bool has_points = (cache_size != 0);
@@ -246,6 +250,7 @@ void GLGizmoSlaSupports::render_points(const Selection& selection, bool picking)
 
 
 
+// [STATE][PORTING_HAZARD:P3] Uses the object clipper to avoid rendering/placing supports when the model is sliced away; Unity port needs an equivalent plane test before honoring new points.
 bool GLGizmoSlaSupports::is_mesh_point_clipped(const Vec3d& point) const
 {
     if (m_c->object_clipper()->get_position() == 0.)
@@ -265,6 +270,7 @@ bool GLGizmoSlaSupports::is_mesh_point_clipped(const Vec3d& point) const
 
 // Unprojects the mouse position on the mesh and saves hit point and normal of the facet into pos_and_normal
 // Return false if no intersection was found, true otherwise.
+// [EVENT][THREAD] Queries the shared raycaster on the UI thread and respects the clipping plane so point picks stay aligned with the visible mesh; Unity should mirror this via a `Collider.Raycast` + clipping mask check.
 bool GLGizmoSlaSupports::unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec3f, Vec3f>& pos_and_normal)
 {
     if (! m_c->raycaster()->raycaster())
@@ -315,6 +321,7 @@ bool GLGizmoSlaSupports::unproject_on_mesh(const Vec2d& mouse_pos, std::pair<Vec
 }
 
 // Following function is called from GLCanvas3D to inform the gizmo about a mouse/keyboard event.
+// [EVENT] Handles control/key-driven editing modes, selection rectangle, auto-generation triggers, and clipping adjustments while returning true if the gizmo consumed the event; [PORTING_HAZARD:P2] Unity ports must replicate this branching in their input handling layer rather than relying on wxWidgets event propagation.
 // The gizmo has an opportunity to react - if it does, it should return true so that the Canvas3D is
 // aware that the event was reacted to and stops trying to make different sense of it. If the gizmo
 // concludes that the event was not intended for it, it should return false.
@@ -497,6 +504,7 @@ bool GLGizmoSlaSupports::gizmo_event(SLAGizmoEventType action, const Vec2d& mous
     return false;
 }
 
+// [STATE] Mutates the editing cache while taking undo/redo snapshots so removal flows through the undo stack correctly.
 void GLGizmoSlaSupports::delete_selected_points(bool force)
 {
     if (! m_editing_mode) {
@@ -517,6 +525,7 @@ void GLGizmoSlaSupports::delete_selected_points(bool force)
 
 void GLGizmoSlaSupports::on_update(const UpdateData& data)
 {
+    // [THREAD] Runs on the canvas update loop to keep hovered points clamped to the surface; avoids touching worker threads.
     if (! m_editing_mode)
         return;
     else {
@@ -531,6 +540,7 @@ void GLGizmoSlaSupports::on_update(const UpdateData& data)
     }
 }
 
+// [STATE] Walks object/printed preset configs with default fallbacks so the slider panel always has option metadata even when custom values are missing.
 std::vector<const ConfigOption*> GLGizmoSlaSupports::get_config_options(const std::vector<std::string>& keys) const
 {
     std::vector<const ConfigOption*> out;
@@ -602,6 +612,7 @@ void GLGizmoSlaSupports::make_line_segments() const
 */
 
 
+// [INTENT][EVENT] Draws the ImGui toolbar that toggles between auto-generation sliders and editing controls; [UNITY] replicate with a UI Toolkit window and `Button`/`Slider` components paired with a MonoBehaviour that mirrors `m_editing_mode` state.
 void GLGizmoSlaSupports::on_render_input_window(float x, float y, float bottom_limit)
 {
     static float last_y = 0.0f;
@@ -838,6 +849,7 @@ RENDER_AGAIN:
         m_parent.set_as_dirty();
 }
 
+// [STATE] Gates activation to SLA printers with a single-instance selection and no invalid volumes; Unity ports should map to a `CanActivate` check that mirrors these constraints.
 bool GLGizmoSlaSupports::on_is_activable() const
 {
     const Selection& selection = m_parent.get_selection();
@@ -855,6 +867,7 @@ bool GLGizmoSlaSupports::on_is_activable() const
     return true;
 }
 
+// [STATE] Ensures the gizmo is exposed only when an SLA printer preset is chosen.
 bool GLGizmoSlaSupports::on_is_selectable() const
 {
     return (wxGetApp().preset_bundle->printers.get_edited_preset().printer_technology() == ptSLA);
@@ -865,6 +878,7 @@ std::string GLGizmoSlaSupports::on_get_name() const
     return _u8L("SLA Support Points");
 }
 
+// [STATE] Declares dependencies such as the raycaster, clippers, and support clipper so the manager provides them before rendering.
 CommonGizmosDataID GLGizmoSlaSupports::on_get_requirements() const
 {
     return CommonGizmosDataID(
@@ -878,6 +892,7 @@ CommonGizmosDataID GLGizmoSlaSupports::on_get_requirements() const
 
 
 
+// [THREAD][PORTING_HAZARD:P2] Dialog spawn happens via `CallAfter` to avoid reentrancy on OSX; Unity will need to marshal similar confirmations back onto the main thread when the user toggles the gizmo state.
 void GLGizmoSlaSupports::ask_about_changes_call_after(std::function<void()> on_yes, std::function<void()> on_no)
 {
     wxGetApp().CallAfter([on_yes, on_no]() {
@@ -894,6 +909,7 @@ void GLGizmoSlaSupports::ask_about_changes_call_after(std::function<void()> on_y
 }
 
 
+// [STATE][EVENT] Handles activation/deactivation transitions, guarding against losing manual edits by prompting via `ask_about_changes_call_after` when the gizmo is toggled off.
 void GLGizmoSlaSupports::on_set_state()
 {
     if (m_state == m_old_state)
@@ -923,6 +939,7 @@ void GLGizmoSlaSupports::on_set_state()
 
 
 
+// [STATE] Stash the prior grabber state so undo/redo and drag rollback work correctly.
 void GLGizmoSlaSupports::on_start_dragging()
 {
     if (m_hover_id != -1) {
@@ -935,6 +952,7 @@ void GLGizmoSlaSupports::on_start_dragging()
 }
 
 
+// [STATE][EVENT] Commits movement snapshots by comparing stored positions and ensures the undo/redo snapshot includes the drag delta.
 void GLGizmoSlaSupports::on_stop_dragging()
 {
     if (m_hover_id != -1) {

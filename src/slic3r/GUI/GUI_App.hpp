@@ -148,6 +148,8 @@ static wxString dots("...", wxConvUTF8);
 #endif
 
 #define VERSION_LEN 4
+// [INTENT] Captures release metadata for update dialogs so bootstrap flows can prompt forced or optional upgrades.
+// [UNITY] Mirror this data in a ScriptableObject or JSON asset consumed by the Unity settings manager.
 class VersionInfo
 {
 public:
@@ -217,6 +219,7 @@ public:
 // [INTENT] Main application class managing wxWidgets lifecycle and UI orchestration
 // [UNITY] Replace wxApp with MonoBehaviour on persistent GameObject (ScriptableObject for state)
 // [PORTING_HAZARD:P1] wxApp is a singleton - Unity needs MonoBehaviour on a GameObject
+// [STATE] Centralizes state for windows, printers, networking, and dialogs so other systems know when globals are live.
 class GUI_App : public wxApp
 {
 public:
@@ -224,7 +227,7 @@ public:
     enum class EAppMode : unsigned char { Editor, GCodeViewer };
 
 private:
-    // [STATE] Application initialization state flags
+    // [STATE] Lifecycle guards used by OnInit/PostInit to know when configs and UI are ready and to avoid re-entrant GUI recreation loops.
     bool     m_initialized{false};         // [UNITY] Replace with MonoBehaviour Awake/Start state
     bool     m_post_initialized{false};    // [UNITY] Replace with scene loading state
     bool     m_app_conf_exists{false};     // [UNITY] Replace with ScriptableObject existence check
@@ -241,6 +244,7 @@ private:
 #endif
 
     // #ifdef _WIN32
+    // [STATE] Cached palette colors keep theme lookups localized so dark-mode updates flip once per toggle instead of per repaint.
     wxColour m_color_label_modified;
     wxColour m_color_label_sys;
     wxColour m_color_label_default;
@@ -253,6 +257,7 @@ private:
     bool     m_force_colors_update{false};
     // #endif
 
+    // [STATE] Font objects drive toolbar/menu layout and tooltip sizing; Unity would wrap font assets via TMP references.
     wxFont m_small_font;
     wxFont m_bold_font;
     wxFont m_normal_font;
@@ -262,17 +267,21 @@ private:
     int m_em_unit; // width of a "m"-symbol in pixels for current system font
                    // Note: for 100% Scale m_em_unit = 10 -> it's a good enough coefficient for a size setting of controls
 
+    // [STATE] Locale references coordinate translation selection; Unity would rely on LocalizationSettings or a dedicated LanguageManager asset.
     std::unique_ptr<wxLocale> m_wxLocale;
     // System language, from locales, owned by wxWidgets.
     const wxLanguageInfo* m_language_info_system = nullptr;
     // Best translation language, provided by Windows or OSX, owned by wxWidgets.
     const wxLanguageInfo* m_language_info_best = nullptr;
 
-    OpenGLManager                          m_opengl_mgr;              // [OPENGL] OpenGL lifecycle management
+    OpenGLManager m_opengl_mgr; // [OPENGL] OpenGL lifecycle management; [UNITY] Unity handles this via its builtin graphics pipeline.
     std::unique_ptr<RemovableDriveManager> m_removable_drive_manager; // [STATE] Removable drive tracking
 
-    std::unique_ptr<ImGuiWrapper>                m_imgui; // [UNITY] ImGuiWrapper -> Unity UI Toolkit or custom ImGui implementation
-    std::unique_ptr<PrintHostJobQueue>           m_printhost_job_queue;            // [THREAD] Background job queue
+    // [UNITY] ImGuiWrapper overlays immediate-mode UI; Unity should port this layer to UI Toolkit or Canvas controllers.
+    // [THREAD] ImGuiWrapper hooks run on the main thread because wxWidgets is not thread-safe for concurrent redraws.
+    std::unique_ptr<ImGuiWrapper> m_imgui;
+    // [THREAD] PrintHostJobQueue pumps background uploads; Unity would re-implement as async Tasks/Coroutines inside a PrintHostService.
+    std::unique_ptr<PrintHostJobQueue>           m_printhost_job_queue;
     std::unique_ptr<OtherInstanceMessageHandler> m_other_instance_message_handler; // [EVENT] Inter-process communication
     std::unique_ptr<wxSingleInstanceChecker>     m_single_instance_checker;        // [STATE] Ensure single instance
     std::string                                  m_instance_hash_string;
@@ -281,11 +290,13 @@ private:
     std::unique_ptr<Downloader> m_downloader; // [THREAD] Background file downloading
 
     // BBS
-    std::atomic<bool>                  m_is_closing{false};       // [STATE] App shutdown state
-    Slic3r::DeviceManager*             m_device_manager{nullptr}; // [STATE] Connected printer manager
-    Slic3r::UserManager*               m_user_manager{nullptr};   // [STATE] User session manager
-    Slic3r::TaskManager*               m_task_manager{nullptr};   // [THREAD] Background task coordination
-    NetworkAgent*                      m_agent{nullptr};          // [STATE] Networking interface
+    // [STATE][THREAD] signals app shutdown so worker threads can observe and exit before wxApp destructs.
+    std::atomic<bool>      m_is_closing{false};
+    Slic3r::DeviceManager* m_device_manager{nullptr}; // [STATE] Connected printer manager
+    Slic3r::UserManager*   m_user_manager{nullptr};   // [STATE] User session manager
+    Slic3r::TaskManager*   m_task_manager{nullptr};   // [THREAD] Background task coordination
+    NetworkAgent*          m_agent{nullptr};          // [STATE] Networking interface
+    // [STATE] Preset cleanup buffers used to unblock UI actions after sync/cancel sequences; Unity should copy to a SettingsSync component.
     std::vector<std::string>           need_delete_presets;
     std::vector<bool>                  m_create_preset_blocked{false, false, false, false, false, false};
     bool                               m_networking_compatible{false};

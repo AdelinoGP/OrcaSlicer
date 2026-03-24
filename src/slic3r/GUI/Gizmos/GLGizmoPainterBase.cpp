@@ -18,8 +18,10 @@
 
 namespace Slic3r::GUI {
 
+// [STATE][OPENGL][UNITY][PORTING_HAZARD:P3] Cache the cursor sphere mesh so repeated renders reuse the same GLModel; Unity should expose a shared MeshRenderer instead of rebuilding.
 std::shared_ptr<GLModel> GLGizmoPainterBase::s_sphere = nullptr;
 
+// [INTENT][STATE] Initialize axis filters now so derived painters can resolve movement constraints before the first drag event.
 GLGizmoPainterBase::GLGizmoPainterBase(GLCanvas3D& parent, const std::string& icon_filename, unsigned int sprite_id)
     : GLGizmoBase(parent, icon_filename, sprite_id)
 {
@@ -33,6 +35,7 @@ GLGizmoPainterBase::~GLGizmoPainterBase()
         s_sphere.reset();
 }
 
+// [INTENT][EVENT][STATE][THREAD][UNITY][PORTING_HAZARD:P2] Refresh triangle selectors on selection updates without blocking UI events; Unity can map this to SelectionChanged→Repaint.
 void GLGizmoPainterBase::data_changed(bool is_serializing)
 {
     if (m_state != On)
@@ -52,6 +55,7 @@ void GLGizmoPainterBase::data_changed(bool is_serializing)
     }
 }
 
+// [INTENT][OPENGL][UNITY] Translate the object clipper into shader uniforms so the painter culls geometry the same way Unity would.
 GLGizmoPainterBase::ClippingPlaneDataWrapper GLGizmoPainterBase::get_clipping_plane_data() const
 {
     ClippingPlaneDataWrapper clp_data_out{{0.f, 0.f, 1.f, FLT_MAX}, {-FLT_MAX, FLT_MAX}};
@@ -73,6 +77,7 @@ GLGizmoPainterBase::ClippingPlaneDataWrapper GLGizmoPainterBase::get_clipping_pl
     return clp_data_out;
 }
 
+// [INTENT][OPENGL][PORTING_HAZARD:P2][STATE][UNITY] Draw the selection triangles through a dedicated shader pass so Unity can reuse Graphics.DrawMesh + MeshCollider state.
 void GLGizmoPainterBase::render_triangles(const Selection& selection) const
 {
     auto* shader = wxGetApp().get_shader("mm_gouraud");
@@ -131,6 +136,7 @@ void GLGizmoPainterBase::render_triangles(const Selection& selection) const
     }
 }
 
+// [INTENT][EVENT][OPENGL][STATE][UNITY] Raycast every frame and switch cursor primitives so Unity can replicate the GraphicRaycaster + reticle logic.
 void GLGizmoPainterBase::render_cursor()
 {
     // First check that the mouse pointer is on an object.
@@ -169,6 +175,7 @@ void GLGizmoPainterBase::render_cursor()
     }
 }
 
+// [STATE][OPENGL][UNITY][PORTING_HAZARD:P2] Build the circle reticle mesh per zoom/viewport so Unity can re-create it through a LineRenderer overlay.
 void GLGizmoPainterBase::render_cursor_circle()
 {
     const Size cnv_size = m_parent.get_canvas_size();
@@ -303,6 +310,7 @@ void GLGizmoPainterBase::render_cursor_circle()
 }
 
 
+// [STATE][OPENGL][PORTING_HAZARD:P3][UNITY] Reuse the cached sphere geometry and recolor it so Unity can keep one MeshRenderer/live color value instead of reiniting the mesh.
 void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
 {
     if (s_sphere == nullptr) {
@@ -347,7 +355,7 @@ void GLGizmoPainterBase::render_cursor_sphere(const Transform3d& trafo) const
     shader->stop_using();
 }
 
-// BBS
+// [INTENT][OPENGL][STATE][UNITY][PORTING_HAZARD:P2] Draw the height range brush contours so Unity can rebuild the same overlay per volume.
 void GLGizmoPainterBase::render_cursor_height_range(const Transform3d& trafo) const
 {
     GLShaderProgram *shader = wxGetApp().get_shader("flat");
@@ -406,6 +414,7 @@ void GLGizmoPainterBase::render_cursor_height_range(const Transform3d& trafo) co
     shader->stop_using();
 }
 
+// [INTENT][STATE][UNITY] Track the combined bounds of active volumes so Unity can align gizmo activation overlays with the same extents.
 BoundingBoxf3 GLGizmoPainterBase::bounding_box() const
 {
     BoundingBoxf3 ret;
@@ -419,6 +428,7 @@ BoundingBoxf3 GLGizmoPainterBase::bounding_box() const
     return ret;
 }
 
+// [INTENT][STATE][OPENGL][UNITY][PORTING_HAZARD:P2] Keep per-volume contour cache synchronized with cursor height so Unity can rebuild the same paint silhouettes.
 void GLGizmoPainterBase::update_contours(int i, const TriangleMesh& vol_mesh, float cursor_z, float max_z, float min_z) const
 {
     const Selection& selection = m_parent.get_selection();
@@ -456,6 +466,7 @@ void GLGizmoPainterBase::update_contours(int i, const TriangleMesh& vol_mesh, fl
             m_cut_contours[i].contours.reset();
 }
 
+// [STATE][OPENGL][UNITY][PORTING_HAZARD:P2] Apply the object clipper in cursor math so Unity can reuse the same plane-filtered points.
 bool GLGizmoPainterBase::is_mesh_point_clipped(const Vec3d& point, const Transform3d& trafo) const
 {
     if (m_c->object_clipper()->get_position() == 0.)
@@ -470,6 +481,7 @@ bool GLGizmoPainterBase::is_mesh_point_clipped(const Vec3d& point, const Transfo
 // Interpolate points between the previous and current mouse positions, which are then projected onto the object.
 // Returned projected mouse positions are grouped by mesh_idx. It may contain multiple std::vector<GLGizmoPainterBase::ProjectedMousePosition>
 // with the same mesh_idx, but all items in std::vector<GLGizmoPainterBase::ProjectedMousePosition> always have the same mesh_idx.
+// [INTENT][EVENT][THREAD][UNITY][PORTING_HAZARD:P2] Trace and simplify every interpolated raycast so brush strokes stay contiguous; Unity should mirror this with batched Physics.Raycast calls.
 std::vector<std::vector<GLGizmoPainterBase::ProjectedMousePosition>> GLGizmoPainterBase::get_projected_mouse_positions(const Vec2d &mouse_position, const double resolution, const std::vector<Transform3d> &trafo_matrices) const
 {
     // List of mouse positions that will be used as seeds for painting.
@@ -588,7 +600,7 @@ std::vector<std::vector<GLGizmoPainterBase::ProjectedMousePosition>> GLGizmoPain
     return mesh_hit_points_by_mesh;
 }
 
-// BBS
+// [INTENT][STATE][EVENT][OPENGL][UNITY][PORTING_HAZARD:P2] Build the height-range footprints per mesh so Unity can emit the same overlay via MeshCollider height queries.
 std::vector<GLGizmoPainterBase::ProjectedHeightRange> GLGizmoPainterBase::get_projected_height_range(
     const Vec2d& mouse_position,
     double resolution,

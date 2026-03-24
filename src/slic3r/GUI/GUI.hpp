@@ -23,6 +23,8 @@ namespace Slic3r {
 
 // [INTENT][UNITY] Namespace providing global UI-related helper functions, platform-specific shortcuts, menu/toolbar wiring, and GL/preview
 // coordination so Unity’s MainMenu + RenderTexture controllers can hook into the same helpers.
+// [STATE][EVENT][UNITY] Tracks the shared menu/tool caches, GL preview timers, and config change emitters so a single Unity controller can
+// mirror wxMenuBar lifetime events and keep RenderTexture refreshes aligned.
 namespace GUI {
 
 // [PORTING_HAZARD:P2] No direct equivalent; requires native plugin for OS-level power management.
@@ -86,17 +88,25 @@ void show_substitutions_info(const ConfigSubstitutions& config_substitutions, co
 // [STATE][EVENT][THREAD] Builds checkbox list state backed by a bitmask string so Unity can present the same selections without losing
 // contextual text. Unity must run this on the main thread (matching wxWidgets) and reimplement as UI Toolkit Checkbox list dialogs with the
 // same bitmask semantics.
+// [UNITY] Mirror this helper with a UI Toolkit `Toggle` list bound to a ScriptableObject-stored bitmask so the serialized flags stay in
+// sync with the wxComboCtrl state. [PORTING_HAZARD:P3] The underlying string bitmask encodes option order, so reusing the same order when
+// Unity deserializes is mandatory; a mismatch will scramble persisted settings.
 void create_combochecklist(wxComboCtrl* comboCtrl, const std::string& text, const std::string& items);
 
 // [STATE] Reads the checkbox bitmask so other parts of the UI know which entries remain checked.
 // [THREAD] The caller assumes this runs on the GUI thread to avoid wxComboCtrl races.
+// [UNITY] Unity should treat this as reading from the same ScriptableObject mask, using `Enum.ToObject`/`Flags` to keep port parity.
+// [PORTING_HAZARD:P3] Recreating the bitmask in C# must preserve per-bit meaning; any drift will flip unrelated settings during round trips.
 unsigned int combochecklist_get_flags(wxComboCtrl* comboCtrl);
 // [STATE] Writes the checkbox bitmask when the caller updates the combo selection.
 // [THREAD] Must execute on the UI thread to keep wxComboCtrl in a safe state.
+// [UNITY] Map this to the same ScriptableObject mask write so Unity can replay the change via the SelectionModel transformer.
 void combochecklist_set_flags(wxComboCtrl* comboCtrl, unsigned int flags);
 
 // [INTENT] Keeps a single conversion boundary between wxString and UTF-8 so other UI helpers rely on consistent encoding.
 // [UNITY] Generally handled by native C# System.Text.Encoding and System.IO.Path.
+// [PORTING_HAZARD:P3][THREAD] These helpers live on the UI thread and must be reimplemented using `System.Text.Encoding.UTF8`/`Path`
+// helpers so Unity reproduces identical path normalization and label encoding instead of re-converting in multiple places.
 wxString                from_u8(const std::string& str);
 std::string             into_u8(const wxString& str);
 wxString                from_path(const boost::filesystem::path& path);

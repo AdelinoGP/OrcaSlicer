@@ -46,6 +46,10 @@
 
 ## Fixes
 
+### mem-1774279479-de76
+> failure: cmd=cmake -S . -B build -DCMAKE_BUILD_TYPE=Release, error=source directory does not contain CMakeLists.txt, next=confirm build instructions or skip runtime tests for documentation-only work
+<!-- tags: tooling, build | created: 2026-03-23 -->
+
 ### mem-1774268687-da18
 > failure: cmd=cmake -S . -B build -DCMAKE_BUILD_TYPE=Release, error=source directory does not contain CMakeLists.txt, next=verify build instructions or skip build for this repo
 <!-- tags: tooling, build | created: 2026-03-23 -->
