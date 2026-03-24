@@ -4794,3 +4794,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1×PORTING_HAZARD:P3 (bulk texture upload needs main-thread queue)
 - Git: Annotate IconManager for Unity port
 - Next recommended Phase 1 task: T414 annotate: src/slic3r/GUI/ImageGrid.cpp
+## Phase 1 - Task T414 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/ImageGrid.cpp
+- Deliverables: src/slic3r/GUI/ImageGrid.cpp, .ralph/agent/handoff.md
+- Substantive additions: 4 Unity/thread guidance comments around group mode, selection state, and scroll handling
+- Verification excerpt: // [UNITY] Unity's virtualized ScrollView should keep this selection focus by updating the bound model instead of forcing a full layout refresh.
+- Unity-impact summary:
+  - Multi-select and group-mode toggles now map explicitly to UI Toolkit SelectionModel/VisualElement flows.
+  - Scroll/wheel handling is documented as UI-thread bound so Unity InputSystem handlers can reuse the same math.
+- Hazards found: 3 (P2 synchronous DownloadCheckFiles rerun, P3 manual alpha/gradient ramps, P3 shadow border drawing)
+- Git: Annotate ImageGrid for Unity port
+- Next recommended Phase 1 task: task-1773880086-9900 T417 annotate: src/slic3r/GUI/IMSlider.cpp

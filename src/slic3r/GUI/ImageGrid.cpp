@@ -125,6 +125,8 @@ void Slic3r::GUI::ImageGrid::SetGroupMode(int mode)
     m_scroll_offset = 0;
     // [STATE] m_row_offset/scroll_offset reset ensures the UI refocus keeps the previous selection in view when GroupMode toggles.
     // [EVENT] This logic runs on user menu actions, so it must rely on PrinterFileSystem events to refresh the new subgroup.
+    // [UNITY] Unity should mirror this menu transition with VisualElement buttons that trigger the same GroupMode change + async ScrollView
+    // layout recalculation before repaint.
 }
 
 void Slic3r::GUI::ImageGrid::SetSelecting(bool selecting)
@@ -134,7 +136,8 @@ void Slic3r::GUI::ImageGrid::SetSelecting(bool selecting)
         m_file_sys->SelectAll(false);
     Refresh();
     // [STATE] Toggles the multi-selection mode so mouse clicks either toggle checkboxes or navigate sub-groups; hooks into
-    // PrinterFileSystem::SelectAll to clear prior selections immediately.
+    // PrinterFileSystem::SelectAll to clear prior selections immediately. [UNITY] Unity UI Toolkit should bind this toggle to VisualElement
+    // classes so the same InputSystem clicks can swap between overlayed checkboxes and navigation hits.
 }
 
 void Slic3r::GUI::ImageGrid::DoActionOnSelection(int action) { DoAction(-1, action); }
@@ -178,6 +181,7 @@ void Slic3r::GUI::ImageGrid::Select(size_t index)
         m_row_offset = m_row_count == 0 ? 0 : m_row_count - 1;
     m_scroll_offset = 0;
     Refresh();
+    // [UNITY] Unity's virtualized ScrollView should keep this selection focus by updating the bound model instead of forcing a full layout refresh.
 }
 
 void Slic3r::GUI::ImageGrid::DoAction(size_t index, int action)
@@ -413,6 +417,7 @@ void ImageGrid::mouseWheelMoved(wxMouseEvent& event)
         m_row_offset = m_row_count == 0 ? 0 : m_row_count - 1;
     m_scroll_offset -= delta * m_cell_size.GetHeight();
     m_timer.StartOnce(4000); // Show position bar
+    // [THREAD] wxMouseEvent and wxTimer callbacks all run on the UI thread so Unity's InputSystem scroll handler can reuse this math without locking.
     // [STATE] wheel movement adjusts m_row_offset/m_scroll_offset so each wheel tick scrolls a quarter row; timer re-triggers to show new
     // position indicator.
     UpdateFocusRange();

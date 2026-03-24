@@ -1092,3 +1092,5 @@
 ## Iteration update
 - Completed T421 annotate `src/slic3r/GUI/InstanceCheck.cpp`, capturing cross-instance bootstrap state, event posting to wx, and the Linux DBus listener threading while mapping hazards to Unity equivalents.
 - Next plan: start `T422 annotate: src/slic3r/GUI/InstanceCheck.hpp` to document the header-level event declarations, state flags, and platform-specific hooks alongside Unity port guidance.
+## Iteration plan - T414 annotate ImageGrid.cpp
+- Goal: analyze grid drawing zoom helpers and overlay events so Unity port knows caching/state/events, then add tags and evidence entry
