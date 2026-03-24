@@ -17,6 +17,9 @@ class Plater;
 // [INTENT] Background job for automated object arrangement.
 // [STATE] Stores polygons for selected, unselected, unprintable, and locked objects.
 // [UNITY] Replaced by a custom C# arrangement system or Unity Job System integration.
+// [INTENT] Header for the ArrangeJob, which defines the interface for the background arrangement process.
+// [STATE] Includes members for tracking selected, unselected, and locked items during the job.
+// [UNITY] Map `ArrangeJob` to a `C# Job` or `Task` that implements `IArrangementTask` interface.
 class ArrangeJob : public Job
 {
     using ArrangePolygon  = arrangement::ArrangePolygon;
