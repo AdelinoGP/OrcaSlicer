@@ -881,3 +881,7 @@
 ## Iteration plan update
 - Selected task: T172 annotate `src/slic3r/GUI/BBLStatusBarPrint.hpp` (next ready target after the print bar cpp).
 - Plan: start task `task-1773880087-...` (if already created) or ensure it exists, read the header thoroughly, annotate the class intent, gauge/button/link layout, print-progress and cancel state caches, event handlers, and worker hints with `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P3]` tags that mention Unity analogs (Canvas VisualElement + MainThreadDispatcher + `Button` command). After adding annotations, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only `BBLStatusBarPrint.hpp` plus any metadata, close T172, and then stop this iteration so another agent can proceed.
+
+## Iteration plan update
+- Selected task: T173 annotate `src/slic3r/GUI/BBLStatusBarSend.cpp`
+- Plan: mark the runtime task active, read `BBLStatusBarSend.cpp` end-to-end, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` annotations around the custom send-status indicators, cancel/retry button hooks, gauge state handling, `wxQueueEvent` dispatches, and network callback resilience; note Unity analogs (UI Toolkit VisualElement panel + `UnityWebRequest` background worker marshaled back via `MainThreadDispatcher`) and hazard notes about wx event ownership. Record the evidence block in `.ralph/agent/handoff.md`, stage/commit the annotated source plus metadata, close T173, and then end this iteration.

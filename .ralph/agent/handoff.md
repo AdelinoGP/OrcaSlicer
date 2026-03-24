@@ -4243,3 +4243,19 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3: custom wxCommandEvent + msw_rescale dependency must be swapped for Unity-friendly dispatching/DPI handling).
 - Git: chore: annotate BBLStatusBarPrint.hpp
 - Next recommended Phase 1 task: T173 annotate: src/slic3r/GUI/BBLStatusBarSend.cpp
+
+## Phase 1 - Task T173 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/BBLStatusBarSend.cpp
+- Deliverables: src/slic3r/GUI/BBLStatusBarSend.cpp
+- Substantive additions: Added multi-tag guidance around send-progress layout, cancel and error link state, event wiring, and Unity mapping notes so the network send row can be reproduced reliably.
+- Verification excerpt: // [EVENT] Parent panels subscribe to these custom commands to reveal error diagnostics or fail overlays.
+- Unity-impact summary:
+  - UI Toolkit `VisualElement` row with `ProgressBar`, percent text, and cancel `Button` mirrors the wx gauge layout.
+  - Error toggle uses a clickable `Label` + `Image` pair tied to `MainThreadDispatcher` events instead of `wxQueueEvent`.
+  - Cancel/state bits map to `CancellationTokenSource` + boolean flags for send jobs driven by `UnityWebRequest` or similar.
+- Hazards found: 1x P3 (wxQueueEvent requires owning parent handlers).
+- Git: Annotate BBL send status bar interactions
+- Next recommended Phase 1 task: T174 annotate: src/slic3r/GUI/BBLStatusBarSend.hpp
+- Next recommended Phase 1 task: T174 annotate: src/slic3r/GUI/BBLStatusBarSend.hpp

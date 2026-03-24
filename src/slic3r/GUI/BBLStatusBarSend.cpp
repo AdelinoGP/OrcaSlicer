@@ -16,17 +16,20 @@
 
 namespace Slic3r {
 
+// [EVENT] Parent panels subscribe to these custom commands to reveal error diagnostics or fail overlays.
+// [UNITY] In Unity this becomes MainThreadDispatcher posts to `VisualElement` error link callbacks before showing the `Panel`.
 wxDEFINE_EVENT(EVT_SHOW_ERROR_INFO_SEND, wxCommandEvent);
 wxDEFINE_EVENT(EVT_SHOW_ERROR_FAIL_SEND, wxCommandEvent);
 
-BBLStatusBarSend::BBLStatusBarSend(wxWindow *parent, int id)
- : m_self{new wxPanel(parent, id == -1 ? wxID_ANY : id)}
-    , m_sizer(new wxBoxSizer(wxHORIZONTAL))
+BBLStatusBarSend::BBLStatusBarSend(wxWindow* parent, int id)
+    : m_self{new wxPanel(parent, id == -1 ? wxID_ANY : id)}, m_sizer(new wxBoxSizer(wxHORIZONTAL))
 {
-    m_self->SetBackgroundColour(wxColour(255,255,255));
+    // [INTENT] This hods a send-progress row with text, gauge, links and a cancel button so the parent frame stays responsive.
+    // [STATE] Layout mirrors DPI via `FromDIP` and caches `m_prog` + `m_cancelbutton` visibility so the Unity port can use UI Toolkit + ProgressBar.
+    m_self->SetBackgroundColour(wxColour(255, 255, 255));
 
-    wxBoxSizer *m_sizer_body = new wxBoxSizer(wxVERTICAL);
-    wxBoxSizer *m_sizer_bottom = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* m_sizer_body   = new wxBoxSizer(wxVERTICAL);
+    wxBoxSizer* m_sizer_bottom = new wxBoxSizer(wxHORIZONTAL);
 
     m_status_text = new wxStaticText(m_self, wxID_ANY, wxEmptyString);
     m_status_text->SetForegroundColour(wxColour(107, 107, 107));
@@ -34,17 +37,17 @@ BBLStatusBarSend::BBLStatusBarSend(wxWindow *parent, int id)
     m_status_text->SetMaxSize(wxSize(m_self->FromDIP(360), m_self->FromDIP(40)));
 
     m_prog = new wxGauge(m_self, wxID_ANY, 100, wxDefaultPosition, wxSize(-1, m_self->FromDIP(6)), wxGA_HORIZONTAL);
-    m_prog->SetMinSize(wxSize(m_self->FromDIP(300),m_self->FromDIP(6)));
+    m_prog->SetMinSize(wxSize(m_self->FromDIP(300), m_self->FromDIP(6)));
     m_prog->SetValue(0);
 
-    //StateColor btn_bd_white(std::pair<wxColour, int>(*wxWHITE, StateColor::Disabled), std::pair<wxColour, int>(wxColour(38, 46, 48), StateColor::Enabled));
+    // StateColor btn_bd_white(std::pair<wxColour, int>(*wxWHITE, StateColor::Disabled), std::pair<wxColour, int>(wxColour(38, 46, 48),
+    // StateColor::Enabled));
 
     m_cancelbutton = new Button(m_self, _L("Cancel"));
     m_cancelbutton->SetStyle(ButtonStyle::Regular, ButtonType::Choice);
-    m_cancelbutton->Bind(wxEVT_BUTTON,
-        [this](wxCommandEvent &evt) {
-        cancel();
-    });
+    m_cancelbutton->Bind(wxEVT_BUTTON, [this](wxCommandEvent& evt) { cancel(); });
+    // [EVENT] Cancel button fires `cancel()` which sets `m_was_cancelled` and optionally invokes the final callback; Unity should wire
+    // `Button.clicked` to a `CancellationToken` trigger.
 
     m_stext_percent = new wxStaticText(m_self, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, 0);
     m_stext_percent->SetForegroundColour(wxColour(107, 107, 107));
@@ -52,40 +55,51 @@ BBLStatusBarSend::BBLStatusBarSend(wxWindow *parent, int id)
     m_stext_percent->Wrap(-1);
 
     m_sizer_status_text = new wxBoxSizer(wxHORIZONTAL);
-    m_link_show_error = new Label(m_self, _L("Check the reason"));
+    m_link_show_error   = new Label(m_self, _L("Check the reason"));
     m_link_show_error->SetForegroundColour(wxColour("#6b6b6b"));
     m_link_show_error->SetFont(::Label::Head_13);
 
-    m_bitmap_show_error_close = create_scaled_bitmap("link_more_error_close", nullptr, 7);
-    m_bitmap_show_error_open = create_scaled_bitmap("link_more_error_open", nullptr, 7);
-    m_static_bitmap_show_error = new wxStaticBitmap(m_self, wxID_ANY, m_bitmap_show_error_open, wxDefaultPosition, wxSize(m_self->FromDIP(7), m_self->FromDIP(7)));
+    m_bitmap_show_error_close  = create_scaled_bitmap("link_more_error_close", nullptr, 7);
+    m_bitmap_show_error_open   = create_scaled_bitmap("link_more_error_open", nullptr, 7);
+    m_static_bitmap_show_error = new wxStaticBitmap(m_self, wxID_ANY, m_bitmap_show_error_open, wxDefaultPosition,
+                                                    wxSize(m_self->FromDIP(7), m_self->FromDIP(7)));
 
-    m_link_show_error->Bind(wxEVT_ENTER_WINDOW, [this](auto& e) {this->m_self->SetCursor(wxCURSOR_HAND); });
-    m_link_show_error->Bind(wxEVT_LEAVE_WINDOW, [this](auto& e) {this->m_self->SetCursor(wxCURSOR_ARROW); });
+    m_link_show_error->Bind(wxEVT_ENTER_WINDOW, [this](auto& e) { this->m_self->SetCursor(wxCURSOR_HAND); });
+    m_link_show_error->Bind(wxEVT_LEAVE_WINDOW, [this](auto& e) { this->m_self->SetCursor(wxCURSOR_ARROW); });
     m_link_show_error->Bind(wxEVT_LEFT_DOWN, [this](auto& e) {
-        if (!m_show_error_info_state) { m_show_error_info_state = true; m_static_bitmap_show_error->SetBitmap(m_bitmap_show_error_close); }
-        else { m_show_error_info_state = false; m_static_bitmap_show_error->SetBitmap(m_bitmap_show_error_open); }
+        if (!m_show_error_info_state) {
+            m_show_error_info_state = true;
+            m_static_bitmap_show_error->SetBitmap(m_bitmap_show_error_close);
+        } else {
+            m_show_error_info_state = false;
+            m_static_bitmap_show_error->SetBitmap(m_bitmap_show_error_open);
+        }
         wxCommandEvent* evt = new wxCommandEvent(EVT_SHOW_ERROR_INFO_SEND);
         wxQueueEvent(this->m_self->GetParent(), evt);
     });
-
+    // [STATE][EVENT] Clicking the link flips `m_show_error_info_state`; the Unity analog is a `Label` + `Image` pair that toggles and
+    // dispatches through `MainThreadDispatcher`. [PORTING_HAZARD:P3] `wxQueueEvent` requires the parent window to own the handler, unlike
+    // Unity Events which can marshal via `UnityMainThreadDispatcher`.
 
     m_link_show_error->Hide();
     m_static_bitmap_show_error->Hide();
 
-
-    m_static_bitmap_show_error->Bind(wxEVT_ENTER_WINDOW, [this](auto& e) {this->m_self->SetCursor(wxCURSOR_HAND); });
-    m_static_bitmap_show_error->Bind(wxEVT_LEAVE_WINDOW, [this](auto& e) {this->m_self->SetCursor(wxCURSOR_ARROW); });
+    m_static_bitmap_show_error->Bind(wxEVT_ENTER_WINDOW, [this](auto& e) { this->m_self->SetCursor(wxCURSOR_HAND); });
+    m_static_bitmap_show_error->Bind(wxEVT_LEAVE_WINDOW, [this](auto& e) { this->m_self->SetCursor(wxCURSOR_ARROW); });
     m_static_bitmap_show_error->Bind(wxEVT_LEFT_DOWN, [this](auto& e) {
-        if (!m_show_error_info_state) {m_show_error_info_state = true;m_static_bitmap_show_error->SetBitmap(m_bitmap_show_error_close);}
-        else {m_show_error_info_state = false;m_static_bitmap_show_error->SetBitmap(m_bitmap_show_error_open);}
+        if (!m_show_error_info_state) {
+            m_show_error_info_state = true;
+            m_static_bitmap_show_error->SetBitmap(m_bitmap_show_error_close);
+        } else {
+            m_show_error_info_state = false;
+            m_static_bitmap_show_error->SetBitmap(m_bitmap_show_error_open);
+        }
         wxCommandEvent* evt = new wxCommandEvent(EVT_SHOW_ERROR_INFO_SEND);
         wxQueueEvent(this->m_self->GetParent(), evt);
     });
 
-
     m_sizer_status_text->Add(m_link_show_error, 0, wxLEFT | wxALIGN_CENTER, 0);
-    m_sizer_status_text->Add(m_static_bitmap_show_error, 0, wxLEFT | wxTOP| wxALIGN_CENTER, m_self->FromDIP(2));
+    m_sizer_status_text->Add(m_static_bitmap_show_error, 0, wxLEFT | wxTOP | wxALIGN_CENTER, m_self->FromDIP(2));
 
     m_sizer_bottom->Add(m_prog, 1, wxALIGN_CENTER, 0);
     m_sizer_bottom->Add(m_stext_percent, 0, wxALIGN_CENTER | wxLEFT | wxRIGHT, 10);
@@ -105,20 +119,16 @@ BBLStatusBarSend::BBLStatusBarSend(wxWindow *parent, int id)
     m_sizer->Fit(m_self);
 }
 
-void BBLStatusBarSend::set_prog_block()
-{
-}
+void BBLStatusBarSend::set_prog_block() {}
 
-int BBLStatusBarSend::get_progress() const
-{
-    return m_prog->GetValue();
-}
+int BBLStatusBarSend::get_progress() const { return m_prog->GetValue(); }
 
 void BBLStatusBarSend::set_progress(int val)
 {
-    if(val < 0) return;
+    if (val < 0)
+        return;
 
-    //add the logic for arrange/orient jobs, which don't call stop_busy
+    // add the logic for arrange/orient jobs, which don't call stop_busy
     if (!m_prog->IsShown()) {
         m_sizer->Show(m_prog);
         m_sizer->Show(m_cancelbutton);
@@ -127,23 +137,22 @@ void BBLStatusBarSend::set_progress(int val)
     set_percent_text(wxString::Format("%d%%", val));
 
     m_sizer->Layout();
+    // [STATE] `m_prog` and `m_cancelbutton` visibility reflect the send activity so Unity must sync the ProgressBar visibility from the
+    // same state flags.
 }
 
-int BBLStatusBarSend::get_range() const
-{
-    return m_prog->GetRange();
-}
+int BBLStatusBarSend::get_range() const { return m_prog->GetRange(); }
 
 void BBLStatusBarSend::set_range(int val)
 {
-    if(val != m_prog->GetRange()) {
+    if (val != m_prog->GetRange()) {
         m_prog->SetRange(val);
     }
 }
 
 void BBLStatusBarSend::clear_percent()
 {
-    //set_percent_text(wxEmptyString);
+    // set_percent_text(wxEmptyString);
     m_cancelbutton->Hide();
 }
 
@@ -161,6 +170,10 @@ void BBLStatusBarSend::show_error_info(wxString msg, int code, wxString descript
 
     wxCommandEvent* evt = new wxCommandEvent(EVT_SHOW_ERROR_FAIL_SEND);
     wxQueueEvent(this->m_self->GetParent(), evt);
+    // [STATE] Error mode hides the percent gauge and shows the clickable link + cancel again.
+    // [UNITY] Unity port should swap to a VisualElement info row and call back to `ShowErrorPopup` via `UnityWebRequest` failure handler.
+    // [PORTING_HAZARD:P3] Posting events into wx's queue from this helper requires living parent handlers; Unity needs explicit event
+    // dispatchers instead.
 }
 
 void BBLStatusBarSend::show_progress(bool show)
@@ -168,8 +181,7 @@ void BBLStatusBarSend::show_progress(bool show)
     if (show) {
         m_sizer->Show(m_prog);
         m_sizer->Layout();
-    }
-    else {
+    } else {
         m_sizer->Hide(m_prog);
         m_sizer->Layout();
     }
@@ -180,6 +192,8 @@ void BBLStatusBarSend::start_busy(int rate)
     m_busy = true;
     show_progress(true);
     show_cancel_button();
+    // [STATE] `m_busy` is a Guard to avoid repeated busy starts; the Unity port can mirror this with a bool and `Coroutines` to keep
+    // progress alive.
 }
 
 void BBLStatusBarSend::stop_busy()
@@ -189,19 +203,23 @@ void BBLStatusBarSend::stop_busy()
     m_prog->SetValue(0);
     m_sizer->Layout();
     m_busy = false;
+    // [STATE] Resetting the gauge also clears the busy flag so Unity can enable other UI interactions or transitions.
 }
 
 void BBLStatusBarSend::set_cancel_callback_fina(BBLStatusBarSend::CancelFn ccb)
 {
     m_cancel_cb_fina = ccb;
-     if (ccb) {
+    if (ccb) {
         m_sizer->Show(m_cancelbutton);
     } else {
         m_sizer->Hide(m_cancelbutton);
     }
+    // [STATE] The final cancel hook toggles button visibility; Unity will need to rerun `Button.visible = ccb != null` each time the
+    // listener is swapped.
 }
 
-void BBLStatusBarSend::set_cancel_callback(BBLStatusBarSend::CancelFn ccb) {
+void BBLStatusBarSend::set_cancel_callback(BBLStatusBarSend::CancelFn ccb)
+{
     /*  m_cancel_cb = ccb;
       if (ccb) {
           m_sizer->Show(m_cancelbutton);
@@ -212,14 +230,11 @@ void BBLStatusBarSend::set_cancel_callback(BBLStatusBarSend::CancelFn ccb) {
       m_sizer->Layout();*/
 }
 
-wxPanel* BBLStatusBarSend::get_panel()
-{
-    return m_self;
-}
+wxPanel* BBLStatusBarSend::get_panel() { return m_self; }
 
 bool BBLStatusBarSend::is_english_text(wxString str)
 {
-    std::regex reg("^[0-9a-zA-Z]+$");
+    std::regex  reg("^[0-9a-zA-Z]+$");
     std::smatch matchResult;
 
     std::string pattern_Special = "{}[]<>~!@#$%^&*(),.?/ :";
@@ -227,8 +242,7 @@ bool BBLStatusBarSend::is_english_text(wxString str)
         std::string regex_str = wxString(str[i]).ToStdString();
         if (std::regex_match(regex_str, matchResult, reg)) {
             continue;
-        }
-        else {
+        } else {
             int result = pattern_Special.find(regex_str.c_str());
             if (result < 0 || result > pattern_Special.length()) {
                 return false;
@@ -251,30 +265,32 @@ bool BBLStatusBarSend::format_text(wxStaticText* dc, int width, const wxString& 
                     if (dc->GetTextExtent(multiline_text.SubString(start, i)).x < width)
                         idx = i;
                     else {
-                        if (idx == size_t(-1)) idx = i;
+                        if (idx == size_t(-1))
+                            idx = i;
                         break;
                     }
                 }
             }
-            if (idx == size_t(-1)) break;
-            multiline = true;
+            if (idx == size_t(-1))
+                break;
+            multiline           = true;
             multiline_text[idx] = '\n';
-            start = idx + 1;
-            if (dc->GetTextExtent(multiline_text.Mid(start)).x < width) break;
+            start               = idx + 1;
+            if (dc->GetTextExtent(multiline_text.Mid(start)).x < width)
+                break;
         }
     }
     return multiline;
-    //return dc->GetTextExtent(multiline_text);
+    // return dc->GetTextExtent(multiline_text);
 }
-
 
 void BBLStatusBarSend::set_status_text(const wxString& txt)
 {
-    //auto txtss = "Sending the printing task has timed out.\nPlease try again!";
-    //auto txtss = "The printing project is being uploaded... 25%%";
-    //m_status_text->SetLabelText(txtss);
-    //wxString str;
-    //format_text(m_status_text, m_self->FromDIP(300), txt, str);
+    // auto txtss = "Sending the printing task has timed out.\nPlease try again!";
+    // auto txtss = "The printing project is being uploaded... 25%%";
+    // m_status_text->SetLabelText(txtss);
+    // wxString str;
+    // format_text(m_status_text, m_self->FromDIP(300), txt, str);
 
     if (m_status_text->GetTextExtent(txt).x > m_self->FromDIP(360)) {
         m_status_text->SetSize(m_self->FromDIP(360), m_self->FromDIP(40));
@@ -283,37 +299,29 @@ void BBLStatusBarSend::set_status_text(const wxString& txt)
     m_status_text->Wrap(m_self->FromDIP(360));
     m_status_text->Layout();
     m_self->Layout();
-    //if (is_english_text(str)) m_status_text->Wrap(m_self->FromDIP(280));
+    // if (is_english_text(str)) m_status_text->Wrap(m_self->FromDIP(280));
 }
 
-void BBLStatusBarSend::set_percent_text(const wxString &txt)
-{
-    m_stext_percent->SetLabelText(txt);
-}
+void BBLStatusBarSend::set_percent_text(const wxString& txt) { m_stext_percent->SetLabelText(txt); }
 
-void BBLStatusBarSend::set_status_text(const std::string& txt)
-{
-    this->set_status_text(txt.c_str());
-}
+void BBLStatusBarSend::set_status_text(const std::string& txt) { this->set_status_text(txt.c_str()); }
 
-void BBLStatusBarSend::set_status_text(const char *txt)
+void BBLStatusBarSend::set_status_text(const char* txt)
 {
     this->set_status_text(wxString::FromUTF8(txt));
     get_panel()->GetParent()->Layout();
     get_panel()->GetParent()->Update();
 }
 
-void BBLStatusBarSend::msw_rescale() {
-    //set_prog_block();
+void BBLStatusBarSend::msw_rescale()
+{
+    // set_prog_block();
     m_cancelbutton->SetMinSize(wxSize(m_self->FromDIP(56), m_self->FromDIP(24)));
 }
 
-wxString BBLStatusBarSend::get_status_text() const
-{
-    return m_status_text->GetLabelText();
-}
+wxString BBLStatusBarSend::get_status_text() const { return m_status_text->GetLabelText(); }
 
-bool BBLStatusBarSend::update_status(wxString &msg, bool &was_cancel, int percent, bool yield)
+bool BBLStatusBarSend::update_status(wxString& msg, bool& was_cancel, int percent, bool yield)
 {
     set_status_text(msg);
     if (percent >= 0)
@@ -323,6 +331,9 @@ bool BBLStatusBarSend::update_status(wxString &msg, bool &was_cancel, int percen
         wxEventLoopBase::GetActive()->YieldFor(wxEVT_CATEGORY_UI | wxEVT_CATEGORY_USER_INPUT);
     was_cancel = m_was_cancelled;
     return true;
+    // [THREAD] Optional `YieldFor` keeps the UI responsive while this status method runs on the main thread; the Unity port should call
+    // `await Task.Yield()` or run on the main loop. [STATE] `was_cancel` piggybacks the `m_was_cancelled` flag so callers can stop longer
+    // jobs; Unity equivalents can expose a `CancellationTokenSource` from `cancel()`.
 }
 
 void BBLStatusBarSend::reset()
@@ -340,10 +351,7 @@ void BBLStatusBarSend::reset()
     set_percent_text(wxString::Format("%d%%", 0));
 }
 
-void BBLStatusBarSend::set_font(const wxFont &font)
-{
-    m_self->SetFont(font);
-}
+void BBLStatusBarSend::set_font(const wxFont& font) { m_self->SetFont(font); }
 
 void BBLStatusBarSend::show_cancel_button()
 {
@@ -357,25 +365,19 @@ void BBLStatusBarSend::hide_cancel_button()
     m_sizer->Layout();
 }
 
-void BBLStatusBarSend::change_button_label(wxString name)
-{
-    m_cancelbutton->SetLabel(name);
-}
+void BBLStatusBarSend::change_button_label(wxString name) { m_cancelbutton->SetLabel(name); }
 
-void BBLStatusBarSend::disable_cancel_button()
-{
-    m_cancelbutton->Disable();
-}
+void BBLStatusBarSend::disable_cancel_button() { m_cancelbutton->Disable(); }
 
-void BBLStatusBarSend::enable_cancel_button()
-{
-    m_cancelbutton->Enable();
-}
+void BBLStatusBarSend::enable_cancel_button() { m_cancelbutton->Enable(); }
 
 void BBLStatusBarSend::cancel()
 {
     m_was_cancelled = true;
-    if (m_cancel_cb_fina) m_cancel_cb_fina();
+    if (m_cancel_cb_fina)
+        m_cancel_cb_fina();
+    // [STATE] `m_was_cancelled` is the shared cancel indicator, so Unity should mirror this with a shared bool/`CancellationTokenSource`
+    // accessible to job controllers.
 }
 
-}
+} // namespace Slic3r
