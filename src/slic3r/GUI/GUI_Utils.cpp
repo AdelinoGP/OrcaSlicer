@@ -540,8 +540,9 @@ bool generate_image(const std::string& filename, wxImage& image, wxSize img_size
 }
 
 // [STATE] Tracks the stack of modal dialogs so the GUI can navigate the chain when closing or re-focusing windows.
-// [THREAD] Muted from the UI thread; Unity's dialog manager should serialize stack operations on the main thread as well.
-// [UNITY] Unity should replicate this via a `DialogManager` that queues GameObjects and restores focus order.
+// [EVENT] Push/pop operations for this stack live inside `DPIAware::ShowModal` inside `GUI_Utils.hpp`, providing a single point to gate ESC/Cancel
+// handlers and prevent stale modal events. [THREAD] Muted from the UI thread; Unity's dialog manager should serialize stack operations on
+// the main thread as well. [UNITY] Unity should replicate this via a `DialogManager` that queues GameObjects and restores focus order.
 std::deque<wxDialog*> dialogStack;
 
 // [INTENT] Clamp dialog size so it never exceeds 80% of the current display, preventing off-screen windows.

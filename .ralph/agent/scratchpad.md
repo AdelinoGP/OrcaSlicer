@@ -29,7 +29,6 @@
 - ## Iteration update
 - - Attempted `T192 annotate: src/slic3r/GUI/Jobs/LightJob.hpp`; file is absent from the repo so the runtime task `task-1773880086-2acc` was failed and a fix memory logged. We'll pick the next ready task (likely T194 or the next accessible job) in the following turn.
 
-## Iteration plan update
 - Selected task: T403 annotate `src/slic3r/GUI/HMS.hpp` (open runtime task `task-1773880086-4a5c`).
 - Plan: read the header top-to-bottom to understand the HMS cache, action slots, and toolbar link points, then sprinkle `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P2]` tags around class intent, cached assets, event binding hooks, and the OpenGL preview helpers, append the required Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header plus metadata, close the task, and stop after this single atomic change so the next iteration can continue.
 - Selected task: T449 annotate: src/slic3r/GUI/Jobs/RotoptimizeJob.cpp (as manifest file exists and is reachable).
@@ -418,6 +417,11 @@
 - Verification: rely on manual inspection that each block explains state/event context and Unity mapping since this change is documentation-only.
 ## Iteration plan update
 - Selected task: T142 annotate `src/slic3r/GUI/2DBed.hpp` as the next goal.
+
+## Iteration plan update
+- Current focus: T398 annotate `src/slic3r/GUI/GUI_Utils.cpp` (task-1773880086-d4b6 active after recent start).
+- Plan: read the full source, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2]` comments for each helper that impacts menu/toolbar setup, config propagation, GL preview refresh, or worker bridging; highlight caches, event wiring, and Unity mapping (e.g., UI Toolkit `VisualElement` helpers, `RenderTexture` preview, ScriptableObject config sync); append the mandatory Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated file, close the task, and stop for this iteration.
+- Verification: rely on the annotation coverage itself (doc-only) and ensure comments outline state/event flows plus Unity migration hazards.
 - Plan: confirm the header matches the already annotated `2DBed.cpp`, read the full file, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD]` annotations for the view geometry, transform flags, event handlers, and canvas state, append the mandatory evidence block to `.ralph/agent/handoff.md`, update `.ralph/ralph-tasks.md` to `[~]` then `[x]`, commit the annotated header, and then end the iteration so another agent continues.
 
 ## Iteration plan update

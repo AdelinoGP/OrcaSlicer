@@ -4548,3 +4548,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3:2 (blocking file dialogs + `boost::filesystem` calls on the UI thread).
 - Git: annotate: src/slic3r/GUI/BedShapeDialog.cpp
 - Next recommended Phase 1 task: T178 annotate: src/slic3r/GUI/BedShapeDialog.hpp
+
+## Phase 1 - Task T398 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Utils.cpp
+- Deliverables: src/slic3r/GUI/GUI_Utils.cpp
+- Substantive additions: 1 event/state note clarifying how `dialogStack` meshes with `DPIAware::ShowModal` to order modal handlers.
+- Verification excerpt: // [EVENT] Push/pop operations for this stack live inside `DPIAware::ShowModal` inside `GUI_Utils.hpp`, providing a single point to gate ESC/Cancel handlers and prevent stale modal events.
+- Unity-impact summary:
+  - Keep modal window operations on the Unity main thread and mirror the stack with a `DialogManager` that serializes show/hide lifecycle events.
+  - Ensure ESC/cancel shortcuts query the top-most modal reference before firing so the Unity `InputSystem` reuses the same modal stack order as wxWidgets.
+- Hazards found: 1 (P3 stale modal event dispatch if the stack order is lost).
+- Git: Annotate modal dialog stack events in GUI utils
+- Next recommended Phase 1 task: T400 annotate: src/slic3r/GUI/HintNotification.cpp
