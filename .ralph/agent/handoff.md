@@ -4577,3 +4577,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P3 stale modal event dispatch if the stack order is lost).
 - Git: Annotate modal dialog stack events in GUI utils
 - Next recommended Phase 1 task: T400 annotate: src/slic3r/GUI/HintNotification.cpp
+
+## Phase 1 - Task T401 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/HintNotification.hpp
+- Deliverables: src/slic3r/GUI/HintNotification.hpp
+- Substantive additions: Added `[THREAD]`/`[PORTING_HAZARD:P3]` guidance on the hint database navigation, the hint notification class, and the timer-driven `retrieve_data` path so Unity ports understand the UI-thread queue and dispatcher requirements.
+- Verification excerpt: // [INTENT][STATE][THREAD][PORTING_HAZARD:P3][UNITY] Floating Did-You-Know notification managed by NotificationManager's wxTimer-driven queue; lives entirely on the UI thread so Unity must host it inside a VisualElement row synced by a DispatcherTimer/coroutine to prevent cross-thread updates.
+- Unity-impact summary:
+  - Model the notification as a `VisualElement` row rendered by a MonoBehaviour that schedules updates via `DispatcherTimer`/coroutines instead of `wxTimer`.
+  - Keep `HintDatabase::get_hint` and `retrieve_data` on the main thread via a `MainThreadDispatcher` before mutating VisualElements, preserving the sequential navigation logic used by the wxWidgets queue.
+- Hazards found: P3 (wxTimer queue/dispatcher mismatch for hint refreshes)
+- Git: annotate: src/slic3r/GUI/HintNotification.hpp
+- Next recommended Phase 1 task: T402 annotate: src/slic3r/GUI/HMS.cpp

@@ -54,7 +54,8 @@ public:
     void operator=(HintDatabase const&) = delete;
 
     // return true if HintData filled;
-    // [EVENT][PORTING_HAZARD:P2] Queries the singleton on the UI dispatcher so Unity can wrap this in its main-thread notification routine.
+    // [EVENT][THREAD][PORTING_HAZARD:P2] Queries the singleton from the UI dispatcher before rendering so Unity can wrap this in its
+    // main-thread notification routine.
     HintData* get_hint(HintDataNavigation nav);
     size_t    get_index() { return m_hint_id; }
     size_t    get_count()
@@ -92,7 +93,9 @@ private:
     std::vector<std::string> m_used_ids;
     bool                     m_used_ids_loaded{false}; // [STATE] signals the persisted "used" set is available before deduping
 };
-// [INTENT][UNITY] Floating Did-You-Know notification that draws via ImGui and can be replaced in Unity with a Canvas overlay + GraphicRaycaster
+// [INTENT][STATE][THREAD][PORTING_HAZARD:P3][UNITY] Floating Did-You-Know notification managed by NotificationManager's wxTimer-driven
+// queue; lives entirely on the UI thread so Unity must host it inside a VisualElement row synced by a DispatcherTimer/coroutine to prevent
+// cross-thread updates.
 class NotificationManager::HintNotification : public NotificationManager::PopNotification
 {
 public:
@@ -136,8 +139,8 @@ protected:
         ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y);
     // [OPENGL] Displays the notification icon texture; Unity can layer this onto a `VisualElement` background image.
     void render_logo(ImGuiWrapper& imgui, const float win_size_x, const float win_size_y, const float win_pos_x, const float win_pos_y);
-    // [STATE][EVENT][THREAD][UNITY] Queries `HintDatabase` to refresh the displayed `HintData` on the UI thread and pushes updates back
-    // into ImGui; Unity should serialize the same call through a `MainThreadDispatcher` before mutating VisualElements.
+    // [STATE][EVENT][THREAD][UNITY][PORTING_HAZARD:P3] Queries `HintDatabase` to refresh the displayed `HintData` while NotificationManager's
+    // wxTimer enqueues updates; Unity must replay this as a DispatcherTimer coroutine to keep VisualElements on the main thread.
     void retrieve_data(bool new_hint = true);
     // [PORTING_HAZARD:P2][EVENT][UNITY] Bridge to `wxGetApp()`'s browser warning dialog; Unity must dispatch through `MainThreadDispatcher`
     // to show a confirmation overlay before calling `Application.OpenURL` so the same warning gating exists.
