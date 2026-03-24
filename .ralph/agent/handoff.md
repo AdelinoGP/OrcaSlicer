@@ -4591,3 +4591,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3 (wxTimer queue/dispatcher mismatch for hint refreshes)
 - Git: annotate: src/slic3r/GUI/HintNotification.hpp
 - Next recommended Phase 1 task: T402 annotate: src/slic3r/GUI/HMS.cpp
+## Phase 1 - Task T178 complete
+- Task type: annotate
+- File: src/slic3r/GUI/BedShapeDialog.hpp
+- Deliverables: src/slic3r/GUI/BedShapeDialog.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md
+- Substantive additions: multi-tag annotations describing bed shape page intent, cached state, event wiring, and DPI handling (INTENT/STATE/EVENT/THREAD/UNITY/PORTING_HAZARD)
+- Verification excerpt: // [INTENT] Capture the dialog's canonical bed outline and parameter helpers so the UI can switch between rectangles, circles, or custom polygons.
+- Unity-impact summary:
+  - Rebuild the BedShapePanel as a UI Toolkit VisualElement tree with a `PopupField<ListView>` plus RenderTexture preview camera so the rectangle/circle/custom options can replay the Simplebook logic.
+  - Map DPI notifications to `Display.onDpiChanged` and re-layout the UI Toolkit window, matching the wxSimplebook resizing hooks.
+- Hazards found: 1 (P3: wxSimplebook/DPI resizing must be rewritten because Unity has no equivalent layout auto-resizing)
+- Git: Annotate BedShape dialog header for Unity port
+- Next recommended Phase 1 task: T179 annotate: src/slic3r/GUI/BindDialog.cpp

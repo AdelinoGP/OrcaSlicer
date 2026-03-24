@@ -1020,3 +1020,7 @@
 ## Iteration plan update
 - Current iteration plan: start `T401 annotate: src/slic3r/GUI/HintNotification.hpp` (runtime task `task-1773880086-1cb9` now active).
 - Plan: read the header end-to-end, add `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P3]` annotations covering the notifier queue, timer-driven refresh, button hooks, and hazard spots (event ownership, cross-thread queueing); append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header plus metadata, close T401, and stop for this iteration as required.
+
+## Iteration plan update
+- Current iteration plan: start `T178 annotate: src/slic3r/GUI/BedShapeDialog.hpp` once the runtime task exists.
+- Plan: ensure the task uses key `gui:T178`, read the header end-to-end, insert `[INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P3]` comments for the bed options, preview, and event hooks, note Unity analogs (UI Toolkit ListView panel + ScriptableObject config bindings) and hazards (custom texture/model loaders shipping manual file dialog states), append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit the annotated header plus metadata, close the task, and stop this iteration.
