@@ -4617,3 +4617,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2:3 (Simplebook layout + DPI resizes, BindJob worker-thread handshake, DeviceManager global cleanup), P3:4 (per-digit focus handling, error toggle cursor state, avatar `CallAfter`, async unbind guard)
 - Git: Annotate BindDialog for Unity port
 - Next recommended Phase 1 task: T180 annotate: src/slic3r/GUI/BindDialog.hpp
+
+## Phase 1 - Task T402 complete
+- Task type: annotate
+- File: src/slic3r/GUI/HMS.cpp
+- Deliverables: src/slic3r/GUI/HMS.cpp
+- Substantive additions: 7 targeted annotations covering thread handling, Unity bridges, and new porting hazards for HMS cache helpers
+- Verification excerpt: // [THREAD] Uses `Slic3r::Http` synchronously so the calling UI thread blocks until the request completes; [UNITY] dispatch an async UnityWebRequest plus a main-thread continuation before updating UI; [PORTING_HAZARD:P3] Any `boost::format` or `HMSQuery::build_query_params` expectations must be replaced with platform-standard URL builders.
+- Unity-impact summary:
+  - Guard HMS downloads inside a coroutine that updates a ScriptableObject-based HMSService, keeping `AppConfig`/stealth flags in sync with Unity's PlayerSettings.
+  - Capture the HMS JSON cache/file names in Unity-friendly dictionaries so the local image cache and wiki URL builder keep referencing the same persistent paths.
+- Hazards found: 2 (P2 reliance on `wxGetApp()` singleton configuration, P3 blocking filesystem copies and writes on the main thread)
+- Git: annotate: src/slic3r/GUI/HMS.cpp
+- Next recommended Phase 1 task: T403 annotate: src/slic3r/GUI/HMS.hpp

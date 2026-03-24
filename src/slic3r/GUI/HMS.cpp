@@ -23,8 +23,8 @@ namespace Slic3r { namespace GUI {
 int get_hms_info_version(std::string& version)
 {
     // [STATE] Guard read-only config state (AppConfig, stealth mode) before contacting HMS.
-    // [THREAD] Uses `Slic3r::Http` synchronously so the calling UI thread blocks until the request completes; the Unity port should
-    // dispatch an async UnityWebRequest plus a main-thread continuation. [PORTING_HAZARD:P3] Any `boost::format` or
+    // [THREAD] Uses `Slic3r::Http` synchronously so the calling UI thread blocks until the request completes; [UNITY] dispatch an async
+    // UnityWebRequest plus a main-thread continuation before updating UI; [PORTING_HAZARD:P3] Any `boost::format` or
     // `HMSQuery::build_query_params` expectations must be replaced with platform-standard URL builders.
     AppConfig* config = wxGetApp().app_config;
     if (!config)
@@ -65,8 +65,8 @@ int get_hms_info_version(std::string& version)
 // [INTENT] Synchronize remote HMS info/action bundles with local JSON caches so UI helpers can read device-specific messages offline.
 // [STATE] Tracks `local_version`, `lang`, and `to_save_local` to avoid redundant writes and include query parameters.
 // [EVENT] HTTP completion/error handlers mutate `receive_json` and log/propagate diagnostic states.
-// [THREAD] `perform_sync()` blocks the caller, so the Unity port should wrap similar logic in a coroutine with retries on the main thread.
-// [PORTING_HAZARD:P2] Relies on `wxGetApp()` for config and `json` layout assumptions (e.g., `result`, `data`, `version`).
+// [THREAD] `perform_sync()` blocks the caller; [UNITY] wrap this in a UnityWebRequest coroutine (with retries) while marshaling results back
+// to main-thread state. [PORTING_HAZARD:P2] Relies on `wxGetApp()` for config and `json` layout assumptions (e.g., `result`, `data`, `version`).
 int HMSQuery::download_hms_related(const std::string& hms_type, const std::string& dev_id_type, json* receive_json)
 {
     std::string local_version = "0";
@@ -148,7 +148,8 @@ int HMSQuery::download_hms_related(const std::string& hms_type, const std::strin
 static void _copy_dir(const fs::path& from_dir, const fs::path& to_dir) /* copy and override with local files*/
 {
     // [INTENT] Mirror shipped HMS assets into the local data directory so the offline cache can be seeded when network downloads fail.
-    // [THREAD] Recursive filesystem walks run synchronously; Unity should move this to a background Task or Job to avoid UI hitches.
+    // [THREAD] Recursive filesystem walks run synchronously; [UNITY] run this work in a background Task/Job that copies StreamingAssets to
+    // Application.persistentDataPath; [PORTING_HAZARD:P3] blocking filesystem work on the main thread will stutter Unity's UI thread.
     try {
         if (!fs::exists(from_dir)) {
             return;
@@ -240,6 +241,9 @@ int HMSQuery::save_to_local(std::string lang, std::string hms_type, std::string 
     // [INTENT] Serialize the HMS JSON to persistent storage so repeated lookups jumpstart from the latest cloud data.
     // [EVENT] Called lazily after new data arrives, so replicating this in Unity means invoking a File Write job immediately after the
     // WebRequest completes.
+    // [UNITY] Use `File.WriteAllText` (or `UnityWebRequest` + `File.WriteAllBytes` on a background Task) under
+    // `Application.persistentDataPath` so the cached JSON mirrors the desktop layout; [PORTING_HAZARD:P3] guard against missing directories
+    // and blocked I/O on the main thread.
     if (data_dir().empty()) {
         BOOST_LOG_TRIVIAL(error) << "HMS: save_to_local, data_dir() is empty";
         return -1;
@@ -282,6 +286,8 @@ std::string HMSQuery::build_query_params(std::string& lang)
 {
     std::string lang_code = HMSQuery::hms_language_code();
     // [STATE] Echo the resolved language back via `lang` so callers can persist it when writing JSON files.
+    // [UNITY] Mirror this logic by reading `LocalizationSettings.SelectedLocale` before caching the value in Service state so the
+    // downstream cache files stay consistent.
     lang                     = lang_code;
     std::string query_params = (boost::format("lang=%1%") % lang_code).str();
     return query_params;
@@ -290,7 +296,8 @@ std::string HMSQuery::build_query_params(std::string& lang)
 std::string HMSQuery::get_hms_file(std::string hms_type, std::string lang, std::string dev_id_type)
 {
     // [INTENT] Map HMS type/dev_id to the correct local filename so caching/saving uses predictable paths for Unity's Resource cache.
-    // [PORTING_HAZARD:P3] Unity ports must treat `dev_id_type` prefixes as the key for HMS lookups instead of relying on wxWidgets-specific logic.
+    // [PORTING_HAZARD:P3] Unity ports must treat `dev_id_type` prefixes as the key for HMS lookups instead of relying on wxWidgets-specific
+    // logic. [UNITY] Mirror these filenames inside a ScriptableObject table so Unity caches reference paths under similar keys.
     if (hms_type.compare(QUERY_HMS_ACTION) == 0) {
         return (boost::format("hms_action_%1%.json") % dev_id_type).str();
     }
@@ -338,6 +345,8 @@ wxString HMSQuery::_query_hms_msg(const string& dev_id_type, const string& long_
 {
     // [INTENT] Use cached JSON to match `long_error_code` to localized intro text, logging gaps for debugging.
     // [STATE] `m_hms_info_jsons[dev_id_type]` is refreshed via `init_hms_info`, so missing keys log errors.
+    // [UNITY] Cache these dictionaries inside `HmsService` and expose `GetMessage` so UI code always reads from the warmed map before
+    // falling back to downloads.
     if (long_error_code.empty()) {
         return wxEmptyString;
     }

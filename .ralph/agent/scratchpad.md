@@ -1029,3 +1029,6 @@
 - Selected task: T179 annotate `src/slic3r/GUI/BindDialog.cpp`
 - Understanding: the dialog handles both ping-entry binding flows and standard device binding, combining multi-page status panels, privacy consent controls, and bind/unbind jobs that surface status bar updates plus failure info; porting to Unity requires capturing those UI states, event channels, and worker callbacks behind a VisualElement dialog + MonoBehaviour.
 - Plan: read `BindDialog.cpp` end-to-end, sprinkle `[INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD:P2]` comments on the pin-entry dialog, binding job lifecycle, error panels, agreement toggles, and avatar/thumbnail loading, call out the network and worker thread boundaries, append the Phase 1 evidence block to `.ralph/agent/handoff.md`, stage/commit only `BindDialog.cpp` plus metadata, close T179, and end this iteration.
+## Iteration plan update
+- Selected task: T402 annotate src/slic3r/GUI/HMS.cpp (runtime task task-1773880086-330c active now).
+- Plan: read HMS.cpp fully, insert [INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD:P2] comments around cache sync, action/button resolution, image handling, and wiki fetch flows, append the Phase 1 evidence block to .ralph/agent/handoff.md, commit the single file, close the task, and stop for this iteration.
