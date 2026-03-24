@@ -56,6 +56,9 @@ static ColorRGBA decode_color_to_float_array(const std::string color)
     return ret;
 }
 
+// [INTENT][STATE][UNITY] Utility that normalizes color edits into a float array used by widget style caches; Unity ports can
+// reuse this when populating `Color` and `Color32` fields from string identifiers before applying theme overrides.
+
 // [INTENT][THREAD][PORTING_HAZARD:P3] Copy helpers are used from UI entry points (e.g., installers, exports) so errors are surfaced
 // immediately; Unity will need to marshal file operations back to the main thread and show an overlay.
 extern CopyFileResult copy_file_gui(const std::string& from,
@@ -475,6 +478,8 @@ private:
     {
         wxCheckBox* cbox;
 
+        // [STATE][PORTING_HAZARD:P3][UNITY] Extra panel caches checkbox state for the dialog payload; Unity would pair a `Toggle` and
+        // `Panel` inside a modal `UIDocument` to keep user preferences bound to the last selection.
         ExtraPanel(wxWindow* parent);
         static wxWindow* ctor(wxWindow* parent);
     };
@@ -493,14 +498,20 @@ private:
     WindowMetrics() : maximized(false) {}
 
 public:
-    static WindowMetrics                  from_window(wxTopLevelWindow* window);
+    // [INTENT][STATE][UNITY][PORTING_HAZARD:P3] Capture the owning frame's bounds/maximized state so launch/persists can restore geometry
+    // across sessions; Unity should hydrate `SerializedObject` data into RectTransforms plus an `isMaximized` flag before applying layout.
+    static WindowMetrics from_window(wxTopLevelWindow* window);
+    // [STATE][UNITY] Deserialize persisted geometry strings so Unity can reconstruct the `Rect` + `bool` pair prior to repositioning windows.
     static boost::optional<WindowMetrics> deserialize(const std::string& str);
 
     const wxRect& get_rect() const { return rect; }
     bool          get_maximized() const { return maximized; }
 
-    void        sanitize_for_display(const wxRect& screen_rect);
-    void        center_for_display(const wxRect& screen_rect);
+    // [STATE][THREAD][UNITY] Helpers invoked when displays change so Unity's canvas scaler can clamp RectTransforms to visible screens.
+    void sanitize_for_display(const wxRect& screen_rect);
+    // [STATE][UNITY] Center logic that maps saved metrics onto the current screen; Unity should mimic by centering `RectTransform` hierarchies.
+    void center_for_display(const wxRect& screen_rect);
+    // [STATE][UNITY] Serialize geometry for persistence after drags/resizes so UI settings match user preference later.
     std::string serialize() const;
 };
 
@@ -524,6 +535,7 @@ class TaskTimer
 public:
     TaskTimer(std::string task_name);
 
+    // [STATE][THREAD][UNITY] Logs duration on destruction so UI threads can collect telemetry like Unity's `ProfilerMarker` use.
     ~TaskTimer();
 };
 

@@ -4150,6 +4150,19 @@ This prompt governs **Phase 1 only**.
 - Git: doc: annotate GUI_Utils utilities
 - Next recommended Phase 1 task: T399 annotate: src/slic3r/GUI/GUI_Utils.hpp
 
+## Phase 1 - Task T399 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GUI_Utils.hpp
+- Deliverables: src/slic3r/GUI/GUI_Utils.hpp
+- Substantive additions: 6 targeted annotations clarifying color helpers, window-metric serialization, the checkbox panel state, and telemetry/event guards (INTENT/STATE/UNITY/PORTING_HAZARD tags).
+- Verification excerpt: // [INTENT][STATE][UNITY][PORTING_HAZARD:P3] Capture the owning frame's bounds/maximized state so launch/persists can restore geometry across sessions; Unity should hydrate `SerializedObject` data into RectTransforms plus an `isMaximized` flag before applying layout.
+- Unity-impact summary:
+  - Persist `WindowMetrics` into a ScriptableObject/PlayerPrefs pair so RectTransform bounds and maximize state can be restored without relying on wx geometry callbacks.
+  - Replace the checkbox-augmented file dialog with a UI Toolkit `FilePanel` + `Toggle` inside a modal overlay, and treat `EventGuard` as a `LifecycleEvent` helper that unbinds UnityEvents from the correct `GameObject` instance.
+- Hazards found: 1 (P3: DPI- and display-specific geometry must stay in sync with Unity's CanvasScaler or else windows could spawn off-screen).
+- Git: annotate: src/slic3r/GUI/GUI_Utils.hpp
+- Next recommended Phase 1 task: T400 annotate: src/slic3r/GUI/HintNotification.cpp
+
 ## Phase 1 - Task T170 complete
 - Task type: annotate
 - File: src/slic3r/GUI/BBLStatusBar.hpp
