@@ -46,6 +46,10 @@
 
 ## Fixes
 
+### mem-1774402745-eb20
+> failure: cmd=read src/slic3r/GUI/DPIFrame.cpp, error=File not found, next=reconcile handoff and manifest as this file is missing
+<!-- tags: gui, missing-file | created: 2026-03-25 -->
+
 ### mem-1774279479-de76
 > failure: cmd=cmake -S . -B build -DCMAKE_BUILD_TYPE=Release, error=source directory does not contain CMakeLists.txt, next=confirm build instructions or skip runtime tests for documentation-only work
 <!-- tags: tooling, build | created: 2026-03-23 -->
