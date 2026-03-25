@@ -4,11 +4,13 @@
 
 #include "DeviceCore/DevManager.h"
 
-namespace Slic3r {
-namespace GUI {
+namespace Slic3r { namespace GUI {
 
-MultiMachineItem::MultiMachineItem(wxWindow* parent, MachineObject* obj)
-    : DeviceItem(parent, obj)
+/*
+ [INTENT] GUI item component for listing a single machine in the Multi-Machine manager.
+ [UNITY] Use UI Toolkit ListView/VisualElement and a dedicated item controller MonoBehaviour.
+*/
+MultiMachineItem::MultiMachineItem(wxWindow* parent, MachineObject* obj) : DeviceItem(parent, obj)
 {
     SetBackgroundColour(*wxWHITE);
     SetMinSize(wxSize(FromDIP(DEVICE_ITEM_MAX_WIDTH), FromDIP(DEVICE_ITEM_MAX_HEIGHT)));
@@ -42,16 +44,11 @@ void MultiMachineItem::OnLeaveWindow(wxMouseEvent& evt)
 
 void MultiMachineItem::OnLeftDown(wxMouseEvent& evt)
 {
-    int left = FromDIP(DEVICE_LEFT_PADDING_LEFT +
-        DEVICE_LEFT_DEV_NAME +
-        DEVICE_LEFT_PRO_NAME +
-        DEVICE_LEFT_PRO_INFO);
+    int  left      = FromDIP(DEVICE_LEFT_PADDING_LEFT + DEVICE_LEFT_DEV_NAME + DEVICE_LEFT_PRO_NAME + DEVICE_LEFT_PRO_INFO);
     auto mouse_pos = ClientToScreen(evt.GetPosition());
-    auto item = this->ClientToScreen(wxPoint(0, 0));
+    auto item      = this->ClientToScreen(wxPoint(0, 0));
 
-    if (mouse_pos.x > (item.x + left) &&
-        mouse_pos.x < (item.x + left + FromDIP(90)) &&
-        mouse_pos.y > item.y &&
+    if (mouse_pos.x > (item.x + left) && mouse_pos.x < (item.x + left + FromDIP(90)) && mouse_pos.y > item.y &&
         mouse_pos.y < (item.y + DEVICE_ITEM_MAX_HEIGHT)) {
         post_event(wxCommandEvent(EVT_MULTI_DEVICE_VIEW));
     }
@@ -59,21 +56,15 @@ void MultiMachineItem::OnLeftDown(wxMouseEvent& evt)
 
 void MultiMachineItem::OnMove(wxMouseEvent& evt)
 {
-    int left = FromDIP(DEVICE_LEFT_PADDING_LEFT +
-        DEVICE_LEFT_DEV_NAME +
-        DEVICE_LEFT_PRO_NAME +
-        DEVICE_LEFT_PRO_INFO);
+    int left = FromDIP(DEVICE_LEFT_PADDING_LEFT + DEVICE_LEFT_DEV_NAME + DEVICE_LEFT_PRO_NAME + DEVICE_LEFT_PRO_INFO);
 
     auto mouse_pos = ClientToScreen(evt.GetPosition());
-    auto item = this->ClientToScreen(wxPoint(0, 0));
+    auto item      = this->ClientToScreen(wxPoint(0, 0));
 
-    if (mouse_pos.x > (item.x + left) &&
-        mouse_pos.x < (item.x + left + FromDIP(90)) &&
-        mouse_pos.y > item.y &&
+    if (mouse_pos.x > (item.x + left) && mouse_pos.x < (item.x + left + FromDIP(90)) && mouse_pos.y > item.y &&
         mouse_pos.y < (item.y + DEVICE_ITEM_MAX_HEIGHT)) {
         SetCursor(wxCURSOR_HAND);
-    }
-    else {
+    } else {
         SetCursor(wxCURSOR_ARROW);
     }
 }
@@ -91,7 +82,7 @@ void MultiMachineItem::render(wxDC& dc)
     wxMemoryDC memdc;
     wxBitmap   bmp(size.x, size.y);
     memdc.SelectObject(bmp);
-    memdc.Blit({ 0, 0 }, size, &dc, { 0, 0 });
+    memdc.Blit({0, 0}, size, &dc, {0, 0});
 
     {
         wxGCDC dc2(memdc);
@@ -105,7 +96,8 @@ void MultiMachineItem::render(wxDC& dc)
 #endif
 }
 
-void MultiMachineItem::DrawTextWithEllipsis(wxDC& dc, const wxString& text, int maxWidth, int left, int top) {
+void MultiMachineItem::DrawTextWithEllipsis(wxDC& dc, const wxString& text, int maxWidth, int left, int top)
+{
     wxSize size = GetSize();
     wxFont font = dc.GetFont();
 
@@ -115,11 +107,11 @@ void MultiMachineItem::DrawTextWithEllipsis(wxDC& dc, const wxString& text, int 
 
     if (textWidth > maxWidth) {
         wxString truncatedText = text;
-        int ellipsisWidth = dc.GetTextExtent("...").GetWidth();
-        int numChars = text.length();
+        int      ellipsisWidth = dc.GetTextExtent("...").GetWidth();
+        int      numChars      = text.length();
 
         for (int i = numChars - 1; i >= 0; --i) {
-            truncatedText = text.substr(0, i) + "...";
+            truncatedText      = text.substr(0, i) + "...";
             int truncatedWidth = dc.GetTextExtent(truncatedText).GetWidth();
 
             if (truncatedWidth <= maxWidth - ellipsisWidth) {
@@ -129,17 +121,14 @@ void MultiMachineItem::DrawTextWithEllipsis(wxDC& dc, const wxString& text, int 
 
         if (top == 0) {
             dc.DrawText(truncatedText, left, (size.y - textSize.y) / 2);
-        }
-        else {
+        } else {
             dc.DrawText(truncatedText, left, (size.y - textSize.y) / 2 - top);
         }
 
-    }
-    else {
+    } else {
         if (top == 0) {
             dc.DrawText(text, left, (size.y - textSize.y) / 2);
-        }
-        else {
+        } else {
             dc.DrawText(text, left, (size.y - textSize.y) / 2 - top);
         }
     }
@@ -153,7 +142,7 @@ void MultiMachineItem::doRender(wxDC& dc)
     int left = FromDIP(DEVICE_LEFT_PADDING_LEFT);
 
     if (obj_) {
-        //dev name
+        // dev name
         wxString dev_name = wxString::FromUTF8(obj_->get_dev_name());
         if (!obj_->is_online()) {
             dev_name = dev_name + "(" + _L("Offline") + ")";
@@ -162,7 +151,7 @@ void MultiMachineItem::doRender(wxDC& dc)
         DrawTextWithEllipsis(dc, dev_name, FromDIP(DEVICE_LEFT_DEV_NAME), left);
         left += FromDIP(DEVICE_LEFT_DEV_NAME);
 
-        //project name
+        // project name
         wxString project_name = _L("No task");
         if (obj_->is_in_printing()) {
             project_name = wxString::Format("%s", GUI::from_u8(obj_->subtask_name));
@@ -171,60 +160,54 @@ void MultiMachineItem::doRender(wxDC& dc)
         DrawTextWithEllipsis(dc, project_name, FromDIP(DEVICE_LEFT_PRO_NAME), left);
         left += FromDIP(DEVICE_LEFT_PRO_NAME);
 
-        //state
+        // state
         dc.SetFont(Label::Body_13);
         if (state_device == 0) {
             dc.SetTextForeground(*wxBLACK);
             DrawTextWithEllipsis(dc, get_state_device(), FromDIP(DEVICE_LEFT_PRO_INFO), left);
-        }
-        else if (state_device == 1) {
-            dc.SetTextForeground(wxColour(0,174,66));
+        } else if (state_device == 1) {
+            dc.SetTextForeground(wxColour(0, 174, 66));
             DrawTextWithEllipsis(dc, get_state_device(), FromDIP(DEVICE_LEFT_PRO_INFO), left);
-        }
-        else if (state_device == 2)
-        {
-            dc.SetTextForeground(wxColour(208,27,27));
+        } else if (state_device == 2) {
+            dc.SetTextForeground(wxColour(208, 27, 27));
             DrawTextWithEllipsis(dc, get_state_device(), FromDIP(DEVICE_LEFT_PRO_INFO), left);
-        }
-        else if (state_device > 2 && state_device < 7) {
+        } else if (state_device > 2 && state_device < 7) {
             dc.SetFont(Label::Body_12);
             dc.SetTextForeground(wxColour(0, 150, 136));
             if (obj_->get_curr_stage() == _L("Printing") && obj_->subtask_) {
-                //wxString layer_info = wxString::Format(_L("Layer: %d/%d"), obj_->curr_layer, obj_->total_layers);
+                // wxString layer_info = wxString::Format(_L("Layer: %d/%d"), obj_->curr_layer, obj_->total_layers);
                 wxString progress_info = wxString::Format("%d", obj_->subtask_->task_progress);
-                wxString left_time = wxString::Format("%s", get_left_time(obj_->mc_left_time));
+                wxString left_time     = wxString::Format("%s", get_left_time(obj_->mc_left_time));
 
                 DrawTextWithEllipsis(dc, progress_info + "%  |  " + left_time, FromDIP(DEVICE_LEFT_PRO_INFO), left, FromDIP(10));
 
-
-                dc.SetPen(wxPen(wxColour(233,233,233)));
-                dc.SetBrush(wxBrush(wxColour(233,233,233)));
+                dc.SetPen(wxPen(wxColour(233, 233, 233)));
+                dc.SetBrush(wxBrush(wxColour(233, 233, 233)));
                 dc.DrawRoundedRectangle(left, FromDIP(30), FromDIP(DEVICE_LEFT_PRO_INFO), FromDIP(10), 2);
 
                 dc.SetPen(wxPen(wxColour(0, 150, 136)));
                 dc.SetBrush(wxBrush(wxColour(0, 150, 136)));
-                dc.DrawRoundedRectangle(left, FromDIP(30), FromDIP(DEVICE_LEFT_PRO_INFO) * (static_cast<float>(obj_->subtask_->task_progress) / 100.0f), FromDIP(10), 2);
-            }
-            else {
+                dc.DrawRoundedRectangle(left, FromDIP(30),
+                                        FromDIP(DEVICE_LEFT_PRO_INFO) * (static_cast<float>(obj_->subtask_->task_progress) / 100.0f),
+                                        FromDIP(10), 2);
+            } else {
                 DrawTextWithEllipsis(dc, obj_->get_curr_stage(), FromDIP(DEVICE_LEFT_PRO_INFO), left);
             }
 
-        }
-        else {
+        } else {
             dc.SetTextForeground(*wxBLACK);
             DrawTextWithEllipsis(dc, get_state_device(), FromDIP(DEVICE_LEFT_PRO_INFO), left);
         }
 
         left += FromDIP(DEVICE_LEFT_PRO_INFO);
 
-        //button
+        // button
         dc.SetPen(wxPen(wxColour(38, 46, 48)));
         dc.SetBrush(wxBrush(wxColour(*wxWHITE)));
         dc.DrawRoundedRectangle(left, (size.y - FromDIP(38)) / 2, FromDIP(90), FromDIP(38), 6);
         dc.SetFont(Label::Body_14);
         dc.SetTextForeground(*wxBLACK);
-        dc.DrawText(_L("View"),left + FromDIP(90) / 2 - dc.GetTextExtent(_L("View")).x / 2, (size.y -dc.GetTextExtent(_L("View")).y) / 2);
-
+        dc.DrawText(_L("View"), left + FromDIP(90) / 2 - dc.GetTextExtent(_L("View")).x / 2, (size.y - dc.GetTextExtent(_L("View")).y) / 2);
     }
 
     if (m_hover) {
@@ -255,15 +238,14 @@ wxString MultiMachineItem::get_left_time(int mc_left_time)
 
     try {
         left_time = get_bbl_monitor_time_dhm(mc_left_time);
-    }
-    catch (...) {
+    } catch (...) {
         ;
     }
 
-    if (!left_time.empty()) left_time_text = wxString::Format("-%s", left_time);
+    if (!left_time.empty())
+        left_time_text = wxString::Format("-%s", left_time);
     return left_time_text;
 }
-
 
 MultiMachineManagerPage::MultiMachineManagerPage(wxWindow* parent)
     : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL)
@@ -276,12 +258,10 @@ MultiMachineManagerPage::MultiMachineManagerPage(wxWindow* parent)
     m_main_panel->SetBackgroundColour(*wxWHITE);
     m_main_sizer = new wxBoxSizer(wxVERTICAL);
 
-    StateColor head_bg(
-        std::pair<wxColour, int>(TABLE_HEAD_PRESSED_COLOUR, StateColor::Pressed),
-        std::pair<wxColour, int>(TABLE_HEAR_NORMAL_COLOUR, StateColor::Normal)
-    );
+    StateColor head_bg(std::pair<wxColour, int>(TABLE_HEAD_PRESSED_COLOUR, StateColor::Pressed),
+                       std::pair<wxColour, int>(TABLE_HEAR_NORMAL_COLOUR, StateColor::Normal));
 
-    //edit prints
+    // edit prints
     auto sizer_button_printer = new wxBoxSizer(wxHORIZONTAL);
     sizer_button_printer->SetMinSize(wxSize(FromDIP(DEVICE_ITEM_MAX_WIDTH), -1));
     m_button_edit = new Button(m_main_panel, _L("Edit Printers"));
@@ -294,7 +274,7 @@ MultiMachineManagerPage::MultiMachineManagerPage(wxWindow* parent)
         evt.Skip();
     });
 
-    sizer_button_printer->Add( 0, 0, 1, wxEXPAND, 5 );
+    sizer_button_printer->Add(0, 0, 1, wxEXPAND, 5);
     sizer_button_printer->Add(m_button_edit, 0, wxALIGN_CENTER, 0);
 
     m_table_head_panel = new wxPanel(m_main_panel, wxID_ANY, wxDefaultPosition, wxDefaultSize);
@@ -310,21 +290,16 @@ MultiMachineManagerPage::MultiMachineManagerPage(wxWindow* parent)
     m_printer_name->SetMinSize(wxSize(FromDIP(DEVICE_LEFT_DEV_NAME), FromDIP(DEVICE_ITEM_MAX_HEIGHT)));
     m_printer_name->SetMaxSize(wxSize(FromDIP(DEVICE_LEFT_DEV_NAME), FromDIP(DEVICE_ITEM_MAX_HEIGHT)));
     m_printer_name->SetCenter(false);
-    m_printer_name->Bind(wxEVT_ENTER_WINDOW, [&](wxMouseEvent& evt) {
-        SetCursor(wxCURSOR_HAND);
-        });
-    m_printer_name->Bind(wxEVT_LEAVE_WINDOW, [&](wxMouseEvent& evt) {
-        SetCursor(wxCURSOR_ARROW);
-        });
+    m_printer_name->Bind(wxEVT_ENTER_WINDOW, [&](wxMouseEvent& evt) { SetCursor(wxCURSOR_HAND); });
+    m_printer_name->Bind(wxEVT_LEAVE_WINDOW, [&](wxMouseEvent& evt) { SetCursor(wxCURSOR_ARROW); });
     m_printer_name->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& evt) {
         device_dev_name_big = !device_dev_name_big;
-        auto sortcb = [this](ObjState s1, ObjState s2) {
+        auto sortcb         = [this](ObjState s1, ObjState s2) {
             return device_dev_name_big ? s1.state_dev_name > s2.state_dev_name : s1.state_dev_name < s2.state_dev_name;
         };
         this->m_sort.set_role(sortcb, SortItem::SR_MACHINE_NAME, device_dev_name_big);
         this->refresh_user_device();
     });
-
 
     m_task_name = new Button(m_table_head_panel, _L("Task Name"), "", wxNO_BORDER, ICON_SINGLE_SIZE);
     m_task_name->SetBackgroundColor(TABLE_HEAR_NORMAL_COLOUR);
@@ -334,8 +309,6 @@ MultiMachineManagerPage::MultiMachineManagerPage(wxWindow* parent)
     m_task_name->SetMaxSize(wxSize(FromDIP(DEVICE_LEFT_DEV_NAME), FromDIP(DEVICE_ITEM_MAX_HEIGHT)));
     m_task_name->SetCenter(false);
 
-
-
     m_status = new Button(m_table_head_panel, _L("Device Status"), "toolbar_double_directional_arrow", wxNO_BORDER, ICON_SINGLE_SIZE);
     m_status->SetBackgroundColor(head_bg);
     m_status->SetFont(TABLE_HEAD_FONT);
@@ -343,21 +316,16 @@ MultiMachineManagerPage::MultiMachineManagerPage(wxWindow* parent)
     m_status->SetMinSize(wxSize(FromDIP(DEVICE_LEFT_PRO_INFO), FromDIP(DEVICE_ITEM_MAX_HEIGHT)));
     m_status->SetMaxSize(wxSize(FromDIP(DEVICE_LEFT_PRO_INFO), FromDIP(DEVICE_ITEM_MAX_HEIGHT)));
     m_status->SetCenter(false);
-    m_status->Bind(wxEVT_ENTER_WINDOW, [&](wxMouseEvent& evt) {
-        SetCursor(wxCURSOR_HAND);
-        });
-    m_status->Bind(wxEVT_LEAVE_WINDOW, [&](wxMouseEvent& evt) {
-        SetCursor(wxCURSOR_ARROW);
-        });
+    m_status->Bind(wxEVT_ENTER_WINDOW, [&](wxMouseEvent& evt) { SetCursor(wxCURSOR_HAND); });
+    m_status->Bind(wxEVT_LEAVE_WINDOW, [&](wxMouseEvent& evt) { SetCursor(wxCURSOR_ARROW); });
     m_status->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& evt) {
         device_state_big = !device_state_big;
-        auto sortcb = [this](ObjState s1, ObjState s2) {
+        auto sortcb      = [this](ObjState s1, ObjState s2) {
             return device_state_big ? s1.state_device > s2.state_device : s1.state_device < s2.state_device;
-            };
+        };
         this->m_sort.set_role(sortcb, SortItem::SortRule::SR_MACHINE_STATE, device_state_big);
         this->refresh_user_device();
     });
-
 
     m_action = new Button(m_table_head_panel, _L("Actions"), "", wxNO_BORDER, ICON_SINGLE_SIZE, false);
     m_action->SetBackgroundColor(TABLE_HEAR_NORMAL_COLOUR);
@@ -366,7 +334,6 @@ MultiMachineManagerPage::MultiMachineManagerPage(wxWindow* parent)
     m_action->SetMinSize(wxSize(FromDIP(DEVICE_LEFT_PRO_NAME), FromDIP(DEVICE_ITEM_MAX_HEIGHT)));
     m_action->SetMaxSize(wxSize(FromDIP(DEVICE_LEFT_PRO_NAME), FromDIP(DEVICE_ITEM_MAX_HEIGHT)));
     m_action->SetCenter(false);
-
 
     m_table_head_sizer->AddSpacer(FromDIP(DEVICE_LEFT_PADDING_LEFT));
     m_table_head_sizer->Add(m_printer_name, 0, wxALIGN_CENTER_VERTICAL, 0);
@@ -406,10 +373,8 @@ MultiMachineManagerPage::MultiMachineManagerPage(wxWindow* parent)
     m_machine_list->Layout();
 
     // add flipping page
-    StateColor ctrl_bg(
-        std::pair<wxColour, int>(CTRL_BUTTON_PRESSEN_COLOUR, StateColor::Pressed),
-        std::pair<wxColour, int>(CTRL_BUTTON_NORMAL_COLOUR, StateColor::Normal)
-    );
+    StateColor ctrl_bg(std::pair<wxColour, int>(CTRL_BUTTON_PRESSEN_COLOUR, StateColor::Pressed),
+                       std::pair<wxColour, int>(CTRL_BUTTON_NORMAL_COLOUR, StateColor::Normal));
 
     m_flipping_panel = new wxPanel(m_main_panel, wxID_ANY, wxDefaultPosition, wxDefaultSize);
     m_flipping_panel->SetMinSize(wxSize(FromDIP(DEVICE_ITEM_MAX_WIDTH), -1));
@@ -417,8 +382,8 @@ MultiMachineManagerPage::MultiMachineManagerPage(wxWindow* parent)
     m_flipping_panel->SetBackgroundColour(*wxWHITE);
 
     m_flipping_page_sizer = new wxBoxSizer(wxHORIZONTAL);
-    m_page_sizer = new wxBoxSizer(wxVERTICAL);
-    btn_last_page = new Button(m_flipping_panel, "", "go_last_plate", 0, FromDIP(20));
+    m_page_sizer          = new wxBoxSizer(wxVERTICAL);
+    btn_last_page         = new Button(m_flipping_panel, "", "go_last_plate", 0, FromDIP(20));
     btn_last_page->SetMinSize(wxSize(FromDIP(20), FromDIP(20)));
     btn_last_page->SetMaxSize(wxSize(FromDIP(20), FromDIP(20)));
     btn_last_page->SetBackgroundColor(head_bg);
@@ -436,7 +401,7 @@ MultiMachineManagerPage::MultiMachineManagerPage(wxWindow* parent)
         update_page_number();
     });
     st_page_number = new wxStaticText(m_flipping_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize);
-    btn_next_page = new Button(m_flipping_panel, "", "go_next_plate", 0, FromDIP(20));
+    btn_next_page  = new Button(m_flipping_panel, "", "go_next_plate", 0, FromDIP(20));
     btn_next_page->SetMinSize(wxSize(FromDIP(20), FromDIP(20)));
     btn_next_page->SetMaxSize(wxSize(FromDIP(20), FromDIP(20)));
     btn_next_page->SetBackgroundColor(head_bg);
@@ -454,24 +419,22 @@ MultiMachineManagerPage::MultiMachineManagerPage(wxWindow* parent)
         update_page_number();
     });
 
-    m_page_num_input = new ::TextInput(m_flipping_panel, wxEmptyString, wxEmptyString, wxEmptyString, wxDefaultPosition, wxSize(FromDIP(50), -1), wxTE_PROCESS_ENTER);
-    StateColor input_bg(std::pair<wxColour, int>(wxColour("#F0F0F1"), StateColor::Disabled), std::pair<wxColour, int>(*wxWHITE, StateColor::Enabled));
+    m_page_num_input = new ::TextInput(m_flipping_panel, wxEmptyString, wxEmptyString, wxEmptyString, wxDefaultPosition,
+                                       wxSize(FromDIP(50), -1), wxTE_PROCESS_ENTER);
+    StateColor input_bg(std::pair<wxColour, int>(wxColour("#F0F0F1"), StateColor::Disabled),
+                        std::pair<wxColour, int>(*wxWHITE, StateColor::Enabled));
     m_page_num_input->SetBackgroundColor(input_bg);
     m_page_num_input->GetTextCtrl()->SetValue("1");
     wxTextValidator validator(wxFILTER_DIGITS);
     m_page_num_input->GetTextCtrl()->SetValidator(validator);
-    m_page_num_input->GetTextCtrl()->Bind(wxEVT_TEXT_ENTER, [&](wxCommandEvent& e) {
-        page_num_enter_evt();
-    });
+    m_page_num_input->GetTextCtrl()->Bind(wxEVT_TEXT_ENTER, [&](wxCommandEvent& e) { page_num_enter_evt(); });
 
     m_page_num_enter = new Button(m_flipping_panel, _("Go"));
     m_page_num_enter->SetMinSize(wxSize(FromDIP(25), FromDIP(25)));
     m_page_num_enter->SetMaxSize(wxSize(FromDIP(25), FromDIP(25)));
     m_page_num_enter->SetBackgroundColor(ctrl_bg);
     m_page_num_enter->SetCornerRadius(FromDIP(5));
-    m_page_num_enter->Bind(wxEVT_COMMAND_BUTTON_CLICKED, [&](auto& evt) {
-        page_num_enter_evt();
-    });
+    m_page_num_enter->Bind(wxEVT_COMMAND_BUTTON_CLICKED, [&](auto& evt) { page_num_enter_evt(); });
 
     m_flipping_page_sizer->Add(0, 0, 1, wxEXPAND, 0);
     m_flipping_page_sizer->Add(btn_last_page, 0, wxALIGN_CENTER, 0);
@@ -485,7 +448,7 @@ MultiMachineManagerPage::MultiMachineManagerPage(wxWindow* parent)
 
     m_main_sizer->AddSpacer(FromDIP(16));
     m_main_sizer->Add(sizer_button_printer, 0, wxALIGN_CENTER_HORIZONTAL, 0);
-     m_main_sizer->AddSpacer(FromDIP(5));
+    m_main_sizer->AddSpacer(FromDIP(5));
     m_main_sizer->Add(m_table_head_panel, 0, wxALIGN_CENTER_HORIZONTAL, 0);
     m_main_sizer->Add(m_tip_text, 0, wxALIGN_CENTER_HORIZONTAL | wxTOP, FromDIP(50));
     m_main_sizer->Add(m_button_add, 0, wxALIGN_CENTER_HORIZONTAL | wxTOP, FromDIP(16));
@@ -516,15 +479,17 @@ void MultiMachineManagerPage::refresh_user_device(bool clear)
     m_sizer_machine_list->Clear(true);
     m_device_items.clear();
 
-    if(clear) return;
+    if (clear)
+        return;
 
     Slic3r::DeviceManager* dev = Slic3r::GUI::wxGetApp().getDeviceManager();
-    if (!dev) return;
+    if (!dev)
+        return;
 
-    auto all_machine = dev->get_my_cloud_machine_list();
+    auto all_machine  = dev->get_my_cloud_machine_list();
     auto user_machine = std::map<std::string, MachineObject*>();
 
-    //selected machine
+    // selected machine
     for (int i = 0; i < PICK_DEVICE_MAX; i++) {
         auto dev_id = wxGetApp().app_config->get("multi_devices", std::to_string(i));
 
@@ -533,7 +498,6 @@ void MultiMachineManagerPage::refresh_user_device(bool clear)
         }
     }
 
-
     m_total_count = user_machine.size();
 
     m_state_objs.clear();
@@ -541,15 +505,16 @@ void MultiMachineManagerPage::refresh_user_device(bool clear)
         sync_state(it->second);
     }
 
-    //sort
+    // sort
     if (m_sort.rule != SortItem::SortRule::SR_None) {
         std::sort(m_state_objs.begin(), m_state_objs.end(), m_sort.get_machine_call_back());
     }
 
     double result = static_cast<double>(user_machine.size()) / m_count_page_item;
-    m_total_page = std::ceil(result);
+    m_total_page  = std::ceil(result);
 
-    std::vector<ObjState> sort_devices = extractRange(m_state_objs, m_current_page * m_count_page_item, (m_current_page + 1) * m_count_page_item - 1 );
+    std::vector<ObjState>    sort_devices = extractRange(m_state_objs, m_current_page * m_count_page_item,
+                                                         (m_current_page + 1) * m_count_page_item - 1);
     std::vector<std::string> subscribe_list;
 
     for (auto i = 0; i < sort_devices.size(); ++i) {
@@ -575,19 +540,20 @@ void MultiMachineManagerPage::refresh_user_device(bool clear)
     Layout();
 }
 
-std::vector<ObjState> MultiMachineManagerPage::extractRange(const std::vector<ObjState>& source, int start, int end) {
+std::vector<ObjState> MultiMachineManagerPage::extractRange(const std::vector<ObjState>& source, int start, int end)
+{
     std::vector<ObjState> result;
 
     if (start < 0 || start > end || source.size() <= 0) {
         return result;
     }
 
-    if ( end >= source.size() ) {
+    if (end >= source.size()) {
         end = source.size();
     }
 
     auto startIter = source.begin() + start;
-    auto endIter = source.begin() + end;
+    auto endIter   = source.begin() + end;
     result.assign(startIter, endIter);
     return result;
 }
@@ -597,31 +563,24 @@ void MultiMachineManagerPage::sync_state(MachineObject* obj_)
     ObjState state_obj;
 
     if (obj_) {
-        state_obj.dev_id = obj_->get_dev_id();
+        state_obj.dev_id         = obj_->get_dev_id();
         state_obj.state_dev_name = obj_->get_dev_name();
 
         if (obj_->print_status == "IDLE") {
             state_obj.state_device = 0;
-        }
-        else if (obj_->print_status == "FINISH") {
+        } else if (obj_->print_status == "FINISH") {
             state_obj.state_device = 1;
-        }
-        else if (obj_->print_status == "FAILED") {
+        } else if (obj_->print_status == "FAILED") {
             state_obj.state_device = 2;
-        }
-        else if (obj_->print_status == "RUNNING") {
+        } else if (obj_->print_status == "RUNNING") {
             state_obj.state_device = 3;
-        }
-        else if (obj_->print_status == "PAUSE") {
+        } else if (obj_->print_status == "PAUSE") {
             state_obj.state_device = 4;
-        }
-        else if (obj_->print_status == "PREPARE") {
+        } else if (obj_->print_status == "PREPARE") {
             state_obj.state_device = 5;
-        }
-        else if (obj_->print_status == "SLICING") {
+        } else if (obj_->print_status == "SLICING") {
             state_obj.state_device = 6;
-        }
-        else {
+        } else {
             state_obj.state_device = 7;
         }
     }
@@ -632,8 +591,7 @@ bool MultiMachineManagerPage::Show(bool show)
 {
     if (show) {
         refresh_user_device();
-    }
-    else {
+    } else {
         Slic3r::DeviceManager* dev = Slic3r::GUI::wxGetApp().getDeviceManager();
         if (dev) {
             dev->subscribe_device_list(std::vector<std::string>());
@@ -646,8 +604,7 @@ void MultiMachineManagerPage::start_timer()
 {
     if (m_flipping_timer) {
         m_flipping_timer->Stop();
-    }
-    else {
+    } else {
         m_flipping_timer = new wxTimer();
     }
 
@@ -659,7 +616,7 @@ void MultiMachineManagerPage::start_timer()
 void MultiMachineManagerPage::update_page_number()
 {
     double result = static_cast<double>(m_total_count) / m_count_page_item;
-    m_total_page = std::ceil(result);
+    m_total_page  = std::ceil(result);
 
     wxString number = wxString(std::to_string(m_current_page + 1)) + " / " + wxString(std::to_string(m_total_page));
     st_page_number->SetLabel(number);
@@ -674,17 +631,14 @@ void MultiMachineManagerPage::on_timer(wxTimerEvent& event)
         btn_next_page->Enable(true);
 }
 
-void MultiMachineManagerPage::clear_page()
-{
-
-}
+void MultiMachineManagerPage::clear_page() {}
 
 void MultiMachineManagerPage::page_num_enter_evt()
 {
     btn_last_page->Enable(false);
     btn_next_page->Enable(false);
     start_timer();
-    auto value = m_page_num_input->GetTextCtrl()->GetValue();
+    auto value    = m_page_num_input->GetTextCtrl()->GetValue();
     long page_num = 0;
     if (value.ToLong(&page_num)) {
         if (page_num > m_total_page)
@@ -730,7 +684,6 @@ void MultiMachineManagerPage::msw_rescale()
     m_button_edit->SetMinSize(wxSize(FromDIP(90), FromDIP(36)));
     m_button_edit->SetMaxSize(wxSize(FromDIP(90), FromDIP(36)));
 
-
     for (const auto& item : m_device_items) {
         item->Refresh();
     }
@@ -740,5 +693,4 @@ void MultiMachineManagerPage::msw_rescale()
     Refresh();
 }
 
-} // namespace GUI
-} // namespace Slic3r
+}} // namespace Slic3r::GUI
