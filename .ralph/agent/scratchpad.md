@@ -1,10 +1,22 @@
-# Scratchpad — GUI Annotation
+# Scratchpad
 
-## 2026-03-25
-- Starting Phase 1 annotation.
-- Selected T479: `src/slic3r/GUI/Mouse3DController.cpp`
-- Plan:
-    1. Annotate `src/slic3r/GUI/Mouse3DController.cpp` according to annotation standards (INTENT, STATE, UNITY, etc.).
-    2. Ensure all requirements are met.
-    3. Update `handoff.md`.
-    4. Commit.
+## Current Task: T481 annotate: src/slic3r/GUI/MsgDialog.cpp
+
+1. Analyze `src/slic3r/GUI/MsgDialog.cpp`
+2. Apply annotations using [INTENT], [STATE], [EVENT], [UNITY] tags.
+3. Commit and update tasks/handoff.
+
+## Plan:
+1. Start T481 task.
+2. Read file.
+3. Add annotations.
+4. Run standard verifications (compile/lint).
+5. Commit and close task.
+
+## T481 annotate: src/slic3r/GUI/MsgDialog.cpp
+
+*   Status: ACTIVE
+*   Reading file content.
+*   Analyzing classes: MsgDialog, ErrorDialog, WarningDialog, MessageDialog, RichMessageDialog, InfoDialog, DownloadDialog, DeleteConfirmDialog, Newer3mfVersionDialog, NetworkErrorDialog.
+*   Goal: Annotate for Unity porting (wxWidgets to Unity UI Toolkit).
+

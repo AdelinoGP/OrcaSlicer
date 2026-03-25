@@ -399,7 +399,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [x] T478 skip-trivial: src/slic3r/GUI/MonitorPage.hpp
 - [ ] T479 annotate: src/slic3r/GUI/Mouse3DController.cpp
 - [ ] T480 annotate: src/slic3r/GUI/Mouse3DController.hpp
-- [ ] T481 annotate: src/slic3r/GUI/MsgDialog.cpp
+- [x] T481 annotate: src/slic3r/GUI/MsgDialog.cpp
 - [ ] T482 annotate: src/slic3r/GUI/MsgDialog.hpp
 - [ ] T483 annotate: src/slic3r/GUI/MultiMachine.cpp
 - [ ] T484 annotate: src/slic3r/GUI/MultiMachine.hpp

@@ -26,6 +26,7 @@
 // It provides a structured layout with a logo, content area, and optional "don't show again" checkbox and action buttons.
 // [UNITY] MsgDialog maps to a MonoBehaviour managing a UI container (e.g., Canvas, Panel) using a layout-friendly component (e.g.,
 // VerticalLayoutGroup). [PORTING_HAZARD:P1] wxWidgets layout management (Sizer) differs significantly from Unity's UI Toolkit layout.
+// Mapping needs custom logic to recreate sizer behavior in Unity via Flexbox (UI Toolkit) or layout groups (Unity UI).
 namespace Slic3r { namespace GUI {
 
 MsgDialog::MsgDialog(
@@ -90,8 +91,8 @@ MsgDialog::~MsgDialog()
 }
 
 // [INTENT] Show "Don't show again" checkbox.
-// [EVENT] Handle toggle event for 'Don't show again'
-// [UNITY] Use UnityEngine.UI.Toggle or UI Toolkit Toggle
+// [EVENT] Handle toggle event for 'Don't show again'.
+// [UNITY] Use UnityEngine.UI.Toggle (Legacy) or UI Toolkit Toggle component.
 void MsgDialog::show_dsa_button(wxString const& title)
 {
     m_checkbox_dsa = new CheckBox(this);
@@ -121,6 +122,8 @@ bool MsgDialog::get_checkbox_state()
     return false;
 }
 
+// [INTENT] Handle DPI changes for dialog buttons.
+// [UNITY] Use Unity's UI scaling logic (Canvas Scaler or UI Toolkit scaling).
 void MsgDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
     if (m_buttons.size() > 0) {
