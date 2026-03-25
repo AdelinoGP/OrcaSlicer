@@ -419,11 +419,11 @@ Last updated: 2026-03-24T21:45:45Z
 - [x] T498 annotate: src/slic3r/GUI/NetworkPluginDialog.hpp
 - [x] T499 annotate: src/slic3r/GUI/NetworkTestDialog.cpp
 - [x] T500 annotate: src/slic3r/GUI/NetworkTestDialog.hpp
-- [ ] T501 annotate: src/slic3r/GUI/Notebook.cpp
-- [ ] T502 annotate: src/slic3r/GUI/Notebook.hpp
+- [x] T501 annotate: src/slic3r/GUI/Notebook.cpp
+- [x] T502 annotate: src/slic3r/GUI/Notebook.hpp
 - [ ] T503 annotate: src/slic3r/GUI/NotificationManager.cpp
 - [ ] T504 annotate: src/slic3r/GUI/NotificationManager.hpp
-- [ ] T505 annotate: src/slic3r/GUI/OAuthDialog.cpp
+- [x] T505 annotate: src/slic3r/GUI/OAuthDialog.cpp
 - [ ] T506 annotate: src/slic3r/GUI/OAuthDialog.hpp
 - [ ] T507 annotate: src/slic3r/GUI/ObjColorDialog.cpp
 - [ ] T508 annotate: src/slic3r/GUI/ObjColorDialog.hpp

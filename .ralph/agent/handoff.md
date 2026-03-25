@@ -13,3 +13,19 @@
 - Hazards found: 2 (P1 for wxWidgets include issues; P2 for complex keyboard navigation logic in `OnNavigationKey`)
 - Git: <commit hash>
 - Next recommended Phase 1 task: T503 annotate: src/slic3r/GUI/NotificationManager.cpp
+
+## Phase 1 - Task T505 complete
+- Task type: annotate
+- File: src/slic3r/GUI/OAuthDialog.cpp
+- Deliverables: src/slic3r/GUI/OAuthDialog.cpp
+- Substantive additions: Added [INTENT], [STATE], [EVENT], [THREAD], and [UNITY] annotations covering dialog lifecycle, background job management, and browser interaction.
+- Verification excerpt: // [UNITY] Use Application.OpenURL() to open the system browser.
+- Unity-impact summary:
+    - DPIDialog maps to Unity UI Modal Dialog.
+    - wxLaunchDefaultBrowser maps to Application.OpenURL.
+    - Background job execution via worker threads maps to C# async/await or Unity Job System.
+    - Manual DPI rescaling is replaced by Unity's Canvas Scaler and layout components.
+- Hazards found: 0
+- Git: <commit subject "annotate: src/slic3r/GUI/OAuthDialog.cpp">
+- Next recommended Phase 1 task: T506 annotate: src/slic3r/GUI/OAuthDialog.hpp
+
