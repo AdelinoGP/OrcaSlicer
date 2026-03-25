@@ -1,3 +1,4 @@
+// [ANNOTATED]
 // [INTENT]
 // This file implements the `FillBedJob`, a background job that automatically
 // duplicates a selected object to fill the available space on the print bed.

@@ -1,11 +1,11 @@
 # Session Handoff
 
-_Generated: 2026-03-24 23:39:22 UTC_
+_Generated: 2026-03-25 01:34:01 UTC_
 
 ## Git Context
 
 - **Branch:** `agent/gui-analysis`
-- **HEAD:** 714fd5ce16: chore: auto-commit before merge (loop primary)
+- **HEAD:** 77c8c198d7: chore: auto-commit before merge (loop primary)
 
 ## Tasks
 
@@ -252,6 +252,7 @@ _Generated: 2026-03-24 23:39:22 UTC_
 - [x] T419 annotate: src/slic3r/GUI/IMToolbar.cpp
 - [x] T420 annotate: src/slic3r/GUI/IMToolbar.hpp
 - [x] T421 annotate: src/slic3r/GUI/InstanceCheck.cpp
+- [x] T422 annotate: src/slic3r/GUI/InstanceCheck.hpp
 - [x] T423 annotate: src/slic3r/GUI/Jobs/ArrangeJob.cpp
 - [x] T424 annotate: src/slic3r/GUI/Jobs/ArrangeJob.hpp
 - [x] T425 annotate: src/slic3r/GUI/Jobs/BindJob.cpp
@@ -284,18 +285,6 @@ _Generated: 2026-03-24 23:39:22 UTC_
 - [x] T704 annotate: src/slic3r/GUI/Widgets/StaticLine.hpp
 - [x] T170 skip-trivial: src/slic3r/GUI/GUI_ObjectManipulation.hpp
 - [x] annotate: src/slic3r/GUI/IMToolbar.cpp
-
-## Phase 1 - Task T422 complete
-- Task type: annotate
-- File: src/slic3r/GUI/InstanceCheck.hpp
-- Deliverables: src/slic3r/GUI/InstanceCheck.hpp
-- Substantive additions: Added [ANNOTATED] tag and reviewed existing high-quality documentation against Phase 1 requirements
-- Verification excerpt: // [ANNOTATED]
-- Unity-impact summary: Single instance check needs Unity `Mutex` or native plugin; IPC is OS-specific; Event system needs `EventBus` or C# delegates.
-- Hazards found: 1 (P3)
-- Git: N/A
-- Next recommended Phase 1 task: T435 annotate: src/slic3r/GUI/Jobs/EmbossJob.hpp
-
 
 ### Remaining
 
@@ -341,7 +330,6 @@ _Generated: 2026-03-24 23:39:22 UTC_
 - [ ] T369 annotate: src/slic3r/GUI/GLToolbar.hpp
 - [ ] T372 annotate: src/slic3r/GUI/GUI_AuxiliaryList.cpp
 - [ ] T383 annotate: src/slic3r/GUI/GUI.hpp
-- [ ] T422 annotate: src/slic3r/GUI/InstanceCheck.hpp
 - [ ] T435 annotate: src/slic3r/GUI/Jobs/EmbossJob.hpp
 - [ ] T436 annotate: src/slic3r/GUI/Jobs/FillBedJob.cpp
 - [ ] T437 annotate: src/slic3r/GUI/Jobs/FillBedJob.hpp
@@ -725,17 +713,17 @@ Recently modified:
 - `.ralph/agent/tasks.jsonl`
 - `.ralph/current-events`
 - `.ralph/current-loop-id`
-- `.ralph/events-20260324-233348.jsonl`
-- `.ralph/history.jsonl`
-- `.ralph/loop.lock`
-- `src/slic3r/GUI/BedShapeDialog.cpp`
+- `.ralph/events-20260324-234925.jsonl`
+- `.ralph/events-20260324-235311.jsonl`
+- `.ralph/events-20260325-012828.jsonl`
+- `.ralph/events-20260325-013320.jsonl`
 
 ## Next Session
 
 The following prompt can be used to continue where this session left off:
 
 ```
-Continue the previous work. Remaining tasks (415):
+Continue the previous work. Remaining tasks (414):
 - P0-T006: Main Window Class Identification
 - T106 annotate: src/libvgcode/include/Viewer.hpp
 - T132 annotate: src/libvgcode/src/ToolMarker.hpp
@@ -778,7 +766,6 @@ Continue the previous work. Remaining tasks (415):
 - T369 annotate: src/slic3r/GUI/GLToolbar.hpp
 - T372 annotate: src/slic3r/GUI/GUI_AuxiliaryList.cpp
 - T383 annotate: src/slic3r/GUI/GUI.hpp
-- T422 annotate: src/slic3r/GUI/InstanceCheck.hpp
 - T435 annotate: src/slic3r/GUI/Jobs/EmbossJob.hpp
 - T436 annotate: src/slic3r/GUI/Jobs/FillBedJob.cpp
 - T437 annotate: src/slic3r/GUI/Jobs/FillBedJob.hpp
@@ -1154,3 +1141,16 @@ Continue the previous work. Remaining tasks (415):
 
 Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Port Preparation## Phase BoundaryThis prompt governs **Phase 1 only**.- Phase 0 is already complete.- Do **not** revisit Phase 0...
 ```
+## Phase 1 - Task T436 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/FillBedJob.cpp
+- Deliverables: src/slic3r/GUI/Jobs/FillBedJob.cpp
+- Substantive additions: 1 (added [ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary: 
+    - Port logic to C# Job System or async/await.
+    - Port bin-packing algorithm.
+    - Callback main-thread for instantiating GameObjects.
+- Hazards found: 0
+- Git: N/A
+- Next recommended Phase 1 task: T437 annotate: src/slic3r/GUI/Jobs/FillBedJob.hpp

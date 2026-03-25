@@ -354,7 +354,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [ ] T433 annotate: src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.hpp
 - [x] T434 annotate: src/slic3r/GUI/Jobs/EmbossJob.cpp
 - [x] T435 annotate: src/slic3r/GUI/Jobs/EmbossJob.hpp
-- [ ] T436 annotate: src/slic3r/GUI/Jobs/FillBedJob.cpp
+- [x] T436 annotate: src/slic3r/GUI/Jobs/FillBedJob.cpp
 - [ ] T437 annotate: src/slic3r/GUI/Jobs/FillBedJob.hpp
 - [x] T438 annotate: src/slic3r/GUI/Jobs/Job.hpp
 - [x] T439 annotate: src/slic3r/GUI/Jobs/NotificationProgressIndicator.cpp
