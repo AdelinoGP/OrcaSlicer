@@ -1,3 +1,24 @@
+// [INTENT]
+// This header declares the `OrientJob` class, a background job responsible for
+// automatically orienting objects on the print bed to find a stable printing
+// orientation. It uses algorithms from `libslic3r/Orient.hpp` to analyze the
+// geometry of the objects and determine the best way to place them.
+//
+// The job separates objects into selected, unselected, and unprintable groups,
+// processes them in a worker thread, and then applies the new orientations in
+// the main UI thread.
+//
+// [UNITY]
+// In a Unity port, this functionality would be handled by a C# script that
+// triggers an async Task or a C# Job.
+// - The `prepare_...` methods would collect the `GameObject`s and their `Mesh`
+//   data from the scene.
+// - The `process` method logic, which calls the core orientation algorithm, would
+//   be ported to C# and run in a background job. The underlying geometry
+//   analysis would need to be ported or replaced with a Unity-compatible library.
+// - The `finalize` method would be a callback on the main thread that applies
+//   the resulting rotation to the `Transform` of each `GameObject`.
+
 #ifndef ORIENTJOB_HPP
 #define ORIENTJOB_HPP
 
@@ -14,33 +35,41 @@ class Plater;
 
 class OrientJob : public Job
 {
-    using OrientMesh = orientation::OrientMesh;
+    using OrientMesh  = orientation::OrientMesh;
     using OrientMeshs = orientation::OrientMeshs;
 
+    // [STATE] The sets of meshes to be processed, separated into selected,
+    // unselected, and unprintable groups.
     OrientMeshs m_selected, m_unselected, m_unprintable;
-    Plater     *m_plater;
+    // [STATE] A pointer to the Plater, providing access to the model and UI.
+    Plater* m_plater;
 
-    // clear m_selected and m_unselected, reserve space for next usage
+    // [INTENT] Clears the input mesh groups to prepare for a new orientation operation.
     void clear_input();
 
-    //BBS: add only one plate mode
+    // [INTENT] Prepares the selection of objects to be oriented.
+    // [PARAM] obj_sel: A boolean vector indicating which objects are selected.
+    // [PARAM] only_one_plate: If true, only orient objects on the current plate.
     void prepare_selection(std::vector<bool> obj_sel, bool only_one_plate);
-    
-    // Prepare the selected and unselected items separately. If nothing is
-    // selected, behaves as if everything would be selected.
+
+    // [INTENT] Prepares the selected and unselected items separately. If nothing is
+    // selected, it treats all printable objects as selected.
     void prepare_selected();
 
-    //BBS:prepare the items from current selected partplate
+    // [INTENT] Prepares the items from the currently selected part plate for orientation.
     void prepare_partplate();
 
 public:
+    // [INTENT] Prepares the data for the orientation job. This is the main entry
+    // point for the preparation phase.
     void prepare();
-    
-    void process(Ctl &ctl) override;
 
+    void process(Ctl& ctl) override;
+
+    // [INTENT] Constructs a new OrientJob.
     OrientJob();
-    
-    void finalize(bool canceled, std::exception_ptr &e) override;
+
+    void finalize(bool canceled, std::exception_ptr& e) override;
 #if 0
     static
     orientation::OrientMesh get_orient_mesh(ModelObject* obj, const Plater* plater)
@@ -56,10 +85,13 @@ public:
         return om;
     }
 #endif
+    // [INTENT] A helper function to create an `OrientMesh` from a `ModelInstance`.
+    // It extracts the necessary mesh data and creates a setter lambda to apply
+    // the orientation result back to the instance.
     static orientation::OrientMesh get_orient_mesh(ModelInstance* instance);
 };
 
-
-}} // namespace Slic3r::GUI
+} // namespace GUI
+} // namespace Slic3r
 
 #endif // ORIENTJOB_HPP
