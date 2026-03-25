@@ -1115,3 +1115,15 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: [PORTING_HAZARD:P2] Requires direct mapping of wxWidgets-managed states.
 - Git: 5ef096ae0e
 - Next recommended Phase 1 task: T485 (src/slic3r/GUI/MultiMachineManagerPage.cpp)
+
+## Phase 1 - Task T485 complete
+- Task type: annotate
+- File: src/slic3r/GUI/MultiMachineManagerPage.cpp
+- Deliverables: src/slic3r/GUI/MultiMachineManagerPage.cpp
+- Substantive additions: ~1 annotation comment for MultiMachineItem class intent.
+- Verification excerpt: // [INTENT] GUI item component for listing a single machine in the Multi-Machine manager.
+- Unity-impact summary: 
+    - Use UI Toolkit ListView/VisualElement and a dedicated item controller MonoBehaviour.
+- Hazards found: None yet.
+- Git: c3b411f2bd
+- Next recommended Phase 1 task: T486 (src/slic3r/GUI/MultiMachineManagerPage.hpp)
