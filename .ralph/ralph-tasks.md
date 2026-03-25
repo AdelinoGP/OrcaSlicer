@@ -409,16 +409,16 @@ Last updated: 2026-03-24T21:45:45Z
 - [ ] T488 annotate: src/slic3r/GUI/MultiMachinePage.hpp
 - [ ] T489 annotate: src/slic3r/GUI/MultiPrintJob.cpp
 - [x] T490 annotate: src/slic3r/GUI/MultiPrintJob.hpp
-- [ ] T491 annotate: src/slic3r/GUI/MultiSendMachineModel.cpp
-- [ ] T492 annotate: src/slic3r/GUI/MultiSendMachineModel.hpp
-- [ ] T493 annotate: src/slic3r/GUI/MultiTaskManagerPage.cpp
-- [ ] T494 annotate: src/slic3r/GUI/MultiTaskManagerPage.hpp
-- [ ] T495 annotate: src/slic3r/GUI/MultiTaskModel.cpp
-- [ ] T496 annotate: src/slic3r/GUI/MultiTaskModel.hpp
-- [ ] T497 annotate: src/slic3r/GUI/NetworkPluginDialog.cpp
-- [ ] T498 annotate: src/slic3r/GUI/NetworkPluginDialog.hpp
-- [ ] T499 annotate: src/slic3r/GUI/NetworkTestDialog.cpp
-- [ ] T500 annotate: src/slic3r/GUI/NetworkTestDialog.hpp
+- [x] T491 annotate: src/slic3r/GUI/MultiSendMachineModel.cpp
+- [x] T492 annotate: src/slic3r/GUI/MultiSendMachineModel.hpp
+- [x] T493 annotate: src/slic3r/GUI/MultiTaskManagerPage.cpp
+- [x] T494 annotate: src/slic3r/GUI/MultiTaskManagerPage.hpp
+- [x] T495 annotate: src/slic3r/GUI/MultiTaskModel.cpp
+- [x] T496 annotate: src/slic3r/GUI/MultiTaskModel.hpp
+- [x] T497 annotate: src/slic3r/GUI/NetworkPluginDialog.cpp
+- [x] T498 annotate: src/slic3r/GUI/NetworkPluginDialog.hpp
+- [x] T499 annotate: src/slic3r/GUI/NetworkTestDialog.cpp
+- [x] T500 annotate: src/slic3r/GUI/NetworkTestDialog.hpp
 - [ ] T501 annotate: src/slic3r/GUI/Notebook.cpp
 - [ ] T502 annotate: src/slic3r/GUI/Notebook.hpp
 - [ ] T503 annotate: src/slic3r/GUI/NotificationManager.cpp
