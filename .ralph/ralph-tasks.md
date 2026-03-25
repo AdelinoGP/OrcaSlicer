@@ -98,7 +98,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [x] T177 annotate: src/slic3r/GUI/BedShapeDialog.cpp
 - [x] T178 annotate: src/slic3r/GUI/BedShapeDialog.hpp
 - [x] T179 annotate: src/slic3r/GUI/BindDialog.cpp
-- [ ] T180 annotate: src/slic3r/GUI/BindDialog.hpp
+- [x] T180 annotate: src/slic3r/GUI/BindDialog.hpp
 - [x] T181 annotate: src/slic3r/GUI/BitmapCache.cpp
 - [x] T182 annotate: src/slic3r/GUI/BitmapCache.hpp
 - [x] T183 annotate: src/slic3r/GUI/BitmapComboBox.cpp

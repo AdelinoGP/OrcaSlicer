@@ -159,3 +159,7 @@
 <!-- tags: voronoi, repair, rotation | created: 2026-03-16 -->
 
 ## Context
+
+### mem-1774477084-669f
+> T177 annotate: src/slic3r/GUI/BedShapeDialog.cpp completed (verified existing annotations). T180 started.
+<!-- tags: gui, annotation, progress | created: 2026-03-25 -->

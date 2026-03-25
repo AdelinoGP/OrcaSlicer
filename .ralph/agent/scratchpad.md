@@ -27,8 +27,8 @@
 - Skip trivial files if they are under 50 lines and semantically inert
 
 ## Next Steps
-- Start with T177 annotate: src/slic3r/GUI/BedShapeDialog.cpp (since it's pending and likely exists)
-- Need to create a runtime task for T177 using ralph tools task ensure with key gui:T177
-- Check if file exists, then mark task active, read file, annotate, commit, etc.
-- If file missing, mark as skip-trivial or skip-vendored accordingly
-- Proceed through pending tasks in order of priority
+- Completed T177: verified existing annotations in BedShapeDialog.cpp, marked task done, committed.
+- T180 (BindDialog.hpp) is next pending task, but we stopped after one task as per prompt.
+- Leave T180 as started for next iteration.
+- Other pending tasks: T180, T184, T185, etc. need annotation.
+- Ensure each file is accounted for in audit.

@@ -104,3 +104,19 @@
 - Git: pending commit
 - Next recommended Phase 1 task: T178 annotate: src/slic3r/GUI/BedShapeDialog.hpp
 
+## Phase 1 - Task T180 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/BindDialog.hpp
+- Deliverables: src/slic3r/GUI/BindDialog.hpp
+- Substantive additions: Added file-level intent, class-level intents for PingCodeBindDialog, BindMachineDialog, UnBindMachineDialog, state variable summaries, event handler lists, Unity migration guidance, and porting hazards.
+- Verification excerpt: // [INTENT] This header defines three printer-binding dialogs: PingCodeBindDialog for PIN-based authentication,
+- Unity-impact summary:
+    - PingCodeBindDialog maps to UI Toolkit VisualElement with six TextFields and StepCtrl.
+    - BindMachineDialog maps to UI Toolkit VisualElement with left/right panels and agreement checkbox.
+    - UnBindMachineDialog maps to UI Toolkit confirmation dialog.
+    - DPIDialog base maps to VisualElement with Canvas Scaler.
+- Hazards found: 2 (P2 for wxSimplebook and DPI scaling, P3 for MemoryStruct CURL handling)
+- Git: pending commit
+- Next recommended Phase 1 task: T184 annotate: src/slic3r/GUI/BitmapComboBox.hpp
+
