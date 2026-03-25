@@ -1,3 +1,3 @@
 
-- MarkdownTip (hpp/cpp) annotated and committed. Task 467 closed.
-- Proceeding to T468: MediaFilePanel.cpp.
+## Task T471: Annotate src/slic3r/GUI/MeshUtils.hpp
+- Plan: Read file, analyze for UI intent, state, event handling. Annotate. Update handoff.
