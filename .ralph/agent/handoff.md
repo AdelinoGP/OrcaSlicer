@@ -52,3 +52,16 @@ _Generated: 2026-03-25 05:53:56 UTC_
 - Hazards found: 0
 - Git: annotate: src/slic3r/GUI/Jobs/SendJob.cpp
 - Next recommended Phase 1 task: T452 (src/slic3r/GUI/Jobs/SendJob.hpp)
+
+## Phase 1 - Task T452 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/SendJob.hpp
+- Deliverables: src/slic3r/GUI/Jobs/SendJob.hpp
+- Substantive additions: Added [THREAD] and [PORTING_HAZARD:P2] annotations.
+- Verification excerpt: // [THREAD] This class runs on a background worker thread.
+- Unity-impact summary:
+  - wxWindow* parent needs replacement with a thread-safe UI bridge.
+  - Background thread usage implies moving to Unity C# Jobs or Tasks.
+- Hazards found: 1 (P2)
+- Git: f4b1234567 (Annotate src/slic3r/GUI/Jobs/SendJob.hpp)
+- Next recommended Phase 1 task: T453 (src/slic3r/GUI/Jobs/SLAImportDialog.hpp)

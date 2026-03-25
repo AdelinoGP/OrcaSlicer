@@ -28,6 +28,8 @@ typedef std::function<bool()>                                      WasCancelledF
 
 class SendJob : public Job
 {
+    // [THREAD] This class runs on a background worker thread.
+    // [PORTING_HAZARD:P2] wxWindow* reference prevents direct background-thread UI manipulation.
     // [STATE] Data about the print job, gathered from the Plater.
     PrintPrepareData job_data;
     // [STATE] The ID of the target device.

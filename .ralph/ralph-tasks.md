@@ -370,7 +370,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [x] T449 annotate: src/slic3r/GUI/Jobs/RotoptimizeJob.cpp
 - [x] T450 annotate: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp
 - [ ] T451 annotate: src/slic3r/GUI/Jobs/SendJob.cpp
-- [ ] T452 annotate: src/slic3r/GUI/Jobs/SendJob.hpp
+- [x] T452 annotate: src/slic3r/GUI/Jobs/SendJob.hpp
 - [ ] T453 annotate: src/slic3r/GUI/Jobs/SLAImportDialog.hpp
 - [x] T454 annotate: src/slic3r/GUI/Jobs/SLAImportJob.cpp
 - [ ] T455 annotate: src/slic3r/GUI/Jobs/SLAImportJob.hpp
