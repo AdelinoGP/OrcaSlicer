@@ -129,4 +129,18 @@
     - Map to custom UI Toolkit Documents (UXML) and C# MonoBehaviours for dialog layouts and logic.
     - wxWidgets types (DPIDialog, wxCommandEvent, wxCollapsiblePane) will need to be replaced with Unity UI Toolkit equivalents.
 - Hazards found: 2 (P2 for `override` issue on `on_dpi_changed`, P3 for missing wxWidgets includes leading to compilation errors)
+- Git: 6fabc987c4
+
+## Phase 1 - Task T499 complete
+- Task type: annotate
+- File: src/slic3r/GUI/NetworkTestDialog.cpp
+- Deliverables: src/slic3r/GUI/NetworkTestDialog.cpp, .ralph/agent/handoff.md
+- Substantive additions: Annotations for NetworkTestDialog class, constructor, UI creation methods, event handlers, and threading logic.
+- Verification excerpt: // [INTENT] This file implements the NetworkTestDialog, a GUI component for testing network connectivity.
+- Unity-impact summary:
+    - UI Toolkit Document (UXML) and C# MonoBehaviour for dialog layout and logic.
+    - wxWidgets sizers and controls replaced by UI Toolkit flexbox and components.
+    - `boost::thread` will be replaced by C# `Task` or `async/await`.
+    - `wxQueueEvent` for UI thread marshaling will be replaced by `UnityMainThreadDispatcher` or similar.
+- Hazards found: 2 (P2 for boost::thread/Http::perform_sync() blocking calls, P3 for missing wxWidgets includes)
 - Git: N/A (will be committed in next step)
