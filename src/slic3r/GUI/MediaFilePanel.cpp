@@ -20,10 +20,13 @@
 #include "../Utils/MacDarkMode.hpp"
 #endif
 
-namespace Slic3r {
-namespace GUI {
+// [INTENT] MediaFilePanel manages and displays printer media files (timelapse, video, model).
+// It acts as a UI controller for browsing and managing files stored on the printer's SD card.
+// [UNITY] Replace with a MonoBehaviour-based UI controller using UI Toolkit (VisualElement) for the layout.
 
-MediaFilePanel::MediaFilePanel(wxWindow * parent)
+namespace Slic3r { namespace GUI {
+
+MediaFilePanel::MediaFilePanel(wxWindow* parent)
     : wxPanel(parent, wxID_ANY)
     , m_bmp_loading(this, "media_loading", 0)
     , m_bmp_failed(this, "media_failed", 0)
@@ -33,9 +36,9 @@ MediaFilePanel::MediaFilePanel(wxWindow * parent)
     SetBackgroundColour(0xEEEEEE);
     Hide();
 
-    wxBoxSizer * sizer = new wxBoxSizer(wxVERTICAL);
+    wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
 
-    wxBoxSizer * top_sizer = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* top_sizer = new wxBoxSizer(wxHORIZONTAL);
     top_sizer->SetMinSize({-1, 75 * em_unit(this) / 10});
 
     // Time group
@@ -45,35 +48,31 @@ MediaFilePanel::MediaFilePanel(wxWindow * parent)
     m_time_panel->SetCornerRadius(0);
     m_button_year  = new ::Button(m_time_panel, _L("Year"), "", wxBORDER_NONE);
     m_button_month = new ::Button(m_time_panel, _L("Month"), "", wxBORDER_NONE);
-    m_button_all = new ::Button(m_time_panel, _L("All Files"), "", wxBORDER_NONE);
+    m_button_all   = new ::Button(m_time_panel, _L("All Files"), "", wxBORDER_NONE);
     m_button_year->SetToolTip(_L("Group files by year, recent first."));
     m_button_month->SetToolTip(_L("Group files by month, recent first."));
     m_button_all->SetToolTip(_L("Show all files, recent first."));
     m_button_all->SetFont(Label::Head_14); // sync with m_last_mode
     for (auto b : {m_button_year, m_button_month, m_button_all}) {
         b->SetBackgroundColor(StateColor());
-        b->SetTextColor(StateColor(
-            std::make_pair(0x3B4446, (int) StateColor::Checked),
-            std::make_pair(*wxLIGHT_GREY, (int) StateColor::Hovered),
-            std::make_pair(0xABACAC, (int) StateColor::Normal)
-        ));
+        b->SetTextColor(StateColor(std::make_pair(0x3B4446, (int) StateColor::Checked),
+                                   std::make_pair(*wxLIGHT_GREY, (int) StateColor::Hovered),
+                                   std::make_pair(0xABACAC, (int) StateColor::Normal)));
     }
 
-    wxBoxSizer *time_sizer = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* time_sizer = new wxBoxSizer(wxHORIZONTAL);
     time_sizer->Add(m_button_year, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, 24);
     time_sizer->Add(m_button_month, 0, wxALIGN_CENTER_VERTICAL);
     time_sizer->Add(m_button_all, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, 24);
     m_time_panel->SetSizer(time_sizer);
-    wxBoxSizer *time_sizer2 = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* time_sizer2 = new wxBoxSizer(wxHORIZONTAL);
     time_sizer2->Add(m_time_panel, 1, wxEXPAND);
     time_panel->SetSizer(time_sizer2);
     top_sizer->Add(time_panel, 1, wxEXPAND);
 
     // File type
-    StateColor background(
-        std::make_pair(0xEEEEEE, (int) StateColor::Checked),
-        std::make_pair(*wxLIGHT_GREY, (int) StateColor::Hovered),
-        std::make_pair(*wxWHITE, (int) StateColor::Normal));
+    StateColor background(std::make_pair(0xEEEEEE, (int) StateColor::Checked), std::make_pair(*wxLIGHT_GREY, (int) StateColor::Hovered),
+                          std::make_pair(*wxWHITE, (int) StateColor::Normal));
     m_type_panel = new ::StaticBox(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
     m_type_panel->SetBackgroundColor(*wxWHITE);
     m_type_panel->SetCornerRadius(FromDIP(5));
@@ -89,18 +88,18 @@ MediaFilePanel::MediaFilePanel(wxWindow * parent)
         b->SetCanFocus(false);
     }
 
-    wxBoxSizer *type_sizer = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* type_sizer = new wxBoxSizer(wxHORIZONTAL);
     type_sizer->Add(m_button_timelapse, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, 24);
-    //type_sizer->Add(m_button_video, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 24);
+    // type_sizer->Add(m_button_video, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 24);
     m_button_video->Hide();
     type_sizer->Add(m_button_model, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 24);
     m_type_panel->SetSizer(type_sizer);
     top_sizer->Add(m_type_panel, 0, wxALIGN_CENTER_VERTICAL);
 
     // File management
-    m_manage_panel      = new ::StaticBox(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
+    m_manage_panel = new ::StaticBox(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
     m_manage_panel->SetBackgroundColor(StateColor());
-    m_button_delete     = new ::Button(m_manage_panel, _L("Delete"));
+    m_button_delete = new ::Button(m_manage_panel, _L("Delete"));
     m_button_delete->SetToolTip(_L("Delete selected files from printer."));
     m_button_download = new ::Button(m_manage_panel, _L("Download"));
     m_button_download->SetToolTip(_L("Download selected files from printer."));
@@ -125,7 +124,7 @@ MediaFilePanel::MediaFilePanel(wxWindow * parent)
     m_button_refresh->SetTextColorNormal(*wxWHITE);
     m_button_refresh->Enable(false);
 
-    wxBoxSizer *manage_sizer = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* manage_sizer = new wxBoxSizer(wxHORIZONTAL);
     manage_sizer->AddStretchSpacer(1);
     manage_sizer->Add(m_button_download, 0, wxALIGN_CENTER_VERTICAL)->Show(false);
     manage_sizer->Add(m_button_delete, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, 24)->Show(false);
@@ -137,14 +136,14 @@ MediaFilePanel::MediaFilePanel(wxWindow * parent)
     sizer->Add(top_sizer, 0, wxEXPAND);
 
     m_image_grid = new ImageGrid(this);
-    m_image_grid->Bind(EVT_ITEM_ACTION, [this](wxCommandEvent &e) { doAction(size_t(e.GetExtraLong()), e.GetInt()); });
+    m_image_grid->Bind(EVT_ITEM_ACTION, [this](wxCommandEvent& e) { doAction(size_t(e.GetExtraLong()), e.GetInt()); });
     m_image_grid->SetStatus(m_bmp_failed, _L("No printers."));
     sizer->Add(m_image_grid, 1, wxEXPAND);
 
     SetSizer(sizer);
 
     // Time group
-    auto time_button_clicked = [this](wxEvent &e) {
+    auto time_button_clicked = [this](wxEvent& e) {
         auto mode = PrinterFileSystem::G_NONE;
         if (e.GetEventObject() == m_button_year)
             mode = PrinterFileSystem::G_YEAR;
@@ -158,8 +157,8 @@ MediaFilePanel::MediaFilePanel(wxWindow * parent)
     m_button_all->SetValue(true);
 
     // File type
-    auto type_button_clicked = [this](wxEvent &e) {
-        Button *buttons[]{m_button_timelapse, m_button_video, m_button_model};
+    auto type_button_clicked = [this](wxEvent& e) {
+        Button* buttons[]{m_button_timelapse, m_button_video, m_button_model};
         auto    type = std::find(buttons, buttons + sizeof(buttons) / sizeof(buttons[0]), e.GetEventObject()) - buttons;
         if (m_last_type == type)
             return;
@@ -176,31 +175,32 @@ MediaFilePanel::MediaFilePanel(wxWindow * parent)
     m_button_timelapse->SetValue(true);
 
     // File management
-    m_button_management->Bind(wxEVT_COMMAND_BUTTON_CLICKED, [this](auto &e) {
+    m_button_management->Bind(wxEVT_COMMAND_BUTTON_CLICKED, [this](auto& e) {
         e.Skip();
         SetSelecting(!m_image_grid->IsSelecting());
     });
-    m_button_refresh->Bind(wxEVT_COMMAND_BUTTON_CLICKED, [this](auto &e) {
+    m_button_refresh->Bind(wxEVT_COMMAND_BUTTON_CLICKED, [this](auto& e) {
         e.Skip();
         if (auto fs = m_image_grid->GetFileSystem())
             fs->ListAllFiles();
     });
-    m_button_download->Bind(wxEVT_COMMAND_BUTTON_CLICKED, [this](auto &e) {
+    m_button_download->Bind(wxEVT_COMMAND_BUTTON_CLICKED, [this](auto& e) {
         m_image_grid->DoActionOnSelection(1);
         SetSelecting(false);
     });
-    m_button_delete->Bind(wxEVT_COMMAND_BUTTON_CLICKED, [this](auto &e) {
+    m_button_delete->Bind(wxEVT_COMMAND_BUTTON_CLICKED, [this](auto& e) {
         m_image_grid->DoActionOnSelection(0);
         SetSelecting(false);
     });
 
-    auto onShowHide = [this](auto &e) {
+    auto onShowHide = [this](auto& e) {
         e.Skip();
-        if (auto w = dynamic_cast<wxWindow *>(e.GetEventObject()); !w || w->IsBeingDeleted())
+        if (auto w = dynamic_cast<wxWindow*>(e.GetEventObject()); !w || w->IsBeingDeleted())
             return;
         CallAfter([this] {
             auto fs = m_image_grid ? m_image_grid->GetFileSystem() : nullptr;
-            if (fs) IsShownOnScreen() ? fs->Start() : fs->Stop();
+            if (fs)
+                IsShownOnScreen() ? fs->Start() : fs->Stop();
         });
     };
     Bind(wxEVT_SHOW, onShowHide);
@@ -209,41 +209,41 @@ MediaFilePanel::MediaFilePanel(wxWindow * parent)
     m_lan_user = "bblp";
 }
 
-MediaFilePanel::~MediaFilePanel()
-{
-    UpdateByObj(nullptr);
-}
+MediaFilePanel::~MediaFilePanel() { UpdateByObj(nullptr); }
 
+// [INTENT] Update UI state when a new machine/printer object is selected.
+// Updates printer connection settings and file system agent.
+// [STATE] Syncs internal printer connection state (LAN/WAN, firmware, storage).
 void MediaFilePanel::UpdateByObj(MachineObject* obj)
 {
-    bool sdcard_state_changed = false;
-    std::string machine = obj ? obj->get_dev_id() : "";
+    bool        sdcard_state_changed = false;
+    std::string machine              = obj ? obj->get_dev_id() : "";
     if (obj) {
-        m_lan_mode     = obj->is_lan_mode_printer();
-        m_lan_ip       = obj->get_dev_ip();
-        m_lan_passwd   = obj->get_access_code();
-        m_dev_ver      = obj->get_ota_version();
-        m_device_busy  = obj->is_camera_busy_off();
-        m_local_proto  = obj->file_local;
-        m_remote_proto = obj->get_file_remote();
+        m_lan_mode               = obj->is_lan_mode_printer();
+        m_lan_ip                 = obj->get_dev_ip();
+        m_lan_passwd             = obj->get_access_code();
+        m_dev_ver                = obj->get_ota_version();
+        m_device_busy            = obj->is_camera_busy_off();
+        m_local_proto            = obj->file_local;
+        m_remote_proto           = obj->get_file_remote();
         m_model_download_support = obj->file_model_download;
 
         if (m_sdcard_exist != (obj->GetStorage()->get_sdcard_state() == DevStorage::HAS_SDCARD_NORMAL)) {
-            m_sdcard_exist = obj->GetStorage()->get_sdcard_state() == DevStorage::HAS_SDCARD_NORMAL;
+            m_sdcard_exist       = obj->GetStorage()->get_sdcard_state() == DevStorage::HAS_SDCARD_NORMAL;
             sdcard_state_changed = true;
         }
     } else {
-        m_lan_mode  = false;
+        m_lan_mode = false;
         m_lan_ip.clear();
         m_lan_passwd.clear();
         m_dev_ver.clear();
-        m_device_busy = false;
-        m_local_proto = 0;
-        m_remote_proto = 0;
+        m_device_busy            = false;
+        m_local_proto            = 0;
+        m_remote_proto           = 0;
         m_model_download_support = false;
 
         if (m_sdcard_exist) {
-            m_sdcard_exist = false; // reset sdcard state when no object
+            m_sdcard_exist       = false; // reset sdcard state when no object
             sdcard_state_changed = true;
         }
     }
@@ -252,7 +252,8 @@ void MediaFilePanel::UpdateByObj(MachineObject* obj)
     if (machine == m_machine && !sdcard_state_changed) {
         if ((m_waiting_enable && IsEnabled()) || (m_waiting_support && (m_local_proto || m_remote_proto))) {
             auto fs = m_image_grid->GetFileSystem();
-            if (fs) fs->Retry();
+            if (fs)
+                fs->Retry();
         }
         return;
     }
@@ -274,13 +275,13 @@ void MediaFilePanel::UpdateByObj(MachineObject* obj)
         fs->Attached();
         m_image_grid->SetFileSystem(fs);
         m_image_grid->SetFileType(m_last_type, m_external ? "" : "internal");
-        fs->Bind(EVT_FILE_CHANGED, [this, wfs = boost::weak_ptr(fs)](auto &e) {
+        fs->Bind(EVT_FILE_CHANGED, [this, wfs = boost::weak_ptr(fs)](auto& e) {
             e.Skip();
             boost::shared_ptr fs(wfs.lock());
             if (fs == nullptr || m_image_grid->GetFileSystem() != fs) // canceled
                 return;
             m_time_panel->Show(fs->GetFileType() < PrinterFileSystem::F_MODEL);
-            //m_manage_panel->Show(fs->GetFileType() < PrinterFileSystem::F_MODEL);
+            // m_manage_panel->Show(fs->GetFileType() < PrinterFileSystem::F_MODEL);
             m_button_refresh->Enable(fs->GetStatus() == PrinterFileSystem::ListReady);
             m_button_management->Enable(fs->GetCount() > 0);
             bool download_support = fs->GetFileType() < PrinterFileSystem::F_MODEL || m_model_download_support;
@@ -288,7 +289,7 @@ void MediaFilePanel::UpdateByObj(MachineObject* obj)
             if (fs->GetCount() == 0)
                 SetSelecting(false);
         });
-        fs->Bind(EVT_SELECT_CHANGED, [this, wfs = boost::weak_ptr(fs)](auto &e) {
+        fs->Bind(EVT_SELECT_CHANGED, [this, wfs = boost::weak_ptr(fs)](auto& e) {
             e.Skip();
             boost::shared_ptr fs(wfs.lock());
             if (fs == nullptr || m_image_grid->GetFileSystem() != fs) // canceled
@@ -303,20 +304,33 @@ void MediaFilePanel::UpdateByObj(MachineObject* obj)
             if (fs == nullptr || m_image_grid->GetFileSystem() != fs) // canceled
                 return;
             ScalableBitmap icon;
-            wxString msg;
-            int status = e.GetInt();
-            int extra = e.GetExtraLong();
+            wxString       msg;
+            int            status = e.GetInt();
+            int            extra  = e.GetExtraLong();
             switch (status) {
-            case PrinterFileSystem::Initializing: icon = m_bmp_loading; msg = _L("Initializing..."); break;
-            case PrinterFileSystem::Connecting: icon = m_bmp_loading; msg = _L("Connecting..."); break;
-            case PrinterFileSystem::Failed: icon = m_bmp_failed; if (extra != 1) msg = _L("Please check the network and try again. You can restart or update the printer if the issue persists."); break;
+            case PrinterFileSystem::Initializing:
+                icon = m_bmp_loading;
+                msg  = _L("Initializing...");
+                break;
+            case PrinterFileSystem::Connecting:
+                icon = m_bmp_loading;
+                msg  = _L("Connecting...");
+                break;
+            case PrinterFileSystem::Failed:
+                icon = m_bmp_failed;
+                if (extra != 1)
+                    msg = _L("Please check the network and try again. You can restart or update the printer if the issue persists.");
+                break;
             case PrinterFileSystem::ListSyncing: {
                 icon = m_bmp_loading;
                 msg  = _L("Loading file list...");
                 fs->ListAllFiles();
                 break;
             }
-            case PrinterFileSystem::ListReady: icon = extra == 0 ? m_bmp_empty : m_bmp_failed; msg = extra == 0 ? _L("No files") : _L("Load failed"); break;
+            case PrinterFileSystem::ListReady:
+                icon = extra == 0 ? m_bmp_empty : m_bmp_failed;
+                msg  = extra == 0 ? _L("No files") : _L("Load failed");
+                break;
             }
             int err = fs->GetLastError();
             if (!e.GetString().IsEmpty())
@@ -341,14 +355,12 @@ void MediaFilePanel::UpdateByObj(MachineObject* obj)
 
             int result = e.GetExtraLong();
             if (result > 1 && !e.GetString().IsEmpty())
-                CallAfter([this, m = e.GetString()] {
-                    MessageDialog(this, m, _L("Download failed"), wxOK | wxICON_ERROR).ShowModal();
-                });
+                CallAfter([this, m = e.GetString()] { MessageDialog(this, m, _L("Download failed"), wxOK | wxICON_ERROR).ShowModal(); });
 
             NetworkAgent* agent = wxGetApp().getAgent();
             if (result > 1 || result == 0) {
                 json j;
-                j["code"] = result;
+                j["code"]   = result;
                 j["dev_id"] = m_machine;
                 j["dev_ip"] = m_lan_ip;
                 if (result > 1) {
@@ -361,7 +373,8 @@ void MediaFilePanel::UpdateByObj(MachineObject* obj)
             }
             return;
         });
-        if (IsShown()) fs->Start();
+        if (IsShown())
+            fs->Start();
     }
     wxCommandEvent e(EVT_MODE_CHANGED);
     modeChanged(e);
@@ -374,8 +387,8 @@ void MediaFilePanel::SwitchStorage(bool external)
     m_external = external;
     m_type_panel->Show(external);
     if (!external) {
-        Button *buttons[]{m_button_timelapse, m_button_video, m_button_model};
-        auto button = buttons[PrinterFileSystem::F_MODEL];
+        Button*        buttons[]{m_button_timelapse, m_button_video, m_button_model};
+        auto           button = buttons[PrinterFileSystem::F_MODEL];
         wxCommandEvent event(wxEVT_COMMAND_BUTTON_CLICKED, button->GetId());
         event.SetEventObject(button);
         wxPostEvent(button, event);
@@ -412,7 +425,7 @@ void MediaFilePanel::SetSelecting(bool selecting)
 {
     m_image_grid->SetSelecting(selecting);
     m_button_management->SetLabel(selecting ? _L("Cancel") : _L("Select"));
-    auto fs = m_image_grid->GetFileSystem();
+    auto fs               = m_image_grid->GetFileSystem();
     bool download_support = (fs && fs->GetFileType() < PrinterFileSystem::F_MODEL) || m_model_download_support;
     m_manage_panel->GetSizer()->Show(m_button_download, selecting && download_support);
     m_manage_panel->GetSizer()->Show(m_button_delete, selecting);
@@ -423,12 +436,12 @@ void MediaFilePanel::SetSelecting(bool selecting)
 void MediaFilePanel::modeChanged(wxCommandEvent& e1)
 {
     e1.Skip();
-    auto fs = m_image_grid->GetFileSystem();
+    auto fs   = m_image_grid->GetFileSystem();
     auto mode = fs ? fs->GetGroupMode() : 0;
     if (m_last_mode == mode)
         return;
     ::Button* buttons[] = {m_button_all, m_button_month, m_button_year};
-    auto b = buttons[m_last_mode];
+    auto      b         = buttons[m_last_mode];
     b->SetFont(Label::Body_14);
     b->SetValue(false);
     b = buttons[mode];
@@ -437,13 +450,15 @@ void MediaFilePanel::modeChanged(wxCommandEvent& e1)
     m_last_mode = mode;
 }
 
-extern wxString hide_passwd(wxString url, std::vector<wxString> const &passwords);
-extern void refresh_agora_url(char const *device, char const *dev_ver, char const *channel, void *context, void (*callback)(void *context, char const *url));
+extern wxString hide_passwd(wxString url, std::vector<wxString> const& passwords);
+extern void     refresh_agora_url(
+        char const* device, char const* dev_ver, char const* channel, void* context, void (*callback)(void* context, char const* url));
 
 void MediaFilePanel::fetchUrl(boost::weak_ptr<PrinterFileSystem> wfs)
 {
     boost::shared_ptr fs(wfs.lock());
-    if (!fs || fs != m_image_grid->GetFileSystem()) return;
+    if (!fs || fs != m_image_grid->GetFileSystem())
+        return;
     if (!IsEnabled()) {
         m_waiting_enable = true;
         m_image_grid->SetStatus(m_bmp_failed, _L("Please confirm if the printer is connected."));
@@ -453,7 +468,8 @@ void MediaFilePanel::fetchUrl(boost::weak_ptr<PrinterFileSystem> wfs)
     m_waiting_enable = false;
     if (!m_local_proto && !m_remote_proto) {
         m_waiting_support = true;
-        m_image_grid->SetStatus(m_bmp_failed, _L("Browsing file in storage is not supported in current firmware. Please update the printer firmware."));
+        m_image_grid->SetStatus(m_bmp_failed,
+                                _L("Browsing file in storage is not supported in current firmware. Please update the printer firmware."));
         fs->SetUrl("0");
         return;
     }
@@ -463,9 +479,9 @@ void MediaFilePanel::fetchUrl(boost::weak_ptr<PrinterFileSystem> wfs)
         return;
     }
     BOOST_LOG_TRIVIAL(info) << "MediaFilePanel::fetchUrl: " << m_local_proto << m_remote_proto;
-    m_waiting_support = false;
-    NetworkAgent *agent = wxGetApp().getAgent();
-    std::string  agent_version = agent ? agent->get_version() : "";
+    m_waiting_support           = false;
+    NetworkAgent* agent         = wxGetApp().getAgent();
+    std::string   agent_version = agent ? agent->get_version() : "";
     if ((m_lan_mode || !m_remote_proto) && m_local_proto && !m_lan_ip.empty()) {
         std::string url = "bambu:///local/" + m_lan_ip + ".?port=6000&user=" + m_lan_user + "&passwd=" + m_lan_passwd;
         url += "&device=" + m_machine;
@@ -493,8 +509,9 @@ void MediaFilePanel::fetchUrl(boost::weak_ptr<PrinterFileSystem> wfs)
     }
     if (agent) {
         std::string protocols[] = {"", "\"tutk\"", "\"agora\"", "\"tutk\",\"agora\""};
-        agent->get_camera_url(m_machine + "|" + m_dev_ver + "|" + protocols[m_remote_proto],
-            [this, wfs, m = m_machine, v = agent->get_version(), dv = m_dev_ver](std::string url) {
+        agent->get_camera_url(m_machine + "|" + m_dev_ver + "|" + protocols[m_remote_proto], [this, wfs, m = m_machine,
+                                                                                              v  = agent->get_version(),
+                                                                                              dv = m_dev_ver](std::string url) {
             if (boost::algorithm::starts_with(url, "bambu:///")) {
                 url += "&device=" + m;
                 url += "&net_ver=" + v;
@@ -506,7 +523,8 @@ void MediaFilePanel::fetchUrl(boost::weak_ptr<PrinterFileSystem> wfs)
             BOOST_LOG_TRIVIAL(info) << "MediaFilePanel::fetchUrl: camera_url: " << hide_passwd(url, {"?uid=", "authkey=", "passwd="});
             CallAfter([=] {
                 boost::shared_ptr fs(wfs.lock());
-                if (!fs || fs != m_image_grid->GetFileSystem()) return;
+                if (!fs || fs != m_image_grid->GetFileSystem())
+                    return;
                 if (boost::algorithm::starts_with(url, "bambu:///")) {
                     fs->SetUrl(url);
                 } else {
@@ -526,10 +544,10 @@ void MediaFilePanel::fetchUrl(boost::weak_ptr<PrinterFileSystem> wfs)
 
 struct MediaProgressDialog : ProgressDialog
 {
-    MediaProgressDialog(wxString title, wxWindow * parent, std::function<void()> cancel)
-        : ProgressDialog(title, "", 100, parent, wxPD_NO_PROGRESS | wxPD_APP_MODAL | wxPD_CAN_ABORT)
-        , m_cancel(cancel) {}
-    void OnCancel() override{m_cancel(); }
+    MediaProgressDialog(wxString title, wxWindow* parent, std::function<void()> cancel)
+        : ProgressDialog(title, "", 100, parent, wxPD_NO_PROGRESS | wxPD_APP_MODAL | wxPD_CAN_ABORT), m_cancel(cancel)
+    {}
+    void                  OnCancel() override { m_cancel(); }
     std::function<void()> m_cancel;
 };
 
@@ -539,16 +557,17 @@ void MediaFilePanel::doAction(size_t index, int action)
     if (action == 0) {
         if (index == -1) {
             MessageDialog dlg(this,
-                wxString::Format(_L_PLURAL("You are going to delete %u file from printer. Are you sure to continue?",
-                                                         "You are going to delete %u files from printer. Are you sure to continue?", fs->GetSelectCount()),
+                              wxString::Format(_L_PLURAL("You are going to delete %u file from printer. Are you sure to continue?",
+                                                         "You are going to delete %u files from printer. Are you sure to continue?",
+                                                         fs->GetSelectCount()),
                                                fs->GetSelectCount()),
-                _L("Delete files"), wxYES_NO | wxICON_WARNING);
+                              _L("Delete files"), wxYES_NO | wxICON_WARNING);
             if (dlg.ShowModal() != wxID_YES)
                 return;
         } else {
             MessageDialog dlg(this,
-                wxString::Format(_L("Do you want to delete the file '%s' from printer?"), from_u8(fs->GetFile(index).name)),
-                _L("Delete file"), wxYES_NO | wxICON_WARNING);
+                              wxString::Format(_L("Do you want to delete the file '%s' from printer?"), from_u8(fs->GetFile(index).name)),
+                              _L("Delete file"), wxYES_NO | wxICON_WARNING);
             if (dlg.ShowModal() != wxID_YES)
                 return;
         }
@@ -558,62 +577,57 @@ void MediaFilePanel::doAction(size_t index, int action)
             if (index != -1) {
                 auto dlg = new MediaProgressDialog(_L("Print"), this, [fs] { fs->FetchModelCancel(); });
                 dlg->Update(0, _L("Fetching model information..."));
-                fs->FetchModel(index, [this, fs, dlg, index](int result, std::string const &data) {
+                fs->FetchModel(index, [this, fs, dlg, index](int result, std::string const& data) {
                     dlg->Destroy();
                     if (result == PrinterFileSystem::ERROR_CANCEL)
                         return;
                     if (result != 0) {
-                        wxString msg = data.empty() ? _L("Failed to fetch model information from printer.") :
-                                                      from_u8(data);
-                        CallAfter([this, msg] {
-                            MessageDialog(this, msg, _L("Print"), wxOK).ShowModal();
-                        });
+                        wxString msg = data.empty() ? _L("Failed to fetch model information from printer.") : from_u8(data);
+                        CallAfter([this, msg] { MessageDialog(this, msg, _L("Print"), wxOK).ShowModal(); });
                         return;
                     }
                     Slic3r::DynamicPrintConfig config;
                     Slic3r::Model              model;
                     Slic3r::PlateDataPtrs      plate_data_list;
-                    Slic3r::Semver file_version;
-                    std::istringstream is(data);
-                    if (!Slic3r::load_gcode_3mf_from_stream(is, &config, &model, &plate_data_list, &file_version)
-                            || plate_data_list.empty()) {
-                        MessageDialog(this,
-                            _L("Failed to parse model information."),
-                            _L("Print"), wxOK).ShowModal();
+                    Slic3r::Semver             file_version;
+                    std::istringstream         is(data);
+                    if (!Slic3r::load_gcode_3mf_from_stream(is, &config, &model, &plate_data_list, &file_version) ||
+                        plate_data_list.empty()) {
+                        MessageDialog(this, _L("Failed to parse model information."), _L("Print"), wxOK).ShowModal();
                         return;
                     }
 
-
-                    auto &file = fs->GetFile(index);
+                    auto& file = fs->GetFile(index);
 
                     std::string file_path = file.path;
                     if (!file_path.empty() && file_path[0] == '/') {
                         file_path.erase(0, 1);
                     }
 
-                    int gcode_file_count = Slic3r::GUI::wxGetApp().plater()->update_print_required_data(config, model, plate_data_list, file.name, file_path);
+                    int gcode_file_count = Slic3r::GUI::wxGetApp().plater()->update_print_required_data(config, model, plate_data_list,
+                                                                                                        file.name, file_path);
 
                     if (gcode_file_count > 0) {
                         wxPostEvent(Slic3r::GUI::wxGetApp().plater(), SimpleEvent(EVT_PRINT_FROM_SDCARD_VIEW));
+                    } else {
+                        MessageDialog dlg(this,
+                                          _L("The .gcode.3mf file contains no G-code data. Please slice it with Orca Slicer and export a "
+                                             "new .gcode.3mf file."),
+                                          wxEmptyString, wxICON_WARNING | wxOK);
+                        auto          res = dlg.ShowModal();
                     }
-                    else {
-                        MessageDialog dlg(this, _L("The .gcode.3mf file contains no G-code data. Please slice it with Orca Slicer and export a new .gcode.3mf file."),
-                            wxEmptyString, wxICON_WARNING | wxOK);
-                        auto res = dlg.ShowModal();
-                    }
-
                 });
                 return;
             }
         }
         if (index != -1) {
-            auto &file = fs->GetFile(index);
+            auto& file = fs->GetFile(index);
             if (file.IsDownload() && file.DownloadProgress() >= -1) {
                 if (!file.local_path.empty()) {
                     if (!fs->DownloadCheckFile(index)) {
-                        MessageDialog(this,
-                            wxString::Format(_L("File '%s' was lost! Please download it again."), from_u8(file.name)),
-                            _L("Error"), wxOK).ShowModal();
+                        MessageDialog(this, wxString::Format(_L("File '%s' was lost! Please download it again."), from_u8(file.name)),
+                                      _L("Error"), wxOK)
+                            .ShowModal();
                         Refresh();
                         return;
                     }
@@ -633,13 +647,13 @@ void MediaFilePanel::doAction(size_t index, int action)
         fs->DownloadFiles(index, wxGetApp().app_config->get("download_path"));
     } else if (action == 2) {
         if (index != -1) {
-            auto &file = fs->GetFile(index);
+            auto& file = fs->GetFile(index);
             if (file.IsDownload() && file.DownloadProgress() >= -1) {
                 if (!file.local_path.empty()) {
                     if (!fs->DownloadCheckFile(index)) {
-                        MessageDialog(this,
-                            wxString::Format(_L("File '%s' was lost! Please download it again."), from_u8(file.name)),
-                            _L("Error"), wxOK).ShowModal();
+                        MessageDialog(this, wxString::Format(_L("File '%s' was lost! Please download it again."), from_u8(file.name)),
+                                      _L("Error"), wxOK)
+                            .ShowModal();
                         Refresh();
                         return;
                     }
@@ -654,20 +668,23 @@ void MediaFilePanel::doAction(size_t index, int action)
     }
 }
 
-MediaFileFrame::MediaFileFrame(wxWindow* parent)
-    : DPIFrame(parent, wxID_ANY, "Media Files", wxDefaultPosition, { 1600, 900 })
+MediaFileFrame::MediaFileFrame(wxWindow* parent) : DPIFrame(parent, wxID_ANY, "Media Files", wxDefaultPosition, {1600, 900})
 {
-    m_panel = new MediaFilePanel(this);
-    wxBoxSizer * sizer = new wxBoxSizer(wxVERTICAL);
+    m_panel           = new MediaFilePanel(this);
+    wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
     sizer->Add(m_panel, 1, wxEXPAND);
     SetSizer(sizer);
 
-    Bind(wxEVT_CLOSE_WINDOW, [this](auto & e){
+    Bind(wxEVT_CLOSE_WINDOW, [this](auto& e) {
         Hide();
         e.Veto();
     });
 }
 
-void MediaFileFrame::on_dpi_changed(const wxRect& suggested_rect) { m_panel->Rescale(); Refresh(); }
+void MediaFileFrame::on_dpi_changed(const wxRect& suggested_rect)
+{
+    m_panel->Rescale();
+    Refresh();
+}
 
-}}
+}} // namespace Slic3r::GUI
