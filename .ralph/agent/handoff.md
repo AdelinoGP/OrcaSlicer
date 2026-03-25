@@ -295,8 +295,8 @@ _Generated: 2026-03-25 01:37:22 UTC_
 - [ ] T132 annotate: src/libvgcode/src/ToolMarker.hpp
 - [ ] T151 annotate: src/slic3r/GUI/MsgDialog.cpp
 - [ ] T153 annotate: src/slic3r/GUI/PresetComboBoxes.cpp
-- [~] T161 annotate: src/slic3r/GUI/DPIFrame.cpp
-- [~] T162 annotate: src/slic3r/GUI/DPIFrame.hpp
+- [~] T161 annotate: src/slic3r/GUI/DPIFrame.cpp (BLOCKED - File not found)
+- [~] T162 annotate: src/slic3r/GUI/DPIFrame.hpp (BLOCKED - File not found)
 - [~] T169 annotate: src/slic3r/GUI/GUI_ObjectManipulation.cpp
 - [~] T170 annotate: src/slic3r/GUI/GUI_ObjectManipulation.hpp
 - [ ] T172 annotate: src/slic3r/GUI/PartPlate.hpp

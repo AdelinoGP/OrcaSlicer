@@ -22,8 +22,10 @@
 #include "slic3r/GUI/MainFrame.hpp"
 #include "GUI_App.hpp"
 #define MSG_DLG_MAX_SIZE wxSize(-1, FromDIP(464)) // notice:ban setting the maximum width value
-// [UNITY] MsgDialog maps to a MonoBehaviour managing a UI container (e.g., Canvas, Panel)
-// [PORTING_HAZARD:P1] wxWidgets layout management (Sizer) differs significantly from Unity's UI Toolkit layout.
+// [INTENT] MsgDialog serves as a base class for various message-based dialogs in OrcaSlicer.
+// It provides a structured layout with a logo, content area, and optional "don't show again" checkbox and action buttons.
+// [UNITY] MsgDialog maps to a MonoBehaviour managing a UI container (e.g., Canvas, Panel) using a layout-friendly component (e.g.,
+// VerticalLayoutGroup). [PORTING_HAZARD:P1] wxWidgets layout management (Sizer) differs significantly from Unity's UI Toolkit layout.
 namespace Slic3r { namespace GUI {
 
 MsgDialog::MsgDialog(
@@ -78,6 +80,7 @@ MsgDialog::MsgDialog(
     wxGetApp().UpdateDlgDarkUI(this);
 }
 
+// [INTENT] Destructor: Clean up button data structures.
 MsgDialog::~MsgDialog()
 {
     for (auto mb : m_buttons) {
@@ -86,8 +89,9 @@ MsgDialog::~MsgDialog()
     }
 }
 
+// [INTENT] Show "Don't show again" checkbox.
 // [EVENT] Handle toggle event for 'Don't show again'
-// [UNITY] Use UnityEngine.UI.Toggle
+// [UNITY] Use UnityEngine.UI.Toggle or UI Toolkit Toggle
 void MsgDialog::show_dsa_button(wxString const& title)
 {
     m_checkbox_dsa = new CheckBox(this);
