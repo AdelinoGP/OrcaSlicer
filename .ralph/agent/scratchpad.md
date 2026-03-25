@@ -1,22 +1,10 @@
 # Scratchpad
 
-## Current Task: T481 annotate: src/slic3r/GUI/MsgDialog.cpp
+- Current task: T485 annotate: src/slic3r/GUI/MultiMachineManagerPage.cpp
+- Previous task: T484 annotated and completed.
+- Plan: Annotate MultiMachineManagerPage.cpp following the same conventions.
+- State: In progress, Phase 1.
 
-1. Analyze `src/slic3r/GUI/MsgDialog.cpp`
-2. Apply annotations using [INTENT], [STATE], [EVENT], [UNITY] tags.
-3. Commit and update tasks/handoff.
-
-## Plan:
-1. Start T481 task.
-2. Read file.
-3. Add annotations.
-4. Run standard verifications (compile/lint).
-5. Commit and close task.
-
-## T481 annotate: src/slic3r/GUI/MsgDialog.cpp
-
-*   Status: ACTIVE
-*   Reading file content.
-*   Analyzing classes: MsgDialog, ErrorDialog, WarningDialog, MessageDialog, RichMessageDialog, InfoDialog, DownloadDialog, DeleteConfirmDialog, Newer3mfVersionDialog, NetworkErrorDialog.
-*   Goal: Annotate for Unity porting (wxWidgets to Unity UI Toolkit).
-
+- T484: Annotated src/slic3r/GUI/MultiMachine.hpp.
+- T485: Annotated src/slic3r/GUI/MultiMachineManagerPage.cpp.
+- Lessons learned: Use surgical edits for annotation to avoid large diffs and potential compilation errors in LSP reporting.
