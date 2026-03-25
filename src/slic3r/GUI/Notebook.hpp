@@ -1,403 +1,268 @@
 #ifndef slic3r_Notebook_hpp_
 #define slic3r_Notebook_hpp_
 
-//#ifdef _WIN32
+// [INTENT] This header defines the interfaces for ButtonsListCtrl and Notebook classes.
+// ButtonsListCtrl is a custom control for managing a list of buttons, typically used as tabs.
+// Notebook is a custom notebook-like control that uses ButtonsListCtrl for navigation.
 
-#include <wx/bookctrl.h>
-#include <wx/sizer.h>
+// #ifdef _WIN32
+
+#include <wx/bookctrl.h> // [INTENT] Base class for generic book controls (like notebooks, tab controls).
+#include <wx/sizer.h>    // [INTENT] For layout management.
+
+// [PORTING_HAZARD:P1] Build environment issues: 'wx/bookctrl.h' and other wxWidgets types not found by LSP.
+// This might indicate an incomplete wxWidgets installation or incorrect CMake configuration,
+// which needs to be resolved for successful compilation in the C++ environment.
+// For Unity porting, this highlights a dependency on wxWidgets' build system and proper inclusion paths.
 
 class ModeSizer;
 class ScalableButton;
 class Button;
 
-// custom message the ButtonsListCtrl sends to its parent (Notebook) to notify a selection change:
+// [INTENT] Custom event for signaling a notebook tab (button) selection change.
+// [UNITY] This custom event will be replaced by C# events or Unity UI Toolkit's UIElements events.
 wxDECLARE_EVENT(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, wxCommandEvent);
 
+// [INTENT] ButtonsListCtrl is a custom wxControl that displays a list of buttons,
+// acting as a tab or navigation bar. It handles visual feedback for selection
+// and integrates with external side tools.
+// [STATE]
+// m_selection: Currently selected button index.
+// m_pageButtons: Vector of Button pointers, representing the individual tabs/pages.
+// m_sizer, m_buttons_sizer: wxSizer objects managing the layout of buttons.
+// [UNITY] This control will likely be implemented as a custom UI Toolkit VisualElement
+// that contains multiple Button VisualElements. The layout will be managed by UI Toolkit's flexbox system.
 class ButtonsListCtrl : public wxControl
 {
 public:
-    // BBS
+    // [INTENT] Constructor for ButtonsListCtrl. Initializes the control and sets up layout.
+    // [UNITY] Corresponds to a custom VisualElement constructor or `UxmlFactory` method.
     ButtonsListCtrl(wxWindow* parent, wxBoxSizer* side_tools = NULL);
+    // [INTENT] Destructor.
     ~ButtonsListCtrl() {}
 
+    // [INTENT] Custom paint event handler to draw selection highlights and lines.
+    // [EVENT] Binds to wxEVT_PAINT (though commented out in .cpp).
+    // [OPENGL] This method uses basic GDI+ drawing, not OpenGL directly.
+    // [UNITY] Custom rendering like this will need to be re-implemented using UI Toolkit's custom drawing APIs,
+    // or by manipulating VisualElement styles/classes based on selection state.
     void OnPaint(wxPaintEvent&);
+
+    // [INTENT] Sets the currently selected button (tab) and updates its visual appearance.
+    // [STATE] Updates m_selection and button background/text colors.
+    // [UNITY] This logic will translate to changing VisualElement styles (e.g., adding/removing USS classes)
+    // or updating properties of individual UI Toolkit buttons.
     void SetSelection(int sel);
+
+    // [INTENT] Updates the display mode, currently commented out in .cpp.
+    // [UNCLEAR] Functionality seems unused or deprecated.
     void UpdateMode();
+
+    // [INTENT] Rescales UI elements based on DPI changes.
+    // [EVENT] Called when a rescale event occurs.
+    // [UNITY] DPI scaling will be handled by Unity's Canvas Scaler or UI Toolkit's scaling mechanisms,
+    // though explicit adjustments for custom elements may still be required.
     void Rescale();
-    bool InsertPage(size_t n, const wxString &text, bool bSelect = false, const std::string &bmp_name = "", const std::string &inactive_bmp_name = "");
+
+    // [INTENT] Inserts a new button (page) into the list at a specified position.
+    // [EVENT] Binds a click event to the new button to dispatch wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED.
+    // [UNITY] New buttons will be instantiated as UI Toolkit VisualElements and added to a parent container.
+    // Event binding will use UI Toolkit's EventSystem.
+    bool InsertPage(
+        size_t n, const wxString& text, bool bSelect = false, const std::string& bmp_name = "", const std::string& inactive_bmp_name = "");
+
+    // [INTENT] Removes a button (page) from the list at a specified position.
+    // [UNITY] Removing a VisualElement from its parent container.
     void RemovePage(size_t n);
+
+    // [INTENT] Sets the image for a specific page button.
+    // [UNCLEAR] The actual bitmap setting is commented out in .cpp.
+    // [UNITY] Updating the `background-image` style property of a UI Toolkit VisualElement or an Image component.
     bool SetPageImage(size_t n, const std::string& bmp_name) const;
+
+    // [INTENT] Sets the text label for a specific page button.
+    // [UNITY] Updating the `text` property of a UI Toolkit Label or Button VisualElement.
     void SetPageText(size_t n, const wxString& strText);
+
+    // [INTENT] Retrieves the text label for a specific page button.
+    // [UNITY] Accessing the `text` property of a UI Toolkit Label or Button VisualElement.
     wxString GetPageText(size_t n) const;
 
 private:
-    wxFlexGridSizer*                m_buttons_sizer;
-    wxBoxSizer*                     m_sizer;
-    // BBS: use Button
-    std::vector<Button*>            m_pageButtons;
-    int                             m_selection {-1};
-    int                             m_btn_margin;
-    int                             m_line_margin;
-    //ModeSizer*                      m_mode_sizer {nullptr};
+    // [STATE] Sizer for arranging buttons in a grid.
+    wxFlexGridSizer* m_buttons_sizer;
+    // [STATE] Main sizer for the entire control, arranging the buttons sizer and side tools.
+    wxBoxSizer* m_sizer;
+    // [STATE] Vector storing pointers to the custom Button controls acting as pages/tabs.
+    std::vector<Button*> m_pageButtons;
+    // [STATE] Index of the currently selected button, initialized to -1 (no selection).
+    int m_selection{-1};
+    // [STATE] Margin value used for spacing between buttons.
+    int m_btn_margin;
+    // [STATE] Margin for the visual highlight line.
+    int m_line_margin;
+    // ModeSizer*                      m_mode_sizer {nullptr}; // [UNCLEAR] Commented out, related to mode selection buttons.
 };
 
-class Notebook: public wxBookCtrlBase
+// [INTENT] Notebook is a custom control that manages multiple "pages" or tabs,
+// using ButtonsListCtrl for tab navigation. It inherits from wxBookCtrlBase,
+// providing common book control functionality and handling page insertion, selection, and display.
+// [STATE]
+// m_bookctrl: An instance of ButtonsListCtrl used for tab navigation.
+// m_controlSizer: Sizer for the navigation controls.
+// m_showEffect, m_hideEffect: Visual effects for page transitions.
+// m_showTimeout, m_hideTimeout: Timouts for visual effects.
+// [UNITY] This will be implemented as a custom UI Toolkit Document (UXML) with a C# MonoBehaviour
+// or a custom VisualElement that orchestrates a set of child VisualElements (pages)
+// and a navigation bar (implemented using concepts from ButtonsListCtrl).
+class Notebook : public wxBookCtrlBase
 {
 public:
-    Notebook(wxWindow * parent,
-                 wxWindowID winid = wxID_ANY,
-                 const wxPoint & pos = wxDefaultPosition,
-                 const wxSize & size = wxDefaultSize,
-                // BBS
-                 wxBoxSizer* side_tools = NULL,
-                 long style = 0)
-    {
-        Init();
-        Create(parent, winid, pos, size, side_tools, style);
-    }
-
-    bool Create(wxWindow * parent,
-                wxWindowID winid = wxID_ANY,
-                const wxPoint & pos = wxDefaultPosition,
-                const wxSize & size = wxDefaultSize,
+    // [INTENT] Constructor for Notebook. Initializes and creates the control.
+    // [UNITY] Corresponds to a custom VisualElement constructor or `UxmlFactory` method for the root Notebook element.
+    Notebook(wxWindow*      parent,
+             wxWindowID     winid = wxID_ANY,
+             const wxPoint& pos   = wxDefaultPosition,
+             const wxSize&  size  = wxDefaultSize,
+             // BBS
+             wxBoxSizer* side_tools = NULL,
+             long        style      = 0);
+    // [INTENT] Create method to initialize the wxWidgets control.
+    // [UNITY] Initialization logic will be part of the C# MonoBehaviour's Awake/Start methods
+    // or a VisualElement's `OnGeometryChanged` callback.
+    bool Create(wxWindow*      parent,
+                wxWindowID     winid = wxID_ANY,
+                const wxPoint& pos   = wxDefaultPosition,
+                const wxSize&  size  = wxDefaultSize,
                 // BBS
                 wxBoxSizer* side_tools = NULL,
-                long style = 0)
-    {
-        if (!wxBookCtrlBase::Create(parent, winid, pos, size, style | wxBK_TOP))
-            return false;
-
-        m_bookctrl = new ButtonsListCtrl(this, side_tools);
-
-        wxSizer* mainSizer = new wxBoxSizer(IsVertical() ? wxVERTICAL : wxHORIZONTAL);
-
-        if (style & wxBK_RIGHT || style & wxBK_BOTTOM)
-            mainSizer->Add(0, 0, 1, wxEXPAND, 0);
-
-        m_controlSizer = new wxBoxSizer(IsVertical() ? wxHORIZONTAL : wxVERTICAL);
-        m_controlSizer->Add(m_bookctrl, wxSizerFlags(1).Expand());
-        wxSizerFlags flags;
-        if (IsVertical())
-            flags.Expand();
-        else
-            flags.CentreVertical();
-        mainSizer->Add(m_controlSizer, flags.Border(wxALL, m_controlMargin));
-        SetSizer(mainSizer);
-
-        this->Bind(wxCUSTOMEVT_NOTEBOOK_SEL_CHANGED, [this](wxCommandEvent& evt)
-        {
-            if (int page_idx = evt.GetId(); page_idx >= 0)
-                SetSelection(page_idx);
-        });
-
-        this->Bind(wxEVT_NAVIGATION_KEY, &Notebook::OnNavigationKey, this);
-
-        return true;
-    }
-
+                long        style      = 0);
 
     // Methods specific to this class.
 
-    // A method allowing to add a new page without any label (which is unused
-    // by this control) and show it immediately.
-    bool ShowNewPage(wxWindow * page)
-    {
-        return AddPage(page, wxString(), "", "");
-    }
+    // [INTENT] Adds a new page to the control without any label and shows it immediately.
+    // [UNITY] Method to add a new VisualElement page to the Notebook's content area.
+    bool ShowNewPage(wxWindow* page);
 
+    // [INTENT] Set effect to use for showing/hiding pages.
+    // [UNITY] Page transition animations/effects will be handled by UI Toolkit animations or custom scripting.
+    void SetEffects(wxShowEffect showEffect, wxShowEffect hideEffect);
 
-    // Set effect to use for showing/hiding pages.
-    void SetEffects(wxShowEffect showEffect, wxShowEffect hideEffect)
-    {
-        m_showEffect = showEffect;
-        m_hideEffect = hideEffect;
-    }
+    // [INTENT] Sets the same effect for both showing and hiding.
+    void SetEffect(wxShowEffect effect);
 
-    // Or the same effect for both of them.
-    void SetEffect(wxShowEffect effect)
-    {
-        SetEffects(effect, effect);
-    }
+    // [INTENT] Sets timeouts for showing and hiding effects.
+    // [UNITY] These timeouts will be managed within Unity's animation system.
+    void SetEffectsTimeouts(unsigned showTimeout, unsigned hideTimeout);
 
-    // And the same for time outs.
-    void SetEffectsTimeouts(unsigned showTimeout, unsigned hideTimeout)
-    {
-        m_showTimeout = showTimeout;
-        m_hideTimeout = hideTimeout;
-    }
-
-    void SetEffectTimeout(unsigned timeout)
-    {
-        SetEffectsTimeouts(timeout, timeout);
-    }
-
+    // [INTENT] Sets the same timeout for both effects.
+    void SetEffectTimeout(unsigned timeout);
 
     // Implement base class pure virtual methods.
 
-    // adds a new page to the control
-    bool AddPage(wxWindow* page,
-                 const wxString& text,
-                 const std::string& bmp_name,
-                 const std::string& inactive_bmp_name,
-                 bool bSelect = false)
-    {
-        DoInvalidateBestSize();
-        return InsertPage(GetPageCount(), page, text, bmp_name, inactive_bmp_name, bSelect);
-    }
+    // [INTENT] Adds a new page to the control. Overrides wxBookCtrlBase::AddPage.
+    // [UNITY] Adds a new VisualElement to the content area and creates a corresponding navigation item.
+    bool AddPage(
+        wxWindow* page, const wxString& text, const std::string& bmp_name, const std::string& inactive_bmp_name, bool bSelect = false);
 
-    // Page management
-    virtual bool InsertPage(size_t n,
-                            wxWindow * page,
-                            const wxString & text,
-                            bool bSelect = false,
-                            int imageId = NO_IMAGE) override
-    {
-        if (!wxBookCtrlBase::InsertPage(n, page, text, bSelect, imageId))
-            return false;
+    // [INTENT] Inserts a new page at a specific index. Overrides wxBookCtrlBase::InsertPage.
+    // [UNITY] Inserts a VisualElement into the content area and its navigation item into the navigation bar.
+    virtual bool InsertPage(size_t n, wxWindow* page, const wxString& text, bool bSelect = false, int imageId = NO_IMAGE) override;
 
-        GetBtnsListCtrl()->InsertPage(n, text, bSelect);
-
-        if (!DoSetSelectionAfterInsertion(n, bSelect))
-            page->Hide();
-
-        return true;
-    }
-
-    bool InsertPage(size_t n,
-                    wxWindow * page,
-                    const wxString & text,
-                    const std::string& bmp_name = "",
+    // [INTENT] Inserts a new page with bitmap names.
+    // [UNITY] Similar to above, but also handles image assignments for the navigation item.
+    bool InsertPage(size_t             n,
+                    wxWindow*          page,
+                    const wxString&    text,
+                    const std::string& bmp_name          = "",
                     const std::string& inactive_bmp_name = "",
-                    bool bSelect = false)
-    {
-        if (!wxBookCtrlBase::InsertPage(n, page, text, bSelect))
-            return false;
+                    bool               bSelect           = false);
 
-        GetBtnsListCtrl()->InsertPage(n, text, bSelect, bmp_name, inactive_bmp_name);
+    // [INTENT] Sets the currently active page. Overrides wxBookCtrlBase::SetSelection.
+    // [EVENT] Triggers a selection change.
+    // [UNITY] Changes the visibility of VisualElement pages and updates the visual state of the corresponding navigation item.
+    virtual int SetSelection(size_t n) override;
 
-        if (bSelect)
-            SetSelection(n);
+    // [INTENT] Changes the selection to a new page. Overrides wxBookCtrlBase::ChangeSelection.
+    // [UNITY] Similar to SetSelection, but may have different internal event handling.
+    virtual int ChangeSelection(size_t n) override;
 
-        return true;
-    }
+    // [INTENT] Sets the text for a specific page's tab. Overrides wxBookCtrlBase::SetPageText.
+    // [UNITY] Updates the `text` property of the corresponding navigation item's Label or Button.
+    virtual bool SetPageText(size_t n, const wxString& strText) override;
 
-    virtual int SetSelection(size_t n) override
-    {
-        int ret = DoSetSelection(n, SetSelection_SendEvent);
-        int new_sel = GetSelection();
-        //check the new_sel firstly
-        if (new_sel != n) {
-            //not allowed, skip it
-            return ret;
-        }
-        GetBtnsListCtrl()->SetSelection(n);
+    // [INTENT] Gets the text for a specific page's tab. Overrides wxBookCtrlBase::GetPageText.
+    // [UNITY] Retrieves the `text` property from the corresponding navigation item.
+    virtual wxString GetPageText(size_t n) const override;
 
-        // check that only the selected page is visible and others are hidden:
-        for (size_t page = 0; page < m_pages.size(); page++) {
-            wxWindow* win_a = GetPage(page);
-            wxWindow* win_b = GetPage(n);
-            if (page != n && GetPage(page) != GetPage(n)) {
-                m_pages[page]->Hide();
-            }
-        }
+    // [INTENT] Sets the image for a specific page's tab. Overrides wxBookCtrlBase::SetPageImage.
+    // [UNITY] Updates the `background-image` style property of the corresponding navigation item.
+    virtual bool SetPageImage(size_t WXUNUSED(n), int WXUNUSED(imageId)) override;
 
-        return ret;
-    }
+    // [INTENT] Gets the image ID for a specific page's tab. Overrides wxBookCtrlBase::GetPageImage.
+    // [UNITY] Retrieves image information from the corresponding navigation item.
+    virtual int GetPageImage(size_t WXUNUSED(n)) const override;
 
-    virtual int ChangeSelection(size_t n) override
-    {
-        GetBtnsListCtrl()->SetSelection(n);
-        return DoSetSelection(n);
-    }
-
-    // Neither labels nor images are supported but we still store the labels
-    // just in case the user code attaches some importance to them.
-    virtual bool SetPageText(size_t n, const wxString & strText) override
-    {
-        wxCHECK_MSG(n < GetPageCount(), false, wxS("Invalid page"));
-
-        GetBtnsListCtrl()->SetPageText(n, strText);
-
-        return true;
-    }
-
-    virtual wxString GetPageText(size_t n) const override
-    {
-        wxCHECK_MSG(n < GetPageCount(), wxString(), wxS("Invalid page"));
-        return GetBtnsListCtrl()->GetPageText(n);
-    }
-
-    virtual bool SetPageImage(size_t WXUNUSED(n), int WXUNUSED(imageId)) override
-    {
-        return false;
-    }
-
-    virtual int GetPageImage(size_t WXUNUSED(n)) const override
-    {
-        return NO_IMAGE;
-    }
-
-    bool SetPageImage(size_t n, const std::string& bmp_name)
-    {
-        return GetBtnsListCtrl()->SetPageImage(n, bmp_name);
-    }
+    // [INTENT] Sets the image for a specific page's tab using a bitmap name.
+    // [UNITY] Updates the `background-image` style property of the corresponding navigation item.
+    bool SetPageImage(size_t n, const std::string& bmp_name);
 
     // Override some wxWindow methods too.
-    virtual void SetFocus() override
-    {
-        wxWindow* const page = GetCurrentPage();
-        if (page)
-            page->SetFocus();
-    }
+    // [INTENT] Sets focus to the currently selected page. Overrides wxWindow::SetFocus.
+    // [UNITY] Sets focus to the active VisualElement page.
+    virtual void SetFocus() override;
 
+    // [INTENT] Helper to get the internal ButtonsListCtrl.
+    // [UNITY] Directly access the child VisualElement for the navigation bar.
     ButtonsListCtrl* GetBtnsListCtrl() const { return static_cast<ButtonsListCtrl*>(m_bookctrl); }
 
-    void UpdateMode()
-    {
-        GetBtnsListCtrl()->UpdateMode();
-    }
+    // [INTENT] Propagates UpdateMode call to internal ButtonsListCtrl.
+    void UpdateMode();
 
-    void Rescale()
-    {
-        GetBtnsListCtrl()->Rescale();
-    }
+    // [INTENT] Propagates Rescale call to internal ButtonsListCtrl.
+    void Rescale();
 
-    void OnNavigationKey(wxNavigationKeyEvent& event)
-    {
-        if (event.IsWindowChange()) {
-            // change pages
-            AdvanceSelection(event.GetDirection());
-        }
-        else {
-            // we get this event in 3 cases
-            //
-            // a) one of our pages might have generated it because the user TABbed
-            // out from it in which case we should propagate the event upwards and
-            // our parent will take care of setting the focus to prev/next sibling
-            //
-            // or
-            //
-            // b) the parent panel wants to give the focus to us so that we
-            // forward it to our selected page. We can't deal with this in
-            // OnSetFocus() because we don't know which direction the focus came
-            // from in this case and so can't choose between setting the focus to
-            // first or last panel child
-            //
-            // or
-            //
-            // c) we ourselves (see MSWTranslateMessage) generated the event
-            //
-            wxWindow* const parent = GetParent();
-
-            // the wxObject* casts are required to avoid MinGW GCC 2.95.3 ICE
-            const bool isFromParent = event.GetEventObject() == (wxObject*)parent;
-            const bool isFromSelf = event.GetEventObject() == (wxObject*)this;
-            const bool isForward = event.GetDirection();
-
-            if (isFromSelf && !isForward)
-            {
-                // focus is currently on notebook tab and should leave
-                // it backwards (Shift-TAB)
-                event.SetCurrentFocus(this);
-                parent->HandleWindowEvent(event);
-            }
-            else if (isFromParent || isFromSelf)
-            {
-                // no, it doesn't come from child, case (b) or (c): forward to a
-                // page but only if entering notebook page (i.e. direction is
-                // backwards (Shift-TAB) comething from out-of-notebook, or
-                // direction is forward (TAB) from ourselves),
-                if (m_selection != wxNOT_FOUND &&
-                    (!event.GetDirection() || isFromSelf))
-                {
-                    // so that the page knows that the event comes from it's parent
-                    // and is being propagated downwards
-                    event.SetEventObject(this);
-
-                    wxWindow* page = m_pages[m_selection];
-                    if (!page->HandleWindowEvent(event))
-                    {
-                        page->SetFocus();
-                    }
-                    //else: page manages focus inside it itself
-                }
-                else // otherwise set the focus to the notebook itself
-                {
-                    SetFocus();
-                }
-            }
-            else
-            {
-                // it comes from our child, case (a), pass to the parent, but only
-                // if the direction is forwards. Otherwise set the focus to the
-                // notebook itself. The notebook is always the 'first' control of a
-                // page.
-                if (!isForward)
-                {
-                    SetFocus();
-                }
-                else if (parent)
-                {
-                    event.SetCurrentFocus(this);
-                    parent->HandleWindowEvent(event);
-                }
-            }
-        }
-    }
+    // [INTENT] Handles keyboard navigation events for changing pages.
+    // [EVENT] Binds to wxEVT_NAVIGATION_KEY.
+    // [UNITY] Handles keyboard input events and updates the active page/tab.
+    // [PORTING_HAZARD:P2] Complex keyboard navigation logic, particularly focus management across nested controls,
+    // requires careful porting to Unity UI Toolkit's event and focus system.
+    void OnNavigationKey(wxNavigationKeyEvent& event);
 
 protected:
-    virtual void UpdateSelectedPage(size_t WXUNUSED(newsel)) override
-    {
-        // Nothing to do here, but must be overridden to avoid the assert in
-        // the base class version.
-    }
+    // [INTENT] Overridden to avoid assert in base class, no action needed here.
+    virtual void UpdateSelectedPage(size_t WXUNUSED(newsel)) override;
 
-    virtual wxBookCtrlEvent * CreatePageChangingEvent() const override
-    {
-        return new wxBookCtrlEvent(wxEVT_BOOKCTRL_PAGE_CHANGING,
-                                   GetId());
-    }
+    // [INTENT] Creates a wxBookCtrlEvent for page changing.
+    // [UNITY] Creates a custom C# event or uses Unity's standard event system for page change notifications.
+    virtual wxBookCtrlEvent* CreatePageChangingEvent() const override;
 
-    virtual void MakeChangedEvent(wxBookCtrlEvent & event) override
-    {
-        event.SetEventType(wxEVT_BOOKCTRL_PAGE_CHANGED);
-    }
+    // [INTENT] Sets the event type to page changed.
+    // [UNITY] Sets the event type for the C# event.
+    virtual void MakeChangedEvent(wxBookCtrlEvent& event) override;
 
-    virtual wxWindow * DoRemovePage(size_t page) override
-    {
-        wxWindow* const win = wxBookCtrlBase::DoRemovePage(page);
-        if (win)
-        {
-            GetBtnsListCtrl()->RemovePage(page);
-            DoSetSelectionAfterRemoval(page);
-        }
+    // [INTENT] Removes a page from the control. Overrides wxBookCtrlBase::DoRemovePage.
+    // [UNITY] Removes the VisualElement page and its corresponding navigation item.
+    virtual wxWindow* DoRemovePage(size_t page) override;
 
-        return win;
-    }
+    // [INTENT] Resizes the current page to fit the control. Overrides wxWindow::DoSize.
+    // [UNITY] UI Toolkit's layout system handles sizing of VisualElements automatically.
+    virtual void DoSize() override;
 
-    virtual void DoSize() override
-    {
-        wxWindow* const page = GetCurrentPage();
-        if (page)
-            page->SetSize(GetPageRect());
-    }
-
-    virtual void DoShowPage(wxWindow * page, bool show) override
-    {
-        if (show)
-            page->ShowWithEffect(m_showEffect, m_showTimeout);
-        else
-            page->HideWithEffect(m_hideEffect, m_hideTimeout);
-    }
+    // [INTENT] Shows or hides a page with visual effects. Overrides wxBookCtrlBase::DoShowPage.
+    // [UNITY] Sets the `display` style property of a VisualElement to `DisplayStyle.Flex` or `DisplayStyle.None`,
+    // possibly with UI Toolkit animations.
+    virtual void DoShowPage(wxWindow* page, bool show) override;
 
 private:
+    // [INTENT] Internal initialization method.
     void Init();
 
-    wxShowEffect m_showEffect,
-                 m_hideEffect;
+    // [STATE] Visual effects for showing/hiding pages.
+    wxShowEffect m_showEffect, m_hideEffect;
 
-    unsigned m_showTimeout,
-             m_hideTimeout;
+    // [STATE] Timouts for visual effects.
+    unsigned m_showTimeout, m_hideTimeout;
 };
-//#endif // _WIN32
+// #endif // _WIN32
 #endif // slic3r_Notebook_hpp_
