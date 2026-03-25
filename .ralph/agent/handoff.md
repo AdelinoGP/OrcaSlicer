@@ -1137,3 +1137,16 @@ Continue the previous work. Remaining tasks (408):
 Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Port Preparation## Phase BoundaryThis prompt governs **Phase 1 only**.- Phase 0 is already complete.- Do **not** revisit Phase 0...
 ```
 ## Phase 1 - Task T528 annotation in-progress: src/slic3r/GUI/Plater.cpp (chunk 1)
+Phase 1 - Task T528 (Plater.cpp) annotation ongoing. Completed some sections. Exiting iteration.
+## Phase 1 - Task T445 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/PlaterWorker.hpp
+- Deliverables: src/slic3r/GUI/Jobs/PlaterWorker.hpp
+- Substantive additions: Added [PORTING_HAZARD:P1] annotation
+- Verification excerpt: // [PORTING_HAZARD:P1] The direct reliance on wxWidgets event loop (wxEVT_IDLE, wxEVT_PAINT) for processing worker thread results is highly coupled to the UI framework and must be replaced by a C# event/async-await mechanism in Unity.
+- Unity-impact summary:
+  - wxWidgets event loop reliance needs replacement with Unity's async/await or Coroutines.
+  - Job management should move to C# Job System or async/await.
+- Hazards found: 1 (P1)
+- Git: N/A (committing now)
+- Next recommended Phase 1 task: T446 annotate: src/slic3r/GUI/Jobs/PrintJob.cpp

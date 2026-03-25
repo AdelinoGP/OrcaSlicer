@@ -1,10 +1,10 @@
 // [INTENT]
-// This header defines a specialized worker class, `PlaterWorker`, for managing
-// background jobs that are initiated from the Plater (the main 3D view). It
-// acts as a decorator around the generic `Worker` class, adding
-// plater-specific functionalities.
+// ... (omitted) ...
+// [PORTING_HAZARD:P1] The direct reliance on wxWidgets event loop (wxEVT_IDLE, wxEVT_PAINT) for processing worker thread results is highly
+// coupled to the UI framework and must be replaced by a C# event/async-await mechanism in Unity.
 //
 // The key components are:
+
 // - `PlaterWorker`: A template class that wraps a `Worker` instance. It ensures
 //   that the UI thread continuously processes messages from the worker thread
 //   by hooking into the `wxEVT_IDLE` and `wxEVT_PAINT` events.
