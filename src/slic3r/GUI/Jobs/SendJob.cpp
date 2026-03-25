@@ -129,6 +129,7 @@ inline std::string get_transform_string(int bytes)
 // [THREAD] This method is executed on a worker thread.
 void SendJob::process(Ctl& ctl)
 {
+    // [STATE] Job configuration and state tracking for the file transfer process.
     PrintParams   params;
     std::string   msg;
     int           curr_percent = 10;
