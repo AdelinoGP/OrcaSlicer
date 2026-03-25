@@ -2,7 +2,7 @@ cli:
   backend: opencode
 event_loop:
   prompt_file: PROMPT.md
-  completion_promise: RALPH_TASK_COMPLETE
+  completion_promise: LOOP_COMPLETION
   idle_timeout_secs: 600
   max_iterations: 200
   max_runtime_seconds: 28800

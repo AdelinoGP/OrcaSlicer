@@ -1,8 +1,8 @@
 # Loop Summary
 
 **Status:** Completed successfully
-**Iterations:** 1
-**Duration:** 1m 48s
+**Iterations:** 2
+**Duration:** 2m 26s
 
 ## Tasks
 
@@ -14,4 +14,4 @@ _No events recorded._
 
 ## Final Commit
 
-b401847aab: T444 annotate: src/slic3r/GUI/Jobs/OrientJob.hpp
+1cf8edff7c: Annotate src/slic3r/GUI/Jobs/PlaterWorker.hpp
