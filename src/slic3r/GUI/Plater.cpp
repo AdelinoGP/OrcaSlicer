@@ -305,6 +305,7 @@ class SlicedInfo : public wxStaticBoxSizer
 public:
     SlicedInfo(wxWindow* parent);
     // [STATE] Updates text for specific slicing metric.
+    // [UNITY] Map to SlicingSummaryUI.UpdateMetric(SlicingMetricIdx, value).
     void SetTextAndShow(SlicedInfoIdx idx, const wxString& text, const wxString& new_label = "");
 
 private:
@@ -400,10 +401,12 @@ struct ExtruderGroup : StaticGroup
         }
     }
 
-    // [INTENT] Updates AMS tray visualization. [UNITY] Map to ExtruderPanel.UpdateAMSTrays().
+    // [INTENT] Updates AMS tray visualization.
+    // [UNITY] Map to ExtruderPanel.UpdateAMSTrays().
     void update_ams();
 
-    // [INTENT] Synchronizes AMS state from MachineObject. [UNITY] Part of DeviceStateSync service.
+    // [INTENT] Synchronizes AMS state from MachineObject.
+    // [UNITY] Part of DeviceStateSync service.
     void sync_ams(MachineObject const* obj, std::vector<DevAms*> const& ams4, std::vector<DevAms*> const& ams1);
 
     // [INTENT] Handles manual DPI rescaling for custom widgets.
