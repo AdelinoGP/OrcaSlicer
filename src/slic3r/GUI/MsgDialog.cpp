@@ -413,6 +413,8 @@ WarningDialog::WarningDialog(wxWindow* parent, const wxString& message, const wx
 #if 1
 // MessageDialog
 
+// [INTENT] MessageDialog: Generic dialog for showing information messages
+// [UNITY] Use UI Toolkit popup or custom Prefab
 MessageDialog::MessageDialog(wxWindow*                            parent,
                              const wxString&                      message,
                              const wxString&                      caption /* = wxEmptyString*/,
@@ -434,6 +436,8 @@ MessageDialog::MessageDialog(wxWindow*                            parent,
 
 // RichMessageDialog
 
+// [INTENT] RichMessageDialog: Advanced dialog for showing message with optional DSA checkbox.
+// [UNITY] Use UI Toolkit popup or custom Prefab
 RichMessageDialog::RichMessageDialog(wxWindow*       parent,
                                      const wxString& message,
                                      const wxString& caption /* = wxEmptyString*/,
@@ -465,6 +469,8 @@ bool RichMessageDialog::IsCheckBoxChecked() const
 #endif
 
 // InfoDialog
+// [INTENT] InfoDialog: Generic dialog for showing simple info.
+// [UNITY] Use UI Toolkit popup
 InfoDialog::InfoDialog(wxWindow*       parent,
                        const wxString& title,
                        const wxString& msg,
@@ -529,6 +535,8 @@ wxString get_wraped_wxString(const wxString& in, size_t line_len /*=80*/)
 }
 
 // InfoDialog
+// [INTENT] DownloadDialog: Prompt for downloading new version.
+// [UNITY] Use UI Toolkit confirmation dialog
 DownloadDialog::DownloadDialog(wxWindow*       parent,
                                const wxString& msg,
                                const wxString& title,
@@ -549,6 +557,8 @@ void DownloadDialog::SetExtendedMessage(const wxString& extendedMessage)
     Fit();
 }
 
+// [INTENT] DeleteConfirmDialog: Confirmation dialog for file/item deletion.
+// [UNITY] Use UI Toolkit confirmation dialog
 DeleteConfirmDialog::DeleteConfirmDialog(wxWindow* parent, const wxString& title, const wxString& msg)
     : DPIDialog(parent ? parent : nullptr, wxID_ANY, title, wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX)
 {
@@ -590,6 +600,8 @@ DeleteConfirmDialog::~DeleteConfirmDialog() {}
 
 void DeleteConfirmDialog::on_dpi_changed(const wxRect& suggested_rect) {}
 
+// [INTENT] Newer3mfVersionDialog: Informs user that 3MF version is newer than current slicer version.
+// [UNITY] Use UI Toolkit info dialog
 Newer3mfVersionDialog::Newer3mfVersionDialog(wxWindow* parent, const Semver* file_version, const Semver* cloud_version, wxString new_keys)
     : DPIDialog(parent ? parent : nullptr,
                 wxID_ANY,
@@ -699,6 +711,8 @@ wxBoxSizer* Newer3mfVersionDialog::get_btn_sizer()
     return horizontal_sizer;
 }
 
+// [INTENT] NetworkErrorDialog: Inform user about network exceptions.
+// [UNITY] Use UI Toolkit info dialog
 NetworkErrorDialog::NetworkErrorDialog(wxWindow* parent)
     : DPIDialog(parent ? parent : nullptr, wxID_ANY, _L("Server Exception"), wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX)
 {
