@@ -299,6 +299,7 @@ enum class LoadType : unsigned char { Unknown, OpenProject, LoadGeometry, LoadCo
 
 // [INTENT] Helper class for displaying slicing results (filament usage, cost, time).
 // [UNITY] Map to SlicingSummaryUI component (UI Toolkit).
+// [PORTING_HAZARD:P3] Requires custom UI component mapping to display slicer results dynamically.
 class SlicedInfo : public wxStaticBoxSizer
 {
 public:
