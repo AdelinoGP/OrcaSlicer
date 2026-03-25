@@ -426,7 +426,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [x] T505 annotate: src/slic3r/GUI/OAuthDialog.cpp
 - [x] T506 annotate: src/slic3r/GUI/OAuthDialog.hpp
 - [x] T507 annotate: src/slic3r/GUI/ObjColorDialog.cpp
-- [ ] T508 annotate: src/slic3r/GUI/ObjColorDialog.hpp
+- [x] T508 annotate: src/slic3r/GUI/ObjColorDialog.hpp
 - [ ] T509 annotate: src/slic3r/GUI/ObjectDataViewModel.cpp
 - [ ] T510 annotate: src/slic3r/GUI/ObjectDataViewModel.hpp
 - [ ] T511 annotate: src/slic3r/GUI/OG_CustomCtrl.cpp

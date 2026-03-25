@@ -60,3 +60,17 @@
 - Git: <commit subject "annotate: src/slic3r/GUI/ObjColorDialog.cpp">
 - Next recommended Phase 1 task: T508 annotate: src/slic3r/GUI/ObjColorDialog.hpp
 
+
+## Phase 1 - Task T508 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ObjColorDialog.hpp
+- Deliverables: src/slic3r/GUI/ObjColorDialog.hpp
+- Substantive additions: Added [INTENT] and [STATE] annotations for ObjColorPanel and ObjColorDialog classes and members.
+- Verification excerpt: // [INTENT] Defines the interface for OBJ color mapping UI, including clustering logic and thumbnail preview orchestration.
+- Unity-impact summary:
+    - ObjColorPanel maps to a C# MonoBehaviour or VisualElement with associated ViewModel for color mapping state.
+    - Result state mapping from ObjDialogInOut structure.
+- Hazards found: 0
+- Git: <commit subject "annotate: src/slic3r/GUI/ObjColorDialog.hpp">
+- Next recommended Phase 1 task: T509 annotate: src/slic3r/GUI/ObjectDataViewModel.cpp
+
