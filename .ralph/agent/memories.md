@@ -46,6 +46,10 @@
 
 ## Fixes
 
+### mem-1774417597-ab4d
+> failure: src/slic3r/GUI/Jobs/OAuthJob.cpp is corrupted, contains duplicated and mangled code at the end of the file, next=require developer to clean up the file before annotation
+<!-- tags: gui, corruption | created: 2026-03-25 -->
+
 ### mem-1774402745-eb20
 > failure: cmd=read src/slic3r/GUI/DPIFrame.cpp, error=File not found, next=reconcile handoff and manifest as this file is missing
 <!-- tags: gui, missing-file | created: 2026-03-25 -->
