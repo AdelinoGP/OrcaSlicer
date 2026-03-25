@@ -182,3 +182,17 @@
 - Git: pending commit
 - Next recommended Phase 1 task: T512 annotate: src/slic3r/GUI/OG_CustomCtrl.hpp
 
+
+## Phase 1 - Task T512 complete
+- Task type: annotate
+- File: src/slic3r/GUI/OG_CustomCtrl.hpp
+- Deliverables: src/slic3r/GUI/OG_CustomCtrl.hpp
+- Substantive additions: Added file-level intent, class-level intent for OG_CustomCtrl and CtrlLine inner struct, state variable annotations, event handler comments, method-level intents for public methods, Unity mapping guidance, and porting hazard for custom drawing.
+- Verification excerpt: // [PORTING_HAZARD:P2] Custom wxDC drawing requires complete redesign in Unity; must map to UI Toolkit custom VisualElement or IMGUI, which may impact performance and require careful layout management.
+- Unity-impact summary:
+    - OG_CustomCtrl maps to UI Toolkit VisualElement with custom USS styling and a MonoBehaviour controller.
+    - CtrlLine maps to sub-VisualElement or custom IMGUI control.
+    - Custom drawing via wxDC translates to UI Toolkit's custom VisualElement or IMGUI, with careful layout management.
+- Hazards found: 1 (P2 for custom wxDC drawing redesign)
+- Git: (pending commit)
+- Next recommended Phase 1 task: T514 annotate: src/slic3r/GUI/OpenGLManager.hpp

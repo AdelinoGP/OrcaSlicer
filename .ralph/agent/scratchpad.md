@@ -18,16 +18,16 @@
 4. Follow standard work loop for each task
 
 ## Current Work
-- Working on T511: src/slic3r/GUI/OG_CustomCtrl.cpp
-- File contains OG_CustomCtrl class, a custom wxPanel for OptionsGroup UI
-- Complex custom control handling layout, painting, mouse events, rendering of config options
-
-## Observations
-- File is large (1038 lines) with complex custom painting and event handling
-- Key responsibilities: layout calculation, rendering of labels/icons/buttons, mouse event handling
-- Uses wxDC for custom drawing, manages visibility modes, handles undo/redo UI
-- Inner class CtrlLine manages individual lines within the control
+- T510 (ObjectDataViewModel.hpp) completed and committed
+- T511 (OG_CustomCtrl.cpp) completed and committed
+- T512 (OG_CustomCtrl.hpp) is active (in_progress) and next to annotate
 
 ## Next Steps
-- Annotate OG_CustomCtrl.cpp
-- Then move to T512 (OG_CustomCtrl.hpp)
+- Read OG_CustomCtrl.hpp, annotate according to Phase 1 standards
+- Commit annotation, update handoff and task status
+- Then proceed to next eligible task (likely T513? but check ready-tasks for unblocked tasks after T512)
+
+## Notes
+- Many other tasks are marked in_progress (likely from parallel loops). We'll ignore them and focus on our sequential path.
+- The ready-tasks list shows many unblocked tasks from T514 onward. After T512, we should pick the next unblocked task (maybe T513? but T513 is not in the open list; maybe T514 is next).
+- We'll need to verify file existence before annotation.
