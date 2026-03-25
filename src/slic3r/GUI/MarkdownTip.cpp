@@ -19,6 +19,7 @@ namespace Slic3r { namespace GUI {
 // [UNITY] Replace with a Unity UI Toolkit `VisualElement` acting as a popup,
 // using a dedicated WebGL/WebView component or a text-rendering system for markdown.
 // [PORTING_HAZARD:P2] WebView implementations in Unity can be brittle compared to wxWidgets.
+// [THREAD] This class runs strictly on the UI thread as it owns wxWebView and wxTimer.
 
 static std::string url_encode(const std::string& value)
 {
