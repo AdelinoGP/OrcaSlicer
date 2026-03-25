@@ -225,6 +225,8 @@ wxDEFINE_EVENT(EVT_NOTICE_FULL_SCREEN_CHANGED, IntEvent);
 #define BTN_SYNC_SIZE (wxSize(FromDIP(96), FromDIP(98)))
 
 // [INTENT] Formats diameter to string with 2 decimal places, ensuring precision for 0.25/0.15 nozzles.
+// [INTENT] Formats diameter to string with 2 decimal places, ensuring precision for 0.25/0.15 nozzles.
+// [UNITY] Map to C# helper method: `string FormatDiameter(float diameter)`. Use `diameter.ToString("F2")` and trim trailing zeros.
 static string get_diameter_string(float diameter)
 {
     std::ostringstream stream; // ORCA ensure 0.25 returned as 0.25. previous code returned as 0.2 because of std::setprecision(1)
