@@ -43,7 +43,7 @@
     - No direct Unity impact as this file is trivial.
     - Represents a minimal organizational unit.
 - Hazards found: none
-- Git: N/A (will be committed in next step)
+- Git: 50e6434e15
 
 ## Phase 1 - Task T491 complete
 - Task type: annotate
@@ -118,3 +118,15 @@
 - Hazards found: none
 - Git: N/A (will be committed in next step)
 - Next recommended Phase 1 task: T497 annotate: src/slic3r/GUI/NetworkPluginDialog.cpp
+
+## Phase 1 - Task T498 complete
+- Task type: annotate
+- File: src/slic3r/GUI/NetworkPluginDialog.hpp
+- Deliverables: src/slic3r/GUI/NetworkPluginDialog.hpp, .ralph/agent/handoff.md
+- Substantive additions: Annotations for NetworkPluginDownloadDialog and NetworkPluginRestartDialog classes, enums, methods, and member variables.
+- Verification excerpt: // [INTENT] This header defines dialogs for managing network plugins, including download, update, and restart prompts.
+- Unity-impact summary:
+    - Map to custom UI Toolkit Documents (UXML) and C# MonoBehaviours for dialog layouts and logic.
+    - wxWidgets types (DPIDialog, wxCommandEvent, wxCollapsiblePane) will need to be replaced with Unity UI Toolkit equivalents.
+- Hazards found: 2 (P2 for `override` issue on `on_dpi_changed`, P3 for missing wxWidgets includes leading to compilation errors)
+- Git: N/A (will be committed in next step)
