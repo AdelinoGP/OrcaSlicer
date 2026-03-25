@@ -1,3 +1,46 @@
+// [INTENT]
+// This header defines the data structures and background job classes responsible for
+// creating and updating embossed text and shapes on 3D model surfaces. It acts as
+// the bridge between the UI (where users configure text, fonts, and projection
+// settings) and the backend `libslic3r` geometry processing library.
+//
+// The core components are:
+// - `DataBase`, `DataCreateVolume`, `DataUpdate`: These are data-carrying structs
+//   that capture all necessary parameters from the GUI to perform the emboss
+//   operation asynchronously. They include the shape to emboss, target object,
+//   transformation, and projection settings.
+// - `UpdateJob`, `UpdateSurfaceVolumeJob`: These are background jobs derived from
+//   the `Job` class. They take the data structs as input, perform the complex
+//   geometric calculations (e.g., projecting text onto a curved surface) on a
+//   worker thread, and then return the resulting `TriangleMesh` to the main
+//   thread for finalization.
+// - Helper functions like `start_create_volume` and `start_update_volume`: These
+//   are the entry points called from UI event handlers (e.g., a button click or
+//   a slider drag). They package the data and enqueue the appropriate job.
+//
+// [UNITY]
+// The entire C++ job system here would be replaced by the Unity C# Job System or
+// async/await Tasks.
+// - The `Data` structs would become C# structs or `ScriptableObject` assets that
+//   hold the emboss parameters.
+// - The `Job` classes would be replaced by `IJob` or `IJobParallelFor` implementations
+//   that operate on native containers (`NativeArray`, etc.) for performance.
+// - The `process` method logic would be ported to C# and executed in a background
+
+//   job. `libslic3r` geometric functions would need to be replaced with Unity
+//   equivalents or a C# port of the necessary geometry algorithms.
+// - The `finalize` method logic would be handled in a main-thread callback
+//   (e.g., `await task;`) after the job completes, where the resulting Unity
+//   `Mesh` is applied to a `GameObject`.
+// - Raycasting would be handled by `UnityEngine.Physics.Raycast`.
+// - The `ObjectID` and `ModelVolume` references would be replaced with Unity
+//   `GameObject` and `Component` references or GUIDs.
+//
+// [PORTING_HAZARD:P1] The core emboss functionality relies heavily on the `libslic3r`
+// geometry library, especially `Emboss.cpp`. Porting this logic to C# to work with
+// Unity's mesh data structures will be a major undertaking. It may be more
+// practical to wrap the existing C++ code as a native plugin initially.
+
 #ifndef slic3r_EmbossJob_hpp_
 #define slic3r_EmbossJob_hpp_
 
@@ -62,6 +105,10 @@ public:
     /// Write data how to reconstruct shape to volume
     /// </summary>
     /// <param name="volume">Data object for store emboss params</param>
+    // [INTENT] Serialize the emboss parameters (text, font, properties) into the ModelVolume
+    // so they can be reloaded later for editing.
+    // [UNITY] This would be equivalent to serializing a ScriptableObject or a component's
+    // data to a file (e.g., as JSON) so the emboss effect can be reconstructed.
     virtual void write(ModelVolume& volume) const;
 
     // Define projection move
@@ -141,10 +188,16 @@ struct DataUpdate
 /// Update text shape in existing text volume
 /// Predict that there is only one runnig(not canceled) instance of it
 /// </summary>
-/// [INTENT] Recompute emboss geometry on a worker thread and stash the result before handing it back to wxWidgets.
+/// [INTENT] A background job to recalculate the mesh of an existing embossed volume.
+/// This is used when the user changes a property of the emboss (like text content,
+/// size, or rotation) to avoid blocking the UI thread with expensive geometry calculations.
+/// [THREAD] Inherits from `Job`, so its `process()` method runs on a worker thread
+/// and its `finalize()` method runs on the main UI thread.
 class UpdateJob : public Job
 {
-    DataUpdate   m_input;
+    DataUpdate m_input;
+    // [STATE] The result of the geometry calculation, a new TriangleMesh. This is
+    // stored here and then moved to the ModelVolume in the finalize step.
     TriangleMesh m_result;
 
 public:
@@ -176,6 +229,10 @@ public:
     /// <param name="base">Data to write into volume</param>
     /// [INTENT] Persist the rebuilt mesh and metadata into ModelVolume without opening GL contexts.
     /// [PORTING_HAZARD:P3] Updating ModelVolume is tied to libslic3r's object graph; Unity needs a replacement data model before rendering.
+    /// [UNITY] In Unity, this would be the final step in the main-thread callback. It would
+    //  involve taking the computed mesh data (vertices, triangles) from the completed
+    //  job and applying it to the `MeshFilter.mesh` of the target `GameObject`. It would
+    //  also update any associated metadata component with the new properties.
     static void update_volume(ModelVolume* volume, TriangleMesh&& mesh, const DataBase& base);
 };
 
