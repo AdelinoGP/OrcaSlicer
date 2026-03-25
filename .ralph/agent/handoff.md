@@ -44,5 +44,18 @@
     - Represents a minimal organizational unit.
 - Hazards found: none
 - Git: N/A (will be committed in next step)
-- Next recommended Phase 1 task: T491 annotate: src/slic3r/GUI/MultiSendMachineModel.cpp
+
+## Phase 1 - Task T491 complete
+- Task type: annotate
+- File: src/slic3r/GUI/MultiSendMachineModel.cpp
+- Deliverables: src/slic3r/GUI/MultiSendMachineModel.cpp, .ralph/agent/handoff.md, .ralph/ralph-tasks.md
+- Substantive additions: Annotations for MultiSendMachineModel methods.
+- Verification excerpt: // [INTENT] Adds a new machine object to the model and returns a wxDataViewItem.
+- Unity-impact summary:
+    - `wxDataViewItem` will be replaced by a C# data model object or a VisualElement in UI Toolkit.
+    - Logic for adding machine data will be migrated to a C# data management class.
+- Hazards found: 1 (P2 - `wxDataViewItem` dependency)
+- Git: N/A (will be committed in next step)
+- Next recommended Phase 1 task: T492 annotate: src/slic3r/GUI/MultiSendMachineModel.hpp
+
 
