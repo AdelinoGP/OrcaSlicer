@@ -10,7 +10,7 @@ event_loop:
 tasks:
   enabled: true    
 RObot:
-  enabled: true
+  enabled: false
   timeout_seconds: 120
   telegram:
     bot_token: 8414074086:AAEcwSci_u4Z2zyv3m1JhdnmR99QPZjbo2k
