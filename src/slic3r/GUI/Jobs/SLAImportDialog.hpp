@@ -1,3 +1,22 @@
+// [INTENT]
+// This header file defines the `SLAImportDialog` class, a dialog box that allows
+// users to import SLA (stereolithography) archives (`.sl1`, `.sl1s`, `.zip`).
+// The dialog provides options to select the file and configure the import
+// process, such as choosing what to import (model, profile, or both) and the
+// quality of the import (which affects the marching squares algorithm).
+//
+// This class implements the `SLAImportJobView` interface, which means it provides
+// the necessary data for the `SLAImportJob`.
+//
+// [UNITY]
+// In a Unity port, this wxWidgets dialog would be replaced by a UI panel created
+// with the Unity UI Toolkit or a custom MonoBehaviour-based UI.
+// - The file picker would be replaced by a native file dialog accessed through a
+//   C# library or a custom plugin.
+// - The dropdowns for import options and quality would be `Dropdown` UI elements.
+// - The logic for getting the selected options would be handled by the C# script
+//   that manages the UI panel.
+
 #ifndef SLAIMPORTDIALOG_HPP
 #define SLAIMPORTDIALOG_HPP
 
@@ -21,17 +40,22 @@
 
 namespace Slic3r { namespace GUI {
 
+// [INTENT] The `SLAImportDialog` class, derived from `wxDialog`, provides the UI for
+// importing SLA archives. It also implements the `SLAImportJobView` interface
+// to provide the necessary data to the `SLAImportJob`.
 class SLAImportDialog : public wxDialog, public SLAImportJobView
 {
-    wxFilePickerCtrl *m_filepicker;
-    wxComboBox       *m_import_dropdown, *m_quality_dropdown;
+    wxFilePickerCtrl* m_filepicker;
+    wxComboBox *      m_import_dropdown, *m_quality_dropdown;
 
 public:
-    SLAImportDialog(Plater *plater) : wxDialog{plater, wxID_ANY, "Import SLA archive"}
+    // [INTENT] Constructs the dialog, creating and arranging all the UI elements.
+    SLAImportDialog(Plater* plater) : wxDialog{plater, wxID_ANY, "Import SLA archive"}
     {
         auto szvert    = new wxBoxSizer{wxVERTICAL};
         auto szfilepck = new wxBoxSizer{wxHORIZONTAL};
 
+        // [UI] A file picker for selecting the SLA archive file.
         m_filepicker = new wxFilePickerCtrl(this, wxID_ANY, from_u8(wxGetApp().app_config->get_last_dir()), _(L("Choose SLA archive:")),
                                             "SL1 / SL1S archive files (*.sl1, *.sl1s, *.zip)|*.sl1;*.SL1;*.sl1s;*.SL1S;*.zip;*.ZIP",
                                             wxDefaultPosition, wxDefaultSize, wxFLP_DEFAULT_STYLE | wxFD_OPEN | wxFD_FILE_MUST_EXIST);
@@ -45,6 +69,7 @@ public:
         static const std::vector<wxString> inp_choices = {_(L("Import model and profile")), _(L("Import profile only")),
                                                           _(L("Import model only"))};
 
+        // [UI] A dropdown for selecting what to import.
         m_import_dropdown = new wxComboBox(this, wxID_ANY, inp_choices[0], wxDefaultPosition, wxDefaultSize, inp_choices.size(),
                                            inp_choices.data(), wxCB_READONLY | wxCB_DROPDOWN);
 
@@ -53,11 +78,13 @@ public:
 
         static const std::vector<wxString> qual_choices = {_(L("Accurate")), _(L("Balanced")), _(L("Quick"))};
 
+        // [UI] A dropdown for selecting the import quality.
         m_quality_dropdown = new wxComboBox(this, wxID_ANY, qual_choices[0], wxDefaultPosition, wxDefaultSize, qual_choices.size(),
                                             qual_choices.data(), wxCB_READONLY | wxCB_DROPDOWN);
         szchoices->Add(m_quality_dropdown);
 
-        m_import_dropdown->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent &) {
+        // [EVENT] When the import selection changes, enable/disable the quality dropdown.
+        m_import_dropdown->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent&) {
             if (get_selection() == Sel::profileOnly)
                 m_quality_dropdown->Disable();
             else
@@ -74,12 +101,15 @@ public:
         SetSizerAndFit(szvert);
     }
 
+    // [INTENT] Returns the user's selection for what to import (model, profile, or both).
     Sel get_selection() const override
     {
         int sel = m_import_dropdown->GetSelection();
         return Sel(std::min(int(Sel::modelOnly), std::max(0, sel)));
     }
 
+    // [INTENT] Returns the window size for the marching squares algorithm based on
+    // the selected quality. A smaller window size results in a more accurate import.
     Vec2i32 get_marchsq_windowsize() const override
     {
         enum { Accurate, Balanced, Fast };
@@ -92,6 +122,7 @@ public:
         }
     }
 
+    // [INTENT] Returns the path of the selected file.
     std::string get_path() const override { return m_filepicker->GetPath().ToUTF8().data(); }
 };
 
