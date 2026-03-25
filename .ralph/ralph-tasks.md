@@ -382,7 +382,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [ ] T461 annotate: src/slic3r/GUI/KBShortcutsDialog.hpp
 - [ ] T462 annotate: src/slic3r/GUI/LibVGCode/LibVGCodeWrapper.cpp
 - [ ] T463 annotate: src/slic3r/GUI/LibVGCode/LibVGCodeWrapper.hpp
-- [ ] T464 annotate: src/slic3r/GUI/MainFrame.cpp
+- [~] T464 annotate: src/slic3r/GUI/MainFrame.cpp
 - [ ] T465 annotate: src/slic3r/GUI/MainFrame.hpp
 - [ ] T466 annotate: src/slic3r/GUI/MarkdownTip.cpp
 - [ ] T467 annotate: src/slic3r/GUI/MarkdownTip.hpp

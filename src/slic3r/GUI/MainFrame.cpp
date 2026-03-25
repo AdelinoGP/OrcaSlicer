@@ -987,6 +987,10 @@ void MainFrame::show_log_window()
 }
 
 // BBS GUI refactor: remove unused layout new/dlg
+// [INTENT] Updates the GUI layout based on application settings or mode (e.g., Editor vs GCodeViewer).
+// [STATE] Managed by m_layout. Uses m_tabpanel and m_plater.
+// [UNITY] Use a UI controller that swaps Prefabs or active UI hierarchy branches based on Application state.
+// [PORTING_HAZARD:P2] wxWidgets-specific reparenting/layout management is non-trivial to map to Unity's static hierarchy.
 void MainFrame::update_layout()
 {
     auto restore_to_creation = [this]() {
@@ -1781,6 +1785,7 @@ bool MainFrame::can_reslice() const { return (m_plater != nullptr) && !m_plater-
 
 // [INTENT] Create the side toolbar with "Slice plate" and "Print plate" buttons.
 // [UNITY] Use a custom SideToolbar MonoBehaviour managing Button components and their state.
+// [EVENT] Binds Slice and Print button clicks to the relevant GL toolbar events.
 wxBoxSizer* MainFrame::create_side_tools()
 {
     enable_multi_machine = wxGetApp().is_enable_multi_machine();
