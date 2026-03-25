@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-24T21:45:45Z
+Last updated: 2026-03-25T22:27:15Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -102,9 +102,9 @@ Last updated: 2026-03-24T21:45:45Z
 - [x] T181 annotate: src/slic3r/GUI/BitmapCache.cpp
 - [x] T182 annotate: src/slic3r/GUI/BitmapCache.hpp
 - [x] T183 annotate: src/slic3r/GUI/BitmapComboBox.cpp
-- [ ] T184 annotate: src/slic3r/GUI/BitmapComboBox.hpp
+- [x] T184 annotate: src/slic3r/GUI/BitmapComboBox.hpp
 - [x] T185 annotate: src/slic3r/GUI/BonjourDialog.cpp
-- [ ] T186 annotate: src/slic3r/GUI/BonjourDialog.hpp
+- [x] T186 annotate: src/slic3r/GUI/BonjourDialog.hpp
 - [ ] T187 annotate: src/slic3r/GUI/calib_dlg.cpp
 - [ ] T188 annotate: src/slic3r/GUI/calib_dlg.hpp
 - [ ] T189 annotate: src/slic3r/GUI/Calibration.cpp
@@ -428,7 +428,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [x] T507 annotate: src/slic3r/GUI/ObjColorDialog.cpp
 - [x] T508 annotate: src/slic3r/GUI/ObjColorDialog.hpp
 - [x] T509 annotate: src/slic3r/GUI/ObjectDataViewModel.cpp
-- [ ] T510 annotate: src/slic3r/GUI/ObjectDataViewModel.hpp
+- [x] T510 annotate: src/slic3r/GUI/ObjectDataViewModel.hpp
 - [ ] T511 annotate: src/slic3r/GUI/OG_CustomCtrl.cpp
 - [ ] T512 annotate: src/slic3r/GUI/OG_CustomCtrl.hpp
 - [ ] T513 annotate: src/slic3r/GUI/OpenGLManager.cpp

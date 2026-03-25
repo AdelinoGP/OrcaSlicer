@@ -1,34 +1,27 @@
-# Phase 1 GUI Annotation - Scratchpad
+# Ralph Scratchpad - GUI Annotation Phase 1
 
-## Current Understanding
-- Phase 1 annotation is ongoing, with many tasks already completed (T101-T378 done, some pending)
-- I see from handoff.md that tasks up to T510 have been completed (T502, T505-T510)
-- However, ralph-tasks.md shows many tasks before T500 are still pending (e.g., T177, T180, etc.)
-- The ready-tasks list includes tasks starting from T511 onward, but there are gaps in numbering
-- Need to reconcile the state: determine which tasks are truly pending vs. already done
-- The objective is to annotate every in-scope GUI file for Unity port preparation
-- Must follow the standard work loop: pick next eligible Phase 1 task, mark active, read file, annotate/classify, add evidence, commit, continue
+## Current Context
+- Objective: Annotate GUI files for Unity port preparation
+- Phase: 1 (Annotation)
+- Last completed: T509 (ObjectDataViewModel.cpp)
+- Next recommended: T510 (ObjectDataViewModel.hpp) but marked as blocked in ready-tasks
+
+## Observations
+1. The ready-tasks list shows T510 as blocked with no blocker listed - likely a task state inconsistency
+2. Many tasks from T511 onward are marked as ready (unblocked)
+3. The handoff suggests continuing with T510 after T509, but task system says it's blocked
 
 ## Plan
-1. First, read the full ralph-tasks.md to understand the current state
-2. Identify the next eligible Phase 1 task (likely one of the pending tasks in the list)
-3. Check if there are any blocked tasks and record blockers
-4. Follow the priority order: app lifecycle, viewport, main windows, configuration, dialogs, background-process, utilities
-5. Use the ready-tasks list as a guide but also look at earlier pending tasks
-6. Start with a task that is unblocked and has a file that exists (avoid known missing files)
-7. Annotate the file according to the standard
-8. Add evidence to handoff.md, commit, and continue
+1. Check actual task status with `ralph tools task list`
+2. If T510 is truly blocked, select next unblocked task from ready-tasks list
+3. If T510 is not blocked, proceed with it
+4. Follow standard work loop for each task
 
-## Notes from Memories
-- Several files are missing (PalmTree, DPIFrame, etc.) - skip those if they don't exist
-- There are patterns for annotation (mem-1774420576-b412)
-- Some files are corrupted (OAuthJob.cpp) - need to handle carefully
-- Use [UNITY] tags with concrete Unity component names
-- Skip trivial files if they are under 50 lines and semantically inert
+## Current Work
+- Working on T510: src/slic3r/GUI/ObjectDataViewModel.hpp
+- File contains class definitions for ObjectDataViewModelNode and ObjectDataViewModel
+- Already annotated the .cpp file (T509), so this is the corresponding header
 
 ## Next Steps
-- Completed T177: verified existing annotations in BedShapeDialog.cpp, marked task done, committed.
-- T180 (BindDialog.hpp) is next pending task, but we stopped after one task as per prompt.
-- Leave T180 as started for next iteration.
-- Other pending tasks: T180, T184, T185, etc. need annotation.
-- Ensure each file is accounted for in audit.
+- Complete annotation of T510 (ObjectDataViewModel.hpp)
+- Then check for next logical task

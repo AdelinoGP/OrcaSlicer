@@ -117,6 +117,53 @@
     - UnBindMachineDialog maps to UI Toolkit confirmation dialog.
     - DPIDialog base maps to VisualElement with Canvas Scaler.
 - Hazards found: 2 (P2 for wxSimplebook and DPI scaling, P3 for MemoryStruct CURL handling)
-- Git: pending commit
+- Git: commit 937b5c6153
 - Next recommended Phase 1 task: T184 annotate: src/slic3r/GUI/BitmapComboBox.hpp
+
+## Phase 1 - Task T184 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/BitmapComboBox.hpp
+- Deliverables: src/slic3r/GUI/BitmapComboBox.hpp
+- Substantive additions: Added file-level intent, class-level intents for BitmapComboBox, platform-specific method annotations, Unity migration guidance, and porting hazards for Retina bitmap scaling and Windows drawing overrides.
+- Verification excerpt: // [INTENT] BitmapComboBox is a specialized wxBitmapComboBox used for preset lists on Sidebar and Tabs.
+- Unity-impact summary:
+    - Replace with UI Toolkit VisualElement with custom USS styling for dropdown items.
+    - Use Sprite/Texture assets for bitmaps, implement custom drawing via custom VisualElement or style.
+    - Platform-specific overrides (#ifdef _WIN32, __APPLE__) require conditional Unity implementation.
+    - Retina bitmap scaling logic on macOS may need custom DPI-aware sprite loading.
+- Hazards found: 2 (P2 for platform-specific overrides, P3 for Retina bitmap scaling)
+- Git: commit 689af01f27
+- Next recommended Phase 1 task: T186 annotate: src/slic3r/GUI/BonjourDialog.hpp
+
+## Phase 1 - Task T186 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/BonjourDialog.hpp
+- Deliverables: src/slic3r/GUI/BonjourDialog.hpp
+- Substantive additions: Added file-level intent, class-level intents for BonjourDialog and IPListDialog, state variable annotations, event handler notes, Unity mapping guidance, and porting hazards for Bonjour networking and modal dialogs.
+- Verification excerpt: // [INTENT] BonjourDialog performs network discovery using Bonjour (mDNS) to find printers.
+- Unity-impact summary:
+    - Replace with UI Toolkit VisualElement dialog with ListView for printer list.
+    - Use C# async/await or Unity Coroutine for network discovery (Bonjour -> UDP multicast).
+    - Map wxListView to UI Toolkit ListView with custom item template.
+    - Map wxTimer to MonoBehaviour.StartCoroutine or Update loop.
+- Hazards found: 2 (P2 for platform-specific Bonjour networking, P3 for wxDialog modal loop)
+- Git: commit a824fe0d8f
+- Next recommended Phase 1 task: T187 annotate: src/slic3r/GUI/calib_dlg.cpp
+
+## Phase 1 - Task T510 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ObjectDataViewModel.hpp
+- Deliverables: src/slic3r/GUI/ObjectDataViewModel.hpp
+- Substantive additions: Added file-level intent, class-level intents for ObjectDataViewModelNode and ObjectDataViewModel classes, enum documentation (ItemType, ColumnNumber), state variable notes, event handling notes (wxCUSTOMEVT_LAST_VOLUME_IS_DELETED), and Unity mapping guidance for hierarchical data model replacement.
+- Verification excerpt: // [INTENT] ObjectDataViewModelNode represents a single node in the object tree hierarchy.
+- Unity-impact summary:
+    - Replace wxDataViewModel with C# ScriptableObject or class hierarchy implementing INotifyPropertyChanged.
+    - Replace wxBitmap icons with Unity Sprite/Texture assets and UI Toolkit VisualElement.
+    - Use UI Toolkit TreeView with custom item templates for hierarchical display.
+    - Map wxDataViewItem references to Unity UI Toolkit visual element handles.
+- Hazards found: 0
+- Git: pending commit
+- Next recommended Phase 1 task: T511 annotate: src/slic3r/GUI/OG_CustomCtrl.cpp
 
