@@ -8,6 +8,7 @@
 namespace Slic3r { namespace GUI {
 
 // [INTENT] Interface for a background job processor.
+// [UNCLEAR] The worker interface might need extension for priority-based job queueing in Unity.
 // Jobs are run sequentially on a dedicated thread, managed from the main UI thread.
 // [UNITY] Use a C# queue-based task processor, e.g., a custom `MonoBehaviour` using `Task` or `Coroutine`.
 // [PORTING_HAZARD:P2] Managing thread-safety between C++ worker thread logic and Unity's main thread API access requires a robust marshaling layer.
