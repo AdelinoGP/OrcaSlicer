@@ -21,13 +21,29 @@
 #include "libslic3r/ExtrusionEntity.hpp"
 #include "libslic3r/Point.hpp"
 
+// [INTENT] This header defines the bridge between Slic3r's internal engine types
+// (like those in libslic3r) and libvgcode's viewer-specific data structures.
+// It provides conversion utilities to prepare data for the G-code preview and visualization.
+//
+// [UNITY] Migration strategy:
+// - Replace Slic3r::Vec3f/Matrix4f with UnityEngine.Vector3/Matrix4x4.
+// - Replace Slic3r::ColorRGBA with UnityEngine.Color.
+// - Replace enums (ExtrusionRole, EMoveType) with C# enums in the Unity layer.
+// - Slic3r::GCodeProcessorResult should be converted to a ScriptableObject-based GCodeDataAsset in Unity.
+// - GCodeInputData: This is a complex struct/class that needs to be mirrored by a custom C#
+//   GCodeInputData struct compatible with Unity's ComputeBuffer or other GPU-based rendering systems.
+//
+// [PORTING_HAZARD:P2] The conversion logic for GCodeInputData (see LibVGCodeWrapper.cpp)
+// is complex and involves massive data copying. In Unity, this data should ideally be
+// processed on a background thread using the C# Job System or even a native C++ plugin
+// to avoid stalling the UI/Render thread.
 
 namespace Slic3r {
 class Print;
 
 namespace CustomGCode {
 struct Item;
-}  // namespace CustomGCode
+} // namespace CustomGCode
 } // namespace Slic3r
 
 namespace libvgcode {
@@ -70,13 +86,17 @@ extern ETimeMode convert(const Slic3r::PrintEstimatedStatistics::ETimeMode& mode
 extern Slic3r::PrintEstimatedStatistics::ETimeMode convert(const ETimeMode& mode);
 
 // mapping from Slic3r::GCodeProcessorResult to libvgcode::GCodeInputData
-extern GCodeInputData convert(const Slic3r::GCodeProcessorResult& result, const std::vector<std::string>& str_tool_colors,
-    const std::vector<std::string>& str_color_print_colors, const Viewer& viewer);
+extern GCodeInputData convert(const Slic3r::GCodeProcessorResult& result,
+                              const std::vector<std::string>&     str_tool_colors,
+                              const std::vector<std::string>&     str_color_print_colors,
+                              const Viewer&                       viewer);
 
 // mapping from Slic3r::Print to libvgcode::GCodeInputData
-extern GCodeInputData convert(const Slic3r::Print& print, const std::vector<std::string>& str_tool_colors,
-    const std::vector<std::string>& str_color_print_colors, const std::vector<Slic3r::CustomGCode::Item>& color_print_values,
-    size_t extruders_count);
+extern GCodeInputData convert(const Slic3r::Print&                          print,
+                              const std::vector<std::string>&               str_tool_colors,
+                              const std::vector<std::string>&               str_color_print_colors,
+                              const std::vector<Slic3r::CustomGCode::Item>& color_print_values,
+                              size_t                                        extruders_count);
 
 } // namespace libvgcode
 
