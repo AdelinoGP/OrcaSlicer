@@ -5,6 +5,11 @@
 // and starting the print. The job is designed to be non-blocking, allowing the
 // user to continue using the application while the print job is being sent.
 //
+// [STATE]
+// - `job_data`: Stores print job information gathered from the UI (`Plater`).
+// - `m_dev_id`: Identifier for the target printer.
+// - `m_print_job_completed_id`: Event ID to notify the main thread on completion.
+//
 // The `PrintJob` supports multiple printing modes:
 // - LAN mode: Sends the print job directly to the printer over the local network.
 //   This can be done via FTP for file transfer and MQTT for control, or using a
@@ -42,6 +47,11 @@
 // - The logic for trying LAN mode and falling back to cloud mode would be
 //   implemented using `try-catch` blocks and conditional logic within the async
 //   methods.
+//
+// [PORTING_HAZARD:P2]
+// - Direct usage of `wxWidgets` (like `wxString`, `wxGetApp`) in `PrintJob` will require full refactoring.
+// - The `PrintJob` relies on the `Plater` and `DeviceManager` which are highly tied to the `wxWidgets` GUI state.
+// - Threading model using `ctl.call_on_main_thread()` and worker threads needs careful `Task`/`Dispatcher` mapping in Unity.
 
 #include "PrintJob.hpp"
 #include "libslic3r/MTUtils.hpp"
