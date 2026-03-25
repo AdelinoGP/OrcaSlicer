@@ -57,7 +57,9 @@ public:
     MultiMachineManagerPage(wxWindow* parent);
     ~MultiMachineManagerPage() {};
 
+    // [INTENT] Update the pagination and device display.
     void update_page();
+    // [INTENT] Reload the user's devices list.
     void refresh_user_device(bool clear = false);
 
     // [EVENT] Sync UI with machine object state changes.
@@ -65,23 +67,31 @@ public:
     void sync_state(MachineObject* obj_);
     bool Show(bool show);
 
+    // [INTENT] Retrieve a range of objects for current page display.
     std::vector<ObjState> extractRange(const std::vector<ObjState>& source, int start, int end);
 
+    // [INTENT] Manage pagination timer for auto-updates.
     void start_timer();
     void update_page_number();
     void on_timer(wxTimerEvent& event);
     void clear_page();
 
+    // [EVENT] Handle page number input interaction.
     void page_num_enter_evt();
 
+    // [INTENT] Rescale UI for Windows High DPI.
     void msw_rescale();
 
 private:
-    std::vector<ObjState>          m_state_objs;
+    // [STATE] Cached list of device states for display.
+    std::vector<ObjState> m_state_objs;
+    // [STATE] Currently displayed device items in the UI.
     std::vector<MultiMachineItem*> m_device_items;
-    SortItem                       m_sort;
-    bool                           device_dev_name_big{true};
-    bool                           device_state_big{true};
+    // [STATE] Sorting configuration for device list.
+    SortItem m_sort;
+    // [STATE] Layout configuration flags.
+    bool device_dev_name_big{true};
+    bool device_state_big{true};
 
     Button*           m_button_edit{nullptr};
     wxBoxSizer*       page_sizer{nullptr};

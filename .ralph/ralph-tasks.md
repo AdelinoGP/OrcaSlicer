@@ -404,7 +404,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [x] T483 annotate: src/slic3r/GUI/MultiMachine.cpp
 - [ ] T484 annotate: src/slic3r/GUI/MultiMachine.hpp
 - [ ] T485 annotate: src/slic3r/GUI/MultiMachineManagerPage.cpp
-- [ ] T486 annotate: src/slic3r/GUI/MultiMachineManagerPage.hpp
+- [x] T486 annotate: src/slic3r/GUI/MultiMachineManagerPage.hpp
 - [ ] T487 annotate: src/slic3r/GUI/MultiMachinePage.cpp
 - [ ] T488 annotate: src/slic3r/GUI/MultiMachinePage.hpp
 - [ ] T489 annotate: src/slic3r/GUI/MultiPrintJob.cpp
