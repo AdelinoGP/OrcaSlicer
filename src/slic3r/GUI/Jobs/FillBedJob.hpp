@@ -4,11 +4,18 @@
 // the data structures used to hold the state of the arrangement process and
 // the interface for the job's three main stages: prepare, process, and finalize.
 //
+// [THREAD] This job is designed to run in a background worker thread to prevent
+// UI blocking during the computationally expensive arrangement process.
+//
 // [UNITY]
 // In a Unity port, this class would not have a direct equivalent. Its role would
 // be fulfilled by a C# script that manages the state of the fill-bed operation
 // and launches the corresponding C# Job or async Task. The member variables
 // would become fields in that C# class.
+//
+// [PORTING_HAZARD:P2] The arrangement library logic (used via `ArrangePolygon`, etc.)
+// is currently C++-specific and will need to be replaced with a C# native or
+// Unity-compatible library.
 
 #ifndef FILLBEDJOB_HPP
 #define FILLBEDJOB_HPP
