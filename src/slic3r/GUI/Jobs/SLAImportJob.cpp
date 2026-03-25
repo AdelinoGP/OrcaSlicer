@@ -27,6 +27,11 @@
 // - The `finalize` logic would be the continuation of the async Task on the main
 //   thread, where the imported `Mesh` is assigned to a `GameObject` and the print
 //   profile data is loaded into a `ScriptableObject` or a settings class.
+//
+// [PORTING_HAZARD:P2]
+// - This job system relies heavily on `wxWidgets` job-management classes (`Ctl`, `Worker`).
+// - A direct replacement for the threading model will be needed (C# `Task` / `Task.Run` is recommended).
+// - The `import_sla_archive` and all its sub-dependencies are C++ logic that will require a full C# port or C++-to-C# wrapper.
 
 #include "SLAImportJob.hpp"
 
