@@ -17,6 +17,7 @@ wxDEFINE_EVENT(EVT_PREFERENCES_SELECT_TAB, wxCommandEvent);
 
 // [INTENT] Dialog displaying keyboard shortcuts in tabs.
 // [UNITY] Reimplement as a UI Toolkit Window or Panel with a custom Tab controller.
+// [PORTING_HAZARD:P3] wxSimplebook is specific to wxWidgets; needs equivalent in UI Toolkit or custom panel switcher.
 KBShortcutsDialog::KBShortcutsDialog()
     : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe),
                 wxID_ANY,
