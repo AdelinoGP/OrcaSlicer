@@ -26,6 +26,12 @@
 //   within the application's data directory.
 // - Progress updates and completion notifications would be handled through C#
 //   events or by binding UI elements to properties of the C# class.
+//
+// [PORTING_HAZARD:P2]
+// - wxWidgets event-passing mechanism (`wxPostEvent`, `wxCommandEvent`) must be
+//   replaced by a C#-native event system or Unity's Event System.
+// - File system operations (`fs::path`, `wxFileName`) will need to map to
+//   Unity's `System.IO.Path`/`Application.persistentDataPath` equivalents.
 
 #include "UpgradeNetworkJob.hpp"
 
