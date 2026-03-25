@@ -1,3 +1,32 @@
+// [INTENT]
+// This header defines a specialized worker class, `PlaterWorker`, for managing
+// background jobs that are initiated from the Plater (the main 3D view). It
+// acts as a decorator around the generic `Worker` class, adding
+// plater-specific functionalities.
+//
+// The key components are:
+// - `PlaterWorker`: A template class that wraps a `Worker` instance. It ensures
+//   that the UI thread continuously processes messages from the worker thread
+//   by hooking into the `wxEVT_IDLE` and `wxEVT_PAINT` events.
+// - `PlaterJob`: A nested wrapper class that decorates any `Job` submitted to
+//   the `PlaterWorker`. Its main purposes are:
+//   - To ensure the UI thread is woken up to process status updates from the
+//     job, providing a responsive UI.
+//   - To add detailed logging for job execution times (process and finalize stages).
+//   - To provide centralized exception handling and display error messages to
+//     the user.
+//   - To show a busy cursor while the job is running.
+//
+// [UNITY]
+// The concept of a dedicated `PlaterWorker` would not be necessary in Unity.
+// The core job management would be handled by the C# Job System or async/await.
+// - The UI responsiveness (waking up the UI thread) is handled automatically by
+//   Unity's main loop and `async/await`'s main thread synchronization context.
+// - Job logging and exception handling would be implemented in a C# wrapper
+//   class or using AOP (Aspect-Oriented Programming) techniques with attributes.
+// - A busy cursor would be managed by a global UI state controller that listens
+//   for "job started" and "job ended" events.
+
 #ifndef PLATERWORKER_HPP
 #define PLATERWORKER_HPP
 
@@ -12,32 +41,47 @@
 
 namespace Slic3r { namespace GUI {
 
-// [INTENT] Template worker class for managing background jobs in the plater
-// [THREAD] Manages worker thread for background processing, communicates with UI thread
-// [EVENT] Uses wxEVT_IDLE and wxEVT_PAINT events to process messages
-// [UNITY] Replace with Unity Job System or async/await patterns
+// [INTENT] A template for a worker class that is specialized for the Plater.
+// It manages a worker thread for background processing and ensures that the
+// Plater's UI remains responsive by processing events during idle time.
+// [THREAD] This class owns a `Worker` instance and manages its lifecycle.
+// [EVENT] It binds to `wxEVT_IDLE` and `wxEVT_PAINT` to continuously process
+// events from the worker thread.
+// [UNITY] This class would be replaced by a C# singleton or a script on a
+// persistent GameObject that manages the lifecycle of background tasks and
+// provides a central point for starting and monitoring jobs.
 template<class WorkerSubclass> class PlaterWorker : public Worker
 {
-    WorkerSubclass m_w;      // [STATE] Worker instance for background processing
-    wxWindow*      m_plater; // [STATE] Reference to plater window for UI updates
+    // [STATE] The actual worker instance that manages the job queue and worker thread.
+    WorkerSubclass m_w;
+    // [STATE] A pointer to the Plater window, used for posting UI update events.
+    wxWindow* m_plater;
 
-    // [INTENT] Wrapper job that adds plater-specific processing and logging
-    // [THREAD] Runs on worker thread, marshals status updates to UI thread
-    // [EVENT] Uses wxWakeUpIdle() to ensure UI thread processes messages
-    // [UNITY] Replace with Unity Job System IJob interface
+    // [INTENT] A wrapper job that adds plater-specific functionality to any
+    // submitted job, such as logging, error handling, and UI responsiveness.
+    // [UNITY] This pattern could be implemented in Unity using a decorator or
+    // a base job class that includes common functionality like logging and
+    // error handling.
     class PlaterJob : public Job
     {
-        std::shared_ptr<Job> m_job;              // [STATE] The actual job to execute
-        wxWindow*            m_plater;           // [STATE] Reference to plater for UI updates
-        long long            m_process_duration; // [ms]
+        // [STATE] The actual job to be executed.
+        std::shared_ptr<Job> m_job;
+        // [STATE] A pointer to the Plater window for UI updates.
+        wxWindow* m_plater;
+        // [STATE] The duration of the `process` stage, for logging.
+        long long m_process_duration; // [ms]
 
     public:
+        // [INTENT] This method executes the wrapped job's `process` method on a
+        // worker thread. It also wraps the `Ctl` object to ensure the UI thread
+        // is woken up for status updates.
+        // [THREAD] This method runs on a worker thread.
         void process(Ctl& c) override
         {
-            // Ensure that wxWidgets processing wakes up to handle outgoing
-            // messages in plater's wxIdle handler. Otherwise it might happen
-            // that the message will only be processed when an event like mouse
-            // move comes along which might be too late.
+            // [INTENT] A wrapper for the `Ctl` object that ensures the UI thread
+            // is woken up whenever a status update is sent from the worker thread.
+            // This prevents the UI from appearing frozen during long operations.
+            // [EVENT] Calls `wxWakeUpIdle()` to force the UI thread to process events.
             struct WakeUpCtl : Ctl
             {
                 Ctl& ctl;
@@ -73,6 +117,7 @@ template<class WorkerSubclass> class PlaterWorker : public Worker
 
             } wctl{c};
 
+            // [INTENT] Shows a busy cursor while the job is running.
             CursorSetterRAII busycursor{wctl};
 
             using namespace std::chrono;
@@ -82,6 +127,9 @@ template<class WorkerSubclass> class PlaterWorker : public Worker
             m_process_duration                   = duration_cast<milliseconds>(process_end - process_start).count();
         }
 
+        // [INTENT] This method executes the wrapped job's `finalize` method on the
+        // main UI thread. It also logs the total execution time and handles exceptions.
+        // [THREAD] This method runs on the main UI thread.
         void finalize(bool canceled, std::exception_ptr& eptr) override
         {
             using namespace std::chrono;
@@ -90,11 +138,14 @@ template<class WorkerSubclass> class PlaterWorker : public Worker
             steady_clock::time_point finalize_end      = steady_clock::now();
             long long                finalize_duration = duration_cast<milliseconds>(finalize_end - finalize_start).count();
 
+            // [INTENT] Log the total execution time of the job.
             BOOST_LOG_TRIVIAL(info) << std::fixed // do not use scientific notations
                                     << "Job '" << typeid(*m_job).name() << "' "
                                     << "spend " << m_process_duration + finalize_duration << "ms "
                                     << "(process " << m_process_duration << "ms + finalize " << finalize_duration << "ms)";
 
+            // [INTENT] Centralized exception handling. If the job threw an
+            // exception, it is re-thrown here and displayed to the user.
             if (eptr)
                 try {
                     std::rethrow_exception(eptr);
@@ -124,14 +175,15 @@ template<class WorkerSubclass> class PlaterWorker : public Worker
         }
     };
 
+    // [EVENT] Guards for the idle and paint events, ensuring that the event
+    // handlers are automatically disconnected when the `PlaterWorker` is destroyed.
     EventGuard on_idle_evt;
     EventGuard on_paint_evt;
 
 public:
-    // [INTENT] Constructor - sets up worker thread and event handlers for continuous message processing
-    // [THREAD] Creates worker thread and sets up idle/paint event handlers
-    // [EVENT] Binds wxEVT_IDLE and wxEVT_PAINT to process events continuously
-    // [UNITY] Replace with Unity's main thread dispatcher or Job System
+    // [INTENT] Constructs the `PlaterWorker`.
+    // [PARAM] plater: A pointer to the Plater window.
+    // [PARAM] args: Arguments to be forwarded to the `WorkerSubclass` constructor.
     template<class... WorkerArgs>
     PlaterWorker(wxWindow* plater, WorkerArgs&&... args)
         : m_w{std::forward<WorkerArgs>(args)...}
@@ -141,7 +193,7 @@ public:
         , on_paint_evt(plater, wxEVT_PAINT, [this](wxPaintEvent&) { process_events(); })
     {}
 
-    // Always package the job argument into a PlaterJob
+    // [INTENT] Pushes a new job to the worker queue, wrapping it in a `PlaterJob`.
     bool push(std::shared_ptr<Job> job) override { return m_w.push(std::make_shared<PlaterJob>(m_plater, std::move(job))); }
 
     bool is_idle() const override { return m_w.is_idle(); }
