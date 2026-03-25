@@ -95,7 +95,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [x] T174 annotate: src/slic3r/GUI/BBLStatusBarSend.hpp
 - [x] T175 annotate: src/slic3r/GUI/BBLTopbar.cpp
 - [x] T176 annotate: src/slic3r/GUI/BBLTopbar.hpp
-- [ ] T177 annotate: src/slic3r/GUI/BedShapeDialog.cpp
+- [x] T177 annotate: src/slic3r/GUI/BedShapeDialog.cpp
 - [x] T178 annotate: src/slic3r/GUI/BedShapeDialog.hpp
 - [x] T179 annotate: src/slic3r/GUI/BindDialog.cpp
 - [ ] T180 annotate: src/slic3r/GUI/BindDialog.hpp

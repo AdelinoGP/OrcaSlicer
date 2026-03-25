@@ -89,3 +89,18 @@
 - Git: <commit subject "annotate: src/slic3r/GUI/ObjectDataViewModel.cpp">
 - Next recommended Phase 1 task: T510 annotate: src/slic3r/GUI/ObjectDataViewModel.hpp
 
+## Phase 1 - Task T177 complete
+- Task type: annotate (verified existing annotations)
+- File: src/slic3r/GUI/BedShapeDialog.cpp
+- Deliverables: src/slic3r/GUI/BedShapeDialog.cpp
+- Substantive additions: File already contains comprehensive [INTENT], [STATE], [EVENT], [THREAD], [UNITY], [PORTING_HAZARD] annotations. Verified coverage of BedShape and BedShapePanel classes, including bed shape parameter handling, custom texture/model imports, and UI preview integration.
+- Verification excerpt: // [INTENT] Construct the BedShape state, holding the build volume and shape type.
+- Unity-impact summary:
+    - BedShapeDialog maps to Unity UI Modal Dialog with UI Toolkit VisualElements.
+    - ConfigOptionsGroup pages map to TabView or Toolbar with shared binding.
+    - Bed preview maps to a RenderTexture with 2D drawing or Mesh generation.
+    - File import dialogs map to async FileBrowser.OpenFilePanel with background parsing.
+- Hazards found: 3 (all P3: boost filesystem, ConfigOptionsGroup any type, manual UI thread blocking)
+- Git: pending commit
+- Next recommended Phase 1 task: T178 annotate: src/slic3r/GUI/BedShapeDialog.hpp
+
