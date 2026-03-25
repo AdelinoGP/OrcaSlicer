@@ -2,6 +2,10 @@
 
 ## Patterns
 
+### mem-1774420576-b412
+> Annotation pattern for UI Panel classes: [INTENT] class purpose, [STATE] important UI state variables, [UNITY] concrete migration mapping for wxWidgets components to UI Toolkit.
+<!-- tags: gui, annotation, unity | created: 2026-03-25 -->
+
 ### mem-1773981659-cd27
 > SKIP_TRIVIAL: src/slic3r/GUI/AboutDialog.hpp
 <!-- tags: gui, annotation, skip | created: 2026-03-20 -->
