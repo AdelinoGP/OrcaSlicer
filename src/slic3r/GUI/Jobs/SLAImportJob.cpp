@@ -1,3 +1,33 @@
+// [INTENT]
+// This file implements the `SLAImportJob` class, a background job for importing
+// models and print profiles from SLA archives (`.sl1`, `.sl1s`, `.zip`). This
+// job is initiated from the `SLAImportDialog`.
+//
+// The import process is handled in a worker thread to avoid blocking the UI,
+// especially when processing large models. The workflow is as follows:
+// 1. The `SLAImportDialog` gathers the file path and import options from the user.
+// 2. An `SLAImportJob` is created, and its `prepare()` method is called on the
+//    main thread to copy the necessary data from the dialog.
+// 3. The `process()` method runs on a worker thread. It calls the
+//    `import_sla_archive` function from `libslic3r/Format/SL1.hpp` to extract
+//    the mesh and/or profile data from the archive. Progress is reported to the
+//    UI through a callback.
+// 4. The `finalize()` method runs on the main thread after the job is complete.
+//    It handles any errors, loads the imported model into the Plater, applies
+//    the new print profile, and displays notifications to the user.
+//
+// [UNITY]
+// In a Unity port, this functionality would be managed by a C# script that uses
+// an async Task to handle the file import.
+// - The `SLAImportDialog` would be a UI panel.
+// - The `process` logic would be an async method that calls a C# version of the
+//   `import_sla_archive` function. This would likely involve using a C# library
+//   for unzipping archives (e.g., `System.IO.Compression`) and parsing the
+//   contained files.
+// - The `finalize` logic would be the continuation of the async Task on the main
+//   thread, where the imported `Mesh` is assigned to a `GameObject` and the print
+//   profile data is loaded into a `ScriptableObject` or a settings class.
+
 #include "SLAImportJob.hpp"
 
 #include "libslic3r/Format/SL1.hpp"
@@ -14,46 +44,54 @@
 
 namespace Slic3r { namespace GUI {
 
+// [INTENT] The `priv` class is a pimpl (pointer to implementation) that holds
+// the internal state of the `SLAImportJob`. This separates the job's data from
+// its interface and helps to keep the header file clean.
+// [STATE] This class holds all the data needed for the import job, including
+// pointers to the Plater and the import dialog, the user's selections, the
+// resulting mesh and profile, and any error messages.
 class SLAImportJob::priv
 {
 public:
     Plater* plater;
 
+    // [STATE] The user's selection from the dialog (e.g., import model, profile, or both).
     Sel sel = Sel::modelAndProfile;
 
+    // [STATE] The imported triangle mesh.
     indexed_triangle_set mesh;
-    DynamicPrintConfig   profile;
-    wxString             path;
-    Vec2i32              win = {2, 2};
-    std::string          err;
-    ConfigSubstitutions  config_substitutions;
+    // [STATE] The imported print profile.
+    DynamicPrintConfig profile;
+    // [STATE] The path to the SLA archive file.
+    wxString path;
+    // [STATE] The window size for the marching squares algorithm, determined by the quality setting.
+    Vec2i32 win = {2, 2};
+    // [STATE] Any error message that occurred during the import.
+    std::string err;
+    // [STATE] Any configuration substitutions that were made during the import.
+    ConfigSubstitutions config_substitutions;
 
+    // [STATE] A pointer to the import dialog view to get the user's selections.
     const SLAImportJobView* import_dlg;
 
     priv(Plater* plt, const SLAImportJobView* view) : plater{plt}, import_dlg{view} {}
 };
 
-// [INTENT] Storage bridge between the import dialog and the background job. `mesh`, `profile`, and `path` are populated on the UI thread
-// before the worker runs so the job only works on POD data and can be safely re-used via `reset()`.
-// [STATE] `sel` and `config_substitutions` capture which portion of the SLA archive we care about and any preset overrides the dialog might
-// have requested.
-
 SLAImportJob::SLAImportJob(const SLAImportJobView* view) : p{std::make_unique<priv>(wxGetApp().plater(), view)} { prepare(); }
 
 SLAImportJob::~SLAImportJob() = default;
 
-// [INTENT] Worker entry point that loads SLA archives off the main thread while caching errors/status for finalize().
-// [THREAD] Process runs on the job thread; use `Ctl` to shuttle progress back to the UI instead of direct wx calls.
-// [UNITY] Map this to a MonoBehaviour `SlaImportController` that awaits `Task.Run(import_sla_archive)` and broadcasts progress through
-// `UnityEvent<float>`. [PORTING_HAZARD:P2] `import_sla_archive` mutates libslic3r geometries/configs, so Unity must keep it on a worker
-// task and forward results via a dispatcher.
+// [INTENT] The main worker method for the job. It calls the `import_sla_archive`
+// function to extract data from the SLA file.
+// [THREAD] This method is executed on a worker thread.
 void SLAImportJob::process(Ctl& ctl)
 {
     auto statustxt = _u8L("Importing SLA archive");
     ctl.update_status(0, statustxt);
 
+    // [EVENT] A callback passed to the import function to report progress and
+    // check for cancellation.
     auto progr = [&ctl, &statustxt](int s) {
-        // [EVENT] Progress callback raises `Ctl` notifications and honors cancellations so the UI thread can observe the percent and stop if needed.
         if (s < 100)
             ctl.update_status(int(s), statustxt);
         return !ctl.was_canceled();
@@ -80,9 +118,10 @@ void SLAImportJob::process(Ctl& ctl)
     ctl.update_status(100, ctl.was_canceled() ? _u8L("Importing canceled.") : _u8L("Importing done."));
 }
 
+// [INTENT] Resets the job's state to its default values, allowing the job object
+// to be reused.
 void SLAImportJob::reset()
 {
-    // [STATE] Clear cached selection/mesh data so the job can restart with fresh dialog inputs, reusing the base SLA profile as a fallback.
     p->sel     = Sel::modelAndProfile;
     p->mesh    = {};
     p->profile = p->plater->sla_print().full_print_config();
@@ -90,11 +129,13 @@ void SLAImportJob::reset()
     p->path.Clear();
 }
 
+// [INTENT] Prepares the job by copying the necessary data from the import dialog.
+// [THREAD] This method is called on the main UI thread before the job starts.
 void SLAImportJob::prepare()
 {
     reset();
 
-    // [EVENT] Copy dialog inputs on the main thread so the worker only sees sanitized STL paths, selection flags, and window sizes.
+    // [STATE] Copy the user's selections from the dialog to the job's private state.
     auto path = p->import_dlg->get_path();
     auto nm   = wxFileName(path);
     p->path   = !nm.Exists(wxFILE_EXISTS_REGULAR) ? "" : nm.GetFullPath();
@@ -103,16 +144,17 @@ void SLAImportJob::prepare()
     p->config_substitutions.clear();
 }
 
+// [INTENT] This method is called on the main UI thread after the job finishes.
+// It applies the imported data to the application.
+// [THREAD] This method is executed on the main UI thread.
 void SLAImportJob::finalize(bool canceled, std::exception_ptr& eptr)
 {
-    // [THREAD] Runs back on the UI thread so it can safely interact with NotificationManager, presets, and the object list.
-    // [EVENT] Finalize dispatches warnings, reloads presets, and pushes mesh data to the UI after the worker completes.
     // Ignore the arrange result if aborted.
     if (canceled || eptr)
         return;
 
+    // [EVENT] If an error occurred, show it to the user.
     if (!p->err.empty()) {
-        // [EVENT] Errors captured during the import are shown after the worker completes so the UI thread drives message boxes.
         show_error(p->plater, p->err);
         p->err = "";
         return;
@@ -128,17 +170,13 @@ void SLAImportJob::finalize(bool canceled, std::exception_ptr& eptr)
                                                                      .ToStdString());
     }
 
-    // [PORTING_HAZARD:P3] Unity needs to swap in its own modal/topology for this warning instead of calling NotificationManager directly.
-
     if (p->sel != Sel::modelOnly) {
         if (p->profile.empty())
             p->profile = p->plater->sla_print().full_print_config();
 
-        // [STATE] Guard against multi-volume objects so we do not corrupt SLA slicing expectations when applying new presets.
         const ModelObjectPtrs& objects = p->plater->model().objects;
         for (auto object : objects)
             if (object->volumes.size() > 1) {
-                // [EVENT] Show blocking info dialog and return early so the UI thread can re-open the object list safely.
                 Slic3r::GUI::show_info(nullptr,
                                        _(L("You cannot load SLA project with a multi-part object on the bed")) + "\n\n" +
                                            _(L("Please check your object list before preset changing.")),
@@ -150,19 +188,19 @@ void SLAImportJob::finalize(bool canceled, std::exception_ptr& eptr)
         config.apply(SLAFullPrintConfig::defaults());
         config += std::move(p->profile);
 
-        // [EVENT] Load the imported configuration so menus, presets, and notifications see the new values immediately.
+        // [EVENT] Load the imported profile into the application.
         wxGetApp().preset_bundle->load_config_model(name, std::move(config));
         wxGetApp().load_current_presets();
     }
 
+    // [EVENT] If a model was imported, add it to the Plater.
     if (!p->mesh.empty()) {
-        // [EVENT] Importing the mesh populates the sidebar list and triggers any GLCanvas refresh needed for the new data.
         bool is_centered = false;
         p->plater->sidebar().obj_list()->load_mesh_object(TriangleMesh{std::move(p->mesh)}, name, is_centered);
     }
 
+    // [EVENT] If any configuration substitutions were made, show them to the user.
     if (!p->config_substitutions.empty())
-        // [EVENT] Display substitution details so the user knows which presets changed during the import.
         show_substitutions_info(p->config_substitutions, p->path.ToUTF8().data());
 
     reset();
