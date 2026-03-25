@@ -18,6 +18,12 @@
 //   by a UI script.
 // - `SLAImportJob` would be replaced by a C# class that manages the import
 //   process using an async Task.
+//
+// [PORTING_HAZARD:P2]
+// - The `SLAImportJobView` interface uses C++ types like `Vec2i32` and `std::string`
+//   that will need C# counterparts in a ported API.
+// - `SLAImportJob` inherits from `Job`, a GUI-layer base class; the Unity equivalent
+//   must be a custom MonoBehaviour or a unified Task-based infrastructure.
 
 #ifndef SLAIMPORTJOB_HPP
 #define SLAIMPORTJOB_HPP
