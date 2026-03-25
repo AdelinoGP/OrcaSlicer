@@ -395,7 +395,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [ ] T474 annotate: src/slic3r/GUI/MonitorBasePanel.cpp
 - [x] T475 annotate: src/slic3r/GUI/Monitor.cpp
 - [x] T476 annotate: src/slic3r/GUI/Monitor.hpp
-- [ ] T477 annotate: src/slic3r/GUI/MonitorPage.cpp
+- [x] T477 skip-trivial: src/slic3r/GUI/MonitorPage.cpp
 - [ ] T478 annotate: src/slic3r/GUI/MonitorPage.hpp
 - [ ] T479 annotate: src/slic3r/GUI/Mouse3DController.cpp
 - [ ] T480 annotate: src/slic3r/GUI/Mouse3DController.hpp
