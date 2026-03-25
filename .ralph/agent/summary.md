@@ -1,8 +1,8 @@
 # Loop Summary
 
 **Status:** Completed successfully
-**Iterations:** 3
-**Duration:** 5m 33s
+**Iterations:** 1
+**Duration:** 40s
 
 ## Tasks
 
@@ -14,4 +14,4 @@ _No events recorded._
 
 ## Final Commit
 
-0be2faa7f0: Annotate src/slic3r/GUI/Jobs/EmbossJob.hpp for Unity porting
+956cedc9c4: annotate: src/slic3r/GUI/InstanceCheck.hpp (T422)
