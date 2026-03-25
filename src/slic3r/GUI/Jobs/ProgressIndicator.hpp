@@ -12,6 +12,10 @@
 // `SetStatus(string status)`, and an event like `OnCancelRequested`. UI elements
 // like progress bars would implement this interface, and background tasks
 // would be given a reference to it to report their progress.
+//
+// [PORTING_HAZARD:P3]
+// The `show_error_info` method uses `wxString` which will require a conversion
+// layer when mapping to Unity's `string` (which is UTF-16).
 
 #ifndef IPROGRESSINDICATOR_HPP
 #define IPROGRESSINDICATOR_HPP
