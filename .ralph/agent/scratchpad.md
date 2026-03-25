@@ -18,10 +18,16 @@
 4. Follow standard work loop for each task
 
 ## Current Work
-- Working on T510: src/slic3r/GUI/ObjectDataViewModel.hpp
-- File contains class definitions for ObjectDataViewModelNode and ObjectDataViewModel
-- Already annotated the .cpp file (T509), so this is the corresponding header
+- Working on T511: src/slic3r/GUI/OG_CustomCtrl.cpp
+- File contains OG_CustomCtrl class, a custom wxPanel for OptionsGroup UI
+- Complex custom control handling layout, painting, mouse events, rendering of config options
+
+## Observations
+- File is large (1038 lines) with complex custom painting and event handling
+- Key responsibilities: layout calculation, rendering of labels/icons/buttons, mouse event handling
+- Uses wxDC for custom drawing, manages visibility modes, handles undo/redo UI
+- Inner class CtrlLine manages individual lines within the control
 
 ## Next Steps
-- Complete annotation of T510 (ObjectDataViewModel.hpp)
-- Then check for next logical task
+- Annotate OG_CustomCtrl.cpp
+- Then move to T512 (OG_CustomCtrl.hpp)

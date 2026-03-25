@@ -429,7 +429,7 @@ Last updated: 2026-03-25T22:27:15Z
 - [x] T508 annotate: src/slic3r/GUI/ObjColorDialog.hpp
 - [x] T509 annotate: src/slic3r/GUI/ObjectDataViewModel.cpp
 - [x] T510 annotate: src/slic3r/GUI/ObjectDataViewModel.hpp
-- [ ] T511 annotate: src/slic3r/GUI/OG_CustomCtrl.cpp
+- [x] T511 annotate: src/slic3r/GUI/OG_CustomCtrl.cpp
 - [ ] T512 annotate: src/slic3r/GUI/OG_CustomCtrl.hpp
 - [ ] T513 annotate: src/slic3r/GUI/OpenGLManager.cpp
 - [ ] T514 annotate: src/slic3r/GUI/OpenGLManager.hpp

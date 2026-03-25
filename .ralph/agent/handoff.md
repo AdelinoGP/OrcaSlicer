@@ -164,6 +164,21 @@
     - Use UI Toolkit TreeView with custom item templates for hierarchical display.
     - Map wxDataViewItem references to Unity UI Toolkit visual element handles.
 - Hazards found: 0
-- Git: pending commit
+- Git: commit dae360fca5
 - Next recommended Phase 1 task: T511 annotate: src/slic3r/GUI/OG_CustomCtrl.cpp
+
+## Phase 1 - Task T511 complete
+- Task type: annotate
+- File: src/slic3r/GUI/OG_CustomCtrl.cpp
+- Deliverables: src/slic3r/GUI/OG_CustomCtrl.cpp
+- Substantive additions: Added file-level intent for custom control painting and event handling, class-level intent for OG_CustomCtrl and CtrlLine inner class, method-level intents for OnPaint, OnMotion, render, and constructor. Added state variable documentation and Unity mapping guidance for custom control replacement.
+- Verification excerpt: // [INTENT] OG_CustomCtrl is a custom wxPanel that provides a specialized control for OptionsGroup.
+- Unity-impact summary:
+    - Replace with UI Toolkit VisualElement with custom USS styling.
+    - Use C# MonoBehaviour controller for layout and event handling.
+    - Custom drawing via UI Toolkit's custom VisualElement or IMGUI.
+    - Tooltip system via UI Toolkit's tooltip attribute or custom popup.
+- Hazards found: 0
+- Git: pending commit
+- Next recommended Phase 1 task: T512 annotate: src/slic3r/GUI/OG_CustomCtrl.hpp
 
