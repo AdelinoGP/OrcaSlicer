@@ -34,34 +34,41 @@
 #include "Widgets/StepCtrl.hpp"
 #include "Widgets/Button.hpp"
 
-
 #define MODEL_MALL_PAGE_SIZE wxSize(FromDIP(1400 * 0.85), FromDIP(1040 * 0.75))
 #define MODEL_MALL_PAGE_CONTROL_SIZE wxSize(FromDIP(1400 * 0.85), FromDIP(40 * 0.75))
 #define MODEL_MALL_PAGE_WEB_SIZE wxSize(FromDIP(1400 * 0.85), FromDIP(1000 * 0.75))
 
 namespace Slic3r { namespace GUI {
 
-    class ModelMallDialog : public DPIFrame
-    {
-    public:
-        ModelMallDialog(Plater* plater = nullptr);
-        ~ModelMallDialog();
+// [INTENT] ModelMallDialog implements an embedded web browser interface for interacting with the Model Mall platform.
+// [UNITY] Replace with a WebView component (e.g., UniWebView or native bridge) and a C#-to-JS/JS-to-C# message bridge for the
+// OnScriptMessage functionality.
+class ModelMallDialog : public DPIFrame
+{
+public:
+    ModelMallDialog(Plater* plater = nullptr);
+    ~ModelMallDialog();
 
-        void OnScriptMessage(wxWebViewEvent& evt);
-        void on_dpi_changed(const wxRect& suggested_rect) override;
-        void on_show(wxShowEvent& event);
-        void on_back(wxMouseEvent& evt);
-        void on_forward(wxMouseEvent& evt);
-        void go_to_url(wxString url);
-        void show_control(bool show);
-        void go_to_mall(wxString url);
-        void go_to_publish(wxString url);
-        void on_refresh(wxMouseEvent& evt);
-    public:
-        wxPanel* m_web_control_panel{nullptr};
-        wxWebView* m_browser{nullptr};
-        wxString m_url;
-    };
+    // [EVENT] Handles messages coming from the embedded web view (e.g., navigation events, script callbacks).
+    void OnScriptMessage(wxWebViewEvent& evt);
+    void on_dpi_changed(const wxRect& suggested_rect) override;
+    void on_show(wxShowEvent& event);
+    // [EVENT] Navigation handlers for browser-like interface.
+    void on_back(wxMouseEvent& evt);
+    void on_forward(wxMouseEvent& evt);
+    void go_to_url(wxString url);
+    void show_control(bool show);
+    void go_to_mall(wxString url);
+    void go_to_publish(wxString url);
+    void on_refresh(wxMouseEvent& evt);
+
+public:
+    // [STATE] The panel container and the embedded web view instance.
+    wxPanel*   m_web_control_panel{nullptr};
+    wxWebView* m_browser{nullptr};
+    // [STATE] Current base URL or home URL for the web view.
+    wxString m_url;
+};
 
 }} // namespace Slic3r::GUI
 
