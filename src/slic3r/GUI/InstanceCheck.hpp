@@ -18,25 +18,6 @@
 // A native plugin might be required for robust cross-platform IPC, especially
 // if relying on OS-specific features beyond simple mutexes is desired.
 
-// [INTENT]
-// This header defines the mechanism for enforcing a single instance of OrcaSlicer.
-// It provides a platform-agnostic function `instance_check` that is called at startup.
-// If another instance is running, it passes the command line arguments to it and exits.
-// This is achieved using platform-specific IPC mechanisms (named pipes on Windows,
-// D-Bus on Linux, and a custom URL scheme or file-based locking on macOS).
-// The `OtherInstanceMessageHandler` class is responsible for receiving and processing
-// messages from other instances, such as requests to load models or bring the
-// window to the front.
-//
-// [UNITY]
-// In Unity, this would be implemented as a C# script on a singleton GameObject that
-// persists across scenes. On startup, it would attempt to create a named `Mutex`.
-// If the mutex is already owned, it would send the command line arguments to the
-// existing instance via a local network socket or other IPC mechanism and then exit.
-// The primary instance's message handler would listen for these connections and
-// use a main-thread dispatcher to execute actions like loading models.
-// A native plugin might be required for robust cross-platform IPC, especially
-// if relying on OS-specific features beyond simple mutexes is desired.
 #ifndef slic3r_InstanceCheck_hpp_
 #define slic3r_InstanceCheck_hpp_
 
