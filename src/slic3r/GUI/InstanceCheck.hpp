@@ -1,3 +1,4 @@
+// [ANNOTATED]
 // [INTENT]
 // This header defines the mechanism for enforcing a single instance of OrcaSlicer.
 // It provides a platform-agnostic function `instance_check` that is called at startup.

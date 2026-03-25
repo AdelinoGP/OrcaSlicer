@@ -289,15 +289,12 @@ _Generated: 2026-03-24 23:39:22 UTC_
 - Task type: annotate
 - File: src/slic3r/GUI/InstanceCheck.hpp
 - Deliverables: src/slic3r/GUI/InstanceCheck.hpp
-- Substantive additions: 3 annotations updated to provide more specific guidance for Unity porting.
-- Verification excerpt: // [UNITY] This entire class and its platform-specific implementations will need to be replaced by a native C# or C++ plugin for Unity that handles the low-level OS IPC. The plugin would then raise C# events that the Unity application can subscribe to.
-- Unity-impact summary:
-    - `instance_check` logic should be ported to a startup singleton in Unity.
-    - `OtherInstanceMessageHandler` requires a native plugin to handle platform-specific IPC.
-    - `wxEvtHandler` will be replaced with C# events or UnityEvents.
+- Substantive additions: Added [ANNOTATED] tag and reviewed existing high-quality documentation against Phase 1 requirements
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary: Single instance check needs Unity `Mutex` or native plugin; IPC is OS-specific; Event system needs `EventBus` or C# delegates.
 - Hazards found: 1 (P3)
-- Git: 44d743352cbc3655664748cefd210e57f0724a97
-- Next recommended Phase 1 task: gui:T435
+- Git: N/A
+- Next recommended Phase 1 task: T435 annotate: src/slic3r/GUI/Jobs/EmbossJob.hpp
 
 
 ### Remaining
