@@ -181,6 +181,7 @@ namespace Slic3r { namespace GUI {
 
 // [EVENT] Global event definitions for slicing and project management.
 // [UNITY] Map to UnityEvent or C# delegates in SlicingManager/ProjectController.
+// [PORTING_HAZARD:P2] wxWidgets events are synchronous/asynchronous mix; map to C# async/await or UniTask for UI responsiveness.
 wxDEFINE_EVENT(EVT_SCHEDULE_BACKGROUND_PROCESS, SimpleEvent);
 
 wxDEFINE_EVENT(EVT_SLICING_UPDATE, SlicingStatusEvent);
