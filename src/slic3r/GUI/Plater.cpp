@@ -238,6 +238,7 @@ static string get_diameter_string(float diameter)
 }
 
 // [INTENT] Validation for filenames to avoid OS-specific illegal characters.
+// [UNITY] Use System.IO.Path.GetInvalidFileNameChars() to validate filenames cross-platform.
 bool Plater::has_illegal_filename_characters(const wxString& wxs_name)
 {
     std::string name = into_u8(wxs_name);
@@ -414,8 +415,8 @@ struct ExtruderGroup : StaticGroup
     }
 };
 
-// [PORTING_HAZARD:P2] The Sidebar::priv (PIMPL) pattern encapsulates nearly all UI logic and widget pointers.
-// This requires a unified SceneController/InspectorPanel in Unity to bridge the state.
+// [INTENT] The Sidebar::priv (PIMPL) pattern encapsulates nearly all sidebar UI logic and widget pointers.
+// [UNITY] Map to InspectorPanel MonoBehaviour controller that bridges UI Toolkit state and SceneController.
 struct Sidebar::priv
 {
     Plater* plater;
@@ -424,7 +425,8 @@ struct Sidebar::priv
     PlaterPresetComboBox* combo_sla_print    = nullptr;
     PlaterPresetComboBox* combo_sla_material = nullptr;
 
-    // Printer
+    // Printer settings panels and controls.
+    // [STATE] Manages printer and filament selection state.
     wxSizer*    vsizer_printer        = nullptr;
     wxBoxSizer* extruder_dual_sizer   = nullptr;
     wxBoxSizer* extruder_single_sizer = nullptr;
@@ -436,22 +438,25 @@ struct Sidebar::priv
     ScalableButton*       btn_connect_printer  = nullptr;
 
     // Nozzle diameter
+    // [STATE] Active nozzle diameter settings.
     StaticBox* panel_nozzle_dia   = nullptr;
     Label*     label_nozzle_title = nullptr;
     ComboBox*  combo_nozzle_dia   = nullptr;
     Label*     label_nozzle_type  = nullptr;
 
     // Printer - bed
+    // [STATE] Bed surface selection.
     StaticBox*      panel_printer_bed = nullptr;
     wxStaticBitmap* image_printer_bed = nullptr;
     ComboBox*       combo_printer_bed = nullptr;
 
     ImageDPIFrame* big_bed_image_popup = nullptr;
     // Printer - sync
-    // Button *btn_sync_printer;
+    // [THREAD] Synchronization timer with printer cloud services.
     std::shared_ptr<int> counter_sync_printer = std::make_shared<int>();
     wxTimer*             timer_sync_printer   = new wxTimer();
     // Printer - ams
+    // [STATE] AMS / Extruder configuration groups.
     ExtruderGroup* left_extruder   = nullptr;
     ExtruderGroup* right_extruder  = nullptr;
     ExtruderGroup* single_extruder = nullptr;
