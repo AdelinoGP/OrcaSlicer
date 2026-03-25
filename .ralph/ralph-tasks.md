@@ -379,7 +379,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [ ] T458 annotate: src/slic3r/GUI/Jobs/UpgradeNetworkJob.hpp
 - [ ] T459 annotate: src/slic3r/GUI/Jobs/Worker.hpp
 - [ ] T460 annotate: src/slic3r/GUI/KBShortcutsDialog.cpp
-- [ ] T461 annotate: src/slic3r/GUI/KBShortcutsDialog.hpp
+- [x] T461 annotate: src/slic3r/GUI/KBShortcutsDialog.hpp
 - [ ] T462 annotate: src/slic3r/GUI/LibVGCode/LibVGCodeWrapper.cpp
 - [ ] T463 annotate: src/slic3r/GUI/LibVGCode/LibVGCodeWrapper.hpp
 - [x] T464 annotate: src/slic3r/GUI/MainFrame.cpp
