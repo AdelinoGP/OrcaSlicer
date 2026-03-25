@@ -401,7 +401,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [ ] T480 annotate: src/slic3r/GUI/Mouse3DController.hpp
 - [x] T481 annotate: src/slic3r/GUI/MsgDialog.cpp
 - [ ] T482 annotate: src/slic3r/GUI/MsgDialog.hpp
-- [ ] T483 annotate: src/slic3r/GUI/MultiMachine.cpp
+- [x] T483 annotate: src/slic3r/GUI/MultiMachine.cpp
 - [ ] T484 annotate: src/slic3r/GUI/MultiMachine.hpp
 - [ ] T485 annotate: src/slic3r/GUI/MultiMachineManagerPage.cpp
 - [ ] T486 annotate: src/slic3r/GUI/MultiMachineManagerPage.hpp

@@ -4,9 +4,7 @@
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
 
-namespace Slic3r {
-namespace GUI {
-
+namespace Slic3r { namespace GUI {
 
 wxDEFINE_EVENT(EVT_MULTI_CLOUD_TASK_SELECTED, wxCommandEvent);
 wxDEFINE_EVENT(EVT_MULTI_LOCAL_TASK_SELECTED, wxCommandEvent);
@@ -15,39 +13,36 @@ wxDEFINE_EVENT(EVT_MULTI_DEVICE_SELECTED_FINHSH, wxCommandEvent);
 wxDEFINE_EVENT(EVT_MULTI_DEVICE_VIEW, wxCommandEvent);
 wxDEFINE_EVENT(EVT_MULTI_REFRESH, wxCommandEvent);
 
-DeviceItem::DeviceItem(wxWindow* parent,  MachineObject* obj)
-    : wxWindow(parent, wxID_ANY)
-    , obj_(obj)
+// [INTENT] DeviceItem encapsulates the state and UI representation of a machine (printer) in the Multi-Machine view.
+// [UNITY] Use a ScriptableObject or MonoBehaviour representing a machine entry, with a UI Toolkit VisualElement representing the item.
+// [INTENT] DeviceItem encapsulates the state and UI representation of a machine (printer) in the Multi-Machine view.
+// [UNITY] Use a ScriptableObject or MonoBehaviour representing a machine entry, with a UI Toolkit VisualElement representing the item.
+DeviceItem::DeviceItem(wxWindow* parent, MachineObject* obj) : wxWindow(parent, wxID_ANY), obj_(obj)
 {
+    // [STATE] state_online, state_printable, state_device etc., represent the machine's status.
+    // [UNITY] Map these states to C# observable properties or a state machine.
     sync_state();
     Bind(EVT_MULTI_REFRESH, &DeviceItem::on_refresh, this);
 }
 
-void DeviceItem::on_refresh(wxCommandEvent& evt)
-{
-    Refresh();
-}
+void DeviceItem::on_refresh(wxCommandEvent& evt) { Refresh(); }
 
 void DeviceItem::sync_state()
 {
     if (obj_) {
-        state_online = obj_->is_online();
+        state_online   = obj_->is_online();
         state_dev_name = obj_->get_dev_name();
 
-        //printable
+        // printable
         if (obj_->print_status == "IDLE") {
             state_printable = 0;
-        }
-        else if (obj_->print_status == "FINISH") {
+        } else if (obj_->print_status == "FINISH") {
             state_printable = 1;
-        }
-        else if (obj_->print_status == "FAILED") {
+        } else if (obj_->print_status == "FAILED") {
             state_printable = 2;
-        }
-        else if (obj_->is_in_printing()) {
+        } else if (obj_->is_in_printing()) {
             state_printable = 3;
-        }
-        else {
+        } else {
             state_printable = 6;
         }
 
@@ -61,30 +56,22 @@ void DeviceItem::sync_state()
 
         state_enable_ams = obj_->ams_exist_bits;
 
-
-        //device
+        // device
         if (obj_->print_status == "IDLE") {
             state_device = 0;
-        }
-        else if (obj_->print_status == "FINISH") {
+        } else if (obj_->print_status == "FINISH") {
             state_device = 1;
-        }
-        else if (obj_->print_status == "FAILED") {
+        } else if (obj_->print_status == "FAILED") {
             state_device = 2;
-        }
-        else if (obj_->print_status == "RUNNING") {
+        } else if (obj_->print_status == "RUNNING") {
             state_device = 3;
-        }
-        else if (obj_->print_status == "PAUSE") {
+        } else if (obj_->print_status == "PAUSE") {
             state_device = 4;
-        }
-        else if (obj_->print_status == "PREPARE") {
+        } else if (obj_->print_status == "PREPARE") {
             state_device = 5;
-        }
-        else if (obj_->print_status == "SLICING") {
+        } else if (obj_->print_status == "SLICING") {
             state_device = 6;
-        }
-        else {
+        } else {
             state_device = 7;
         }
     }
@@ -107,16 +94,17 @@ void DeviceItem::unselected()
 bool DeviceItem::is_blocking_printing(MachineObject* obj_)
 {
     DeviceManager* dev = Slic3r::GUI::wxGetApp().getDeviceManager();
-    if (!dev) return true;
-    auto target_model = obj_->printer_type;
+    if (!dev)
+        return true;
+    auto        target_model = obj_->printer_type;
     std::string source_model = "";
 
     PresetBundle* preset_bundle = wxGetApp().preset_bundle;
-    source_model = preset_bundle->printers.get_edited_preset().get_printer_type(preset_bundle);
+    source_model                = preset_bundle->printers.get_edited_preset().get_printer_type(preset_bundle);
 
     if (source_model != target_model) {
-        std::vector<std::string> compatible_machine = obj_->get_compatible_machine();
-        vector<std::string>::iterator it = find(compatible_machine.begin(), compatible_machine.end(), source_model);
+        std::vector<std::string>      compatible_machine = obj_->get_compatible_machine();
+        vector<std::string>::iterator it                 = find(compatible_machine.begin(), compatible_machine.end(), source_model);
         if (it == compatible_machine.end()) {
             return true;
         }
@@ -130,16 +118,16 @@ void DeviceItem::update_item(const DeviceItem* item)
     // Except for the selected status, everything else is updated
     if (this == item)
         return;
-    this->state_online = item->state_online;
-    this->state_printable = item->state_printable;
+    this->state_online     = item->state_online;
+    this->state_printable  = item->state_printable;
     this->state_enable_ams = item->state_enable_ams;
-    this->state_device = item->state_device;
+    this->state_device     = item->state_device;
     this->state_local_task = item->state_local_task;
 }
 
 wxString DeviceItem::get_state_printable()
 {
-    //0-idle 1-finish 2-printing 3-upgrading 4-preset incompatible  5-unknown
+    // 0-idle 1-finish 2-printing 3-upgrading 4-preset incompatible  5-unknown
     std::vector<wxString> str_state_printable;
     str_state_printable.push_back(_L("Idle"));
     str_state_printable.push_back(_L("Idle"));
@@ -154,7 +142,7 @@ wxString DeviceItem::get_state_printable()
 
 wxString DeviceItem::get_state_device()
 {
-    //0-idle 1-finish 2-running 3-pause 4-failed  5-prepare 
+    // 0-idle 1-finish 2-running 3-pause 4-failed  5-prepare
     std::vector<wxString> str_state_device;
     str_state_device.push_back(_L("Idle"));
     str_state_device.push_back(_L("Printing Finish"));
@@ -170,7 +158,7 @@ wxString DeviceItem::get_state_device()
 
 wxString DeviceItem::get_local_state_task()
 {
-    //0-padding  1-sending 2-sending finish  3-sending cancel  4-sending failed 5-Removed
+    // 0-padding  1-sending 2-sending finish  3-sending cancel  4-sending failed 5-Removed
     std::vector<wxString> str_state_task;
     str_state_task.push_back(_L("Pending"));
     str_state_task.push_back(_L("Sending"));
@@ -181,13 +169,13 @@ wxString DeviceItem::get_local_state_task()
     str_state_task.push_back(_L("Print Success"));
     str_state_task.push_back(_L("Print Failed"));
     str_state_task.push_back(_L("Removed"));
-    str_state_task.push_back(_L("Idle"));   
+    str_state_task.push_back(_L("Idle"));
     return str_state_task[state_local_task];
 }
 
 wxString DeviceItem::get_cloud_state_task()
 {
-    //0-printing 1-printing finish 2-printing failed
+    // 0-printing 1-printing finish 2-printing failed
     std::vector<wxString> str_state_task;
     str_state_task.push_back(_L("Printing"));
     str_state_task.push_back(_L("Printing Finish"));
@@ -196,17 +184,16 @@ wxString DeviceItem::get_cloud_state_task()
     return str_state_task[state_cloud_task];
 }
 
-
 std::vector<DeviceItem*> selected_machines(const std::vector<DeviceItem*>& dev_item_list, std::string search_text)
 {
     std::vector<DeviceItem*> res;
     for (const auto& item : dev_item_list) {
-        const MachineObject* dev = item->get_obj();
-        const std::string& dev_name = dev->get_dev_name();
-        const std::string& dev_ip = dev->get_dev_ip();
+        const MachineObject* dev      = item->get_obj();
+        const std::string&   dev_name = dev->get_dev_name();
+        const std::string&   dev_ip   = dev->get_dev_ip();
 
         auto name_it = dev_name.find(search_text);
-        auto ip_it = dev_ip.find(search_text);
+        auto ip_it   = dev_ip.find(search_text);
 
         if (name_it != std::string::npos || ip_it != std::string::npos)
             res.emplace_back(item);
@@ -246,23 +233,19 @@ SortItem::SortItem()
     }));
 }
 
-SortItem::SortCallBack SortItem::get_call_back()
-{
-    return sort_map[rule];
-}
+SortItem::SortCallBack SortItem::get_call_back() { return sort_map[rule]; }
 
 void SortItem::set_role(SortRule rule, bool big)
 {
     this->rule = rule;
-    this->big = big;
+    this->big  = big;
 }
 
 void SortItem::set_role(SortMultiMachineCB cb, SortRule rl, bool big)
 {
-    this->cb = cb;
+    this->cb   = cb;
     this->rule = rl;
-    this->big = big;
+    this->big  = big;
 }
 
-} // namespace GUI
-} // namespace Slic3r
+}} // namespace Slic3r::GUI
