@@ -393,7 +393,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [ ] T472 annotate: src/slic3r/GUI/ModelMall.cpp
 - [ ] T473 annotate: src/slic3r/GUI/ModelMall.hpp
 - [ ] T474 annotate: src/slic3r/GUI/MonitorBasePanel.cpp
-- [ ] T475 annotate: src/slic3r/GUI/Monitor.cpp
+- [x] T475 annotate: src/slic3r/GUI/Monitor.cpp
 - [x] T476 annotate: src/slic3r/GUI/Monitor.hpp
 - [ ] T477 annotate: src/slic3r/GUI/MonitorPage.cpp
 - [ ] T478 annotate: src/slic3r/GUI/MonitorPage.hpp

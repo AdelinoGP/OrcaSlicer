@@ -34,11 +34,16 @@
 
 #include "DeviceCore/DevManager.h"
 
-namespace Slic3r {
-namespace GUI {
+namespace Slic3r { namespace GUI {
 
-#define REFRESH_INTERVAL       1000
+#define REFRESH_INTERVAL 1000
 
+/*
+ * [INTENT] AddMachinePanel serves as a placeholder UI panel displayed when no machine
+ *          is selected or configured. Provides a button to initiate the 'Add Machine' flow.
+ * [UNITY] Replace with a GameObject containing a UI Toolkit VisualElement or Button
+ *         component, managed by an 'AddMachineController' MonoBehaviour.
+ */
 AddMachinePanel::AddMachinePanel(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size, long style, const wxString& name)
     : wxPanel(parent, id, pos, size, style)
 {
@@ -57,13 +62,10 @@ AddMachinePanel::AddMachinePanel(wxWindow* parent, wxWindowID id, const wxPoint&
     horiz_sizer->Add(0, 0, 538, 0, 0);
 
     wxBoxSizer* btn_sizer = new wxBoxSizer(wxVERTICAL);
-    m_button_add_machine = new Button(this, "", "monitor_add_machine", FromDIP(24));
+    m_button_add_machine  = new Button(this, "", "monitor_add_machine", FromDIP(24));
     m_button_add_machine->SetCornerRadius(FromDIP(12));
-    StateColor button_bg(
-        std::pair<wxColour, int>(0xCECECE, StateColor::Pressed),
-        std::pair<wxColour, int>(0xCECECE, StateColor::Hovered),
-        std::pair<wxColour, int>(this->GetBackgroundColour(), StateColor::Normal)
-    );
+    StateColor button_bg(std::pair<wxColour, int>(0xCECECE, StateColor::Pressed), std::pair<wxColour, int>(0xCECECE, StateColor::Hovered),
+                         std::pair<wxColour, int>(this->GetBackgroundColour(), StateColor::Normal));
     m_button_add_machine->SetBackgroundColor(button_bg);
     m_button_add_machine->SetBorderColor(0x909090);
     m_button_add_machine->SetMinSize(wxSize(96, 39));
@@ -87,21 +89,32 @@ AddMachinePanel::AddMachinePanel(wxWindow* parent, wxWindowID id, const wxPoint&
     m_button_add_machine->Connect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(AddMachinePanel::on_add_machine), NULL, this);
 }
 
-void AddMachinePanel::msw_rescale() {
+void AddMachinePanel::msw_rescale() {}
 
-}
-
-void AddMachinePanel::on_add_machine(wxCommandEvent& event) {
+void AddMachinePanel::on_add_machine(wxCommandEvent& event)
+{
     // load a url
 }
 
-AddMachinePanel::~AddMachinePanel() {
+AddMachinePanel::~AddMachinePanel()
+{
     m_button_add_machine->Disconnect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(AddMachinePanel::on_add_machine), NULL, this);
 }
 
+/*
+ * [INTENT] MonitorPanel acts as the primary orchestrator for the machine monitoring interface,
+ *          managing printer selection, status visualization, media management, and firmware updates.
+ * [STATE] m_initialized: Tracks whether the UI components have been fully created.
+ *         m_refresh_timer: Periodic timer for updating machine status and HMS alerts.
+ *         m_select_machine: Popup control for choosing between available printers.
+ *         m_tabpanel: Main tabbed container hosting status, media, firmware, and HMS panels.
+ * [EVENT] Binds timers, mouse interactions, and machine selection callbacks to update UI.
+ * [THREAD] Periodic status updates via timer; requires synchronization if network calls are performed.
+ * [UNITY] MonitorPanel container with UI Toolkit Tab/Navigation system. Use 'MachineMonitorController'
+ *         MonoBehaviour to orchestrate sub-panels, status polling, and events.
+ */
 MonitorPanel::MonitorPanel(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size, long style)
-    : wxPanel(parent, id, pos, size, style),
-    m_select_machine(SelectMachinePopup(this))
+    : wxPanel(parent, id, pos, size, style), m_select_machine(SelectMachinePopup(this))
 {
 #ifdef __WINDOWS__
     SetDoubleBuffered(true);
@@ -123,12 +136,10 @@ MonitorPanel::MonitorPanel(wxWindow* parent, wxWindowID id, const wxPoint& pos, 
     Bind(wxEVT_SIZE, &MonitorPanel::on_size, this);
     Bind(wxEVT_COMMAND_CHOICE_SELECTED, &MonitorPanel::on_select_printer, this);
 
-    m_select_machine.Bind(EVT_FINISHED_UPDATE_MACHINE_LIST, [this](wxCommandEvent& e) {
-        m_side_tools->start_interval();
-        });
+    m_select_machine.Bind(EVT_FINISHED_UPDATE_MACHINE_LIST, [this](wxCommandEvent& e) { m_side_tools->start_interval(); });
 
     Bind(EVT_ALREADY_READ_HMS, [this](wxCommandEvent& e) {
-        auto key = e.GetString().ToStdString();
+        auto key  = e.GetString().ToStdString();
         auto iter = m_hms_panel->temp_hms_list.find(key);
         if (iter != m_hms_panel->temp_hms_list.end()) {
             m_hms_panel->temp_hms_list[key].set_read();
@@ -136,7 +147,7 @@ MonitorPanel::MonitorPanel(wxWindow* parent, wxWindowID id, const wxPoint& pos, 
 
         update_hms_tag();
         e.Skip();
-        });
+    });
 }
 
 MonitorPanel::~MonitorPanel()
@@ -152,10 +163,10 @@ void MonitorPanel::init_bitmap()
 {
     m_signal_strong_img = create_scaled_bitmap("monitor_signal_strong", nullptr, 24);
     m_signal_middle_img = create_scaled_bitmap("monitor_signal_middle", nullptr, 24);
-    m_signal_weak_img = create_scaled_bitmap("monitor_signal_weak", nullptr, 24);
-    m_signal_no_img   = create_scaled_bitmap("monitor_signal_no", nullptr, 24);
-    m_printer_img = create_scaled_bitmap("monitor_printer", nullptr, 26);
-    m_arrow_img = create_scaled_bitmap("monitor_arrow",nullptr, 14);
+    m_signal_weak_img   = create_scaled_bitmap("monitor_signal_weak", nullptr, 24);
+    m_signal_no_img     = create_scaled_bitmap("monitor_signal_no", nullptr, 24);
+    m_printer_img       = create_scaled_bitmap("monitor_printer", nullptr, 26);
+    m_arrow_img         = create_scaled_bitmap("monitor_arrow", nullptr, 14);
 }
 
 void MonitorPanel::init_timer()
@@ -163,40 +174,46 @@ void MonitorPanel::init_timer()
     m_refresh_timer = new wxTimer();
     m_refresh_timer->SetOwner(this);
     m_refresh_timer->Start(REFRESH_INTERVAL);
-    if (update_flag) { update_all();}
+    if (update_flag) {
+        update_all();
+    }
 }
 
 void MonitorPanel::init_tabpanel()
 {
-    m_side_tools = new SideTools(this, wxID_ANY);
+    m_side_tools                 = new SideTools(this, wxID_ANY);
     wxBoxSizer* sizer_side_tools = new wxBoxSizer(wxVERTICAL);
     sizer_side_tools->Add(m_side_tools, 1, wxEXPAND, 0);
-    m_tabpanel             = new Tabbook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, sizer_side_tools, wxNB_LEFT | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME);
+    m_tabpanel = new Tabbook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, sizer_side_tools,
+                             wxNB_LEFT | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME);
     m_side_tools->set_table_panel(m_tabpanel);
     m_tabpanel->SetBackgroundColour(wxColour("#FEFFFF"));
-    m_tabpanel->Bind(wxEVT_BOOKCTRL_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {
-        auto page = m_tabpanel->GetCurrentPage();
-        if (page == m_media_file_panel) {
-            auto title = m_tabpanel->GetPageText(m_tabpanel->GetSelection());
-            m_media_file_panel->SwitchStorage(title == _L("Storage"));
-        }
-        page->SetFocus();
-        update_all();
-        }, m_tabpanel->GetId());
+    m_tabpanel->Bind(
+        wxEVT_BOOKCTRL_PAGE_CHANGED,
+        [this](wxBookCtrlEvent& e) {
+            auto page = m_tabpanel->GetCurrentPage();
+            if (page == m_media_file_panel) {
+                auto title = m_tabpanel->GetPageText(m_tabpanel->GetSelection());
+                m_media_file_panel->SwitchStorage(title == _L("Storage"));
+            }
+            page->SetFocus();
+            update_all();
+        },
+        m_tabpanel->GetId());
 
-    //m_status_add_machine_panel = new AddMachinePanel(m_tabpanel);
-    m_status_info_panel        = new StatusPanel(m_tabpanel);
+    // m_status_add_machine_panel = new AddMachinePanel(m_tabpanel);
+    m_status_info_panel = new StatusPanel(m_tabpanel);
     m_tabpanel->AddPage(m_status_info_panel, _L("Status"), "", true);
 
     m_media_file_panel = new MediaFilePanel(m_tabpanel);
     m_tabpanel->AddPage(m_media_file_panel, _L("Storage"), "", false);
-    //m_tabpanel->AddPage(m_media_file_panel, _L("Internal Storage"), "", false);
+    // m_tabpanel->AddPage(m_media_file_panel, _L("Internal Storage"), "", false);
 
     m_upgrade_panel = new UpgradePanel(m_tabpanel);
     m_tabpanel->AddPage(m_upgrade_panel, _CTX(L_CONTEXT("Update", "Firmware"), "Firmware"), "", false);
 
     m_hms_panel = new HMSPanel(m_tabpanel);
-    m_tabpanel->AddPage(m_hms_panel, _L("Assistant(HMS)"),    "", false);
+    m_tabpanel->AddPage(m_hms_panel, _L("Assistant(HMS)"), "", false);
 
     std::string network_ver = Slic3r::NetworkAgent::get_version();
     if (!network_ver.empty()) {
@@ -204,29 +221,29 @@ void MonitorPanel::init_tabpanel()
     }
 
     m_initialized = true;
-    show_status((int)MonitorStatus::MONITOR_NO_PRINTER);
+    show_status((int) MonitorStatus::MONITOR_NO_PRINTER);
 }
 
 void MonitorPanel::set_default()
 {
-    obj = nullptr;
+    obj            = nullptr;
     last_conn_type = "undefined";
 
     /* reset status panel*/
     m_status_info_panel->set_default();
 
     /* reset side tool*/
-    //m_bitmap_wifi_signal->SetBitmap(wxNullBitmap);
+    // m_bitmap_wifi_signal->SetBitmap(wxNullBitmap);
 }
 
 wxWindow* MonitorPanel::create_side_tools()
 {
-    //TEST function
-    //m_bitmap_wifi_signal->Connect(wxEVT_LEFT_DCLICK, wxMouseEventHandler(MonitorPanel::on_update_all), NULL, this);
+    // TEST function
+    // m_bitmap_wifi_signal->Connect(wxEVT_LEFT_DCLICK, wxMouseEventHandler(MonitorPanel::on_update_all), NULL, this);
 
     wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
     auto        panel = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(0, FromDIP(50)));
-    panel->SetBackgroundColour(wxColour(135,206,250));
+    panel->SetBackgroundColour(wxColour(135, 206, 250));
     panel->SetSizer(sizer);
     sizer->Layout();
     panel->Fit();
@@ -247,7 +264,7 @@ void MonitorPanel::msw_rescale()
     /* side_tool rescale */
     m_side_tools->msw_rescale();
     m_tabpanel->Rescale();
-    //m_status_add_machine_panel->msw_rescale();
+    // m_status_add_machine_panel->msw_rescale();
     m_status_info_panel->msw_rescale();
     m_media_file_panel->Rescale();
     m_upgrade_panel->msw_rescale();
@@ -259,26 +276,26 @@ void MonitorPanel::msw_rescale()
 
 void MonitorPanel::select_machine(std::string machine_sn)
 {
-    wxCommandEvent *event = new wxCommandEvent(wxEVT_COMMAND_CHOICE_SELECTED);
+    wxCommandEvent* event = new wxCommandEvent(wxEVT_COMMAND_CHOICE_SELECTED);
     event->SetString(machine_sn);
     wxQueueEvent(this, event);
 }
-
 
 void MonitorPanel::on_timer(wxTimerEvent& event)
 {
     if (update_flag) {
         update_all();
-        //Layout();
+        // Layout();
     }
 }
 
 void MonitorPanel::on_select_printer(wxCommandEvent& event)
 {
     Slic3r::DeviceManager* dev = Slic3r::GUI::wxGetApp().getDeviceManager();
-    if (!dev) return;
+    if (!dev)
+        return;
 
-    if ( dev->get_selected_machine() && (dev->get_selected_machine()->get_dev_id() != event.GetString().ToStdString()) && m_hms_panel) {
+    if (dev->get_selected_machine() && (dev->get_selected_machine()->get_dev_id() != event.GetString().ToStdString()) && m_hms_panel) {
         m_hms_panel->clear_hms_tag();
     }
 
@@ -288,12 +305,12 @@ void MonitorPanel::on_select_printer(wxCommandEvent& event)
     set_default();
     update_all();
 
-    MachineObject *obj_ = dev->get_selected_machine();
+    MachineObject* obj_ = dev->get_selected_machine();
     if (obj_) {
         obj_->last_cali_version = -1;
         obj_->reset_pa_cali_history_result();
         obj_->reset_pa_cali_result();
-        Sidebar &sidebar = GUI::wxGetApp().sidebar();
+        Sidebar& sidebar = GUI::wxGetApp().sidebar();
         sidebar.update_sync_status(obj_);
         sidebar.set_need_auto_sync_after_connect_printer(sidebar.need_auto_sync_extruder_list_after_connect_priner(obj_));
     }
@@ -301,15 +318,15 @@ void MonitorPanel::on_select_printer(wxCommandEvent& event)
     Layout();
 }
 
-void MonitorPanel::on_printer_clicked(wxMouseEvent &event)
+void MonitorPanel::on_printer_clicked(wxMouseEvent& event)
 {
-    auto mouse_pos = ClientToScreen(event.GetPosition());
-    wxPoint rect = m_side_tools->ClientToScreen(wxPoint(0, 0));
+    auto    mouse_pos = ClientToScreen(event.GetPosition());
+    wxPoint rect      = m_side_tools->ClientToScreen(wxPoint(0, 0));
 
     if (!m_side_tools->is_in_interval()) {
         wxPoint pos = m_side_tools->ClientToScreen(wxPoint(0, 0));
         pos.y += m_side_tools->GetRect().height;
-        //pos.x = pos.x < 0? 0:pos.x;
+        // pos.x = pos.x < 0? 0:pos.x;
         m_select_machine.Move(pos);
 
 #ifdef __linux__
@@ -322,25 +339,33 @@ void MonitorPanel::on_printer_clicked(wxMouseEvent &event)
     }
 }
 
-void MonitorPanel::on_size(wxSizeEvent &event)
+void MonitorPanel::on_size(wxSizeEvent& event)
 {
     Layout();
-    //event.Skip();
-    //Refresh();
+    // event.Skip();
+    // Refresh();
 }
 
+/*
+ * [INTENT] Updates all UI panels (status, media, upgrade, HMS) based on the selected machine object.
+ * [STATE] Synchronizes UI state with the current Printer (obj) state.
+ * [THREAD] This method is called from timer and event handlers, likely on the UI thread.
+ * [UNITY] Implement 'MachineStateMonitor' system. Poll printer state asynchronously, marshal
+ *         data back to main thread, and update UI components (e.g., UI Toolkit Bindings) reactively.
+ */
 void MonitorPanel::update_all()
 {
     if (!m_initialized)
         return;
 
-    NetworkAgent* m_agent = wxGetApp().getAgent();
-    Slic3r::DeviceManager* dev = Slic3r::GUI::wxGetApp().getDeviceManager();
-    if (!dev) return;
+    NetworkAgent*          m_agent = wxGetApp().getAgent();
+    Slic3r::DeviceManager* dev     = Slic3r::GUI::wxGetApp().getDeviceManager();
+    if (!dev)
+        return;
     obj = dev->get_selected_machine();
 
     if (!obj) {
-        show_status((int)MONITOR_NO_PRINTER);
+        show_status((int) MONITOR_NO_PRINTER);
         m_hms_panel->clear_hms_tag();
         m_tabpanel->GetBtnsListCtrl()->showNewTag(3, false);
         if (m_status_info_panel->IsShown()) {
@@ -350,7 +375,9 @@ void MonitorPanel::update_all()
         return;
     }
 
-    if (obj->connection_type() != last_conn_type) { last_conn_type = obj->connection_type(); }
+    if (obj->connection_type() != last_conn_type) {
+        last_conn_type = obj->connection_type();
+    }
 
     m_side_tools->update_status(obj);
 
@@ -362,7 +389,7 @@ void MonitorPanel::update_all()
         // only disconnected server in cloud mode
         if (obj->connection_type() != "lan") {
             if (m_agent) {
-                server_status = m_agent->is_server_connected() ? 0 : (int)MONITOR_DISCONNECTED_SERVER;
+                server_status = m_agent->is_server_connected() ? 0 : (int) MONITOR_DISCONNECTED_SERVER;
             }
         }
         show_status((int) MONITOR_DISCONNECTED + server_status);
@@ -394,14 +421,17 @@ void MonitorPanel::update_all()
 void MonitorPanel::update_hms_tag()
 {
     for (auto hmsitem : m_hms_panel->temp_hms_list) {
+        if (!obj) {
+            break;
+        }
 
-        if (!obj) { break;}
-
-        const wxString &msg = wxGetApp().get_hms_query()->query_hms_msg(obj->get_dev_id(), hmsitem.second.get_long_error_code());
-        if (msg.empty()){ continue;} /*STUDIO-10363 it's hidden message*/
+        const wxString& msg = wxGetApp().get_hms_query()->query_hms_msg(obj->get_dev_id(), hmsitem.second.get_long_error_code());
+        if (msg.empty()) {
+            continue;
+        } /*STUDIO-10363 it's hidden message*/
 
         if (!hmsitem.second.has_read()) {
-            //show HMS new tag
+            // show HMS new tag
             m_tabpanel->GetBtnsListCtrl()->showNewTag(3, true);
             return;
         }
@@ -416,8 +446,8 @@ bool MonitorPanel::Show(bool show)
     wxGetApp().mainframe->SetMinSize(wxGetApp().plater()->GetMinSize());
 #endif
 
-    NetworkAgent* m_agent = wxGetApp().getAgent();
-    DeviceManager* dev = Slic3r::GUI::wxGetApp().getDeviceManager();
+    NetworkAgent*  m_agent = wxGetApp().getAgent();
+    DeviceManager* dev     = Slic3r::GUI::wxGetApp().getDeviceManager();
     if (show) {
         start_update();
         update_network_version_footer();
@@ -425,10 +455,12 @@ bool MonitorPanel::Show(bool show)
         m_refresh_timer->Stop();
         m_refresh_timer->SetOwner(this);
         m_refresh_timer->Start(REFRESH_INTERVAL);
-        if (update_flag) { update_all(); }
+        if (update_flag) {
+            update_all();
+        }
 
         if (dev) {
-            //set a default machine when obj is null
+            // set a default machine when obj is null
             obj = dev->get_selected_machine();
             if (obj == nullptr) {
                 dev->load_last_machine();
@@ -445,16 +477,17 @@ bool MonitorPanel::Show(bool show)
 
 void MonitorPanel::show_status(int status)
 {
-    if (!m_initialized) return;
-    if (last_status == status)return;
-    if ((last_status & (int)MonitorStatus::MONITOR_CONNECTING) != 0) {
+    if (!m_initialized)
+        return;
+    if (last_status == status)
+        return;
+    if ((last_status & (int) MonitorStatus::MONITOR_CONNECTING) != 0) {
         NetworkAgent* agent = wxGetApp().getAgent();
-        json j;
+        json          j;
         j["dev_id"] = obj ? obj->get_dev_id() : "obj_nullptr";
-        if ((status & (int)MonitorStatus::MONITOR_DISCONNECTED) != 0) {
+        if ((status & (int) MonitorStatus::MONITOR_DISCONNECTED) != 0) {
             j["result"] = "failed";
-        }
-        else if ((status & (int)MonitorStatus::MONITOR_NORMAL) != 0) {
+        } else if ((status & (int) MonitorStatus::MONITOR_NORMAL) != 0) {
             j["result"] = "success";
         }
     }
@@ -462,49 +495,41 @@ void MonitorPanel::show_status(int status)
 
     BOOST_LOG_TRIVIAL(info) << "monitor: show_status = " << status;
 
-    //Freeze();
-    // update panels
-    if (m_side_tools) { m_side_tools->show_status(status); };
+    // Freeze();
+    //  update panels
+    if (m_side_tools) {
+        m_side_tools->show_status(status);
+    };
     m_status_info_panel->show_status(status);
     m_hms_panel->show_status(status);
     m_upgrade_panel->show_status(status);
 
-    if ((status & (int)MonitorStatus::MONITOR_NO_PRINTER) != 0) {
+    if ((status & (int) MonitorStatus::MONITOR_NO_PRINTER) != 0) {
         set_default();
         m_tabpanel->Layout();
-    } else if (((status & (int)MonitorStatus::MONITOR_NORMAL) != 0)
-        || ((status & (int)MonitorStatus::MONITOR_DISCONNECTED) != 0)
-        || ((status & (int) MonitorStatus::MONITOR_DISCONNECTED_SERVER) != 0)
-        || ((status & (int)MonitorStatus::MONITOR_CONNECTING) != 0) )
-    {
-
-        if (((status & (int) MonitorStatus::MONITOR_DISCONNECTED) != 0)
-            || ((status & (int) MonitorStatus::MONITOR_DISCONNECTED_SERVER) != 0)
-            || ((status & (int)MonitorStatus::MONITOR_CONNECTING) != 0))
-        {
+    } else if (((status & (int) MonitorStatus::MONITOR_NORMAL) != 0) || ((status & (int) MonitorStatus::MONITOR_DISCONNECTED) != 0) ||
+               ((status & (int) MonitorStatus::MONITOR_DISCONNECTED_SERVER) != 0) ||
+               ((status & (int) MonitorStatus::MONITOR_CONNECTING) != 0)) {
+        if (((status & (int) MonitorStatus::MONITOR_DISCONNECTED) != 0) ||
+            ((status & (int) MonitorStatus::MONITOR_DISCONNECTED_SERVER) != 0) ||
+            ((status & (int) MonitorStatus::MONITOR_CONNECTING) != 0)) {
             set_default();
         }
         m_tabpanel->Layout();
     }
     Layout();
-    //Thaw();
+    // Thaw();
 }
 
 std::string MonitorPanel::get_string_from_tab(PrinterTab tab)
 {
     switch (tab) {
-    case PT_STATUS :
-        return "status";
-    case PT_MEDIA:
-        return "sd_card";
-    case PT_UPDATE:
-        return "update";
-    case PT_HMS:
-        return "HMS";
-    case PT_DEBUG:
-        return "debug";
-    default:
-        return "";
+    case PT_STATUS: return "status";
+    case PT_MEDIA: return "sd_card";
+    case PT_UPDATE: return "update";
+    case PT_HMS: return "HMS";
+    case PT_DEBUG: return "debug";
+    default: return "";
     }
     return "";
 }
@@ -520,11 +545,12 @@ void MonitorPanel::jump_to_HMS()
 
 void MonitorPanel::jump_to_LiveView()
 {
-    if (!this->IsShown()) { return; }
+    if (!this->IsShown()) {
+        return;
+    }
 
     auto page = m_tabpanel->GetCurrentPage();
-    if (page && page != m_hms_panel)
-    {
+    if (page && page != m_hms_panel) {
         m_tabpanel->SetSelection(PT_STATUS);
     }
 
@@ -538,8 +564,8 @@ void MonitorPanel::update_network_version_footer()
         return;
 
     std::string configured_version = wxGetApp().app_config->get_network_plugin_version();
-    std::string suffix = extract_suffix(configured_version);
-    std::string configured_base = extract_base_version(configured_version);
+    std::string suffix             = extract_suffix(configured_version);
+    std::string configured_base    = extract_base_version(configured_version);
 
     wxString footer_text;
     if (!suffix.empty() && configured_base == binary_version) {
@@ -551,5 +577,4 @@ void MonitorPanel::update_network_version_footer()
     m_tabpanel->SetFooterText(footer_text);
 }
 
-} // GUI
-} // Slic3r
+}} // namespace Slic3r::GUI
