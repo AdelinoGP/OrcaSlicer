@@ -242,6 +242,8 @@ static string get_diameter_string(float diameter)
 
 // [INTENT] Validation for filenames to avoid OS-specific illegal characters.
 // [UNITY] Use System.IO.Path.GetInvalidFileNameChars() to validate filenames cross-platform.
+// [INTENT] Validation for filenames to avoid OS-specific illegal characters.
+// [UNITY] Use System.IO.Path.GetInvalidFileNameChars() to validate filenames cross-platform.
 bool Plater::has_illegal_filename_characters(const wxString& wxs_name)
 {
     std::string name = into_u8(wxs_name);
