@@ -80,7 +80,21 @@
     - Custom drawing logic will need to be re-written using UI Toolkit's custom drawing API.
 - Hazards found: 2 (P2 for custom drawing/event binding, P1 for platform-specific rendering)
 - Git: N/A (will be committed in next step)
-- Next recommended Phase 1 task: T494 annotate: src/slic3r/GUI/MultiTaskManagerPage.hpp
+
+## Phase 1 - Task T494 complete
+- Task type: annotate
+- File: src/slic3r/GUI/MultiTaskManagerPage.hpp
+- Deliverables: src/slic3r/GUI/MultiTaskManagerPage.hpp, .ralph/agent/handoff.md, .ralph/ralph-tasks.md
+- Substantive additions: Annotations for constants, MultiTaskItem, LocalTaskManagerPage, and CloudTaskManagerPage classes and members.
+- Verification excerpt: // [INTENT] MultiTaskItem is a custom wxWindow control that represents a single task item
+- Unity-impact summary:
+    - Custom UI elements (MultiTaskItem) will be reimplemented as UI Toolkit VisualElements/MonoBehaviours.
+    - wxWidgets layout (sizers) will be replaced by UI Toolkit's flexbox system (USS).
+    - Data models (e.g., for task lists) will be C# classes bound to UI Toolkit ListViews.
+- Hazards found: 2 (P2 for custom drawing/event binding/wxWidgets dependencies, P1 for platform-specific DPI scaling)
+- Git: N/A (will be committed in next step)
+- Next recommended Phase 1 task: T495 annotate: src/slic3r/GUI/MultiTaskModel.cpp
+
 
 
 
