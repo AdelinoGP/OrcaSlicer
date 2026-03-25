@@ -360,7 +360,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [x] T439 annotate: src/slic3r/GUI/Jobs/NotificationProgressIndicator.cpp
 - [x] T440 annotate: src/slic3r/GUI/Jobs/NotificationProgressIndicator.hpp
 - [ ] T441 annotate: src/slic3r/GUI/Jobs/OAuthJob.cpp
-- [ ] T442 annotate: src/slic3r/GUI/Jobs/OAuthJob.hpp
+- [x] T442 annotate: src/slic3r/GUI/Jobs/OAuthJob.hpp
 - [ ] T443 annotate: src/slic3r/GUI/Jobs/OrientJob.cpp
 - [ ] T444 annotate: src/slic3r/GUI/Jobs/OrientJob.hpp
 - [ ] T445 annotate: src/slic3r/GUI/Jobs/PlaterWorker.hpp

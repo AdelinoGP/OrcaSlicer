@@ -77,6 +77,11 @@ struct OAuthData
 
 // [INTENT] The `OAuthJob` class encapsulates the entire OAuth 2.0 flow in a
 // background job to avoid blocking the UI thread.
+// [THREAD] The `process` method is executed on a worker thread, while `finalize`
+// is executed on the main UI thread.
+// [PORTING_HAZARD:P2] The `Job` base class and the `wxPostEvent` mechanism for
+// UI notification will need to be replaced with a C# `Task` and `Task`-based
+// completion notification system.
 class OAuthJob : public Job
 {
     // [STATE] The local HTTP server to handle the OAuth callback.
