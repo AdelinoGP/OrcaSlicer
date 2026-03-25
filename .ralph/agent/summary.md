@@ -1,8 +1,8 @@
 # Loop Summary
 
 **Status:** Completed successfully
-**Iterations:** 6
-**Duration:** 9m 16s
+**Iterations:** 5
+**Duration:** 9m 35s
 
 ## Tasks
 
@@ -14,4 +14,4 @@ _No events recorded._
 
 ## Final Commit
 
-dfcb0e73bf: annotate: src/slic3r/GUI/Jobs/SLAImportDialog.hpp
+387d3a853a: Annotate src/slic3r/GUI/Jobs/Worker.hpp
