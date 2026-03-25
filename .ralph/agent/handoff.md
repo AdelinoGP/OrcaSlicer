@@ -1,5 +1,19 @@
 # Session Handoff
 
+## Phase 1 - Task T461 complete
+- Task type: annotate
+- File: src/slic3r/GUI/KBShortcutsDialog.hpp
+- Deliverables: src/slic3r/GUI/KBShortcutsDialog.hpp
+- Substantive additions: Added comprehensive [INTENT], [STATE], [EVENT], [THREAD], [UNITY], and [PORTING_HAZARD:P2] annotations.
+- Verification excerpt: // [INTENT] Manages the keyboard shortcuts UI dialog, allowing users to view shortcuts.
+- Unity-impact summary:
+  - Re-implement dialog as a MonoBehaviour (e.g., UI Toolkit UIDocument).
+  - Replace wxWidgets sizers with Unity Layout Groups or UI Toolkit Flex layouts.
+  - Map wxSimplebook to a tab-based UI view.
+- Hazards found: 2 (P2: Full UI reimplementation required).
+- Git: 79ab23e547
+- Next recommended Phase 1 task: T462 annotate: src/slic3r/GUI/LibVGCode/LibVGCodeWrapper.cpp
+
 ## Phase 1 - Task T460 complete
 - Task type: annotate
 - File: src/slic3r/GUI/KBShortcutsDialog.cpp
