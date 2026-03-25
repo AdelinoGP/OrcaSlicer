@@ -1,8 +1,11 @@
-# Scratchpad
+# Plan
+I am starting Phase 1 annotation.
+Current task: T459 - `src/slic3r/GUI/Jobs/Worker.hpp`
 
-- Objective: Annotation of `src/slic3r/GUI/Jobs/SendJob.hpp` (T452)
-- Plan:
-    1. Read `src/slic3r/GUI/Jobs/SendJob.hpp`.
-    2. Analyze for `[INTENT]`, `[STATE]`, `[EVENT]`, `[THREAD]`, `[UNITY]`.
-    3. Add annotations with the required tags.
-    4. Verify and record completion.
+My plan:
+1. Read `src/slic3r/GUI/Jobs/Worker.hpp`.
+2. Analyze the code for intent, state, threading, and porting hazards.
+3. Add annotations according to the project guidelines.
+4. Verify the annotations and create a completion-evidence block in `.ralph/agent/handoff.md`.
+5. Mark the task as done and commit.
+6. Record any new memories.
