@@ -424,7 +424,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [ ] T503 annotate: src/slic3r/GUI/NotificationManager.cpp
 - [ ] T504 annotate: src/slic3r/GUI/NotificationManager.hpp
 - [x] T505 annotate: src/slic3r/GUI/OAuthDialog.cpp
-- [ ] T506 annotate: src/slic3r/GUI/OAuthDialog.hpp
+- [x] T506 annotate: src/slic3r/GUI/OAuthDialog.hpp
 - [ ] T507 annotate: src/slic3r/GUI/ObjColorDialog.cpp
 - [ ] T508 annotate: src/slic3r/GUI/ObjColorDialog.hpp
 - [ ] T509 annotate: src/slic3r/GUI/ObjectDataViewModel.cpp

@@ -29,3 +29,18 @@
 - Git: <commit subject "annotate: src/slic3r/GUI/OAuthDialog.cpp">
 - Next recommended Phase 1 task: T506 annotate: src/slic3r/GUI/OAuthDialog.hpp
 
+
+## Phase 1 - Task T506 complete
+- Task type: annotate
+- File: src/slic3r/GUI/OAuthDialog.hpp
+- Deliverables: src/slic3r/GUI/OAuthDialog.hpp
+- Substantive additions: Added [INTENT], [STATE], [THREAD], [EVENT], and [UNITY] annotations for the OAuthDialog class and its members.
+- Verification excerpt: // [INTENT] Returns the final authorization result to the caller.
+- Unity-impact summary:
+    - DPIDialog maps to Unity UI Modal Dialog.
+    - Worker maps to C# Task or Unity Job System.
+    - Result state mapping to ScriptableObject or shared data structure.
+- Hazards found: 0
+- Git: <commit subject "annotate: src/slic3r/GUI/OAuthDialog.hpp">
+- Next recommended Phase 1 task: T507 annotate: src/slic3r/GUI/ObjColorDialog.cpp
+
