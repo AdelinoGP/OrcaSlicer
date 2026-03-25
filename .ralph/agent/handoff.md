@@ -1,13 +1,13 @@
-## Phase 1 - Task T466 complete
+## Phase 1 - Task T468 complete
 - Task type: annotate
-- File: src/slic3r/GUI/MarkdownTip.cpp
-- Deliverables: src/slic3r/GUI/MarkdownTip.cpp
-- Substantive additions: Added [INTENT], [UNITY], [PORTING_HAZARD:P2] for the class and [INTENT] for helper methods.
-- Verification excerpt: // [INTENT] A transient popup window that renders markdown tips using a wxWebView.
+- File: src/slic3r/GUI/MediaFilePanel.cpp
+- Deliverables: src/slic3r/GUI/MediaFilePanel.cpp
+- Substantive additions: 3 blocks of annotations (Class intent, Constructor, UpdateByObj)
+- Verification excerpt: // [INTENT] MediaFilePanel manages and displays printer media files (timelapse, video, model).
 - Unity-impact summary: 
-    - Replace `wxPopupTransientWindow` with Unity `Canvas` or `PopupWindow`.
-    - Replace `wxWebView` with a custom WebGL/WebView or UI Toolkit component.
-    - Porting hazardous as webview implementation is platform-dependent.
-- Hazards found: 1 (P2: webview brittle)
-- Git: 706c3d6212
-- Next recommended Phase 1 task: T467 annotate: src/slic3r/GUI/MarkdownTip.hpp
+    - Replace wxWidgets with Unity UI/UI Toolkit.
+    - Replace wxPanel with MonoBehaviour controller.
+    - Use async/await for network/storage operations.
+- Hazards found: 0
+- Git: c33ac08efc
+- Next recommended Phase 1 task: T469 annotate: src/slic3r/GUI/MediaPlayCtrl.cpp

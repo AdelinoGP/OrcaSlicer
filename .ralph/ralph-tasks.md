@@ -386,7 +386,7 @@ Last updated: 2026-03-24T21:45:45Z
 - [ ] T465 annotate: src/slic3r/GUI/MainFrame.hpp
 - [ ] T466 annotate: src/slic3r/GUI/MarkdownTip.cpp
 - [ ] T467 annotate: src/slic3r/GUI/MarkdownTip.hpp
-- [ ] T468 annotate: src/slic3r/GUI/MediaFilePanel.cpp
+- [x] T468 annotate: src/slic3r/GUI/MediaFilePanel.cpp
 - [ ] T469 annotate: src/slic3r/GUI/MediaPlayCtrl.cpp
 - [ ] T470 annotate: src/slic3r/GUI/MeshUtils.cpp
 - [ ] T471 annotate: src/slic3r/GUI/MeshUtils.hpp
