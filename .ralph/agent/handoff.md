@@ -74,3 +74,18 @@
 - Git: <commit subject "annotate: src/slic3r/GUI/ObjColorDialog.hpp">
 - Next recommended Phase 1 task: T509 annotate: src/slic3r/GUI/ObjectDataViewModel.cpp
 
+
+## Phase 1 - Task T509 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ObjectDataViewModel.cpp
+- Deliverables: src/slic3r/GUI/ObjectDataViewModel.cpp
+- Substantive additions: Added [INTENT], [STATE], and [EVENT] annotations for the object list data model and its nodes.
+- Verification excerpt: // [INTENT] ObjectDataViewModel provides the hierarchical data source for the object list (tree view) in the slicer's sidebar.
+- Unity-impact summary:
+    - wxDataViewModel maps to TreeView or ListView data source in Unity UI Toolkit.
+    - Nodes map to a C# hierarchical data structure.
+    - Icon management maps to Sprite/Texture assignment in VisualElements.
+- Hazards found: 0
+- Git: <commit subject "annotate: src/slic3r/GUI/ObjectDataViewModel.cpp">
+- Next recommended Phase 1 task: T510 annotate: src/slic3r/GUI/ObjectDataViewModel.hpp
+
