@@ -2,7 +2,7 @@
 
 **Status:** Completed successfully
 **Iterations:** 1
-**Duration:** 40s
+**Duration:** 1m 8s
 
 ## Tasks
 
@@ -14,4 +14,4 @@ _No events recorded._
 
 ## Final Commit
 
-956cedc9c4: annotate: src/slic3r/GUI/InstanceCheck.hpp (T422)
+92362f12c7: annotate: src/slic3r/GUI/Jobs/FillBedJob.cpp
