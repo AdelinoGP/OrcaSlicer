@@ -1,11 +1,11 @@
 # Session Handoff
 
-_Generated: 2026-03-25 05:47:16 UTC_
+_Generated: 2026-03-25 05:49:29 UTC_
 
 ## Git Context
 
 - **Branch:** `agent/gui-analysis`
-- **HEAD:** b9de46d1c6: chore: auto-commit before merge (loop primary)
+- **HEAD:** cb6fc7eecb: chore: auto-commit before merge (loop primary)
 
 ## Tasks
 
@@ -290,6 +290,7 @@ _Generated: 2026-03-25 05:47:16 UTC_
 - [x] T704 annotate: src/slic3r/GUI/Widgets/StaticLine.hpp
 - [x] T170 skip-trivial: src/slic3r/GUI/GUI_ObjectManipulation.hpp
 - [x] annotate: src/slic3r/GUI/IMToolbar.cpp
+- [x] T528 annotate: src/slic3r/GUI/Plater.cpp
 
 ### Remaining
 
@@ -716,23 +717,11 @@ Recently modified:
 - `.ralph/current-loop-id`
 - `.ralph/events-20260325-013741.jsonl`
 - `.ralph/events-20260325-054603.jsonl`
-- `.ralph/history.jsonl`
+- `.ralph/events-20260325-054731.jsonl`
 
 ## Next Session
 
-
-## Phase 1 - Task T528 complete
-- Task type: annotate
-- File: src/slic3r/GUI/Plater.cpp
-- Deliverables: Plater.cpp annotated
-- Substantive additions: Added [INTENT] and [UNITY] tags to sidebar components and filename validation
-- Verification excerpt: // [UNITY] Map to SceneController (3D workspace) and InspectorPanel (Sidebar).
-- Unity-impact summary: 
-    - Sidebar needs full reimplementation using UI Toolkit.
-    - Printer and Filament configuration requires state synchronization service.
-- Hazards found: 2 (P2 - manual DPI rescaling, PIMPL encapsulation)
-- Git: N/A (Commit pending)
-- Next recommended Phase 1 task: T553 annotate: src/slic3r/GUI/Project.cpp
+The following prompt can be used to continue where this session left off:
 
 ```
 Continue the previous work. Remaining tasks (409):
@@ -975,6 +964,20 @@ Continue the previous work. Remaining tasks (409):
 - T644 annotate: src/slic3r/GUI/Widgets/AnimaController.hpp
 - T645 annotate: src/slic3r/GUI/Widgets/AxisCtrlButton.cpp
 - T646 annotate: src/slic3r/GUI/Widgets/AxisCtrlButton.hpp
+
+## Phase 1 - Task T444 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Jobs/OrientJob.hpp
+- Deliverables: src/slic3r/GUI/Jobs/OrientJob.hpp
+- Substantive additions: Added [THREAD] and [PORTING_HAZARD:P2] tags and explanations.
+- Verification excerpt: // [PORTING_HAZARD:P2]
+- Unity-impact summary:
+    - Orientation logic must be replaced with C# for Unity.
+    - Threading model transitions to C# Tasks/Jobs.
+- Hazards found: 1 (P2)
+- Git: T444 annotate OrientJob.hpp
+- Next recommended Phase 1 task: T445 annotate: src/slic3r/GUI/Jobs/PlaterWorker.hpp
+
 - T652 annotate: src/slic3r/GUI/Widgets/ComboBox.hpp
 - T653 annotate: src/slic3r/GUI/Widgets/DialogButtons.cpp
 - T654 annotate: src/slic3r/GUI/Widgets/DialogButtons.hpp

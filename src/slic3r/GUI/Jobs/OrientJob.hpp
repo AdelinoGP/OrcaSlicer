@@ -8,6 +8,11 @@
 // processes them in a worker thread, and then applies the new orientations in
 // the main UI thread.
 //
+// [THREAD]
+// - This job runs as a background task. The `process` method is executed in a
+//   separate thread, and the `finalize` method is called on the main UI thread
+//   to update the UI/scene state.
+//
 // [UNITY]
 // In a Unity port, this functionality would be handled by a C# script that
 // triggers an async Task or a C# Job.
@@ -18,6 +23,11 @@
 //   analysis would need to be ported or replaced with a Unity-compatible library.
 // - The `finalize` method would be a callback on the main thread that applies
 //   the resulting rotation to the `Transform` of each `GameObject`.
+//
+// [PORTING_HAZARD:P2]
+// - The C++ orientation algorithms (`libslic3r/Orient.hpp`) must be completely
+//   replaced or re-implemented in C# to run within Unity, as they depend on
+//   libslic3r data structures that aren't natively supported in Unity.
 
 #ifndef ORIENTJOB_HPP
 #define ORIENTJOB_HPP
