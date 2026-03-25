@@ -45,11 +45,13 @@ namespace Slic3r { namespace GUI {
 // to provide the necessary data to the `SLAImportJob`.
 class SLAImportDialog : public wxDialog, public SLAImportJobView
 {
+    // [STATE] UI controls for user input: file picker, import type selection, and quality setting.
     wxFilePickerCtrl* m_filepicker;
     wxComboBox *      m_import_dropdown, *m_quality_dropdown;
 
 public:
     // [INTENT] Constructs the dialog, creating and arranging all the UI elements.
+    // [PORTING_HAZARD:P2] wxDialog and associated sizers need replacement with Unity UI canvas/LayoutGroup structure.
     SLAImportDialog(Plater* plater) : wxDialog{plater, wxID_ANY, "Import SLA archive"}
     {
         auto szvert    = new wxBoxSizer{wxVERTICAL};
