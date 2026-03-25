@@ -1,3 +1,24 @@
+// [INTENT]
+// This header file declares the `SLAImportJob` class and its associated view
+// interface, `SLAImportJobView`. This is part of the system for importing SLA
+// archives (`.sl1`, `.sl1s`, `.zip`) into the application.
+//
+// - `SLAImportJobView`: A pure virtual interface that defines the contract for
+//   any UI element (like a dialog) that can provide the necessary information
+//   for an SLA import. This decouples the background job from the specific UI
+//   implementation.
+//
+// - `SLAImportJob`: The background job that performs the actual import. It
+//   takes an `SLAImportJobView` to get the user's settings, and then runs the
+//   import process on a worker thread to avoid blocking the UI.
+//
+// [UNITY]
+// In a Unity port:
+// - `SLAImportJobView` would be a C# interface (`ISLAImportView`) implemented
+//   by a UI script.
+// - `SLAImportJob` would be replaced by a C# class that manages the import
+//   process using an async Task.
+
 #ifndef SLAIMPORTJOB_HPP
 #define SLAIMPORTJOB_HPP
 
@@ -6,13 +27,11 @@
 
 namespace Slic3r { namespace GUI {
 
-// [INTENT] Extract the customers decisions (model vs profile, slice window size, file path) that drive the SLA import workflow.
-// [STATE] Exposes the dropdown selection, march square canvas size, and file path that the job will snapshot before running.
-// [EVENT] Implemented by the dialog/panel so Apply/Start buttons grab this interface, and changing UI state should stay on the UI thread to
-// avoid races. [THREAD] These getters execute on the UI thread; the job must marshal the captured values before the worker thread reads
-// them. [UNITY] Mirror this contract via a MonoBehaviour (e.g., a SerializedScriptableObject + controller) that exposes SelectionMode,
-// CanvasSize, and SourcePath fields for the async job kick-off. [PORTING_HAZARD:P3] UI state can mutate between query and worker start; the
-// Unity port must snapshot or lock the view to keep the worker consistent.
+// [INTENT] An interface class that defines the contract for a UI view that
+// provides the necessary data for an SLA import job. This decouples the job
+// from the specific UI implementation.
+// [UNITY] This would be a C# interface (e.g., `ISLAImportDataProvider`) that
+// the UI panel for SLA import would implement.
 class SLAImportJobView
 {
 public:
@@ -20,38 +39,42 @@ public:
 
     virtual ~SLAImportJobView() = default;
 
-    virtual Sel         get_selection() const          = 0;
-    virtual Vec2i32     get_marchsq_windowsize() const = 0;
-    virtual std::string get_path() const               = 0;
+    // [INTENT] Gets the user's selection for what to import.
+    virtual Sel get_selection() const = 0;
+    // [INTENT] Gets the window size for the marching squares algorithm, based on the quality setting.
+    virtual Vec2i32 get_marchsq_windowsize() const = 0;
+    // [INTENT] Gets the path to the SLA archive file.
+    virtual std::string get_path() const = 0;
 };
 
 class Plater;
 
+// [INTENT] A background job for importing SLA archives. It uses the pimpl idiom
+// to hide its implementation details.
 class SLAImportJob : public Job
 {
     class priv;
 
-    // [STATE] Holds the captured selection, file path, and any job-specific caches until completion.
+    // [STATE] A pointer to the private implementation, holding the job's state.
     std::unique_ptr<priv> p;
     using Sel = SLAImportJobView::Sel;
 
 public:
-    // [EVENT] Called on the UI thread when the job is registered so that the view snapshot can be stored before the worker launches.
+    // [INTENT] Prepares the job by getting data from the view.
+    // [THREAD] This is called on the main UI thread before the worker thread starts.
     void prepare();
-    // [THREAD] Held by the worker thread; runs the heavy lifting of moving the selection into the SLA importer while avoiding UI touches.
-    // [UNITY] Map to a Unity Job System worker that feeds data into the SLA render pipeline and then queues completion via
-    // UnityMainThreadDispatcher.
+    // [INTENT] The main worker method that performs the import.
+    // [THREAD] This runs on a worker thread.
     void process(Ctl& ctl) override;
-    // [THREAD] Fired back on the UI thread to deliver completion/cancellation signals and clean up the texture upload handoff.
-    // [EVENT] Notify the progress indicator/preview controller with the final status.
-    // [PORTING_HAZARD:P2] Unity will need an explicit scheduler for job completion callbacks rather than relying on wxWidgets event loops.
+    // [INTENT] Finalizes the job on the main thread, applying the results.
+    // [THREAD] This runs on the main UI thread.
     void finalize(bool canceled, std::exception_ptr&) override;
 
-    // [INTENT] Build the job around the provided view so UI state can be captured lazily via prepare().
+    // [INTENT] Constructs the job with a view from which to get the import settings.
     SLAImportJob(const SLAImportJobView*);
     ~SLAImportJob();
 
-    // [STATE] Clears any cached selections so the job can be reused without dangling file handles.
+    // [INTENT] Resets the job's state so it can be reused.
     void reset();
 };
 
