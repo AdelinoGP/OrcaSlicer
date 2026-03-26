@@ -47,4 +47,4 @@ public:
 
 }} // namespace Slic3r::GUI
 
-#endif
+#endif// [UNITY] Note: Ensure webview controller exists in Unity and is correctly managed.
