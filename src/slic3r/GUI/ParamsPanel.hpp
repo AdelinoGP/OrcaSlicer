@@ -1,11 +1,9 @@
 #ifndef slic3r_params_panel_hpp_
 #define slic3r_params_panel_hpp_
 
-
 #include <map>
 #include <vector>
 #include <memory>
-
 
 #include <wx/artprov.h>
 #include <wx/xrc/xmlres.h>
@@ -34,141 +32,156 @@
 class SwitchButton;
 class StaticBox;
 
-namespace Slic3r {
-namespace GUI {
+namespace Slic3r { namespace GUI {
 
 ///////////////////////////////////////////////////////////////////////////
 
+// [INTENT] Dialog for displaying user tips or helpful information.
+// [UNITY] Use a custom MonoBehaviour with UI Toolkit, utilizing a Window or standard Modal Dialog component for presentation.
 class TipsDialog : public DPIDialog
 {
 private:
+    // [STATE] Preference for showing the tip again in future sessions.
     bool m_show_again{false};
+    // [STATE] Unique identifier for this tip.
     std::string m_app_key;
 
 public:
-    TipsDialog(wxWindow *parent, const wxString &title, const wxString &description, std::string app_key = "", long style = wxOK, std::map<wxStandardID,wxString> option_map={});
-    Button *m_confirm{nullptr};
-    Button *m_cancel{nullptr};
-    wxPanel *m_top_line{nullptr};
-    wxStaticText *m_msg;
+    TipsDialog(wxWindow*                        parent,
+               const wxString&                  title,
+               const wxString&                  description,
+               std::string                      app_key    = "",
+               long                             style      = wxOK,
+               std::map<wxStandardID, wxString> option_map = {});
+    Button*       m_confirm{nullptr};
+    Button*       m_cancel{nullptr};
+    wxPanel*      m_top_line{nullptr};
+    wxStaticText* m_msg;
 
 protected:
-    void on_dpi_changed(const wxRect &suggested_rect) override;
-    wxBoxSizer *create_item_checkbox(wxString title, wxWindow *parent, wxString tooltip, std::string param);
-    Button* add_button(wxWindowID btn_id, const wxString &label, bool set_focus = false);
+    void        on_dpi_changed(const wxRect& suggested_rect) override;
+    wxBoxSizer* create_item_checkbox(wxString title, wxWindow* parent, wxString tooltip, std::string param);
+    Button*     add_button(wxWindowID btn_id, const wxString& label, bool set_focus = false);
 };
 
 ///////////////////////////////////////////////////////////////////////////////
 /// Class ParamsPanel
 ///////////////////////////////////////////////////////////////////////////////
+// [INTENT] Main container panel for Slic3r parameter settings, managing tabs (Print, Filament, Printer).
+// [UNITY] Use a VisualElement tree with a TabView or similar controller for tabbed navigation.
 class ParamsPanel : public wxPanel
 {
 #if __WXOSX__
-    wxWindow*            m_tmp_panel;
-    int                 m_size_move = -1;
+    wxWindow* m_tmp_panel;
+    int       m_size_move = -1;
 #endif // __WXOSX__
 
-	private:
-        void free_sizers();
-        void delete_subwindows();
-        void refresh_tabs();
+private:
+    void free_sizers();
+    void delete_subwindows();
+    void refresh_tabs();
 
-	protected:
-        wxBoxSizer* m_top_sizer { nullptr };
-        wxBoxSizer* m_left_sizer { nullptr };
-        wxBoxSizer* m_mode_sizer { nullptr };
-        // // BBS: new layout
-        StaticBox* m_top_panel{ nullptr };
-        ScalableButton* m_process_icon{ nullptr };
-        wxStaticText* m_title_label { nullptr };
-        SwitchButton* m_mode_region { nullptr };
-        ScalableButton *m_tips_arrow{nullptr};
-        bool m_tips_arror_blink{false};
-        ScalableButton* m_mode_icon { nullptr }; // ORCA
-        SwitchButton* m_mode_view { nullptr };
-        //wxBitmapButton* m_search_button { nullptr };
-        wxStaticLine* m_staticline_print { nullptr };
-        //wxBoxSizer* m_print_sizer { nullptr };
-        wxPanel* m_tab_print { nullptr };
-        wxPanel* m_tab_print_plate { nullptr };
-        wxPanel* m_tab_print_object { nullptr };
-        wxStaticLine* m_staticline_print_object { nullptr };
-        wxPanel* m_tab_print_part { nullptr };
-        wxPanel* m_tab_print_layer { nullptr };
-        wxStaticLine* m_staticline_print_part { nullptr };
-        wxStaticLine* m_staticline_filament { nullptr };
-        //wxBoxSizer* m_filament_sizer { nullptr };
-        wxPanel* m_tab_filament { nullptr };
-        wxStaticLine* m_staticline_printer { nullptr };
-        //wxBoxSizer* m_printer_sizer { nullptr };
-        wxPanel* m_tab_printer { nullptr };
-        //wxStaticLine* m_staticline_buttons { nullptr };
-        // BBS: new layout
-        wxBoxSizer* m_button_sizer { nullptr };
-        wxWindow* m_export_to_file { nullptr };
-        wxWindow* m_import_from_file { nullptr };
-        //wxStaticLine* m_staticline_middle{ nullptr };
-        //wxBoxSizer* m_right_sizer { nullptr };
-        wxScrolledWindow* m_page_view { nullptr };
-        wxBoxSizer* m_page_sizer { nullptr };
+protected:
+    // [STATE] Layout sizers.
+    wxBoxSizer* m_top_sizer{nullptr};
+    wxBoxSizer* m_left_sizer{nullptr};
+    wxBoxSizer* m_mode_sizer{nullptr};
+    // // BBS: new layout
+    StaticBox*      m_top_panel{nullptr};
+    ScalableButton* m_process_icon{nullptr};
+    wxStaticText*   m_title_label{nullptr};
+    SwitchButton*   m_mode_region{nullptr};
+    ScalableButton* m_tips_arrow{nullptr};
+    bool            m_tips_arror_blink{false};
+    ScalableButton* m_mode_icon{nullptr}; // ORCA
+    SwitchButton*   m_mode_view{nullptr};
+    // wxBitmapButton* m_search_button { nullptr };
+    wxStaticLine* m_staticline_print{nullptr};
+    // wxBoxSizer* m_print_sizer { nullptr };
+    wxPanel*      m_tab_print{nullptr};
+    wxPanel*      m_tab_print_plate{nullptr};
+    wxPanel*      m_tab_print_object{nullptr};
+    wxStaticLine* m_staticline_print_object{nullptr};
+    wxPanel*      m_tab_print_part{nullptr};
+    wxPanel*      m_tab_print_layer{nullptr};
+    wxStaticLine* m_staticline_print_part{nullptr};
+    wxStaticLine* m_staticline_filament{nullptr};
+    // wxBoxSizer* m_filament_sizer { nullptr };
+    wxPanel*      m_tab_filament{nullptr};
+    wxStaticLine* m_staticline_printer{nullptr};
+    // wxBoxSizer* m_printer_sizer { nullptr };
+    wxPanel* m_tab_printer{nullptr};
+    // wxStaticLine* m_staticline_buttons { nullptr };
+    //  BBS: new layout
+    wxBoxSizer* m_button_sizer{nullptr};
+    wxWindow*   m_export_to_file{nullptr};
+    wxWindow*   m_import_from_file{nullptr};
+    // wxStaticLine* m_staticline_middle{ nullptr };
+    // wxBoxSizer* m_right_sizer { nullptr };
+    wxScrolledWindow* m_page_view{nullptr};
+    wxBoxSizer*       m_page_sizer{nullptr};
 
-        ScalableButton*		m_setting_btn { nullptr };
-        ScalableButton*		m_search_btn { nullptr };
-        ScalableButton*		m_compare_btn { nullptr };
+    ScalableButton* m_setting_btn{nullptr};
+    ScalableButton* m_search_btn{nullptr};
+    ScalableButton* m_compare_btn{nullptr};
 
-        wxBitmap m_toggle_on_icon;
-        wxBitmap m_toggle_off_icon;
+    wxBitmap m_toggle_on_icon;
+    wxBitmap m_toggle_off_icon;
 
-        wxPanel* m_current_tab { nullptr };
+    wxPanel* m_current_tab{nullptr};
 
-        bool m_has_object_config { false };
+    bool m_has_object_config{false};
 
-        struct Highlighter
-        {
-            void set_timer_owner(wxEvtHandler *owner, int timerid = wxID_ANY);
-            void init(std::pair<wxWindow *, bool *>, wxWindow *parent = nullptr);
-            void blink();
-            void invalidate();
+    struct Highlighter
+    {
+        void set_timer_owner(wxEvtHandler* owner, int timerid = wxID_ANY);
+        void init(std::pair<wxWindow*, bool*>, wxWindow* parent = nullptr);
+        void blink();
+        void invalidate();
 
-        private:
-            wxWindow *      m_bitmap{nullptr};
-            bool *         m_show_blink_ptr{nullptr};
-            int            m_blink_counter{0};
-            wxTimer        m_timer;
-            wxWindow *      m_parent { nullptr };
-        } m_highlighter;
+    private:
+        wxWindow* m_bitmap{nullptr};
+        bool*     m_show_blink_ptr{nullptr};
+        int       m_blink_counter{0};
+        wxTimer   m_timer;
+        wxWindow* m_parent{nullptr};
+    } m_highlighter;
 
-        void OnToggled(wxCommandEvent& event);
+    // [EVENT] Handle tab toggles.
+    void OnToggled(wxCommandEvent& event);
 
-	public:
-		ParamsPanel( wxWindow* parent, wxWindowID id = wxID_ANY, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( 1800,1080 ), long style = wxTAB_TRAVERSAL, const wxString& type = wxEmptyString );
-		~ParamsPanel();
+public:
+    ParamsPanel(wxWindow*       parent,
+                wxWindowID      id    = wxID_ANY,
+                const wxPoint&  pos   = wxDefaultPosition,
+                const wxSize&   size  = wxSize(1800, 1080),
+                long            style = wxTAB_TRAVERSAL,
+                const wxString& type  = wxEmptyString);
+    ~ParamsPanel();
 
-        void rebuild_panels();
-        void create_layout();
-        //clear the right page
-        void clear_page();
-        void OnActivate();
-        void set_active_tab(wxPanel*tab);
-        bool is_active_and_shown_tab(wxPanel*tab);
-        void update_mode();
-        void msw_rescale();
-        void switch_to_global();
-        void switch_to_object(bool with_tips = false);
+    void rebuild_panels();
+    void create_layout();
+    // clear the right page
+    void clear_page();
+    void OnActivate();
+    void set_active_tab(wxPanel* tab);
+    bool is_active_and_shown_tab(wxPanel* tab);
+    void update_mode();
+    void msw_rescale();
+    void switch_to_global();
+    void switch_to_object(bool with_tips = false);
 
-        void notify_object_config_changed();
-        void switch_to_object_if_has_object_configs();
+    void notify_object_config_changed();
+    void switch_to_object_if_has_object_configs();
 
-        StaticBox* get_top_panel() { return m_top_panel; }
+    StaticBox* get_top_panel() { return m_top_panel; }
 
-        wxPanel* filament_panel() { return m_tab_filament; }
+    wxPanel* filament_panel() { return m_tab_filament; }
 
-        wxScrolledWindow* get_paged_view() { return m_page_view;}
-        wxPanel*    get_current_tab() { return m_current_tab; }
-
+    wxScrolledWindow* get_paged_view() { return m_page_view; }
+    wxPanel*          get_current_tab() { return m_current_tab; }
 };
 
-} // GUI
-} // Slic3r
+}} // namespace Slic3r::GUI
 
-#endif //slic3r_params_panel_hpp_
+#endif // slic3r_params_panel_hpp_
