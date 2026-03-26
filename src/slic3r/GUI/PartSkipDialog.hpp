@@ -24,7 +24,6 @@
 #include "I18N.hpp"
 #include "GUI_Utils.hpp"
 
-
 namespace Slic3r { namespace GUI {
 
 class SkipPartCanvas;
@@ -34,81 +33,86 @@ enum URL_STATE {
     URL_TUTK,
 };
 
+// [INTENT] PartSkipConfirmDialog is a confirmation dialog shown before final object skipping.
+// [UNITY] Use UI Toolkit modal dialog.
 class PartSkipConfirmDialog : public DPIDialog
 {
 private:
 protected:
-    Label  *m_msg_label;
-    Label  *m_tip_label;
-    Button *m_apply_button;
+    Label*  m_msg_label;
+    Label*  m_tip_label;
+    Button* m_apply_button;
 
 public:
-    PartSkipConfirmDialog(wxWindow *parent);
+    PartSkipConfirmDialog(wxWindow* parent);
     ~PartSkipConfirmDialog();
 
-    void    on_dpi_changed(const wxRect &suggested_rect);
-    Button *GetConfirmButton();
+    void    on_dpi_changed(const wxRect& suggested_rect);
+    Button* GetConfirmButton();
     void    SetMsgLabel(wxString msg);
     void    SetTipLabel(wxString msg);
     bool    Show(bool show);
 };
 
+// [INTENT] PartSkipDialog manages the UI for selecting parts on a build plate to skip during a print.
+// [STATE] Tracks part selection states, canvas interaction (zoom, drag), and network sync status.
+// [UNITY] Use a UI Toolkit-based dialog; the 3D view can be a RenderTexture rendered to a quad.
 class PartSkipDialog : public DPIDialog
 {
 public:
-    PartSkipDialog(wxWindow *parent);
+    PartSkipDialog(wxWindow* parent);
     ~PartSkipDialog();
-    void on_dpi_changed(const wxRect &suggested_rect);
+    void on_dpi_changed(const wxRect& suggested_rect);
     bool Show(bool show);
 
-    void UpdatePartsStateFromPrinter(MachineObject *obj_);
+    void UpdatePartsStateFromPrinter(MachineObject* obj_);
     void SetSimplebookPage(int page);
-    void InitSchedule(MachineObject *obj_);
+    void InitSchedule(MachineObject* obj_);
     void InitDialogUI();
     int  GetAllSkippedPartsNum();
 
-    MachineObject *m_obj{nullptr};
+    MachineObject* m_obj{nullptr};
 
-    wxSimplebook *m_simplebook;
-    wxPanel      *m_book_third_panel;
-    wxPanel      *m_book_second_panel;
-    wxPanel      *m_book_first_panel;
+    wxSimplebook* m_simplebook;
+    wxPanel*      m_book_third_panel;
+    wxPanel*      m_book_second_panel;
+    wxPanel*      m_book_first_panel;
 
-    SkipPartCanvas   *m_canvas;
-    Button           *m_zoom_in_btn;
-    Button           *m_zoom_out_btn;
-    Button           *m_switch_drag_btn;
-    CheckBox         *m_all_checkbox;
-    Button           *m_percent_label;
-    Label            *m_all_label;
-    wxPanel          *m_line;
-    wxPanel          *m_line_top;
-    wxScrolledWindow *m_list_view;
+    SkipPartCanvas*   m_canvas;
+    Button*           m_zoom_in_btn;
+    Button*           m_zoom_out_btn;
+    Button*           m_switch_drag_btn;
+    CheckBox*         m_all_checkbox;
+    Button*           m_percent_label;
+    Label*            m_all_label;
+    wxPanel*          m_line;
+    wxPanel*          m_line_top;
+    wxScrolledWindow* m_list_view;
 
-    wxPanel *m_dlg_placeholder;
-    Label   *m_cnt_label;
-    Label   *m_tot_label;
+    wxPanel* m_dlg_placeholder;
+    Label*   m_cnt_label;
+    Label*   m_tot_label;
 
-    Button *m_apply_btn;
+    Button* m_apply_btn;
 
-    Label          *m_loading_label;
-    Label          *m_retry_label;
-    ScalableBitmap *m_retry_icon;
-    wxStaticBitmap *m_retry_bitmap;
+    Label*          m_loading_label;
+    Label*          m_retry_label;
+    ScalableBitmap* m_retry_icon;
+    wxStaticBitmap* m_retry_bitmap;
 
-    wxBoxSizer *m_sizer;
-    wxBoxSizer *m_dlg_sizer;
-    wxBoxSizer *m_dlg_content_sizer;
-    wxBoxSizer *m_dlg_btn_sizer;
-    wxBoxSizer *m_canvas_sizer;
-    wxBoxSizer *m_canvas_btn_sizer;
-    wxBoxSizer *m_list_sizer;
-    wxBoxSizer *m_scroll_sizer;
-    wxBoxSizer *m_book_first_sizer;
-    wxBoxSizer *m_book_second_sizer;
-    wxBoxSizer *m_book_second_btn_sizer;
-    Button     *m_second_retry_btn;
-    AnimaIcon  *m_loading_icon;
+    wxBoxSizer* m_sizer;
+    wxBoxSizer* m_dlg_sizer;
+    wxBoxSizer* m_dlg_content_sizer;
+    wxBoxSizer* m_dlg_btn_sizer;
+    wxBoxSizer* m_canvas_sizer;
+    wxBoxSizer* m_canvas_btn_sizer;
+    wxBoxSizer* m_list_sizer;
+    wxBoxSizer* m_scroll_sizer;
+    wxBoxSizer* m_book_first_sizer;
+    wxBoxSizer* m_book_second_sizer;
+    wxBoxSizer* m_book_second_btn_sizer;
+    Button*     m_second_retry_btn;
+    AnimaIcon*  m_loading_icon;
 
 private:
     int  m_plate_idx{-1};
@@ -135,18 +139,18 @@ private:
     std::vector<string>                  m_target_paths;
     std::string                          create_tmp_path();
 
-    bool is_local_file_existed(const std::vector<string> &local_paths);
+    bool is_local_file_existed(const std::vector<string>& local_paths);
 
     void DownloadPartsFile();
-    void OnFileSystemEvent(wxCommandEvent &event);
-    void OnFileSystemResult(wxCommandEvent &event);
+    void OnFileSystemEvent(wxCommandEvent& event);
+    void OnFileSystemResult(wxCommandEvent& event);
     void fetchUrl(boost::weak_ptr<PrinterFileSystem> wfs);
 
-    void OnZoomIn(wxCommandEvent &event);
-    void OnZoomOut(wxCommandEvent &event);
-    void OnSwitchDrag(wxCommandEvent &event);
-    void OnZoomPercent(wxCommandEvent &event);
-    void UpdatePartsStateFromCanvas(wxCommandEvent &event);
+    void OnZoomIn(wxCommandEvent& event);
+    void OnZoomOut(wxCommandEvent& event);
+    void OnSwitchDrag(wxCommandEvent& event);
+    void OnZoomPercent(wxCommandEvent& event);
+    void UpdatePartsStateFromCanvas(wxCommandEvent& event);
 
     void UpdateZoomPercent();
     void UpdateCountLabel();
@@ -155,9 +159,9 @@ private:
     bool IsAllChecked();
     bool IsAllCancled();
 
-    void OnRetryButton(wxCommandEvent &event);
-    void OnAllCheckbox(wxCommandEvent &event);
-    void OnApplyDialog(wxCommandEvent &event);
+    void OnRetryButton(wxCommandEvent& event);
+    void OnAllCheckbox(wxCommandEvent& event);
+    void OnApplyDialog(wxCommandEvent& event);
 };
 
 }} // namespace Slic3r::GUI
