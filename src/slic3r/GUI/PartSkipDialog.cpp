@@ -30,10 +30,11 @@
 
 #include "DeviceCore/DevManager.h"
 
-namespace Slic3r { namespace GUI {
+namespace Slic3r { namespace GUI { // Annotation: PartSkipDialog analysis
 
-extern wxString hide_passwd(wxString url, std::vector<wxString> const &passwords);
-extern void     refresh_agora_url(char const *device, char const *dev_ver, char const *channel, void *context, void (*callback)(void *context, char const *url));
+extern wxString hide_passwd(wxString url, std::vector<wxString> const& passwords);
+extern void     refresh_agora_url(
+    char const* device, char const* dev_ver, char const* channel, void* context, void (*callback)(void* context, char const* url));
 
 StateColor percent_bg(std::pair<wxColour, int>(wxColour(255, 255, 255), StateColor::Disabled),
                       std::pair<wxColour, int>(wxColour(255, 255, 255), StateColor::Pressed),
@@ -47,10 +48,13 @@ static StateColor zoom_bg(std::pair<wxColour, int>(wxColour(255, 255, 255), Stat
                           std::pair<wxColour, int>(wxColour(255, 255, 255), StateColor::Enabled),
                           std::pair<wxColour, int>(wxColour(255, 255, 255), StateColor::Normal));
 
-static StateColor zoom_bd(std::pair<wxColour, int>(wxColour(144, 144, 144), StateColor::Disabled), std::pair<wxColour, int>(wxColour(38, 46, 48), StateColor::Enabled));
-static StateColor zoom_text(std::pair<wxColour, int>(wxColour(144, 144, 144), StateColor::Disabled), std::pair<wxColour, int>(wxColour(38, 46, 48), StateColor::Enabled));
+static StateColor zoom_bd(std::pair<wxColour, int>(wxColour(144, 144, 144), StateColor::Disabled),
+                          std::pair<wxColour, int>(wxColour(38, 46, 48), StateColor::Enabled));
+static StateColor zoom_text(std::pair<wxColour, int>(wxColour(144, 144, 144), StateColor::Disabled),
+                            std::pair<wxColour, int>(wxColour(38, 46, 48), StateColor::Enabled));
 
-PartSkipDialog::PartSkipDialog(wxWindow *parent) : DPIDialog(parent, wxID_ANY, _L("Skip Objects"), wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX)
+PartSkipDialog::PartSkipDialog(wxWindow* parent)
+    : DPIDialog(parent, wxID_ANY, _L("Skip Objects"), wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX)
 {
     std::time_t       t = std::time(0);
     std::stringstream buf;
@@ -221,7 +225,8 @@ PartSkipDialog::PartSkipDialog(wxWindow *parent) : DPIDialog(parent, wxID_ANY, _
     m_book_second_sizer     = new wxBoxSizer(wxVERTICAL);
     m_book_second_btn_sizer = new wxBoxSizer(wxHORIZONTAL);
 
-    m_retry_bitmap = new wxStaticBitmap(m_book_second_panel, -1, create_scaled_bitmap("partskip_retry", m_book_second_panel, 200), wxDefaultPosition, wxDefaultSize);
+    m_retry_bitmap = new wxStaticBitmap(m_book_second_panel, -1, create_scaled_bitmap("partskip_retry", m_book_second_panel, 200),
+                                        wxDefaultPosition, wxDefaultSize);
     m_retry_label  = new Label(m_book_second_panel, _L("Load skipping objects information failed. Please try again."));
     m_retry_label->Wrap(-1);
     m_retry_label->SetBackgroundColour(*wxWHITE);
@@ -287,7 +292,7 @@ PartSkipDialog::PartSkipDialog(wxWindow *parent) : DPIDialog(parent, wxID_ANY, _
 
 PartSkipDialog::~PartSkipDialog() {}
 
-void PartSkipDialog::on_dpi_changed(const wxRect &suggested_rect)
+void PartSkipDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
     m_canvas->LoadPickImage(m_local_paths[0]);
 
@@ -328,13 +333,13 @@ void PartSkipDialog::on_dpi_changed(const wxRect &suggested_rect)
     m_all_checkbox->Rescale();
 
     for (auto it = m_scroll_sizer->GetChildren().begin(); it != m_scroll_sizer->GetChildren().end(); ++it) {
-        wxSizerItem *item = *it;
+        wxSizerItem* item = *it;
         if (item && item->IsSizer()) {
-            wxSizer *sizer      = item->GetSizer();
+            wxSizer* sizer      = item->GetSizer();
             auto     check_item = sizer->GetItem((size_t) 0);
             if (check_item && check_item->IsWindow()) {
-                wxWindow *window   = check_item->GetWindow();
-                CheckBox *checkbox = dynamic_cast<CheckBox *>(window);
+                wxWindow* window   = check_item->GetWindow();
+                CheckBox* checkbox = dynamic_cast<CheckBox*>(window);
                 checkbox->SetMinSize(wxSize(FromDIP(18), FromDIP(18)));
                 checkbox->Rescale();
             }
@@ -367,14 +372,18 @@ std::string PartSkipDialog::create_tmp_path()
     }
     std::string tmp_path = (parent_path / buf.str()).string();
 
-    if (!std::filesystem::exists(tmp_path + "Metadata/") && !fs::create_directories(tmp_path + "Metadata/")) { wxMessageBox("create file failed."); }
+    if (!std::filesystem::exists(tmp_path + "Metadata/") && !fs::create_directories(tmp_path + "Metadata/")) {
+        wxMessageBox("create file failed.");
+    }
     return tmp_path;
 }
 
-bool PartSkipDialog::is_local_file_existed(const std::vector<string> &local_paths)
+bool PartSkipDialog::is_local_file_existed(const std::vector<string>& local_paths)
 {
     for (auto path : local_paths) {
-        if (!std::filesystem::exists(path)) { return false; }
+        if (!std::filesystem::exists(path)) {
+            return false;
+        }
     }
     return true;
 }
@@ -423,10 +432,11 @@ void PartSkipDialog::DownloadPartsFile()
 void PartSkipDialog::fetchUrl(boost::weak_ptr<PrinterFileSystem> wfs)
 {
     boost::shared_ptr fs(wfs.lock());
-    if (!fs) return;
+    if (!fs)
+        return;
 
-    DeviceManager *dm  = GUI::wxGetApp().getDeviceManager();
-    MachineObject *obj = dm->get_selected_machine();
+    DeviceManager* dm  = GUI::wxGetApp().getDeviceManager();
+    MachineObject* obj = dm->get_selected_machine();
 
     if (obj == nullptr) {
         fs->SetUrl("0");
@@ -436,11 +446,13 @@ void PartSkipDialog::fetchUrl(boost::weak_ptr<PrinterFileSystem> wfs)
     std::string dev_id  = obj->get_dev_id();
     // int         remote_proto = obj->get_file_remote();
 
-    NetworkAgent *agent         = wxGetApp().getAgent();
+    NetworkAgent* agent         = wxGetApp().getAgent();
     std::string   agent_version = agent ? agent->get_version() : "";
 
     auto url_state = m_url_state;
-    if (obj->is_lan_mode_printer()) { url_state = URL_TCP; }
+    if (obj->is_lan_mode_printer()) {
+        url_state = URL_TCP;
+    }
 
     if (agent) {
         switch (url_state) {
@@ -450,7 +462,8 @@ void PartSkipDialog::fetchUrl(boost::weak_ptr<PrinterFileSystem> wfs)
             std::string tcp_url    = "bambu:///local/" + devIP + "?port=6000&user=" + "bblp" + "&passwd=" + accessCode;
             CallAfter([=] {
                 boost::shared_ptr fs(wfs.lock());
-                if (!fs) return;
+                if (!fs)
+                    return;
                 if (boost::algorithm::starts_with(tcp_url, "bambu:///")) {
                     fs->SetUrl(tcp_url);
                 } else {
@@ -461,26 +474,27 @@ void PartSkipDialog::fetchUrl(boost::weak_ptr<PrinterFileSystem> wfs)
         }
         case URL_TUTK: {
             std::string protocols[] = {"", "\"tutk\"", "\"agora\"", "\"tutk\",\"agora\""};
-            agent->get_camera_url(obj->get_dev_id() + "|" + dev_ver + "|" + protocols[3], [this, wfs, m = dev_id, v = agent->get_version(), dv = dev_ver](std::string url)
-                {
-                if (boost::algorithm::starts_with(url, "bambu:///")) {
-                    url += "&device=" + m;
-                    url += "&net_ver=" + v;
-                    url += "&dev_ver=" + dv;
-                    url += "&refresh_url=" + boost::lexical_cast<std::string>(&refresh_agora_url);
-                    url += "&cli_id=" + wxGetApp().app_config->get("slicer_uuid");
-                    url += "&cli_ver=" + std::string(SLIC3R_VERSION);
-                }
-                CallAfter([=] {
-                    boost::shared_ptr fs(wfs.lock());
-                    if (!fs) return;
-                    if (boost::algorithm::starts_with(url, "bambu:///")) {
-                        fs->SetUrl(url);
-                    } else {
-                        fs->SetUrl("3");
-                    }
-                });
-            });
+            agent->get_camera_url(obj->get_dev_id() + "|" + dev_ver + "|" + protocols[3],
+                                  [this, wfs, m = dev_id, v = agent->get_version(), dv = dev_ver](std::string url) {
+                                      if (boost::algorithm::starts_with(url, "bambu:///")) {
+                                          url += "&device=" + m;
+                                          url += "&net_ver=" + v;
+                                          url += "&dev_ver=" + dv;
+                                          url += "&refresh_url=" + boost::lexical_cast<std::string>(&refresh_agora_url);
+                                          url += "&cli_id=" + wxGetApp().app_config->get("slicer_uuid");
+                                          url += "&cli_ver=" + std::string(SLIC3R_VERSION);
+                                      }
+                                      CallAfter([=] {
+                                          boost::shared_ptr fs(wfs.lock());
+                                          if (!fs)
+                                              return;
+                                          if (boost::algorithm::starts_with(url, "bambu:///")) {
+                                              fs->SetUrl(url);
+                                          } else {
+                                              fs->SetUrl("3");
+                                          }
+                                      });
+                                  });
             break;
         }
         default: break;
@@ -488,12 +502,13 @@ void PartSkipDialog::fetchUrl(boost::weak_ptr<PrinterFileSystem> wfs)
     }
 }
 // controller
-void PartSkipDialog::OnFileSystemEvent(wxCommandEvent &e)
+void PartSkipDialog::OnFileSystemEvent(wxCommandEvent& e)
 {
     e.Skip();
     auto              wfs = boost::weak_ptr(m_file_sys);
     boost::shared_ptr fs(wfs.lock());
-    if (!fs) return;
+    if (!fs)
+        return;
 
     wxString msg;
     int      status = e.GetInt();
@@ -524,7 +539,8 @@ void PartSkipDialog::OnFileSystemEvent(wxCommandEvent &e)
     if (e.GetInt() == PrinterFileSystem::Initializing) {
         CallAfter([=] {
             boost::shared_ptr fs(wfs.lock());
-            if (!fs) return;
+            if (!fs)
+                return;
             fetchUrl(boost::weak_ptr(fs));
             BOOST_LOG_TRIVIAL(info) << "part skip: fetch url, get parts info files from printer.";
         });
@@ -532,7 +548,7 @@ void PartSkipDialog::OnFileSystemEvent(wxCommandEvent &e)
 }
 
 // reseter: [TCP -> TUTK(TCP)] -> [TCP -> TUTK(TCP)]
-void PartSkipDialog::OnFileSystemResult(wxCommandEvent &event)
+void PartSkipDialog::OnFileSystemResult(wxCommandEvent& event)
 {
     int result = event.GetInt();
     m_loading_icon->Stop();
@@ -549,7 +565,7 @@ void PartSkipDialog::OnFileSystemResult(wxCommandEvent &event)
     }
 }
 
-void PartSkipDialog::InitSchedule(MachineObject *obj)
+void PartSkipDialog::InitSchedule(MachineObject* obj)
 {
     m_obj = obj;
     SetSimplebookPage(0);
@@ -557,7 +573,7 @@ void PartSkipDialog::InitSchedule(MachineObject *obj)
     DownloadPartsFile();
 }
 
-void PartSkipDialog::OnRetryButton(wxCommandEvent &event)
+void PartSkipDialog::OnRetryButton(wxCommandEvent& event)
 {
     event.Skip();
     InitSchedule(m_obj);
@@ -569,23 +585,25 @@ bool PartSkipDialog::is_drag_mode() { return m_is_drag == true; }
 PartsInfo PartSkipDialog::GetPartsInfo()
 {
     PartsInfo parts_info;
-    for (auto [part_id, part_state] : this->m_parts_state) { parts_info.push_back(std::pair<int, PartState>(part_id, part_state)); }
+    for (auto [part_id, part_state] : this->m_parts_state) {
+        parts_info.push_back(std::pair<int, PartState>(part_id, part_state));
+    }
     return parts_info;
 }
 
-void PartSkipDialog::OnZoomIn(wxCommandEvent &event)
+void PartSkipDialog::OnZoomIn(wxCommandEvent& event)
 {
     m_canvas->ZoomIn(20);
     UpdateZoomPercent();
 }
 
-void PartSkipDialog::OnZoomOut(wxCommandEvent &event)
+void PartSkipDialog::OnZoomOut(wxCommandEvent& event)
 {
     m_canvas->ZoomOut(20);
     UpdateZoomPercent();
 }
 
-void PartSkipDialog::OnSwitchDrag(wxCommandEvent &event)
+void PartSkipDialog::OnSwitchDrag(wxCommandEvent& event)
 {
     if (this->is_drag_mode()) {
         m_is_drag = false;
@@ -599,7 +617,7 @@ void PartSkipDialog::OnSwitchDrag(wxCommandEvent &event)
     m_canvas->SwitchDrag(m_is_drag);
 }
 
-void PartSkipDialog::OnZoomPercent(wxCommandEvent &event)
+void PartSkipDialog::OnZoomPercent(wxCommandEvent& event)
 {
     m_zoom_percent = event.GetInt();
     if (m_zoom_percent >= 1000) {
@@ -620,14 +638,18 @@ void PartSkipDialog::OnZoomPercent(wxCommandEvent &event)
     UpdateZoomPercent();
 }
 
-void PartSkipDialog::UpdatePartsStateFromCanvas(wxCommandEvent &event)
+void PartSkipDialog::UpdatePartsStateFromCanvas(wxCommandEvent& event)
 {
     int       part_id    = event.GetExtraLong();
     PartState part_state = PartState(event.GetInt());
 
     m_parts_state[part_id] = part_state;
-    if (part_state == psUnCheck) { m_all_checkbox->SetValue(false); }
-    if (IsAllChecked()) { m_all_checkbox->SetValue(true); }
+    if (part_state == psUnCheck) {
+        m_all_checkbox->SetValue(false);
+    }
+    if (IsAllChecked()) {
+        m_all_checkbox->SetValue(true);
+    }
 
     UpdateApplyButtonStatus();
     UpdateDialogUI();
@@ -640,8 +662,10 @@ void PartSkipDialog::UpdateCountLabel()
     int check_cnt = 0;
     int tot_cnt   = 0;
     for (auto [part_id, part_state] : m_parts_state) {
-        if (part_state == PartState::psChecked) check_cnt++;
-        if (part_state != PartState::psSkipped) tot_cnt++;
+        if (part_state == PartState::psChecked)
+            check_cnt++;
+        if (part_state != PartState::psSkipped)
+            tot_cnt++;
     }
     m_cnt_label->SetLabel(wxString::Format("%d", check_cnt));
     m_cnt_label->Fit();
@@ -690,23 +714,25 @@ void PartSkipDialog::InitDialogUI()
     if (helper.Parse()) {
         is_model_support_partskip = helper.GetLabelObjectEnabled(m_plate_idx);
         auto parse_result         = helper.GetPlateObjects(m_plate_idx);
-        for (const auto &part : parse_result) {
+        for (const auto& part : parse_result) {
             m_parts_state[part.identify_id] = part.state;
             m_parts_name[part.identify_id]  = part.name;
         }
         if (m_obj) {
             std::vector<int> partskip_ids = m_obj->m_partskip_ids;
-            for (auto part_id : partskip_ids) { m_parts_state[part_id] = PartState::psSkipped; }
+            for (auto part_id : partskip_ids) {
+                m_parts_state[part_id] = PartState::psSkipped;
+            }
         }
 
-        for (const auto &[part_id, part_state] : m_parts_state) {
+        for (const auto& [part_id, part_state] : m_parts_state) {
             auto line_sizer = new wxBoxSizer(wxHORIZONTAL);
             auto checkbox   = new CheckBox(m_list_view);
             auto label      = new Label(m_list_view, wxEmptyString);
 
             checkbox->Bind(
                 wxEVT_TOGGLEBUTTON,
-                [this, part_id = part_id](wxCommandEvent &event) {
+                [this, part_id = part_id](wxCommandEvent& event) {
                     m_parts_state[part_id] = event.IsChecked() ? PartState::psChecked : PartState::psUnCheck;
                     if (!event.IsChecked()) {
                         m_all_checkbox->SetValue(false);
@@ -756,7 +782,7 @@ void PartSkipDialog::InitDialogUI()
     BOOST_LOG_TRIVIAL(info) << "part skip: unlock parts info from printer.";
 }
 
-void PartSkipDialog::UpdatePartsStateFromPrinter(MachineObject *obj)
+void PartSkipDialog::UpdatePartsStateFromPrinter(MachineObject* obj)
 {
     if (m_print_lock) {
         BOOST_LOG_TRIVIAL(info) << "part skip: parts info from printer is locked.";
@@ -790,14 +816,14 @@ void PartSkipDialog::UpdateDialogUI()
         int  idx        = std::distance(m_parts_state.begin(), it);
         auto part_state = it->second;
 
-        wxSizerItem *item = m_scroll_sizer->GetItem(idx);
+        wxSizerItem* item = m_scroll_sizer->GetItem(idx);
         if (item && item->IsSizer()) {
-            wxSizer *sizer      = item->GetSizer();
+            wxSizer* sizer      = item->GetSizer();
             auto     check_item = sizer->GetItem((size_t) 0);
 
             if (check_item && check_item->IsWindow()) {
-                wxWindow *window   = check_item->GetWindow();
-                CheckBox *checkbox = dynamic_cast<CheckBox *>(window);
+                wxWindow* window   = check_item->GetWindow();
+                CheckBox* checkbox = dynamic_cast<CheckBox*>(window);
                 if (part_state == PartState::psChecked) {
                     checkbox->SetValue(true);
                 } else if (part_state == PartState::psUnCheck) {
@@ -818,29 +844,33 @@ void PartSkipDialog::SetSimplebookPage(int page) { m_simplebook->SetSelection(pa
 
 bool PartSkipDialog::IsAllChecked()
 {
-    for (auto &[part_id, part_state] : m_parts_state) {
-        if (part_state == PartState::psUnCheck) return false;
+    for (auto& [part_id, part_state] : m_parts_state) {
+        if (part_state == PartState::psUnCheck)
+            return false;
     }
     return true;
 }
 
 bool PartSkipDialog::IsAllCancled()
 {
-    for (auto &[part_id, part_state] : m_parts_state) {
-        if (part_state == PartState::psChecked) return false;
+    for (auto& [part_id, part_state] : m_parts_state) {
+        if (part_state == PartState::psChecked)
+            return false;
     }
     return true;
 }
 
-void PartSkipDialog::OnAllCheckbox(wxCommandEvent &event)
+void PartSkipDialog::OnAllCheckbox(wxCommandEvent& event)
 {
     if (m_all_checkbox->GetValue()) {
-        for (auto &[part_id, part_state] : m_parts_state) {
-            if (part_state == PartState::psUnCheck) part_state = PartState::psChecked;
+        for (auto& [part_id, part_state] : m_parts_state) {
+            if (part_state == PartState::psUnCheck)
+                part_state = PartState::psChecked;
         }
     } else {
-        for (auto &[part_id, part_state] : m_parts_state) {
-            if (part_state == PartState::psChecked) part_state = PartState::psUnCheck;
+        for (auto& [part_id, part_state] : m_parts_state) {
+            if (part_state == PartState::psChecked)
+                part_state = PartState::psUnCheck;
         }
     }
     UpdateApplyButtonStatus();
@@ -870,20 +900,24 @@ void PartSkipDialog::UpdateApplyButtonStatus()
     }
 }
 
-void PartSkipDialog::OnApplyDialog(wxCommandEvent &event)
+void PartSkipDialog::OnApplyDialog(wxCommandEvent& event)
 {
     event.Skip();
 
-    if (!m_enable_apply_btn) return;
+    if (!m_enable_apply_btn)
+        return;
 
     m_partskip_ids.clear();
-    for (const auto &[part_id, part_state] : m_parts_state) {
-        if (part_state == PartState::psChecked) { m_partskip_ids.push_back(part_id); }
+    for (const auto& [part_id, part_state] : m_parts_state) {
+        if (part_state == PartState::psChecked) {
+            m_partskip_ids.push_back(part_id);
+        }
     }
 
     bool all_skipped = true;
     for (auto [part_id, part_state] : m_parts_state) {
-        if (part_state == PartState::psUnCheck) all_skipped = false;
+        if (part_state == PartState::psUnCheck)
+            all_skipped = false;
     }
 
     PartSkipConfirmDialog confirm_dialog(this);
@@ -916,19 +950,21 @@ void PartSkipDialog::OnApplyDialog(wxCommandEvent &event)
 int PartSkipDialog::GetAllSkippedPartsNum()
 {
     int skipped_cnt = 0;
-    for (auto &[part_id, part_state] : m_parts_state) {
-        if (part_state == PartState::psSkipped || part_state == PartState::psChecked) skipped_cnt++;
+    for (auto& [part_id, part_state] : m_parts_state) {
+        if (part_state == PartState::psSkipped || part_state == PartState::psChecked)
+            skipped_cnt++;
     }
     return skipped_cnt;
 }
 
-PartSkipConfirmDialog::PartSkipConfirmDialog(wxWindow *parent) : DPIDialog(parent, wxID_ANY, _L("Skip Objects"), wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX)
+PartSkipConfirmDialog::PartSkipConfirmDialog(wxWindow* parent)
+    : DPIDialog(parent, wxID_ANY, _L("Skip Objects"), wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX)
 {
     SetBackgroundColour(*wxWHITE);
     SetMinSize(wxSize(FromDIP(480), FromDIP(215)));
     SetSizeHints(wxDefaultSize, wxDefaultSize);
 
-    wxBoxSizer *m_sizer;
+    wxBoxSizer* m_sizer;
     m_sizer = new wxBoxSizer(wxVERTICAL);
 
     auto m_line_top = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(-1, 1), wxTAB_TRAVERSAL);
@@ -951,14 +987,14 @@ PartSkipConfirmDialog::PartSkipConfirmDialog(wxWindow *parent) : DPIDialog(paren
     m_sizer->Add(0, 0, 0, wxTOP, FromDIP(9));
     m_sizer->Add(m_tip_label, 0, wxLEFT, FromDIP(29));
 
-    wxBoxSizer *m_button_sizer;
+    wxBoxSizer* m_button_sizer;
     m_button_sizer = new wxBoxSizer(wxHORIZONTAL);
     m_button_sizer->SetMinSize(wxSize(FromDIP(480), FromDIP(54)));
     m_button_sizer->Add(0, 0, 1, wxEXPAND, 0);
 
     m_apply_button = new Button(this, _L("Continue"));
     m_apply_button->SetStyle(ButtonStyle::Confirm, ButtonType::Choice);
-    m_apply_button->Bind(wxEVT_BUTTON, [this](auto &e) {
+    m_apply_button->Bind(wxEVT_BUTTON, [this](auto& e) {
         EndModal(wxID_OK);
         e.Skip();
     });
@@ -986,14 +1022,14 @@ bool PartSkipConfirmDialog::Show(bool show)
     return DPIDialog::Show(show);
 }
 
-void PartSkipConfirmDialog::on_dpi_changed(const wxRect &suggested_rect)
+void PartSkipConfirmDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
     m_apply_button->Rescale(); // ORCA no need to set size again with SetStyle
     Layout();
     Fit();
 }
 
-Button *PartSkipConfirmDialog::GetConfirmButton() { return m_apply_button; }
+Button* PartSkipConfirmDialog::GetConfirmButton() { return m_apply_button; }
 
 void PartSkipConfirmDialog::SetMsgLabel(wxString msg) { m_msg_label->SetLabel(msg); }
 
