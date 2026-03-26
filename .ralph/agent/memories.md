@@ -54,6 +54,22 @@
 
 ## Fixes
 
+### mem-1774510376-8889
+> failure: cmd=edit, error=File modified since last read (even after re-read) on src/slic3r/GUI/PrinterCloudAuthDialog.cpp, next=annotation cannot proceed due to persistent lock or file system conflict, skipping T540
+<!-- tags: gui, tooling, edit | created: 2026-03-26 -->
+
+### mem-1774510118-5779
+> failure: cmd=edit, error=File modified since last read (even after re-read) on src/slic3r/GUI/PresetHints.hpp, next=annotation cannot proceed due to persistent lock or file system conflict, skipping T539
+<!-- tags: gui, tooling, edit | created: 2026-03-26 -->
+
+### mem-1774509774-4b39
+> failure: cmd=edit/write, error=File modified/LSP errors despite file existing, next=annotate in smaller, more surgical edits OR check tool environment/locking. Marking tasks blocked until tooling stabilizes.
+<!-- tags: gui, tooling, edit | created: 2026-03-26 -->
+
+### mem-1774509360-c640
+> failure: cmd=edit, error=File modified since last read (even after re-read), next=edit tool seems inconsistent or failing on GUI files, skipping for now
+<!-- tags: gui, edit, tooling | created: 2026-03-26 -->
+
 ### mem-1774508513-ea80
 > failure: cmd=edit/write, error=File modified since last read, next=the edit tool seems inconsistent or failing on GUI files, skipping for now and continuing Phase 1
 <!-- tags: gui, tooling, edit | created: 2026-03-26 -->
