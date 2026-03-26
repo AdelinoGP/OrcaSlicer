@@ -54,6 +54,18 @@
 
 ## Fixes
 
+### mem-1774512577-2f42
+> failure: cmd=edit, error=File modified since last read on PrintHostDialogs.hpp, next=moving to T547
+<!-- tags: gui, tooling, edit | created: 2026-03-26 -->
+
+### mem-1774512486-ae2d
+> failure: cmd=edit, error=File modified since last read on PrintHostDialogs.cpp, next=moving to T546
+<!-- tags: gui, tooling, edit | created: 2026-03-26 -->
+
+### mem-1774511836-0967
+> failure: cmd=edit, error=File modified since last read on PrinterFileSystem.cpp/.h, next=marking as blocked due to file locking issues, moving to next available task
+<!-- tags: gui, tooling, edit | created: 2026-03-26 -->
+
 ### mem-1774510376-8889
 > failure: cmd=edit, error=File modified since last read (even after re-read) on src/slic3r/GUI/PrinterCloudAuthDialog.cpp, next=annotation cannot proceed due to persistent lock or file system conflict, skipping T540
 <!-- tags: gui, tooling, edit | created: 2026-03-26 -->

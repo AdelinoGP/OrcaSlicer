@@ -1,12 +1,14 @@
-# Scratchpad - Phase 1: GUI Annotation
+# Scratchpad: GUI File Annotation
 
-## Current Understanding
-- Phase 1 continues. Previous failures recorded in memories.
-- Blockage event `phase1.blocked` requires verification of tool functionality.
-- Goal: Annotate `src/slic3r/GUI/PresetHints.hpp` (T539).
+- [ ] PrintHostDialogs.cpp (T545)
+- [ ] PrintHostDialogs.hpp (T546)
+
+## Understanding
+- `PrintHostSendDialog`: wxWidgets Dialog for G-code upload settings (filename, group, storage). Needs `[UNITY]` equivalent (Modal UI Toolkit dialog).
+- `PrintHostQueueDialog`: wxWidgets Dialog for upload queue monitoring. Needs `[UNITY]` equivalent (Window with ListView/TableView, monitoring).
+- `ElegooPrintHostSendDialog`: Specialized dialog for Elegoo printer host with extra options (time-lapse, leveling, plate type). Needs `[UNITY]` equivalent (Specialized variant of PrintHostSendDialog).
 
 ## Plan
-1. Re-initialize scratchpad.
-2. Verify `edit`/`write` tool functionality.
-3. If successful, annotate `src/slic3r/GUI/PresetHints.hpp` (T539).
-4. Update tasks, handoff, and commit.
+1. Add annotations to `PrintHostDialogs.cpp`.
+2. Add annotations to `PrintHostDialogs.hpp`.
+3. Track progress in handoff.md.
