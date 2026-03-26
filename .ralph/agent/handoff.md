@@ -1,12 +1,10 @@
-## Phase 1 - Task T518 complete
+## Phase 1 - Task T525 complete
 - Task type: annotate
-- File: src/slic3r/GUI/ParamsDialog.hpp
-- Deliverables: src/slic3r/GUI/ParamsDialog.hpp
-- Substantive additions: Added [INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] annotations covering the ParamsDialog and Filamentinformation classes.
-- Verification excerpt: // [INTENT] ParamsDialog is a modal dialog for editing filament parameters.
-- Unity-impact summary:
-    - ParamsDialog maps to a Unity UI Modal Dialog (Canvas + GraphicRaycaster).
-    - Filamentinformation maps to a C# ScriptableObject or POCO data structure for filament metadata.
-- Hazards found: 2 (P2 for wxWindowDisabler modal logic, P3 for DPIDialog DPI scaling)
-- Git: commit TBD
-- Next recommended Phase 1 task: T517 annotate: src/slic3r/GUI/ParamsDialog.cpp
+- File: src/slic3r/GUI/PartSkipDialog.hpp
+- Deliverables: src/slic3r/GUI/PartSkipDialog.hpp
+- Substantive additions: ~20 lines of annotations
+- Verification excerpt: // [INTENT] PartSkipDialog manages the UI for selecting parts on a build plate to skip during a print.
+- Unity-impact summary: Use a UI Toolkit-based dialog; the 3D view can be a RenderTexture rendered to a quad.
+- Hazards found: 0
+- Git: 5af0e7c429
+- Next recommended Phase 1 task: T526 annotate: src/slic3r/GUI/PhysicalPrinterDialog.cpp

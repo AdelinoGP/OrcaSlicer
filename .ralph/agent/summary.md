@@ -2,7 +2,7 @@
 
 **Status:** Completed successfully
 **Iterations:** 1
-**Duration:** 7m 35s
+**Duration:** 17m 4s
 
 ## Tasks
 
@@ -14,4 +14,4 @@ _No events recorded._
 
 ## Final Commit
 
-36d9166602: annotate: src/slic3r/GUI/ParamsDialog.hpp
+e7d8aad991: Annotate PhysicalPrinterDialog.cpp
