@@ -54,6 +54,22 @@
 
 ## Fixes
 
+### mem-1774508513-ea80
+> failure: cmd=edit/write, error=File modified since last read, next=the edit tool seems inconsistent or failing on GUI files, skipping for now and continuing Phase 1
+<!-- tags: gui, tooling, edit | created: 2026-03-26 -->
+
+### mem-1774508237-72b3
+> failure: cmd=edit, error=File modified since last read, next=the edit tool seems inconsistent or failing on GUI files, skipping for now and continuing Phase 1
+<!-- tags: gui, edit, tooling | created: 2026-03-26 -->
+
+### mem-1774507782-6c00
+> failure: cmd=edit, error=File modified since last read (even after re-read), next=inspect if lock file exists or if multiple iterations are corrupting the file state.
+<!-- tags: gui, tooling, edit | created: 2026-03-26 -->
+
+### mem-1774507126-4025
+> failure: cmd=edit, error=File modified since last read (even after re-read), next=inspect if lock file exists or if multiple iterations are corrupting the file state.
+<!-- tags: gui, tooling, edit | created: 2026-03-26 -->
+
 ### mem-1774420863-9009
 > failure: cmd=edit, error=LSP compilation errors (inconsistent file state or header removal), next=annotate in smaller, more surgical edits
 <!-- tags: gui, tooling, edit | created: 2026-03-25 -->
