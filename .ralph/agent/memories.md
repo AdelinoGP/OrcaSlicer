@@ -2,6 +2,10 @@
 
 ## Patterns
 
+### mem-1774478311-f0ae
+> OG_CustomCtrl uses custom wxDC drawing for OptionsGroup UI; Unity replacement requires UI Toolkit custom VisualElement or IMGUI with careful layout management.
+<!-- tags: gui, custom-drawing, unity, porting | created: 2026-03-25 -->
+
 ### mem-1774420576-b412
 > Annotation pattern for UI Panel classes: [INTENT] class purpose, [STATE] important UI state variables, [UNITY] concrete migration mapping for wxWidgets components to UI Toolkit.
 <!-- tags: gui, annotation, unity | created: 2026-03-25 -->

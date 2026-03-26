@@ -1,8 +1,8 @@
 # Loop Summary
 
 **Status:** Completed successfully
-**Iterations:** 4
-**Duration:** 9m 23s
+**Iterations:** 1
+**Duration:** 7m 35s
 
 ## Tasks
 
@@ -14,4 +14,4 @@ _No events recorded._
 
 ## Final Commit
 
-518e44ce0a: annotate: src/slic3r/GUI/MultiMachine.cpp
+36d9166602: annotate: src/slic3r/GUI/ParamsDialog.hpp

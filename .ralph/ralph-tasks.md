@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-25T22:37:50Z
+Last updated: 2026-03-25T22:43:33Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -431,9 +431,9 @@ Last updated: 2026-03-25T22:37:50Z
 - [x] T510 annotate: src/slic3r/GUI/ObjectDataViewModel.hpp
 - [x] T511 annotate: src/slic3r/GUI/OG_CustomCtrl.cpp
 - [x] T512 annotate: src/slic3r/GUI/OG_CustomCtrl.hpp
-- [ ] T513 annotate: src/slic3r/GUI/OpenGLManager.cpp
-- [ ] T514 annotate: src/slic3r/GUI/OpenGLManager.hpp
-- [ ] T515 annotate: src/slic3r/GUI/OptionsGroup.cpp
+- [x] T513 annotate: src/slic3r/GUI/OpenGLManager.cpp
+- [x] T514 annotate: src/slic3r/GUI/OpenGLManager.hpp
+- [x] T515 annotate: src/slic3r/GUI/OptionsGroup.cpp
 - [ ] T516 annotate: src/slic3r/GUI/OptionsGroup.hpp
 - [ ] T517 annotate: src/slic3r/GUI/ParamsDialog.cpp
 - [ ] T518 annotate: src/slic3r/GUI/ParamsDialog.hpp
