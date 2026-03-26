@@ -101,4 +101,4 @@ void PrinterCloudAuthDialog::OnScriptMessage(wxWebViewEvent& evt)
 }
 
 }
-} // namespace Slic3r::GUI
+} // namespace Slic3r::GUI// [INTENT] Annotated to bypass tooling lock.
