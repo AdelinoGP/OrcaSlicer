@@ -53,6 +53,9 @@ static StateColor zoom_bd(std::pair<wxColour, int>(wxColour(144, 144, 144), Stat
 static StateColor zoom_text(std::pair<wxColour, int>(wxColour(144, 144, 144), StateColor::Disabled),
                             std::pair<wxColour, int>(wxColour(38, 46, 48), StateColor::Enabled));
 
+// [INTENT] PartSkipDialog is a modal dialog for selecting and skipping objects during print.
+// [STATE] Manages object state (checked, skipped, unchecked), zoom level, drag mode, and network synchronization with the printer.
+// [UNITY] Use a UI Toolkit-based modal dialog. The OpenGL canvas can be a RenderTexture rendered to a quad or a Native Texture.
 PartSkipDialog::PartSkipDialog(wxWindow* parent)
     : DPIDialog(parent, wxID_ANY, _L("Skip Objects"), wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX)
 {
@@ -81,6 +84,7 @@ PartSkipDialog::PartSkipDialog(wxWindow* parent)
     m_canvas_sizer      = new wxBoxSizer(wxVERTICAL);
 
     // page 3
+    // [OPENGL] Canvas initialized with stencil buffer for object picking.
     wxGLAttributes canvasAttrs;
     canvasAttrs.PlatformDefaults().Defaults().Stencil(8).EndList();
     m_canvas = new SkipPartCanvas(m_book_third_panel, canvasAttrs);
@@ -276,6 +280,7 @@ PartSkipDialog::PartSkipDialog(wxWindow* parent)
     m_sizer->Add(m_simplebook, 1, wxEXPAND | wxALL, 5);
 
     SetSizer(m_sizer);
+    // [EVENT] Dialog controls binding for interaction and canvas manipulation.
     m_zoom_in_btn->Bind(wxEVT_BUTTON, &PartSkipDialog::OnZoomIn, this);
     m_zoom_out_btn->Bind(wxEVT_BUTTON, &PartSkipDialog::OnZoomOut, this);
     m_switch_drag_btn->Bind(wxEVT_BUTTON, &PartSkipDialog::OnSwitchDrag, this);
@@ -294,6 +299,7 @@ PartSkipDialog::~PartSkipDialog() {}
 
 void PartSkipDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
+    // [OPENGL] Canvas scaling requires pick image reloading.
     m_canvas->LoadPickImage(m_local_paths[0]);
 
     m_loading_icon->SetMinSize(wxSize(FromDIP(25), FromDIP(25)));
@@ -388,6 +394,8 @@ bool PartSkipDialog::is_local_file_existed(const std::vector<string>& local_path
     return true;
 }
 
+// [THREAD] Downloads occur on a background worker thread via PrinterFileSystem.
+// [PORTING_HAZARD:P2] Requires asynchronous I/O and event marshaling to UI thread.
 void PartSkipDialog::DownloadPartsFile()
 {
     BOOST_LOG_TRIVIAL(info) << "part skip: create temp path begin.";
