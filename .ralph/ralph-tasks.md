@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-25T22:43:33Z
+Last updated: 2026-03-27T06:46:44Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -639,7 +639,7 @@ Last updated: 2026-03-25T22:43:33Z
 - [ ] T718 annotate: src/slic3r/GUI/WipeTowerDialog.hpp
 - [ ] T719 annotate: src/slic3r/GUI/wxExtensions.cpp
 - [ ] T720 annotate: src/slic3r/GUI/wxExtensions.hpp
-- [ ] T721 annotate: src/slic3r/GUI/wxMediaCtrl2.cpp
+- [x] T721 annotate: src/slic3r/GUI/wxMediaCtrl2.cpp
 - [x] T722 annotate: src/slic3r/Utils/ASCIIFolding.cpp
 - [x] T723 annotate: src/slic3r/Utils/ASCIIFolding.hpp
 - [ ] T724 annotate: src/slic3r/Utils/AstroBox.cpp

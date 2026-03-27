@@ -960,6 +960,18 @@ Continue the previous work. Remaining tasks (336):
 - T719 annotate: src/slic3r/GUI/wxExtensions.cpp
 - T720 annotate: src/slic3r/GUI/wxExtensions.hpp
 - T721 annotate: src/slic3r/GUI/wxMediaCtrl2.cpp
+
+## Phase 1 - Task T721 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/wxMediaCtrl2.cpp
+- Deliverables: src/slic3r/GUI/wxMediaCtrl2.cpp, .ralph/agent/handoff.md, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md
+- Substantive additions: 7 annotation blocks covering intent, state, events, threading, Unity mapping, and porting hazards
+- Verification excerpt: [PORTING_HAZARD:P1] The Windows branch depends on WMP being installed and on a custom CLSID / registry registration for BambuSource
+- Unity-impact summary: native-plugin-backed media bridge; UI-side state mirror for load/error; platform capability checks instead of registry mutation
+- Hazards found: P1: 1, P2: 1
+- Git: annotate wxMediaCtrl2 media shim
+- Next recommended Phase 1 task: T720 src/slic3r/GUI/wxExtensions.hpp
 - T722 annotate: src/slic3r/Utils/ASCIIFolding.cpp
 - T724 annotate: src/slic3r/Utils/AstroBox.cpp
 - T725 annotate: src/slic3r/Utils/AstroBox.hpp
