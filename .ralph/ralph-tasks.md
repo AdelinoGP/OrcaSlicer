@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-27T09:01:23Z
+Last updated: 2026-03-27T09:15:43Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -489,7 +489,7 @@ Last updated: 2026-03-27T09:01:23Z
 - [x] T568 annotate: src/slic3r/GUI/SafetyOptionsDialog.hpp
 - [x] T569 annotate: src/slic3r/GUI/SavePresetDialog.cpp
 - [x] T570 annotate: src/slic3r/GUI/SavePresetDialog.hpp
-- [ ] T571 annotate: src/slic3r/GUI/SceneRaycaster.cpp
+- [x] T571 annotate: src/slic3r/GUI/SceneRaycaster.cpp
 - [ ] T572 annotate: src/slic3r/GUI/SceneRaycaster.hpp
 - [ ] T573 annotate: src/slic3r/GUI/Search.cpp
 - [ ] T574 annotate: src/slic3r/GUI/Search.hpp

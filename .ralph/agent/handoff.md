@@ -158,6 +158,21 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - File: src/slic3r/GUI/calib_dlg.cpp
 - Deliverables: src/slic3r/GUI/calib_dlg.cpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
 - Substantive additions: 17 annotation blocks covering shared helpers, eight calibration dialogs, and direct Plater dispatch paths
+
+## Phase 1 - Task T571 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SceneRaycaster.cpp
+- Deliverables: src/slic3r/GUI/SceneRaycaster.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 5 annotation blocks covering scene-picking intent, pick registry state, UI-thread hit queries, selected-volume bias, and OpenGL debug overlay mapping
+- Verification excerpt: `[UNITY] Port this as a dedicated scene-query service backed by collider/raycast layers plus an explicit selection-priority policy.`
+- Unity-impact summary: 
+  - Preserve bucket ordering for gizmos, fallback gizmos, beds, and volumes.
+  - Carry the selected-volume bias into the Unity selection controller.
+  - Render debug hit markers through a gizmo/debug pass instead of gameplay rendering.
+- Hazards found: P2=1, P3=0, P1=0
+- Git: chore: annotate SceneRaycaster raycast flow
+- Next recommended Phase 1 task: T572 annotate: src/slic3r/GUI/SceneRaycaster.hpp
 - Verification excerpt: `[PORTING_HAZARD:P2] The dialog reconfigures controls live based on firmware and method selection`
 - Unity-impact summary:
   - Model each calibration dialog as a controller-backed modal form.

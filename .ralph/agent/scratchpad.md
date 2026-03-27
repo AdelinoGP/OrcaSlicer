@@ -69,3 +69,10 @@
 
 - Reconciled the T570 handoff event and started the next atomic step on `src/slic3r/GUI/SavePresetDialog.hpp`.
 - Completed the header annotations for modal ownership/state/event flow plus nested Item migration guidance; the main Unity hazard is command-driven side effects from a confirm action.
+
+- Current iteration focus: T571 annotate `src/slic3r/GUI/SceneRaycaster.cpp`.
+- Chosen because it is the scene-picking hub for beds, volumes, gizmos, and debug visualization, so the Unity port needs explicit notes on selection preservation, backface filtering, and OpenGL debug overlays.
+- Next step: add durable file-level and method-level annotations for hit-test state, selection override logic, and debug rendering, then record completion evidence and close the task.
+
+- Completed T571 on `src/slic3r/GUI/SceneRaycaster.cpp`; the key migration notes are the bucket-ordered pick pipeline, the sticky selected-volume bias, and the debug-only OpenGL hit overlay.
+- Next recommended task is T572 annotate `src/slic3r/GUI/SceneRaycaster.hpp`.
