@@ -55,3 +55,7 @@
 - Completed T564 on `src/slic3r/GUI/ReleaseNote.hpp` with class-level annotations for seven dialogs plus the shared event declarations.
 - Key migration takeaway: the header mixes webview-backed release notes, dynamic confirmation dialogs, and an async IP onboarding wizard, so Unity needs reusable modal controllers plus a real background-task bridge.
 - Next recommended task is T565 annotate `src/slic3r/GUI/RemovableDriveManager.cpp`.
+
+- Current iteration focus: T567 annotate `src/slic3r/GUI/SafetyOptionsDialog.cpp`.
+- Chosen because it is a compact but behavior-rich safety modal with direct device commands, stateful enable/disable logic, and a transient toast path that should map cleanly to Unity UI controls.
+- Outcome: added durable annotations for intent/state/event/thread/unity/hazard boundaries in the cpp; next iteration should handle `SafetyOptionsDialog.hpp`.

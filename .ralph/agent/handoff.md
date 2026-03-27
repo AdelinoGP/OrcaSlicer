@@ -1386,3 +1386,14 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x2, P3 x1
 - Git: annotate removable drive manager header
 - Next recommended Phase 1 task: T567 annotate: src/slic3r/GUI/SafetyOptionsDialog.cpp
+## Phase 1 - Task T567 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SafetyOptionsDialog.cpp
+- Deliverables: `src/slic3r/GUI/SafetyOptionsDialog.cpp`, `.ralph/agent/scratchpad.md`
+- Substantive additions: 7 comment blocks covering dialog intent, DPI/layout refresh, UI-thread refresh flow, direct device-command event handlers, unavailable-state rendering, settings-group composition, and toast lifetime/porting hazards
+- Verification excerpt: `[PORTING_HAZARD:P3] wxPopupWindow positioning and lifetime are bespoke; Unity should use an overlay toast anchored to the same row instead of a separate floating native window.`
+- Unity-impact summary: modal settings panel; direct device command bridge; overlay toast for unavailable idle-heating mode
+- Hazards found: 1 P2, 1 P3
+- Git: SafetyOptionsDialog annotations
+- Next recommended Phase 1 task: T568 annotate `src/slic3r/GUI/SafetyOptionsDialog.hpp`
