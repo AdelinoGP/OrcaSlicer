@@ -1149,3 +1149,15 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 0
 - Git: fd37a3eb61
 - Next recommended Phase 1 task: T551 annotate: src/slic3r/GUI/ProgressStatusBar.cpp (or next pending)
+
+## Phase 1 - Task T554 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/ProjectDirtyStateManager.cpp
+- Deliverables: annotated source file with [INTENT], [EVENT], [STATE], [UNITY] comments.
+- Substantive additions: 4 lines of annotations at top and for each method.
+- Verification excerpt: // [INTENT] ProjectDirtyStateManager tracks whether the current project has unsaved changes.
+- Unity-impact summary: Map to C# class observing UndoRedo stack changes and preset bundle changes; events notify UI of dirty state; debug window uses ImGui (replace with Unity IMGUI or custom EditorWindow).
+- Hazards found: 1 (P2) - Heavy dependency on wxGetApp() global singleton and wxWidgets types; Unity requires dependency injection or static service locator.
+- Git: 7e1278f7e5
+- Next recommended Phase 1 task: T555 annotate: src/slic3r/GUI/ProjectDirtyStateManager.hpp (or next pending)
