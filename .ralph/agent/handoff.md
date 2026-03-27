@@ -751,6 +751,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate publish dialog workflow
 - Next recommended Phase 1 task: T558 annotate: src/slic3r/GUI/PublishDialog.hpp
 
+## Phase 1 - Task T562 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/RecenterDialog.hpp
+- Deliverables: `src/slic3r/GUI/RecenterDialog.hpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/handoff.md`, `.ralph/agent/scratchpad.md`
+- Substantive additions: 5 annotation blocks covering class intent, member ownership, event handlers, Unity mapping, and DPI/layout hazard
+- Verification excerpt: `[UNITY] Port as a modal confirmation panel/controller with a shared icon asset, explicit button callbacks, and a scale-change relayout hook.`
+- Unity-impact summary: modal controller with explicit confirm/close actions; layout-driven replacement for pixel-measurement wrapping; DPI-change hook must refresh shared art and relayout
+- Hazards found: P2: 1
+- Git: Annotate RecenterDialog header for Unity port
+- Next recommended Phase 1 task: T563 annotate `src/slic3r/GUI/ReleaseNote.cpp`
+
 ## Key Files
 
 Recently modified:

@@ -31,3 +31,10 @@
 
 - Completed T561 with annotations for modal intent, cached home icon state, owner-drawn paint flow, brittle locale-sensitive wrapping, Go Home/Close event semantics, and DPI relayout handling.
 - Next recommended task is T562 annotate `src/slic3r/GUI/RecenterDialog.hpp`.
+
+- Current iteration focus: T562 annotate `src/slic3r/GUI/RecenterDialog.hpp`.
+- Chosen because the header is the declaration boundary for an already-annotated custom-painted modal dialog, so it can carry durable ownership/state/event/Unity notes without expanding scope.
+- Next step: finish the header annotations, record completion evidence in handoff, and close the task as one atomic annotation step.
+
+- Completed T562 with class/member/event annotations and a Unity mapping note that keeps the dialog's modal confirm/close semantics explicit.
+- Next recommended task is T563 annotate `src/slic3r/GUI/ReleaseNote.cpp`.

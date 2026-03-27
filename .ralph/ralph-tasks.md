@@ -480,7 +480,7 @@ Last updated: 2026-03-27T07:51:16Z
 - [x] T559 annotate: src/slic3r/GUI/RammingChart.cpp
 - [~] T560 annotate: src/slic3r/GUI/RammingChart.hpp
 - [x] T561 annotate: src/slic3r/GUI/RecenterDialog.cpp
-- [ ] T562 annotate: src/slic3r/GUI/RecenterDialog.hpp
+- [x] T562 annotate: src/slic3r/GUI/RecenterDialog.hpp
 - [ ] T563 annotate: src/slic3r/GUI/ReleaseNote.cpp
 - [ ] T564 annotate: src/slic3r/GUI/ReleaseNote.hpp
 - [ ] T565 annotate: src/slic3r/GUI/RemovableDriveManager.cpp
