@@ -28,3 +28,6 @@
 
 - Completed T560 with header-level annotations for the event bridge, constructor state, coordinate transforms, hit-testing, and derived-cache ownership.
 - Next recommended task is T561 annotate `src/slic3r/GUI/RecenterDialog.cpp`.
+
+- Completed T561 with annotations for modal intent, cached home icon state, owner-drawn paint flow, brittle locale-sensitive wrapping, Go Home/Close event semantics, and DPI relayout handling.
+- Next recommended task is T562 annotate `src/slic3r/GUI/RecenterDialog.hpp`.

@@ -1299,3 +1299,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2=1
 - Git: Annotate ramming chart interaction flow
 - Next recommended Phase 1 task: T560 annotate: src/slic3r/GUI/RammingChart.hpp
+
+## Phase 1 - Task T561 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/RecenterDialog.cpp
+- Deliverables: src/slic3r/GUI/RecenterDialog.cpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 6 annotation blocks covering dialog intent/state, owner-drawn paint flow, brittle text wrapping, button event semantics, and DPI refresh handling
+- Verification excerpt: `[PORTING_HAZARD:P2] The layout is hand-built from pixel measurements, so a Unity port should replace this with a locale-aware layout helper instead of copying the wrapping heuristic.`
+- Unity-impact summary:
+  - Port as a modal confirmation controller with explicit Go Home and Close actions.
+  - Replace the paint-time text measurement/wrapping with a reusable locale-aware layout helper.
+  - Refresh icon assets and layout on scale-factor changes.
+- Hazards found: P2 x1, P3 x1
+- Git: Annotate RecenterDialog confirmation flow
+- Next recommended Phase 1 task: T562 annotate: src/slic3r/GUI/RecenterDialog.hpp
