@@ -3,10 +3,16 @@
 #include "BitmapCache.hpp"
 #include <wx/dcgraph.h>
 #include <slic3r/GUI/I18N.hpp>
+// [INTENT] PrivacyUpdateDialog: Modal dialog to present privacy policy updates with webview content and accept/log out actions.
+// [STATE] m_vebview_release_note (WebView for HTML content), m_button_ok, m_button_cancel, m_host_url (local file URL), m_mkdown_text (cached markdown).
+// [EVENT] EVT_PRIVACY_UPDATE_CONFIRM/EVT_PRIVACY_UPDATE_CANCEL custom events, button click handlers, webview navigation events.
+// [UNITY] Replace with Unity UI Toolkit VisualElement dialog with embedded WebView2 (Windows) or browser plugin (cross-platform). Use ScriptableObject for dialog state.
+// [PORTING_HAZARD:P2] wxWebView and DPIDialog are wxWidgets-specific; requires custom Unity UI with JavaScript interop for markdown rendering.
 
 
 namespace Slic3r { namespace GUI {
 
+// [EVENT] Custom events for dialog confirmation and cancellation.
 wxDEFINE_EVENT(EVT_PRIVACY_UPDATE_CONFIRM, wxCommandEvent);
 wxDEFINE_EVENT(EVT_PRIVACY_UPDATE_CANCEL, wxCommandEvent);
 
@@ -31,6 +37,7 @@ static std::string url_encode(const std::string& value) {
 	return escaped.str();
 }
 
+// [INTENT] Constructor builds dialog layout: top line, webview, buttons, event bindings.
 PrivacyUpdateDialog::PrivacyUpdateDialog(wxWindow* parent, wxWindowID id, const wxString& title, enum VisibleButtons btn_style, const wxPoint& pos, const wxSize& size, long style) // ORCA VisibleButtons instead ButtonStyle 
     :DPIDialog(parent, id, title, pos, size, style)
 {
@@ -120,6 +127,7 @@ PrivacyUpdateDialog::PrivacyUpdateDialog(wxWindow* parent, wxWindowID id, const 
     wxGetApp().UpdateDlgDarkUI(this);
 }
 
+// [INTENT] Factory method to create WebView instance, using custom WebView wrapper.
 wxWebView* PrivacyUpdateDialog::CreateTipView(wxWindow* parent)
 {
 	wxWebView* tipView = WebView::CreateWebView(parent, "");
@@ -145,6 +153,7 @@ bool PrivacyUpdateDialog::ShowReleaseNote(std::string content)
     return true;
 }
 
+// [INTENT] Execute JavaScript in webview and apply dark mode switch.
 void PrivacyUpdateDialog::RunScript(std::string script)
 {
     WebView::RunScript(m_vebview_release_note, script);
