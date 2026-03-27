@@ -12,27 +12,35 @@
 #include <algorithm>
 #include <assert.h>
 
-namespace Slic3r {
-namespace GUI {
+// [INTENT] ProjectDirtyStateManager tracks whether the current project has unsaved changes.
+// It monitors three dirty sources: plater (geometry/arrangement), presets (filament/print),
+// and project config. It updates the main window title to reflect dirty state.
+// [UNITY] Map to a C# class that observes UndoRedo stack changes and preset bundle changes,
+// using events to notify UI (e.g., star in title bar). Could be a MonoBehaviour that
+// subscribes to project change events.
 
+namespace Slic3r { namespace GUI {
+
+// [EVENT] Called when undo/redo stack changes (plater geometry modifications)
 void ProjectDirtyStateManager::update_from_undo_redo_stack(bool dirty)
 {
     m_plater_dirty = dirty;
-    if (const Plater *plater = wxGetApp().plater(); plater && wxGetApp().initialized())
+    if (const Plater* plater = wxGetApp().plater(); plater && wxGetApp().initialized())
         wxGetApp().mainframe->update_title();
 }
 
+// [EVENT] Called when preset selection changes or preset bundle loads
 void ProjectDirtyStateManager::update_from_presets()
 {
     m_presets_dirty = false;
     // check switching of the presets only for exist/loaded project, but not for new
-    GUI_App &app = wxGetApp();
+    GUI_App& app = wxGetApp();
     if (!app.plater()->get_project_filename().IsEmpty()) {
-        for (const auto &[type, name] : app.get_selected_presets()) { 
-            if (type == Preset::Type::TYPE_FILAMENT) { 
+        for (const auto& [type, name] : app.get_selected_presets()) {
+            if (type == Preset::Type::TYPE_FILAMENT) {
                 m_presets_dirty |= m_initial_filament_presets_names != wxGetApp().preset_bundle->filament_presets;
-                if (ConfigOption *color_option = wxGetApp().preset_bundle->project_config.option("filament_colour")) {
-                    auto colors = static_cast<ConfigOptionStrings *>(color_option->clone());
+                if (ConfigOption* color_option = wxGetApp().preset_bundle->project_config.option("filament_colour")) {
+                    auto colors = static_cast<ConfigOptionStrings*>(color_option->clone());
                     m_presets_dirty |= m_initial_filament_presets_colors != colors->values;
                     delete colors;
                 }
@@ -48,24 +56,26 @@ void ProjectDirtyStateManager::update_from_presets()
     app.mainframe->update_title();
 }
 
+// [EVENT] Reset dirty flags after project save
 void ProjectDirtyStateManager::reset_after_save()
 {
     this->reset_initial_presets();
-    m_plater_dirty  = false;
-    m_presets_dirty = false;
+    m_plater_dirty         = false;
+    m_presets_dirty        = false;
     m_project_config_dirty = false;
     wxGetApp().mainframe->update_title();
 }
 
+// [STATE] Store initial preset names and config for dirty comparison
 void ProjectDirtyStateManager::reset_initial_presets()
 {
     m_initial_presets.fill(std::string{});
-    GUI_App &app = wxGetApp();
-    for (const auto &[type, name] : app.get_selected_presets()) { 
+    GUI_App& app = wxGetApp();
+    for (const auto& [type, name] : app.get_selected_presets()) {
         if (type == Preset::Type::TYPE_FILAMENT) {
             m_initial_filament_presets_names = wxGetApp().preset_bundle->filament_presets;
-            if (ConfigOption *color_option = wxGetApp().preset_bundle->project_config.option("filament_colour")) {
-                auto colors = static_cast<ConfigOptionStrings *>(color_option->clone());
+            if (ConfigOption* color_option = wxGetApp().preset_bundle->project_config.option("filament_colour")) {
+                auto colors                       = static_cast<ConfigOptionStrings*>(color_option->clone());
                 m_initial_filament_presets_colors = colors->values;
                 delete colors;
             }
@@ -76,17 +86,16 @@ void ProjectDirtyStateManager::reset_initial_presets()
     m_initial_project_config = app.preset_bundle->project_config;
 }
 
+// [UNITY] Debug window uses ImGui; Unity replacement would use custom EditorWindow or IMGUI.
 #if ENABLE_PROJECT_DIRTY_STATE_DEBUG_WINDOW
 void ProjectDirtyStateManager::render_debug_window() const
 {
     ImGuiWrapper& imgui = *wxGetApp().imgui();
 
     auto color = [](bool value) {
-        return value ? ImVec4(1.0f, 0.49f, 0.216f, 1.0f) /* orange */: ImVec4(1.0f, 1.0f, 1.0f, 1.0f) /* white */;
+        return value ? ImVec4(1.0f, 0.49f, 0.216f, 1.0f) /* orange */ : ImVec4(1.0f, 1.0f, 1.0f, 1.0f) /* white */;
     };
-    auto bool_to_text = [](bool value) {
-        return value ? "true" : "false";
-    };
+    auto bool_to_text     = [](bool value) { return value ? "true" : "false"; };
     auto append_bool_item = [color, bool_to_text, &imgui](const std::string& name, bool value) {
         imgui.text_colored(color(value), name);
         ImGui::SameLine();
@@ -106,7 +115,8 @@ void ProjectDirtyStateManager::render_debug_window() const
             imgui.text("-");
     };
 
-    imgui.begin(std::string("Project dirty state statistics"), ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+    imgui.begin(std::string("Project dirty state statistics"),
+                ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
     if (ImGui::CollapsingHeader("Dirty state", ImGuiTreeNodeFlags_DefaultOpen)) {
         append_bool_item("Overall:", is_dirty());
@@ -121,9 +131,10 @@ void ProjectDirtyStateManager::render_debug_window() const
         append_int_item("Current gizmo:", m_last_save.gizmo);
     }
 
-    const UndoRedo::Stack& main_stack = wxGetApp().plater()->undo_redo_stack_main();
-    const UndoRedo::Snapshot* main_active_snapshot = get_active_snapshot(main_stack);
-    const UndoRedo::Snapshot* main_last_saveable_snapshot = get_last_saveable_snapshot(EStackType::Main, main_stack, m_state.gizmos, m_last_save.main);
+    const UndoRedo::Stack&    main_stack                  = wxGetApp().plater()->undo_redo_stack_main();
+    const UndoRedo::Snapshot* main_active_snapshot        = get_active_snapshot(main_stack);
+    const UndoRedo::Snapshot* main_last_saveable_snapshot = get_last_saveable_snapshot(EStackType::Main, main_stack, m_state.gizmos,
+                                                                                       m_last_save.main);
     const std::vector<UndoRedo::Snapshot>& main_snapshots = main_stack.snapshots();
 
     if (ImGui::CollapsingHeader("Main snapshots", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -151,8 +162,8 @@ void ProjectDirtyStateManager::render_debug_window() const
     const UndoRedo::Stack& active_stack = wxGetApp().plater()->undo_redo_stack_active();
     if (&active_stack != &main_stack) {
         if (ImGui::CollapsingHeader("Gizmo undo/redo stack", ImGuiTreeNodeFlags_DefaultOpen)) {
-            const UndoRedo::Snapshot* active_active_snapshot = get_active_snapshot(active_stack);
-            const std::vector<UndoRedo::Snapshot>& active_snapshots = active_stack.snapshots();
+            const UndoRedo::Snapshot*              active_active_snapshot = get_active_snapshot(active_stack);
+            const std::vector<UndoRedo::Snapshot>& active_snapshots       = active_stack.snapshots();
             for (const UndoRedo::Snapshot& snapshot : active_snapshots) {
                 bool active = active_active_snapshot->timestamp == snapshot.timestamp;
                 imgui.text_colored(color(active), snapshot.name);
@@ -166,6 +177,4 @@ void ProjectDirtyStateManager::render_debug_window() const
 }
 #endif // ENABLE_PROJECT_DIRTY_STATE_DEBUG_WINDOW
 
-} // namespace GUI
-} // namespace Slic3r
-
+}} // namespace Slic3r::GUI
