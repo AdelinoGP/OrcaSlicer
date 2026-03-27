@@ -258,6 +258,21 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - [x] T376 annotate: src/slic3r/GUI/GUI_Colors.cpp
 - [x] T377 annotate: src/slic3r/GUI/GUI_Colors.hpp
 - [x] T378 annotate: src/slic3r/GUI/GUI.cpp
+
+## Phase 1 - Task T570 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SavePresetDialog.hpp
+- Deliverables: src/slic3r/GUI/SavePresetDialog.hpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 2 annotation blocks covering dialog ownership/state/event flow and nested Item row migration guidance
+- Verification excerpt: `// [UNITY] Map this to a modal controller with a repeated row prefab, explicit validation badges, and confirm/cancel`
+- Unity-impact summary:
+  - The header now captures the modal preset-save controller boundary instead of leaving row semantics implicit in the cpp.
+  - Per-row validation, project-save toggles, and detach state are called out as separate Unity view-model concerns.
+  - The dialog's printer-context side effects are flagged as a command-driven migration hazard.
+- Hazards found: P2=1, P3=1
+- Git: pending commit "Annotate SavePresetDialog header"
+- Next recommended Phase 1 task: T571 annotate `src/slic3r/GUI/SceneRaycaster.cpp`
 - [x] T379 annotate: src/slic3r/GUI/GUI_Factories.cpp
 - [x] T380 annotate: src/slic3r/GUI/GUI_Factories.hpp
 - [x] T381 annotate: src/slic3r/GUI/GUI_Geometry.cpp

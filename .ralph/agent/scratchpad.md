@@ -66,3 +66,6 @@
 - Current iteration focus: T569 annotate `src/slic3r/GUI/SavePresetDialog.cpp`.
 - Chosen because it is a modal preset-save flow with live validation, project-embedded toggle state, and printer-binding side effects that need explicit Unity migration notes.
 - Completed the cpp annotations for row-level validation, destructive overwrite handling, modal construction, printer-specific action panels, and synchronous printer rebinding; next iteration should move to T570 on the header.
+
+- Reconciled the T570 handoff event and started the next atomic step on `src/slic3r/GUI/SavePresetDialog.hpp`.
+- Completed the header annotations for modal ownership/state/event flow plus nested Item migration guidance; the main Unity hazard is command-driven side effects from a confirm action.

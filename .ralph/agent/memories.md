@@ -2,6 +2,14 @@
 
 ## Patterns
 
+### mem-1774602321-2d97
+> SavePresetDialog.hpp is the declaration boundary for the preset-save modal: keep row ownership, validation flags, printer-context state, and Unity-mapping notes in the header; the save flow can trigger overwrite and printer/project side effects from one confirm action.
+<!-- tags: gui, unity, dialog, preset | created: 2026-03-27 -->
+
+### mem-1774602034-4a17
+> SavePresetDialog.cpp uses per-row live validation, project-embedded toggle state, and a printer-binding action panel; warning acceptance can delete the existing preset and trigger cloud cleanup, so Unity needs a modal controller with explicit async side effects.
+<!-- tags: gui, unity, dialog, preset, threading | created: 2026-03-27 -->
+
 ### mem-1774601068-786b
 > SafetyOptionsDialog is a compact safety modal that directly dispatches MachineObject/PrintOptions commands from UI toggles; the unavailable idle-heating state is explained via a timer-driven popup toast, so Unity should use a modal settings panel with an anchored overlay toast rather than a separate native popup.
 <!-- tags: gui, unity, dialog, porting | created: 2026-03-27 -->
