@@ -1371,3 +1371,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x4, P3 x1
 - Git: Annotate removable drive manager lifecycle
 - Next recommended Phase 1 task: T566 annotate: src/slic3r/GUI/RemovableDriveManager.hpp
+
+## Phase 1 - Task T566 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/RemovableDriveManager.hpp
+- Deliverables: src/slic3r/GUI/RemovableDriveManager.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 16 annotation blocks covering drive identity, events, lifecycle, platform threading, cache state, and macOS/Windows portability
+- Verification excerpt: `[PORTING_HAZARD:P2] Platform behavior diverges: macOS uses notifications, Windows can callback from volume events, and Unix/OSX eject may block.`
+- Unity-impact summary:
+  - Model the manager as a long-lived platform service with main-thread UI callbacks.
+  - Keep drive snapshots and eject completion as explicit async state rather than direct widget logic.
+  - Split macOS/Windows/worker behavior behind a native plugin boundary.
+- Hazards found: P2 x2, P3 x1
+- Git: annotate removable drive manager header
+- Next recommended Phase 1 task: T567 annotate: src/slic3r/GUI/SafetyOptionsDialog.cpp

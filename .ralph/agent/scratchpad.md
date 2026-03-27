@@ -48,6 +48,10 @@
 - Outcome: added durable annotations for the module, Windows/Unix eject paths, discovery helpers, lifecycle hooks, status caching, update/polling flow, and macOS cleanup.
 - Next recommended task is T566 annotate `src/slic3r/GUI/RemovableDriveManager.hpp`.
 
+- Current iteration focus: T566 annotate `src/slic3r/GUI/RemovableDriveManager.hpp`.
+- Chosen because the header is the declaration boundary for the platform service, so it should capture ownership, cache, threading, and Unity adapter notes without expanding scope.
+- Next step: close the header task after verification, then move to T567.
+
 - Completed T564 on `src/slic3r/GUI/ReleaseNote.hpp` with class-level annotations for seven dialogs plus the shared event declarations.
 - Key migration takeaway: the header mixes webview-backed release notes, dynamic confirmation dialogs, and an async IP onboarding wizard, so Unity needs reusable modal controllers plus a real background-task bridge.
 - Next recommended task is T565 annotate `src/slic3r/GUI/RemovableDriveManager.cpp`.
