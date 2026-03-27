@@ -18,11 +18,16 @@
 #include "Widgets/ComboBox.hpp"
 #include "Widgets/HyperLink.hpp"
 
+// [PORTING_HAZARD:P2] Heavy reliance on wxWidgets dialogs, custom widgets, and DPIDialog base class. Unity port requires custom Dialog UI component with equivalent DPI scaling and event handling.
 // Previous definitions
 class SwitchBoard;
 
 namespace Slic3r { namespace GUI {
 
+// [INTENT] PrinterPartsDialog: UI for updating nozzle and flow settings on a connected printer.
+// [STATE] obj: MachineObject pointer for current printer connection state.
+// [EVENT] ComboBox selections trigger nozzle info updates via OnNozzleRefresh.
+// [UNITY] Unity replacement: Canvas with Dropdown controls and Button handlers; use ScriptableObject for nozzle config data.
 class PrinterPartsDialog : public DPIDialog
 {
 protected:
@@ -72,6 +77,10 @@ private:
 };
 
 
+// [INTENT] PrintOptionsDialog: UI for configuring printer-specific options (AI monitoring, spaghetti detection, etc.)
+// [STATE] obj: MachineObject pointer; CheckBox* for feature toggles; sensitivity level enums.
+// [EVENT] CheckBox clicks and ComboBox selections trigger updates via update_options.
+// [UNITY] Unity replacement: ScrollView with Toggle and Dropdown components; use ScriptableObject for option state.
 class PrintOptionsDialog : public DPIDialog
 {
 protected:
@@ -167,6 +176,7 @@ public:
     void             update_machine_obj(MachineObject *obj_);
     bool             Show(bool show) override;
 
+    // [STATE] Enum for AI monitor sensitivity levels (LOW, MEDIUM, HIGH). Used by combo boxes.
     enum AiMonitorSensitivityLevel {
         LOW         = 0,
         MEDIUM      = 1,
