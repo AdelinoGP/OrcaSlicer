@@ -2,6 +2,10 @@
 
 ## Patterns
 
+### mem-1774597298-62af
+> RammingChart.cpp is a retained-state wx chart: paint(), drag handlers, and recalculate_line() form one immediate-mode control, so a Unity port should use a custom chart controller with separate curve model, sampled preview cache, and change-event callback.
+<!-- tags: gui, unity, annotation | created: 2026-03-27 -->
+
 ### mem-1774596584-7d37
 > PublishDialog.hpp is a thin declaration layer for the publish flow: it exposes a non-owning Plater* back-pointer, sticky cancel state, and stepper/progress UI methods that should map to a modal Unity controller with an async progress overlay.
 <!-- tags: gui, unity, publish | created: 2026-03-27 -->

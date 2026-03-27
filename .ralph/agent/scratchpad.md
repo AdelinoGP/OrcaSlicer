@@ -22,3 +22,9 @@
 - Current iteration focus: T559 annotate `src/slic3r/GUI/RammingChart.cpp`.
 - Chosen because it is a self-contained interactive chart with immediate-mode drawing, mouse-driven point editing, spline recalculation, and wx event dispatch that need concrete Unity mapping.
 - Next step: add boundary-level annotations for rendering, drag handling, spline math, and event emission, then record handoff evidence and close the task.
+
+- Completed T559 with chart-control annotations covering paint flow, drag/edit events, spline rebuilds, export helpers, and the wx event-table bridge.
+- Next recommended task remains T560 annotate `src/slic3r/GUI/RammingChart.hpp`.
+
+- Completed T560 with header-level annotations for the event bridge, constructor state, coordinate transforms, hit-testing, and derived-cache ownership.
+- Next recommended task is T561 annotate `src/slic3r/GUI/RecenterDialog.cpp`.

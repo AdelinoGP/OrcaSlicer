@@ -166,6 +166,22 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Hazards found: P2 x3, P3 x1
 - Git: annotate calib_dlg calibration dialogs
 - Next recommended Phase 1 task: T188 annotate: src/slic3r/GUI/calib_dlg.hpp
+- [x] T559 annotate: src/slic3r/GUI/RammingChart.cpp
+
+## Phase 1 - Task T560 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/RammingChart.hpp
+- Deliverables: src/slic3r/GUI/RammingChart.hpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 12 annotation blocks covering event bridge, constructor state, accessors, hit-testing, coordinate transforms, and derived-cache ownership
+- Verification excerpt: `[PORTING_HAZARD:P2] The current design mixes input, curve mutation, and redraw triggers inside the widget.`
+- Unity-impact summary:
+  - Port the chart as a dedicated controller/renderer rather than a stock form field.
+  - Keep math-space and screen-space conversion explicit in the Unity implementation.
+  - Surface curve refreshes through a custom event or callback path.
+- Hazards found: P2 x1
+- Git: annotate RammingChart chart header
+- Next recommended Phase 1 task: T561 annotate: src/slic3r/GUI/RecenterDialog.cpp
 - [x] T307 annotate: src/slic3r/GUI/Gizmos/GLGizmoAssembly.cpp
 - [x] T308 annotate: src/slic3r/GUI/Gizmos/GLGizmoAssembly.hpp
 - [x] T309 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp
