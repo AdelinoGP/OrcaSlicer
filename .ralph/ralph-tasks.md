@@ -473,7 +473,7 @@ Last updated: 2026-03-27T06:54:12Z
 - [ ] T552 annotate: src/slic3r/GUI/ProgressStatusBar.hpp
 - [ ] T553 annotate: src/slic3r/GUI/Project.cpp
 - [ ] T554 annotate: src/slic3r/GUI/ProjectDirtyStateManager.cpp
-- [ ] T555 annotate: src/slic3r/GUI/ProjectDirtyStateManager.hpp
+- [x] T555 annotate: src/slic3r/GUI/ProjectDirtyStateManager.hpp
 - [ ] T556 annotate: src/slic3r/GUI/Project.hpp
 - [ ] T557 annotate: src/slic3r/GUI/PublishDialog.cpp
 - [ ] T558 annotate: src/slic3r/GUI/PublishDialog.hpp

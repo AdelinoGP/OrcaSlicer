@@ -459,7 +459,7 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - [ ] T552 annotate: src/slic3r/GUI/ProgressStatusBar.hpp
 - [~] T553 annotate: src/slic3r/GUI/Project.cpp
 - [ ] T554 annotate: src/slic3r/GUI/ProjectDirtyStateManager.cpp
-- [ ] T555 annotate: src/slic3r/GUI/ProjectDirtyStateManager.hpp
+- [x] T555 annotate: src/slic3r/GUI/ProjectDirtyStateManager.hpp
 - [ ] T556 annotate: src/slic3r/GUI/Project.hpp
 - [ ] T557 annotate: src/slic3r/GUI/PublishDialog.cpp
 - [ ] T558 annotate: src/slic3r/GUI/PublishDialog.hpp
@@ -1188,3 +1188,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2) - Heavy dependency on wxGetApp() global singleton and wxWidgets types; Unity requires dependency injection or static service locator.
 - Git: 7e1278f7e5
 - Next recommended Phase 1 task: T555 annotate: src/slic3r/GUI/ProjectDirtyStateManager.hpp (or next pending)
+
+## Phase 1 - Task T555 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/ProjectDirtyStateManager.hpp
+- Deliverables: annotated header file plus synchronized task/handoff status updates.
+- Substantive additions: 7 annotation lines covering class intent, event flow, Unity mapping, and baseline state members.
+- Verification excerpt: // [INTENT] Tracks whether the active project has diverged from its saved baseline.
+- Unity-impact summary: Convert the header into a C# dirty-state service backed by project/preset events.
+- Unity-impact summary: Preserve saved-baseline snapshot comparisons for presets and project_config.
+- Hazards found: 1 (P2) - equality-based dirty detection depends on stable snapshot serialization.
+- Git: Annotate ProjectDirtyStateManager header
+- Next recommended Phase 1 task: T556 annotate: src/slic3r/GUI/Project.hpp
