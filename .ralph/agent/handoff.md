@@ -1457,3 +1457,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P1 x1, P2 x3, P3 x1
 - Git: Annotate SavePresetDialog preset save flow
 - Next recommended Phase 1 task: T570 annotate `src/slic3r/GUI/SavePresetDialog.hpp`
+
+## Phase 1 - Task T572 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SceneRaycaster.hpp
+- Deliverables: src/slic3r/GUI/SceneRaycaster.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 12 annotation blocks covering item ownership, bucketed picking state, hit-result metadata, debug-only GL overlay members, query/mutation APIs, and id-encoding contract
+- Verification excerpt: `[UNITY] Replace with a scene-picking service plus explicit priority buckets, fed by the input bridge and queried from the main thread.`
+- Unity-impact summary:
+  - Keep pick priority as explicit buckets for beds, volumes, gizmos, and fallback gizmos.
+  - Centralize encoded-id mapping in one adapter so Unity can preserve the legacy selection contract.
+  - Treat debug hit visualization as a separate overlay path, not part of normal rendering.
+- Hazards found: P2 x1, P3 x1, P1 x0
+- Git: annotate SceneRaycaster header
+- Next recommended Phase 1 task: T573 annotate `src/slic3r/GUI/Search.cpp`

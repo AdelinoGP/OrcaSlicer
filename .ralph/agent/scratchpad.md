@@ -76,3 +76,7 @@
 
 - Completed T571 on `src/slic3r/GUI/SceneRaycaster.cpp`; the key migration notes are the bucket-ordered pick pipeline, the sticky selected-volume bias, and the debug-only OpenGL hit overlay.
 - Next recommended task is T572 annotate `src/slic3r/GUI/SceneRaycaster.hpp`.
+
+- Completed T572 on `src/slic3r/GUI/SceneRaycaster.hpp`; the header now documents the item wrapper, bucketed picking registry, debug overlay members, and legacy id encoding contract.
+- Verification note: the Unity strategy is now explicit in the declaration boundary as a centralized picking service with priority buckets and a main-thread query path.
+- Next recommended task is T573 annotate `src/slic3r/GUI/Search.cpp`.
