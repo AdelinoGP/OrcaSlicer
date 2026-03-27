@@ -42,3 +42,7 @@
 - Completed T563 on `src/slic3r/GUI/ReleaseNote.cpp`; the file is now annotated as a bundle of modal update, confirmation, print-error, and printer-connection flows.
 - Key migration takeaway: the version/release-note path uses embedded web content and script injection, while the IP setup path uses a worker thread plus UI-thread event reentry.
 - Next recommended task is T564 annotate `src/slic3r/GUI/ReleaseNote.hpp`.
+
+- Completed T564 on `src/slic3r/GUI/ReleaseNote.hpp` with class-level annotations for seven dialogs plus the shared event declarations.
+- Key migration takeaway: the header mixes webview-backed release notes, dynamic confirmation dialogs, and an async IP onboarding wizard, so Unity needs reusable modal controllers plus a real background-task bridge.
+- Next recommended task is T565 annotate `src/slic3r/GUI/RemovableDriveManager.cpp`.

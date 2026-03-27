@@ -500,6 +500,21 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - [ ] T562 annotate: src/slic3r/GUI/RecenterDialog.hpp
 - [ ] T563 annotate: src/slic3r/GUI/ReleaseNote.cpp
 - [ ] T564 annotate: src/slic3r/GUI/ReleaseNote.hpp
+
+## Phase 1 - Task T564 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/ReleaseNote.hpp
+- Deliverables: src/slic3r/GUI/ReleaseNote.hpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 9 annotation blocks covering the release-note, plugin-update, version-update, confirmation, print-error, send-confirm, and IP-setup dialogs
+- Verification excerpt: `[PORTING_HAZARD:P1] This dialog crosses UI/network/thread boundaries and depends on timed close behavior, so the port needs a real async state machine.`
+- Unity-impact summary:
+  - Map the webview-driven version/update flow to a UI Toolkit controller with an embedded WebView plugin or browser fallback.
+  - Treat the IP onboarding path as an async wizard with explicit main-thread marshaling and cancellation.
+  - Rebuild the confirmation/error dialogs as reusable modal panels with data-driven button rows.
+- Hazards found: P1 x1, P2 x2, P3 x2
+- Git: annotate ReleaseNote.hpp
+- Next recommended Phase 1 task: T565 annotate: src/slic3r/GUI/RemovableDriveManager.cpp
 - [ ] T565 annotate: src/slic3r/GUI/RemovableDriveManager.cpp
 - [ ] T566 annotate: src/slic3r/GUI/RemovableDriveManager.hpp
 - [ ] T567 annotate: src/slic3r/GUI/SafetyOptionsDialog.cpp
