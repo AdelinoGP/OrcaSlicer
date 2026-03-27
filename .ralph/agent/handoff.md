@@ -1113,3 +1113,39 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2) - heavy wxWidgets dependency.
 - Git: b6c5e8b7d785eb4b8bfa205c07a6a1cffb906cc3
 - Next recommended Phase 1 task: T549 annotate: src/slic3r/GUI/PrivacyUpdateDialog.cpp (or next pending)
+
+## Phase 1 - Task T549 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/PrivacyUpdateDialog.cpp
+- Deliverables: annotated source file with [INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] comments.
+- Substantive additions: 5 lines of annotations across class, constructor, event definitions, and RunScript method.
+- Verification excerpt: // [INTENT] PrivacyUpdateDialog: Modal dialog to present privacy policy updates with webview content and accept/log out actions.
+- Unity-impact summary: Replace wxWebView with Unity WebView2/browser plugin; use UI Toolkit VisualElement or Canvas for dialog; require JavaScript interop for markdown rendering.
+- Hazards found: 1 (P2) - wxWebView and DPIDialog are wxWidgets-specific.
+- Git: db91875bc0
+- Next recommended Phase 1 task: T550 annotate: src/slic3r/GUI/PrivacyUpdateDialog.hpp (or next pending)
+
+## Phase 1 - Task T550 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/PrivacyUpdateDialog.hpp
+- Deliverables: annotated header file with [INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] comments.
+- Substantive additions: 6 lines of annotations at top of header.
+- Verification excerpt: // [INTENT] PrivacyUpdateDialog displays privacy policy updates and release notes using a webview.
+- Unity-impact summary: Replace wxWebView with Unity UI Toolkit WebView or HTML-like UI Document; Buttons with UI Toolkit Button; DPIDialog with custom Dialog.
+- Hazards found: 1 (P2) - wxWebView dependency; Unity lacks built-in webview.
+- Git: 6b398a2655
+- Next recommended Phase 1 task: T551 annotate: src/slic3r/GUI/ProgressStatusBar.cpp (or next pending)
+
+## Phase 1 - Task T552 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/ProgressStatusBar.hpp
+- Deliverables: annotated header file with [INTENT], [STATE], [EVENT], [UNITY] comments.
+- Substantive additions: 5 lines of annotations.
+- Verification excerpt: // [INTENT] The ProgressStatusBar class is the widgets occupying the lower area
+- Unity-impact summary: Map to Unity UI Toolkit VisualElement with ProgressBar and Button; wxStatusBar wrapper replaced with custom UI component.
+- Hazards found: 0
+- Git: fd37a3eb61
+- Next recommended Phase 1 task: T551 annotate: src/slic3r/GUI/ProgressStatusBar.cpp (or next pending)
