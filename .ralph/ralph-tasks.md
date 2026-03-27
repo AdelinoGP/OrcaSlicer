@@ -551,7 +551,7 @@ Last updated: 2026-03-25T22:43:33Z
 - [ ] T630 annotate: src/slic3r/GUI/WebDownPluginDlg.hpp
 - [ ] T631 annotate: src/slic3r/GUI/WebGuideDialog.cpp
 - [ ] T632 annotate: src/slic3r/GUI/WebGuideDialog.hpp
-- [ ] T633 annotate: src/slic3r/GUI/WebUpdatePlugin.cpp
+- [x] T633 skip-trivial: src/slic3r/GUI/WebUpdatePlugin.cpp
 - [ ] T634 annotate: src/slic3r/GUI/WebUpdatePlugin.hpp
 - [ ] T635 annotate: src/slic3r/GUI/WebUserLoginDialog.cpp
 - [ ] T636 annotate: src/slic3r/GUI/WebUserLoginDialog.hpp
