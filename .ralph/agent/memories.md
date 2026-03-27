@@ -2,6 +2,10 @@
 
 ## Patterns
 
+### mem-1774596198-fe0e
+> PublishDialog uses queued EVT_PUBLISH events plus wxEventLoopBase::YieldFor reentry; a Unity port should model it as a modal progress state machine with async/coroutine marshaling.
+<!-- tags: gui, unity, publish | created: 2026-03-27 -->
+
 ### mem-1774595899-fa60
 > src/slic3r/GUI/calib_dlg.hpp groups several modal calibration dialogs that share Calib_Params + non-owning Plater* state; Unity port should factor a shared calibration view-model/controller and keep per-test dispatch logic separate.
 <!-- tags: gui, unity, calibration | created: 2026-03-27 -->

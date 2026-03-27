@@ -12,3 +12,7 @@
 - Completed T556 on Project.hpp with class/state/event/thread annotations; next focus is the publish dialog path.
 
 - Reconciled runtime task state for T188 after `ralph tools task ready` returned no ready tasks: ensured `gui:T188`, started reused task `task-1773880086-cb14`, and annotated `calib_dlg.hpp` as the next atomic Phase 1 step.
+
+- Current iteration focus: T557 annotate `src/slic3r/GUI/PublishDialog.cpp`.
+- Chosen because it coordinates a publish-step progress UI, queued Plater events, and reentrant progress callbacks that are directly relevant to Unity coroutine/state-machine mapping.
+- Next step: append durable annotations for modal lifecycle, event routing, cancel semantics, and wx event-loop reentry, then record handoff evidence and close the task.

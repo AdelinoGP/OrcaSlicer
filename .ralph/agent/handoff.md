@@ -720,6 +720,21 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - [~] annotate: src/slic3r/GUI/AboutDialog.cpp
 - [~] annotate: src/slic3r/GUI/AboutDialog.hpp
 
+## Phase 1 - Task T557 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/PublishDialog.cpp
+- Deliverables: src/slic3r/GUI/PublishDialog.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 8 annotation blocks covering modal lifecycle, queued publish events, cancel/reset state, reentrant progress callbacks, step rail construction, and DPI behavior
+- Verification excerpt: `[PORTING_HAZARD:P2] The implementation relies on wx event-loop reentry (`YieldFor`) during a`
+- Unity-impact summary:
+  - Model this as a modal progress state machine backed by async/coroutine orchestration.
+  - Route publish start/stop through a controller layer rather than direct widget-to-Plater ownership.
+  - Replace wx steprail/sizer composition with a Unity stepper/list UI and main-thread marshaling.
+- Hazards found: P2 x1, P3 x0
+- Git: Annotate publish dialog workflow
+- Next recommended Phase 1 task: T558 annotate: src/slic3r/GUI/PublishDialog.hpp
+
 ## Key Files
 
 Recently modified:
