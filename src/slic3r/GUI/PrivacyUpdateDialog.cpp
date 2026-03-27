@@ -41,6 +41,13 @@ static std::string url_encode(const std::string& value) {
 PrivacyUpdateDialog::PrivacyUpdateDialog(wxWindow* parent, wxWindowID id, const wxString& title, enum VisibleButtons btn_style, const wxPoint& pos, const wxSize& size, long style) // ORCA VisibleButtons instead ButtonStyle 
     :DPIDialog(parent, id, title, pos, size, style)
 {
+    // [STATE] m_sizer_main: main vertical sizer for layout. m_vebview_release_note: webview for HTML content.
+    // [STATE] m_button_ok, m_button_cancel: custom Button widgets for accept/log out.
+    // [STATE] m_mkdown_text: cached markdown content to display after webview loads.
+    // [STATE] m_host_url: local file URL to privacyupdate.html.
+    // [EVENT] EVT_PRIVACY_UPDATE_CONFIRM/EVT_PRIVACY_UPDATE_CANCEL events posted on button clicks.
+    // [UNITY] Use UI Toolkit VisualElement with embedded WebView2 (Windows) or browser plugin (cross-platform). Buttons as UI Toolkit Buttons with click events.
+    // [PORTING_HAZARD:P2] wxWebView and DPIDialog are wxWidgets-specific; requires custom Unity UI with JavaScript interop for markdown rendering.
     SetBackgroundColour(*wxWHITE);
     m_sizer_main = new wxBoxSizer(wxVERTICAL);
     auto        m_line_top = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(540), 1));
@@ -134,6 +141,7 @@ wxWebView* PrivacyUpdateDialog::CreateTipView(wxWindow* parent)
 	return tipView;
 }
 
+// [INTENT] Handle webview navigation events, prevent external links from opening within dialog, open in default browser.
 void PrivacyUpdateDialog::OnNavigating(wxWebViewEvent& event)
 {
     wxString jump_url = event.GetURL();
@@ -146,6 +154,7 @@ void PrivacyUpdateDialog::OnNavigating(wxWebViewEvent& event)
     }
 }
 
+// [INTENT] Inject markdown content into webview via JavaScript, encoding the content URL.
 bool PrivacyUpdateDialog::ShowReleaseNote(std::string content)
 {
 	auto script = "window.showMarkdown('" + url_encode(content) + "', true);";
@@ -164,17 +173,20 @@ void PrivacyUpdateDialog::RunScript(std::string script)
     script.clear();
 }
 
+// [INTENT] Update dark mode UI and show dialog modally.
 void PrivacyUpdateDialog::on_show()
 {
     wxGetApp().UpdateDlgDarkUI(this);
     this->ShowModal();
 }
 
+// [INTENT] End modal dialog with OK result.
 void PrivacyUpdateDialog::on_hide()
 {
     EndModal(wxID_OK);
 }
 
+// [INTENT] Update button labels and rescale UI for DPI changes.
 void PrivacyUpdateDialog::update_btn_label(wxString ok_btn_text, wxString cancel_btn_text)
 {
     m_button_ok->SetLabel(ok_btn_text);
@@ -182,6 +194,7 @@ void PrivacyUpdateDialog::update_btn_label(wxString ok_btn_text, wxString cancel
     rescale();
 }
 
+// [INTENT] Destructor default, no explicit cleanup needed.
 PrivacyUpdateDialog::~PrivacyUpdateDialog()
 {
 
@@ -192,6 +205,7 @@ void PrivacyUpdateDialog::on_dpi_changed(const wxRect& suggested_rect)
     rescale();
 }
 
+// [INTENT] Rescale buttons for DPI changes, maintaining layout consistency.
 void PrivacyUpdateDialog::rescale()
 {
     m_button_ok->Rescale();
