@@ -2,6 +2,10 @@
 
 ## Patterns
 
+### mem-1774598082-f9c7
+> RecenterDialog.cpp is a custom-painted DPIDialog: owner-drawn wxPaintDC rendering, hand-wrapped localized text, and DPI-rescaled home icon state. Unity port should use a modal confirmation controller with a shared icon asset and locale-aware layout helper instead of the current width-measurement heuristic.
+<!-- tags: gui, unity, annotation | created: 2026-03-27 -->
+
 ### mem-1774597298-62af
 > RammingChart.cpp is a retained-state wx chart: paint(), drag handlers, and recalculate_line() form one immediate-mode control, so a Unity port should use a custom chart controller with separate curve model, sampled preview cache, and change-event callback.
 <!-- tags: gui, unity, annotation | created: 2026-03-27 -->
