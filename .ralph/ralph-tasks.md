@@ -474,7 +474,7 @@ Last updated: 2026-03-27T06:54:12Z
 - [ ] T553 annotate: src/slic3r/GUI/Project.cpp
 - [ ] T554 annotate: src/slic3r/GUI/ProjectDirtyStateManager.cpp
 - [x] T555 annotate: src/slic3r/GUI/ProjectDirtyStateManager.hpp
-- [ ] T556 annotate: src/slic3r/GUI/Project.hpp
+- [x] T556 annotate: src/slic3r/GUI/Project.hpp
 - [ ] T557 annotate: src/slic3r/GUI/PublishDialog.cpp
 - [ ] T558 annotate: src/slic3r/GUI/PublishDialog.hpp
 - [ ] T559 annotate: src/slic3r/GUI/RammingChart.cpp

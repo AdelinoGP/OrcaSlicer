@@ -1090,7 +1090,21 @@ Continue the previous work. Remaining tasks (336):
 - annotate: src/slic3r/GUI/AboutDialog.cpp
 - annotate: src/slic3r/GUI/AboutDialog.hpp
 
-Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Port Preparation## Phase BoundaryThis prompt governs **Phase 1 only**.- Phase 0 is already complete.- Do **not** revisit Phase 0...
+Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Port Preparation
+
+
+
+## Phase Boundary
+
+
+
+This prompt governs **Phase 1 only**.
+
+
+
+- Phase 0 is already complete.
+
+- Do **not** revisit Phase 0...
 ```
 
 ## Phase 1 - Task T633 complete
@@ -1201,3 +1215,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2) - equality-based dirty detection depends on stable snapshot serialization.
 - Git: Annotate ProjectDirtyStateManager header
 - Next recommended Phase 1 task: T556 annotate: src/slic3r/GUI/Project.hpp
+
+## Phase 1 - Task T556 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Project.hpp
+- Deliverables: annotated header file plus synchronized task status update.
+- Substantive additions: 20+ annotation lines covering class intent, state, events, threading, Unity mapping, and porting hazards.
+- Verification excerpt: // [UNITY] Likely maps to a UI Toolkit panel with a dedicated web-content surface or embedded webview plugin plus a C# controller
+- Unity-impact summary: Preserve the embedded webview + native editor split as an explicit bridge layer.
+- Unity-impact summary: Keep background filesystem scans off the UI thread and marshal results back through a message bus.
+- Hazards found: 1 (P2) - browser scripting, file scanning, and delayed UI swaps are tightly coupled.
+- Git: Annotate Project.hpp
+- Next recommended Phase 1 task: T557 annotate: src/slic3r/GUI/PublishDialog.cpp

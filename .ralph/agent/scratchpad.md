@@ -8,3 +8,5 @@
 - Iteration focus: T555 annotate `src/slic3r/GUI/ProjectDirtyStateManager.hpp`.
 - Chosen because the header defines the dirty-state baseline used by the already-annotated cpp and is small enough for a precise atomic update.
 - Next step: add class/member annotations for snapshot-based dirty comparisons, then record completion evidence and move to the next Phase 1 task.
+
+- Completed T556 on Project.hpp with class/state/event/thread annotations; next focus is the publish dialog path.
