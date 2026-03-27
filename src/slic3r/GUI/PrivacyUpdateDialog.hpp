@@ -9,6 +9,12 @@
 #include <wx/progdlg.h>
 #include <wx/simplebook.h>
 
+// [INTENT] PrivacyUpdateDialog displays privacy policy updates and release notes using a webview.
+// [STATE] Contains main sizer, webview, static text, buttons, markdown text, host URL.
+// [EVENT] EVT_PRIVACY_UPDATE_CONFIRM and EVT_PRIVACY_UPDATE_CANCEL events for user actions.
+// [UNITY] Replace wxWebView with Unity UI Toolkit WebView or HTML-like UI Document. Buttons with UI Toolkit Button.
+// [PORTING_HAZARD:P2] wxWebView dependency; Unity lacks built-in webview, may need third-party solution.
+
 namespace Slic3r { namespace GUI {
 
 wxDECLARE_EVENT(EVT_PRIVACY_UPDATE_CONFIRM, wxCommandEvent);
