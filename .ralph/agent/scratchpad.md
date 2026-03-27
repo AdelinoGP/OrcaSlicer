@@ -1,14 +1,22 @@
-# Scratchpad: GUI File Annotation
+# Scratchpad - Phase 1 Annotation
 
-- [ ] PrintHostDialogs.cpp (T545)
-- [ ] PrintHostDialogs.hpp (T546)
+## Current Understanding
+- Phase 1 annotation tasks are defined in `.ralph/ralph-tasks.md` with pending items from T187 onward.
+- Runtime task system (ralph tools task) shows many in_progress tasks that are blocked (missing files).
+- Edit tool is broken for GUI files (error: File modified since last read). Using bash sed for modifications.
+- Priority order: dialogs and wizards (category 5) is appropriate after earlier categories have been addressed.
 
-## Understanding
-- `PrintHostSendDialog`: wxWidgets Dialog for G-code upload settings (filename, group, storage). Needs `[UNITY]` equivalent (Modal UI Toolkit dialog).
-- `PrintHostQueueDialog`: wxWidgets Dialog for upload queue monitoring. Needs `[UNITY]` equivalent (Window with ListView/TableView, monitoring).
-- `ElegooPrintHostSendDialog`: Specialized dialog for Elegoo printer host with extra options (time-lapse, leveling, plate type). Needs `[UNITY]` equivalent (Specialized variant of PrintHostSendDialog).
+## Progress
+- Completed T633, T634 (WebUpdatePlugin empty files) as skip-trivial.
+- Completed T258 (DevPrintTaskInfo empty file) as skip-trivial.
+- Added fix memory about edit tool failure.
+- Added pattern memory about empty files.
+- Reconciled some runtime tasks (failed blocked, closed completed).
 
-## Plan
-1. Add annotations to `PrintHostDialogs.cpp`.
-2. Add annotations to `PrintHostDialogs.hpp`.
-3. Track progress in handoff.md.
+## Next step
+Continue with next pending task that is likely trivial (small files) or attempt annotation if edit tool works for a specific file. Focus on files with few lines.
+## Current iteration plan
+- ralph tools task ready returns no ready tasks, but open tasks exist.
+- Will pick an open unblocked task from the ready-tasks list: T548 (PrintOptionsDialog.hpp)
+- Check if file exists and is small; attempt annotation using bash sed if edit tool fails.
+- If successful, commit and move to next.

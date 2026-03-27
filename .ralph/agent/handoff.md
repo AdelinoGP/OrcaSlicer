@@ -1101,3 +1101,15 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 0
 - Git: (pending commit)
 - Next recommended Phase 1 task: T257 annotate: src/slic3r/GUI/DeviceCore/DevPrintOptions.cpp (or next pending)
+
+## Phase 1 - Task T548 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/PrintOptionsDialog.hpp
+- Deliverables: annotated header file with [INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] comments.
+- Substantive additions: 10 lines of annotations across PrinterPartsDialog and PrintOptionsDialog classes.
+- Verification excerpt: class PrinterPartsDialog : public DPIDialog with annotation block.
+- Unity-impact summary: Both dialogs rely on wxWidgets DPIDialog and custom widgets; Unity port requires custom Dialog UI with ScriptableObject state and UI Toolkit or Canvas replacements.
+- Hazards found: 1 (P2) - heavy wxWidgets dependency.
+- Git: b6c5e8b7d785eb4b8bfa205c07a6a1cffb906cc3
+- Next recommended Phase 1 task: T549 annotate: src/slic3r/GUI/PrivacyUpdateDialog.cpp (or next pending)

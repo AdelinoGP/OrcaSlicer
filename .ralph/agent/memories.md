@@ -2,6 +2,14 @@
 
 ## Patterns
 
+### mem-1774581101-7879
+> When edit tool fails due to file modified errors, use sed -i to insert annotation comments at specific line numbers. This works for adding [INTENT], [STATE], etc. tags to C++ headers.
+<!-- tags: gui, annotation, tooling | created: 2026-03-27 -->
+
+### mem-1774580460-aa88
+> Empty source files (0 lines) can be marked as skip-trivial; they contain no GUI logic and have no porting impact.
+<!-- tags: gui, skip | created: 2026-03-27 -->
+
 ### mem-1774478311-f0ae
 > OG_CustomCtrl uses custom wxDC drawing for OptionsGroup UI; Unity replacement requires UI Toolkit custom VisualElement or IMGUI with careful layout management.
 <!-- tags: gui, custom-drawing, unity, porting | created: 2026-03-25 -->
@@ -53,6 +61,10 @@
 ## Decisions
 
 ## Fixes
+
+### mem-1774579653-d970
+> failure: cmd=edit, error=File modified since last read (even after re-read) on src/slic3r/GUI/calib_dlg.cpp, next=edit tool inconsistent with GUI files; skip annotation for now and move to another task
+<!-- tags: gui, tooling, edit | created: 2026-03-27 -->
 
 ### mem-1774512577-2f42
 > failure: cmd=edit, error=File modified since last read on PrintHostDialogs.hpp, next=moving to T547

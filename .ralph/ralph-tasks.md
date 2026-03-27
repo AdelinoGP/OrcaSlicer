@@ -466,7 +466,7 @@ Last updated: 2026-03-25T22:43:33Z
 - [ ] T545 annotate: src/slic3r/GUI/PrintHostDialogs.cpp
 - [ ] T546 annotate: src/slic3r/GUI/PrintHostDialogs.hpp
 - [ ] T547 annotate: src/slic3r/GUI/PrintOptionsDialog.cpp
-- [ ] T548 annotate: src/slic3r/GUI/PrintOptionsDialog.hpp
+- [x] T548 annotate: src/slic3r/GUI/PrintOptionsDialog.hpp
 - [ ] T549 annotate: src/slic3r/GUI/PrivacyUpdateDialog.cpp
 - [ ] T550 annotate: src/slic3r/GUI/PrivacyUpdateDialog.hpp
 - [ ] T551 annotate: src/slic3r/GUI/ProgressStatusBar.cpp
