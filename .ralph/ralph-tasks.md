@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-27T08:48:32Z
+Last updated: 2026-03-27T09:01:23Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -487,7 +487,7 @@ Last updated: 2026-03-27T08:48:32Z
 - [x] T566 annotate: src/slic3r/GUI/RemovableDriveManager.hpp
 - [x] T567 annotate: src/slic3r/GUI/SafetyOptionsDialog.cpp
 - [x] T568 annotate: src/slic3r/GUI/SafetyOptionsDialog.hpp
-- [ ] T569 annotate: src/slic3r/GUI/SavePresetDialog.cpp
+- [x] T569 annotate: src/slic3r/GUI/SavePresetDialog.cpp
 - [ ] T570 annotate: src/slic3r/GUI/SavePresetDialog.hpp
 - [ ] T571 annotate: src/slic3r/GUI/SceneRaycaster.cpp
 - [ ] T572 annotate: src/slic3r/GUI/SceneRaycaster.hpp

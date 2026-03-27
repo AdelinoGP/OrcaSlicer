@@ -1412,3 +1412,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 P2, 1 P3
 - Git: SafetyOptionsDialog annotations
 - Next recommended Phase 1 task: T568 annotate `src/slic3r/GUI/SafetyOptionsDialog.hpp`
+
+## Phase 1 - Task T569 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SavePresetDialog.cpp
+- Deliverables: `src/slic3r/GUI/SavePresetDialog.cpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 7 annotation blocks covering per-row validation, live naming rules, modal construction, printer-specific action routing, destructive overwrite handling, and synchronous printer rebinding
+- Verification excerpt: `[PORTING_HAZARD:P1] The confirmation path is not just a local dialog close; it can trigger remote preset cleanup`
+- Unity-impact summary:
+  - Port the dialog as a modal controller with row-level view-models.
+  - Preserve live validation and printer-binding side effects as explicit controller state.
+  - Treat cloud delete and printer rebinding as separate async side effects in Unity.
+- Hazards found: P1 x1, P2 x3, P3 x1
+- Git: Annotate SavePresetDialog preset save flow
+- Next recommended Phase 1 task: T570 annotate `src/slic3r/GUI/SavePresetDialog.hpp`

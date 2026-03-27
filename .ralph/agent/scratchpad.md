@@ -62,3 +62,7 @@
 
 - Reconciled the T567 task.done event against commit `4087159d82` and continued with T568 on the declaration header.
 - The header now carries the dialog's ownership and Unity-mapping boundaries so the next porting step can treat the modal as a scrollable settings controller plus overlay toast.
+
+- Current iteration focus: T569 annotate `src/slic3r/GUI/SavePresetDialog.cpp`.
+- Chosen because it is a modal preset-save flow with live validation, project-embedded toggle state, and printer-binding side effects that need explicit Unity migration notes.
+- Completed the cpp annotations for row-level validation, destructive overwrite handling, modal construction, printer-specific action panels, and synchronous printer rebinding; next iteration should move to T570 on the header.
