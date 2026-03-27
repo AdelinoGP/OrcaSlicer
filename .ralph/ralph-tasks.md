@@ -476,7 +476,7 @@ Last updated: 2026-03-27T07:18:30Z
 - [x] T555 annotate: src/slic3r/GUI/ProjectDirtyStateManager.hpp
 - [x] T556 annotate: src/slic3r/GUI/Project.hpp
 - [x] T557 annotate: src/slic3r/GUI/PublishDialog.cpp
-- [ ] T558 annotate: src/slic3r/GUI/PublishDialog.hpp
+- [x] T558 annotate: src/slic3r/GUI/PublishDialog.hpp
 - [ ] T559 annotate: src/slic3r/GUI/RammingChart.cpp
 - [ ] T560 annotate: src/slic3r/GUI/RammingChart.hpp
 - [ ] T561 annotate: src/slic3r/GUI/RecenterDialog.cpp

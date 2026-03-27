@@ -16,3 +16,5 @@
 - Current iteration focus: T557 annotate `src/slic3r/GUI/PublishDialog.cpp`.
 - Chosen because it coordinates a publish-step progress UI, queued Plater events, and reentrant progress callbacks that are directly relevant to Unity coroutine/state-machine mapping.
 - Next step: append durable annotations for modal lifecycle, event routing, cancel semantics, and wx event-loop reentry, then record handoff evidence and close the task.
+- Completed T558 on `src/slic3r/GUI/PublishDialog.hpp` by adding class/method/member annotations for workflow state, event flow, UI-thread progress callbacks, and Unity migration guidance.
+- Next recommended task is T559 on `src/slic3r/GUI/RammingChart.cpp`; it should likely need explicit render/update and OpenGL state annotations if it drives charts or live preview.

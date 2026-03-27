@@ -2,6 +2,10 @@
 
 ## Patterns
 
+### mem-1774596584-7d37
+> PublishDialog.hpp is a thin declaration layer for the publish flow: it exposes a non-owning Plater* back-pointer, sticky cancel state, and stepper/progress UI methods that should map to a modal Unity controller with an async progress overlay.
+<!-- tags: gui, unity, publish | created: 2026-03-27 -->
+
 ### mem-1774596198-fe0e
 > PublishDialog uses queued EVT_PUBLISH events plus wxEventLoopBase::YieldFor reentry; a Unity port should model it as a modal progress state machine with async/coroutine marshaling.
 <!-- tags: gui, unity, publish | created: 2026-03-27 -->

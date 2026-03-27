@@ -1255,3 +1255,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x 5, P3 x 3
 - Git: Annotate calibration dialog header
 - Next recommended Phase 1 task: T189 annotate: src/slic3r/GUI/Calibration.cpp
+
+## Phase 1 - Task T558 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/PublishDialog.hpp
+- Deliverables: src/slic3r/GUI/PublishDialog.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 10 annotation blocks covering class intent, publish-step state, UI-thread callbacks, cancel/close flow, and Unity mapping
+- Verification excerpt: // [PORTING_HAZARD:P2] The wx version assumes the dialog can remain alive while queued publish events
+- Unity-impact summary: model as a modal controller plus async progress overlay/stepper
+- Unity-impact summary: marshal publish status updates onto the main thread instead of yielding inside the dialog
+- Hazards found: P2 x2
+- Git: annotate PublishDialog header
+- Next recommended Phase 1 task: T559 annotate: src/slic3r/GUI/RammingChart.cpp
