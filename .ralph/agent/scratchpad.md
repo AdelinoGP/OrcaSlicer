@@ -59,3 +59,6 @@
 - Current iteration focus: T567 annotate `src/slic3r/GUI/SafetyOptionsDialog.cpp`.
 - Chosen because it is a compact but behavior-rich safety modal with direct device commands, stateful enable/disable logic, and a transient toast path that should map cleanly to Unity UI controls.
 - Outcome: added durable annotations for intent/state/event/thread/unity/hazard boundaries in the cpp; next iteration should handle `SafetyOptionsDialog.hpp`.
+
+- Reconciled the T567 task.done event against commit `4087159d82` and continued with T568 on the declaration header.
+- The header now carries the dialog's ownership and Unity-mapping boundaries so the next porting step can treat the modal as a scrollable settings controller plus overlay toast.

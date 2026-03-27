@@ -2,6 +2,14 @@
 
 ## Patterns
 
+### mem-1774601068-786b
+> SafetyOptionsDialog is a compact safety modal that directly dispatches MachineObject/PrintOptions commands from UI toggles; the unavailable idle-heating state is explained via a timer-driven popup toast, so Unity should use a modal settings panel with an anchored overlay toast rather than a separate native popup.
+<!-- tags: gui, unity, dialog, porting | created: 2026-03-27 -->
+
+### mem-1774600646-742b
+> RemovableDriveManager.hpp defines the declaration boundary for the removable-drive service: cached drive snapshots, update/eject events, polling worker ownership, and macOS callback bridge all belong behind a platform service with main-thread UI dispatch in Unity.
+<!-- tags: gui, unity, threading | created: 2026-03-27 -->
+
 ### mem-1774599749-961e
 > RemovableDriveManager mixes platform-specific drive discovery with a polling worker thread and OS callbacks; Unity should use a cached service plus main-thread completion events.
 <!-- tags: gui, unity, threading | created: 2026-03-27 -->

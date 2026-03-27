@@ -168,6 +168,21 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Next recommended Phase 1 task: T188 annotate: src/slic3r/GUI/calib_dlg.hpp
 - [x] T559 annotate: src/slic3r/GUI/RammingChart.cpp
 
+## Phase 1 - Task T568 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SafetyOptionsDialog.hpp
+- Deliverables: src/slic3r/GUI/SafetyOptionsDialog.hpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 10 annotation blocks covering dialog intent, state ownership, transient toast behavior, printer-object sync, and Unity migration guidance
+- Verification excerpt: `[PORTING_HAZARD:P2] The dialog mixes local UI toggles with live device capability checks and a wxPopupWindow + wxTimer feedback path.`
+- Unity-impact summary:
+  - Model the dialog as a scrollable modal settings panel, not a native popup tree.
+  - Keep printer state in a controller-backed model and treat the toast as an overlay/notice.
+  - Preserve UI-thread-only timer behavior when porting the unavailable-state feedback.
+- Hazards found: P2 x1, P3 x1
+- Git: annotate SafetyOptionsDialog header
+- Next recommended Phase 1 task: T569 annotate: src/slic3r/GUI/SavePresetDialog.cpp
+
 ## Phase 1 - Task T560 complete
 
 - Task type: annotate
