@@ -38,3 +38,7 @@
 
 - Completed T562 with class/member/event annotations and a Unity mapping note that keeps the dialog's modal confirm/close semantics explicit.
 - Next recommended task is T563 annotate `src/slic3r/GUI/ReleaseNote.cpp`.
+
+- Completed T563 on `src/slic3r/GUI/ReleaseNote.cpp`; the file is now annotated as a bundle of modal update, confirmation, print-error, and printer-connection flows.
+- Key migration takeaway: the version/release-note path uses embedded web content and script injection, while the IP setup path uses a worker thread plus UI-thread event reentry.
+- Next recommended task is T564 annotate `src/slic3r/GUI/ReleaseNote.hpp`.

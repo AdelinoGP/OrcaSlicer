@@ -2,6 +2,14 @@
 
 ## Patterns
 
+### mem-1774598719-3415
+> ReleaseNote.cpp bundles several update/confirmation dialogs: markdown release notes, webview-backed version preview, and printer/IP setup flows. The Unity port should split them into reusable modal controllers, with async task/coroutine handling for the network probe and web image fetches.
+<!-- tags: gui, unity, modal, threading | created: 2026-03-27 -->
+
+### mem-1774598508-b438
+> RecenterDialog.hpp is the declaration boundary for a custom-painted modal dialog; keep ownership, event, and Unity migration notes in the header while leaving pixel-measurement hazards in the cpp.
+<!-- tags: gui, unity, annotation, header | created: 2026-03-27 -->
+
 ### mem-1774598082-f9c7
 > RecenterDialog.cpp is a custom-painted DPIDialog: owner-drawn wxPaintDC rendering, hand-wrapped localized text, and DPI-rescaled home icon state. Unity port should use a modal confirmation controller with a shared icon asset and locale-aware layout helper instead of the current width-measurement heuristic.
 <!-- tags: gui, unity, annotation | created: 2026-03-27 -->

@@ -258,6 +258,21 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - [x] T392 annotate: src/slic3r/GUI/GUI_ObjectTable.cpp
 - [x] T393 annotate: src/slic3r/GUI/GUI_ObjectTable.hpp
 - [x] T394 annotate: src/slic3r/GUI/GUI_ObjectTableSettings.cpp
+
+## Phase 1 - Task T563 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/ReleaseNote.cpp
+- Deliverables: src/slic3r/GUI/ReleaseNote.cpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 16 annotation blocks covering release-note display, plug-in/version update flows, secondary confirmation routing, print-error reconfiguration, IP setup threading, and failure handling
+- Verification excerpt: `[THREAD] The network probe runs on a boost thread and posts results back through wx events and CallAfter.`
+- Unity-impact summary:
+  - Split the file into reusable modal controllers instead of one monolithic wx dialog source.
+  - Move async network/image work behind main-thread marshaling in the Unity port.
+  - Preserve the markdown/web preview behavior with a dedicated rich-text or webview component.
+- Hazards found: P2 x3, P3 x2
+- Git: annotate ReleaseNote dialogs
+- Next recommended Phase 1 task: T564 annotate: src/slic3r/GUI/ReleaseNote.hpp
 - [x] T395 annotate: src/slic3r/GUI/GUI_ObjectTableSettings.hpp
 - [x] T396 annotate: src/slic3r/GUI/GUI_Preview.cpp
 - [x] T397 annotate: src/slic3r/GUI/GUI_Preview.hpp
