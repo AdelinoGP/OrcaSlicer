@@ -2,6 +2,26 @@
 
 ## Patterns
 
+### mem-1774595899-fa60
+> src/slic3r/GUI/calib_dlg.hpp groups several modal calibration dialogs that share Calib_Params + non-owning Plater* state; Unity port should factor a shared calibration view-model/controller and keep per-test dispatch logic separate.
+<!-- tags: gui, unity, calibration | created: 2026-03-27 -->
+
+### mem-1774595450-ae77
+> ProjectPanel is a wxWebView + AuxiliaryPanel bridge: it loads bundled file:// HTML, relays JSON script messages, and scans auxiliary asset folders on a worker thread before posting UI updates back via CallAfter.
+<!-- tags: gui, webview, threading, unity | created: 2026-03-27 -->
+
+### mem-1774594971-c054
+> ProjectDirtyStateManager.hpp is annotated with class-level [INTENT]/[EVENT]/[UNITY]/[PORTING_HAZARD] comments and member-level [STATE] notes; dirty-state comparison is snapshot-based across plater, presets, and project_config.
+<!-- tags: gui, annotation, unity, state | created: 2026-03-27 -->
+
+### mem-1774594677-4dae
+> calib_dlg.cpp groups multiple modal calibration forms that directly call Plater calibration methods; Unity port should treat them as controller-backed modal panels with firmware-aware axis mirroring/hiding.
+<!-- tags: gui, unity, calibration | created: 2026-03-27 -->
+
+### mem-1774582388-03fa
+> Header file annotation pattern: Insert class-level [INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] comments after includes, before namespace. Use sed for surgical edits when edit tool fails.
+<!-- tags: gui, annotation, unity, header | created: 2026-03-27 -->
+
 ### mem-1774581101-7879
 > When edit tool fails due to file modified errors, use sed -i to insert annotation comments at specific line numbers. This works for adding [INTENT], [STATE], etc. tags to C++ headers.
 <!-- tags: gui, annotation, tooling | created: 2026-03-27 -->
@@ -61,6 +81,14 @@
 ## Decisions
 
 ## Fixes
+
+### mem-1774595683-7aa6
+> failure: cmd=ralph tools task start gui:T188, exit=1, error=Task gui:T188 not found, next=start the reused task by its returned id task-1773880086-cb14
+<!-- tags: tooling, error-handling | created: 2026-03-27 -->
+
+### mem-1774594784-7833
+> failure: cmd=/home/admin/.config/nvm/versions/node/v24.14.0/lib/node_modules/@ralph-orchestrator/ralph-cli/node_modules/.bin_real/ralph tools task start T555, exit=1, error=Task T555 not found, next=resolve the runtime task id via task list before starting the Phase 1 task
+<!-- tags: tooling, error-handling | created: 2026-03-27 -->
 
 ### mem-1774579653-d970
 > failure: cmd=edit, error=File modified since last read (even after re-read) on src/slic3r/GUI/calib_dlg.cpp, next=edit tool inconsistent with GUI files; skip annotation for now and move to another task

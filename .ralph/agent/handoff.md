@@ -1228,3 +1228,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P2) - browser scripting, file scanning, and delayed UI swaps are tightly coupled.
 - Git: Annotate Project.hpp
 - Next recommended Phase 1 task: T557 annotate: src/slic3r/GUI/PublishDialog.cpp
+
+## Phase 1 - Task T188 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/calib_dlg.hpp
+- Deliverables: src/slic3r/GUI/calib_dlg.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 9 annotation blocks covering dialog-family intent, state, events, Unity mapping, and porting hazards
+- Verification excerpt: `[UNITY] Recreate these as controller-backed modal UI Toolkit pages with validated inputs, explicit confirm actions, and a shared calibration view-model.`
+- Unity-impact summary: shared calibration view-model; modal dialog/controller split; preserve per-test dispatch semantics
+- Hazards found: P2 x 5, P3 x 3
+- Git: Annotate calibration dialog header
+- Next recommended Phase 1 task: T189 annotate: src/slic3r/GUI/Calibration.cpp

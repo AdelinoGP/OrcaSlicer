@@ -10,3 +10,5 @@
 - Next step: add class/member annotations for snapshot-based dirty comparisons, then record completion evidence and move to the next Phase 1 task.
 
 - Completed T556 on Project.hpp with class/state/event/thread annotations; next focus is the publish dialog path.
+
+- Reconciled runtime task state for T188 after `ralph tools task ready` returned no ready tasks: ensured `gui:T188`, started reused task `task-1773880086-cb14`, and annotated `calib_dlg.hpp` as the next atomic Phase 1 step.
