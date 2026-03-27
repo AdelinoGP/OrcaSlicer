@@ -2,6 +2,14 @@
 
 ## Patterns
 
+### mem-1774599749-961e
+> RemovableDriveManager mixes platform-specific drive discovery with a polling worker thread and OS callbacks; Unity should use a cached service plus main-thread completion events.
+<!-- tags: gui, unity, threading | created: 2026-03-27 -->
+
+### mem-1774599147-2a93
+> ReleaseNote.hpp groups multiple modal update/confirmation dialogs: webview-backed release notes, dynamic error prompts, and an async IP onboarding wizard. Unity port should split them into reusable modal controllers and preserve the worker-thread handoff for IP checks.
+<!-- tags: gui, unity, modal, threading | created: 2026-03-27 -->
+
 ### mem-1774598719-3415
 > ReleaseNote.cpp bundles several update/confirmation dialogs: markdown release notes, webview-backed version preview, and printer/IP setup flows. The Unity port should split them into reusable modal controllers, with async task/coroutine handling for the network probe and web image fetches.
 <!-- tags: gui, unity, modal, threading | created: 2026-03-27 -->

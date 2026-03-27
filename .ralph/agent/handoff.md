@@ -1356,3 +1356,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1, P3 x1
 - Git: Annotate RecenterDialog confirmation flow
 - Next recommended Phase 1 task: T562 annotate: src/slic3r/GUI/RecenterDialog.hpp
+
+## Phase 1 - Task T565 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/RemovableDriveManager.cpp
+- Deliverables: src/slic3r/GUI/RemovableDriveManager.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 12 annotation blocks covering module scope, Windows eject flow, Unix/macOS discovery and eject flow, lifecycle, status, update, polling, and cleanup
+- Verification excerpt: `[UNITY] Replace with a platform service + main-thread UI controller, backed by async device enumeration and explicit eject-result callbacks.`
+- Unity-impact summary:
+  - Model removable-drive state as a cached service rather than per-widget polling.
+  - Marshal eject completion and drive-change events back to the main thread.
+  - Replace blocking OS commands with async tasks or native plugin calls.
+- Hazards found: P2 x4, P3 x1
+- Git: Annotate removable drive manager lifecycle
+- Next recommended Phase 1 task: T566 annotate: src/slic3r/GUI/RemovableDriveManager.hpp

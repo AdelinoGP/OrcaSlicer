@@ -43,6 +43,11 @@
 - Key migration takeaway: the version/release-note path uses embedded web content and script injection, while the IP setup path uses a worker thread plus UI-thread event reentry.
 - Next recommended task is T564 annotate `src/slic3r/GUI/ReleaseNote.hpp`.
 
+- Current iteration focus: T565 annotate `src/slic3r/GUI/RemovableDriveManager.cpp`.
+- Chosen because the file combines OS-specific drive discovery, cache invalidation, worker-thread polling, and eject completion callbacks that need explicit Unity migration notes.
+- Outcome: added durable annotations for the module, Windows/Unix eject paths, discovery helpers, lifecycle hooks, status caching, update/polling flow, and macOS cleanup.
+- Next recommended task is T566 annotate `src/slic3r/GUI/RemovableDriveManager.hpp`.
+
 - Completed T564 on `src/slic3r/GUI/ReleaseNote.hpp` with class-level annotations for seven dialogs plus the shared event declarations.
 - Key migration takeaway: the header mixes webview-backed release notes, dynamic confirmation dialogs, and an async IP onboarding wizard, so Unity needs reusable modal controllers plus a real background-task bridge.
 - Next recommended task is T565 annotate `src/slic3r/GUI/RemovableDriveManager.cpp`.
