@@ -151,6 +151,21 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - [x] T197 annotate: src/slic3r/GUI/Jobs/SLAImportJob.cpp
 - [x] T198 annotate: src/slic3r/GUI/Jobs/SLAImportJob.hpp
 - [x] T205 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp
+
+## Phase 1 - Task T187 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/calib_dlg.cpp
+- Deliverables: src/slic3r/GUI/calib_dlg.cpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 17 annotation blocks covering shared helpers, eight calibration dialogs, and direct Plater dispatch paths
+- Verification excerpt: `[PORTING_HAZARD:P2] The dialog reconfigures controls live based on firmware and method selection`
+- Unity-impact summary:
+  - Model each calibration dialog as a controller-backed modal form.
+  - Preserve firmware-aware axis hiding/mirroring in the Unity view model.
+  - Treat calibration submission as a synchronous command payload to the printer pipeline.
+- Hazards found: P2 x3, P3 x1
+- Git: annotate calib_dlg calibration dialogs
+- Next recommended Phase 1 task: T188 annotate: src/slic3r/GUI/calib_dlg.hpp
 - [x] T307 annotate: src/slic3r/GUI/Gizmos/GLGizmoAssembly.cpp
 - [x] T308 annotate: src/slic3r/GUI/Gizmos/GLGizmoAssembly.hpp
 - [x] T309 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp
