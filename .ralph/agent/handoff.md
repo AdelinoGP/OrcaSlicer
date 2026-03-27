@@ -1268,3 +1268,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x2
 - Git: annotate PublishDialog header
 - Next recommended Phase 1 task: T559 annotate: src/slic3r/GUI/RammingChart.cpp
+
+## Phase 1 - Task T559 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/RammingChart.cpp
+- Deliverables: `.ralph/agent/scratchpad.md`, `.ralph/ralph-tasks.md`, `src/slic3r/GUI/RammingChart.cpp`
+- Substantive additions: 9 boundary comments covering paint flow, event flow, drag handling, spline rebuilds, export helpers, and wx event-table routing
+- Verification excerpt: `[PORTING_HAZARD:P2] The view mixes model sampling with pixel-space drawing`
+- Unity-impact summary:
+  - Replace the chart with a custom Unity control backed by retained math-space curve data
+  - Split drag/edit interactions from sampled rendering so zoom and export stay deterministic
+  - Keep chart-change notifications as controller events for the wipe-tower workflow
+- Hazards found: P2=1
+- Git: Annotate ramming chart interaction flow
+- Next recommended Phase 1 task: T560 annotate: src/slic3r/GUI/RammingChart.hpp

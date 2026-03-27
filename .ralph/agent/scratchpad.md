@@ -18,3 +18,7 @@
 - Next step: append durable annotations for modal lifecycle, event routing, cancel semantics, and wx event-loop reentry, then record handoff evidence and close the task.
 - Completed T558 on `src/slic3r/GUI/PublishDialog.hpp` by adding class/method/member annotations for workflow state, event flow, UI-thread progress callbacks, and Unity migration guidance.
 - Next recommended task is T559 on `src/slic3r/GUI/RammingChart.cpp`; it should likely need explicit render/update and OpenGL state annotations if it drives charts or live preview.
+
+- Current iteration focus: T559 annotate `src/slic3r/GUI/RammingChart.cpp`.
+- Chosen because it is a self-contained interactive chart with immediate-mode drawing, mouse-driven point editing, spline recalculation, and wx event dispatch that need concrete Unity mapping.
+- Next step: add boundary-level annotations for rendering, drag handling, spline math, and event emission, then record handoff evidence and close the task.

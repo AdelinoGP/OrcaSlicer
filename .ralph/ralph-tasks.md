@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-27T07:18:30Z
+Last updated: 2026-03-27T07:39:12Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -477,7 +477,7 @@ Last updated: 2026-03-27T07:18:30Z
 - [x] T556 annotate: src/slic3r/GUI/Project.hpp
 - [x] T557 annotate: src/slic3r/GUI/PublishDialog.cpp
 - [x] T558 annotate: src/slic3r/GUI/PublishDialog.hpp
-- [ ] T559 annotate: src/slic3r/GUI/RammingChart.cpp
+- [x] T559 annotate: src/slic3r/GUI/RammingChart.cpp
 - [ ] T560 annotate: src/slic3r/GUI/RammingChart.hpp
 - [ ] T561 annotate: src/slic3r/GUI/RecenterDialog.cpp
 - [ ] T562 annotate: src/slic3r/GUI/RecenterDialog.hpp
