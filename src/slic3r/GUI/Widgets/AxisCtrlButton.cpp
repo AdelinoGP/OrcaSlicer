@@ -5,15 +5,23 @@
 #include <wx/dcclient.h>
 #include <wx/dcgraph.h>
 
-StateColor blank_bg(StateColor(std::make_pair(wxColour("#FFFFFF"), (int)StateColor::Normal)));
-static const wxColour BUTTON_BG_COL = wxColour("#EEEEEE");
+// [INTENT] Radial axis-jog button: it renders concentric action rings plus a center home target and
+// translates pointer position into one of the eight directional sectors carried by the click event.
+// [UNITY] Best fit is a custom radial joystick/jog control built on a retained UI Toolkit element or
+// immediate-mode mesh, with sector hit-testing kept in a shared geometry helper.
+// [PORTING_HAZARD:P2] The active sector is inferred from painted geometry, so the hit zones and visuals
+// must stay in lockstep when this is reimplemented outside wxGraphicsContext.
+StateColor            blank_bg(StateColor(std::make_pair(wxColour("#FFFFFF"), (int) StateColor::Normal)));
+static const wxColour BUTTON_BG_COL    = wxColour("#EEEEEE");
 static const wxColour BUTTON_IN_BG_COL = wxColour("#CECECE");
 
-static const wxColour bd = wxColour(0, 150, 136);
+static const wxColour bd               = wxColour(0, 150, 136);
 static const wxColour text_num_color   = wxColour("#898989");
 static const wxColour BUTTON_PRESS_COL = wxColour(172, 172, 172);
-static const double sqrt2 = std::sqrt(2);
+static const double   sqrt2            = std::sqrt(2);
 
+// [EVENT] Mouse down/up/motion are routed through the wx event table; the control captures the mouse
+// on press, recomputes hover sector state on move, and emits a command-style click on release.
 BEGIN_EVENT_TABLE(AxisCtrlButton, wxWindow)
 EVT_LEFT_DOWN(AxisCtrlButton::mouseDown)
 EVT_LEFT_UP(AxisCtrlButton::mouseReleased)
@@ -21,13 +29,13 @@ EVT_MOTION(AxisCtrlButton::mouseMoving)
 EVT_PAINT(AxisCtrlButton::paintEvent)
 END_EVENT_TABLE()
 
-#define OUTER_SIZE      FromDIP(105)
-#define INNER_SIZE      FromDIP(58)
-#define HOME_SIZE       FromDIP(23)
-#define BLANK_SIZE      FromDIP(24)
-#define GAP_SIZE        FromDIP(4)
+#define OUTER_SIZE FromDIP(105)
+#define INNER_SIZE FromDIP(58)
+#define HOME_SIZE FromDIP(23)
+#define BLANK_SIZE FromDIP(24)
+#define GAP_SIZE FromDIP(4)
 
-AxisCtrlButton::AxisCtrlButton(wxWindow *parent, ScalableBitmap &icon, long stlye)
+AxisCtrlButton::AxisCtrlButton(wxWindow* parent, ScalableBitmap& icon, long stlye)
     : wxWindow(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, stlye)
     , r_outer(OUTER_SIZE)
     , r_inner(INNER_SIZE)
@@ -37,11 +45,13 @@ AxisCtrlButton::AxisCtrlButton(wxWindow *parent, ScalableBitmap &icon, long stly
     , last_pos(UNDEFINED)
     , current_pos(UNDEFINED) // don't change init value
     , text_color(std::make_pair(0x6B6B6B, (int) StateColor::Disabled), std::make_pair(*wxBLACK, (int) StateColor::Normal))
-	, state_handler(this)
+    , state_handler(this)
 {
     m_icon = icon;
-	wxWindow::SetBackgroundColour(parent->GetBackgroundColour());
+    wxWindow::SetBackgroundColour(parent->GetBackgroundColour());
 
+    // [STATE] The control keeps separate state-colored brushes for the outer ring, inner ring, border,
+    // and text; StateHandler rebinding is what lets hover/press/disabled colors follow wx state changes.
     border_color.append(bd, StateColor::Hovered);
 
     background_color.append(BUTTON_BG_COL, StateColor::Disabled);
@@ -56,45 +66,43 @@ AxisCtrlButton::AxisCtrlButton(wxWindow *parent, ScalableBitmap &icon, long stly
     inner_background_color.append(BUTTON_IN_BG_COL, StateColor::Normal);
     inner_background_color.append(BUTTON_IN_BG_COL, StateColor::Enabled);
 
-    state_handler.attach({ &border_color, &background_color });
+    state_handler.attach({&border_color, &background_color});
     state_handler.update_binds();
 }
 
-void AxisCtrlButton::updateParams() {
+void AxisCtrlButton::updateParams()
+{
     r_outer = OUTER_SIZE;
     r_inner = INNER_SIZE;
-    r_home = HOME_SIZE;
+    r_home  = HOME_SIZE;
     r_blank = BLANK_SIZE;
-    gap = GAP_SIZE;
+    gap     = GAP_SIZE;
 }
 
 void AxisCtrlButton::SetMinSize(const wxSize& size)
 {
-	wxSize cur_size = GetSize();
+    wxSize cur_size = GetSize();
     if (size.GetWidth() > 0 && size.GetHeight() > 0) {
-        stretch = std::min((double)size.GetWidth() / cur_size.x,(double)size.GetHeight() / cur_size.y);
-		minSize = size;
+        stretch = std::min((double) size.GetWidth() / cur_size.x, (double) size.GetHeight() / cur_size.y);
+        minSize = size;
         updateParams();
-    }
-    else if (size.GetWidth() > 0) {
-		stretch = (double)size.GetWidth() / cur_size.x;
-		minSize.x = size.x;
+    } else if (size.GetWidth() > 0) {
+        stretch   = (double) size.GetWidth() / cur_size.x;
+        minSize.x = size.x;
         updateParams();
-    }
-    else if (size.GetHeight() > 0) {
-		stretch = (double)size.GetHeight() / cur_size.y;
-		minSize.y = size.y;
+    } else if (size.GetHeight() > 0) {
+        stretch   = (double) size.GetHeight() / cur_size.y;
+        minSize.y = size.y;
         updateParams();
-    }
-    else {
-		stretch = 1.0;
+    } else {
+        stretch = 1.0;
         minSize = wxSize(228, 228);
     }
     wxWindow::SetMinSize(minSize);
     center = wxPoint(minSize.x / 2, minSize.y / 2);
 }
 
-void AxisCtrlButton::SetTextColor(StateColor const &color)
+void AxisCtrlButton::SetTextColor(StateColor const& color)
 {
     text_color = color;
     state_handler.update_binds();
@@ -122,22 +130,20 @@ void AxisCtrlButton::SetInnerBackgroundColor(StateColor const& color)
     Refresh();
 }
 
-void AxisCtrlButton::SetBitmap(ScalableBitmap &bmp)
+void AxisCtrlButton::SetBitmap(ScalableBitmap& bmp)
 {
-    if (&bmp  && (& bmp.bmp()) && (bmp.bmp().IsOk())) {
+    if (&bmp && (&bmp.bmp()) && (bmp.bmp().IsOk())) {
         m_icon = bmp;
     }
 }
 
-void AxisCtrlButton::Rescale() {
-	Refresh();
-}
+void AxisCtrlButton::Rescale() { Refresh(); }
 
 void AxisCtrlButton::paintEvent(wxPaintEvent& evt)
 {
     // depending on your system you may need to look at double-buffered dcs
     wxPaintDC dc(this);
-    wxGCDC gcdc(dc);
+    wxGCDC    gcdc(dc);
     render(gcdc);
 }
 
@@ -148,15 +154,18 @@ void AxisCtrlButton::paintEvent(wxPaintEvent& evt)
  */
 void AxisCtrlButton::render(wxDC& dc)
 {
+    // [OPENGL] Not applicable here; the paint path is CPU-side vector drawing through wxGraphicsContext.
+    // [INTENT] The geometry is split into outer ring, inner ring, optional sector overlay, gap cuts,
+    // center/home target, and axis labels so the painted affordance matches the hit-test sectors.
     wxGraphicsContext* gc = dc.GetGraphicsContext();
 
-    int states = state_handler.states();
-	wxSize size = GetSize();
+    int    states = state_handler.states();
+    wxSize size   = GetSize();
 
     gc->PushState();
     gc->Translate(center.x, center.y);
 
-	//draw the outer ring
+    // draw the outer ring
     wxGraphicsPath outer_path = gc->CreatePath();
     outer_path.AddCircle(0, 0, r_outer);
     outer_path.AddCircle(0, 0, r_inner);
@@ -164,44 +173,43 @@ void AxisCtrlButton::render(wxDC& dc)
     gc->SetBrush(StateColor::darkModeColorFor(BUTTON_BG_COL));
     gc->DrawPath(outer_path);
 
-	//draw the inner ring
+    // draw the inner ring
     wxGraphicsPath inner_path = gc->CreatePath();
     inner_path.AddCircle(0, 0, r_inner);
     inner_path.AddCircle(0, 0, r_blank);
     gc->SetPen(StateColor::darkModeColorFor(BUTTON_IN_BG_COL));
     gc->SetBrush(StateColor::darkModeColorFor(BUTTON_IN_BG_COL));
-	gc->DrawPath(inner_path);
+    gc->DrawPath(inner_path);
 
-	//draw an arc in corresponding position
-	if (current_pos != CurrentPos::UNDEFINED) {
-		wxGraphicsPath path = gc->CreatePath();
-		if (current_pos < 4) {
-			path.AddArc(0, 0, r_outer, (5 - 2 * current_pos) * PI / 4, (7 - 2 * current_pos) * PI / 4, true);
-			path.AddArc(0, 0, r_inner, (7 - 2 * current_pos) * PI / 4, (5 - 2 * current_pos) * PI / 4, false);
-			path.CloseSubpath();
-			gc->SetBrush(wxBrush(background_color.colorForStates(states)));
-		}
-		else if (current_pos < 8) {
-			path.AddArc(0, 0, r_inner, (5 - 2 * current_pos) * PI / 4, (7 - 2 * current_pos) * PI / 4, true);
-			path.AddArc(0, 0, r_blank, (7 - 2 * current_pos) * PI / 4, (5 - 2 * current_pos) * PI / 4, false);
-			path.CloseSubpath();
-			gc->SetBrush(wxBrush(inner_background_color.colorForStates(states)));
+    // draw an arc in corresponding position
+    if (current_pos != CurrentPos::UNDEFINED) {
+        wxGraphicsPath path = gc->CreatePath();
+        if (current_pos < 4) {
+            path.AddArc(0, 0, r_outer, (5 - 2 * current_pos) * PI / 4, (7 - 2 * current_pos) * PI / 4, true);
+            path.AddArc(0, 0, r_inner, (7 - 2 * current_pos) * PI / 4, (5 - 2 * current_pos) * PI / 4, false);
+            path.CloseSubpath();
+            gc->SetBrush(wxBrush(background_color.colorForStates(states)));
+        } else if (current_pos < 8) {
+            path.AddArc(0, 0, r_inner, (5 - 2 * current_pos) * PI / 4, (7 - 2 * current_pos) * PI / 4, true);
+            path.AddArc(0, 0, r_blank, (7 - 2 * current_pos) * PI / 4, (5 - 2 * current_pos) * PI / 4, false);
+            path.CloseSubpath();
+            gc->SetBrush(wxBrush(inner_background_color.colorForStates(states)));
         }
-		gc->SetPen(wxPen(border_color.colorForStates(states),2));
-		gc->DrawPath(path);
-	}
+        gc->SetPen(wxPen(border_color.colorForStates(states), 2));
+        gc->DrawPath(path);
+    }
 
-	//draw rectangle gap
-	gc->SetPen(blank_bg.colorForStates(StateColor::Normal));
-	gc->SetBrush(blank_bg.colorForStates(StateColor::Normal));
-	gc->PushState();
-	gc->Rotate(-PI / 4);
-	gc->DrawRectangle(-sqrt2 * size.x / 2, -sqrt2 * gap / 2, sqrt2 * size.x, sqrt2 * gap);
-	gc->Rotate(-PI / 2);
-	gc->DrawRectangle(-sqrt2 * size.x / 2, -sqrt2 * gap / 2, sqrt2 * size.x, sqrt2 * gap);
-	gc->PopState();
+    // draw rectangle gap
+    gc->SetPen(blank_bg.colorForStates(StateColor::Normal));
+    gc->SetBrush(blank_bg.colorForStates(StateColor::Normal));
+    gc->PushState();
+    gc->Rotate(-PI / 4);
+    gc->DrawRectangle(-sqrt2 * size.x / 2, -sqrt2 * gap / 2, sqrt2 * size.x, sqrt2 * gap);
+    gc->Rotate(-PI / 2);
+    gc->DrawRectangle(-sqrt2 * size.x / 2, -sqrt2 * gap / 2, sqrt2 * size.x, sqrt2 * gap);
+    gc->PopState();
 
-	// draw the home circle
+    // draw the home circle
     wxGraphicsPath home_path = gc->CreatePath();
     home_path.AddCircle(0, 0, r_home);
     home_path.CloseSubpath();
@@ -216,12 +224,13 @@ void AxisCtrlButton::render(wxDC& dc)
     gc->DrawPath(home_path);
 
     if (m_icon.bmp().IsOk()) {
-        gc->DrawBitmap(m_icon.bmp(), -1 * m_icon.GetBmpWidth() / 2, -1 * m_icon.GetBmpHeight() / 2, m_icon.GetBmpWidth(), m_icon.GetBmpHeight());
+        gc->DrawBitmap(m_icon.bmp(), -1 * m_icon.GetBmpWidth() / 2, -1 * m_icon.GetBmpHeight() / 2, m_icon.GetBmpWidth(),
+                       m_icon.GetBmpHeight());
     }
     gc->PopState();
 
-	//draw linear border of the arc
-	if (current_pos != CurrentPos::UNDEFINED) {
+    // draw linear border of the arc
+    if (current_pos != CurrentPos::UNDEFINED) {
         gc->PushState();
         gc->SetPen(wxPen(border_color.colorForStates(states), 2));
 
@@ -249,39 +258,38 @@ void AxisCtrlButton::render(wxDC& dc)
             gc->StrokePath(line_path2);
         }
         gc->PopState();
-	}
+    }
 
-	//draw text
+    // draw text
     if (!IsEnabled())
         gc->SetFont(Label::Body_12, text_color.colorForStates(StateColor::Disabled));
     else
-	    gc->SetFont(Label::Head_12, text_color.colorForStates(states));
-	wxDouble w, h;
-	gc->GetTextExtent("Y", &w, &h);
-	gc->DrawText(wxT("Y"), -w / 2, -r_outer + (r_outer - r_inner) / 2 - h / 2);
-	gc->GetTextExtent("-X", &w, &h);
-	gc->DrawText(wxT("-X"), -r_outer + (r_outer - r_inner) / 2 - w / 2, - h / 2);
-	gc->GetTextExtent("-Y", &w, &h);
-	gc->DrawText(wxT("-Y"), -w / 2, r_outer - (r_outer - r_inner) / 2 - h / 2);
-	gc->GetTextExtent("X", &w, &h);
-	gc->DrawText(wxT("X"), r_outer - (r_outer - r_inner) / 2 - w / 2, -h / 2);
+        gc->SetFont(Label::Head_12, text_color.colorForStates(states));
+    wxDouble w, h;
+    gc->GetTextExtent("Y", &w, &h);
+    gc->DrawText(wxT("Y"), -w / 2, -r_outer + (r_outer - r_inner) / 2 - h / 2);
+    gc->GetTextExtent("-X", &w, &h);
+    gc->DrawText(wxT("-X"), -r_outer + (r_outer - r_inner) / 2 - w / 2, -h / 2);
+    gc->GetTextExtent("-Y", &w, &h);
+    gc->DrawText(wxT("-Y"), -w / 2, r_outer - (r_outer - r_inner) / 2 - h / 2);
+    gc->GetTextExtent("X", &w, &h);
+    gc->DrawText(wxT("X"), r_outer - (r_outer - r_inner) / 2 - w / 2, -h / 2);
 
-	gc->SetFont(Label::Body_12, text_num_color);
+    gc->SetFont(Label::Body_12, text_num_color);
 
-	gc->PushState();
-	gc->Rotate(PI / 4);
-	gc->GetTextExtent("+10", &w, &h);
-	gc->DrawText(wxT("+10"), sqrt2 * gap, -r_outer + (r_outer - r_inner) / 2 - h / 2);
-	gc->GetTextExtent("+1", &w, &h);
-	gc->DrawText(wxT("+1"), sqrt2 * gap, -r_inner + (r_inner - r_blank) / 2 - h / 2);
-	gc->GetTextExtent("-1", &w, &h);
-	gc->DrawText(wxT("-1"), sqrt2 * gap, r_inner - (r_inner - r_blank) / 2 - h / 2);
-	gc->GetTextExtent("-10", &w, &h);
-	gc->DrawText(wxT("-10"), sqrt2 * gap, r_outer - (r_outer - r_inner) / 2 - h / 2);
-	gc->PopState();
+    gc->PushState();
+    gc->Rotate(PI / 4);
+    gc->GetTextExtent("+10", &w, &h);
+    gc->DrawText(wxT("+10"), sqrt2 * gap, -r_outer + (r_outer - r_inner) / 2 - h / 2);
+    gc->GetTextExtent("+1", &w, &h);
+    gc->DrawText(wxT("+1"), sqrt2 * gap, -r_inner + (r_inner - r_blank) / 2 - h / 2);
+    gc->GetTextExtent("-1", &w, &h);
+    gc->DrawText(wxT("-1"), sqrt2 * gap, r_inner - (r_inner - r_blank) / 2 - h / 2);
+    gc->GetTextExtent("-10", &w, &h);
+    gc->DrawText(wxT("-10"), sqrt2 * gap, r_outer - (r_outer - r_inner) / 2 - h / 2);
+    gc->PopState();
 
-
-	gc->PopState();
+    gc->PopState();
 }
 
 void AxisCtrlButton::mouseDown(wxMouseEvent& event)
@@ -298,73 +306,59 @@ void AxisCtrlButton::mouseReleased(wxMouseEvent& event)
     if (pressedDown) {
         pressedDown = false;
         ReleaseMouse();
-        if (wxRect({ 0, 0 }, GetSize()).Contains(event.GetPosition()))
+        if (wxRect({0, 0}, GetSize()).Contains(event.GetPosition()))
             sendButtonEvent();
     }
 }
 
 void AxisCtrlButton::mouseMoving(wxMouseEvent& event)
 {
+    // [STATE] Hover state is a pure function of pointer position relative to the cached center/radii;
+    // the enum value doubles as the event payload and the paint-time selection of the active sector.
     if (pressedDown)
         return;
-	wxPoint mouse_pos(event.GetX(), event.GetY());
-	wxPoint transformed_mouse_pos = mouse_pos - center;
-	double r_temp = transformed_mouse_pos.x * transformed_mouse_pos.x + transformed_mouse_pos.y * transformed_mouse_pos.y;
-	if (r_temp > r_outer * r_outer) {
-		current_pos = CurrentPos::UNDEFINED;
-	}
-	else if (r_temp > r_inner * r_inner) {
-		if (transformed_mouse_pos.y < transformed_mouse_pos.x - gap && transformed_mouse_pos.y < -transformed_mouse_pos.x - gap)
-		{
-			current_pos = CurrentPos::OUTER_UP;
-		}
-		else if (transformed_mouse_pos.y > transformed_mouse_pos.x + gap && transformed_mouse_pos.y < -transformed_mouse_pos.x - gap)
-		{
-			current_pos = CurrentPos::OUTER_LEFT;
-		}
-		else if (transformed_mouse_pos.y > transformed_mouse_pos.x + gap && transformed_mouse_pos.y > -transformed_mouse_pos.x + gap)
-		{
-			current_pos = CurrentPos::OUTER_DOWN;
-		}
-		else if (transformed_mouse_pos.y < transformed_mouse_pos.x - gap && transformed_mouse_pos.y > -transformed_mouse_pos.x + gap)
-		{
-			current_pos = CurrentPos::OUTER_RIGHT;
-		}
-        else {
+    wxPoint mouse_pos(event.GetX(), event.GetY());
+    wxPoint transformed_mouse_pos = mouse_pos - center;
+    double  r_temp                = transformed_mouse_pos.x * transformed_mouse_pos.x + transformed_mouse_pos.y * transformed_mouse_pos.y;
+    if (r_temp > r_outer * r_outer) {
+        current_pos = CurrentPos::UNDEFINED;
+    } else if (r_temp > r_inner * r_inner) {
+        if (transformed_mouse_pos.y < transformed_mouse_pos.x - gap && transformed_mouse_pos.y < -transformed_mouse_pos.x - gap) {
+            current_pos = CurrentPos::OUTER_UP;
+        } else if (transformed_mouse_pos.y > transformed_mouse_pos.x + gap && transformed_mouse_pos.y < -transformed_mouse_pos.x - gap) {
+            current_pos = CurrentPos::OUTER_LEFT;
+        } else if (transformed_mouse_pos.y > transformed_mouse_pos.x + gap && transformed_mouse_pos.y > -transformed_mouse_pos.x + gap) {
+            current_pos = CurrentPos::OUTER_DOWN;
+        } else if (transformed_mouse_pos.y < transformed_mouse_pos.x - gap && transformed_mouse_pos.y > -transformed_mouse_pos.x + gap) {
+            current_pos = CurrentPos::OUTER_RIGHT;
+        } else {
             current_pos = CurrentPos::UNDEFINED;
         }
-	}
-	else if (r_temp > r_blank * r_blank) {
-		if (transformed_mouse_pos.y < transformed_mouse_pos.x - gap && transformed_mouse_pos.y < -transformed_mouse_pos.x - gap)
-		{
-			current_pos = CurrentPos::INNER_UP;
-		}
-		else if (transformed_mouse_pos.y > transformed_mouse_pos.x + gap && transformed_mouse_pos.y < -transformed_mouse_pos.x - gap)
-		{
-			current_pos = CurrentPos::INNER_LEFT;
-		}
-		else if (transformed_mouse_pos.y > transformed_mouse_pos.x + gap && transformed_mouse_pos.y > -transformed_mouse_pos.x + gap)
-		{
-			current_pos = CurrentPos::INNER_DOWN;
-		}
-		else if (transformed_mouse_pos.y < transformed_mouse_pos.x - gap && transformed_mouse_pos.y > -transformed_mouse_pos.x + gap)
-		{
-			current_pos = CurrentPos::INNER_RIGHT;
-		}
-        else {
+    } else if (r_temp > r_blank * r_blank) {
+        if (transformed_mouse_pos.y < transformed_mouse_pos.x - gap && transformed_mouse_pos.y < -transformed_mouse_pos.x - gap) {
+            current_pos = CurrentPos::INNER_UP;
+        } else if (transformed_mouse_pos.y > transformed_mouse_pos.x + gap && transformed_mouse_pos.y < -transformed_mouse_pos.x - gap) {
+            current_pos = CurrentPos::INNER_LEFT;
+        } else if (transformed_mouse_pos.y > transformed_mouse_pos.x + gap && transformed_mouse_pos.y > -transformed_mouse_pos.x + gap) {
+            current_pos = CurrentPos::INNER_DOWN;
+        } else if (transformed_mouse_pos.y < transformed_mouse_pos.x - gap && transformed_mouse_pos.y > -transformed_mouse_pos.x + gap) {
+            current_pos = CurrentPos::INNER_RIGHT;
+        } else {
             current_pos = CurrentPos::UNDEFINED;
         }
     } else if (r_temp <= r_home * r_home) {
         current_pos = INNER_HOME;
     }
-	if (last_pos != current_pos) {
-		last_pos = current_pos;
-		Refresh();
-	}
+    if (last_pos != current_pos) {
+        last_pos = current_pos;
+        Refresh();
+    }
 }
 
 void AxisCtrlButton::sendButtonEvent()
 {
+    // [EVENT] The clicked sector is forwarded as wxCommandEvent::SetInt so the parent can dispatch
+    // a jog/home action without depending on the control's internal sector geometry.
     wxCommandEvent event(wxEVT_COMMAND_BUTTON_CLICKED, GetId());
     event.SetEventObject(this);
     event.SetInt(current_pos);

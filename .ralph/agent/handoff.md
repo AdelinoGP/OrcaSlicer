@@ -2459,3 +2459,14 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3 x1
 - Git: Annotate AnimaController declaration boundary
 - Next recommended Phase 1 task: T645 annotate: src/slic3r/GUI/Widgets/AxisCtrlButton.cpp
+## Phase 1 - Task T645 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/AxisCtrlButton.cpp
+- Deliverables: src/slic3r/GUI/Widgets/AxisCtrlButton.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 5 boundary comment blocks covering widget intent, event routing, state-colored rendering, hover-sector hit testing, and command-event dispatch
+- Verification excerpt: `[UNITY] Best fit is a custom radial joystick/jog control built on a retained UI Toolkit element or immediate-mode mesh, with sector hit-testing kept in a shared geometry helper.`
+- Unity-impact summary: radial jog control maps to a custom retained control; paint geometry and hit-testing must stay synchronized; sector selection should be forwarded as an explicit command payload
+- Hazards found: P2 x1
+- Git: Annotate AxisCtrlButton radial control
+- Next recommended Phase 1 task: T646 annotate: src/slic3r/GUI/Widgets/AxisCtrlButton.hpp

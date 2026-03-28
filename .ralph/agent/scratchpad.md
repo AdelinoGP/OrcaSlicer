@@ -296,3 +296,7 @@
 
 - Reconciled the task state for the AnimaController pair: T643 is already marked done in `.ralph/ralph-tasks.md`, so the active file for this iteration is T644 (`src/slic3r/GUI/Widgets/AnimaController.hpp`).
 - The header is the declaration boundary for the same widget, so I am adding class-level intent/state/thread/Unity notes plus a porting hazard for the fixed-frame playback assumptions before committing this atomic header annotation.
+
+- T645 (`src/slic3r/GUI/Widgets/AxisCtrlButton.cpp`) is annotated and verified with `git diff --check`.
+- The widget is a radial jog control: CPU-side vector paint, pointer-sector hit testing, and command-event dispatch all stay tied to the same geometry, so the Unity port needs a custom radial controller plus a shared geometry helper.
+- Next task should be T646 (`src/slic3r/GUI/Widgets/AxisCtrlButton.hpp`).
