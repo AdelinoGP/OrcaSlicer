@@ -2372,3 +2372,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x5, P3 x1
 - Git: pending commit for AMSControl.cpp annotation
 - Next recommended Phase 1 task: T640 annotate: src/slic3r/GUI/Widgets/AMSControl.hpp
+
+## Phase 1 - Task T640 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/AMSControl.hpp
+- Deliverables: src/slic3r/GUI/Widgets/AMSControl.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 11 boundary comment groups covering class intent, state caches, widget ownership, action flow, mode switching, event routing, thread boundary, and Unity mapping
+- Verification excerpt: `[PORTING_HAZARD:P2] wxSimplebook/page ownership and the raw popup pointers make teardown and refresh ordering implicit; Unity should centralize ownership instead.`
+- Unity-impact summary:
+  - Model the AMS dashboard as a presenter with retained selection/page state.
+  - Split popups and tips into dedicated overlay controllers.
+  - Keep machine snapshot parsing and pass-road updates on a main-thread refresh boundary.
+- Hazards found: P2 x1
+- Git: Annotate AMSControl.hpp boundary
+- Next recommended Phase 1 task: T641 annotate: src/slic3r/GUI/Widgets/AMSItem.cpp

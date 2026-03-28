@@ -558,7 +558,7 @@ Last updated: 2026-03-28T07:59:08Z
 - [x] T637 annotate: src/slic3r/GUI/WebViewDialog.cpp
 - [x] T638 annotate: src/slic3r/GUI/WebViewDialog.hpp
 - [~] T639 annotate: src/slic3r/GUI/Widgets/AMSControl.cpp
-- [ ] T640 annotate: src/slic3r/GUI/Widgets/AMSControl.hpp
+- [x] T640 annotate: src/slic3r/GUI/Widgets/AMSControl.hpp
 - [ ] T641 annotate: src/slic3r/GUI/Widgets/AMSItem.cpp
 - [ ] T642 annotate: src/slic3r/GUI/Widgets/AMSItem.hpp
 - [ ] T643 annotate: src/slic3r/GUI/Widgets/AnimaController.cpp

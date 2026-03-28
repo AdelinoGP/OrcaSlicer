@@ -268,3 +268,7 @@
 - Started T639 (`src/slic3r/GUI/Widgets/AMSControl.cpp`) as the AMS dashboard/controller.
 - The file owns the preview pages, per-AMS item widgets, load/unload/refill events, humidity popups, and the pass-road state machine, so the annotation focus is on state transitions, UI-thread refreshes, and the selection/transport-path split for Unity.
 - Plan: keep the comments centered on mode switching, live device reconciliation, selection syncing, and route-progress rendering, then verify with `git diff --check` before closing the task.
+
+- Completed T640 (`src/slic3r/GUI/Widgets/AMSControl.hpp`) as the declaration boundary for the retained AMS dashboard.
+- The header now records the selection/page caches, widget ownership groups, virtual-AMS state, event handlers, and the Unity split between a presenter controller and popup overlays.
+- Next step after commit: close T640 in the runtime registry, then move to T641 (`src/slic3r/GUI/Widgets/AMSItem.cpp`).

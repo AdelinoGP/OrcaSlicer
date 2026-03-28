@@ -2,6 +2,10 @@
 
 ## Patterns
 
+### mem-1774685334-3cdf
+> AMSControl.hpp is the declaration boundary for the retained AMS dashboard: it caches current slot/page state, owns popup/controller pointers, and should port as a presenter MonoBehaviour with separate overlay controllers.
+<!-- tags: gui, unity, widgets, ams | created: 2026-03-28 -->
+
 ### mem-1774684653-cce1
 > AMSControl.cpp is a stateful AMS dashboard: it owns preview pages, item widgets, humidity popups, and the load/unload event bridge, so Unity should model it as a presenter with retained slot groups and explicit selection/state transitions.
 <!-- tags: gui, unity, widgets, ams | created: 2026-03-28 -->
