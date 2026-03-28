@@ -505,7 +505,7 @@ Last updated: 2026-03-28T02:01:10Z
 - [x] T584 annotate: src/slic3r/GUI/SendSystemInfoDialog.hpp
 - [x] T585 annotate: src/slic3r/GUI/SendToPrinter.cpp
 - [x] T586 annotate: src/slic3r/GUI/SendToPrinter.hpp
-- [ ] T587 annotate: src/slic3r/GUI/SingleChoiceDialog.cpp
+- [x] T587 annotate: src/slic3r/GUI/SingleChoiceDialog.cpp
 - [ ] T588 annotate: src/slic3r/GUI/SingleChoiceDialog.hpp
 - [ ] T589 annotate: src/slic3r/GUI/SkipPartCanvas.cpp
 - [ ] T590 annotate: src/slic3r/GUI/SkipPartCanvas.hpp

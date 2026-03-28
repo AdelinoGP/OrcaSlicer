@@ -31,6 +31,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate SendToPrinter.hpp boundary
 - Next recommended Phase 1 task: T587 annotate: src/slic3r/GUI/SingleChoiceDialog.cpp
 
+## Phase 1 - Task T587 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SingleChoiceDialog.cpp
+- Deliverables: src/slic3r/GUI/SingleChoiceDialog.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 5 boundary comments covering modal intent, transient selection state, empty-list hazard, button events, and the fixed-layout DPI hook
+- Verification excerpt: `[PORTING_HAZARD:P2] The constructor assumes at least one choice; the Unity port should validate or normalize empty lists before opening.`
+- Unity-impact summary: modal choice dialog maps cleanly to a dismissible overlay; the selection stays widget-owned until confirm; layout can be responsive without a manual DPI callback
+- Hazards found: P2 x1 (empty choice-list assumption)
+- Git: Annotate SingleChoiceDialog selection flow
+- Next recommended Phase 1 task: T588 annotate: src/slic3r/GUI/SingleChoiceDialog.hpp
+
 ## Tasks
 
 ### Completed

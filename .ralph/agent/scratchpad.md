@@ -51,3 +51,7 @@
 - Started T586 (`src/slic3r/GUI/SendToPrinter.hpp`) as the declaration boundary for the same modal send workflow.
 - The header is the state-machine seam: it owns printer/device selection state, transfer-job lifetimes, timer-driven refresh, and the public event surface that the cpp wires up.
 - Plan: keep the annotation focused on declaration-level [INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY] boundaries, then close the task and continue to the next header in the queue.
+
+- Started T587 (`src/slic3r/GUI/SingleChoiceDialog.cpp`) as a compact modal choice dialog.
+- The file is a thin DPIDialog wrapper around a read-only ComboBox plus OK/Cancel dismissal, with one obvious Unity hazard: it assumes a non-empty choice list when seeding the combo.
+- Plan: keep the annotations focused on the modal wrapper boundary, transient selection state, button/event flow, the empty-list hazard, and the fixed-layout DPI hook, then close the task and move to T588 (`src/slic3r/GUI/SingleChoiceDialog.hpp`).
