@@ -171,3 +171,7 @@
 
 - Completed T614 (`src/slic3r/GUI/TextLines.hpp`) with declaration-boundary annotations for the preview cache, init/render separation, reset semantics, and the line-height helper.
 - Verification: `git diff --check -- src/slic3r/GUI/TextLines.hpp .ralph/agent/scratchpad.md .ralph/ralph-tasks.md` passed; next step is T615 (`src/slic3r/GUI/ThermalPreconditioningDialog.cpp`).
+
+- Started T615 (`src/slic3r/GUI/ThermalPreconditioningDialog.cpp`) as the thermal preconditioning countdown dialog.
+- The file is a short-lived modal status window driven by a UI-thread wxTimer; it polls DeviceManager for the selected machine, formats the remaining time, and closes through the OK event.
+- Plan: keep the annotations centered on event-table routing, timer ownership/lifetime, countdown state, and the Unity split to a modal controller with a scheduled tick, then verify with `git diff --check` and close the task.

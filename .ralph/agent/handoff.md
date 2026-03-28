@@ -233,6 +233,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate TaskManager scheduler boundary
 - Next recommended Phase 1 task: T612 annotate: src/slic3r/GUI/TaskManager.hpp
 
+## Phase 1 - Task T615 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/ThermalPreconditioningDialog.cpp
+- Deliverables: src/slic3r/GUI/ThermalPreconditioningDialog.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md, .ralph/ralph-tasks.md, .ralph/agent/memories.md
+- Substantive additions: 7 boundary comments covering event routing, modal intent/state, timer lifetime, UI layout, confirm dismissal, countdown recomputation, and timer stop conditions
+- Verification excerpt: `[PORTING_HAZARD:P2] stage_curr == 58 is a protocol magic value, and get_my_machine() is assumed to succeed without a null check.`
+- Unity-impact summary: modal controller with a scheduled tick; retained countdown label bound to device-state data; explicit state/service split for machine lookup and stage gating
+- Hazards found: P2 x1, UNCLEAR x1
+- Git: Annotate ThermalPreconditioningDialog countdown dialog
+- Next recommended Phase 1 task: T616 annotate: src/slic3r/GUI/ThermalPreconditioningDialog.hpp
+
 ## Tasks
 
 ### Completed

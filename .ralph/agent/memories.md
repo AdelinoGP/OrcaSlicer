@@ -2,6 +2,26 @@
 
 ## Patterns
 
+### mem-1774675021-483b
+> ThermalPreconditioningDialog is a UI-thread modal countdown that polls DeviceManager with wxTimer ticks; stage_curr == 58 is the thermal-preconditioning gate and should become an explicit state enum in Unity.
+<!-- tags: gui, unity, dialog, threading | created: 2026-03-28 -->
+
+### mem-1774674524-ac00
+> TextLinesModel rebuilds embossed text previews by slicing model volumes into per-line contours, then renders cached GLModel geometry through the flat shader; Unity should split mesh generation into a worker/job service and keep render-time drawing on a dedicated material path.
+<!-- tags: gui, unity, opengl | created: 2026-03-28 -->
+
+### mem-1774673200-968a
+> Tab.hpp is the preset-controller boundary: Page owns per-preset option groups and visibility state, Tab caches preset/page/dirty-state machinery, and the Unity split should use a retained tab controller with derived printer/filament pages.
+<!-- tags: gui, unity, tabs | created: 2026-03-28 -->
+
+### mem-1774672930-fc5e
+> TabButton.hpp is the declaration boundary for the custom tab button widget: it caches label/icon metrics, repaints on property changes, and forwards mouse clicks as command-style selection events, so Unity should use a retained toggle row with explicit layout invalidation.
+<!-- tags: gui, unity, tabs | created: 2026-03-28 -->
+
+### mem-1774672492-cc09
+> TabButton.cpp is a custom-painted sidebar tab control: it measures label/icon content, re-emits mouse clicks as command events, and should map to a retained UI Toolkit button/toggle with separate badge visuals and parent-owned selection state.
+<!-- tags: gui, unity, tabs | created: 2026-03-28 -->
+
 ### mem-1774671570-142f
 > TabButtonsListCtrl is a custom left-rail notebook shell: it reparents a caller-owned sizer, paints only the selected-page chrome, posts wxCUSTOMEVT_TABBOOK_SEL_CHANGED on button click, and a Unity port should use a vertical tab rail with shared selection state and a separate footer row.
 <!-- tags: gui, unity, tabs | created: 2026-03-28 -->
@@ -237,6 +257,10 @@
 ## Decisions
 
 ## Fixes
+
+### mem-1774673200-a877
+> failure: cmd=read /mnt/vm_shared/slicerProject/OrcaSlicerDocumented_tests/src/slic3r/GUI/Widgets/TabButton.hpp, exit=1, error=File not found; correct file is src/slic3r/GUI/TabButton.hpp, next=use the actual repo-relative path or glob before reading
+<!-- tags: tooling, error-handling | created: 2026-03-28 -->
 
 ### mem-1774669621-68df
 > failure: cmd=/home/admin/.config/nvm/versions/node/v24.14.0/lib/node_modules/@ralph-orchestrator/ralph-cli/node_modules/.bin_real/ralph tools task list --format json | python - <<'PY'\nimport sys, json\nitems=json.load(sys.stdin)\nPY, exit=1, error=JSONDecodeError from empty stdin, next=inspect task list output format before piping
