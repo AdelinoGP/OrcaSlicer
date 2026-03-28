@@ -82,3 +82,7 @@
 - Started T593 (`src/slic3r/GUI/SlicingProgressNotification.cpp`) for the slice-progress HUD overlay.
 - The file is a UI-thread-owned immediate-mode notification that drives a small progress state machine, late print-info enrichment, and an embedded Daily Tips panel on the canvas overlay.
 - Plan: keep the annotation focused on the state transitions, render path, button events, and Unity mapping to a retained HUD controller, then verify with a diff check and close the task.
+
+- Started T594 (`src/slic3r/GUI/SlicingProgressNotification.hpp`) as the declaration boundary for the same overlay.
+- The header needs class-level intent plus the key state fields: progress mode, sidebar fade behavior, export availability, cancel callback, and the embedded DailyTipsPanel.
+- Plan: add compact boundary comments that preserve the current fade/state semantics and spell out the Unity split as a screen-space HUD controller with a reusable child panel, then verify with `git diff --check` and close the task.

@@ -103,6 +103,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: annotate SlicingProgressNotification overlay
 - Next recommended Phase 1 task: T594 annotate: src/slic3r/GUI/SlicingProgressNotification.hpp
 
+## Phase 1 - Task T594 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SlicingProgressNotification.hpp
+- Deliverables: src/slic3r/GUI/SlicingProgressNotification.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 6 boundary comments covering class intent, transient state, event flow, UI-thread ownership, Unity mapping, and a P2 porting hazard; plus state-field annotations for the notification mode and fade behavior
+- Verification excerpt: `[THREAD] The notification is UI-thread-owned; the cancel callback and late-state updates must re-enter through the notification manager rather than mutate rendering state from workers.`
+- Unity-impact summary: screen-space HUD controller keeps the state machine explicit; DailyTips stays as a reusable child panel; worker-thread mutation remains out of band
+- Hazards found: P2 x1 (lifecycle, rendering, and interaction are coupled in one overlay class)
+- Git: Annotate SlicingProgressNotification header boundary
+- Next recommended Phase 1 task: T595 annotate: src/slic3r/GUI/StatusPanel.cpp
+
 ## Tasks
 
 ### Completed
