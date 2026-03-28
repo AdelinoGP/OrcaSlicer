@@ -19,6 +19,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate SendToPrinter send workflow
 - Next recommended Phase 1 task: T586 annotate: src/slic3r/GUI/SendToPrinter.hpp
 
+## Phase 1 - Task T586 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SendToPrinter.hpp
+- Deliverables: src/slic3r/GUI/SendToPrinter.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 4 boundary comments covering dialog intent, shared state, event surface, thread handoff, Unity mapping, and porting hazard
+- Verification excerpt: `[UNITY] Map this to a modal controller with a ScriptableObject-backed printer/device model and an async upload service.`
+- Unity-impact summary: modal controller boundary is explicit; background transfer jobs stay behind the dialog; state machine and widget ownership are called out separately
+- Hazards found: P2 x1 (protocol selection and dialog re-entry are interleaved with widget ownership)
+- Git: Annotate SendToPrinter.hpp boundary
+- Next recommended Phase 1 task: T587 annotate: src/slic3r/GUI/SingleChoiceDialog.cpp
+
 ## Tasks
 
 ### Completed

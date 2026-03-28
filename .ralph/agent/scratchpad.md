@@ -47,3 +47,7 @@
 - The file combines printer discovery, storage selection, rename validation, device sync, tunnel setup, and upload progress/timeouts; the key Unity mapping is a modal controller backed by an async connection/upload service plus explicit main-thread marshaling for status updates.
 - Plan: add a small set of high-value boundary comments around dialog intent/state, refresh and connection threading, send/upload flow, and timeout/cancel hazards, then verify and close the task.
 - Completed T585 with boundary annotations on the send state machine, async device fetch, tunnel connection, upload callbacks, and teardown path.
+
+- Started T586 (`src/slic3r/GUI/SendToPrinter.hpp`) as the declaration boundary for the same modal send workflow.
+- The header is the state-machine seam: it owns printer/device selection state, transfer-job lifetimes, timer-driven refresh, and the public event surface that the cpp wires up.
+- Plan: keep the annotation focused on declaration-level [INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY] boundaries, then close the task and continue to the next header in the queue.
