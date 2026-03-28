@@ -304,3 +304,7 @@
 - Completed T646 (`src/slic3r/GUI/Widgets/AxisCtrlButton.hpp`) with class-level annotations for the retained radial control, geometry/state caches, event handlers, and the typed command-payload Unity mapping.
 - Verification: `git diff --check -- src/slic3r/GUI/Widgets/AxisCtrlButton.hpp` passed; the diagnostics shown by the editor were include-path noise from the wx headers, not from the inserted comments.
 - Next recommended task is T652 (`src/slic3r/GUI/Widgets/ComboBox.hpp`).
+
+- Completed T652 (`src/slic3r/GUI/Widgets/ComboBox.hpp`) with class-level annotations for the composite editable/popup control, item-model state, event routing, Windows message handling, and Unity migration split.
+- Verification: `git diff --check -- src/slic3r/GUI/Widgets/ComboBox.hpp` passed; the LSP diagnostics are environment/include-path noise from wx headers, not syntax issues in the annotation block.
+- Next recommended task is T653 (`src/slic3r/GUI/Widgets/DialogButtons.cpp`).

@@ -118,6 +118,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate Tab preset controller boundary
 - Next recommended Phase 1 task: T611 annotate: src/slic3r/GUI/TaskManager.cpp
 
+## Phase 1 - Task T652 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/ComboBox.hpp
+- Deliverables: src/slic3r/GUI/Widgets/ComboBox.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 6 boundary comments covering class intent, state ownership, item mutation, selection event emission, Windows message interception, and low-level input routing
+- Verification excerpt: `[PORTING_HAZARD:P2] wxItemContainer-style mutation exposes per-item client data, bitmaps, aliases, and tooltips directly; Unity needs an explicit item view-model instead of mutating widgets in place.`
+- Unity-impact summary: editable text + popup list maps to a composite control; item state needs a retained model; replace-text/image mode needs a separate display renderer
+- Hazards found: P2 x1, P3 x1
+- Git: Annotate ComboBox header boundary
+- Next recommended Phase 1 task: T653 annotate: src/slic3r/GUI/Widgets/DialogButtons.cpp
+
 ## Phase 1 - Task T631 complete
 
 - Task type: annotate
