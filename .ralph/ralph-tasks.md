@@ -509,7 +509,7 @@ Last updated: 2026-03-28T02:44:00Z
 - [x] T588 annotate: src/slic3r/GUI/SingleChoiceDialog.hpp
 - [x] T589 annotate: src/slic3r/GUI/SkipPartCanvas.cpp
 - [x] T590 annotate: src/slic3r/GUI/SkipPartCanvas.hpp
-- [ ] T591 annotate: src/slic3r/GUI/SliceInfoPanel.cpp
+- [x] T591 annotate: src/slic3r/GUI/SliceInfoPanel.cpp
 - [ ] T592 annotate: src/slic3r/GUI/SliceInfoPanel.hpp
 - [ ] T593 annotate: src/slic3r/GUI/SlicingProgressNotification.cpp
 - [ ] T594 annotate: src/slic3r/GUI/SlicingProgressNotification.hpp

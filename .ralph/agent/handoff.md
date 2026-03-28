@@ -238,7 +238,7 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Deliverables: src/slic3r/GUI/SceneRaycaster.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
 - Substantive additions: 5 annotation blocks covering scene-picking intent, pick registry state, UI-thread hit queries, selected-volume bias, and OpenGL debug overlay mapping
 - Verification excerpt: `[UNITY] Port this as a dedicated scene-query service backed by collider/raycast layers plus an explicit selection-priority policy.`
-- Unity-impact summary: 
+- Unity-impact summary:
   - Preserve bucket ordering for gizmos, fallback gizmos, beds, and volumes.
   - Carry the selected-volume bias into the Unity selection controller.
   - Render debug hit markers through a gizmo/debug pass instead of gameplay rendering.
@@ -1364,6 +1364,18 @@ Continue the previous work. Remaining tasks (336):
 - T817 annotate: src/slic3r/Utils/WebSocketClient.hpp
 - T818 annotate: src/slic3r/Utils/WxFontUtils.cpp
 - T819 annotate: src/slic3r/Utils/WxFontUtils.hpp
+
+## Phase 1 - Task T591 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SliceInfoPanel.cpp
+- Deliverables: src/slic3r/GUI/SliceInfoPanel.cpp
+- Substantive additions: 7 comments covering popup intent, color decoding state, async thumbnail flow, stale-request cancellation, and DPI rescale behavior
+- Verification excerpt: `// [THREAD] Thumbnail loading is asynchronous; on completion the response stream is converted to`
+- Unity-impact summary: preview popup becomes a floating detail view; async thumbnail fetch/cancel stays outside the view; DPI sizing remains a layout concern.
+- Hazards found: none
+- Git: working tree updated, commit pending
+- Next recommended Phase 1 task: T592 src/slic3r/GUI/SliceInfoPanel.hpp
 - annotate: src/slic3r/GUI/2DBed.cpp
 - annotate: src/slic3r/GUI/2DBed.hpp
 - annotate: src/slic3r/GUI/3DBed.cpp

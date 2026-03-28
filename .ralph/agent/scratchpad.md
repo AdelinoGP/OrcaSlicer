@@ -70,3 +70,7 @@
 - Started T590 on `src/slic3r/GUI/SkipPartCanvas.hpp` and annotated the declaration boundary for the color-picking canvas, its event surface, and the 3MF metadata parser helper.
 - The header confirms the Unity split: a RenderTexture-backed controller for pick/zoom/drag behavior, plus a separate import service for plate/object parsing.
 - Next step after commit: close T590 and move to T591 (`src/slic3r/GUI/SliceInfoPanel.cpp`).
+
+- Completed T591 (`src/slic3r/GUI/SliceInfoPanel.cpp`) with annotations around popup intent, filament color decoding, async thumbnail refresh/cancel behavior, and DPI rescaling.
+- The panel is a compact summary card plus detail popup rather than a single tooltip, and the Unity port should keep the thumbnail fetch/cancel path isolated from the view so stale image responses cannot win.
+- Next step after commit: close T591 and move to T592 (`src/slic3r/GUI/SliceInfoPanel.hpp`).

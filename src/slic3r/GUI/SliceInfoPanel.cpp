@@ -4,39 +4,38 @@
 #include "I18N.hpp"
 #include "Widgets/Label.hpp"
 #include "libslic3r/Utils.hpp"
-#include "GUI_App.hpp"//for  ICON_SIZE (wxSize(FromDIP(16), FromDIP(16)))
+#include "GUI_App.hpp" //for  ICON_SIZE (wxSize(FromDIP(16), FromDIP(16)))
 
-namespace Slic3r {
-namespace GUI {
+namespace Slic3r { namespace GUI {
 
-#define THUMBNAIL_SIZE  (wxSize(FromDIP(60), FromDIP(60)))
+// [INTENT] This panel pair shows a compact slice summary: the popup renders per-filament details,
+// while the embedded panel keeps the always-visible thumbnail, ETA, weight, and print action.
+#define THUMBNAIL_SIZE (wxSize(FromDIP(60), FromDIP(60)))
 #define PRINT_ICON_SIZE (wxSize(FromDIP(18), FromDIP(18)))
 
 wxIMPLEMENT_CLASS(SliceInfoPopup, PopupWindow);
 
-wxBEGIN_EVENT_TABLE(SliceInfoPopup, PopupWindow)
-    EVT_MOUSE_EVENTS( SliceInfoPopup::OnMouse )
-    EVT_SIZE(SliceInfoPopup::OnSize)
-    EVT_SET_FOCUS( SliceInfoPopup::OnSetFocus )
-    EVT_KILL_FOCUS( SliceInfoPopup::OnKillFocus )
-wxEND_EVENT_TABLE()
+wxBEGIN_EVENT_TABLE(SliceInfoPopup, PopupWindow) EVT_MOUSE_EVENTS(SliceInfoPopup::OnMouse) EVT_SIZE(SliceInfoPopup::OnSize)
+    EVT_SET_FOCUS(SliceInfoPopup::OnSetFocus) EVT_KILL_FOCUS(SliceInfoPopup::OnKillFocus) wxEND_EVENT_TABLE()
 
-static wxColour BUTTON_BORDER_COL = wxColour(255, 255, 255);
+        static wxColour BUTTON_BORDER_COL = wxColour(255, 255, 255);
 
+// [STATE] Convert RGB brightness to a simple luminance estimate so text stays readable on top of
+// arbitrary filament colors.
 inline float calc_gray(wxColour color)
-{
-    return 0.299 * (float) color.Red() + 0.587 * (float) color.Green() + 0.114 * (float) color.Blue();
-}
+{ return 0.299 * (float) color.Red() + 0.587 * (float) color.Green() + 0.114 * (float) color.Blue(); }
 
-static wxColour decode_color(const std::string &color)
+// [STATE] Filament palette values arrive as '#RRGGBB' strings; malformed input falls back to black.
+static wxColour decode_color(const std::string& color)
 {
     std::array<int, 3> ret = {0, 0, 0};
-    const char *       c   = color.data() + 1;
+    const char*        c   = color.data() + 1;
     if (color.size() == 7 && color.front() == '#') {
         for (size_t j = 0; j < 3; ++j) {
             int digit1 = hex_digit_to_int(*c++);
             int digit2 = hex_digit_to_int(*c++);
-            if (digit1 == -1 || digit2 == -1) break;
+            if (digit1 == -1 || digit2 == -1)
+                break;
 
             ret[j] = float(digit1 * 16 + digit2);
         }
@@ -44,32 +43,33 @@ static wxColour decode_color(const std::string &color)
     return wxColour(ret[0], ret[1], ret[2]);
 }
 
-
-SliceInfoPopup::SliceInfoPopup(wxWindow *parent, wxBitmap bmp, BBLSliceInfo *info)
-   : PopupWindow(parent, wxBORDER_NONE | wxPU_CONTAINS_CONTROLS)
+SliceInfoPopup::SliceInfoPopup(wxWindow* parent, wxBitmap bmp, BBLSliceInfo* info)
+    : PopupWindow(parent, wxBORDER_NONE | wxPU_CONTAINS_CONTROLS)
 {
 #ifdef __WINDOWS__
     SetDoubleBuffered(true);
 #endif
+    // [INTENT] The popup is a scrollable, read-only detail sheet built directly from the slice info
+    // snapshot passed in by the parent panel.
     m_panel = new wxScrolledWindow(this, wxID_ANY);
     m_panel->SetBackgroundColour(*wxWHITE);
 
     m_panel->Bind(wxEVT_MOTION, &SliceInfoPopup::OnMouse, this);
 
-    wxBoxSizer * main_sizer = new wxBoxSizer(wxHORIZONTAL);
-    wxBoxSizer * topSizer   = new wxBoxSizer(wxVERTICAL);
-    wxBoxSizer * caption_sizer = new wxBoxSizer(wxHORIZONTAL);
-    wxBoxSizer * caption_left_sizer = new wxBoxSizer(wxHORIZONTAL);
-    wxBoxSizer * caption_right_sizer = new wxBoxSizer(wxHORIZONTAL);
-    auto prediction_bitmap = new wxStaticBitmap(m_panel, wxID_ANY, create_scaled_bitmap("monitor_item_prediction", nullptr, 16));
-    wxString predict_text;
+    wxBoxSizer* main_sizer          = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* topSizer            = new wxBoxSizer(wxVERTICAL);
+    wxBoxSizer* caption_sizer       = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* caption_left_sizer  = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* caption_right_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto        prediction_bitmap   = new wxStaticBitmap(m_panel, wxID_ANY, create_scaled_bitmap("monitor_item_prediction", nullptr, 16));
+    wxString    predict_text;
     if (info)
         predict_text = get_bbl_monitor_time_dhm(info->prediction);
     auto prediction = new wxStaticText(m_panel, wxID_ANY, predict_text, wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
     caption_left_sizer->Add(prediction_bitmap, 0, wxALIGN_CENTER_VERTICAL | wxALL, FromDIP(5));
     caption_left_sizer->Add(prediction, 1, wxALIGN_CENTER_VERTICAL | wxALL, FromDIP(5));
     prediction->Wrap(-1);
-    auto cost_bitmap = new wxStaticBitmap(m_panel, wxID_ANY, create_scaled_bitmap("monitor_item_cost", nullptr, 16));
+    auto     cost_bitmap = new wxStaticBitmap(m_panel, wxID_ANY, create_scaled_bitmap("monitor_item_cost", nullptr, 16));
     wxString cost_text;
     if (info) {
         if (info->weight > 0) {
@@ -88,7 +88,7 @@ SliceInfoPopup::SliceInfoPopup(wxWindow *parent, wxBitmap bmp, BBLSliceInfo *inf
     topSizer->Add(caption_sizer, 0, wxEXPAND | wxALL, 0);
     auto static_line = new StaticLine(m_panel);
     topSizer->Add(static_line, 0, wxEXPAND | wxALL, 0);
-    wxGridSizer *grid_sizer = new wxGridSizer(2, wxSize(FromDIP(10), 0));
+    wxGridSizer* grid_sizer = new wxGridSizer(2, wxSize(FromDIP(10), 0));
     if (info) {
         for (auto f : info->filaments_info) {
             auto f_sizer = new wxBoxSizer(wxHORIZONTAL);
@@ -96,7 +96,7 @@ SliceInfoPopup::SliceInfoPopup(wxWindow *parent, wxBitmap bmp, BBLSliceInfo *inf
             f_type->SetBorderColor(BUTTON_BORDER_COL);
             wxColour color = decode_color(f.color);
             f_type->SetBackgroundColor(color);
-            auto  textcolor = wxColour(0, 0, 0);
+            auto textcolor = wxColour(0, 0, 0);
             if (calc_gray(color) <= 128)
                 textcolor = wxColour(255, 255, 255);
             else
@@ -109,13 +109,13 @@ SliceInfoPopup::SliceInfoPopup(wxWindow *parent, wxBitmap bmp, BBLSliceInfo *inf
             f_type->SetCornerRadius(FromDIP(10));
 
             wxString used_g_text = wxString::Format("%.1fg", f.used_g);
-            auto f_used_g = new wxStaticText(m_panel, wxID_ANY, used_g_text, wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
+            auto     f_used_g    = new wxStaticText(m_panel, wxID_ANY, used_g_text, wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
             f_used_g->Wrap(-1);
             f_used_g->SetSize(wxSize(FromDIP(60), -1));
             f_sizer->Add(f_type, 0, wxEXPAND | wxALL, FromDIP(5));
             f_sizer->Add(f_used_g, 0, wxEXPAND | wxALL, FromDIP(5));
             grid_sizer->Add(f_sizer, 0, wxEXPAND, 0);
-            f_type->Bind(wxEVT_LEFT_DOWN, [this](auto &e) {});
+            f_type->Bind(wxEVT_LEFT_DOWN, [this](auto& e) {});
         }
     }
     topSizer->Add(grid_sizer, 0, wxALL, FromDIP(5));
@@ -131,45 +131,30 @@ SliceInfoPopup::SliceInfoPopup(wxWindow *parent, wxBitmap bmp, BBLSliceInfo *inf
     SetClientSize(m_panel->GetSize());
 }
 
-void SliceInfoPopup::Popup(wxWindow *WXUNUSED(focus)) {
-    PopupWindow::Popup();
-}
+void SliceInfoPopup::Popup(wxWindow* WXUNUSED(focus)) { PopupWindow::Popup(); }
 
-void SliceInfoPopup::OnDismiss() {
-    PopupWindow::OnDismiss();
-}
+void SliceInfoPopup::OnDismiss() { PopupWindow::OnDismiss(); }
 
-bool SliceInfoPopup::ProcessLeftDown(wxMouseEvent &event)
-{
-    return PopupWindow::ProcessLeftDown(event);
-}
-bool SliceInfoPopup::Show(bool show)
-{
-    return PopupWindow::Show(show);
-}
+bool SliceInfoPopup::ProcessLeftDown(wxMouseEvent& event) { return PopupWindow::ProcessLeftDown(event); }
+bool SliceInfoPopup::Show(bool show) { return PopupWindow::Show(show); }
 
-void SliceInfoPopup::OnSize(wxSizeEvent &event)
-{
-    event.Skip();
-}
+void SliceInfoPopup::OnSize(wxSizeEvent& event) { event.Skip(); }
 
-void SliceInfoPopup::OnSetFocus(wxFocusEvent &event)
-{
-    event.Skip();
-}
+void SliceInfoPopup::OnSetFocus(wxFocusEvent& event) { event.Skip(); }
 
-void SliceInfoPopup::OnKillFocus(wxFocusEvent &event)
-{
-    event.Skip();
-}
+void SliceInfoPopup::OnKillFocus(wxFocusEvent& event) { event.Skip(); }
 
-void SliceInfoPopup::OnMouse(wxMouseEvent &event)
-{
-    event.Skip();
-}
+void SliceInfoPopup::OnMouse(wxMouseEvent& event) { event.Skip(); }
 
-SliceInfoPanel::SliceInfoPanel(wxWindow *parent, wxBitmap &prediction, wxBitmap &cost, wxBitmap &print,
-    wxWindowID id, const wxPoint &pos, const wxSize &size, long style, const wxString &name)
+SliceInfoPanel::SliceInfoPanel(wxWindow*       parent,
+                               wxBitmap&       prediction,
+                               wxBitmap&       cost,
+                               wxBitmap&       print,
+                               wxWindowID      id,
+                               const wxPoint&  pos,
+                               const wxSize&   size,
+                               long            style,
+                               const wxString& name)
     : wxPanel(parent, id, pos, size, style, name)
 {
     this->SetBackgroundColour(*wxWHITE);
@@ -182,10 +167,10 @@ SliceInfoPanel::SliceInfoPanel(wxWindow *parent, wxBitmap &prediction, wxBitmap 
 
     m_item_top_sizer->Add(m_bmp_item_thumbnail, 0, wxALL, 0);
 
-    wxBoxSizer *m_item_content_sizer;
+    wxBoxSizer* m_item_content_sizer;
     m_item_content_sizer = new wxBoxSizer(wxVERTICAL);
 
-    wxBoxSizer *m_item_info_sizer = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* m_item_info_sizer = new wxBoxSizer(wxHORIZONTAL);
 
     m_bmp_item_prediction = new wxStaticBitmap(this, wxID_ANY, prediction);
     m_bmp_item_prediction->SetMinSize(ICON_SIZE);
@@ -207,13 +192,13 @@ SliceInfoPanel::SliceInfoPanel(wxWindow *parent, wxBitmap &prediction, wxBitmap 
 
     m_item_content_sizer->Add(m_item_info_sizer, 0, wxEXPAND, 0);
 
-    wxGridSizer *m_filament_info_sizer = new wxGridSizer(0, 3, 0, 8);
+    wxGridSizer* m_filament_info_sizer = new wxGridSizer(0, 3, 0, 8);
 
     m_item_content_sizer->Add(m_filament_info_sizer, 0, wxEXPAND, 0);
 
     m_item_top_sizer->Add(m_item_content_sizer, 0, wxEXPAND, 0);
 
-    wxBoxSizer *m_item_right_sizer;
+    wxBoxSizer* m_item_right_sizer;
     m_item_right_sizer = new wxBoxSizer(wxVERTICAL);
 
     m_bmp_item_print = new wxStaticBitmap(this, wxID_ANY, print, wxDefaultPosition, wxDefaultSize, wxBU_AUTODRAW | 0);
@@ -249,20 +234,21 @@ SliceInfoPanel::~SliceInfoPanel()
     m_bmp_item_print->Disconnect(wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler(SliceInfoPanel::on_subtask_print), NULL, this);
 }
 
-void SliceInfoPanel::SetImages(wxBitmap &prediction, wxBitmap &cost, wxBitmap &printing)
+void SliceInfoPanel::SetImages(wxBitmap& prediction, wxBitmap& cost, wxBitmap& printing)
 {
     m_bmp_item_prediction->SetBitmap(prediction);
     m_bmp_item_cost->SetBitmap(cost);
     m_bmp_item_print->SetBitmap(printing);
 }
 
-void SliceInfoPanel::on_subtask_print(wxCommandEvent &evt)
-{
-    ;
-}
+// [INTENT] The print button is wired for future workflow integration; the handler is currently a
+// placeholder so the panel can exist without launching a print job yet.
+void SliceInfoPanel::on_subtask_print(wxCommandEvent& evt) { ; }
 
-void SliceInfoPanel::on_thumbnail_enter(wxMouseEvent &event)
+void SliceInfoPanel::on_thumbnail_enter(wxMouseEvent& event)
 {
+    // [INTENT] Hover-preview logic is intentionally disabled here; the commented block shows the old
+    // popup-based thumbnail inspection path.
     /*
     m_slice_info_popup = std::make_shared<SliceInfoPopup>(this);
     wxWindow *ctrl    = (wxWindow *) event.GetEventObject();
@@ -273,18 +259,22 @@ void SliceInfoPanel::on_thumbnail_enter(wxMouseEvent &event)
     */
 }
 
-void SliceInfoPanel::on_thumbnail_leave(wxMouseEvent &event)
+void SliceInfoPanel::on_thumbnail_leave(wxMouseEvent& event)
 {
-    if (m_thumbnail_popup) { m_thumbnail_popup->Hide(); }
+    if (m_thumbnail_popup) {
+        m_thumbnail_popup->Hide();
+    }
 }
 
-void SliceInfoPanel::on_mouse_enter(wxMouseEvent &event) { ; }
+void SliceInfoPanel::on_mouse_enter(wxMouseEvent& event) { ; }
 
-void SliceInfoPanel::on_mouse_leave(wxMouseEvent &event) { ; }
+void SliceInfoPanel::on_mouse_leave(wxMouseEvent& event) { ; }
 
-void SliceInfoPanel::on_webrequest_state(wxWebRequestEvent &evt)
+void SliceInfoPanel::on_webrequest_state(wxWebRequestEvent& evt)
 {
     BOOST_LOG_TRIVIAL(trace) << "monitor: sub_task_panel web request state = " << evt.GetState();
+    // [THREAD] Thumbnail loading is asynchronous; on completion the response stream is converted to
+    // a bitmap and scaled to the current thumbnail slot size.
     switch (evt.GetState()) {
     case wxWebRequest::State_Completed: {
         m_thumbnail_img    = *evt.GetResponse().GetStream();
@@ -303,8 +293,10 @@ void SliceInfoPanel::on_webrequest_state(wxWebRequestEvent &evt)
     }
 }
 
-void SliceInfoPanel::update(BBLSliceInfo *info)
+void SliceInfoPanel::update(BBLSliceInfo* info)
 {
+    // [INTENT] Refresh the visible summary from the latest slice snapshot and restart the thumbnail
+    // fetch if the job provides a remote preview URL.
     wxString prediction = wxString::Format("%s", get_bbl_time_dhms(info->prediction));
     m_text_item_prediction->SetLabelText(prediction);
 
@@ -313,7 +305,10 @@ void SliceInfoPanel::update(BBLSliceInfo *info)
 
     m_text_plate_index->SetLabelText(info->index);
 
-    if (web_request.IsOk()) web_request.Cancel();
+    // [STATE] Cancel any in-flight request first so stale thumbnail responses do not overwrite the
+    // current job preview after the panel has already moved on.
+    if (web_request.IsOk())
+        web_request.Cancel();
 
     if (!info->thumbnail_url.empty()) {
         web_request = wxWebSession::GetDefault().CreateRequest(this, info->thumbnail_url);
@@ -326,6 +321,7 @@ void SliceInfoPanel::update(BBLSliceInfo *info)
 
 void SliceInfoPanel::msw_rescale()
 {
+    // [EVENT] Reapply Windows/DPI-dependent icon sizes, then let layout recalculate the row heights.
     m_bmp_item_prediction->SetMinSize(ICON_SIZE);
     m_bmp_item_prediction->SetSize(ICON_SIZE);
     m_bmp_item_cost->SetMinSize(ICON_SIZE);
@@ -335,6 +331,4 @@ void SliceInfoPanel::msw_rescale()
     this->Layout();
 }
 
-
-}
-}
+}} // namespace Slic3r::GUI
