@@ -2444,3 +2444,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1, P3 x1
 - Git: Annotate AnimaController animated icon
 - Next recommended Phase 1 task: T644 annotate: src/slic3r/GUI/Widgets/AnimaController.hpp
+
+## Phase 1 - Task T644 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/AnimaController.hpp
+- Deliverables: src/slic3r/GUI/Widgets/AnimaController.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 1 boundary comment block covering class intent, cached frame state, UI-thread timer ownership, Unity mapping, and fixed-frame playback hazard
+- Verification excerpt: `[UNITY] Map to a small Image/RawImage controller with a sprite swap or coroutine-driven frame advance, keeping click forwarding on the UI event bridge.`
+- Unity-impact summary:
+  - Keep the widget as a compact sprite-swap controller instead of a generalized animation system.
+  - Preserve the main-thread timer model and explicit click forwarding in the Unity input bridge.
+  - Make frame count and idle icon selection data-driven in the port.
+- Hazards found: P3 x1
+- Git: Annotate AnimaController declaration boundary
+- Next recommended Phase 1 task: T645 annotate: src/slic3r/GUI/Widgets/AxisCtrlButton.cpp

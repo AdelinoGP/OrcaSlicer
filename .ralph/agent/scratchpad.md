@@ -293,3 +293,6 @@
 - Started T643 (`src/slic3r/GUI/Widgets/AnimaController.cpp`) as the tiny animated status icon widget.
 - The file is a fixed-size wxPanel that caches scaled frames, advances them with a UI-thread wxTimer, and rebroadcasts bitmap clicks to the parent panel.
 - Plan: keep the annotations focused on the timer/frame loop, the event rebroadcast seam, the steady-state enable bitmap, and the Unity mapping to a compact sprite-swap controller; then verify with `git diff --check` and close the task atomically.
+
+- Reconciled the task state for the AnimaController pair: T643 is already marked done in `.ralph/ralph-tasks.md`, so the active file for this iteration is T644 (`src/slic3r/GUI/Widgets/AnimaController.hpp`).
+- The header is the declaration boundary for the same widget, so I am adding class-level intent/state/thread/Unity notes plus a porting hazard for the fixed-frame playback assumptions before committing this atomic header annotation.

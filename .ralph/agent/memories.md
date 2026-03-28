@@ -2,6 +2,14 @@
 
 ## Patterns
 
+### mem-1774736779-8d1d
+> AnimaController.cpp is a tiny wxTimer-driven animated icon widget: it caches scaled frames, rebroadcasts bitmap clicks to the parent panel, and uses a separate enabled-state bitmap; Unity should model this as a compact sprite swap controller with main-thread frame ticks.
+<!-- tags: gui, unity, widgets, animation | created: 2026-03-28 -->
+
+### mem-1774736357-0223
+> AMSItem.hpp is the declaration boundary for the composite AMS dashboard: it owns tray DTOs, refresh widgets, route compositors, preview/humidity badges, and the root event surface, so Unity should split it into a retained root prefab with child tray/route/preview controllers.
+<!-- tags: gui, unity, widgets, ams | created: 2026-03-28 -->
+
 ### mem-1774735565-184a
 > AMSItem.cpp is the composite AMS dashboard: it owns tray cards, refresh indicators, humidity badges, route overlays, and selection fan-out, so Unity should split it into a retained root prefab with child tray/route view controllers.
 <!-- tags: gui, unity, widgets, ams | created: 2026-03-28 -->
@@ -333,6 +341,10 @@
 ## Decisions
 
 ## Fixes
+
+### mem-1774737149-25cd
+> failure: cmd=/home/admin/.config/nvm/versions/node/v24.14.0/lib/node_modules/@ralph-orchestrator/ralph-cli/node_modules/.bin_real/ralph tools task start task-1773880088-?, exit=1, error=zsh glob pattern mistake in task id, next=start the intended task with the exact runtime id task-1773880088-023d
+<!-- tags: tooling, error-handling | created: 2026-03-28 -->
 
 ### mem-1774682896-6b59
 > failure: cmd=/home/admin/.config/nvm/versions/node/v24.14.0/lib/node_modules/@ralph-orchestrator/ralph-cli/node_modules/.bin_real/ralph tools task list --format json | python - <<'PY' ...\nPY, exit=1, error=JSONDecodeError from empty stdin; next=parse task list output from saved file or use a direct JSON parse without stdin confusion
