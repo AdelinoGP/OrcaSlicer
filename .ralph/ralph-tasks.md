@@ -491,7 +491,7 @@ Last updated: 2026-03-27T09:15:43Z
 - [x] T570 annotate: src/slic3r/GUI/SavePresetDialog.hpp
 - [x] T571 annotate: src/slic3r/GUI/SceneRaycaster.cpp
 - [ ] T572 annotate: src/slic3r/GUI/SceneRaycaster.hpp
-- [ ] T573 annotate: src/slic3r/GUI/Search.cpp
+- [x] T573 annotate: src/slic3r/GUI/Search.cpp
 - [ ] T574 annotate: src/slic3r/GUI/Search.hpp
 - [ ] T575 annotate: src/slic3r/GUI/Selection.cpp
 - [ ] T576 annotate: src/slic3r/GUI/Selection.hpp

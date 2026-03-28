@@ -1472,3 +1472,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1, P3 x1, P1 x0
 - Git: annotate SceneRaycaster header
 - Next recommended Phase 1 task: T573 annotate `src/slic3r/GUI/Search.cpp`
+
+## Phase 1 - Task T573 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Search.cpp
+- Deliverables: src/slic3r/GUI/Search.cpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md, .ralph/agent/scratchpad.md
+- Substantive additions: 8 annotation blocks covering shared search intent, option-cache state, popup row rendering, preset popup lifecycle, query rebuild flow, virtual list modeling, object popup lifecycle, and object refresh flow
+- Verification excerpt: [UNITY] Port this as a query-owned floating panel: a UI Toolkit SearchField driving a filtered ListView, with row selection callbacks into the preset/object controllers.
+- Unity-impact summary:
+  - Split preset-search and object-search into separate Unity controllers that share a filtered list widget.
+  - Preserve the manual highlight/selection semantics in a persistent row template instead of string-rebuilding widgets.
+  - Model dismissal and focus loss explicitly to replace wxPopupWindow behavior.
+- Hazards found: P2 x4, P3 x1, P1 x0
+- Git: annotate Search popup flow
+- Next recommended Phase 1 task: T574 annotate `src/slic3r/GUI/Search.hpp`
