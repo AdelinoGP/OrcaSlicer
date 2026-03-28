@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-28T00:42:13Z
+Last updated: 2026-03-28T01:19:50Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -497,7 +497,7 @@ Last updated: 2026-03-28T00:42:13Z
 - [x] T576 annotate: src/slic3r/GUI/Selection.hpp
 - [x] T577 annotate: src/slic3r/GUI/SelectMachine.cpp
 - [x] T578 annotate: src/slic3r/GUI/SelectMachine.hpp
-- [ ] T579 annotate: src/slic3r/GUI/SelectMachinePop.cpp
+- [x] T579 annotate: src/slic3r/GUI/SelectMachinePop.cpp
 - [ ] T580 annotate: src/slic3r/GUI/SelectMachinePop.hpp
 - [ ] T581 annotate: src/slic3r/GUI/SendMultiMachinePage.cpp
 - [ ] T582 annotate: src/slic3r/GUI/SendMultiMachinePage.hpp

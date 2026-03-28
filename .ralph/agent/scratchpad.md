@@ -18,3 +18,7 @@
 - Completed T578 (`src/slic3r/GUI/SelectMachine.hpp`) as the next atomic annotation pass.
 - The header now frames the send-print dialog boundary, custom option rows, thumbnail compositing, mode switching, printer header controls, and the modal workflow state machine for Unity migration.
 - Next step: move to T579 (`src/slic3r/GUI/SelectMachinePop.cpp`) and keep the annotation blocks focused on ownership, events, thread boundaries, and concrete Unity mappings.
+
+- Started T579 (`src/slic3r/GUI/SelectMachinePop.cpp`) and annotated the popup shell, row widgets, async refresh path, manual hit-testing, rename dialog validation, and the pin-code shortcut rows.
+- The popup is a pooled wxPopupWindow with two live device sections, a disabled SSDP hook, worker-thread print-info fetch, and screen-space click forwarding; Unity should replace that with a floating controller, recycled rows, and standard UI event routing.
+- Verification so far: `git diff --check` is clean for this patch; next step is to commit the atomic annotation and move to T580 (`src/slic3r/GUI/SelectMachinePop.hpp`).

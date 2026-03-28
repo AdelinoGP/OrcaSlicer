@@ -1566,3 +1566,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1
 - Git: Annotate SelectMachine send-print flow
 - Next recommended Phase 1 task: T578 annotate: src/slic3r/GUI/SelectMachine.hpp
+
+## Phase 1 - Task T579 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SelectMachinePop.cpp
+- Deliverables: src/slic3r/GUI/SelectMachinePop.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 10 comment blocks covering popup ownership, row rendering, async refresh, dismissal, list rebuilds, manual hit-testing, rename validation, and the pin-code shortcut rows
+- Verification excerpt: `// [UNITY] Model this as a retained controller plus scrollable item list with reusable row views.`
+- Unity-impact summary:
+  - Floating popup controller with pooled rows and two live device sections
+  - Standard UI event routing should replace screen-space click forwarding
+  - Worker-thread fetches and timer refreshes need explicit main-thread marshaling in Unity
+- Hazards found: P1 x1, P2 x4, P3 x3
+- Git: Annotate SelectMachinePop popup controller
+- Next recommended Phase 1 task: T580 annotate: src/slic3r/GUI/SelectMachinePop.hpp
