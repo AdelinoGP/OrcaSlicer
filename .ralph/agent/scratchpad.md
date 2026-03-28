@@ -212,3 +212,7 @@
 - Completed T624 (`src/slic3r/GUI/UpgradePanel.hpp`) with declaration-boundary annotations for the root scroller, machine card, accessory row prefabs, progress block, and confirmation dialogs.
 - The header now calls out the retained-scroll-view Unity split and the dynamic row/show-hide hazard that will need explicit state in C#.
 - Next step after commit: close T624 and move to T625 (`src/slic3r/GUI/UserManager.cpp`).
+
+- Started T625 (`src/slic3r/GUI/UserManager.cpp`) as the network-auth payload adapter.
+- The file is a thin JSON parser that only reacts to `bind` success, updates the device selection through GUI singletons, and may be called from a network callback path.
+- Unity mapping: typed auth-result message + main-thread completion handler; the transport layer should not own modal dialog closure or selected-machine state.

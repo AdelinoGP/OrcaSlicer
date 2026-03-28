@@ -2175,3 +2175,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x2, P3 x1
 - Git: Annotate UpgradePanel.hpp upgrade dashboard boundary
 - Next recommended Phase 1 task: T625 annotate: src/slic3r/GUI/UserManager.cpp
+
+## Phase 1 - Task T625 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/UserManager.cpp
+- Deliverables: src/slic3r/GUI/UserManager.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 3 boundary comment blocks covering transport/session ownership, dependency injection, and bind-success payload parsing
+- Verification excerpt: `[UNITY] Model this as a typed auth-result message plus a UI-thread completion callback rather than parsing JSON in the view layer.`
+- Unity-impact summary: auth success becomes event-driven; UI mutations need main-thread marshaling; transport should not own modal dialog closure or machine selection
+- Hazards found: P2 x1, UNCLEAR x1
+- Git: Annotate UserManager auth payload parsing
+- Next recommended Phase 1 task: T626 annotate: src/slic3r/GUI/UserManager.hpp

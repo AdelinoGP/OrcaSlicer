@@ -543,7 +543,7 @@ Last updated: 2026-03-28T06:15:26Z
 - [x] T622 annotate: src/slic3r/GUI/UpdateDialogs.hpp
 - [x] T623 annotate: src/slic3r/GUI/UpgradePanel.cpp
 - [x] T624 annotate: src/slic3r/GUI/UpgradePanel.hpp
-- [ ] T625 annotate: src/slic3r/GUI/UserManager.cpp
+- [x] T625 annotate: src/slic3r/GUI/UserManager.cpp
 - [ ] T626 annotate: src/slic3r/GUI/UserManager.hpp
 - [ ] T627 annotate: src/slic3r/GUI/UserNotification.cpp
 - [ ] T628 annotate: src/slic3r/GUI/UserNotification.hpp
