@@ -31,14 +31,17 @@ using namespace nlohmann;
 
 namespace Slic3r { namespace GUI {
 
-DownPluginFrame::DownPluginFrame(GUI_App *pGUI) : wxDialog((wxWindow *) (pGUI->mainframe), wxID_ANY, "Orca Slicer"), m_appconfig_new()
+// [INTENT] This dialog hosts the bundled plugin web flow inside a dialog-owned wxWebView.
+// [STATE] It retains the GUI app back-pointer, a staging AppConfig instance, and the web browser control.
+// [UNITY] Port this as a retained WebView host panel with a main-thread command bridge for download/install actions.
+DownPluginFrame::DownPluginFrame(GUI_App* pGUI) : wxDialog((wxWindow*) (pGUI->mainframe), wxID_ANY, "Orca Slicer"), m_appconfig_new()
 {
     // INI
     m_MainPtr = pGUI;
 
     // set the frame icon
-    wxBoxSizer *topsizer = new wxBoxSizer(wxVERTICAL);
-    wxString TargetUrl    = from_u8((boost::filesystem::path(resources_dir()) / "web/guide/6/index.html").make_preferred().string());
+    wxBoxSizer* topsizer  = new wxBoxSizer(wxVERTICAL);
+    wxString    TargetUrl = from_u8((boost::filesystem::path(resources_dir()) / "web/guide/6/index.html").make_preferred().string());
 
     TargetUrl = "file://" + TargetUrl;
 
@@ -68,7 +71,9 @@ DownPluginFrame::DownPluginFrame(GUI_App *pGUI) : wxDialog((wxWindow *) (pGUI->m
     // int MaxY         = (screenheight - pSize.y) > 0 ? (screenheight - pSize.y) / 2 : 0;
     // MoveWindow(this->m_hWnd, (screenwidth - pSize.x) / 2, MaxY, pSize.x, pSize.y, TRUE);
 
-    // Connect the webview events
+    // [EVENT] The embedded page drives navigation, load, fullscreen, error, and script-message callbacks.
+    // [PORTING_HAZARD:P2] The web content is not passive; it can trigger privileged install/restart/file-open behavior.
+    // [UNITY] Keep the same split as a browser surface plus a typed message router instead of ad hoc JS handlers.
     Bind(wxEVT_WEBVIEW_NAVIGATING, &DownPluginFrame::OnNavigationRequest, this, m_browser->GetId());
     Bind(wxEVT_WEBVIEW_NAVIGATED, &DownPluginFrame::OnNavigationComplete, this, m_browser->GetId());
     Bind(wxEVT_WEBVIEW_LOADED, &DownPluginFrame::OnDocumentLoaded, this, m_browser->GetId());
@@ -77,7 +82,6 @@ DownPluginFrame::DownPluginFrame(GUI_App *pGUI) : wxDialog((wxWindow *) (pGUI->m
     Bind(wxEVT_WEBVIEW_TITLE_CHANGED, &DownPluginFrame::OnTitleChanged, this, m_browser->GetId());
     Bind(wxEVT_WEBVIEW_FULLSCREEN_CHANGED, &DownPluginFrame::OnFullScreenChanged, this, m_browser->GetId());
     Bind(wxEVT_WEBVIEW_SCRIPT_MESSAGE_RECEIVED, &DownPluginFrame::OnScriptMessage, this, m_browser->GetId());
-
 }
 
 DownPluginFrame::~DownPluginFrame()
@@ -88,7 +92,10 @@ DownPluginFrame::~DownPluginFrame()
     }
 }
 
-void DownPluginFrame::load_url(wxString &url)
+// [INTENT] Reuse the same dialog for different plugin pages and bring focus to the browser after navigation.
+// [STATE] This assumes the webview was constructed successfully; if creation failed the dialog is only partially initialized.
+// [UNITY] Keep navigation state in a controller that can swap the hosted page without recreating the overlay.
+void DownPluginFrame::load_url(wxString& url)
 {
     BOOST_LOG_TRIVIAL(trace) << "app_start: DownPluginFrame url=" << url.ToStdString();
     this->Show();
@@ -106,7 +113,7 @@ void DownPluginFrame::UpdateState()
     // SetTitle(m_browser->GetCurrentTitle());
 }
 
-void DownPluginFrame::OnIdle(wxIdleEvent &WXUNUSED(evt))
+void DownPluginFrame::OnIdle(wxIdleEvent& WXUNUSED(evt))
 {
     if (m_browser->IsBusy()) {
         wxSetCursor(wxCURSOR_ARROWWAIT);
@@ -124,7 +131,8 @@ void DownPluginFrame::OnIdle(wxIdleEvent &WXUNUSED(evt))
  * Callback invoked when there is a request to load a new page (for instance
  * when the user clicks a link)
  */
-void DownPluginFrame::OnNavigationRequest(wxWebViewEvent &evt)
+// [EVENT] Page navigation is observed mainly to refresh UI state; the dialog does not intercept ordinary links here.
+void DownPluginFrame::OnNavigationRequest(wxWebViewEvent& evt)
 {
     // wxLogMessage("%s", "Navigation request to '" + evt.GetURL() + "'
     // (target='" + evt.GetTarget() + "')");
@@ -135,7 +143,7 @@ void DownPluginFrame::OnNavigationRequest(wxWebViewEvent &evt)
 /**
  * Callback invoked when a navigation request was accepted
  */
-void DownPluginFrame::OnNavigationComplete(wxWebViewEvent &evt)
+void DownPluginFrame::OnNavigationComplete(wxWebViewEvent& evt)
 {
     // wxLogMessage("%s", "Navigation complete; url='" + evt.GetURL() + "'");
 
@@ -147,7 +155,7 @@ void DownPluginFrame::OnNavigationComplete(wxWebViewEvent &evt)
 /**
  * Callback invoked when a page is finished loading
  */
-void DownPluginFrame::OnDocumentLoaded(wxWebViewEvent &evt)
+void DownPluginFrame::OnDocumentLoaded(wxWebViewEvent& evt)
 {
     // Only notify if the document is the main frame, not a subframe
     wxString tmpUrl = evt.GetURL();
@@ -166,7 +174,9 @@ void DownPluginFrame::OnDocumentLoaded(wxWebViewEvent &evt)
 /**
  * On new window, we veto to stop extra windows appearing
  */
-void DownPluginFrame::OnNewWindow(wxWebViewEvent &evt)
+// [EVENT] External links are forced out to the system browser instead of opening a second in-app window.
+// [UNITY] Map this to Application.OpenURL or a platform browser bridge, not a second WebView instance.
+void DownPluginFrame::OnNewWindow(wxWebViewEvent& evt)
 {
     wxString flag = " (other)";
 
@@ -183,19 +193,22 @@ void DownPluginFrame::OnNewWindow(wxWebViewEvent &evt)
     UpdateState();
 }
 
-void DownPluginFrame::OnTitleChanged(wxWebViewEvent &evt)
+void DownPluginFrame::OnTitleChanged(wxWebViewEvent& evt)
 {
     // SetTitle(evt.GetString());
     // wxLogMessage("%s", "Title changed; title='" + evt.GetString() + "'");
 }
 
-void DownPluginFrame::OnFullScreenChanged(wxWebViewEvent &evt)
+void DownPluginFrame::OnFullScreenChanged(wxWebViewEvent& evt)
 {
     // wxLogMessage("Full screen changed; status = %d", evt.GetInt());
     ShowFullScreen(evt.GetInt() != 0);
 }
 
-void DownPluginFrame::OnScriptMessage(wxWebViewEvent &evt)
+// [INTENT] The embedded page sends JSON command packets that trigger download/install/cancel/restart flows.
+// [THREAD] CallAfter defers the actual app mutation to the UI thread after the webview callback returns.
+// [PORTING_HAZARD:P1] This is a privileged command surface; a Unity port needs a typed, validated message schema.
+void DownPluginFrame::OnScriptMessage(wxWebViewEvent& evt)
 {
     try {
         wxString strInput = evt.GetString();
@@ -205,34 +218,30 @@ void DownPluginFrame::OnScriptMessage(wxWebViewEvent &evt)
 
         if (strCmd == "Begin_Download_network_plugin") {
             wxGetApp().CallAfter([this] { DownloadPlugin(); });
-        }
-        else if (strCmd == "netplugin_download_cancel") {
+        } else if (strCmd == "netplugin_download_cancel") {
             wxGetApp().cancel_networking_install();
             this->EndModal(wxID_CANCEL);
             this->Close();
-        }
-        else if (strCmd == "begin_install_plugin") {
+        } else if (strCmd == "begin_install_plugin") {
             wxGetApp().CallAfter([this] { InstallPlugin(); });
-        }
-        else if (strCmd == "restart_studio") {
+        } else if (strCmd == "restart_studio") {
             wxGetApp().restart_networking();
             this->EndModal(wxID_OK);
             this->Close();
-        }
-        else if (strCmd == "close_download_dialog") {
+        } else if (strCmd == "close_download_dialog") {
             this->EndModal(wxID_OK);
             this->Close();
-        }
-        else if (strCmd == "open_plugin_folder") {
-            auto plugin_folder = (boost::filesystem::path(wxStandardPaths::Get().GetUserDataDir().ToUTF8().data()) / "plugins").make_preferred().string();
+        } else if (strCmd == "open_plugin_folder") {
+            auto plugin_folder =
+                (boost::filesystem::path(wxStandardPaths::Get().GetUserDataDir().ToUTF8().data()) / "plugins").make_preferred().string();
             desktop_open_any_folder(plugin_folder);
         }
-    } catch (std::exception &) {
+    } catch (std::exception&) {
         // wxMessageBox(e.what(), "json Exception", MB_OK);
     }
 }
 
-void DownPluginFrame::RunScript(const wxString &javascript)
+void DownPluginFrame::RunScript(const wxString& javascript)
 {
     // Remember the script we run in any case, so the next time the user opens
     // the "Run Script" dialog box, it is shown there for convenient updating.
@@ -240,13 +249,14 @@ void DownPluginFrame::RunScript(const wxString &javascript)
 
     // wxLogMessage("Running JavaScript:\n%s\n", javascript);
 
-    if (!m_browser) return;
+    if (!m_browser)
+        return;
 
     WebView::RunScript(m_browser, javascript);
 }
 
 #if wxUSE_WEBVIEW_IE
-void DownPluginFrame::OnRunScriptObjectWithEmulationLevel(wxCommandEvent &WXUNUSED(evt))
+void DownPluginFrame::OnRunScriptObjectWithEmulationLevel(wxCommandEvent& WXUNUSED(evt))
 {
     wxWebViewIE::MSWSetModernEmulationLevel();
     RunScript("function f(){var person = new Object();person.name = 'Foo'; \
@@ -254,7 +264,7 @@ void DownPluginFrame::OnRunScriptObjectWithEmulationLevel(wxCommandEvent &WXUNUS
     wxWebViewIE::MSWSetModernEmulationLevel(false);
 }
 
-void DownPluginFrame::OnRunScriptDateWithEmulationLevel(wxCommandEvent &WXUNUSED(evt))
+void DownPluginFrame::OnRunScriptDateWithEmulationLevel(wxCommandEvent& WXUNUSED(evt))
 {
     wxWebViewIE::MSWSetModernEmulationLevel();
     RunScript("function f(){var d = new Date('10/08/2017 21:30:40'); \
@@ -263,7 +273,7 @@ void DownPluginFrame::OnRunScriptDateWithEmulationLevel(wxCommandEvent &WXUNUSED
     wxWebViewIE::MSWSetModernEmulationLevel(false);
 }
 
-void DownPluginFrame::OnRunScriptArrayWithEmulationLevel(wxCommandEvent &WXUNUSED(evt))
+void DownPluginFrame::OnRunScriptArrayWithEmulationLevel(wxCommandEvent& WXUNUSED(evt))
 {
     wxWebViewIE::MSWSetModernEmulationLevel();
     RunScript("function f(){ return [\"foo\", \"bar\"]; }f();");
@@ -274,7 +284,9 @@ void DownPluginFrame::OnRunScriptArrayWithEmulationLevel(wxCommandEvent &WXUNUSE
 /**
  * Callback invoked when a loading error occurs
  */
-void DownPluginFrame::OnError(wxWebViewEvent &evt)
+// [EVENT] Web navigation errors are logged and then the dialog state is refreshed; no recovery UI is exposed here.
+// [UNCLEAR] The commented info-bar path suggests legacy UI that has been intentionally disabled rather than removed.
+void DownPluginFrame::OnError(wxWebViewEvent& evt)
 {
 #define WX_ERROR_CASE(type) \
     case type: category = #type; break;
@@ -302,24 +314,29 @@ void DownPluginFrame::OnError(wxWebViewEvent &evt)
     UpdateState();
 }
 
-void DownPluginFrame::OnScriptResponseMessage(wxCommandEvent &WXUNUSED(evt))
-{
+void DownPluginFrame::OnScriptResponseMessage(wxCommandEvent& WXUNUSED(evt)) {}
 
-}
-
+// [INTENT] Bridge the web command into GUI_App's plugin archive workflow.
+// [UNITY] Model this as an async package download/install service with completion events routed back to the controller.
 int DownPluginFrame::DownloadPlugin()
 {
     return wxGetApp().download_plugin(
-        "plugins", "network_plugin.zip", [this](int status, int percent, bool &cancel) { return ShowPluginStatus(status, percent, cancel); }, nullptr);
+        "plugins", "network_plugin.zip",
+        [this](int status, int percent, bool& cancel) { return ShowPluginStatus(status, percent, cancel); }, nullptr);
 }
 
+// [INTENT] Complete the workflow by invoking the app's install path for the downloaded archive.
+// [THREAD] The callback chain still runs through GUI_App, so the dialog must remain responsive while install executes.
 int DownPluginFrame::InstallPlugin()
 {
-    return wxGetApp().install_plugin(
-        "plugins", "network_plugin.zip", [this](int status, int percent, bool &cancel) { return ShowPluginStatus(status, percent, cancel); });
+    return wxGetApp().install_plugin("plugins", "network_plugin.zip",
+                                     [this](int status, int percent, bool& cancel) { return ShowPluginStatus(status, percent, cancel); });
 }
 
-int DownPluginFrame::ShowPluginStatus(int status, int percent, bool &cancel)
+// [STATE] Progress is deduplicated with a static percent cache, which makes the callback effectively process-wide.
+// [PORTING_HAZARD:P2] Unity should make progress tracking instance-scoped so concurrent dialogs cannot race.
+// [UNITY] Bind a retained progress model to the controller and push typed status updates back to the hosted page.
+int DownPluginFrame::ShowPluginStatus(int status, int percent, bool& cancel)
 {
     static int nPercent = 0;
     if (nPercent == percent)
@@ -327,14 +344,14 @@ int DownPluginFrame::ShowPluginStatus(int status, int percent, bool &cancel)
 
     nPercent = percent;
 
-    json m_Data = json::object();
-    m_Data["status"] = status;
+    json m_Data       = json::object();
+    m_Data["status"]  = status;
     m_Data["percent"] = percent;
 
     json m_Res           = json::object();
     m_Res["command"]     = "ShowStatusPercent";
     m_Res["sequence_id"] = "10001";
-    m_Res["data"]    = m_Data;
+    m_Res["data"]        = m_Data;
 
     wxString strJS = wxString::Format("HandleStudio(%s)", m_Res.dump(-1, ' ', false, json::error_handler_t::ignore));
 

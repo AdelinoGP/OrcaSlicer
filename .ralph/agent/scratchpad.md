@@ -225,3 +225,10 @@
 
 - T628 (`src/slic3r/GUI/UserNotification.hpp`) is also semantically inert: the header only exposes a small enum plus an empty constructor shell, so it was normalized from `annotate` to `skip-trivial` and marked done.
 - Next recommended task after commit is T629 (`src/slic3r/GUI/WebDownPluginDlg.cpp`).
+
+## T629 plan
+
+- Active file is `src/slic3r/GUI/WebDownPluginDlg.cpp`, the web-based plugin download/install dialog.
+- The file mixes wxWebView lifecycle, JS command dispatch, app-level download/install callbacks, and fullscreen/new-window handling, so the Unity mapping should call out a retained web-content host plus a main-thread command bridge.
+- I will annotate the dialog boundary, webview event flow, script-message contract, and plugin progress callback path, then record completion evidence and commit this atomic file only.
+- The page is not just informational: JS commands can cancel, restart, install, and open folders, so the Unity port needs a typed command schema with validation before it reaches app services.

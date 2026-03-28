@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-28T06:15:26Z
+Last updated: 2026-03-28T06:53:31Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -547,7 +547,7 @@ Last updated: 2026-03-28T06:15:26Z
 - [ ] T626 annotate: src/slic3r/GUI/UserManager.hpp
 - [x] T627 skip-trivial: src/slic3r/GUI/UserNotification.cpp
 - [x] T628 skip-trivial: src/slic3r/GUI/UserNotification.hpp
-- [ ] T629 annotate: src/slic3r/GUI/WebDownPluginDlg.cpp
+- [x] T629 annotate: src/slic3r/GUI/WebDownPluginDlg.cpp
 - [ ] T630 annotate: src/slic3r/GUI/WebDownPluginDlg.hpp
 - [ ] T631 annotate: src/slic3r/GUI/WebGuideDialog.cpp
 - [ ] T632 annotate: src/slic3r/GUI/WebGuideDialog.hpp

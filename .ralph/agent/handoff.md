@@ -2231,3 +2231,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: none
 - Git: pending commit `Skip trivial UserNotification header`
 - Next recommended Phase 1 task: T629 annotate: src/slic3r/GUI/WebDownPluginDlg.cpp
+
+## Phase 1 - Task T629 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/WebDownPluginDlg.cpp
+- Deliverables: src/slic3r/GUI/WebDownPluginDlg.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 9 boundary comment blocks covering the dialog host boundary, browser event bindings, URL reload flow, external-window routing, JS command dispatch, plugin download/install bridges, progress reporting, and error handling
+- Verification excerpt: `[PORTING_HAZARD:P1] This is a privileged command surface; a Unity port needs a typed, validated message schema.`
+- Unity-impact summary: retained WebView host plus typed command router; plugin transfer/install should move behind async services; external links stay outside the embedded view
+- Hazards found: P1 x1, P2 x2, UNCLEAR x1
+- Git: Annotate WebDownPluginDlg plugin web host
+- Next recommended Phase 1 task: T630 annotate: src/slic3r/GUI/WebDownPluginDlg.hpp
