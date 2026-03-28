@@ -66,3 +66,7 @@
 - Started T589 on `src/slic3r/GUI/SkipPartCanvas.cpp` and annotated the canvas boundary, image reload state reset, immediate-mode OpenGL render path, hover/click/drag event flow, and the embedded 3MF metadata parser.
 - The file mixes color-encoded hit testing with custom OpenGL stencil drawing, so the Unity split should be a retained controller over explicit hit data plus a separate import/parser service.
 - Next step after commit: close T589 and move to T590 (`src/slic3r/GUI/SkipPartCanvas.hpp`).
+
+- Started T590 on `src/slic3r/GUI/SkipPartCanvas.hpp` and annotated the declaration boundary for the color-picking canvas, its event surface, and the 3MF metadata parser helper.
+- The header confirms the Unity split: a RenderTexture-backed controller for pick/zoom/drag behavior, plus a separate import service for plate/object parsing.
+- Next step after commit: close T590 and move to T591 (`src/slic3r/GUI/SliceInfoPanel.cpp`).

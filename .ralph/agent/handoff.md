@@ -67,6 +67,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate SkipPartCanvas canvas and parser boundary
 - Next recommended Phase 1 task: T590 annotate: src/slic3r/GUI/SkipPartCanvas.hpp
 
+## Phase 1 - Task T590 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SkipPartCanvas.hpp
+- Deliverables: src/slic3r/GUI/SkipPartCanvas.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 5 boundary comments covering the GL canvas contract, wx event routing, selection/zoom notifications, parser threading, and Unity migration split
+- Verification excerpt: `[UNITY] Port this as a custom controller over a RenderTexture-backed image view with explicit`
+- Unity-impact summary: color-picking stays outside the widget tree; mouse/zoom events map to a standard input bridge; 3MF parsing should become an import service
+- Hazards found: P2 x1 (color-coded pick interaction model), P3 x1 (UI/import coupling in the header)
+- Git: Annotate SkipPartCanvas.hpp boundary
+- Next recommended Phase 1 task: T591 annotate: src/slic3r/GUI/SliceInfoPanel.cpp
+
 ## Tasks
 
 ### Completed
