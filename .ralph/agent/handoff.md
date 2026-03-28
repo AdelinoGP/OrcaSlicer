@@ -2541,3 +2541,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1
 - Git: Annotate DropDown declaration boundary
 - Next recommended Phase 1 task: T657 annotate: src/slic3r/GUI/Widgets/ErrorMsgStaticText.cpp
+
+## Phase 1 - Task T657 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/ErrorMsgStaticText.cpp
+- Deliverables: src/slic3r/GUI/Widgets/ErrorMsgStaticText.cpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md, .ralph/agent/scratchpad.md
+- Substantive additions: 6 boundary comments covering widget intent, paint/event ownership, wrapping behavior, size mutation, Unity mapping, and a multibyte/empty-string hazard
+- Verification excerpt: `[PORTING_HAZARD:P2] The direct m_msg[0]/m_msg[1] access assumes at least two characters, and the ad-hoc multibyte heuristic is fragile outside wxWidgets text rendering.`
+- Unity-impact summary: port as a wrapped text component with layout-driven height; keep wrapping decisions out of the paint path; replace the manual multibyte heuristic with a retained text layout service
+- Hazards found: P2 x1
+- Git: Annotate ErrorMsgStaticText paint wrapping
+- Next recommended Phase 1 task: T658 annotate: src/slic3r/GUI/Widgets/ErrorMsgStaticText.hpp

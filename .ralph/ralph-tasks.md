@@ -575,7 +575,7 @@ Last updated: 2026-03-28T23:19:13Z
 - [x] T654 annotate: src/slic3r/GUI/Widgets/DialogButtons.hpp
 - [x] T655 annotate: src/slic3r/GUI/Widgets/DropDown.cpp
 - [x] T656 annotate: src/slic3r/GUI/Widgets/DropDown.hpp
-- [ ] T657 annotate: src/slic3r/GUI/Widgets/ErrorMsgStaticText.cpp
+- [x] T657 annotate: src/slic3r/GUI/Widgets/ErrorMsgStaticText.cpp
 - [ ] T658 annotate: src/slic3r/GUI/Widgets/ErrorMsgStaticText.hpp
 - [ ] T659 annotate: src/slic3r/GUI/Widgets/FanControl.cpp
 - [ ] T660 annotate: src/slic3r/GUI/Widgets/FanControl.hpp

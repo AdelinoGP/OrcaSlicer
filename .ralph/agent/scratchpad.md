@@ -323,3 +323,8 @@
 - Completed T656 (`src/slic3r/GUI/Widgets/DropDown.hpp`) as the declaration boundary for the popup selector.
 - The header now records the caller-owned item model, nested submenu ownership, geometry caches, state colors, and event routing seams, plus a Unity mapping to a retained dropdown root with a separate popup submenu presenter.
 - Verification target was `git diff --check -- src/slic3r/GUI/Widgets/DropDown.hpp`; next step after commit is T657 (`src/slic3r/GUI/Widgets/ErrorMsgStaticText.cpp`).
+
+- Completed T657 (`src/slic3r/GUI/Widgets/ErrorMsgStaticText.cpp`) with boundary comments for the custom-painted wrapped error label.
+- The widget is a greedy wrap-and-resize control: it mutates its own height during paint, relies on a fragile multibyte heuristic, and assumes non-empty text when peeking at the first two bytes.
+- Unity mapping to preserve: a retained text element with automatic wrapping and layout-driven height, plus a separate text-measurement/layout service instead of ad-hoc DC wrapping.
+- Next step after commit: close T657 and move to T658 (`src/slic3r/GUI/Widgets/ErrorMsgStaticText.hpp`).

@@ -2,6 +2,10 @@
 
 ## Patterns
 
+### mem-1774740689-5fad
+> ErrorMsgStaticText.cpp is a custom-painted wrapped error label: it greedily measures text during paint, mutates its own height via min/max sizing, and has a fragile multibyte/empty-string heuristic at the first two bytes; Unity should use a retained text element with automatic wrapping and layout-driven height.
+<!-- tags: gui, unity, widgets | created: 2026-03-28 -->
+
 ### mem-1774739831-babf
 > DropDown.cpp is a popup selector: it measures grouped items, lazily spawns a submenu popup for grouped branches, and uses screen-space anchoring plus scroll-offset state to keep long lists navigable; Unity should model it as a retained dropdown with a separate submenu presenter and explicit viewport clamping.
 <!-- tags: gui, unity, widgets | created: 2026-03-28 -->
