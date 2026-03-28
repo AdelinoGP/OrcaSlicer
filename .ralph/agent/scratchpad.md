@@ -300,3 +300,7 @@
 - T645 (`src/slic3r/GUI/Widgets/AxisCtrlButton.cpp`) is annotated and verified with `git diff --check`.
 - The widget is a radial jog control: CPU-side vector paint, pointer-sector hit testing, and command-event dispatch all stay tied to the same geometry, so the Unity port needs a custom radial controller plus a shared geometry helper.
 - Next task should be T646 (`src/slic3r/GUI/Widgets/AxisCtrlButton.hpp`).
+
+- Completed T646 (`src/slic3r/GUI/Widgets/AxisCtrlButton.hpp`) with class-level annotations for the retained radial control, geometry/state caches, event handlers, and the typed command-payload Unity mapping.
+- Verification: `git diff --check -- src/slic3r/GUI/Widgets/AxisCtrlButton.hpp` passed; the diagnostics shown by the editor were include-path noise from the wx headers, not from the inserted comments.
+- Next recommended task is T652 (`src/slic3r/GUI/Widgets/ComboBox.hpp`).

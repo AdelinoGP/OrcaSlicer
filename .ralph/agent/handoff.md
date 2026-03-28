@@ -2470,3 +2470,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1
 - Git: Annotate AxisCtrlButton radial control
 - Next recommended Phase 1 task: T646 annotate: src/slic3r/GUI/Widgets/AxisCtrlButton.hpp
+
+## Phase 1 - Task T646 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/AxisCtrlButton.hpp
+- Deliverables: src/slic3r/GUI/Widgets/AxisCtrlButton.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 1 class-level boundary block plus member/method notes for geometry cache, state palette, mouse routing, and command payload flow
+- Verification excerpt: `[UNITY] Best fit is a custom retained control (UI Toolkit VisualElement or IMGUI) with shared sector-hit geometry and a typed click payload instead of a raw wx command event.`
+- Unity-impact summary: keep paint geometry and hit-testing aligned; model the button as a retained radial controller; forward sector selection as typed data rather than widget internals
+- Hazards found: P2 x1
+- Git: Annotate AxisCtrlButton header boundary
+- Next recommended Phase 1 task: T652 annotate: src/slic3r/GUI/Widgets/ComboBox.hpp

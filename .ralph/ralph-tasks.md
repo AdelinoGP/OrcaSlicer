@@ -564,7 +564,7 @@ Last updated: 2026-03-28T22:35:40Z
 - [x] T643 annotate: src/slic3r/GUI/Widgets/AnimaController.cpp
 - [x] T644 annotate: src/slic3r/GUI/Widgets/AnimaController.hpp
 - [x] T645 annotate: src/slic3r/GUI/Widgets/AxisCtrlButton.cpp
-- [ ] T646 annotate: src/slic3r/GUI/Widgets/AxisCtrlButton.hpp
+- [x] T646 annotate: src/slic3r/GUI/Widgets/AxisCtrlButton.hpp
 - [x] T647 annotate: src/slic3r/GUI/Widgets/Button.cpp
 - [x] T648 annotate: src/slic3r/GUI/Widgets/Button.hpp
 - [x] T649 annotate: src/slic3r/GUI/Widgets/CheckBox.cpp
