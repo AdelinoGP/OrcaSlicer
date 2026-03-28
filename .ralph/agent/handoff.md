@@ -2145,3 +2145,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1
 - Git: Annotate UpdateDialogs.hpp update-flow boundary
 - Next recommended Phase 1 task: T623 annotate: src/slic3r/GUI/UpgradePanel.cpp
+
+## Phase 1 - Task T623 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/UpgradePanel.cpp
+- Deliverables: src/slic3r/GUI/UpgradePanel.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 20+ boundary annotations covering the root dashboard, machine card, accessory rows, status/progress state machine, and upgrade confirmation flows
+- Verification excerpt: `[PORTING_HAZARD:P2] This routine mixes module discovery, naming rules, and dynamic row creation, so it needs a cleaner data model in Unity.`
+- Unity-impact summary:
+  - Map the screen to a retained controller with reusable machine/accessory subviews.
+  - Keep firmware status and upgrade progress in a dedicated view-model/state machine.
+  - Preserve confirmation dialogs as modal overlays, not inline widget branches.
+- Hazards found: P2 x1
+- Git: Annotate upgrade panel firmware dashboard
+- Next recommended Phase 1 task: T624 annotate: src/slic3r/GUI/UpgradePanel.hpp

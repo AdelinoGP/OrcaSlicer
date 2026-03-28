@@ -204,3 +204,7 @@
 - Started T622 (`src/slic3r/GUI/UpdateDialogs.hpp`) as the declaration boundary for the same update/incompatibility modal cluster.
 - The header now captures the shared modal shell, opt-out checkbox state, hyperlink event, forced pre-wizard gating, and the structured compatibility rows that should survive a Unity port.
 - Next step after commit: close T622 and move to T623 (`src/slic3r/GUI/UpgradePanel.cpp`).
+
+- Started T623 (`src/slic3r/GUI/UpgradePanel.cpp`) as the firmware-upgrade dashboard/controller.
+- The file now carries annotations for the root panel, machine card, accessory subpanels, status/progress state machine, dialog triggers, and the Unity split into a retained controller plus reusable machine/accessory views.
+- Verification target was `git diff --check`; next step after commit is to close T623 and move to T624 (`src/slic3r/GUI/UpgradePanel.hpp`).

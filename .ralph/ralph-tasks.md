@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-28T05:47:59Z
+Last updated: 2026-03-28T06:15:26Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -541,7 +541,7 @@ Last updated: 2026-03-28T05:47:59Z
 - [x] T620 annotate: src/slic3r/GUI/UnsavedChangesDialog.hpp
 - [ ] T621 annotate: src/slic3r/GUI/UpdateDialogs.cpp
 - [x] T622 annotate: src/slic3r/GUI/UpdateDialogs.hpp
-- [ ] T623 annotate: src/slic3r/GUI/UpgradePanel.cpp
+- [x] T623 annotate: src/slic3r/GUI/UpgradePanel.cpp
 - [ ] T624 annotate: src/slic3r/GUI/UpgradePanel.hpp
 - [ ] T625 annotate: src/slic3r/GUI/UserManager.cpp
 - [ ] T626 annotate: src/slic3r/GUI/UserManager.hpp

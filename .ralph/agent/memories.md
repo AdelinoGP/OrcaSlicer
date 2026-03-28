@@ -2,6 +2,26 @@
 
 ## Patterns
 
+### mem-1774678502-281b
+> UpgradePanel.cpp is a firmware-upgrade dashboard: the root panel hosts a MachineInfoPanel plus accessory rows (AMS, extra AMS, extension board, air pump, cutting, laser, extinguish), and the Unity split should be a retained controller with reusable machine/accessory views and a status/progress state machine.
+<!-- tags: gui, unity, dialog, firmware | created: 2026-03-28 -->
+
+### mem-1774677630-28d4
+> UpdateDialogs.hpp is the declaration boundary for the update/incompatibility modal cluster: it reuses one modal shell across update, forced-update, incompatible-data, and no-update cases, with opt-out checkbox state, hyperlink events, and force-before-wizard gating.
+<!-- tags: gui, unity, dialog, update | created: 2026-03-28 -->
+
+### mem-1774677170-07d0
+> UpdateDialogs.cpp groups four update-related modal flows: update notice, config update, forced incompatibility gate, and no-update info popup. Unity should split the shared update/version service from the dialog variants, because the current code mixes startup-blocking compatibility checks with lightweight informational prompts.
+<!-- tags: gui, unity, dialog, update | created: 2026-03-28 -->
+
+### mem-1774676974-98b2
+> UnsavedChangesDialog.hpp is the declaration boundary for the preset-diff modal: DiffModel/DiffViewCtrl wrap wxDataViewModel semantics, while the dialog owns the action state and paired compare flow. Unity should split this into a retained diff-tree model, modal decision controller, and separate preset-comparison workspace because wxGTK container and PresetBundle snapshot behavior do not map 1:1.
+<!-- tags: gui, unity, dialog, preset | created: 2026-03-28 -->
+
+### mem-1774676456-8a68
+> UnsavedChangesDialog.cpp is a modal preset-diff workflow: it builds a toggleable diff tree, a full-text compare popup, and a paired preset comparison dialog that can post a transfer event back to the host. Unity should split this into a modal controller, retained diff-tree view-model, and separate preset-save/compatibility subflows.
+<!-- tags: gui, unity, dialog, preset | created: 2026-03-28 -->
+
 ### mem-1774676030-0e9a
 > TickCode.hpp is the declaration boundary for tick marker editing: it owns a sorted std::set of markers, keeps a non-owning extruder-color palette pointer, and should split marker edits from color resolution in Unity.
 <!-- tags: gui, unity, annotation | created: 2026-03-28 -->
