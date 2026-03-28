@@ -286,3 +286,6 @@
 
 - Completed the AMSItem.hpp annotation pass with high-level comments on the snapshot DTOs, refresh affordance, tray card, route compositors, preview tile, humidity badge, composite root, and custom events.
 - Verification passed with `git diff --check`; the remaining work for the phase is broader coverage, not this header.
+
+- Reconciled the stale runtime state for T630 (`src/slic3r/GUI/WebDownPluginDlg.hpp`): the task registry and handoff already show the header as complete, so this iteration is bookkeeping only.
+- Current action is to close the runtime task, keep the existing annotation evidence as-is, and continue from the next open Phase 1 task (`T643`).
