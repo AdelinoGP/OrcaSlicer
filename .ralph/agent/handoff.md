@@ -118,6 +118,21 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate StepMeshDialog import dialog
 - Next recommended Phase 1 task: T598 annotate: src/slic3r/GUI/StepMeshDialog.hpp
 
+## Phase 1 - Task T598 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/StepMeshDialog.hpp
+- Deliverables: `src/slic3r/GUI/StepMeshDialog.hpp`, `.ralph/agent/scratchpad.md`
+- Substantive additions: 6 comment blocks covering dialog intent, cached validation state, worker-thread ownership, Unity mapping, and lifecycle hazard
+- Verification excerpt: `[UNITY] Map this to a modal controller with text fields, validation state, and an async mesh estimate service`
+- Unity-impact summary:
+  - Keep validation UI separate from async mesh estimation.
+  - Preserve raw-text vs last-valid numeric state in the view-model.
+  - Treat worker lifetime as explicit cancel/join behavior on close.
+- Hazards found: P2 x1
+- Git: Annotate StepMeshDialog header for Unity port
+- Next recommended Phase 1 task: T599 annotate: src/slic3r/GUI/SurfaceDrag.cpp
+
 ## Phase 1 - Task T593 complete
 
 - Task type: annotate

@@ -99,3 +99,7 @@
 - Started T597 (`src/slic3r/GUI/StepMeshDialog.cpp`) as the STEP import-tessellation dialog.
 - The dialog couples numeric validation, slider/text synchronization, app-config persistence, and a worker-thread triangle-count preview, so the Unity port should split it into a modal controller plus an async mesh-estimation service.
 - The main hazards are the blocking join/cancel path and the dialog's role as both importer and settings bridge; next step after commit is T598 (`src/slic3r/GUI/StepMeshDialog.hpp`).
+
+- Started T598 (`src/slic3r/GUI/StepMeshDialog.hpp`) as the declaration boundary for the same STEP import dialog.
+- The header now captures the modal tessellation controller, cached raw-vs-valid numeric state, worker-thread ownership, and the Unity split between validation UI and async mesh estimation.
+- Next step after commit: close T598 and move to T599 (`src/slic3r/GUI/SurfaceDrag.cpp`).
