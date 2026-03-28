@@ -25,10 +25,16 @@ namespace Slic3r { namespace GUI {
 
 /*
  * [INTENT] AMSControl manages the user interface for the Automatic Material System (AMS).
- * It provides panels and controls for filament loading, unloading, humidity monitoring,
- * and AMS settings management.
- * [UNITY] Replace with a dedicated UI Controller MonoBehaviour using a UI Toolkit View or
- * a complex Unity UI hierarchy for AMS slots.
+ * It owns the slot preview pages, per-AMS item widgets, load/unload controls, and the
+ * humidity popups that mirror printer state back into the GUI.
+ * [STATE] Constructor-time layout depends on the selected machine snapshot and caches the
+ * current AMS, visible AMS pages, nozzle grouping, and tooltip/popup widgets.
+ * [EVENT] The control wires button clicks and preview taps directly to parent events so the
+ * higher-level device workflow can decide whether to load, unload, refill, or configure.
+ * [UNITY] Replace with a stateful controller MonoBehaviour backed by a UI Toolkit tree for
+ * AMS cards plus a separate popup service for humidity and warning overlays.
+ * [PORTING_HAZARD:P2] wxSimplebook page ownership and the raw popup pointers make teardown
+ * ordering implicit; Unity should centralize ownership instead of mixing widget lifetimes.
  */
 AMSControl::AMSControl(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size)
     : wxSimplebook(parent, wxID_ANY, pos, size)
@@ -403,6 +409,12 @@ void AMSControl::EnableUnLoadFilamentBtn(bool enable, const std::string& ams_id,
 
 void AMSControl::EnterNoneAMSMode()
 {
+    /* [INTENT] Switch to the no-AMS presentation: hide the AMS preview rail, force the extruder
+     * into non-AMS behavior, and refresh the helper text that explains manual loading.
+     * [STATE] This mutates the mode enum that gates all other layout branches.
+     * [UNITY] Model this as a presenter state change that toggles the visibility of the AMS rail,
+     * the extruder widget, and the contextual tip block in one frame.
+     */
     // m_vams_lib->m_ams_model = m_ext_model;
     if (m_is_none_ams_mode == AMSModel::EXT_AMS)
         return;
@@ -423,6 +435,13 @@ void AMSControl::EnterNoneAMSMode()
 
 void AMSControl::EnterGenericAMSMode()
 {
+    /* [INTENT] Return the control to the generic AMS layout without forcing a specific nozzle
+     * pairing or hiding the preview rail.
+     * [STATE] This is the default normal mode for generic AMS hardware and the fallback after
+     * transient non-AMS states.
+     * [UNITY] Use a data-driven state enum that reconfigures the same panel set rather than
+     * rebuilding the control tree.
+     */
     if (m_is_none_ams_mode == AMSModel::GENERIC_AMS)
         return;
     m_extruder->no_ams_mode(false);
@@ -434,6 +453,12 @@ void AMSControl::EnterGenericAMSMode()
 
 void AMSControl::EnterExtraAMSMode()
 {
+    /* [INTENT] Switch the AMS control into the extra-AMS/lite layout branch.
+     * [STATE] Like EnterNoneAMSMode, this hides the left preview rail and changes the road
+     * visualization that is shown underneath the slot cards.
+     * [PORTING_HAZARD:P3] The method duplicates layout work from the other mode setters; in
+     * Unity this should likely collapse into a single state-apply helper.
+     */
     // m_vams_lib->m_ams_model = m_ext_model;
     if (m_is_none_ams_mode == AMSModel::AMS_LITE)
         return;
@@ -517,6 +542,12 @@ void AMSControl::msw_rescale()
 
 void AMSControl::CreateAms()
 {
+    /* [INTENT] Seed the control with a synthetic eight-slot AMS view used when no live machine
+     * data is available yet.
+     * [STATE] This populates the default AMS list, preview widgets, and slot metadata before the
+     * printer-specific refresh path rewrites them.
+     * [UNITY] Treat this as an editor/placeholder data bootstrap for the retained AMS model.
+     */
     auto caninfo0_0 = Caninfo{"def_can_0", (""), *wxWHITE, AMSCanType::AMS_CAN_TYPE_VIRTUAL};
     auto caninfo0_1 = Caninfo{"def_can_1", (""), *wxWHITE, AMSCanType::AMS_CAN_TYPE_VIRTUAL};
     auto caninfo0_2 = Caninfo{"def_can_2", (""), *wxWHITE, AMSCanType::AMS_CAN_TYPE_VIRTUAL};
@@ -556,6 +587,12 @@ void AMSControl::CreateAms()
 
 void AMSControl::ClearAms()
 {
+    /* [INTENT] Tear down all generated AMS pages and cached preview widgets before a rebuild.
+     * [STATE] This clears page indices, preview caches, item maps, and pairing metadata so the
+     * next refresh starts from a clean slate.
+     * [PORTING_HAZARD:P2] Manual delete/DestroyChildren calls depend on wx ownership semantics;
+     * a Unity port should make object lifetime explicit.
+     */
     m_simplebook_ams_right->DeleteAllPages();
     m_simplebook_ams_left->DeleteAllPages();
     m_simplebook_ams_right->DestroyChildren();
@@ -583,6 +620,13 @@ void AMSControl::ClearAms()
 
 void AMSControl::CreateAmsDoubleNozzle(const std::string& series_name, const std::string& printer_type)
 {
+    /* [INTENT] Build the paired-nozzle AMS layout, including paired single-slot trays and the
+     * virtual-tray entries used for the down-road visualization.
+     * [STATE] This also computes the left/right grouping tables that later drive selection and
+     * road-length calculations.
+     * [UNITY] Port as a retained grouping model that feeds separate left/right AMS containers and
+     * a shared road-visualization component.
+     */
     std::vector<AMSinfo> single_info_left;
     std::vector<AMSinfo> single_info_right;
 
@@ -895,6 +939,15 @@ void AMSControl::UpdateAms(const std::string&   series_name,
                            bool                 is_reset,
                            bool                 test)
 {
+    /* [INTENT] Reconcile live device data against the cached AMS model and rebuild the visible
+     * control tree when the printer topology changes.
+     * [STATE] This is the main refresh path for AMS inventory, extension trays, humidity popups,
+     * and nozzle-count changes.
+     * [THREAD] The UI and popup widgets are mutated directly, so callers must keep this on the UI
+     * thread even though the source data may come from device callbacks.
+     * [UNITY] Represent this as a model diff plus presenter refresh rather than mutating widgets
+     * in place.
+     */
     if (!test) {
         // update item
         bool fresh = false;
@@ -1218,6 +1271,13 @@ void AMSControl::AddAms(std::vector<AMSinfo> single_info, const std::string& ser
 
 void AMSControl::AddAmsPreview(std::vector<AMSinfo> single_info, AMSPanelPos pos)
 {
+    /* [INTENT] Create the clickable preview strip for one or two AMS entries and bind it back to
+     * SwitchAms.
+     * [EVENT] Each preview item becomes a selection source; the preview list is both UI chrome and
+     * an interaction surface.
+     * [UNITY] Use a recycled list/tile view with explicit selection callbacks instead of manually
+     * binding each wxStaticBitmap.
+     */
     if (single_info.size() <= 0)
         return;
 
@@ -1263,6 +1323,13 @@ void AMSControl::AddAmsPreview(std::vector<AMSinfo> single_info, AMSPanelPos pos
  */
 void AMSControl::SwitchAms(std::string ams_id)
 {
+    /* [STATE] This is the central selection synchronizer: it updates the active preview, the
+     * current page in the simplebook, the down-road visualization, and the cached selection id.
+     * [EVENT] Preview clicks call into this method; it then emits the higher-level switch event for
+     * the rest of the workflow.
+     * [PORTING_HAZARD:P2] The method mixes selection, visibility, and transport-path updates; a
+     * Unity port should split those responsibilities behind one explicit state transition.
+     */
     if (ams_id == m_current_show_ams_left || ams_id == m_current_show_ams_right) {
         return;
     }
@@ -1412,6 +1479,15 @@ void AMSControl::SetExtruder(bool on_off, int nozzle_id, std::string ams_id, std
 
 void AMSControl::SetAmsStep(std::string ams_id, std::string canid, AMSPassRoadType type, AMSPassRoadSTEP step)
 {
+    /* [INTENT] Translate an AMS loading step into the visual pass-road length, color, and loading
+     * animation state.
+     * [STATE] This method remembers the last tray/AMS selection and derives path geometry from the
+     * current topology, pair grouping, and nozzle count.
+     * [UNITY] Port this as a route-progress presenter that consumes model state and updates a road
+     * diagram plus the extruder loading indicator.
+     * [PORTING_HAZARD:P2] The length heuristics are layout-specific and depend on multiple printer
+     * types; Unity should keep them in a data table or strategy object.
+     */
     AmsItem* ams          = nullptr;
     auto     amsit        = m_ams_item_list.find(ams_id);
     bool     in_same_page = false;
@@ -1571,6 +1647,13 @@ void AMSControl::SetAmsStep(std::string ams_id, std::string canid, AMSPassRoadTy
 
 void AMSControl::on_filament_load(wxCommandEvent& event)
 {
+    /* [INTENT] Validate the selected slot before dispatching the load action to the parent
+     * workflow.
+     * [EVENT] The button click is converted into a typed AMS load event only after the filament
+     * metadata check passes.
+     * [UNITY] Keep the UI warning as a modal dialog or overlay and route the load request through
+     * a command bus or presenter callback.
+     */
     /*If the filament is unknown, show warning*/
     const auto& filament_id = get_filament_id(m_current_ams, GetCurrentCan(m_current_ams));
     if (filament_id.empty()) {
@@ -1616,6 +1699,12 @@ void AMSControl::on_ams_setting_click(wxMouseEvent& event) { post_event(SimpleEv
 
 void AMSControl::parse_object(MachineObject* obj)
 {
+    /* [INTENT] Snapshot AMS inventory from the selected machine object into the local view model.
+     * [STATE] This is the bridge from DeviceManager data to the widget cache that drives the rest
+     * of the control.
+     * [UNITY] Port as a one-way import from the printer/device model into a serialized AMS state
+     * object.
+     */
     if (!obj || obj->GetFilaSystem()->GetAmsList().size() == 0) {
         return;
     }

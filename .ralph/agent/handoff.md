@@ -2357,3 +2357,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1
 - Git: Annotate WebViewDialog header boundary
 - Next recommended Phase 1 task: T639 annotate: src/slic3r/GUI/Widgets/AMSControl.cpp
+
+## Phase 1 - Task T639 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/AMSControl.cpp
+- Deliverables: src/slic3r/GUI/Widgets/AMSControl.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 13 boundary comment blocks covering the AMS dashboard, mode switching, synthetic data bootstrap, teardown/rebuild, paired-nozzle grouping, live refresh, preview selection, route-progress mapping, load validation, and machine snapshot import
+- Verification excerpt: `[PORTING_HAZARD:P2] wxSimplebook page ownership and the raw popup pointers make teardown ordering implicit; Unity should centralize ownership instead of mixing widget lifetimes.`
+- Unity-impact summary:
+  - AMS should port as a retained presenter with explicit selection and mode state.
+  - Preview tiles, humidity popups, and route progress need separate Unity surfaces/services.
+  - Live device refresh must stay on a UI-thread model diff boundary.
+- Hazards found: P2 x5, P3 x1
+- Git: pending commit for AMSControl.cpp annotation
+- Next recommended Phase 1 task: T640 annotate: src/slic3r/GUI/Widgets/AMSControl.hpp

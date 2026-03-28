@@ -2,6 +2,22 @@
 
 ## Patterns
 
+### mem-1774684653-cce1
+> AMSControl.cpp is a stateful AMS dashboard: it owns preview pages, item widgets, humidity popups, and the load/unload event bridge, so Unity should model it as a presenter with retained slot groups and explicit selection/state transitions.
+<!-- tags: gui, unity, widgets, ams | created: 2026-03-28 -->
+
+### mem-1774684358-1b8d
+> WebViewDialog.hpp is the declaration boundary for the embedded browser host: it owns the browser, menu chrome, login timer, and cached script state, so Unity should model it as a persistent web-host controller plus a typed command router.
+<!-- tags: gui, unity, webview, header | created: 2026-03-28 -->
+
+### mem-1774683866-a0c8
+> WebViewDialog.cpp is a retained browser host: it mixes navigation gating, login polling, page-to-native JS commands, and queued response delivery, so Unity should split the host shell from a typed command router and main-thread response service.
+<!-- tags: gui, unity, webview, threading | created: 2026-03-28 -->
+
+### mem-1774683455-52a7
+> WebUserLoginDialog.hpp is the declaration boundary for the embedded login modal: it retains browser/timer/auth state, routes webview events through the UI thread, and should port to a modal browser shell with a typed command bridge.
+<!-- tags: gui, unity, webview, auth, threading | created: 2026-03-28 -->
+
 ### mem-1774683100-d04c
 > WebUserLoginDialog.cpp is a dual-mode modal login host: it either shows a network-plugin-missing notice or embeds a wxWebView auth flow. JS messages are the command surface (login setup, autotest token, localhost handoff, third-party login, new_webpage), and modal completion is carefully deferred via EndModal + CallAfter to avoid reentrancy.
 <!-- tags: gui, unity, webview, auth, threading | created: 2026-03-28 -->
