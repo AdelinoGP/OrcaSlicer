@@ -237,3 +237,7 @@
 - The header is the declaration boundary for the same plugin-download dialog: it should capture ownership/lifetime of the browser widget, the exposed web callbacks, the install/download/status bridge, and the Unity split between a retained web-content host and a typed command router.
 - Plan: add compact [INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD] comments around class purpose, browser ownership, event handlers, script bridge, and progress callback state, then verify with `git diff --check` and close the task.
 - T630 annotation is complete in the working tree; next step is to commit the atomic header change and move to T631 (`src/slic3r/GUI/WebGuideDialog.cpp`).
+
+- Started T631 (`src/slic3r/GUI/WebGuideDialog.cpp`) as the web-based setup wizard controller.
+- This file mixes embedded web navigation, JSON script-command handling, preset bundle import/export, and async preset loading, so the annotations need to call out the webview bridge, the shared wizard state, the worker-thread handoff, and the config/preset side effects that Unity must isolate.
+- Memory search for `WebGuideDialog` returned no existing reusable pattern, so I am annotating the file directly and will record the wizard/controller pattern if it holds after verification.

@@ -547,7 +547,7 @@ _Generated: 2026-03-26 08:10:14 UTC_
   - Move device polling/subscription into a cached service that refreshes the UI on the main thread.
   - Replace pipe-delimited mapping payloads with a typed DTO boundary in Unity.
 - Hazards found: P2=2, P3=2, P1=0
-- Git: pending commit
+- Git: Annotate WebGuideDialog wizard controller
 - Next recommended Phase 1 task: T582 annotate: src/slic3r/GUI/SendMultiMachinePage.hpp
 
 ## Phase 1 - Task T582 complete
@@ -2255,3 +2255,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P1 x1, P2 x1
 - Git: Annotate WebDownPluginDlg.hpp boundary
 - Next recommended Phase 1 task: T631 annotate: src/slic3r/GUI/WebGuideDialog.cpp
+
+## Phase 1 - Task T631 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/WebGuideDialog.cpp
+- Deliverables: src/slic3r/GUI/WebGuideDialog.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 12 boundary comments covering shared wizard state, webview event flow, async preset loading, config persistence, and plugin install hooks
+- Verification excerpt: `[EVENT] The page posts JSON commands here to drive onboarding, profile edits,`
+- Unity-impact summary:
+  - WebView page traffic needs a typed command bridge instead of raw JSON parsing in the view layer.
+  - The preset loader must become a cancellable async service with explicit state ownership.
+  - Config/app mutations need a staged service layer because finish/save triggers cross-system side effects.
+- Hazards found: P2 x2, P3 x1, UNCLEAR x1
+- Git: pending commit
+- Next recommended Phase 1 task: T632 annotate: src/slic3r/GUI/WebGuideDialog.hpp
