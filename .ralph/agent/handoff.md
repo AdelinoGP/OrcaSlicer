@@ -183,6 +183,21 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Next recommended Phase 1 task: T188 annotate: src/slic3r/GUI/calib_dlg.hpp
 - [x] T559 annotate: src/slic3r/GUI/RammingChart.cpp
 
+## Phase 1 - Task T578 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SelectMachine.hpp
+- Deliverables: src/slic3r/GUI/SelectMachine.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 8 annotation blocks covering the dialog boundary, thumbnail luminance helper, option rows, preview panel, mode switch, modal workflow, and printer header control
+- Verification excerpt: `[UNITY] Port this as a modal controller with step views, a printer picker, async job/status events, and a dedicated preview panel.`
+- Unity-impact summary:
+  - Keep the send-print flow as a modal controller with explicit step states.
+  - Split the painted option/thumbnail widgets into reusable Unity subviews.
+  - Marshal worker/status callbacks back to the UI thread before touching UI state.
+- Hazards found: P2=1, P3=4
+- Git: annotate SelectMachine header
+- Next recommended Phase 1 task: T579 annotate: src/slic3r/GUI/SelectMachinePop.cpp
+
 ## Phase 1 - Task T568 complete
 
 - Task type: annotate
