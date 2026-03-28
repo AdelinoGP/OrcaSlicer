@@ -42,3 +42,7 @@
 - Started T584 (`src/slic3r/GUI/SendSystemInfoDialog.hpp`) as a declaration-only consent-gate boundary.
 - The header is intentionally thin: it exposes the dialog entry point without any payload state, so the Unity port only needs a modal controller hook plus the same privacy gate semantics.
 - Next step after commit: close T584 and move to T585 (`src/slic3r/GUI/SendToPrinter.cpp`).
+
+- Started T585 (`src/slic3r/GUI/SendToPrinter.cpp`) for the send-to-printer/storage modal.
+- The file combines printer discovery, storage selection, rename validation, device sync, tunnel setup, and upload progress/timeouts; the key Unity mapping is a modal controller backed by an async connection/upload service plus explicit main-thread marshaling for status updates.
+- Plan: add a small set of high-value boundary comments around dialog intent/state, refresh and connection threading, send/upload flow, and timeout/cancel hazards, then verify and close the task.

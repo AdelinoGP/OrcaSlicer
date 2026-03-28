@@ -7,6 +7,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - **Branch:** `agent/gui-analysis`
 - **HEAD:** 67ddccd62d: chore: auto-commit before merge (loop primary)
 
+## Phase 1 - Task T585 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SendToPrinter.cpp
+- Deliverables: src/slic3r/GUI/SendToPrinter.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md
+- Substantive additions: 9 boundary comments covering error translation, workflow state, async fetch, connection retries, upload progress, and teardown
+- Verification excerpt: `[THREAD] Upload completion also returns on the UI thread; success closes the send flow by posting back into Plater.`
+- Unity-impact summary: modal controller + async tunnel/upload service; explicit main-thread marshaling; state machine splits cleanly into prepare/sending/finish
+- Hazards found: P2 x2 (connection retry path, teardown/cancellation cleanup)
+- Git: Annotate SendToPrinter send workflow
+- Next recommended Phase 1 task: T586 annotate: src/slic3r/GUI/SendToPrinter.hpp
+
 ## Tasks
 
 ### Completed
