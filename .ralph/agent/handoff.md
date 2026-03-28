@@ -91,6 +91,21 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: annotate SliceInfoPanel header boundary
 - Next recommended Phase 1 task: T593 annotate: src/slic3r/GUI/SlicingProgressNotification.cpp
 
+## Phase 1 - Task T596 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/StatusPanel.hpp
+- Deliverables: src/slic3r/GUI/StatusPanel.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 6 boundary comments covering file intent, extruder-state painting, switching-status feedback, score upload state, task-panel actions, base dashboard layout, and concrete status-panel orchestration
+- Verification excerpt: `[THREAD] Thumbnail refresh uses wxWebRequest and related callbacks, so response handling must preserve UI-thread ownership when ported.`
+- Unity-impact summary:
+  - Retained dashboard root should be split into reusable child panels plus popup/dialog services
+  - Async web-request and thumbnail lifecycle need explicit main-thread marshaling in Unity
+  - The base panel's many virtual hooks make a monolithic MonoBehaviour risky
+- Hazards found: P2 x2, P3 x1
+- Git: pending commit for StatusPanel.hpp annotation
+- Next recommended Phase 1 task: T597 annotate: src/slic3r/GUI/StepMeshDialog.cpp
+
 ## Phase 1 - Task T593 complete
 
 - Task type: annotate

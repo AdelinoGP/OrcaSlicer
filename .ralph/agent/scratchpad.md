@@ -90,3 +90,8 @@
 - Started T595 (`src/slic3r/GUI/StatusPanel.cpp`) as the large printer-status dashboard/controller.
 - The file mixes extruder glyph rendering, AMS switching feedback, printing-progress cards, camera/control scaffolding, and the rating/upload modal; Unity should split it into retained subviews plus a shared dashboard model.
 - Plan: keep the annotation focused on the major class boundaries and the async thumbnail/upload seam, then verify whitespace with `git diff --check`, append handoff evidence, and close the task.
+
+- Started T596 (`src/slic3r/GUI/StatusPanel.hpp`) as the declaration boundary for the same dashboard.
+- Added class-level annotations for the full status surface, then marked the major subcontrollers: extruder image state, switching status strip, score dialog, printing task panel, base dashboard, and concrete status panel.
+- Unity mapping now calls out a retained dashboard root with child panels/services, plus explicit async web-request handling for thumbnail refresh.
+- Next step after commit: close T596 and move to T597 (`src/slic3r/GUI/StepMeshDialog.cpp`).
