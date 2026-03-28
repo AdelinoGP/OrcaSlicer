@@ -6,6 +6,10 @@
 > DropDown.cpp is a popup selector: it measures grouped items, lazily spawns a submenu popup for grouped branches, and uses screen-space anchoring plus scroll-offset state to keep long lists navigable; Unity should model it as a retained dropdown with a separate submenu presenter and explicit viewport clamping.
 <!-- tags: gui, unity, widgets | created: 2026-03-28 -->
 
+### mem-1774740500-t656
+> DropDown.hpp is the declaration boundary for the popup selector: it keeps the caller-owned item vector, submenu back-links, geometry/style caches, and dismissal state explicit, so Unity should model it as a retained dropdown root with a separate popup submenu presenter and owned model state.
+<!-- tags: gui, unity, widgets, annotation | created: 2026-03-28 -->
+
 ### mem-1774740000-t654
 > DialogButtons.hpp is the declaration boundary for a reusable dialog-footer strip: it exposes role-tagged footer prefab wiring, keeps label-to-ID aliasing explicit to avoid collisions, and requires an explicit relayout pass when DPI changes.
 <!-- tags: gui, unity, widgets, annotation | created: 2026-03-28 -->

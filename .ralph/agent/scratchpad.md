@@ -319,3 +319,7 @@
 - Started T655 (`src/slic3r/GUI/Widgets/DropDown.cpp`) as the grouped popup selector.
 - The file mixes buffered custom painting, nested submenu popups, drag-to-scroll hover handling, and screen-space auto-positioning, so the annotations need to call out the retained popup state, selection/hover caches, and the Unity split between a dropdown panel and a separate submenu presenter.
 - Verification so far: `git diff --check -- src/slic3r/GUI/Widgets/DropDown.cpp` passed; the local diagnostics are the expected include-path noise from `boost/date_time`, not from the inserted comments.
+
+- Completed T656 (`src/slic3r/GUI/Widgets/DropDown.hpp`) as the declaration boundary for the popup selector.
+- The header now records the caller-owned item model, nested submenu ownership, geometry caches, state colors, and event routing seams, plus a Unity mapping to a retained dropdown root with a separate popup submenu presenter.
+- Verification target was `git diff --check -- src/slic3r/GUI/Widgets/DropDown.hpp`; next step after commit is T657 (`src/slic3r/GUI/Widgets/ErrorMsgStaticText.cpp`).

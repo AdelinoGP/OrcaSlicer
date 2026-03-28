@@ -2529,3 +2529,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1, P3 x1
 - Git: Annotate DropDown popup selector
 - Next recommended Phase 1 task: T656 annotate: src/slic3r/GUI/Widgets/DropDown.hpp
+
+## Phase 1 - Task T656 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/DropDown.hpp
+- Deliverables: src/slic3r/GUI/Widgets/DropDown.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 15 boundary comments covering class intent, caller-owned model state, submenu linkage, geometry/style caches, dismissal timing, paint/render boundaries, measurement/positioning, and event dispatch
+- Verification excerpt: `[UNITY] Map this to a retained dropdown root with a separate popup submenu presenter and explicit dismissal/selection state.`
+- Unity-impact summary: retain the popup as a controller with explicit selection/hover state; model the submenu as a separate presenter; replace raw submenu pointer choreography with owned controller relationships
+- Hazards found: P2 x1
+- Git: Annotate DropDown declaration boundary
+- Next recommended Phase 1 task: T657 annotate: src/slic3r/GUI/Widgets/ErrorMsgStaticText.cpp
