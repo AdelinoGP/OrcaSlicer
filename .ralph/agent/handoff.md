@@ -2565,3 +2565,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3 x1 (paint-time size mutation / measurement coupling)
 - Git: pending commit for ErrorMsgStaticText.hpp annotation
 - Next recommended Phase 1 task: T659 annotate: src/slic3r/GUI/Widgets/FanControl.cpp
+
+## Phase 1 - Task T659 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/FanControl.cpp
+- Deliverables: src/slic3r/GUI/Widgets/FanControl.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 10 boundary comments covering the passive gauge, interactive stepper, device-command bridge, mode inference, popup rebuilds, optional cooling-filter submode, and the switch-row helper
+- Verification excerpt: `[UNITY] Port as a modal overlay with recyclable mode chips, part cards, and a separate device-control service.`
+- Unity-impact summary: split the UI into a readout card, a control strip, and a modal popup; keep device commands behind an async service; make fan mode an explicit model state in Unity
+- Hazards found: P2 x4, P3 x2
+- Git: Annotate FanControl fan controls
+- Next recommended Phase 1 task: T660 annotate: src/slic3r/GUI/Widgets/FanControl.hpp

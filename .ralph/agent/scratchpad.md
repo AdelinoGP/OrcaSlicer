@@ -332,3 +332,7 @@
 - The widget is a greedy wrap-and-resize control: it mutates its own height during paint, relies on a fragile multibyte heuristic, and assumes non-empty text when peeking at the first two bytes.
 - Unity mapping to preserve: a retained text element with automatic wrapping and layout-driven height, plus a separate text-measurement/layout service instead of ad-hoc DC wrapping.
 - Next step after commit: close T657 and move to T658 (`src/slic3r/GUI/Widgets/ErrorMsgStaticText.hpp`).
+
+- T658 is now complete in the runtime narrative and T659 (`src/slic3r/GUI/Widgets/FanControl.cpp`) is the active atomic annotation.
+- FanControl.cpp is a three-layer fan UI: passive gauge, interactive +/- strip, and modal popup/controller for duct modes and per-part fan tiles.
+- Plan: keep the file-level comments focused on ownership, screen-space hit testing, device-command bridging, and the optional cooling-filter submode; then verify with `git diff --check`, record handoff evidence, and commit the atomic change.
