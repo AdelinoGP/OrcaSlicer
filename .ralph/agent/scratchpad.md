@@ -164,3 +164,10 @@
 - Started T613 (`src/slic3r/GUI/TextLines.cpp`) as the embossed-text line meshing and rendering pipeline.
 - The file builds contour-following tube meshes from sliced model volumes, caches the generated `TextLinesModel` geometry, and renders it through the shared flat shader with explicit depth/blend state toggles.
 - Plan: annotate the preprocessing helpers, selection heuristic, model init path, and OpenGL render boundary with concrete Unity mapping notes, then verify with `git diff --check`, record handoff evidence, and close the task.
+
+- T613 is already reflected as done in `.ralph/ralph-tasks.md` and the handoff log, so the next active annotation is T614 (`src/slic3r/GUI/TextLines.hpp`).
+- TextLines.hpp is the declaration boundary for the embossed-text preview cache: it owns the selected contour list, the reusable GLModel preview, and the line-height helper that keeps the header aligned with the cpp meshing path.
+- Plan: add compact [INTENT]/[STATE]/[THREAD]/[UNITY]/[PORTING_HAZARD] notes around class purpose, cached geometry ownership, reset/init lifecycle, and the worker/job split for contour generation, then verify and close the task.
+
+- Completed T614 (`src/slic3r/GUI/TextLines.hpp`) with declaration-boundary annotations for the preview cache, init/render separation, reset semantics, and the line-height helper.
+- Verification: `git diff --check -- src/slic3r/GUI/TextLines.hpp .ralph/agent/scratchpad.md .ralph/ralph-tasks.md` passed; next step is T615 (`src/slic3r/GUI/ThermalPreconditioningDialog.cpp`).

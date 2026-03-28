@@ -2027,6 +2027,21 @@ This prompt governs **Phase 1 only**.
 - Unity-impact summary:
   - Geometry generation should move to a worker/job service.
   - Render-time code should consume cached Mesh data via a dedicated material.
+
+## Phase 1 - Task T614 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/TextLines.hpp
+- Deliverables: src/slic3r/GUI/TextLines.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md, .ralph/ralph-tasks.md
+- Substantive additions: 8 boundary comments covering class intent/state, init/render boundaries, reset/cache ownership, line-height helper, and the Unity job/service split
+- Verification excerpt: `[UNITY] Model this as a ScriptableObject-backed geometry cache plus a worker/job service that emits a finished Mesh for a render-only view.`
+- Unity-impact summary:
+  - Separate the preview cache from the expensive contour builder.
+  - Keep render-only consumption on the main thread/material path.
+  - Preserve the line-height helper as pure layout math.
+- Hazards found: P2 x1
+- Git: Annotate TextLines header boundary
+- Next recommended Phase 1 task: T615 annotate: src/slic3r/GUI/ThermalPreconditioningDialog.cpp
   - Contour selection stays isolated as a replaceable heuristic service.
 - Hazards found: 1 P2, 1 P3
 - Git: TextLines.cpp annotate: emboss preview mesh boundary annotations

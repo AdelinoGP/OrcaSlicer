@@ -532,7 +532,7 @@ Last updated: 2026-03-28T05:05:59Z
 - [~] T611 annotate: src/slic3r/GUI/TaskManager.cpp
 - [x] T612 annotate: src/slic3r/GUI/TaskManager.hpp
 - [x] T613 annotate: src/slic3r/GUI/TextLines.cpp
-- [ ] T614 annotate: src/slic3r/GUI/TextLines.hpp
+- [x] T614 annotate: src/slic3r/GUI/TextLines.hpp
 - [ ] T615 annotate: src/slic3r/GUI/ThermalPreconditioningDialog.cpp
 - [ ] T616 annotate: src/slic3r/GUI/ThermalPreconditioningDialog.hpp
 - [ ] T617 annotate: src/slic3r/GUI/TickCode.cpp
