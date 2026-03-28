@@ -160,3 +160,7 @@
 - Completed T612 (`src/slic3r/GUI/TaskManager.hpp`) with declaration-boundary annotations for the scheduler, per-task state capsule, batch policy, worker lifecycle, and the multi-send-limit event.
 - Verification: `git diff --check -- src/slic3r/GUI/TaskManager.hpp` passed; the only diagnostics are inherited include-path/type-resolution noise from the local LSP environment.
 - Next step after commit: close T612 and move to T613 (`src/slic3r/GUI/TextLines.cpp`).
+
+- Started T613 (`src/slic3r/GUI/TextLines.cpp`) as the embossed-text line meshing and rendering pipeline.
+- The file builds contour-following tube meshes from sliced model volumes, caches the generated `TextLinesModel` geometry, and renders it through the shared flat shader with explicit depth/blend state toggles.
+- Plan: annotate the preprocessing helpers, selection heuristic, model init path, and OpenGL render boundary with concrete Unity mapping notes, then verify with `git diff --check`, record handoff evidence, and close the task.

@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-28T04:53:09Z
+Last updated: 2026-03-28T05:05:59Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -531,7 +531,7 @@ Last updated: 2026-03-28T04:53:09Z
 - [x] T610 annotate: src/slic3r/GUI/Tab.hpp
 - [~] T611 annotate: src/slic3r/GUI/TaskManager.cpp
 - [x] T612 annotate: src/slic3r/GUI/TaskManager.hpp
-- [ ] T613 annotate: src/slic3r/GUI/TextLines.cpp
+- [x] T613 annotate: src/slic3r/GUI/TextLines.cpp
 - [ ] T614 annotate: src/slic3r/GUI/TextLines.hpp
 - [ ] T615 annotate: src/slic3r/GUI/ThermalPreconditioningDialog.cpp
 - [ ] T616 annotate: src/slic3r/GUI/ThermalPreconditioningDialog.hpp

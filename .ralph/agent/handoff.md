@@ -2015,3 +2015,19 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1, UNCLEAR x1
 - Git: Annotate TaskManager scheduler boundary
 - Next recommended Phase 1 task: T613 annotate: src/slic3r/GUI/TextLines.cpp
+
+
+## Phase 1 - Task T613 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/TextLines.cpp
+- Deliverables: src/slic3r/GUI/TextLines.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md, .ralph/ralph-tasks.md
+- Substantive additions: 7 boundary comments covering mesh generation, contour selection, GLModel conversion, CPU rebuild, render path, and line-height derivation
+- Verification excerpt: `[OPENGL] Render the cached preview mesh through the shared flat shader, temporarily enabling depth test and blending around the draw.`
+- Unity-impact summary:
+  - Geometry generation should move to a worker/job service.
+  - Render-time code should consume cached Mesh data via a dedicated material.
+  - Contour selection stays isolated as a replaceable heuristic service.
+- Hazards found: 1 P2, 1 P3
+- Git: TextLines.cpp annotate: emboss preview mesh boundary annotations
+- Next recommended Phase 1 task: T614 `src/slic3r/GUI/TextLines.hpp`
