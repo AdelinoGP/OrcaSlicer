@@ -243,6 +243,21 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: annotate SendMultiMachinePage header
 - Next recommended Phase 1 task: T583 annotate: src/slic3r/GUI/SendSystemInfoDialog.cpp
 
+## Phase 1 - Task T583 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SendSystemInfoDialog.cpp
+- Deliverables: src/slic3r/GUI/SendSystemInfoDialog.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 12 annotation blocks covering dialog purpose, cached payload state, preview modal, version gate, payload assembly, platform probes, OpenGL metadata, worker-thread upload flow, and the external entry point
+- Verification excerpt: `[PORTING_HAZARD:P2] The payload is assembled from OS, hardware, OpenGL, and installed-library probes, so the Unity port needs a privacy-reviewed data contract rather than a 1:1 UI swap.`
+- Unity-impact summary:
+  - Model the prompt as a modal opt-in controller with a read-only payload preview.
+  - Move upload behavior behind an async service/coroutine boundary instead of a nested modal worker thread.
+  - Treat the system-info schema as a reviewed payload contract, not just a UI translation.
+- Hazards found: P2=2, P3=0, P1=0
+- Git: annotate SendSystemInfoDialog system-info flow
+- Next recommended Phase 1 task: T584 annotate: src/slic3r/GUI/SendSystemInfoDialog.hpp
+
 ## Phase 1 - Task T568 complete
 
 - Task type: annotate

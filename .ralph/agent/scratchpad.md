@@ -34,3 +34,7 @@
 - Started T582 (`src/slic3r/GUI/SendMultiMachinePage.hpp`) and added declaration-level annotations for the custom-painted device row controller and the modal multi-printer workflow boundary.
 - The header makes the Unity split explicit: prefabbed recyclable device rows, a modal shell, and a separate AMS mapping/settings model with main-thread refresh handling.
 - Next step after commit: close T582 and continue with T583 (`src/slic3r/GUI/SendSystemInfoDialog.cpp`).
+
+- Started T583 (`src/slic3r/GUI/SendSystemInfoDialog.cpp`) and annotated the consent dialog boundary, cached payload state, preview modal, version gate, payload assembly, platform probes, OpenGL metadata, worker-thread upload flow, and the external entry point.
+- The file is a privacy-sensitive telemetry prompt: it collects OS/hardware/display/OpenGL details and sends them via a blocking HTTP flow, so the Unity port should treat it as a modal opt-in controller plus an async upload service with a reviewed payload schema.
+- Next step after commit: close T583 and move to T584 (`src/slic3r/GUI/SendSystemInfoDialog.hpp`).
