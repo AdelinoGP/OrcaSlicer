@@ -118,6 +118,10 @@
 - Verification target: keep the annotation compact but cover state ownership, event flow, and the transform helpers that bridge selection space to world/surface space.
 
 - T600 was already closed in the runtime registry, so the active work for this iteration is T601 (`src/slic3r/GUI/SyncAmsInfoDialog.cpp`).
+
+- The runtime queue still exposed T610 as the next actionable annotation, and I started it successfully; the earlier TabButton.hpp lookup was a path mismatch (`src/slic3r/GUI/Widgets/TabButton.hpp` vs `src/slic3r/GUI/TabButton.hpp`), so I switched to the actual `Tab.hpp` task that was present in the ready list.
+- Tab.hpp now carries class-level and boundary annotations for the page stack, preset controller, printer/filament specializations, and the config-binding seam.
+- Verification passed with `git diff --check` on `src/slic3r/GUI/Tab.hpp`; next step is to record handoff evidence, close the task, and move to the next ready annotation item.
 - SyncAmsInfoDialog.cpp is the AMS synchronization modal: dialog setup, printer-info refresh, status gating, custom filament rows, thumbnail recoloring, and the final sync toasts all live here.
 - Annotation plan: keep a handful of boundary comments for the modal controller, UI event wiring, worker-thread refresh, row popup flow, and CPU-side preview pipeline.
 

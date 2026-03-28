@@ -106,6 +106,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: pending commit for StatusPanel.hpp annotation
 - Next recommended Phase 1 task: T597 annotate: src/slic3r/GUI/StepMeshDialog.cpp
 
+## Phase 1 - Task T610 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Tab.hpp
+- Deliverables: src/slic3r/GUI/Tab.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 9 boundary comments covering page ownership, tab-controller state, event flow, background update seams, per-tab specialization, and printer/filament model splits
+- Verification excerpt: `[PORTING_HAZARD:P1] ScalableButton, wxTreeCtrl, and the custom page-switch workflow are tightly coupled to wx event semantics and need a bespoke Unity interaction layer.`
+- Unity-impact summary: retained tab-controller with page stack; ScriptableObject-backed preset/config model; derived printer/filament page controllers instead of one monolith
+- Hazards found: P1 x1, P2 x2, P3 x1
+- Git: Annotate Tab preset controller boundary
+- Next recommended Phase 1 task: T611 annotate: src/slic3r/GUI/TaskManager.cpp
+
 ## Phase 1 - Task T597 complete
 
 - Task type: annotate

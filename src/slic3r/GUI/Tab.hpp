@@ -54,8 +54,11 @@ namespace GUI {
 class TabPresetComboBox;
 class OG_CustomCtrl;
 
-// Single Tab page containing a{ vsizer } of{ optgroups }
-// package Slic3r::GUI::Tab::Page;
+// [INTENT] Page is the per-preset option surface: it owns a tab-owned panel, a page title row, and a vector of option groups.
+// [STATE] The page caches visibility, modification flags, layout mode, and the config pointer that drives reload/update calls.
+// [UNITY] Map this to a retained VisualElement page with child option groups, explicit visibility toggles, and a shared config binding.
+// [PORTING_HAZARD:P2] The page mutates wx widgets directly during config refresh, so Unity should keep layout invalidation and data binding
+// separate. Single Tab page containing a{ vsizer } of{ optgroups } package Slic3r::GUI::Tab::Page;
 using ConfigOptionsGroupShp = std::shared_ptr<ConfigOptionsGroup>;
 class Page : public std::enable_shared_from_this<Page> // : public wxScrolledWindow
 {
@@ -126,9 +129,13 @@ protected:
 };
 
 using PageShp = std::shared_ptr<Page>;
-// [INTENT] Tab: Expert tab (right side of main window) managing preset configuration pages.
-// [UNITY] Reimplement as a custom MonoBehaviour ('TabController') managing a collection of UI 'Page' panels.
-// [PORTING_HAZARD:P1] ScalableButton is a custom wxWidgets component requiring custom Unity UI implementation.
+// [INTENT] Tab is the preset editor shell for one preset type; it owns the tree, page stack, preset actions, search, and dirty-state
+// propagation. [STATE] It caches the active preset, page tree, icon/bitmap sets, compatibility toggles, pending page switches, and update
+// recursion guards. [EVENT] Tree selection, key input, preset actions, search, and undo/revert controls all route back through this
+// controller. [THREAD] update_current_page_in_background() indicates a UI/background split; Unity should marshal page rebuilds back onto
+// the main thread. [UNITY] Use a retained TabController MonoBehaviour with a page ListView/stack, ScriptableObject-backed preset model, and
+// explicit command buttons. [PORTING_HAZARD:P1] ScalableButton, wxTreeCtrl, and the custom page-switch workflow are tightly coupled to wx
+// event semantics and need a bespoke Unity interaction layer.
 class Tab : public wxPanel
 {
     // BBS: GUI refactor
@@ -445,6 +452,9 @@ public:
     void switch_excluder(int extruder_id = -1);
 
 protected:
+    // [INTENT] These helpers build option rows and compatibility widgets, then feed config values back into the active page tree.
+    // [STATE] They depend on the active preset/page selection and the cached config diff model, so Unity should keep them as controller
+    // methods. [UNITY] This is the seam for a row-factory plus per-field binding layer in UI Toolkit rather than direct widget mutation.
     void     create_line_with_widget(ConfigOptionsGroup* optgroup, const std::string& opt_key, const std::string& path, widget_t widget);
     wxSizer* compatible_widget_create(wxWindow* parent, PresetDependencies& deps);
     void     compatible_widget_reload(PresetDependencies& deps);
@@ -465,6 +475,8 @@ protected:
     friend class EditGCodeDialog;
 };
 
+// [INTENT] TabPrint specializes Tab for FFF print settings and swaps in print-specific pages and hints.
+// [UNITY] Keep this as a derived print-settings controller with a dedicated page set and text-hint panel.
 class TabPrint : public Tab
 {
 public:
@@ -485,6 +497,10 @@ private:
     ogStaticText* m_top_bottom_shell_thickness_explanation           = nullptr;
 };
 
+// [INTENT] TabPrintModel bridges preset state to per-object/per-part print overrides and can write back into model configs.
+// [THREAD] Model config updates must remain UI-thread owned; Unity should treat object change notifications as main-thread events.
+// [PORTING_HAZARD:P2] The class mixes preset inheritance with object-scoped overrides, so the view-model split needs explicit ownership of
+// object maps.
 class TabPrintModel : public TabPrint
 {
 public:
@@ -525,6 +541,7 @@ protected:
     bool                                m_back_to_sys = false;
 };
 
+// [INTENT] TabPrintPlate narrows the model tab to plate-level print overrides and spiral-mode validation.
 class TabPrintPlate : public TabPrintModel
 {
 public:
@@ -534,9 +551,7 @@ public:
     void build() override;
     void reset_model_config() override;
     int  show_spiral_mode_settings_dialog(bool is_object_config)
-    {
-        return m_config_manipulation.show_spiral_mode_settings_dialog(is_object_config);
-    }
+    { return m_config_manipulation.show_spiral_mode_settings_dialog(is_object_config); }
 
 protected:
     virtual void on_value_change(const std::string& opt_key, const boost::any& value) override;
@@ -544,6 +559,7 @@ protected:
     virtual void update_custom_dirty(std::vector<std::string>& dirty_options, std::vector<std::string>& nonsys_options) override;
 };
 
+// [INTENT] TabPrintObject handles object-scoped print overrides and forwards change notifications to the owning model layer.
 class TabPrintObject : public TabPrintModel
 {
 public:
@@ -555,6 +571,7 @@ protected:
     virtual void notify_changed(ObjectBase* object) override;
 };
 
+// [INTENT] TabPrintPart handles part-scoped print overrides with the same model update contract as object mode.
 class TabPrintPart : public TabPrintModel
 {
 public:
@@ -566,6 +583,7 @@ protected:
     virtual void notify_changed(ObjectBase* object) override;
 };
 
+// [INTENT] TabPrintLayer is the layer-scoped print override tab; it adds its own dirty-state translation for per-layer edits.
 class TabPrintLayer : public TabPrintModel
 {
 public:
@@ -578,6 +596,8 @@ protected:
     virtual void update_custom_dirty(std::vector<std::string>& dirty_options, std::vector<std::string>& nonsys_options) override;
 };
 
+// [INTENT] TabFilament specializes Tab for filament presets, including flow/cooling hints and filament override pages.
+// [UNITY] Model this as a filament-settings controller with separate override subpanels and hint text bindings.
 class TabFilament : public Tab
 {
 private:
@@ -608,6 +628,12 @@ public:
     void               set_custom_gcode(const t_config_option_key& opt_key, const std::string& value) override;
 };
 
+// [INTENT] TabPrinter owns printer hardware and technology-specific pages, including extruder-count-dependent rebuilds.
+// [STATE] It caches FFF/SLA page sets, extruder counts, and technology-specific preset metadata.
+// [EVENT] Build/update paths rebuild pages when printer technology or extruder count changes.
+// [UNITY] Use a printer-settings controller with technology-specific page groups and a dedicated extruder-count subview.
+// [PORTING_HAZARD:P2] The class rebuilds large chunks of UI in response to config changes, so Unity should preserve the same invalidation
+// boundaries.
 class TabPrinter : public Tab
 {
 private:
@@ -666,6 +692,7 @@ public:
     bool     apply_extruder_cnt_from_cache();
 };
 
+// [INTENT] TabSLAMaterial is the SLA material preset shell; it is intentionally thin and only gates technology compatibility.
 class TabSLAMaterial : public Tab
 {
 public:
@@ -680,6 +707,7 @@ public:
     bool supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptSLA; }
 };
 
+// [INTENT] TabSLAPrint is the SLA process-settings shell and carries the SLA-specific hint text for support elevation.
 class TabSLAPrint : public Tab
 {
 public:
