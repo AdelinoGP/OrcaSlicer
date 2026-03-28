@@ -106,6 +106,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: pending commit for StatusPanel.hpp annotation
 - Next recommended Phase 1 task: T597 annotate: src/slic3r/GUI/StepMeshDialog.cpp
 
+## Phase 1 - Task T597 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/StepMeshDialog.cpp
+- Deliverables: src/slic3r/GUI/StepMeshDialog.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md, .ralph/ralph-tasks.md
+- Substantive additions: 7 boundary comments covering dialog intent, modal state, slider/text sync, config persistence, UI-thread event routing, worker cancellation, and Unity migration guidance
+- Verification excerpt: `[THREAD] The current implementation uses a stop flag plus blocking join; Unity should replace this with cancellable async work.`
+- Unity-impact summary: modal controller plus async mesh-estimation service; keep validation and persistence in a typed view model; avoid blocking joins in the confirm/cancel path
+- Hazards found: P2 x1, P3 x1
+- Git: Annotate StepMeshDialog import dialog
+- Next recommended Phase 1 task: T598 annotate: src/slic3r/GUI/StepMeshDialog.hpp
+
 ## Phase 1 - Task T593 complete
 
 - Task type: annotate

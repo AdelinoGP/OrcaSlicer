@@ -95,3 +95,7 @@
 - Added class-level annotations for the full status surface, then marked the major subcontrollers: extruder image state, switching status strip, score dialog, printing task panel, base dashboard, and concrete status panel.
 - Unity mapping now calls out a retained dashboard root with child panels/services, plus explicit async web-request handling for thumbnail refresh.
 - Next step after commit: close T596 and move to T597 (`src/slic3r/GUI/StepMeshDialog.cpp`).
+
+- Started T597 (`src/slic3r/GUI/StepMeshDialog.cpp`) as the STEP import-tessellation dialog.
+- The dialog couples numeric validation, slider/text synchronization, app-config persistence, and a worker-thread triangle-count preview, so the Unity port should split it into a modal controller plus an async mesh-estimation service.
+- The main hazards are the blocking join/cancel path and the dialog's role as both importer and settings bridge; next step after commit is T598 (`src/slic3r/GUI/StepMeshDialog.hpp`).

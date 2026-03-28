@@ -16,32 +16,35 @@
 using namespace Slic3r;
 using namespace Slic3r::GUI;
 
+// [INTENT] This dialog tunes STEP import tessellation and optionally splits compound geometry before the file is converted.
+// [UNITY] Port as a modal import-settings controller with a background mesh-estimation service and typed validation state.
 static int _scale(const int val) { return val * Slic3r::GUI::wxGetApp().em_unit() / 10; }
 static int _ITEM_WIDTH() { return _scale(30); }
-#define MIN_DIALOG_WIDTH        FromDIP(400)
-#define SLIDER_WIDTH            FromDIP(200)
-#define SLIDER_HEIGHT           FromDIP(25)
-#define TEXT_CTRL_WIDTH         FromDIP(70)
-#define BUTTON_SIZE             wxSize(FromDIP(58), FromDIP(24))
-#define BUTTON_BORDER           FromDIP(int(400 - 58 * 2) / 8)
-#define SLIDER_SCALE(val)       ((val) / 0.001)
-#define SLIDER_UNSCALE(val)     ((val) * 0.001)
-#define SLIDER_SCALE_10(val)    ((val) / 0.01)
-#define SLIDER_UNSCALE_10(val)  ((val) * 0.01)
-#define LEFT_RIGHT_PADING       FromDIP(20)
-#define FONT_COLOR              wxColour("#6B6B6B")
+#define MIN_DIALOG_WIDTH FromDIP(400)
+#define SLIDER_WIDTH FromDIP(200)
+#define SLIDER_HEIGHT FromDIP(25)
+#define TEXT_CTRL_WIDTH FromDIP(70)
+#define BUTTON_SIZE wxSize(FromDIP(58), FromDIP(24))
+#define BUTTON_BORDER FromDIP(int(400 - 58 * 2) / 8)
+#define SLIDER_SCALE(val) ((val) / 0.001)
+#define SLIDER_UNSCALE(val) ((val) * 0.001)
+#define SLIDER_SCALE_10(val) ((val) / 0.01)
+#define SLIDER_UNSCALE_10(val) ((val) * 0.01)
+#define LEFT_RIGHT_PADING FromDIP(20)
+#define FONT_COLOR wxColour("#6B6B6B")
 
 wxDEFINE_EVENT(wxEVT_THREAD_DONE, wxCommandEvent);
 
 class CenteredStaticText : public wxStaticText
 {
 public:
-    CenteredStaticText(wxWindow* parent, wxWindowID id, const wxString& label, const wxPoint& position, const wxSize& size = wxDefaultSize, long style = 0)
-        : wxStaticText(parent, id, label, position, size, style) {
-        CenterOnPosition(position);
-    }
+    CenteredStaticText(
+        wxWindow* parent, wxWindowID id, const wxString& label, const wxPoint& position, const wxSize& size = wxDefaultSize, long style = 0)
+        : wxStaticText(parent, id, label, position, size, style)
+    { CenterOnPosition(position); }
 
-    void CenterOnPosition(const wxPoint& position) {
+    void CenterOnPosition(const wxPoint& position)
+    {
         int textWidth, textHeight;
         GetTextExtent(GetLabel(), &textWidth, &textHeight);
         int x = position.x - textWidth / 2;
@@ -50,10 +53,10 @@ public:
     }
 };
 
-void StepMeshDialog::on_dpi_changed(const wxRect& suggested_rect) {
-};
+void StepMeshDialog::on_dpi_changed(const wxRect& suggested_rect) {};
 
-bool StepMeshDialog:: validate_number_range(const wxString& value, double min, double max) {
+bool StepMeshDialog::validate_number_range(const wxString& value, double min, double max)
+{
     double num = 0.0;
     if (value.IsEmpty()) {
         return false;
@@ -69,17 +72,21 @@ bool StepMeshDialog:: validate_number_range(const wxString& value, double min, d
     return (num >= min && num <= max);
 }
 
+// [STATE] The dialog keeps two mirrored representations per numeric field: live text input and last-valid cached strings.
+// [EVENT] Construction wires slider/text synchronization, validation, config persistence, and modal dismissal in one place.
 StepMeshDialog::StepMeshDialog(wxWindow* parent, Slic3r::Step& file, double linear_init, double angle_init)
-    : DPIDialog(parent ? parent : static_cast<wxWindow *>(wxGetApp().mainframe),
+    : DPIDialog(parent ? parent : static_cast<wxWindow*>(wxGetApp().mainframe),
                 wxID_ANY,
                 _(L("Step file import parameters")),
                 wxDefaultPosition,
                 wxDefaultSize,
-                wxDEFAULT_DIALOG_STYLE /* | wxRESIZE_BORDER*/), m_file(file)
+                wxDEFAULT_DIALOG_STYLE /* | wxRESIZE_BORDER*/)
+    , m_file(file)
 {
     m_linear_last = wxString::Format("%.3f", linear_init);
-    m_angle_last = wxString::Format("%.2f", angle_init);
+    m_angle_last  = wxString::Format("%.2f", angle_init);
 
+    // [EVENT] Background triangle counting reports completion through a custom wx event back onto the UI thread.
     Bind(wxEVT_THREAD_DONE, &StepMeshDialog::on_task_done, this);
 
     SetBackgroundColour(*wxWHITE);
@@ -87,7 +94,7 @@ StepMeshDialog::StepMeshDialog(wxWindow* parent, Slic3r::Step& file, double line
     wxBoxSizer* bSizer = new wxBoxSizer(wxVERTICAL);
     bSizer->SetMinSize(wxSize(MIN_DIALOG_WIDTH, -1));
 
-    auto  image_bitmap = create_scaled_bitmap("step_mesh_info", this, FromDIP(120));
+    auto image_bitmap = create_scaled_bitmap("step_mesh_info", this, FromDIP(120));
 
     // wxPanel* overlay_panel = new wxPanel(this, wxID_ANY, wxDefaultPosition, image_bitmap.GetSize(), wxTAB_TRAVERSAL);
     // overlay_panel->SetBackgroundStyle(wxBG_STYLE_PAINT);
@@ -114,136 +121,137 @@ StepMeshDialog::StepMeshDialog(wxWindow* parent, Slic3r::Step& file, double line
 
     // bSizer->Add(overlay_panel, 0, wxALIGN_CENTER | wxALL, 10);
 
-    wxBoxSizer* tips_sizer = new wxBoxSizer(wxVERTICAL);
-    wxStaticText* info = new wxStaticText(this, wxID_ANY, _L("Smaller linear and angular deflections result in higher-quality transformations but increase the processing time."));
+    wxBoxSizer*   tips_sizer = new wxBoxSizer(wxVERTICAL);
+    wxStaticText* info       = new wxStaticText(
+        this, wxID_ANY,
+        _L("Smaller linear and angular deflections result in higher-quality transformations but increase the processing time."));
     info->SetForegroundColour(StateColor::darkModeColorFor(FONT_COLOR));
 
     // ORCA standardized HyperLink
-    HyperLink *tips = new HyperLink(this, _L("Wiki Guide"), "https://www.orcaslicer.com/wiki/import_export#step");
+    HyperLink* tips = new HyperLink(this, _L("Wiki Guide"), "https://www.orcaslicer.com/wiki/import_export#step");
     tips->SetFont(::Label::Body_12);
- 
+
     info->Wrap(FromDIP(400));
     tips_sizer->Add(info, 0, wxALIGN_LEFT);
     tips_sizer->Add(tips, 0, wxALIGN_LEFT);
     bSizer->Add(tips_sizer, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, LEFT_RIGHT_PADING);
 
+    // [STATE] Slider and text box must stay synchronized, but the expensive mesh recompute only runs after validation/commit.
     wxBoxSizer* linear_sizer = new wxBoxSizer(wxHORIZONTAL);
-    //linear_sizer->SetMinSize(wxSize(MIN_DIALOG_WIDTH, -1));
-    wxStaticText* linear_title = new wxStaticText(this,
-                                                  wxID_ANY, _L("Linear Deflection") + ": ");
+    // linear_sizer->SetMinSize(wxSize(MIN_DIALOG_WIDTH, -1));
+    wxStaticText* linear_title = new wxStaticText(this, wxID_ANY, _L("Linear Deflection") + ": ");
     linear_title->SetForegroundColour(StateColor::darkModeColorFor(FONT_COLOR));
     linear_sizer->Add(linear_title, 0, wxALIGN_LEFT);
     linear_sizer->AddStretchSpacer(1);
-    wxSlider* linear_slider = new wxSlider(this, wxID_ANY,
-                                           SLIDER_SCALE(get_linear_defletion()),
-                                           1, 100, wxDefaultPosition,
-                                           wxSize(SLIDER_WIDTH, SLIDER_HEIGHT),
-                                           wxSL_HORIZONTAL);
+    wxSlider* linear_slider = new wxSlider(this, wxID_ANY, SLIDER_SCALE(get_linear_defletion()), 1, 100, wxDefaultPosition,
+                                           wxSize(SLIDER_WIDTH, SLIDER_HEIGHT), wxSL_HORIZONTAL);
     linear_sizer->Add(linear_slider, 0, wxALIGN_RIGHT | wxLEFT, FromDIP(5));
 
-    auto linear_input = new ::TextInput(this, m_linear_last, wxEmptyString, wxEmptyString, wxDefaultPosition, wxSize(TEXT_CTRL_WIDTH, -1), wxTE_CENTER);
+    auto linear_input = new ::TextInput(this, m_linear_last, wxEmptyString, wxEmptyString, wxDefaultPosition, wxSize(TEXT_CTRL_WIDTH, -1),
+                                        wxTE_CENTER);
     linear_input->GetTextCtrl()->SetFont(Label::Body_12);
     linear_input->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
     linear_sizer->Add(linear_input, 0, wxALIGN_RIGHT | wxLEFT, FromDIP(5));
     linear_input->Bind(wxEVT_KILL_FOCUS, ([this, linear_input](wxFocusEvent& e) {
-        wxString value = linear_input->GetTextCtrl()->GetValue();
-        if (validate_number_range(value, 0.001, 0.1)) {
-            m_linear_last = value;
-            update_mesh_number_text();
-        } else {
-            MessageDialog msg_dlg(nullptr, _L("Please input a valid value (0.001 < linear deflection < 0.1)"), wxEmptyString, wxICON_WARNING | wxOK);
-            msg_dlg.ShowModal();
-            linear_input->GetTextCtrl()->SetValue(m_linear_last);
-        }
-        e.Skip();
-    }));
+                           wxString value = linear_input->GetTextCtrl()->GetValue();
+                           if (validate_number_range(value, 0.001, 0.1)) {
+                               m_linear_last = value;
+                               update_mesh_number_text();
+                           } else {
+                               MessageDialog msg_dlg(nullptr, _L("Please input a valid value (0.001 < linear deflection < 0.1)"),
+                                                     wxEmptyString, wxICON_WARNING | wxOK);
+                               msg_dlg.ShowModal();
+                               linear_input->GetTextCtrl()->SetValue(m_linear_last);
+                           }
+                           e.Skip();
+                       }));
     // textctrl bind slider
     linear_input->Bind(wxEVT_TEXT, ([this, linear_slider, linear_input](wxCommandEvent& e) {
-        double slider_value_long;
-        int slider_value;
-        wxString value = linear_input->GetTextCtrl()->GetValue();
-        if (value.ToDouble(&slider_value_long)) {
-            slider_value = SLIDER_SCALE(slider_value_long);
-            if (slider_value >= linear_slider->GetMin() && slider_value <= linear_slider->GetMax()) {
-                linear_slider->SetValue(slider_value);
-            }
-        }
-    }));
+                           double   slider_value_long;
+                           int      slider_value;
+                           wxString value = linear_input->GetTextCtrl()->GetValue();
+                           if (value.ToDouble(&slider_value_long)) {
+                               slider_value = SLIDER_SCALE(slider_value_long);
+                               if (slider_value >= linear_slider->GetMin() && slider_value <= linear_slider->GetMax()) {
+                                   linear_slider->SetValue(slider_value);
+                               }
+                           }
+                       }));
     linear_slider->Bind(wxEVT_SLIDER, ([this, linear_slider, linear_input](wxCommandEvent& e) {
-        double slider_value = SLIDER_UNSCALE(linear_slider->GetValue());
-        linear_input->GetTextCtrl()->SetValue(wxString::Format("%.3f", slider_value));
-        m_linear_last = wxString::Format("%.3f", slider_value);
-    }));
+                            double slider_value = SLIDER_UNSCALE(linear_slider->GetValue());
+                            linear_input->GetTextCtrl()->SetValue(wxString::Format("%.3f", slider_value));
+                            m_linear_last = wxString::Format("%.3f", slider_value);
+                        }));
     linear_slider->Bind(wxEVT_LEFT_UP, ([this](wxMouseEvent& e) {
-        update_mesh_number_text();
-        e.Skip();
-    }));
+                            update_mesh_number_text();
+                            e.Skip();
+                        }));
 
     bSizer->Add(linear_sizer, 1, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, LEFT_RIGHT_PADING);
 
-    wxBoxSizer* angle_sizer = new wxBoxSizer(wxHORIZONTAL);
-    wxStaticText* angle_title = new wxStaticText(this,
-                                                  wxID_ANY, _L("Angle Deflection") + ": ");
+    wxBoxSizer*   angle_sizer = new wxBoxSizer(wxHORIZONTAL);
+    wxStaticText* angle_title = new wxStaticText(this, wxID_ANY, _L("Angle Deflection") + ": ");
     angle_title->SetForegroundColour(StateColor::darkModeColorFor(FONT_COLOR));
     angle_sizer->Add(angle_title, 0, wxALIGN_LEFT);
     angle_sizer->AddStretchSpacer(1);
-    wxSlider* angle_slider = new wxSlider(this, wxID_ANY,
-                                           SLIDER_SCALE_10(get_angle_defletion()),
-                                           1, 100, wxDefaultPosition,
-                                           wxSize(SLIDER_WIDTH, SLIDER_HEIGHT),
-                                           wxSL_HORIZONTAL);
+    wxSlider* angle_slider = new wxSlider(this, wxID_ANY, SLIDER_SCALE_10(get_angle_defletion()), 1, 100, wxDefaultPosition,
+                                          wxSize(SLIDER_WIDTH, SLIDER_HEIGHT), wxSL_HORIZONTAL);
     angle_sizer->Add(angle_slider, 0, wxALIGN_RIGHT | wxLEFT, FromDIP(5));
 
-    auto angle_input = new ::TextInput(this, m_angle_last, wxEmptyString, wxEmptyString, wxDefaultPosition, wxSize(TEXT_CTRL_WIDTH, -1), wxTE_CENTER);
+    auto angle_input = new ::TextInput(this, m_angle_last, wxEmptyString, wxEmptyString, wxDefaultPosition, wxSize(TEXT_CTRL_WIDTH, -1),
+                                       wxTE_CENTER);
     angle_input->GetTextCtrl()->SetFont(Label::Body_12);
     angle_input->GetTextCtrl()->SetValidator(wxTextValidator(wxFILTER_NUMERIC));
     angle_sizer->Add(angle_input, 0, wxALIGN_RIGHT | wxLEFT, FromDIP(5));
     angle_input->Bind(wxEVT_KILL_FOCUS, ([this, angle_input](wxFocusEvent& e) {
-        wxString value = angle_input->GetTextCtrl()->GetValue();
-        if (validate_number_range(value, 0.01, 1)) {
-            m_angle_last = value;
-            update_mesh_number_text();
-        } else {
-            MessageDialog msg_dlg(nullptr, _L("Please input a valid value (0.01 < angle deflection < 1.0)"), wxEmptyString, wxICON_WARNING | wxOK);
-            msg_dlg.ShowModal();
-            angle_input->GetTextCtrl()->SetValue(m_angle_last);
-        }
-        e.Skip();
-    }));
+                          wxString value = angle_input->GetTextCtrl()->GetValue();
+                          if (validate_number_range(value, 0.01, 1)) {
+                              m_angle_last = value;
+                              update_mesh_number_text();
+                          } else {
+                              MessageDialog msg_dlg(nullptr, _L("Please input a valid value (0.01 < angle deflection < 1.0)"),
+                                                    wxEmptyString, wxICON_WARNING | wxOK);
+                              msg_dlg.ShowModal();
+                              angle_input->GetTextCtrl()->SetValue(m_angle_last);
+                          }
+                          e.Skip();
+                      }));
     // textctrl bind slider
     angle_input->Bind(wxEVT_TEXT, ([this, angle_slider, angle_input](wxCommandEvent& e) {
-        double slider_value_long;
-        int slider_value;
-        wxString value = angle_input->GetTextCtrl()->GetValue();
-        if (value.ToDouble(&slider_value_long)) {
-            slider_value = SLIDER_SCALE_10(slider_value_long);
-            if (slider_value >= angle_slider->GetMin() && slider_value <= angle_slider->GetMax()) {
-                angle_slider->SetValue(slider_value);
-            }
-        }
-    }));
+                          double   slider_value_long;
+                          int      slider_value;
+                          wxString value = angle_input->GetTextCtrl()->GetValue();
+                          if (value.ToDouble(&slider_value_long)) {
+                              slider_value = SLIDER_SCALE_10(slider_value_long);
+                              if (slider_value >= angle_slider->GetMin() && slider_value <= angle_slider->GetMax()) {
+                                  angle_slider->SetValue(slider_value);
+                              }
+                          }
+                      }));
 
     angle_slider->Bind(wxEVT_SLIDER, ([this, angle_slider, angle_input](wxCommandEvent& e) {
-        double slider_value = SLIDER_UNSCALE_10(angle_slider->GetValue());
-        angle_input->GetTextCtrl()->SetValue(wxString::Format("%.2f", slider_value));
-        m_angle_last = wxString::Format("%.2f", slider_value);
-    }));
+                           double slider_value = SLIDER_UNSCALE_10(angle_slider->GetValue());
+                           angle_input->GetTextCtrl()->SetValue(wxString::Format("%.2f", slider_value));
+                           m_angle_last = wxString::Format("%.2f", slider_value);
+                       }));
     angle_slider->Bind(wxEVT_LEFT_UP, ([this](wxMouseEvent& e) {
-        update_mesh_number_text();
-        e.Skip();
-    }));
+                           update_mesh_number_text();
+                           e.Skip();
+                       }));
 
     bSizer->Add(angle_sizer, 1, wxEXPAND | wxLEFT | wxRIGHT, LEFT_RIGHT_PADING);
 
-    wxBoxSizer* check_sizer = new wxBoxSizer(wxHORIZONTAL);
-    m_split_compound_checkbox = new wxCheckBox(this, wxID_ANY, _L("Split compound and compsolid into multiple objects"), wxDefaultPosition, wxDefaultSize, 0);
+    // [STATE] The split-compound toggle is persisted through app_config, so the dialog is acting as a settings bridge as well as an importer.
+    wxBoxSizer* check_sizer   = new wxBoxSizer(wxHORIZONTAL);
+    m_split_compound_checkbox = new wxCheckBox(this, wxID_ANY, _L("Split compound and compsolid into multiple objects"), wxDefaultPosition,
+                                               wxDefaultSize, 0);
     m_split_compound_checkbox->SetForegroundColour(StateColor::darkModeColorFor(FONT_COLOR));
     m_split_compound_checkbox->SetValue(wxGetApp().app_config->get_bool("is_split_compound"));
     check_sizer->Add(m_split_compound_checkbox, 0, wxALIGN_LEFT);
     bSizer->Add(check_sizer, 1, wxEXPAND | wxLEFT | wxRIGHT, LEFT_RIGHT_PADING);
 
-    wxBoxSizer* mesh_face_number_sizer = new wxBoxSizer(wxHORIZONTAL);
-    wxStaticText *mesh_face_number_title = new wxStaticText(this, wxID_ANY, _L("Number of triangular facets") + ": ");
+    wxBoxSizer*   mesh_face_number_sizer = new wxBoxSizer(wxHORIZONTAL);
+    wxStaticText* mesh_face_number_title = new wxStaticText(this, wxID_ANY, _L("Number of triangular facets") + ": ");
     mesh_face_number_title->SetForegroundColour(StateColor::darkModeColorFor(FONT_COLOR));
     mesh_face_number_text = new wxStaticText(this, wxID_ANY, "0");
     mesh_face_number_text->SetForegroundColour(StateColor::darkModeColorFor(FONT_COLOR));
@@ -263,6 +271,8 @@ StepMeshDialog::StepMeshDialog(wxWindow* parent, Slic3r::Step& file, double line
 
     bSizer_button->Add(dlg_btns, 0, wxEXPAND);
 
+    // [THREAD] OK commits settings only after the current worker join completes; Unity should make this an async confirm path, not a
+    // blocking join.
     dlg_btns->GetOK()->Bind(wxEVT_BUTTON, [this, angle_input, linear_input](wxCommandEvent& e) {
         stop_task();
         if (validate_number_range(angle_input->GetTextCtrl()->GetValue(), 0.01, 1) &&
@@ -291,12 +301,9 @@ StepMeshDialog::StepMeshDialog(wxWindow* parent, Slic3r::Step& file, double line
     this->Layout();
     bSizer->Fit(this);
 
-    this->Bind(wxEVT_LEFT_DOWN, [this](auto& e) {
-        SetFocusIgnoringChildren();
-    });
-    mesh_face_number_text->Bind(wxEVT_LEFT_DOWN, [this](auto& e) {
-        SetFocusIgnoringChildren();
-    });
+    // [EVENT] The dialog steals focus on background clicks so text validation and enter/escape behavior stay predictable.
+    this->Bind(wxEVT_LEFT_DOWN, [this](auto& e) { SetFocusIgnoringChildren(); });
+    mesh_face_number_text->Bind(wxEVT_LEFT_DOWN, [this](auto& e) { SetFocusIgnoringChildren(); });
 
     this->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& e) {
         stop_task();
@@ -306,16 +313,14 @@ StepMeshDialog::StepMeshDialog(wxWindow* parent, Slic3r::Step& file, double line
     wxGetApp().UpdateDlgDarkUI(this);
 }
 
-StepMeshDialog::~StepMeshDialog()
-{
-    stop_task();
-}
+StepMeshDialog::~StepMeshDialog() { stop_task(); }
 
 void StepMeshDialog::on_task_done(wxCommandEvent& event)
 {
+    // [THREAD] Worker completion re-enters on the UI thread, updates the visible count, and then joins/deletes the worker.
     wxString text = event.GetString();
     mesh_face_number_text->SetLabel(text);
-    if(m_task) {
+    if (m_task) {
         if (m_task->joinable()) {
             m_task->join();
             delete m_task;
@@ -326,7 +331,8 @@ void StepMeshDialog::on_task_done(wxCommandEvent& event)
 
 void StepMeshDialog::stop_task()
 {
-    if(m_task) {
+    // [THREAD] The current implementation uses a stop flag plus blocking join; Unity should replace this with cancellable async work.
+    if (m_task) {
         m_file.m_stop_mesh.store(true);
         if (m_task->joinable()) {
             m_task->join();
@@ -335,11 +341,11 @@ void StepMeshDialog::stop_task()
         }
         m_file.m_stop_mesh.store(false);
     }
-
 }
 
 void StepMeshDialog::update_mesh_number_text()
 {
+    // [STATE] Recompute only when the committed values change; this avoids repeatedly spawning expensive STEP tessellation work.
     if ((m_last_linear == get_linear_defletion()) && (m_last_angle == get_angle_defletion()) && (m_mesh_number != 0))
         return;
     wxString newText = wxString::Format(_L("Calculating, please wait..."));
@@ -349,7 +355,7 @@ void StepMeshDialog::update_mesh_number_text()
         m_task = new boost::thread(Slic3r::create_thread([this]() -> void {
             m_mesh_number = m_file.get_triangle_num(get_linear_defletion(), get_angle_defletion());
             if (m_mesh_number != 0) {
-                wxString number_text = wxString::Format("%d", m_mesh_number);
+                wxString       number_text = wxString::Format("%d", m_mesh_number);
                 wxCommandEvent event(wxEVT_THREAD_DONE);
                 event.SetString(number_text);
                 wxPostEvent(this, event);
