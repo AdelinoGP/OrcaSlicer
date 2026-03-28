@@ -279,3 +279,10 @@
 - The file also picked up some whitespace/format churn while the annotation blocks landed, but the added engineering content is concentrated on selection flow, pass-road highlighting, and Unity prefab decomposition.
 - Next step is to commit this atomic annotation, record the handoff evidence, and move to T642 (`src/slic3r/GUI/Widgets/AMSItem.hpp`).
 - Tab.cpp needs the preset-shell, dirty-state, and deletion hazards called out explicitly so Unity can split the page tree and modal preset workflow cleanly.
+
+- Started T642 (`src/slic3r/GUI/Widgets/AMSItem.hpp`) as the declaration boundary for the composite AMS dashboard widgets.
+- The header is dense with AMS/tray/pass-road enums, state structs, recyclable subwidgets, and event declarations, so the annotations need to emphasize ownership/lifetime, selection and refresh state, custom paint/event boundaries, and the Unity split into retained tray/card prefabs plus service-backed route/render helpers.
+- Plan: keep the notes focused on the class boundaries that drive the cpp implementation, then verify with `git diff --check`, record handoff evidence, and close the task atomically.
+
+- Completed the AMSItem.hpp annotation pass with high-level comments on the snapshot DTOs, refresh affordance, tray card, route compositors, preview tile, humidity badge, composite root, and custom events.
+- Verification passed with `git diff --check`; the remaining work for the phase is broader coverage, not this header.

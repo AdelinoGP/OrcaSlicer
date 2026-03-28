@@ -2414,3 +2414,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x2, P3 x1
 - Git: Annotate AMSItem.cpp boundaries
 - Next recommended Phase 1 task: T642 annotate: src/slic3r/GUI/Widgets/AMSItem.hpp
+
+## Phase 1 - Task T642 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/AMSItem.hpp
+- Deliverables: src/slic3r/GUI/Widgets/AMSItem.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 15 boundary comment groups covering the AMS snapshot DTOs, refresh widget, tray card, route compositors, preview tile, humidity badge, composite root, and event surface
+- Verification excerpt: `[UNITY] Split this into a retained root prefab with child tray-card, route-line, humidity, preview, and external-AMS controllers backed by a shared AMS dashboard model.`
+- Unity-impact summary:
+  - Keep tray identity, loading, and pass-road state in a shared dashboard model.
+  - Split the route artwork into dedicated upper/lower compositor prefabs.
+  - Treat the root `AmsItem` as a coordinator, not a single monolithic view.
+- Hazards found: P2 x3, P3 x1
+- Git: Annotate AMSItem.hpp boundaries
+- Next recommended Phase 1 task: T643 annotate: src/slic3r/GUI/Widgets/AnimaController.cpp

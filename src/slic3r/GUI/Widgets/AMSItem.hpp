@@ -13,7 +13,6 @@
 #include <wx/animate.h>
 #include <wx/dynarray.h>
 
-
 #define AMS_CONTROL_BRAND_COLOUR wxColour(0, 150, 136)
 #define AMS_CONTROL_GRAY700 wxColour(107, 107, 107)
 #define AMS_CONTROL_GRAY800 wxColour(50, 58, 61)
@@ -29,28 +28,24 @@
 #define AMS_CONTRO_CALIBRATION_BUTTON_SIZE wxSize(FromDIP(150), FromDIP(28))
 #define AMS_CONTROL_DEF_HUMIDITY_BK_COLOUR wxColour(238, 238, 238)
 
-
 namespace Slic3r { namespace GUI {
 
+// [INTENT] This header defines the retained AMS dashboard model plus the custom-painted tray, route, humidity, and preview widgets used by
+// the AMS control surface. [STATE] It carries the normalized AMS snapshot, per-slot tray metadata, selection flags, pass-road progress, and
+// widget-owned bitmap caches that the cpp layer mutates. [UNITY] Port this as a retained dashboard prefab with tray-card, route-line,
+// humidity, and preview child controllers backed by a shared AMS view model.
+
 enum AMSModel {
-    EXT_AMS             = 0,    //ext
-    GENERIC_AMS         = 1,
-    AMS_LITE            = 2,    //ams-lite
-    N3F_AMS             = 3,
-    N3S_AMS             = 4     //n3s  single_ams
+    EXT_AMS     = 0, // ext
+    GENERIC_AMS = 1,
+    AMS_LITE    = 2, // ams-lite
+    N3F_AMS     = 3,
+    N3S_AMS     = 4 // n3s  single_ams
 };
 
-enum AMSModelOriginType {
-    GENERIC_EXT,
-    LITE_EXT
-};
+enum AMSModelOriginType { GENERIC_EXT, LITE_EXT };
 
-enum ActionButton {
-    ACTION_BTN_CALI     = 0,
-    ACTION_BTN_LOAD     = 1,
-    ACTION_BTN_UNLOAD   = 2,
-    ACTION_BTN_COUNT    = 3
-};
+enum ActionButton { ACTION_BTN_CALI = 0, ACTION_BTN_LOAD = 1, ACTION_BTN_UNLOAD = 2, ACTION_BTN_COUNT = 3 };
 
 enum class AMSRoadMode : int {
     AMS_ROAD_MODE_LEFT,
@@ -98,9 +93,9 @@ enum class AMSAction : int {
 
 enum class AMSPassRoadSTEP : int {
     AMS_ROAD_STEP_NONE = 0,
-    AMS_ROAD_STEP_1 = 1, // lib -> extrusion
-    AMS_ROAD_STEP_2 = 2, // extrusion->buffer
-    AMS_ROAD_STEP_3 = 4, // extrusion
+    AMS_ROAD_STEP_1    = 1, // lib -> extrusion
+    AMS_ROAD_STEP_2    = 2, // extrusion->buffer
+    AMS_ROAD_STEP_3    = 4, // extrusion
 
     AMS_ROAD_STEP_COMBO_LOAD_STEP1,
     AMS_ROAD_STEP_COMBO_LOAD_STEP2,
@@ -134,11 +129,10 @@ enum FilamentStep {
     STEP_COUNT,
 };
 
-
 enum FilamentStepType {
-    STEP_TYPE_LOAD      = 0,
-    STEP_TYPE_UNLOAD    = 1,
-    STEP_TYPE_VT_LOAD   = 2,
+    STEP_TYPE_LOAD    = 0,
+    STEP_TYPE_UNLOAD  = 1,
+    STEP_TYPE_VT_LOAD = 2,
 };
 
 #define AMS_ITEM_CUBE_SIZE wxSize(FromDIP(9), FromDIP(14))
@@ -152,8 +146,8 @@ enum FilamentStepType {
 #define AMS_LITE_CAN_LIB_SIZE wxSize(FromDIP(49), FromDIP(72))
 #define AMS_CAN_ROAD_SIZE wxSize(FromDIP(264), FromDIP(50))
 #define AMS_ITEMS_PANEL_SIZE wxSize(FromDIP(264), FromDIP(44))
-//#define AMS_CANS_SIZE wxSize(FromDIP(284), FromDIP(184))
-//#define AMS_CANS_WINDOW_SIZE wxSize(FromDIP(264), FromDIP(196))
+// #define AMS_CANS_SIZE wxSize(FromDIP(284), FromDIP(184))
+// #define AMS_CANS_WINDOW_SIZE wxSize(FromDIP(264), FromDIP(196))
 #define AMS_STEP_SIZE wxSize(FromDIP(172), FromDIP(196))
 #define AMS_REFRESH_SIZE wxSize(FromDIP(28), FromDIP(28))
 #define AMS_EXTRUDER_SIZE wxSize(FromDIP(29), FromDIP(37))
@@ -172,35 +166,32 @@ enum FilamentStepType {
 #define GENERIC_AMS_SLOT_NUM 4
 #define MAX_AMS_NUM_IN_PANEL 2
 
+// [INTENT] Caninfo is the normalized per-slot/material snapshot shared by the tray cards, refresh controls, and preview widgets.
+// [STATE] Equality compares the full material identity, remaining amount, calibration indices, filament id, and cached color list, so the
+// GUI treats it as a diffable tray DTO rather than a passive POD. [UNITY] Use a serializable tray-slot view model plus explicit dirty-state
+// comparison; do not rely on reference identity. [PORTING_HAZARD:P2] The equality operators fold display and device state together, so a
+// Unity port needs a clear rule for when repaint/update is allowed to coalesce.
 struct Caninfo
 {
-    std::string     can_id;
-    wxString        material_name;
-    wxColour        material_colour = {*wxWHITE};
-    AMSCanType      material_state;
-    int             ctype=0;
-    int             material_remain = 100;
-    int             cali_idx = -1;
-    std::string     filament_id;
-    float           k = 0.0f;
-    float           n = 0.0f;
+    std::string           can_id;
+    wxString              material_name;
+    wxColour              material_colour = {*wxWHITE};
+    AMSCanType            material_state;
+    int                   ctype           = 0;
+    int                   material_remain = 100;
+    int                   cali_idx        = -1;
+    std::string           filament_id;
+    float                 k = 0.0f;
+    float                 n = 0.0f;
     std::vector<wxColour> material_cols;
 
 public:
     bool operator==(const Caninfo& other) const
     {
-        if (can_id == other.can_id &&
-            material_name == other.material_name &&
-            material_colour == other.material_colour &&
-            material_state == other.material_state &&
-            ctype == other.ctype &&
-            material_remain == other.material_remain &&
-            cali_idx == other.cali_idx &&
-            filament_id == other.filament_id &&
-            k == other.k &&
-            n == other.n &&
-            material_cols == other.material_cols)
-        {
+        if (can_id == other.can_id && material_name == other.material_name && material_colour == other.material_colour &&
+            material_state == other.material_state && ctype == other.ctype && material_remain == other.material_remain &&
+            cali_idx == other.cali_idx && filament_id == other.filament_id && k == other.k && n == other.n &&
+            material_cols == other.material_cols) {
             return true;
         }
 
@@ -208,68 +199,67 @@ public:
     };
 };
 
+// [INTENT] AMSinfo aggregates the full machine-side AMS snapshot consumed by the dashboard and route renderers.
+// [STATE] It owns the per-can array, nozzle binding, active action/step, humidity/temperature fields, and AMS model/type tags that drive
+// conditional UI. [THREAD] parse_ams_info() and parse_ext_info() sit on the refresh boundary and should be treated as state reconstruction,
+// not direct widget mutation in Unity. [UNITY] Model this as a dashboard snapshot + parser service that publishes immutable refresh
+// payloads to the view layer.
 struct AMSinfo
 {
 public:
-    std::string             ams_id;
-    std::vector<Caninfo>    cans;
-    int                     nozzle_id = 0;
-    std::string             current_can_id;
-    AMSPassRoadSTEP         current_step = AMSPassRoadSTEP::AMS_ROAD_STEP_NONE;
-    AMSAction               current_action;
-    int                     curreent_filamentstep;
-    int                     ams_humidity = 0;
-    int                     humidity_raw = -1;
-    int                     left_dray_time = 0;
-    float                   current_temperature = INVALID_AMS_TEMPERATURE;
-    AMSModel                ams_type = AMSModel::GENERIC_AMS;
-    AMSModelOriginType      ext_type = AMSModelOriginType::GENERIC_EXT;
+    std::string          ams_id;
+    std::vector<Caninfo> cans;
+    int                  nozzle_id = 0;
+    std::string          current_can_id;
+    AMSPassRoadSTEP      current_step = AMSPassRoadSTEP::AMS_ROAD_STEP_NONE;
+    AMSAction            current_action;
+    int                  curreent_filamentstep;
+    int                  ams_humidity        = 0;
+    int                  humidity_raw        = -1;
+    int                  left_dray_time      = 0;
+    float                current_temperature = INVALID_AMS_TEMPERATURE;
+    AMSModel             ams_type            = AMSModel::GENERIC_AMS;
+    AMSModelOriginType   ext_type            = AMSModelOriginType::GENERIC_EXT;
 
 public:
-    bool operator== (const AMSinfo& other) const
+    bool operator==(const AMSinfo& other) const
     {
-        if (ams_id == other.ams_id &&
-            cans == other.cans &&
-            nozzle_id == other.nozzle_id &&
-            current_can_id == other.current_can_id &&
-            current_step == other.current_step &&
-            current_action == other.current_action &&
-            curreent_filamentstep == other.curreent_filamentstep &&
-            ams_humidity == other.ams_humidity &&
-            left_dray_time == other.left_dray_time &&
-            current_temperature == other.current_temperature &&
-            ams_type == other.ams_type &&
-            ext_type == other.ext_type)
-        {
+        if (ams_id == other.ams_id && cans == other.cans && nozzle_id == other.nozzle_id && current_can_id == other.current_can_id &&
+            current_step == other.current_step && current_action == other.current_action &&
+            curreent_filamentstep == other.curreent_filamentstep && ams_humidity == other.ams_humidity &&
+            left_dray_time == other.left_dray_time && current_temperature == other.current_temperature && ams_type == other.ams_type &&
+            ext_type == other.ext_type) {
             return true;
         }
 
         return false;
     };
 
-    bool operator!=(const AMSinfo &other) const
+    bool operator!=(const AMSinfo& other) const
     {
-        if (operator==(other))
-        {
+        if (operator==(other)) {
             return false;
         }
 
         return true;
     };
 
-    bool parse_ams_info(MachineObject* obj, DevAms *ams, bool remain_flag = false, bool humidity_flag = false);
+    bool parse_ams_info(MachineObject* obj, DevAms* ams, bool remain_flag = false, bool humidity_flag = false);
     void parse_ext_info(MachineObject* obj, DevAmsTray tray);
 
-    bool support_drying() const { return (ams_type == AMSModel::N3S_AMS) || (ams_type == AMSModel::N3F_AMS); };
-    bool support_humidity() const { return  1 <= get_humidity_display_idx() && get_humidity_display_idx() <= 5; }
+    bool    support_drying() const { return (ams_type == AMSModel::N3S_AMS) || (ams_type == AMSModel::N3F_AMS); };
+    bool    support_humidity() const { return 1 <= get_humidity_display_idx() && get_humidity_display_idx() <= 5; }
     Caninfo get_caninfo(const std::string& can_id, bool& found) const;
 
-    int  get_humidity_display_idx() const;
+    int get_humidity_display_idx() const;
 };
 
 /*************************************************
 Description:AMSExtText
 **************************************************/
+
+// [INTENT] AMSExtText is the tiny painted label/badge that sits on the external-AMS view.
+// [UNITY] Replace with a lightweight text label or TextMeshPro overlay; no dedicated rendering service is needed beyond layout invalidation.
 
 class AMSExtText : public wxWindow
 {
@@ -277,106 +267,129 @@ public:
     void msw_rescale();
     void paintEvent(wxPaintEvent& evt);
 
-    void            render(wxDC& dc);
-    void            doRender(wxDC& dc);
+    void render(wxDC& dc);
+    void doRender(wxDC& dc);
     AMSExtText(wxWindow* parent, wxWindowID id, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize);
     ~AMSExtText();
 };
-
 
 /*************************************************
 Description:AMSrefresh
 **************************************************/
 #define AMS_REFRESH_PLAY_LOADING_TIMER 100
+
+// [INTENT] AMSrefresh is the per-slot refresh affordance: it shows the can card, animates loading, and posts selection/click events back to
+// the dashboard. [STATE] It retains the current AMS/can ids, selected/loading flags, rotation timer, and bitmap variants for
+// normal/selected/rfid states. [EVENT] Mouse enter/leave/click and timer ticks all feed the same command bridge, so Unity should expose
+// them through a single button/controller surface. [UNITY] Use a clickable card prefab with an explicit loading animation controller and a
+// main-thread command callback. [PORTING_HAZARD:P3] The widget mixes its visual state with command dispatch, so the Unity version should
+// split visuals from the action router.
 class AMSrefresh : public wxWindow
 {
 public:
     AMSrefresh();
-    AMSrefresh(wxWindow *parent, std::string ams_id, wxString can_id, Caninfo info, const wxPoint &pos = wxDefaultPosition, const wxSize &size = wxDefaultSize);
-    AMSrefresh(wxWindow *parent, std::string ams_id, int can_id, Caninfo info, const wxPoint &pos = wxDefaultPosition, const wxSize &size = wxDefaultSize);
+    AMSrefresh(wxWindow*      parent,
+               std::string    ams_id,
+               wxString       can_id,
+               Caninfo        info,
+               const wxPoint& pos  = wxDefaultPosition,
+               const wxSize&  size = wxDefaultSize);
+    AMSrefresh(wxWindow*      parent,
+               std::string    ams_id,
+               int            can_id,
+               Caninfo        info,
+               const wxPoint& pos  = wxDefaultPosition,
+               const wxSize&  size = wxDefaultSize);
     ~AMSrefresh();
 
 public:
-    void        Update(std::string ams_id, Caninfo info);
+    void Update(std::string ams_id, Caninfo info);
 
     std::string GetCanId() const { return m_info.can_id; };
 
-    void    PlayLoading();
-    void    StopLoading();
+    void PlayLoading();
+    void StopLoading();
 
-    void    msw_rescale();
-
-protected:
-    void create(wxWindow *parent, wxWindowID id, const wxPoint &pos, const wxSize &size);
-
-    void on_timer(wxTimerEvent &event);
-    void OnEnterWindow(wxMouseEvent &evt);
-    void OnLeaveWindow(wxMouseEvent &evt);
-    void OnClick(wxMouseEvent &evt);
-    void post_event(wxCommandEvent &&event);
-    void paintEvent(wxPaintEvent &evt);
+    void msw_rescale();
 
 protected:
-    wxTimer *m_playing_timer= {nullptr};
+    void create(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size);
+
+    void on_timer(wxTimerEvent& event);
+    void OnEnterWindow(wxMouseEvent& evt);
+    void OnLeaveWindow(wxMouseEvent& evt);
+    void OnClick(wxMouseEvent& evt);
+    void post_event(wxCommandEvent&& event);
+    void paintEvent(wxPaintEvent& evt);
+
+protected:
+    wxTimer* m_playing_timer  = {nullptr};
     int      m_rotation_angle = 0;
-    bool             m_play_loading = {false};
-    bool             m_selected      = {false};
+    bool     m_play_loading   = {false};
+    bool     m_selected       = {false};
 
-    std::string      m_ams_id;
-    std::string      m_can_id;
-    Caninfo          m_info;
+    std::string m_ams_id;
+    std::string m_can_id;
+    Caninfo     m_info;
 
-    ScalableBitmap   m_bitmap_normal;
-    ScalableBitmap   m_bitmap_selected;
-    ScalableBitmap   m_bitmap_ams_rfid_0;
-    ScalableBitmap   m_bitmap_ams_rfid_1;
-    ScalableBitmap   m_bitmap_ams_rfid_2;
-    ScalableBitmap   m_bitmap_ams_rfid_3;
-    ScalableBitmap   m_bitmap_ams_rfid_4;
-    ScalableBitmap   m_bitmap_ams_rfid_5;
-    ScalableBitmap   m_bitmap_ams_rfid_6;
-    ScalableBitmap   m_bitmap_ams_rfid_7;
+    ScalableBitmap              m_bitmap_normal;
+    ScalableBitmap              m_bitmap_selected;
+    ScalableBitmap              m_bitmap_ams_rfid_0;
+    ScalableBitmap              m_bitmap_ams_rfid_1;
+    ScalableBitmap              m_bitmap_ams_rfid_2;
+    ScalableBitmap              m_bitmap_ams_rfid_3;
+    ScalableBitmap              m_bitmap_ams_rfid_4;
+    ScalableBitmap              m_bitmap_ams_rfid_5;
+    ScalableBitmap              m_bitmap_ams_rfid_6;
+    ScalableBitmap              m_bitmap_ams_rfid_7;
     std::vector<ScalableBitmap> m_rfid_bitmap_list;
 
-    wxString         m_refresh_id;
-    wxBoxSizer *     m_size_body;
-    virtual void     DoSetSize(int x, int y, int width, int height, int sizeFlags = wxSIZE_AUTO);
+    wxString     m_refresh_id;
+    wxBoxSizer*  m_size_body;
+    virtual void DoSetSize(int x, int y, int width, int height, int sizeFlags = wxSIZE_AUTO);
 
-    bool m_disable_mode{ false };
+    bool m_disable_mode{false};
 };
 
 /*************************************************
 Description:AMSextruder
 **************************************************/
-class AMSextruderImage: public wxWindow
+
+// [INTENT] AMSextruderImage paints a nozzle/extruder glyph with loading and color overlays for the AMS item and road widgets.
+// [STATE] The widget keeps the active color, loading flag, visibility flag, and cached bitmap asset so the parent can toggle it without
+// rebuilding layout. [UNITY] Use a sprite renderer or Image + mask overlay with state driven by the parent tray controller.
+class AMSextruderImage : public wxWindow
 {
 public:
     void OnAmsLoading(bool load, wxColour col);
     void TurnOff();
     void setShowState(bool show_state) { m_show_state = show_state; };
     void msw_rescale();
-    void paintEvent(wxPaintEvent &evt);
+    void paintEvent(wxPaintEvent& evt);
 
-	void            render(wxDC &dc);
-    bool            m_show_state = {false};
-    wxColour        m_colour;
-    ScalableBitmap  m_ams_extruder;
-    string m_file_name;
-    bool            m_ams_loading{ false };
-    void            doRender(wxDC &dc);
-    AMSextruderImage(wxWindow *parent, wxWindowID id, string file_name, const wxSize& size, const wxPoint &pos = wxDefaultPosition);
+    void           render(wxDC& dc);
+    bool           m_show_state = {false};
+    wxColour       m_colour;
+    ScalableBitmap m_ams_extruder;
+    string         m_file_name;
+    bool           m_ams_loading{false};
+    void           doRender(wxDC& dc);
+    AMSextruderImage(wxWindow* parent, wxWindowID id, string file_name, const wxSize& size, const wxPoint& pos = wxDefaultPosition);
     ~AMSextruderImage();
 };
 
-//AMSExtImage upon ext lib
+// [INTENT] AMSExtImage renders the external-AMS iconography and printer-series dependent illustration.
+// [STATE] It caches the series/printer type strings and the current ext-panel mode so the parent can swap visuals without recreating the
+// widget. [UNITY] Model as a reusable image prefab with a small asset-selection helper keyed by printer family and AMS position.
+// AMSExtImage upon ext lib
 class AMSExtImage : public wxWindow
 {
 private:
     std::string m_series_name;
     std::string m_printer_type_name;
 
-    bool    m_show_ams_ext = false;
-    bool    m_show_ext     = false;
+    bool m_show_ams_ext = false;
+    bool m_show_ext     = false;
 
     AMSPanelPos m_ext_pos;
     int         m_ext_num = 1;
@@ -384,22 +397,29 @@ private:
     ScalableBitmap m_ext_image;
 
 public:
-    AMSExtImage(wxWindow *parent, AMSPanelPos ext_pos, int total_ext_num, bool over_ext, wxWindowID id = wxID_ANY, const wxPoint &pos = wxDefaultPosition);
+    AMSExtImage(wxWindow*      parent,
+                AMSPanelPos    ext_pos,
+                int            total_ext_num,
+                bool           over_ext,
+                wxWindowID     id  = wxID_ANY,
+                const wxPoint& pos = wxDefaultPosition);
     ~AMSExtImage();
 
     void msw_rescale();
     void setShowAmsExt(bool show);
-    void setTotalExtNum(const std::string &series_name, const std::string &printer_type, int num);
+    void setTotalExtNum(const std::string& series_name, const std::string& printer_type, int num);
 
 private:
-    void paintEvent(wxPaintEvent &evt);
-    void render(wxDC &dc);
-    void doRender(wxDC &dc);
+    void paintEvent(wxPaintEvent& evt);
+    void render(wxDC& dc);
+    void doRender(wxDC& dc);
 
-    const wxBitmap &get_bmp(const std::string &printer_type, bool is_ams_ext, AMSPanelPos pos);
+    const wxBitmap& get_bmp(const std::string& printer_type, bool is_ams_ext, AMSPanelPos pos);
 };
 
-
+// [INTENT] AMSextruder is the nozzle-side holder for one or two AMS extruder images, including the active nozzle count and virtual-AMS/loading
+// states. [STATE] It owns the left/right extruder image children plus the panel/sizer shell that keeps the nozzle art aligned with selection
+// and load state. [UNITY] Port as a compact container prefab with two child image slots and an explicit nozzle-count state machine.
 class AMSextruder : public wxWindow
 {
 private:
@@ -412,23 +432,31 @@ public:
     void OnVamsLoading(bool load, wxColour col = AMS_CONTROL_GRAY500);
     void OnAmsLoading(bool load, int nozzle_id = 0, wxColour col = AMS_CONTROL_GRAY500);
     void msw_rescale();
-    void has_ams(bool hams) {m_has_vams = hams; Refresh();};
-    void no_ams_mode(bool mode) {m_none_ams_mode = mode; Refresh();};
+    void has_ams(bool hams)
+    {
+        m_has_vams = hams;
+        Refresh();
+    };
+    void no_ams_mode(bool mode)
+    {
+        m_none_ams_mode = mode;
+        Refresh();
+    };
     bool updateNozzleNum(int nozzle_num, const std::string& series_name = string());
 
-    bool            m_none_ams_mode{true};
-    bool            m_has_vams{false};
-    bool            m_vams_loading{false};
-    bool            m_ams_loading{false};
-    wxColour        m_current_colur;
-    wxColour        m_current_colur_deputy;
+    bool     m_none_ams_mode{true};
+    bool     m_has_vams{false};
+    bool     m_vams_loading{false};
+    bool     m_ams_loading{false};
+    wxColour m_current_colur;
+    wxColour m_current_colur_deputy;
 
-    wxBoxSizer *    m_bitmap_sizer{nullptr};
-    wxPanel *       m_bitmap_panel{nullptr};
-    //AMSextruderImage *m_amsSextruder{nullptr};
-    AMSextruderImage* m_left_extruder = nullptr;
+    wxBoxSizer* m_bitmap_sizer{nullptr};
+    wxPanel*    m_bitmap_panel{nullptr};
+    // AMSextruderImage *m_amsSextruder{nullptr};
+    AMSextruderImage* m_left_extruder  = nullptr;
     AMSextruderImage* m_right_extruder = nullptr;
-    AMSextruder(wxWindow *parent, wxWindowID id, int nozzle_num, const wxPoint &pos = wxDefaultPosition, const wxSize &size = wxDefaultSize);
+    AMSextruder(wxWindow* parent, wxWindowID id, int nozzle_num, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize);
     ~AMSextruder();
 
 private:
@@ -438,42 +466,54 @@ private:
 /*************************************************
 Description:AMSLib
 **************************************************/
+
+// [INTENT] AMSLib is the selectable tray card: it displays slot contents, selection/enable state, editable/read-only/transparency artwork,
+// and the pass-road highlight. [STATE] It owns the tray bitmaps, selection/hover flags, show-kn/support-cali toggles, border colors, and
+// the non-owning MachineObject* back-reference used to resolve model-specific behavior. [EVENT] Hover, click, and selection callbacks all
+// route through the card so the parent dashboard can fan out a single selection change. [UNITY] Use a clickable tray-card prefab with
+// separate visual states for editable/read-only/transparency and a controller callback for selection. [PORTING_HAZARD:P2] The card blends
+// presentation with device/action policy, so Unity should split the view from the AMS capability checks.
 class AMSLib : public wxWindow
 {
 public:
-    AMSLib(wxWindow *parent, std::string ams_idx, Caninfo info, AMSModelOriginType ext_type = AMSModelOriginType::GENERIC_EXT);
+    AMSLib(wxWindow* parent, std::string ams_idx, Caninfo info, AMSModelOriginType ext_type = AMSModelOriginType::GENERIC_EXT);
     ~AMSLib();
     void create(wxWindow* parent, wxWindowID id = wxID_ANY, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize);
+
 public:
-    wxColour     GetLibColour();
-    Caninfo      m_info;
-    MachineObject* m_obj = { nullptr };
+    wxColour       GetLibColour();
+    Caninfo        m_info;
+    MachineObject* m_obj = {nullptr};
 
-    std::string  m_ams_id;
-    std::string  m_slot_id;
+    std::string m_ams_id;
+    std::string m_slot_id;
 
-    int          m_can_index = 0;
-    bool         transparent_changed = { false };
-    AMSModel     m_ams_model;
-    AMSModelOriginType m_ext_type = { AMSModelOriginType::GENERIC_EXT };
+    int                m_can_index         = 0;
+    bool               transparent_changed = {false};
+    AMSModel           m_ams_model;
+    AMSModelOriginType m_ext_type = {AMSModelOriginType::GENERIC_EXT};
 
-    void         Update(Caninfo info, std::string ams_idx, bool refresh = true);
-    void         UnableSelected() { m_unable_selected = true; };
-    void         EableSelected() { m_unable_selected = false; };
-    void         OnSelected();
-    void         UnSelected();
-    bool         is_selected() {return m_selected;};
-    void         post_event(wxCommandEvent &&event);
-    void         show_kn_value(bool show) { m_show_kn = show; };
-    void         support_cali(bool sup) { m_support_cali = sup; Refresh(); };
+    void Update(Caninfo info, std::string ams_idx, bool refresh = true);
+    void UnableSelected() { m_unable_selected = true; };
+    void EableSelected() { m_unable_selected = false; };
+    void OnSelected();
+    void UnSelected();
+    bool is_selected() { return m_selected; };
+    void post_event(wxCommandEvent&& event);
+    void show_kn_value(bool show) { m_show_kn = show; };
+    void support_cali(bool sup)
+    {
+        m_support_cali = sup;
+        Refresh();
+    };
     virtual bool Enable(bool enable = true);
     void         set_disable_mode(bool disable) { m_disable_mode = disable; }
     void         msw_rescale();
     void         on_pass_road(bool pass);
 
 protected:
-    wxStaticBitmap *m_edit_bitmp       = {nullptr};
-    wxStaticBitmap *m_edit_bitmp_light = {nullptr};
+    wxStaticBitmap* m_edit_bitmp       = {nullptr};
+    wxStaticBitmap* m_edit_bitmp_light = {nullptr};
     ScalableBitmap  m_bitmap_editable;
     ScalableBitmap  m_bitmap_editable_light;
     ScalableBitmap  m_bitmap_readonly;
@@ -482,38 +522,37 @@ protected:
     ScalableBitmap  m_bitmap_transparent_def;
     ScalableBitmap  m_bitmap_transparent_lite;
 
-    ScalableBitmap  m_bitmap_extra_tray_left;
-    ScalableBitmap  m_bitmap_extra_tray_right;
-    ScalableBitmap  m_bitmap_extra_tray_mid;
+    ScalableBitmap m_bitmap_extra_tray_left;
+    ScalableBitmap m_bitmap_extra_tray_right;
+    ScalableBitmap m_bitmap_extra_tray_mid;
 
-    ScalableBitmap  m_bitmap_extra_tray_left_hover;
-    ScalableBitmap  m_bitmap_extra_tray_right_hover;
-    ScalableBitmap  m_bitmap_extra_tray_mid_hover;
+    ScalableBitmap m_bitmap_extra_tray_left_hover;
+    ScalableBitmap m_bitmap_extra_tray_right_hover;
+    ScalableBitmap m_bitmap_extra_tray_mid_hover;
 
-    ScalableBitmap  m_bitmap_extra_tray_left_selected;
-    ScalableBitmap  m_bitmap_extra_tray_right_selected;
-    ScalableBitmap  m_bitmap_extra_tray_mid_selected;
+    ScalableBitmap m_bitmap_extra_tray_left_selected;
+    ScalableBitmap m_bitmap_extra_tray_right_selected;
+    ScalableBitmap m_bitmap_extra_tray_mid_selected;
 
-    bool            m_unable_selected = {false};
-    bool            m_enable          = {false};
-    bool            m_selected        = {false};
-    bool            m_hover           = {false};
-    bool            m_show_kn         = {false};
-    bool            m_support_cali    = {false};
-
+    bool m_unable_selected = {false};
+    bool m_enable          = {false};
+    bool m_selected        = {false};
+    bool m_hover           = {false};
+    bool m_show_kn         = {false};
+    bool m_support_cali    = {false};
 
     double   m_radius = {4};
     wxColour m_border_color;
     wxColour m_road_def_color;
     wxColour m_lib_color;
-    bool m_disable_mode{ false };
-    bool m_pass_road{false};
+    bool     m_disable_mode{false};
+    bool     m_pass_road{false};
 
-    void on_enter_window(wxMouseEvent &evt);
-    void on_leave_window(wxMouseEvent &evt);
-    void on_left_down(wxMouseEvent &evt);
-    void paintEvent(wxPaintEvent &evt);
-    void render(wxDC &dc);
+    void on_enter_window(wxMouseEvent& evt);
+    void on_leave_window(wxMouseEvent& evt);
+    void on_left_down(wxMouseEvent& evt);
+    void paintEvent(wxPaintEvent& evt);
+    void render(wxDC& dc);
     void render_lite_text(wxDC& dc);
     void render_generic_text(wxDC& dc);
     void doRender(wxDC& dc);
@@ -524,12 +563,22 @@ protected:
 /*************************************************
 Description:AMSRoad
 **************************************************/
+
+// [INTENT] AMSRoad renders the horizontal route segment beneath a can card, including step progress and pass-road highlighting.
+// [STATE] It keeps the current AMS snapshot, can metadata, selected flag, route mode, and per-step pass-road state that the parent
+// refreshes. [UNITY] Use a retained route-line prefab or custom graphic element driven by step/progress state.
 class AMSRoad : public wxWindow
 {
 public:
     AMSRoad();
-    AMSRoad(wxWindow *parent, wxWindowID id, Caninfo info, int canindex, int maxcan, const wxPoint &pos = wxDefaultPosition, const wxSize &size = wxDefaultSize);
-    void create(wxWindow *parent, wxWindowID id = wxID_ANY, const wxPoint &pos = wxDefaultPosition, const wxSize &size = wxDefaultSize);
+    AMSRoad(wxWindow*      parent,
+            wxWindowID     id,
+            Caninfo        info,
+            int            canindex,
+            int            maxcan,
+            const wxPoint& pos  = wxDefaultPosition,
+            const wxSize&  size = wxDefaultSize);
+    void create(wxWindow* parent, wxWindowID id = wxID_ANY, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize);
 
 public:
     AMSinfo                      m_amsinfo;
@@ -546,9 +595,8 @@ public:
 
     std::vector<ScalableBitmap> ams_humidity_img;
 
-
-    int      m_humidity = { 0 };
-    bool     m_show_humidity = { false };
+    int      m_humidity      = {0};
+    bool     m_show_humidity = {false};
     bool     m_vams_loading{false};
     AMSModel m_ams_model;
 
@@ -558,20 +606,28 @@ public:
     void OnPassRoad(std::vector<AMSPassRoadMode> prord_list);
     void UpdatePassRoad(int tag_index, AMSPassRoadType type, AMSPassRoadSTEP step);
 
-    void paintEvent(wxPaintEvent &evt);
-    void render(wxDC &dc);
-    void doRender(wxDC &dc);
+    void paintEvent(wxPaintEvent& evt);
+    void render(wxDC& dc);
+    void doRender(wxDC& dc);
 };
-
 
 /*************************************************
 Description:AMSRoadUpPart
 **************************************************/
+
+// [INTENT] AMSRoadUpPart is the upper route compositor that combines AMS-level pass-road state with slot/nozzle placement.
+// [STATE] It tracks the selected load slot/AMS index, route mode, load step, humidity display state, and the loaded-vs-loading styling used
+// by the stacked route art. [UNITY] Port as a route-compositor child prefab that takes the current slot, nozzle, and progress snapshot as data.
 class AMSRoadUpPart : public wxWindow
 {
 public:
     AMSRoadUpPart();
-    AMSRoadUpPart(wxWindow* parent, wxWindowID id, AMSinfo info, AMSModel mode, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize);
+    AMSRoadUpPart(wxWindow*      parent,
+                  wxWindowID     id,
+                  AMSinfo        info,
+                  AMSModel       mode,
+                  const wxPoint& pos  = wxDefaultPosition,
+                  const wxSize&  size = wxDefaultSize);
     void create(wxWindow* parent, wxWindowID id = wxID_ANY, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize);
 
 public:
@@ -616,10 +672,13 @@ private:
     AMSModel m_ams_model;
 };
 
-
 /*************************************************
 Description:AMSRoadDownPart
 **************************************************/
+
+// [INTENT] AMSRoadDownPart is the lower route compositor for left/right nozzle branches and the shared pass-road line.
+// [STATE] It stores the left/right route show modes, per-branch lengths, per-branch step progress, and the current route colors for each
+// side. [UNITY] Use a split route-line prefab with explicit left/right branch state instead of implicit geometry math in the view.
 class AMSRoadDownPart : public wxWindow
 {
 public:
@@ -628,7 +687,8 @@ public:
     void create(wxWindow* parent, wxWindowID id = wxID_ANY, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize);
 
 public:
-    // void                         Update(AMSRoadDownPartMode nozzle, AMSRoadShowMode left_mode, AMSRoadShowMode right_mode, int left_len, int right_len);
+    // void                         Update(AMSRoadDownPartMode nozzle, AMSRoadShowMode left_mode, AMSRoadShowMode right_mode, int left_len,
+    // int right_len);
     void UpdateLeft(int nozzle_num, AMSRoadShowMode mode);
     void UpdateRight(int nozzle_num, AMSRoadShowMode mode);
 
@@ -659,46 +719,55 @@ private:
     AMSPassRoadSTEP m_pass_road_right_step = {AMSPassRoadSTEP::AMS_ROAD_STEP_NONE};
 
     std::map<int, wxColour> m_road_color;
-    bool m_vams_loading{false};
-    AMSModel m_ams_model;
+    bool                    m_vams_loading{false};
+    AMSModel                m_ams_model;
 };
 
 /*************************************************
 Description:AMSPreview
 **************************************************/
+
+// [INTENT] AMSPreview is the clickable AMS summary tile used to switch the active AMS or nozzle context.
+// [STATE] It retains the open/selected/hover flags, the AMS snapshot, and the four-slot vs single-slot preview bitmaps that drive the
+// compressed summary art. [EVENT] Mouse enter/leave/selection calls turn the tile into a lightweight interactive card. [UNITY] Port as a
+// summary-tile prefab with a click handler and a small state machine for open/selected hover feedback.
 class AMSPreview : public wxWindow
 {
 public:
     AMSPreview();
-    AMSPreview(wxWindow *parent, wxWindowID id, AMSinfo amsinfo, AMSModel itemType = AMSModel::GENERIC_AMS, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize);
+    AMSPreview(wxWindow*      parent,
+               wxWindowID     id,
+               AMSinfo        amsinfo,
+               AMSModel       itemType = AMSModel::GENERIC_AMS,
+               const wxPoint& pos      = wxDefaultPosition,
+               const wxSize&  size     = wxDefaultSize);
 
     bool m_open = {false};
     void Open();
     void Close();
 
     void         Update(AMSinfo amsinfo);
-    void         create(wxWindow *parent, wxWindowID id, const wxPoint &pos, const wxSize &size);
-    void         OnEnterWindow(wxMouseEvent &evt);
-    void         OnLeaveWindow(wxMouseEvent &evt);
+    void         create(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size);
+    void         OnEnterWindow(wxMouseEvent& evt);
+    void         OnLeaveWindow(wxMouseEvent& evt);
     void         OnSelected();
     void         UnSelected();
     virtual bool Enable(bool enable = true);
     void         msw_rescale();
     bool         IsSelected() const;
 
-
-    std::string  get_ams_id() const { return m_amsinfo.ams_id; };
-    int          get_nozzle_id() const { return m_amsinfo.nozzle_id; };
+    std::string get_ams_id() const { return m_amsinfo.ams_id; };
+    int         get_nozzle_id() const { return m_amsinfo.nozzle_id; };
 
 protected:
-    AMSinfo  m_amsinfo;
+    AMSinfo m_amsinfo;
 
     wxSize   m_cube_size;
-    wxColour m_background_colour = { AMS_CONTROL_DEF_LIB_BK_COLOUR };
+    wxColour m_background_colour = {AMS_CONTROL_DEF_LIB_BK_COLOUR};
     float    m_padding;
     float    m_space;
-    bool     m_hover             = {false};
-    bool     m_selected          = {false};
+    bool     m_hover         = {false};
+    bool     m_selected      = {false};
     AMSModel m_ams_item_type = AMSModel::GENERIC_AMS;
 
     ScalableBitmap m_ts_bitmap_cube;
@@ -708,15 +777,18 @@ protected:
     ScalableBitmap m_single_slot_bitmap;
     ScalableBitmap m_single_slot_bitmap_dark;
 
-    void         paintEvent(wxPaintEvent &evt);
-    void         render(wxDC &dc);
-    void         doRender(wxDC &dc);
+    void paintEvent(wxPaintEvent& evt);
+    void render(wxDC& dc);
+    void doRender(wxDC& dc);
 };
-
 
 /*************************************************
 Description:AMSHumidity
 **************************************************/
+
+// [INTENT] AMSHumidity renders the humidity/drying status badge for an AMS container.
+// [STATE] It caches the humidity icon sets, sun/drying icons, current AMS snapshot, selected flag, and the vAMS loading state used to
+// change the badge art. [UNITY] Use a badge prefab with icon-state swapping and a compact formatter for humidity/drying mode.
 class AMSHumidity : public wxWindow
 {
 public:
@@ -725,11 +797,11 @@ public:
     void create(wxWindow* parent, wxWindowID id = wxID_ANY, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize);
 
 public:
-    AMSinfo                      m_amsinfo;
-    int                          m_canindex = { 0 };
-    bool                         m_selected = { false };
-    double                       m_radius = { 12 };
-    void                         Update(AMSinfo amsinfo);
+    AMSinfo m_amsinfo;
+    int     m_canindex = {0};
+    bool    m_selected = {false};
+    double  m_radius   = {12};
+    void    Update(AMSinfo amsinfo);
 
     std::vector<ScalableBitmap> ams_humidity_imgs;
     std::vector<ScalableBitmap> ams_humidity_dark_imgs;
@@ -740,7 +812,7 @@ public:
     ScalableBitmap ams_sun_img;
     ScalableBitmap ams_drying_img;
 
-    bool     m_vams_loading{ false };
+    bool     m_vams_loading{false};
     AMSModel m_ams_model;
 
     void paintEvent(wxPaintEvent& evt);
@@ -752,44 +824,51 @@ private:
     void update_size();
 };
 
-
 /*************************************************
 Description:AmsItem
 **************************************************/
+
+// [INTENT] AmsItem is the composite AMS dashboard root: it assembles tray cards, refresh affordances, humidity, route overlays, and
+// external-AMS visuals into one panel. [STATE] It owns the tray/card maps, refresh widgets, route compositor, humidity widget, sizers,
+// selection indices, and the current AMS snapshot that the dashboard re-renders from. [EVENT] Selection, load/unload, refresh, calibration,
+// and retry events all fan out through this root so the parent page can stay focused on device-level workflow. [UNITY] Split this into a
+// retained root prefab with child tray-card, route-line, humidity, preview, and external-AMS controllers backed by a shared AMS dashboard
+// model. [PORTING_HAZARD:P2] The class couples layout, asset selection, and routing state, so Unity needs explicit subviews rather than a
+// single monolithic MonoBehaviour.
 class AmsItem : public wxWindow
 {
 public:
-    AmsItem(wxWindow *parent, AMSinfo info, AMSModel model, AMSPanelPos pos);
+    AmsItem(wxWindow* parent, AMSinfo info, AMSModel model, AMSPanelPos pos);
     ~AmsItem();
 
-    void     Update(AMSinfo info);
-    void     create(wxWindow *parent);
-    void     AddCan(Caninfo caninfo, int canindex, int maxcan, wxBoxSizer* sizer);
-    void     AddLiteCan(Caninfo caninfo, int canindex, wxGridSizer* sizer);
-    void     SetDefSelectCan();
-    void     SelectCan(std::string canid);
-    void     PlayRridLoading(wxString canid);
-    void     StopRridLoading(wxString canid);
-    void     msw_rescale();
-    void     show_sn_value(bool show);
-    void     SetAmsStepExtra(wxString canid, AMSPassRoadType type, AMSPassRoadSTEP step);
-    void     SetAmsStep(std::string amsid, std::string canid, AMSPassRoadType type, AMSPassRoadSTEP step);
-    void     SetAmsStep(std::string can_id);
-    void     paintEvent(wxPaintEvent& evt);
-    void     render(wxDC& dc);
-    void     doRender(wxDC& dc);
-    void     RenderLiteRoad(wxDC& dc, wxSize size);
-    wxColour GetTagColr(wxString canid);
+    void        Update(AMSinfo info);
+    void        create(wxWindow* parent);
+    void        AddCan(Caninfo caninfo, int canindex, int maxcan, wxBoxSizer* sizer);
+    void        AddLiteCan(Caninfo caninfo, int canindex, wxGridSizer* sizer);
+    void        SetDefSelectCan();
+    void        SelectCan(std::string canid);
+    void        PlayRridLoading(wxString canid);
+    void        StopRridLoading(wxString canid);
+    void        msw_rescale();
+    void        show_sn_value(bool show);
+    void        SetAmsStepExtra(wxString canid, AMSPassRoadType type, AMSPassRoadSTEP step);
+    void        SetAmsStep(std::string amsid, std::string canid, AMSPassRoadType type, AMSPassRoadSTEP step);
+    void        SetAmsStep(std::string can_id);
+    void        paintEvent(wxPaintEvent& evt);
+    void        render(wxDC& dc);
+    void        doRender(wxDC& dc);
+    void        RenderLiteRoad(wxDC& dc, wxSize size);
+    wxColour    GetTagColr(wxString canid);
     std::string GetCurrentCan();
 
 public:
-    AMSinfo             get_ams_info() const { return m_info; };
+    AMSinfo get_ams_info() const { return m_info; };
 
-    std::string         get_ams_id() const { return m_info.ams_id; };
-    AMSModel            get_ams_model() const { return m_info.ams_type; };
+    std::string get_ams_id() const { return m_info.ams_id; };
+    AMSModel    get_ams_model() const { return m_info.ams_type; };
 
-    AMSModelOriginType  get_ext_type() const { return m_info.ext_type; };
-    AMSExtImage        *get_ext_image() const { return m_ext_image; };
+    AMSModelOriginType get_ext_type() const { return m_info.ext_type; };
+    AMSExtImage*       get_ext_image() const { return m_ext_image; };
 
     size_t                         get_can_count() const { return m_info.cans.size(); };
     std::map<std::string, AMSLib*> get_can_lib_list() const { return m_can_lib_list; };
@@ -801,36 +880,39 @@ public:
     int         get_nozzle_id() const { return m_info.nozzle_id; };
 
 private:
-    ScalableBitmap  m_bitmap_extra_framework;
-    int             m_canlib_selection = { -1 };
-    int             m_selection = { 0 };
-    int             m_can_count = { 0 };
+    ScalableBitmap m_bitmap_extra_framework;
+    int            m_canlib_selection = {-1};
+    int            m_selection        = {0};
+    int            m_can_count        = {0};
 
-    AMSModel        m_ams_model;
-    AMSPanelPos     m_panel_pos;
-    std::string     m_canlib_id;
+    AMSModel    m_ams_model;
+    AMSPanelPos m_panel_pos;
+    std::string m_canlib_id;
 
-    std::string     m_road_canid;
-    wxColour        m_road_colour;
+    std::string m_road_canid;
+    wxColour    m_road_colour;
 
-    std::map<std::string, AMSLib*>      m_can_lib_list;
-    //std::map<std::string, AMSRoad*>     m_can_road_list;
-    AMSRoadUpPart* m_panel_road = { nullptr };
-    std::map<std::string, AMSrefresh*>  m_can_refresh_list;
-    AMSHumidity* m_humidity = { nullptr };
+    std::map<std::string, AMSLib*> m_can_lib_list;
+    // std::map<std::string, AMSRoad*>     m_can_road_list;
+    AMSRoadUpPart*                     m_panel_road = {nullptr};
+    std::map<std::string, AMSrefresh*> m_can_refresh_list;
+    AMSHumidity*                       m_humidity = {nullptr};
 
-    AMSinfo         m_info;
-    wxBoxSizer *    sizer_can = {nullptr};
-    wxGridSizer*    sizer_can_extra = { nullptr };
-    wxBoxSizer *    sizer_humidity = { nullptr };
-    wxBoxSizer *    sizer_item = { nullptr };
-    wxBoxSizer *    sizer_can_middle = {nullptr};
-    wxBoxSizer *    sizer_can_left = {nullptr};
-    wxBoxSizer *    sizer_can_right = {nullptr};
-    AMSExtImage*    m_ext_image = { nullptr };      //the ext image upon the ext ams
-    AMSExtText* m_ext_text = { nullptr };       //the ext text upon the ext ams
+    AMSinfo      m_info;
+    wxBoxSizer*  sizer_can        = {nullptr};
+    wxGridSizer* sizer_can_extra  = {nullptr};
+    wxBoxSizer*  sizer_humidity   = {nullptr};
+    wxBoxSizer*  sizer_item       = {nullptr};
+    wxBoxSizer*  sizer_can_middle = {nullptr};
+    wxBoxSizer*  sizer_can_left   = {nullptr};
+    wxBoxSizer*  sizer_can_right  = {nullptr};
+    AMSExtImage* m_ext_image      = {nullptr}; // the ext image upon the ext ams
+    AMSExtText*  m_ext_text       = {nullptr}; // the ext text upon the ext ams
 };
 
+// [EVENT] These custom events are the dashboard's command surface; in Unity they map to typed callbacks/messages rather than wx event
+// bubbling. [UNITY] Prefer explicit command enums or C# events for load/unload/refresh/calibration routing so the parent panel stays
+// decoupled from the child widgets.
 wxDECLARE_EVENT(EVT_AMS_EXTRUSION_CALI, wxCommandEvent);
 wxDECLARE_EVENT(EVT_AMS_LOAD, SimpleEvent);
 wxDECLARE_EVENT(EVT_AMS_UNLOAD, SimpleEvent);
