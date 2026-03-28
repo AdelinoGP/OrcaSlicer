@@ -271,6 +271,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate SysInfoDialog.cpp system report dialog
 - Next recommended Phase 1 task: T604 annotate: src/slic3r/GUI/SysInfoDialog.hpp
 
+## Phase 1 - Task T604 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SysInfoDialog.hpp
+- Deliverables: src/slic3r/GUI/SysInfoDialog.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 6 boundary comments covering modal intent, retained state, Unity mapping, porting hazard, DPI refresh, and clipboard close/export handlers
+- Verification excerpt: `[UNITY] Map this to a modal overlay/popup with a retained report-text model, two scrollable text panes, and a command button.`
+- Unity-impact summary: header now defines the retained report-panes boundary; clipboard/export remains a distinct command path; process-inspection data stays behind a service in the Unity split
+- Hazards found: P2 x1 (live process inspection plus clipboard access coupled to the dialog)
+- Git: e21686b45f Annotate SysInfoDialog.hpp boundary
+- Next recommended Phase 1 task: T605 annotate: src/slic3r/GUI/Tabbook.cpp
+
 ## Phase 1 - Task T602 complete
 
 - Task type: annotate

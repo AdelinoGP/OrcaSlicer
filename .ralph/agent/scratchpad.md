@@ -127,3 +127,7 @@
 - T602 is now complete in the runtime queue; the next atomic work item is T603 (`src/slic3r/GUI/SysInfoDialog.cpp`).
 - SysInfoDialog is a modal system-report dialog that mixes app metadata, live memory/undo-stack stats, OpenGL capability text, and a clipboard export path, so the annotations should emphasize the modal boundary, process-scoped data gathering, DPI rescaling, and the Unity split into a retained summary panel plus a command button.
 - T603 is annotated and ready to close after commit; next in line is T604 (`src/slic3r/GUI/SysInfoDialog.hpp`), which should capture the same modal/report boundary from the declaration side.
+
+- Completed T604 (`src/slic3r/GUI/SysInfoDialog.hpp`) as the declaration boundary for the system-information modal.
+- The header now records the retained report panes, logo bitmap scaling, clipboard command wiring, Unity split into a modal overlay with a report-text model, and the clipboard/process-inspection porting hazard.
+- Next step after commit: close T604 in the runtime registry, then move to T605 (`src/slic3r/GUI/Tabbook.cpp`).
