@@ -79,6 +79,30 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate SkipPartCanvas.hpp boundary
 - Next recommended Phase 1 task: T591 annotate: src/slic3r/GUI/SliceInfoPanel.cpp
 
+## Phase 1 - Task T592 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SliceInfoPanel.hpp
+- Deliverables: src/slic3r/GUI/SliceInfoPanel.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 4 boundary comments covering popup ownership, async web-request completion, transient hover state, and the Unity split between the summary card and popover controller
+- Verification excerpt: `[UNITY] Port as a summary card plus a separate popover controller, with thumbnail loading outside the view tree.`
+- Unity-impact summary: summary card and detail popover become separate UI pieces; async fetch remains outside the view; hover state stays transient
+- Hazards found: P2 x1 (async thumbnail completion can outlive the panel)
+- Git: annotate SliceInfoPanel header boundary
+- Next recommended Phase 1 task: T593 annotate: src/slic3r/GUI/SlicingProgressNotification.cpp
+
+## Phase 1 - Task T593 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SlicingProgressNotification.cpp
+- Deliverables: src/slic3r/GUI/SlicingProgressNotification.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 19 boundary comments covering the progress state machine, theme updates, late print-info enrichment, canvas overlay rendering, button events, and Unity mapping
+- Verification excerpt: `[UNITY] Port this as a screen-space overlay controller that reflows from state, not a custom-painted native window.`
+- Unity-impact summary: retained HUD controller over the viewport; Daily Tips remains a separate panel; cancel/close and late metadata are explicit state transitions
+- Hazards found: P2 x1 (immediate-mode overlay mixes lifecycle, rendering, and actions)
+- Git: annotate SlicingProgressNotification overlay
+- Next recommended Phase 1 task: T594 annotate: src/slic3r/GUI/SlicingProgressNotification.hpp
+
 ## Tasks
 
 ### Completed

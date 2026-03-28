@@ -78,3 +78,7 @@
 - Started T592 (`src/slic3r/GUI/SliceInfoPanel.hpp`) as the declaration boundary for the slice summary card and popup pair.
 - The header now captures popup ownership, async web-request completion, transient hover state, and the Unity split between a summary card and a separate popover controller.
 - Next step after commit: close T592 and move to T593 (`src/slic3r/GUI/SlicingProgressNotification.cpp`).
+
+- Started T593 (`src/slic3r/GUI/SlicingProgressNotification.cpp`) for the slice-progress HUD overlay.
+- The file is a UI-thread-owned immediate-mode notification that drives a small progress state machine, late print-info enrichment, and an embedded Daily Tips panel on the canvas overlay.
+- Plan: keep the annotation focused on the state transitions, render path, button events, and Unity mapping to a retained HUD controller, then verify with a diff check and close the task.

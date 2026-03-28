@@ -2,6 +2,34 @@
 
 ## Patterns
 
+### mem-1774666014-194f
+> SlicingProgressNotification is a UI-thread-owned immediate-mode ImGui overlay: it maintains a small progress state machine, embeds Daily Tips, and should become a retained Unity HUD controller with explicit state transitions.
+<!-- tags: gui, unity, notification, immediate-mode | created: 2026-03-28 -->
+
+### mem-1774665649-c9b3
+> SliceInfoPanel.hpp is the declaration boundary for the slice summary card and hover popup pair: it owns a shared transient popover, an async wxWebRequest pipeline, and should become a retained summary card plus separate popover controller in Unity.
+<!-- tags: gui, unity, annotation, threading | created: 2026-03-28 -->
+
+### mem-1774665471-696b
+> SliceInfoPanel.cpp is a compact summary card plus detail popup; async thumbnail fetch must cancel stale responses before update, and the Unity port should keep preview loading outside the view tree.
+<!-- tags: gui, unity, annotation, threading | created: 2026-03-28 -->
+
+### mem-1774664516-b4ab
+> SkipPartCanvas is a color-encoded OpenGL selection canvas that decodes pick images into contour meshes, toggles part states via custom wx events, and should split into a Unity controller with RenderTexture hit data plus a background 3MF metadata parser.
+<!-- tags: gui, unity, opengl, annotation | created: 2026-03-28 -->
+
+### mem-1774664219-9944
+> SingleChoiceDialog.hpp is a thin declaration boundary: the dialog owns a transient ComboBox selection, exposes a raw ComboBox accessor, and should be ported as a modal dropdown controller with empty-list validation before open.
+<!-- tags: gui, unity, dialog | created: 2026-03-28 -->
+
+### mem-1774663962-4e0f
+> SingleChoiceDialog.cpp is a thin modal selector wrapper: the combo is widget-owned until OK, Cancel returns -1, and the constructor assumes a non-empty choices array, so Unity should validate empty input before opening.
+<!-- tags: gui, unity, dialog | created: 2026-03-28 -->
+
+### mem-1774663654-9136
+> SendToPrinter.hpp is the declaration boundary for the modal send workflow: it owns printer/device selection state, transfer-job lifetimes, timer-driven refresh, and the event surface that the cpp wires up. Unity should split it into a modal controller with an async upload service and keep protocol/state handling out of view widgets.
+<!-- tags: gui, unity, dialog, threading | created: 2026-03-28 -->
+
 ### mem-1774663115-fe5d
 > SendToPrinter.cpp is a modal send workflow: printer discovery, storage selection, rename validation, and upload progress all re-enter the dialog on the UI thread; Unity should model it as a modal controller plus async tunnel/upload service with explicit teardown.
 <!-- tags: gui, unity, dialog, threading | created: 2026-03-28 -->
@@ -173,6 +201,10 @@
 ## Decisions
 
 ## Fixes
+
+### mem-1774664045-93eb
+> failure: cmd="/home/admin/.config/nvm/versions/node/v24.14.0/lib/node_modules/@ralph-orchestrator/ralph-cli/node_modules/.bin_real/ralph tools task start task-1773880087-1f?", exit=1, error=zsh glob pattern mistake in task id, next=start the intended task with the exact runtime id task-1773880087-aff1
+<!-- tags: tooling, error-handling | created: 2026-03-28 -->
 
 ### mem-1774661946-6480
 > failure: cmd=ralph tools skill load ralph-tools, exit=1, error=Skill "ralph-tools" not found; available skills: none, next=proceed without loading the skill and use existing task/memory tooling
