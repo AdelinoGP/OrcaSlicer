@@ -2128,7 +2128,7 @@ This prompt governs **Phase 1 only**.
 - Verification excerpt: `[UNITY] Model this as a retained marker view-model plus a pure color-resolution service, so row edits do not own palette math.`
 - Unity-impact summary: sorted-set marker model stays explicit; color derivation should live in a shared service; edit/erase semantics depend on container ordering
 - Hazards found: P2 x1, P3 x1
-- Git: pending commit
+- Git: 19fbcabcc4 Annotate WebGuideDialog header boundary
 - Next recommended Phase 1 task: T618 annotate: src/slic3r/GUI/TickCode.hpp
 
 ## Phase 1 - Task T621 complete
