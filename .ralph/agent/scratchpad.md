@@ -216,3 +216,7 @@
 - Started T625 (`src/slic3r/GUI/UserManager.cpp`) as the network-auth payload adapter.
 - The file is a thin JSON parser that only reacts to `bind` success, updates the device selection through GUI singletons, and may be called from a network callback path.
 - Unity mapping: typed auth-result message + main-thread completion handler; the transport layer should not own modal dialog closure or selected-machine state.
+
+- Started T626 (`src/slic3r/GUI/UserManager.hpp`) as the declaration boundary for the same auth adapter.
+- The header is intentionally small but still needs explicit comments for the non-owning `NetworkAgent*`, callback thread affinity, and the typed message bridge that Unity should use instead of view-layer JSON parsing.
+- Verification target: `git diff --check -- src/slic3r/GUI/UserManager.hpp` after annotation, then commit the atomic header change and close the task.

@@ -2187,3 +2187,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1, UNCLEAR x1
 - Git: Annotate UserManager auth payload parsing
 - Next recommended Phase 1 task: T626 annotate: src/slic3r/GUI/UserManager.hpp
+
+## Phase 1 - Task T626 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/UserManager.hpp
+- Deliverables: src/slic3r/GUI/UserManager.hpp, .ralph/agent/handoff.md, .ralph/agent/scratchpad.md
+- Substantive additions: 7 boundary comments covering class intent, non-owning agent state, thread affinity, Unity mapping, porting hazard, and the two method contracts
+- Verification excerpt: `[UNITY] Replace with a typed auth-result message handler plus a main-thread completion bridge; keep transport parsing out of view code.`
+- Unity-impact summary:
+  - Treat the header as a transport adapter boundary, not a UI controller.
+  - Marshal agent-driven UI changes back to the Unity main thread.
+  - Preserve external ownership of `NetworkAgent` and make the coupling explicit in C#.
+- Hazards found: P2 x1
+- Git: pending commit `Annotate UserManager header for auth adapter`
+- Next recommended Phase 1 task: T627 annotate: src/slic3r/GUI/UserNotification.cpp
