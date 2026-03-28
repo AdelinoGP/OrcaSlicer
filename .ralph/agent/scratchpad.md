@@ -308,3 +308,7 @@
 - Completed T652 (`src/slic3r/GUI/Widgets/ComboBox.hpp`) with class-level annotations for the composite editable/popup control, item-model state, event routing, Windows message handling, and Unity migration split.
 - Verification: `git diff --check -- src/slic3r/GUI/Widgets/ComboBox.hpp` passed; the LSP diagnostics are environment/include-path noise from wx headers, not syntax issues in the annotation block.
 - Next recommended task is T653 (`src/slic3r/GUI/Widgets/DialogButtons.cpp`).
+
+- Started T653 (`src/slic3r/GUI/Widgets/DialogButtons.cpp`) as the reusable dialog-footer button strip.
+- The file owns a role-aware Button collection, rebuilds layout on DPI changes, caches primary/alert styling, and wraps keyboard focus across the strip; the Unity mapping should be a retained footer prefab with role-tagged children and an explicit relayout pass.
+- Plan: keep the comments centered on ownership/lifetime, update flow, event wiring, focus traversal, and the UI-thread DPI hazard, then verify with `git diff --check` and close the task atomically.

@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-28T22:54:02Z
+Last updated: 2026-03-28T23:00:23Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -571,7 +571,7 @@ Last updated: 2026-03-28T22:54:02Z
 - [ ] T650 annotate: src/slic3r/GUI/Widgets/CheckBox.hpp
 - [x] T651 annotate: src/slic3r/GUI/Widgets/ComboBox.cpp
 - [x] T652 annotate: src/slic3r/GUI/Widgets/ComboBox.hpp
-- [ ] T653 annotate: src/slic3r/GUI/Widgets/DialogButtons.cpp
+- [x] T653 annotate: src/slic3r/GUI/Widgets/DialogButtons.cpp
 - [ ] T654 annotate: src/slic3r/GUI/Widgets/DialogButtons.hpp
 - [ ] T655 annotate: src/slic3r/GUI/Widgets/DropDown.cpp
 - [ ] T656 annotate: src/slic3r/GUI/Widgets/DropDown.hpp

@@ -130,6 +130,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate ComboBox header boundary
 - Next recommended Phase 1 task: T653 annotate: src/slic3r/GUI/Widgets/DialogButtons.cpp
 
+## Phase 1 - Task T653 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/DialogButtons.cpp
+- Deliverables: src/slic3r/GUI/Widgets/DialogButtons.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 6 boundary comments covering dialog-footer intent, DPI-driven relayout, primary/alert role caching, button-style refresh, Unity footer prefab mapping, and wraparound keyboard focus
+- Verification excerpt: `[UNITY] Port as a retained footer prefab with role-tagged button children and a layout helper that reflows on scale changes.`
+- Unity-impact summary: footer becomes a retained prefab; role styling must survive layout refreshes; keyboard focus wrap needs explicit handling in Unity
+- Hazards found: P2 x1, P3 x1
+- Git: Annotate DialogButtons footer strip
+- Next recommended Phase 1 task: T654 annotate: src/slic3r/GUI/Widgets/DialogButtons.hpp
+
 ## Phase 1 - Task T631 complete
 
 - Task type: annotate
