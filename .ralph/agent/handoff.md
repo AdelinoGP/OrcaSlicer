@@ -2327,3 +2327,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1
 - Git: Annotate WebUserLoginDialog.hpp for web login host
 - Next recommended Phase 1 task: T637 annotate: src/slic3r/GUI/WebViewDialog.cpp
+
+## Phase 1 - Task T637 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/WebViewDialog.cpp
+- Deliverables: src/slic3r/GUI/WebViewDialog.cpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 6 boundary comment groups covering the retained browser host, navigation entry point, login/status polling bridge, JS command router, script cache, and source-view modal
+- Verification excerpt: `[PORTING_HAZARD:P1] The current code lets page messages directly drive login/network behavior, so the bridge boundary must be hardened in Unity.`
+- Unity-impact summary:
+  - Persistent browser host should become a typed webview controller with explicit navigation gating.
+  - Login polling and JS response delivery need main-thread services instead of implicit timer/event reentry.
+  - Page-to-native commands must be validated before they can reach app services.
+- Hazards found: P1 x1, P2 x1
+- Git: pending commit for WebViewDialog annotations
+- Next recommended Phase 1 task: T638 annotate: src/slic3r/GUI/WebViewDialog.hpp

@@ -256,3 +256,7 @@
 - Completed T636 (`src/slic3r/GUI/WebUserLoginDialog.hpp`) as the declaration boundary for the same login modal.
 - The header now captures retained browser/timer/session state, the event-table bridge, the UI-thread modal lifecycle, and a concrete Unity mapping to a browser-hosted login shell plus typed command router.
 - Next step after commit: close T636 and move to T637 (`src/slic3r/GUI/WebViewDialog.cpp`).
+
+- Started T637 (`src/slic3r/GUI/WebViewDialog.cpp`) as the retained browser-host and JS bridge implementation.
+- The file mixes navigation gating, login polling, main-thread response reentry, developer tools, and page-to-native command handling, so the annotations emphasize the host/controller split, timer ownership, and the hardening required for Unity.
+- Plan: keep the comments concentrated on the browser host boundary, script-message bridge, login refresh seam, navigation/error flow, and the source-view modal, then verify and close the task.
