@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-28T01:41:32Z
+Last updated: 2026-03-28T01:49:22Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -502,7 +502,7 @@ Last updated: 2026-03-28T01:41:32Z
 - [~] T581 annotate: src/slic3r/GUI/SendMultiMachinePage.cpp
 - [x] T582 annotate: src/slic3r/GUI/SendMultiMachinePage.hpp
 - [x] T583 annotate: src/slic3r/GUI/SendSystemInfoDialog.cpp
-- [ ] T584 annotate: src/slic3r/GUI/SendSystemInfoDialog.hpp
+- [x] T584 annotate: src/slic3r/GUI/SendSystemInfoDialog.hpp
 - [ ] T585 annotate: src/slic3r/GUI/SendToPrinter.cpp
 - [ ] T586 annotate: src/slic3r/GUI/SendToPrinter.hpp
 - [ ] T587 annotate: src/slic3r/GUI/SingleChoiceDialog.cpp

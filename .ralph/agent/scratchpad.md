@@ -38,3 +38,7 @@
 - Started T583 (`src/slic3r/GUI/SendSystemInfoDialog.cpp`) and annotated the consent dialog boundary, cached payload state, preview modal, version gate, payload assembly, platform probes, OpenGL metadata, worker-thread upload flow, and the external entry point.
 - The file is a privacy-sensitive telemetry prompt: it collects OS/hardware/display/OpenGL details and sends them via a blocking HTTP flow, so the Unity port should treat it as a modal opt-in controller plus an async upload service with a reviewed payload schema.
 - Next step after commit: close T583 and move to T584 (`src/slic3r/GUI/SendSystemInfoDialog.hpp`).
+
+- Started T584 (`src/slic3r/GUI/SendSystemInfoDialog.hpp`) as a declaration-only consent-gate boundary.
+- The header is intentionally thin: it exposes the dialog entry point without any payload state, so the Unity port only needs a modal controller hook plus the same privacy gate semantics.
+- Next step after commit: close T584 and move to T585 (`src/slic3r/GUI/SendToPrinter.cpp`).

@@ -258,6 +258,21 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: annotate SendSystemInfoDialog system-info flow
 - Next recommended Phase 1 task: T584 annotate: src/slic3r/GUI/SendSystemInfoDialog.hpp
 
+## Phase 1 - Task T584 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SendSystemInfoDialog.hpp
+- Deliverables: src/slic3r/GUI/SendSystemInfoDialog.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 3 annotation lines covering the privacy-consent entry point, Unity migration hook, and network-I/O hazard
+- Verification excerpt: `[UNITY] Model this as a modal controller entry method that can open a consent panel and then hand off to an async upload service.`
+- Unity-impact summary:
+  - Keep the consent gate as a distinct modal entry rather than inlining it into a generic settings screen.
+  - Marshal any future upload work behind an async service boundary in Unity.
+  - Preserve the privacy boundary between UI consent and data collection.
+- Hazards found: P2=1, P3=0, P1=0
+- Git: annotate SendSystemInfoDialog header
+- Next recommended Phase 1 task: T585 annotate: src/slic3r/GUI/SendToPrinter.cpp
+
 ## Phase 1 - Task T568 complete
 
 - Task type: annotate
