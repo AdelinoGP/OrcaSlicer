@@ -2553,3 +2553,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1
 - Git: Annotate ErrorMsgStaticText paint wrapping
 - Next recommended Phase 1 task: T658 annotate: src/slic3r/GUI/Widgets/ErrorMsgStaticText.hpp
+
+## Phase 1 - Task T658 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/ErrorMsgStaticText.hpp
+- Deliverables: src/slic3r/GUI/Widgets/ErrorMsgStaticText.hpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md, .ralph/agent/scratchpad.md
+- Substantive additions: 1 boundary block covering custom paint intent, transient message state, paint-event flow, Unity mapping, and retained-mode porting hazard
+- Verification excerpt: `[UNITY] Map this to a TextMeshProUGUI label inside a layout-driven container, with preferred-height measurement outside the draw pass.`
+- Unity-impact summary: retained text element should own wrapping and height; paint-time resizing should move into layout; the header stays a thin ownership boundary
+- Hazards found: P3 x1 (paint-time size mutation / measurement coupling)
+- Git: pending commit for ErrorMsgStaticText.hpp annotation
+- Next recommended Phase 1 task: T659 annotate: src/slic3r/GUI/Widgets/FanControl.cpp
