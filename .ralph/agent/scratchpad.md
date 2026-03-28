@@ -315,3 +315,7 @@
 - Completed T654 (`src/slic3r/GUI/Widgets/DialogButtons.hpp`) with declaration-boundary annotations for the semantic footer strip, role lookup tables, cached primary/alert styling, DPI relayout, and keyboard navigation.
 - The header now calls out the string-based label mapping hazard, the retained footer state, and the Unity split to a role-tagged footer prefab with an explicit relayout pass.
 - Verification: `git diff --check -- src/slic3r/GUI/Widgets/DialogButtons.hpp` is clean; next step after commit is T655 (`src/slic3r/GUI/Widgets/DropDown.cpp`).
+
+- Started T655 (`src/slic3r/GUI/Widgets/DropDown.cpp`) as the grouped popup selector.
+- The file mixes buffered custom painting, nested submenu popups, drag-to-scroll hover handling, and screen-space auto-positioning, so the annotations need to call out the retained popup state, selection/hover caches, and the Unity split between a dropdown panel and a separate submenu presenter.
+- Verification so far: `git diff --check -- src/slic3r/GUI/Widgets/DropDown.cpp` passed; the local diagnostics are the expected include-path noise from `boost/date_time`, not from the inserted comments.

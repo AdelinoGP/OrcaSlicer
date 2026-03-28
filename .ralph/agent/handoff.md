@@ -2517,3 +2517,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1, P3 x1
 - Git: Annotate DialogButtons footer boundary
 - Next recommended Phase 1 task: T655 annotate: src/slic3r/GUI/Widgets/DropDown.cpp
+
+## Phase 1 - Task T655 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/DropDown.cpp
+- Deliverables: src/slic3r/GUI/Widgets/DropDown.cpp, .ralph/agent/scratchpad.md, .ralph/agent/memories.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 18 boundary comments covering popup/event setup, retained state, content-width sync, buffered paint/render flow, grouped layout measurement, submenu creation, screen anchoring, drag/hover scrolling, event emission, and dismissal propagation
+- Verification excerpt: `[UNITY] Use screen-space anchoring plus a constrained viewport rather than relying on wx popup placement heuristics.`
+- Unity-impact summary: retain the popup as a controller with a separate submenu presenter; model selection/hover/offset as explicit state; replace custom wxDC painting with a retained list + viewport
+- Hazards found: P2 x1, P3 x1
+- Git: Annotate DropDown popup selector
+- Next recommended Phase 1 task: T656 annotate: src/slic3r/GUI/Widgets/DropDown.hpp
