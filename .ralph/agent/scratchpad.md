@@ -22,3 +22,7 @@
 - Started T579 (`src/slic3r/GUI/SelectMachinePop.cpp`) and annotated the popup shell, row widgets, async refresh path, manual hit-testing, rename dialog validation, and the pin-code shortcut rows.
 - The popup is a pooled wxPopupWindow with two live device sections, a disabled SSDP hook, worker-thread print-info fetch, and screen-space click forwarding; Unity should replace that with a floating controller, recycled rows, and standard UI event routing.
 - Verification so far: `git diff --check` is clean for this patch; next step is to commit the atomic annotation and move to T580 (`src/slic3r/GUI/SelectMachinePop.hpp`).
+
+- Completed T580 (`src/slic3r/GUI/SelectMachinePop.hpp`) as the next atomic annotation pass.
+- The header now frames the popup boundary, row widget intent, worker-thread fetch boundary, custom event routing, and the rename modal mapping for Unity migration.
+- Next step: move to T581 (`src/slic3r/GUI/SendMultiMachinePage.cpp`) after committing this atomic annotation.

@@ -198,6 +198,21 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: annotate SelectMachine header
 - Next recommended Phase 1 task: T579 annotate: src/slic3r/GUI/SelectMachinePop.cpp
 
+## Phase 1 - Task T580 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SelectMachinePop.hpp
+- Deliverables: src/slic3r/GUI/SelectMachinePop.hpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md, .ralph/agent/scratchpad.md
+- Substantive additions: 8 annotation blocks covering the popup boundary, row widget intent, row state, popup lifecycle, worker-thread boundary, event routing, and rename dialog mapping
+- Verification excerpt: `[UNITY] Port as a non-modal floating controller with recycled row views and explicit focus-loss dismissal instead of wxPopupWindow + manual mouse forwarding.`
+- Unity-impact summary:
+  - Model the popup as a controller owning a recycled device list and filter state.
+  - Replace manual click forwarding and timer refreshes with explicit main-thread events.
+  - Treat the rename flow as a simple modal dialog controller with validation state.
+- Hazards found: P2=1, P3=1
+- Git: annotate SelectMachinePop header
+- Next recommended Phase 1 task: T581 annotate: src/slic3r/GUI/SendMultiMachinePage.cpp
+
 ## Phase 1 - Task T568 complete
 
 - Task type: annotate
