@@ -554,7 +554,7 @@ Last updated: 2026-03-28T07:30:32Z
 - [x] T633 skip-trivial: src/slic3r/GUI/WebUpdatePlugin.cpp
 - [x] T634 skip-trivial: src/slic3r/GUI/WebUpdatePlugin.hpp
 - [x] T635 annotate: src/slic3r/GUI/WebUserLoginDialog.cpp
-- [ ] T636 annotate: src/slic3r/GUI/WebUserLoginDialog.hpp
+- [x] T636 annotate: src/slic3r/GUI/WebUserLoginDialog.hpp
 - [ ] T637 annotate: src/slic3r/GUI/WebViewDialog.cpp
 - [ ] T638 annotate: src/slic3r/GUI/WebViewDialog.hpp
 - [ ] T639 annotate: src/slic3r/GUI/Widgets/AMSControl.cpp

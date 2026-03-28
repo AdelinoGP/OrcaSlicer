@@ -252,3 +252,7 @@
 - Completed T635 (`src/slic3r/GUI/WebUserLoginDialog.cpp`) as the embedded login host / fallback error flow.
 - The file now calls out the dual-mode modal shell, browser event surface, UI-thread timeout, command-style JS bridge, cached script state, and the error-page fallback.
 - Next step after commit: close T635 and move to T636 (`src/slic3r/GUI/WebUserLoginDialog.hpp`).
+
+- Completed T636 (`src/slic3r/GUI/WebUserLoginDialog.hpp`) as the declaration boundary for the same login modal.
+- The header now captures retained browser/timer/session state, the event-table bridge, the UI-thread modal lifecycle, and a concrete Unity mapping to a browser-hosted login shell plus typed command router.
+- Next step after commit: close T636 and move to T637 (`src/slic3r/GUI/WebViewDialog.cpp`).

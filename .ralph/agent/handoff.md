@@ -2312,3 +2312,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x2, P3 x2
 - Git: pending commit
 - Next recommended Phase 1 task: T636 annotate: src/slic3r/GUI/WebUserLoginDialog.hpp
+
+## Phase 1 - Task T636 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/WebUserLoginDialog.hpp
+- Deliverables: src/slic3r/GUI/WebUserLoginDialog.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 6 boundary comments covering modal intent, retained state, event flow, thread affinity, and Unity migration boundaries
+- Verification excerpt: `[UNITY] Port this as a modal Canvas/UIPanel shell that hosts a browser surface plus a typed command bridge for login completion.`
+- Unity-impact summary:
+  - Modal browser shell stays explicit, but completion should move to a typed command router.
+  - Timer-driven UI-thread polling needs an owned lifecycle in Unity.
+  - Auth/session/browser state is retained across navigation and fallback pages.
+- Hazards found: P2 x1
+- Git: Annotate WebUserLoginDialog.hpp for web login host
+- Next recommended Phase 1 task: T637 annotate: src/slic3r/GUI/WebViewDialog.cpp
