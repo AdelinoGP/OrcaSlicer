@@ -109,6 +109,10 @@
 - Unity mapping to preserve: a dedicated pointer-drag controller with explicit hit-test state, a model-layer transform helper, and a scene-query service for direct-hit plus nearest-point fallbacks.
 - Verification so far: `git diff --check` will be used as the whitespace/patch sanity check before commit; the local LSP diagnostics are still the known include-path noise from `libslic3r/Point.hpp`.
 
+- Completed T607 (`src/slic3r/GUI/TabButton.cpp`) as the next atomic annotation pass.
+- Added boundary comments for the widget intent/state, event routing, enable-state forwarding, render/layout, size measurement, pointer capture, and click translation.
+- Verification: `git diff --check -- src/slic3r/GUI/TabButton.cpp` passed cleanly; next step is T608 (`src/slic3r/GUI/TabButton.hpp`).
+
 - Started T600 (`src/slic3r/GUI/SurfaceDrag.hpp`) as the declaration boundary for the transient drag session and geometry helpers.
 - The header now needs to spell out the non-owning drag cache, the mouse-event gate, and the fix-up transform pipeline so Unity can mirror the controller/service split without hiding selection lifetime assumptions.
 - Verification target: keep the annotation compact but cover state ownership, event flow, and the transform helpers that bridge selection space to world/surface space.

@@ -1955,3 +1955,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x2, P3 x1
 - Git: Annotate Tabbook.hpp boundary
 - Next recommended Phase 1 task: T607 annotate: src/slic3r/GUI/TabButton.cpp
+
+## Phase 1 - Task T607 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/TabButton.cpp
+- Deliverables: src/slic3r/GUI/TabButton.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 6 comment blocks covering widget intent/state, event routing, enable-state forwarding, render layout, size measurement, and click translation.
+- Verification excerpt: `[UNITY] Port as a UI Toolkit Button/Toggle with custom visuals, shared selection state, and a separate badge overlay.`
+- Unity-impact summary: retained tab-item control; anchored text/icon/badge layout; selection styling and enable-state changes should live in a parent controller.
+- Hazards found: 1 P3 (manual capture/release click semantics).
+- Git: Annotate TabButton sidebar control
+- Next recommended Phase 1 task: T608 annotate: src/slic3r/GUI/TabButton.hpp

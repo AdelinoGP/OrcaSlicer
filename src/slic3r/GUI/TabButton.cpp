@@ -4,6 +4,10 @@
 #include <wx/dcclient.h>
 #include <wx/dcgraph.h>
 
+// [INTENT] Custom-painted sidebar tab button with manual label/icon layout and state-dependent chrome.
+// [STATE] The widget tracks text/icon size, padding, selection colors, a pressed flag, and a transient "new" badge.
+// [EVENT] wxWidgets routes mouse and paint events through the table below; clicks are re-emitted as a command event.
+// [UNITY] Port as a UI Toolkit Button/Toggle with custom visuals, shared selection state, and a separate badge overlay.
 BEGIN_EVENT_TABLE(TabButton, StaticBox)
 
 EVT_LEFT_DOWN(TabButton::mouseDown)
@@ -16,37 +20,33 @@ END_EVENT_TABLE()
 
 static wxColour BORDER_HOVER_COL = wxColour(0, 150, 136);
 
-const static wxColour TAB_BUTTON_BG    = wxColour("#FEFFFF");
-const static wxColour TAB_BUTTON_SEL   = wxColour("#BFE1DE"); // ORCA
+const static wxColour TAB_BUTTON_BG  = wxColour("#FEFFFF");
+const static wxColour TAB_BUTTON_SEL = wxColour("#BFE1DE"); // ORCA
 
 TabButton::TabButton()
     : paddingSize(18, 16) // ORCA reduce / match left margin buttons on sidebars
     , text_color(*wxBLACK)
 {
-    background_color = StateColor(
-        std::make_pair(TAB_BUTTON_SEL, (int) StateColor::Checked),
-        std::make_pair(wxColour("#FEFFFF"), (int) StateColor::Hovered),
-        std::make_pair(wxColour("#FEFFFF"), (int) StateColor::Normal));
+    background_color = StateColor(std::make_pair(TAB_BUTTON_SEL, (int) StateColor::Checked),
+                                  std::make_pair(wxColour("#FEFFFF"), (int) StateColor::Hovered),
+                                  std::make_pair(wxColour("#FEFFFF"), (int) StateColor::Normal));
 
-    border_color = StateColor(
-        std::make_pair(TAB_BUTTON_SEL, (int) StateColor::Checked), // ORCA use same color for border to prevent 1px blank border
-        std::make_pair(BORDER_HOVER_COL, (int) StateColor::Hovered),
-        std::make_pair(wxColour("#FEFFFF"), (int)StateColor::Normal));
+    border_color = StateColor(std::make_pair(TAB_BUTTON_SEL,
+                                             (int) StateColor::Checked), // ORCA use same color for border to prevent 1px blank border
+                              std::make_pair(BORDER_HOVER_COL, (int) StateColor::Hovered),
+                              std::make_pair(wxColour("#FEFFFF"), (int) StateColor::Normal));
 }
 
-TabButton::TabButton(wxWindow *parent, wxString text, ScalableBitmap &bmp, long style, int iconSize)
-    : TabButton()
-{
-    Create(parent, text, bmp, style, iconSize);
-}
+TabButton::TabButton(wxWindow* parent, wxString text, ScalableBitmap& bmp, long style, int iconSize) : TabButton()
+{ Create(parent, text, bmp, style, iconSize); }
 
-bool TabButton::Create(wxWindow *parent, wxString text, ScalableBitmap &bmp, long style, int iconSize)
+bool TabButton::Create(wxWindow* parent, wxString text, ScalableBitmap& bmp, long style, int iconSize)
 {
     StaticBox::Create(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, style);
-    newtag_img = ScalableBitmap(this, "monitor_hms_new",7);
+    newtag_img = ScalableBitmap(this, "monitor_hms_new", 7);
     state_handler.attach({&text_color, &border_color});
     state_handler.update_binds();
-    //BBS set default font
+    // BBS set default font
     SetFont(Label::Body_14);
     wxWindow::SetLabel(text);
     this->icon = bmp;
@@ -54,60 +54,55 @@ bool TabButton::Create(wxWindow *parent, wxString text, ScalableBitmap &bmp, lon
     return true;
 }
 
-void TabButton::SetLabel(const wxString &label)
+void TabButton::SetLabel(const wxString& label)
 {
     wxWindow::SetLabel(label);
     messureSize();
     Refresh();
 }
 
-void TabButton::SetMinSize(const wxSize &size)
+void TabButton::SetMinSize(const wxSize& size)
 {
     minSize = size;
     messureSize();
 }
 
-void TabButton::SetPaddingSize(const wxSize &size)
+void TabButton::SetPaddingSize(const wxSize& size)
 {
     paddingSize = size;
     messureSize();
 }
 
-const wxSize& TabButton::GetPaddingSize() 
-{
-    return paddingSize;
-}
+const wxSize& TabButton::GetPaddingSize() { return paddingSize; }
 
-void TabButton::SetTextColor(StateColor const &color)
+void TabButton::SetTextColor(StateColor const& color)
 {
     text_color = color;
     state_handler.update_binds();
     Refresh();
 }
 
-void TabButton::SetBorderColor(StateColor const &color)
+void TabButton::SetBorderColor(StateColor const& color)
 {
     border_color = color;
     state_handler.update_binds();
     Refresh();
 }
 
-void TabButton::SetBGColor(StateColor const &color)
+void TabButton::SetBGColor(StateColor const& color)
 {
     background_color = color;
     state_handler.update_binds();
     Refresh();
 }
 
-void TabButton::SetBitmap(ScalableBitmap &bitmap)
-{
-    this->icon = bitmap;
-}
+void TabButton::SetBitmap(ScalableBitmap& bitmap) { this->icon = bitmap; }
 
 bool TabButton::Enable(bool enable)
 {
     bool result = wxWindow::Enable(enable);
     if (result) {
+        // [EVENT] Forward enabled-state changes so the parent rail can restyle or rebuild selection affordances.
         wxCommandEvent e(EVT_ENABLE_CHANGED);
         e.SetEventObject(this);
         GetEventHandler()->ProcessEvent(e);
@@ -115,12 +110,9 @@ bool TabButton::Enable(bool enable)
     return result;
 }
 
-void TabButton::Rescale()
-{
-    messureSize();
-}
+void TabButton::Rescale() { messureSize(); }
 
-void TabButton::paintEvent(wxPaintEvent &evt)
+void TabButton::paintEvent(wxPaintEvent& evt)
 {
     // depending on your system you may need to look at double-buffered dcs
     wxPaintDC dc(this);
@@ -132,8 +124,11 @@ void TabButton::paintEvent(wxPaintEvent &evt)
  * method so that it can work no matter what type of DC
  * (e.g. wxPaintDC or wxClientDC) is used.
  */
-void TabButton::render(wxDC &dc)
+void TabButton::render(wxDC& dc)
 {
+    // [INTENT] Render the button as a flat, center-balanced tab with custom border, text, and trailing icon.
+    // [STATE] Visual output depends on the current state handler plus the measured text/icon extents.
+    // [UNITY] Recreate this layout with a retained rect, explicit text/icon anchors, and a style swap on selection.
     StaticBox::render(dc);
     int    states = state_handler.states();
     wxSize size   = GetSize();
@@ -152,7 +147,8 @@ void TabButton::render(wxDC &dc)
         }
         szIcon = icon.GetBmpSize();
         szContent.x += szIcon.x;
-        if (szIcon.y > szContent.y) szContent.y = szIcon.y;
+        if (szIcon.y > szContent.y)
+            szContent.y = szIcon.y;
     }
     // move to center
     wxRect rcContent = {{0, 0}, size};
@@ -170,10 +166,10 @@ void TabButton::render(wxDC &dc)
         dc.DrawText(text, pt);
     }
 
-    wxBitmap showimg = icon.bmp();
-    int offset_left = 0;
+    wxBitmap showimg     = icon.bmp();
+    int      offset_left = 0;
     if (show_new_tag) {
-        showimg = newtag_img.bmp();
+        showimg     = newtag_img.bmp();
         offset_left = FromDIP(4);
     }
 
@@ -186,6 +182,7 @@ void TabButton::render(wxDC &dc)
 
 void TabButton::messureSize()
 {
+    // [STATE] Recompute intrinsic size from the current label/icon pair so the tab rail stays aligned on DPI or content changes.
     wxClientDC dc(this);
     textSize = dc.GetTextExtent(GetLabel());
     if (minSize.GetWidth() > 0) {
@@ -200,21 +197,24 @@ void TabButton::messureSize()
         }
         wxSize szIcon = this->icon.GetBmpSize();
         szContent.x += szIcon.x;
-        if (szIcon.y > szContent.y) szContent.y = szIcon.y;
+        if (szIcon.y > szContent.y)
+            szContent.y = szIcon.y;
     }
     wxWindow::SetMinSize(szContent + paddingSize);
 }
 
-void TabButton::mouseDown(wxMouseEvent &event)
+void TabButton::mouseDown(wxMouseEvent& event)
 {
+    // [EVENT] Capture the pointer while pressed so the release can be validated against the original tab bounds.
     event.Skip();
     pressedDown = true;
     SetFocus();
     CaptureMouse();
 }
 
-void TabButton::mouseReleased(wxMouseEvent &event)
+void TabButton::mouseReleased(wxMouseEvent& event)
 {
+    // [EVENT] Only fire the logical click if the pointer is released inside the button after a captured press.
     event.Skip();
     if (pressedDown) {
         pressedDown = false;
@@ -226,6 +226,7 @@ void TabButton::mouseReleased(wxMouseEvent &event)
 
 void TabButton::sendButtonEvent()
 {
+    // [EVENT] Translate the low-level mouse gesture into a normal button-click command for the owning tab container.
     wxCommandEvent event(wxEVT_COMMAND_BUTTON_CLICKED, GetId());
     event.SetEventObject(this);
     GetEventHandler()->ProcessEvent(event);
