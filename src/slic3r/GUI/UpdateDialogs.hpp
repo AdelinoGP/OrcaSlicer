@@ -26,14 +26,14 @@ public:
     MsgUpdateSlic3r& operator=(const MsgUpdateSlic3r&) = delete;
     virtual ~MsgUpdateSlic3r();
 
-    // Tells whether the user checked the "don't bother me again" checkbox
+    // [INTENT] Report whether the user opted out of future version checks from this modal.
     bool disable_version_check() const;
 
+    // [EVENT] Hyperlink click opens the release/update web target from inside the dialog.
     void on_hyperlink(wxHyperlinkEvent& evt);
 
 private:
-    // [STATE] Checkbox state
-    // [UNITY] UnityEngine.UI.Toggle
+    // [STATE] Dialog-owned opt-out checkbox state; Unity should bind this to a Toggle in the same modal view.
     wxCheckBox* cbox;
 };
 
@@ -45,6 +45,7 @@ public:
     // [INTENT] Structure representing a single configuration update.
     struct Update
     {
+        // [STATE] Snapshot of one updated bundle entry shown in the modal list.
         std::string vendor;
         Semver      version;
         std::string comment;
@@ -57,8 +58,9 @@ public:
         {}
     };
 
-    // force_before_wizard - indicates that check of updated is forced before ConfigWizard opening
+    // [STATE] Force-gate flag changes whether the dialog is a blocking pre-wizard step or a normal informational prompt.
     MsgUpdateConfig(const std::vector<Update>& updates, bool force_before_wizard = false);
+    // [EVENT] DPI changes may resize/reflow the modal list and its header/footer controls.
     void on_dpi_changed(const wxRect& suggested_rect);
     // MsgUpdateConfig(MsgUpdateConfig &&)      = delete;
     // MsgUpdateConfig(const MsgUpdateConfig &) = delete;
@@ -75,6 +77,7 @@ public:
     // [INTENT] Update description
     struct Update
     {
+        // [STATE] Same bundle snapshot shape as the regular update dialog, reused for compatibility gating.
         std::string vendor;
         Semver      version;
         std::string comment;
@@ -101,6 +104,8 @@ class MsgDataIncompatible : public MsgDialog
 {
 public:
     // [INTENT] Map of "vendor name" -> "version restrictions"
+    // [PORTING_HAZARD:P2] The map compresses multiple incompatibility causes into a single summary string; Unity should preserve per-vendor
+    // detail rows rather than flattening early.
     MsgDataIncompatible(const std::unordered_map<std::string, wxString>& incompats);
     MsgDataIncompatible(MsgDataIncompatible&&)                 = delete;
     MsgDataIncompatible(const MsgDataIncompatible&)            = delete;
@@ -113,6 +118,8 @@ public:
 class MsgNoUpdates : public MsgDialog
 {
 public:
+    // [INTENT] Lightweight informational modal for the no-update path.
+    // [UNITY] Reuse the same modal shell with a text-only content panel and standard dismiss button.
     MsgNoUpdates();
     MsgNoUpdates(MsgNoUpdates&&)                 = delete;
     MsgNoUpdates(const MsgNoUpdates&)            = delete;

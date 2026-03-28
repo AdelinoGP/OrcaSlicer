@@ -200,3 +200,7 @@
 - Started T621 (`src/slic3r/GUI/UpdateDialogs.cpp`) as the update/incompatibility dialog cluster.
 - The file mixes four distinct modal outcomes: update notice, configuration release notes, forced incompatibility gate, and a no-updates info dialog; the live code still carries legacy/commented UI paths and a stubbed opt-out.
 - Plan: keep the annotations centered on the startup-blocking compatibility path, the scrollable release-note flow, the event wiring for modal results, and the Unity split between a shared version-check service and lightweight dialog variants.
+
+- Started T622 (`src/slic3r/GUI/UpdateDialogs.hpp`) as the declaration boundary for the same update/incompatibility modal cluster.
+- The header now captures the shared modal shell, opt-out checkbox state, hyperlink event, forced pre-wizard gating, and the structured compatibility rows that should survive a Unity port.
+- Next step after commit: close T622 and move to T623 (`src/slic3r/GUI/UpgradePanel.cpp`).

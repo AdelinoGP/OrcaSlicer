@@ -2130,3 +2130,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P1=1, P2=3, P3=1
 - Git: Annotate update dialogs for Unity port
 - Next recommended Phase 1 task: T622 annotate: src/slic3r/GUI/UpdateDialogs.hpp
+
+## Phase 1 - Task T622 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/UpdateDialogs.hpp
+- Deliverables: src/slic3r/GUI/UpdateDialogs.hpp, .ralph/agent/handoff.md, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md
+- Substantive additions: 11 boundary comments covering update modal intent, opt-out state, hyperlink event flow, config-update force gating, compatibility hazards, and the shared no-update shell
+- Verification excerpt: `[UNITY] Reuse the same modal shell with a text-only content panel and standard dismiss button.`
+- Unity-impact summary:
+  - Keep the update/update-forced/update-incompatible dialogs on one reusable modal shell.
+  - Preserve the opt-out toggle and pre-wizard gating as explicit retained state.
+  - Treat compatibility summaries as structured rows, not a flattened string blob.
+- Hazards found: P2 x1
+- Git: Annotate UpdateDialogs.hpp update-flow boundary
+- Next recommended Phase 1 task: T623 annotate: src/slic3r/GUI/UpgradePanel.cpp

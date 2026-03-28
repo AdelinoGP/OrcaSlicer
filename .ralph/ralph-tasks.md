@@ -540,7 +540,7 @@ Last updated: 2026-03-28T05:47:59Z
 - [x] T619 annotate: src/slic3r/GUI/UnsavedChangesDialog.cpp
 - [x] T620 annotate: src/slic3r/GUI/UnsavedChangesDialog.hpp
 - [ ] T621 annotate: src/slic3r/GUI/UpdateDialogs.cpp
-- [ ] T622 annotate: src/slic3r/GUI/UpdateDialogs.hpp
+- [x] T622 annotate: src/slic3r/GUI/UpdateDialogs.hpp
 - [ ] T623 annotate: src/slic3r/GUI/UpgradePanel.cpp
 - [ ] T624 annotate: src/slic3r/GUI/UpgradePanel.hpp
 - [ ] T625 annotate: src/slic3r/GUI/UserManager.cpp
