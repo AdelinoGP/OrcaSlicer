@@ -520,7 +520,7 @@ Last updated: 2026-03-28T03:18:21Z
 - [x] T599 annotate: src/slic3r/GUI/SurfaceDrag.cpp
 - [x] T600 annotate: src/slic3r/GUI/SurfaceDrag.hpp
 - [x] T601 annotate: src/slic3r/GUI/SyncAmsInfoDialog.cpp
-- [ ] T602 annotate: src/slic3r/GUI/SyncAmsInfoDialog.hpp
+- [x] T602 annotate: src/slic3r/GUI/SyncAmsInfoDialog.hpp
 - [ ] T603 annotate: src/slic3r/GUI/SysInfoDialog.cpp
 - [ ] T604 annotate: src/slic3r/GUI/SysInfoDialog.hpp
 - [ ] T605 annotate: src/slic3r/GUI/Tabbook.cpp

@@ -119,3 +119,7 @@
 
 - T601 now has boundary comments for the modal controller, event wiring, async printer refresh, status gating, popup-backed rows, thumbnail compositing, and the transient sync-success toasts.
 - Next iteration should move to T602 (`src/slic3r/GUI/SyncAmsInfoDialog.hpp`) after commit.
+
+- Started T602 (`src/slic3r/GUI/SyncAmsInfoDialog.hpp`) and annotated the multi-state AMS sync modal boundary, dialog state, async refresh/thread seam, widget ownership, public event surface, and the two transparent overlay frames.
+- Unity mapping now calls for a modal controller with a retained model plus anchored overlay prefabs for the nozzle/AMS sync confirmation and completion frames.
+- Next step after commit: close T602 and move to T603 (`src/slic3r/GUI/SysInfoDialog.cpp`).

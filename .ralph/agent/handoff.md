@@ -258,6 +258,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - [x] T121-part2: annotate src/slic3r/GUI/Plater.cpp (2001-4000)
 - [x] T121-part3: annotate src/slic3r/GUI/Plater.cpp (4001-6000)
 - [x] T121-part4: src/slic3r/GUI/Plater.cpp (6001-8000)
+
+## Phase 1 - Task T602 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SyncAmsInfoDialog.hpp
+- Deliverables: src/slic3r/GUI/SyncAmsInfoDialog.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md
+- Substantive additions: 6 comment blocks covering modal intent, dialog state, widget ownership, event flow, payload state, and overlay-frame mapping
+- Verification excerpt: `[UNITY] Split into a modal controller backed by a retained data model, with separate popup/overlay prefabs for the sync confirm and completion banners.`
+- Unity-impact summary: modal controller + retained model split; anchored overlay prefabs for sync confirmation/completion; explicit async refresh/thread seam
+- Hazards found: P2 x1
+- Git: Annotate SyncAmsInfoDialog.hpp
+- Next recommended Phase 1 task: T603 annotate: src/slic3r/GUI/SysInfoDialog.cpp
 - [x] T121-part5: annotate src/slic3r/GUI/Plater.cpp (8000-10000)
 - [x] T121-part6: Plater.cpp part 6
 - [x] T121-part7: Plater.cpp (12000-14000)
