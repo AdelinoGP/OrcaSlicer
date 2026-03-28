@@ -518,7 +518,7 @@ Last updated: 2026-03-28T03:18:21Z
 - [x] T597 annotate: src/slic3r/GUI/StepMeshDialog.cpp
 - [x] T598 annotate: src/slic3r/GUI/StepMeshDialog.hpp
 - [x] T599 annotate: src/slic3r/GUI/SurfaceDrag.cpp
-- [ ] T600 annotate: src/slic3r/GUI/SurfaceDrag.hpp
+- [x] T600 annotate: src/slic3r/GUI/SurfaceDrag.hpp
 - [ ] T601 annotate: src/slic3r/GUI/SyncAmsInfoDialog.cpp
 - [ ] T602 annotate: src/slic3r/GUI/SyncAmsInfoDialog.hpp
 - [ ] T603 annotate: src/slic3r/GUI/SysInfoDialog.cpp

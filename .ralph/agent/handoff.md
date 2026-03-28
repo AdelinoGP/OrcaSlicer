@@ -149,6 +149,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate SurfaceDrag drag controller
 - Next recommended Phase 1 task: T600 annotate: src/slic3r/GUI/SurfaceDrag.hpp
 
+## Phase 1 - Task T600 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SurfaceDrag.hpp
+- Deliverables: src/slic3r/GUI/SurfaceDrag.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 4 boundary comments covering the transient drag session, mouse-event gate, geometry helper layer, and fixed-transform pipeline
+- Verification excerpt: `[UNITY] The closest match is a pointer-drag controller fed by IPointerDown/Drag/Up events plus a scene-query service that owns the cached hit-test filter and transform math.`
+- Unity-impact summary: transient drag-session model; pure geometry/service layer for transform math; explicit selection/hover precondition for gesture start
+- Hazards found: P2 x2 (raw-pointer/session lifetime, hover-gated drag start)
+- Git: SurfaceDrag header annotations
+- Next recommended Phase 1 task: T601 annotate: src/slic3r/GUI/SyncAmsInfoDialog.cpp
+
 ## Phase 1 - Task T593 complete
 
 - Task type: annotate

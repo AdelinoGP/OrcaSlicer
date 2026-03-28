@@ -108,3 +108,7 @@
 - The file is a transient controller that caches cursor offsets, raycast filters, fix transforms, and initial angle/distance, then converts pointer motion into a deterministic scene transform.
 - Unity mapping to preserve: a dedicated pointer-drag controller with explicit hit-test state, a model-layer transform helper, and a scene-query service for direct-hit plus nearest-point fallbacks.
 - Verification so far: `git diff --check` will be used as the whitespace/patch sanity check before commit; the local LSP diagnostics are still the known include-path noise from `libslic3r/Point.hpp`.
+
+- Started T600 (`src/slic3r/GUI/SurfaceDrag.hpp`) as the declaration boundary for the transient drag session and geometry helpers.
+- The header now needs to spell out the non-owning drag cache, the mouse-event gate, and the fix-up transform pipeline so Unity can mirror the controller/service split without hiding selection lifetime assumptions.
+- Verification target: keep the annotation compact but cover state ownership, event flow, and the transform helpers that bridge selection space to world/surface space.
