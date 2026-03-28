@@ -2202,3 +2202,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1
 - Git: pending commit `Annotate UserManager header for auth adapter`
 - Next recommended Phase 1 task: T627 annotate: src/slic3r/GUI/UserNotification.cpp
+
+## Phase 1 - Task T627 complete
+
+- Task type: skip-trivial
+- File: src/slic3r/GUI/UserNotification.cpp
+- Deliverables: .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 0; the file is a 5-line namespace-only stub with no GUI logic or state
+- Verification excerpt: `namespace Slic3r {` / `} // namespace Slic3r`
+- Unity-impact summary:
+  - No first-party behavior to port in this file.
+  - Keep the real migration notes on `src/slic3r/GUI/UserNotification.hpp`.
+- Hazards found: none
+- Git: Skip trivial UserNotification.cpp
+- Next recommended Phase 1 task: T628 annotate: src/slic3r/GUI/UserNotification.hpp

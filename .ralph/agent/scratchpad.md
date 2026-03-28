@@ -220,3 +220,5 @@
 - Started T626 (`src/slic3r/GUI/UserManager.hpp`) as the declaration boundary for the same auth adapter.
 - The header is intentionally small but still needs explicit comments for the non-owning `NetworkAgent*`, callback thread affinity, and the typed message bridge that Unity should use instead of view-layer JSON parsing.
 - Verification target: `git diff --check -- src/slic3r/GUI/UserManager.hpp` after annotation, then commit the atomic header change and close the task.
+
+- T627 turned out to be a namespace-only 5-line stub, so the correct classification is `skip-trivial`. The next real behavior boundary should be `UserNotification.hpp` rather than this .cpp file.
