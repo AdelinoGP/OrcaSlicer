@@ -312,3 +312,6 @@
 - Started T653 (`src/slic3r/GUI/Widgets/DialogButtons.cpp`) as the reusable dialog-footer button strip.
 - The file owns a role-aware Button collection, rebuilds layout on DPI changes, caches primary/alert styling, and wraps keyboard focus across the strip; the Unity mapping should be a retained footer prefab with role-tagged children and an explicit relayout pass.
 - Plan: keep the comments centered on ownership/lifetime, update flow, event wiring, focus traversal, and the UI-thread DPI hazard, then verify with `git diff --check` and close the task atomically.
+- Completed T654 (`src/slic3r/GUI/Widgets/DialogButtons.hpp`) with declaration-boundary annotations for the semantic footer strip, role lookup tables, cached primary/alert styling, DPI relayout, and keyboard navigation.
+- The header now calls out the string-based label mapping hazard, the retained footer state, and the Unity split to a role-tagged footer prefab with an explicit relayout pass.
+- Verification: `git diff --check -- src/slic3r/GUI/Widgets/DialogButtons.hpp` is clean; next step after commit is T655 (`src/slic3r/GUI/Widgets/DropDown.cpp`).

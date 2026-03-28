@@ -2,6 +2,22 @@
 
 ## Patterns
 
+### mem-1774740000-t654
+> DialogButtons.hpp is the declaration boundary for a reusable dialog-footer strip: it exposes role-tagged footer prefab wiring, keeps label-to-ID aliasing explicit to avoid collisions, and requires an explicit relayout pass when DPI changes.
+<!-- tags: gui, unity, widgets, annotation | created: 2026-03-28 -->
+
+### mem-1774738950-6ee4
+> DialogButtons.cpp is a reusable dialog-footer strip: it caches role semantics (primary/alert), rebuilds layout on DPI changes, and uses wraparound keyboard focus; Unity should model it as a retained footer prefab with role-tagged button children and an explicit relayout pass.
+<!-- tags: gui, unity, widgets | created: 2026-03-28 -->
+
+### mem-1774738515-498e
+> ComboBox.hpp is a composite editable/dropdown widget: it wraps TextInput + DropDown, mirrors wxItemContainer item mutations, and needs a Unity split into an editable field plus anchored popup ListView with a separate replace-text/image display mode.
+<!-- tags: gui, unity, widgets | created: 2026-03-28 -->
+
+### mem-1774738169-3d0e
+> AxisCtrlButton.hpp is the declaration boundary for the radial jog control: it caches ring geometry, state-color palettes, and the current sector, so Unity should use a retained radial controller with shared hit-test geometry and a typed click payload.
+<!-- tags: gui, unity, widgets, annotation | created: 2026-03-28 -->
+
 ### mem-1774736779-8d1d
 > AnimaController.cpp is a tiny wxTimer-driven animated icon widget: it caches scaled frames, rebroadcasts bitmap clicks to the parent panel, and uses a separate enabled-state bitmap; Unity should model this as a compact sprite swap controller with main-thread frame ticks.
 <!-- tags: gui, unity, widgets, animation | created: 2026-03-28 -->

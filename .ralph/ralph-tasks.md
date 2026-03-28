@@ -572,7 +572,7 @@ Last updated: 2026-03-28T23:00:23Z
 - [x] T651 annotate: src/slic3r/GUI/Widgets/ComboBox.cpp
 - [x] T652 annotate: src/slic3r/GUI/Widgets/ComboBox.hpp
 - [x] T653 annotate: src/slic3r/GUI/Widgets/DialogButtons.cpp
-- [ ] T654 annotate: src/slic3r/GUI/Widgets/DialogButtons.hpp
+- [x] T654 annotate: src/slic3r/GUI/Widgets/DialogButtons.hpp
 - [ ] T655 annotate: src/slic3r/GUI/Widgets/DropDown.cpp
 - [ ] T656 annotate: src/slic3r/GUI/Widgets/DropDown.hpp
 - [ ] T657 annotate: src/slic3r/GUI/Widgets/ErrorMsgStaticText.cpp

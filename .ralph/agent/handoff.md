@@ -2506,3 +2506,14 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1
 - Git: Annotate AxisCtrlButton header boundary
 - Next recommended Phase 1 task: T652 annotate: src/slic3r/GUI/Widgets/ComboBox.hpp
+## Phase 1 - Task T654 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/DialogButtons.hpp
+- Deliverables: src/slic3r/GUI/Widgets/DialogButtons.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 5 boundary comments covering footer intent, lookup helpers, cached role styling, DPI relayout, and keyboard navigation
+- Verification excerpt: `[PORTING_HAZARD:P2] Label-to-standard-ID lookup is string-based and includes alias collisions, so Unity should prefer an explicit button-role enum over raw localized text.`
+- Unity-impact summary: footer becomes a retained prefab; role styling stays data-driven; layout refresh and focus wrap need explicit controller logic in Unity
+- Hazards found: P2 x1, P3 x1
+- Git: Annotate DialogButtons footer boundary
+- Next recommended Phase 1 task: T655 annotate: src/slic3r/GUI/Widgets/DropDown.cpp
