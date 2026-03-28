@@ -1740,3 +1740,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P1 x1, P2 x4, P3 x3
 - Git: Annotate SelectMachinePop popup controller
 - Next recommended Phase 1 task: T580 annotate: src/slic3r/GUI/SelectMachinePop.hpp
+
+## Phase 1 - Task T592 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SliceInfoPanel.hpp
+- Deliverables: src/slic3r/GUI/SliceInfoPanel.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 11 boundary comments covering popup intent/state, async web-request threading, hover-driven transient overlays, and Unity migration guidance
+- Verification excerpt: `[THREAD] \`wxWebRequest\` callbacks may arrive asynchronously, so image updates must be treated as UI-thread completion events.`
+- Unity-impact summary: retained summary card plus separate popover controller; async thumbnail loading stays outside the view tree; widget ownership boundaries are now explicit
+- Hazards found: P2 x1 (stale async thumbnail responses can race popup state)
+- Git: Annotate SliceInfoPanel header boundary
+- Next recommended Phase 1 task: T593 annotate: src/slic3r/GUI/SlicingProgressNotification.cpp

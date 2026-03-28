@@ -74,3 +74,7 @@
 - Completed T591 (`src/slic3r/GUI/SliceInfoPanel.cpp`) with annotations around popup intent, filament color decoding, async thumbnail refresh/cancel behavior, and DPI rescaling.
 - The panel is a compact summary card plus detail popup rather than a single tooltip, and the Unity port should keep the thumbnail fetch/cancel path isolated from the view so stale image responses cannot win.
 - Next step after commit: close T591 and move to T592 (`src/slic3r/GUI/SliceInfoPanel.hpp`).
+
+- Started T592 (`src/slic3r/GUI/SliceInfoPanel.hpp`) as the declaration boundary for the slice summary card and popup pair.
+- The header now captures popup ownership, async web-request completion, transient hover state, and the Unity split between a summary card and a separate popover controller.
+- Next step after commit: close T592 and move to T593 (`src/slic3r/GUI/SlicingProgressNotification.cpp`).
