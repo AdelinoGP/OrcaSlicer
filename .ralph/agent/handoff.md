@@ -2340,5 +2340,5 @@ This prompt governs **Phase 1 only**.
   - Login polling and JS response delivery need main-thread services instead of implicit timer/event reentry.
   - Page-to-native commands must be validated before they can reach app services.
 - Hazards found: P1 x1, P2 x1
-- Git: pending commit for WebViewDialog annotations
+- Git: 98b791e02e (Annotate WebViewDialog browser bridge)
 - Next recommended Phase 1 task: T638 annotate: src/slic3r/GUI/WebViewDialog.hpp
