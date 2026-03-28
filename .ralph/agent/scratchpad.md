@@ -192,3 +192,7 @@
 - Completed T618 (`src/slic3r/GUI/TickCode.hpp`) with boundary comments for the tick marker value object, the ordered marker set, the non-owning extruder-color palette pointer, and the model/service split for Unity.
 - `git diff --check -- src/slic3r/GUI/TickCode.hpp` passed; local diagnostics are the expected missing include-path noise from `libslic3r/CustomGCode.hpp`, not from the annotation edits.
 - Next active task should be T619 (`src/slic3r/GUI/UnsavedChangesDialog.cpp`).
+
+- Completed T620 (`src/slic3r/GUI/UnsavedChangesDialog.hpp`) with declaration-boundary annotations for the diff-tree model, the modal unsaved-changes workflow, the full-compare popup, and the paired preset-comparison dialog.
+- The header now calls out the retained-tree Unity split, the action-state ownership, and the main wxWidgets porting hazards around data-view semantics and preset-bundle snapshots.
+- Next step after commit: close T620 and move to T621 (`src/slic3r/GUI/UpdateDialogs.cpp`).

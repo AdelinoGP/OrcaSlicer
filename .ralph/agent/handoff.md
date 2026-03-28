@@ -142,6 +142,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate UnsavedChangesDialog workflow
 - Next recommended Phase 1 task: T620 annotate: src/slic3r/GUI/UnsavedChangesDialog.hpp
 
+## Phase 1 - Task T620 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/UnsavedChangesDialog.hpp
+- Deliverables: src/slic3r/GUI/UnsavedChangesDialog.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 5 boundary comment blocks covering the shared diff-tree boundary, DiffModel, DiffViewCtrl, the modal unsaved-changes workflow, the full-compare popup, and the paired preset-comparison dialog
+- Verification excerpt: `[UNITY] Port this as a modal controller with a retained diff-tree view-model, a separate compare-presets workspace, and command buttons bound to explicit transfer/save/discard actions.`
+- Unity-impact summary: retained diff-tree model; modal decision flow stays separate from preset save/transfer side effects; compare presets remains a paired data-bound workspace
+- Hazards found: P2 x3, UNCLEAR x1
+- Git: Annotate UnsavedChangesDialog.hpp boundary
+- Next recommended Phase 1 task: T621 annotate: src/slic3r/GUI/UpdateDialogs.cpp
+
 ## Phase 1 - Task T597 complete
 
 - Task type: annotate
