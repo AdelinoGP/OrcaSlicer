@@ -1498,3 +1498,26 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 P2
 - Git: Annotate search popup boundary in Search.hpp
 - Next recommended Phase 1 task: T575 annotate: src/slic3r/GUI/Selection.cpp
+
+## Phase 1 - Task T575 complete
+
+- Task type: annotate
+
+- File: src/slic3r/GUI/Selection.cpp
+
+- Deliverables: src/slic3r/GUI/Selection.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+
+- Substantive additions: 14 boundary comments covering lifecycle, selection mutation, undo/snapshot flow, clipboard copy/paste, cached transform math, GL overlay rendering, sibling synchronization, and bed-clamping hazards
+
+- Verification excerpt: `[PORTING_HAZARD:P2] This file mixes undo snapshots, model mutation, object-list refreshes, and GL preview rendering.`
+
+- Unity-impact summary:
+  - Model selection as a transaction-backed edit service, not a rendered-node owner
+  - Split overlay rendering from selection state and command dispatch
+  - Preserve sibling fan-out and plate-aware paste heuristics explicitly
+
+- Hazards found: P2 x4, P3 x3, UNCLEAR x1
+
+- Git: Annotate Selection selection and render flow
+
+- Next recommended Phase 1 task: T576 annotate: src/slic3r/GUI/Selection.hpp
