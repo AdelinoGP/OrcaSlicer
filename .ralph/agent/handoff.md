@@ -2243,3 +2243,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P1 x1, P2 x2, UNCLEAR x1
 - Git: Annotate WebDownPluginDlg plugin web host
 - Next recommended Phase 1 task: T630 annotate: src/slic3r/GUI/WebDownPluginDlg.hpp
+
+## Phase 1 - Task T630 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/WebDownPluginDlg.hpp
+- Deliverables: src/slic3r/GUI/WebDownPluginDlg.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md, .ralph/ralph-tasks.md
+- Substantive additions: 7 boundary comments covering dialog intent, browser ownership, page-load flow, browser/script event routing, install/download bridge, and progress state
+- Verification excerpt: `[PORTING_HAZARD:P1] The web page can trigger install/restart/file-open behavior, so the message surface is privileged rather than informational.`
+- Unity-impact summary: retained WebView host panel; typed command router instead of raw JS dispatch; progress updates should stay on a main-thread service boundary
+- Hazards found: P1 x1, P2 x1
+- Git: Annotate WebDownPluginDlg.hpp boundary
+- Next recommended Phase 1 task: T631 annotate: src/slic3r/GUI/WebGuideDialog.cpp

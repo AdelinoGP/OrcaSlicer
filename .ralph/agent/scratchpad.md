@@ -232,3 +232,8 @@
 - The file mixes wxWebView lifecycle, JS command dispatch, app-level download/install callbacks, and fullscreen/new-window handling, so the Unity mapping should call out a retained web-content host plus a main-thread command bridge.
 - I will annotate the dialog boundary, webview event flow, script-message contract, and plugin progress callback path, then record completion evidence and commit this atomic file only.
 - The page is not just informational: JS commands can cancel, restart, install, and open folders, so the Unity port needs a typed command schema with validation before it reaches app services.
+
+- Recovery note: T629 is already marked done in `.ralph/ralph-tasks.md`, so the active file task for this iteration is T630 (`src/slic3r/GUI/WebDownPluginDlg.hpp`).
+- The header is the declaration boundary for the same plugin-download dialog: it should capture ownership/lifetime of the browser widget, the exposed web callbacks, the install/download/status bridge, and the Unity split between a retained web-content host and a typed command router.
+- Plan: add compact [INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD] comments around class purpose, browser ownership, event handlers, script bridge, and progress callback state, then verify with `git diff --check` and close the task.
+- T630 annotation is complete in the working tree; next step is to commit the atomic header change and move to T631 (`src/slic3r/GUI/WebGuideDialog.cpp`).
