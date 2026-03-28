@@ -1,7 +1,6 @@
 #ifndef slic3r_WebViewDialog_hpp_
 #define slic3r_WebViewDialog_hpp_
 
-
 #include "wx/artprov.h"
 #include "wx/cmdline.h"
 #include "wx/notifmsg.h"
@@ -25,22 +24,29 @@
 #include "wx/textctrl.h"
 #include <wx/timer.h>
 
-
 namespace Slic3r {
 
 class NetworkAgent;
 
 namespace GUI {
 
-
+// [INTENT] WebViewPanel is the retained browser-host shell for embedded web flows, debug tooling, and login/status bridging.
+// [STATE] It owns the browser widget, toolbar/menu affordances, info bar, login timer, and the last/response JS snippets that survive
+// across page interactions. [EVENT] The declaration surface exposes navigation, webview, menu, timer, and close handlers that all route
+// back to one UI-thread controller. [THREAD] The timer and queued response path are the only explicit cross-boundary hooks; Unity should
+// keep them behind a main-thread web host service. [UNITY] Map this to a persistent browser-host MonoBehaviour plus a typed JS-command
+// router and a separate debug/tool menu panel. [PORTING_HAZARD:P2] The page can directly drive app/login/network behavior, so the view host
+// and command execution path must be separated in Unity.
 class WebViewPanel : public wxPanel
 {
 public:
-    WebViewPanel(wxWindow *parent);
+    WebViewPanel(wxWindow* parent);
     virtual ~WebViewPanel();
 
+    // [INTENT] Entry point for controller-driven navigation into the embedded page.
     void load_url(wxString& url);
 
+    // [STATE] These handlers keep browser chrome, command state, and selection/edit affordances synchronized with the current page.
     void UpdateState();
     void OnIdle(wxIdleEvent& evt);
     void OnUrl(wxCommandEvent& evt);
@@ -51,7 +57,7 @@ public:
     void OnNavigationRequest(wxWebViewEvent& evt);
     void OnNavigationComplete(wxWebViewEvent& evt);
     void OnDocumentLoaded(wxWebViewEvent& evt);
-    void OnTitleChanged(wxWebViewEvent &evt);
+    void OnTitleChanged(wxWebViewEvent& evt);
     void OnNewWindow(wxWebViewEvent& evt);
     void OnScriptMessage(wxWebViewEvent& evt);
     void OnScriptResponseMessage(wxCommandEvent& evt);
@@ -89,33 +95,37 @@ public:
     void OnEnableDevTools(wxCommandEvent& evt);
     void OnClose(wxCloseEvent& evt);
 
-    wxTimer * m_LoginUpdateTimer{nullptr};
-    void OnFreshLoginStatus(wxTimerEvent &event);
+    // [THREAD] Timer ownership is explicit so login refresh stops with the panel and does not outlive the browser host.
+    wxTimer* m_LoginUpdateTimer{nullptr};
+    void     OnFreshLoginStatus(wxTimerEvent& event);
 
 public:
+    // [UNITY] These are host-to-page data pushes; Unity should feed them through a view-model or message bus rather than raw JS strings.
     void SendRecentList(int images);
     void SetLoginPanelVisibility(bool bshow);
     void SendDesignStaffpick(bool on);
-    void OpenModelDetail(std::string id, NetworkAgent *agent);
+    void OpenModelDetail(std::string id, NetworkAgent* agent);
     void SendLoginInfo();
     void ShowNetpluginTip();
 
+    // [INTENT] Helper methods wrap backend-specific URL and content fetch behavior used by the embedded experience.
     void get_design_staffpick(int offset, int limit, std::function<void(std::string)> callback);
-    int  get_model_mall_detail_url(std::string *url, std::string id);
+    int  get_model_mall_detail_url(std::string* url, std::string id);
 
     void update_mode();
+
 private:
+    // [STATE] Browser and chrome widgets are owned by the panel and are rebuilt only with the host.
+    wxWebView*  m_browser;
+    wxBoxSizer* bSizer_toolbar;
+    wxButton*   m_button_back;
+    wxButton*   m_button_forward;
+    wxButton*   m_button_stop;
+    wxButton*   m_button_reload;
+    wxTextCtrl* m_url;
+    wxButton*   m_button_tools;
 
-    wxWebView* m_browser;
-    wxBoxSizer *bSizer_toolbar;
-    wxButton *  m_button_back;
-    wxButton *  m_button_forward;
-    wxButton *  m_button_stop;
-    wxButton *  m_button_reload;
-    wxTextCtrl *m_url;
-    wxButton *  m_button_tools;
-
-    wxMenu* m_tools_menu;
+    wxMenu*     m_tools_menu;
     wxMenuItem* m_tools_handle_navigation;
     wxMenuItem* m_tools_handle_new_window;
     wxMenuItem* m_edit_cut;
@@ -145,9 +155,11 @@ private:
     wxMenuItem* m_context_menu;
     wxMenuItem* m_dev_tools;
 
-    wxInfoBar *m_info;
+    // [STATE] The info bar is used for page-load errors and debug messages, not as a primary app dialog.
+    wxInfoBar*    m_info;
     wxStaticText* m_info_text;
 
+    // [STATE] Zoom and script caches persist across navigation so the tools menu can replay the last snippet.
     long m_zoomFactor;
 
     // Last executed JavaScript snippet, for convenience.
@@ -157,13 +169,15 @@ private:
     DECLARE_EVENT_TABLE()
 };
 
+// [INTENT] SourceViewDialog is the transient read-only inspector for the browser tools menu.
+// [UNITY] Use a modal/popup read-only text panel instead of spawning another browser instance.
 class SourceViewDialog : public wxDialog
 {
 public:
     SourceViewDialog(wxWindow* parent, wxString source);
 };
 
-} // GUI
-} // Slic3r
+} // namespace GUI
+} // namespace Slic3r
 
 #endif /* slic3r_Tab_hpp_ */

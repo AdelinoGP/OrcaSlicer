@@ -556,7 +556,7 @@ Last updated: 2026-03-28T07:30:32Z
 - [x] T635 annotate: src/slic3r/GUI/WebUserLoginDialog.cpp
 - [x] T636 annotate: src/slic3r/GUI/WebUserLoginDialog.hpp
 - [x] T637 annotate: src/slic3r/GUI/WebViewDialog.cpp
-- [ ] T638 annotate: src/slic3r/GUI/WebViewDialog.hpp
+- [x] T638 annotate: src/slic3r/GUI/WebViewDialog.hpp
 - [ ] T639 annotate: src/slic3r/GUI/Widgets/AMSControl.cpp
 - [ ] T640 annotate: src/slic3r/GUI/Widgets/AMSControl.hpp
 - [ ] T641 annotate: src/slic3r/GUI/Widgets/AMSItem.cpp

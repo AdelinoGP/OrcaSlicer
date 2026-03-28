@@ -260,3 +260,7 @@
 - Started T637 (`src/slic3r/GUI/WebViewDialog.cpp`) as the retained browser-host and JS bridge implementation.
 - The file mixes navigation gating, login polling, main-thread response reentry, developer tools, and page-to-native command handling, so the annotations emphasize the host/controller split, timer ownership, and the hardening required for Unity.
 - Plan: keep the comments concentrated on the browser host boundary, script-message bridge, login refresh seam, navigation/error flow, and the source-view modal, then verify and close the task.
+
+- Completed T638 (`src/slic3r/GUI/WebViewDialog.hpp`) as the declaration boundary for the retained browser host.
+- The header now records the browser/menu/timer ownership, the navigation and JS bridge handlers, the cached script state, and the Unity split between a persistent web host shell and a typed command router.
+- Next step after commit: close T638 in the runtime registry, then move to T639 (`src/slic3r/GUI/Widgets/AMSControl.cpp`).

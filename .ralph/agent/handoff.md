@@ -2342,3 +2342,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P1 x1, P2 x1
 - Git: 98b791e02e (Annotate WebViewDialog browser bridge)
 - Next recommended Phase 1 task: T638 annotate: src/slic3r/GUI/WebViewDialog.hpp
+
+## Phase 1 - Task T638 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/WebViewDialog.hpp
+- Deliverables: src/slic3r/GUI/WebViewDialog.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 6 boundary comment groups covering the retained browser-host shell, navigation entry point, JS/status push helpers, ownership/state grouping, and source-view modal
+- Verification excerpt: `[PORTING_HAZARD:P2] The page can directly drive app/login/network behavior, so the view host and command execution path must be separated in Unity.`
+- Unity-impact summary:
+  - Persist the browser host as a controller-managed webview shell with explicit command routing.
+  - Keep timer-driven login refresh and JS response replay on the main-thread boundary.
+  - Replace ad hoc raw JS pushes with typed page/model messages where possible.
+- Hazards found: P2 x1
+- Git: Annotate WebViewDialog header boundary
+- Next recommended Phase 1 task: T639 annotate: src/slic3r/GUI/Widgets/AMSControl.cpp
