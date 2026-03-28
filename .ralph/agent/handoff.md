@@ -2003,3 +2003,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1 (implicit click model and custom paint/event bridge)
 - Git: Annotate TabButton header boundary
 - Next recommended Phase 1 task: T609 annotate: src/slic3r/GUI/Tab.cpp
+
+## Phase 1 - Task T612 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/TaskManager.hpp
+- Deliverables: src/slic3r/GUI/TaskManager.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 9 boundary comments covering the file-level scheduler boundary, per-task state capsule, metadata payload, scheduler policy, batch grouping, queue/service split, worker-thread lifecycle, cached queue state, and the limit event
+- Verification excerpt: `[UNITY] Model this as an async job-queue service plus a main-thread event channel, not a widget-owned controller.`
+- Unity-impact summary: service-backed queue with explicit concurrency policy; job state becomes a DTO/view-model; UI reacts via events instead of owning worker threads
+- Hazards found: P2 x1, UNCLEAR x1
+- Git: Annotate TaskManager scheduler boundary
+- Next recommended Phase 1 task: T613 annotate: src/slic3r/GUI/TextLines.cpp

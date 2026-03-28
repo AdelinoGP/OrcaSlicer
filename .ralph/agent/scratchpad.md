@@ -156,3 +156,7 @@
 - Handled the pending phase1.task.done event for T610 by treating `src/slic3r/GUI/Tab.hpp` as completed in the runtime narrative; the next active file task is T611 (`src/slic3r/GUI/TaskManager.cpp`).
 - T611 is the throttled multi-printer send scheduler: task ingestion snapshots settings into a shared cache, a background loop gates dispatch by concurrency/interval, and worker threads bridge progress callbacks back to the UI.
 - The verification target for T611 is `git diff --check` plus a focused review of the inserted boundary annotations; the main Unity mapping is an async queue/service with main-thread marshaling instead of raw boost thread ownership.
+
+- Completed T612 (`src/slic3r/GUI/TaskManager.hpp`) with declaration-boundary annotations for the scheduler, per-task state capsule, batch policy, worker lifecycle, and the multi-send-limit event.
+- Verification: `git diff --check -- src/slic3r/GUI/TaskManager.hpp` passed; the only diagnostics are inherited include-path/type-resolution noise from the local LSP environment.
+- Next step after commit: close T612 and move to T613 (`src/slic3r/GUI/TextLines.cpp`).
