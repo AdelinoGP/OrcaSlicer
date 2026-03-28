@@ -30,8 +30,9 @@ static const char* URL_DEV       = "%1%";
 static const std::string CONFIG_UPDATE_WIKI_URL("");
 
 // [INTENT] Dialog to inform user about new Slic3r updates and provide download/changelog links.
-// [UNITY] Use a standard Dialog or Panel with Unity UI Toolkit (VisualElement).
-// [PORTING_HAZARD:P2] Dialog handles versioning logic. Requires porting version check service logic to C#.
+// [STATE] Legacy version/current-release state is present here, but the live code path is reduced to a finalized shell because the
+// hyperlink and opt-out UI are commented out. [UNITY] Use a standard Dialog or Panel with Unity UI Toolkit (VisualElement). [PORTING_HAZARD:P2]
+// Dialog handles versioning logic. Requires porting version check service logic to C#.
 
 // MsgUpdateSlic3r
 MsgUpdateSlic3r::MsgUpdateSlic3r(const Semver& ver_current, const Semver& ver_online)
@@ -84,12 +85,18 @@ void MsgUpdateSlic3r::on_hyperlink(wxHyperlinkEvent& evt) { wxGetApp().open_brow
 
 bool MsgUpdateSlic3r::disable_version_check() const
 {
+    // [UNCLEAR] The checkbox-backed opt-out flow is commented out, so this stub always suppresses further checks.
+    // [PORTING_HAZARD:P2] Unity needs a real persisted preference instead of a hardcoded return value.
     // TODO: for new dialog with updaterpre
     // return cbox->GetValue();
     return true;
 }
 
 // [INTENT] Dialog to inform user about configuration updates.
+// [STATE] Owns a scrollable release-note pane, per-update rows, and modal result buttons.
+// [EVENT] OK and Cancel close the dialog immediately with explicit modal results.
+// [UNITY] Implement as a modal panel with a ScrollRect-style details area plus primary/secondary buttons.
+// [PORTING_HAZARD:P3] wxScrolledWindow sizing and Fit() behavior need a dedicated Unity layout pass.
 // [UNITY] Use a Dialog with a ScrolledWindow equivalent in Unity UI Toolkit.
 // [PORTING_HAZARD:P2] Requires porting the configuration update logic and release note display.
 // MsgUpdateConfig
@@ -213,8 +220,11 @@ void MsgUpdateConfig::on_dpi_changed(const wxRect& suggested_rect) {}
 MsgUpdateConfig::~MsgUpdateConfig() {}
 
 // [INTENT] Informs user about incompatible configuration.
+// [STATE] This is the startup gate that builds vendor/version rows and the optional changelog buffer before any dismissal.
+// [EVENT] Exit and OK are bound to return modal IDs directly.
+// [UNITY] Modal error dialog with a scrollable details panel and explicit result buttons.
 // [UNITY] Use a standard Dialog with a critical error icon and message.
-// [PORTING_HAZARD:P1] Requires porting incompatibility detection logic.
+// [PORTING_HAZARD:P1] This gate runs before the app can continue, so Unity must preserve the startup-blocking compatibility check.
 // MsgUpdateForced
 MsgUpdateForced::MsgUpdateForced(const std::vector<Update>& updates)
     : MsgDialog(nullptr,
@@ -292,6 +302,9 @@ MsgDataIncompatible::MsgDataIncompatible(const std::unordered_map<std::string, w
                 _(L("the configuration package is incompatible with the current application.")),
                 wxICON_ERROR)
 {
+    // [INTENT] Stubbed incompatible-bundle dialog; the intended row population and reconfigure action are commented out.
+    // [UNCLEAR] The legacy UX appears to have been abandoned here, so the live behavior is only a finalized shell.
+    // [UNITY] Replace with a modal incompatibility prompt plus a reconfiguration entry point if this flow is restored.
     // TODO
     // auto *text = new wxStaticText(this, wxID_ANY, wxString::Format(_(L(
     //	"This version of %s is not compatible with currently installed configuration bundles.\n"
@@ -373,6 +386,8 @@ MsgDataIncompatible::~MsgDataIncompatible() {}
 // MsgNoUpdate
 
 // [INTENT] Informs user that no updates are available.
+// [STATE] No additional payload is shown; this is a simple acknowledgment dialog with one message string.
+// [UNITY] Small info popup or dialog with a single dismiss action.
 // [UNITY] Use a simple Dialog or Info popup.
 MsgNoUpdates::MsgNoUpdates() : MsgDialog(nullptr, _(L("Configuration updates")), _(L("No updates available.")), wxICON_ERROR | wxOK)
 {

@@ -2118,3 +2118,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1, P3 x1
 - Git: pending commit
 - Next recommended Phase 1 task: T618 annotate: src/slic3r/GUI/TickCode.hpp
+
+## Phase 1 - Task T621 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/UpdateDialogs.cpp
+- Deliverables: src/slic3r/GUI/UpdateDialogs.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md, .ralph/ralph-tasks.md
+- Substantive additions: 7 boundary comments covering update notice state, opt-out uncertainty, config-update layout/events, startup incompatibility gating, and no-update fallback UX
+- Verification excerpt: `[PORTING_HAZARD:P1] This gate runs before the app can continue, so Unity must preserve the startup-blocking compatibility check.`
+- Unity-impact summary: shared version-check service; modal config-update panel with scrollable details; separate startup-blocking incompatibility dialog
+- Hazards found: P1=1, P2=3, P3=1
+- Git: Annotate update dialogs for Unity port
+- Next recommended Phase 1 task: T622 annotate: src/slic3r/GUI/UpdateDialogs.hpp

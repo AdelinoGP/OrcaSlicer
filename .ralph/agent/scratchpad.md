@@ -196,3 +196,7 @@
 - Completed T620 (`src/slic3r/GUI/UnsavedChangesDialog.hpp`) with declaration-boundary annotations for the diff-tree model, the modal unsaved-changes workflow, the full-compare popup, and the paired preset-comparison dialog.
 - The header now calls out the retained-tree Unity split, the action-state ownership, and the main wxWidgets porting hazards around data-view semantics and preset-bundle snapshots.
 - Next step after commit: close T620 and move to T621 (`src/slic3r/GUI/UpdateDialogs.cpp`).
+
+- Started T621 (`src/slic3r/GUI/UpdateDialogs.cpp`) as the update/incompatibility dialog cluster.
+- The file mixes four distinct modal outcomes: update notice, configuration release notes, forced incompatibility gate, and a no-updates info dialog; the live code still carries legacy/commented UI paths and a stubbed opt-out.
+- Plan: keep the annotations centered on the startup-blocking compatibility path, the scrollable release-note flow, the event wiring for modal results, and the Unity split between a shared version-check service and lightweight dialog variants.
