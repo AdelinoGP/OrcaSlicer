@@ -118,6 +118,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate Tab preset controller boundary
 - Next recommended Phase 1 task: T611 annotate: src/slic3r/GUI/TaskManager.cpp
 
+## Phase 1 - Task T618 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/TickCode.hpp
+- Deliverables: src/slic3r/GUI/TickCode.hpp, .ralph/agent/scratchpad.md
+- Substantive additions: 4 boundary comments covering the tick marker value object, ordered set semantics, non-owning palette state, and the Unity model/service split
+- Verification excerpt: `[PORTING_HAZARD:P2] The class mixes marker-model mutations with palette resolution and UI suppression rules, so a Unity port should split editing from color lookup.`
+- Unity-impact summary: marker data stays serializable and model-driven; color lookup becomes a separate service; the palette pointer should not be preserved as a raw ownership contract
+- Hazards found: P2 x1, P3 x1
+- Git: Annotate TickCode.hpp boundary
+- Next recommended Phase 1 task: T619 annotate: src/slic3r/GUI/UnsavedChangesDialog.cpp
+
 ## Phase 1 - Task T597 complete
 
 - Task type: annotate

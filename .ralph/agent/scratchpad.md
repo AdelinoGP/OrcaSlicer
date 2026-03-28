@@ -183,3 +183,7 @@
 - Completed T617 (`src/slic3r/GUI/TickCode.cpp`) with boundary comments for color resolution, tick mutation, deletion, and membership queries.
 - Verified the annotation patch with `git diff --check`; the compiler diagnostics are include-path noise from `TickCode.hpp`, not a syntax regression in the inserted comments.
 - Next active task should be T618 (`src/slic3r/GUI/TickCode.hpp`).
+
+- Completed T618 (`src/slic3r/GUI/TickCode.hpp`) with boundary comments for the tick marker value object, the ordered marker set, the non-owning extruder-color palette pointer, and the model/service split for Unity.
+- `git diff --check -- src/slic3r/GUI/TickCode.hpp` passed; local diagnostics are the expected missing include-path noise from `libslic3r/CustomGCode.hpp`, not from the annotation edits.
+- Next active task should be T619 (`src/slic3r/GUI/UnsavedChangesDialog.cpp`).

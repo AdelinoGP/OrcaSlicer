@@ -2,6 +2,14 @@
 
 ## Patterns
 
+### mem-1774676030-0e9a
+> TickCode.hpp is the declaration boundary for tick marker editing: it owns a sorted std::set of markers, keeps a non-owning extruder-color palette pointer, and should split marker edits from color resolution in Unity.
+<!-- tags: gui, unity, annotation | created: 2026-03-28 -->
+
+### mem-1774675777-6edd
+> TickCodeInfo derives marker colors from a sorted tick set and neighboring ColorChange entries; Unity should keep this as a retained marker model plus a pure color-resolution service.
+<!-- tags: gui, unity, color | created: 2026-03-28 -->
+
 ### mem-1774675403-0a0a
 > ThermalPreconditioningDialog.hpp is the declaration boundary for the thermal countdown modal: it owns the UI-thread wxTimer, device-id lookup, and dismiss/update controls, so Unity should use a modal overlay controller with a scheduled tick and explicit lifetime ownership.
 <!-- tags: gui, unity, dialog, threading | created: 2026-03-28 -->
