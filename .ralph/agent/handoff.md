@@ -1521,3 +1521,18 @@ This prompt governs **Phase 1 only**.
 - Git: Annotate Selection selection and render flow
 
 - Next recommended Phase 1 task: T576 annotate: src/slic3r/GUI/Selection.hpp
+
+## Phase 1 - Task T576 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Selection.hpp
+- Deliverables: src/slic3r/GUI/Selection.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 12 annotation blocks covering selection ownership, clipboard state, drag cache lifetime, overlay rendering, synchronization, and Unity migration guidance
+- Verification excerpt: `[PORTING_HAZARD:P2] Drag session state is implicit here, so a Unity port should make the gesture lifetime explicit.`
+- Unity-impact summary:
+  - Model the file as a scene-selection controller with explicit selection and clipboard view-model state.
+  - Replace retained GL overlay helpers with a dedicated gizmo/overlay renderer.
+  - Preserve index rebasing and sibling-instance synchronization as explicit controller actions.
+- Hazards found: P2 x2, P3 x1
+- Git: Annotate Selection header
+- Next recommended Phase 1 task: T577 annotate: src/slic3r/GUI/SelectMachine.cpp
