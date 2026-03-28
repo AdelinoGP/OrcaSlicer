@@ -2,6 +2,10 @@
 
 ## Patterns
 
+### mem-1774678922-eca9
+> UpgradePanel.hpp is the declaration boundary for the firmware-upgrade dashboard: root scroller plus machine card, accessory rows, confirm dialogs, and dynamic show/hide state. Unity should use a scrollable retained controller with reusable row prefabs and modal prompt overlays.
+<!-- tags: gui, unity, dialog | created: 2026-03-28 -->
+
 ### mem-1774678502-281b
 > UpgradePanel.cpp is a firmware-upgrade dashboard: the root panel hosts a MachineInfoPanel plus accessory rows (AMS, extra AMS, extension board, air pump, cutting, laser, extinguish), and the Unity split should be a retained controller with reusable machine/accessory views and a status/progress state machine.
 <!-- tags: gui, unity, dialog, firmware | created: 2026-03-28 -->

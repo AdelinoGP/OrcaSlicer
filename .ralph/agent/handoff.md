@@ -2160,3 +2160,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1
 - Git: Annotate upgrade panel firmware dashboard
 - Next recommended Phase 1 task: T624 annotate: src/slic3r/GUI/UpgradePanel.hpp
+
+## Phase 1 - Task T624 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/UpgradePanel.hpp
+- Deliverables: src/slic3r/GUI/UpgradePanel.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 8 boundary annotations covering the dashboard root, accessory cards, machine-card state, progress block, upgrade command flow, and hint-dialog gating
+- Verification excerpt: `[UNITY] Port as a scroll view with a single lazily-created machine card prefab and modal prompt layer.`
+- Unity-impact summary:
+  - Keep the upgrade page as a retained scroll view with one lazily created machine-card controller.
+  - Model accessory rows as reusable prefabs bound to version/status view-models.
+  - Preserve force/consistency dialogs as modal overlays, not inline branches.
+- Hazards found: P2 x2, P3 x1
+- Git: Annotate UpgradePanel.hpp upgrade dashboard boundary
+- Next recommended Phase 1 task: T625 annotate: src/slic3r/GUI/UserManager.cpp

@@ -208,3 +208,7 @@
 - Started T623 (`src/slic3r/GUI/UpgradePanel.cpp`) as the firmware-upgrade dashboard/controller.
 - The file now carries annotations for the root panel, machine card, accessory subpanels, status/progress state machine, dialog triggers, and the Unity split into a retained controller plus reusable machine/accessory views.
 - Verification target was `git diff --check`; next step after commit is to close T623 and move to T624 (`src/slic3r/GUI/UpgradePanel.hpp`).
+
+- Completed T624 (`src/slic3r/GUI/UpgradePanel.hpp`) with declaration-boundary annotations for the root scroller, machine card, accessory row prefabs, progress block, and confirmation dialogs.
+- The header now calls out the retained-scroll-view Unity split and the dynamic row/show-hide hazard that will need explicit state in C#.
+- Next step after commit: close T624 and move to T625 (`src/slic3r/GUI/UserManager.cpp`).
