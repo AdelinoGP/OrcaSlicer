@@ -1,7 +1,11 @@
 #include "TickCode.hpp"
 
-namespace Slic3r {
-namespace GUI {
+namespace Slic3r { namespace GUI {
+// [INTENT] TickCodeInfo turns the G-code marker list into color/extra payloads that the UI can display and edit.
+// [STATE] The set is the authoritative, ordered marker store; color lookups depend on the current extruder palette and the single-extruder
+// default-color toggle. [UNITY] Model this as a retained marker view-model plus a pure color-resolution service, so row edits do not own
+// palette math. [PORTING_HAZARD:P2] Color selection walks neighboring markers in sorted order; a Unity port needs equivalent ordering and
+// lookup helpers or marker colors will drift around adjacent changes.
 std::string TickCodeInfo::get_color_for_tick(TickCode tick, Type type, const int extruder)
 {
     auto opposite_one_color = [](const std::string& color) {
@@ -10,31 +14,39 @@ std::string TickCodeInfo::get_color_for_tick(TickCode tick, Type type, const int
         return encode_color(opposite(rgb));
     };
     auto opposite_two_colors = [](const std::string& a, const std::string& b) {
-        ColorRGB rgb1; decode_color(a, rgb1);
-        ColorRGB rgb2; decode_color(b, rgb2);
+        ColorRGB rgb1;
+        decode_color(a, rgb1);
+        ColorRGB rgb2;
+        decode_color(b, rgb2);
         return encode_color(opposite(rgb1, rgb2));
     };
 
     if (mode == SingleExtruder && type == ColorChange && m_use_default_colors) {
 #if 1
-        if (ticks.empty()) return opposite_one_color((*m_colors)[0]);
+        if (ticks.empty())
+            return opposite_one_color((*m_colors)[0]);
 
         auto before_tick_it = std::lower_bound(ticks.begin(), ticks.end(), tick);
         if (before_tick_it == ticks.end()) {
             while (before_tick_it != ticks.begin())
-                if (--before_tick_it; before_tick_it->type == ColorChange) break;
-            if (before_tick_it->type == ColorChange) return opposite_one_color(before_tick_it->color);
+                if (--before_tick_it; before_tick_it->type == ColorChange)
+                    break;
+            if (before_tick_it->type == ColorChange)
+                return opposite_one_color(before_tick_it->color);
             return opposite_one_color((*m_colors)[0]);
         }
 
         if (before_tick_it == ticks.begin()) {
-            const std::string &frst_color = (*m_colors)[0];
-            if (before_tick_it->type == ColorChange) return opposite_two_colors(frst_color, before_tick_it->color);
+            const std::string& frst_color = (*m_colors)[0];
+            if (before_tick_it->type == ColorChange)
+                return opposite_two_colors(frst_color, before_tick_it->color);
 
             auto next_tick_it = before_tick_it;
             while (next_tick_it != ticks.end())
-                if (++next_tick_it; next_tick_it->type == ColorChange) break;
-            if (next_tick_it->type == ColorChange) return opposite_two_colors(frst_color, next_tick_it->color);
+                if (++next_tick_it; next_tick_it->type == ColorChange)
+                    break;
+            if (next_tick_it->type == ColorChange)
+                return opposite_two_colors(frst_color, next_tick_it->color);
 
             return opposite_one_color(frst_color);
         }
@@ -52,18 +64,22 @@ std::string TickCodeInfo::get_color_for_tick(TickCode tick, Type type, const int
         }
 
         while (before_tick_it != ticks.begin())
-            if (--before_tick_it; before_tick_it->type == ColorChange) break;
+            if (--before_tick_it; before_tick_it->type == ColorChange)
+                break;
 
         if (before_tick_it->type == ColorChange) {
-            if (frst_color.empty()) return opposite_one_color(before_tick_it->color);
+            if (frst_color.empty())
+                return opposite_one_color(before_tick_it->color);
             return opposite_two_colors(before_tick_it->color, frst_color);
         }
 
-        if (frst_color.empty()) return opposite_one_color((*m_colors)[0]);
+        if (frst_color.empty())
+            return opposite_one_color((*m_colors)[0]);
         return opposite_two_colors((*m_colors)[0], frst_color);
 #else
-        const std::vector<std::string> &colors = ColorPrintColors::get();
-        if (ticks.empty()) return colors[0];
+        const std::vector<std::string>& colors = ColorPrintColors::get();
+        if (ticks.empty())
+            return colors[0];
         m_default_color_idx++;
 
         return colors[m_default_color_idx % colors.size()];
@@ -84,34 +100,36 @@ std::string TickCodeInfo::get_color_for_tick(TickCode tick, Type type, const int
             }
         }
 
-        //TODO
-        //color = get_new_color(color);
+        // TODO
+        // color = get_new_color(color);
     }
     return color;
 }
 
-
 bool TickCodeInfo::add_tick(const int tick, Type type, const int extruder, double print_z)
 {
+    // [INTENT] Add a new marker only after its serialized payload can be derived; this keeps the tick set free of incomplete entries.
+    // [STATE] Single-extruder inserts force m_use_default_colors so later color-change markers continue to inherit the default palette path.
     std::string color;
     std::string extra;
     if (type == Custom) // custom Gcode
     {
-        //extra = get_custom_code(custom_gcode, print_z);
-        //if (extra.empty()) return false;
-        //custom_gcode = extra;
+        // extra = get_custom_code(custom_gcode, print_z);
+        // if (extra.empty()) return false;
+        // custom_gcode = extra;
     } else if (type == PausePrint) {
-        //BBS do not set pause extra message
-        //extra = get_pause_print_msg(pause_print_msg, print_z);
-        //if (extra.empty()) return false;
+        // BBS do not set pause extra message
+        // extra = get_pause_print_msg(pause_print_msg, print_z);
+        // if (extra.empty()) return false;
         pause_print_msg = extra;
-    }
-    else {
-        color = get_color_for_tick(TickCode{ tick }, type, extruder);
-        if (color.empty()) return false;
+    } else {
+        color = get_color_for_tick(TickCode{tick}, type, extruder);
+        if (color.empty())
+            return false;
     }
 
-    if (mode == SingleExtruder) m_use_default_colors = true;
+    if (mode == SingleExtruder)
+        m_use_default_colors = true;
 
     ticks.emplace(TickCode{tick, type, extruder, color, extra});
 
@@ -120,8 +138,11 @@ bool TickCodeInfo::add_tick(const int tick, Type type, const int extruder, doubl
 
 bool TickCodeInfo::edit_tick(std::set<TickCode>::iterator it, double print_z)
 {
+    // [INTENT] Editing is modeled as erase + reinsert because the set key participates in ordering and the payload may change the sort
+    // identity. [PORTING_HAZARD:P3] The current implementation still carries TODO-era gaps for template/custom payload regeneration, so a
+    // Unity port should not assume full parity here without replacement logic.
     std::string edited_value;
-    //TODO
+    // TODO
     /* BBS
     if (it->type == ColorChange)
         edited_value = get_new_color(it->color);
@@ -130,19 +151,22 @@ bool TickCodeInfo::edit_tick(std::set<TickCode>::iterator it, double print_z)
     else
         edited_value = get_custom_code(it->type == Template ? gcode(Template) : it->extra, print_z);
     */
-    if (edited_value.empty()) return false;
+    if (edited_value.empty())
+        return false;
 
     TickCode changed_tick = *it;
     if (it->type == ColorChange) {
-        if (it->color == edited_value) return false;
+        if (it->color == edited_value)
+            return false;
         changed_tick.color = edited_value;
     } else if (it->type == Template) {
-        //if (gcode(Template) == edited_value) return false;
-        //changed_tick.extra = edited_value;
-        //changed_tick.type  = Custom;
+        // if (gcode(Template) == edited_value) return false;
+        // changed_tick.extra = edited_value;
+        // changed_tick.type  = Custom;
         ;
     } else if (it->type == Custom || it->type == PausePrint) {
-        if (it->extra == edited_value) return false;
+        if (it->extra == edited_value)
+            return false;
         changed_tick.extra = edited_value;
     }
 
@@ -154,6 +178,7 @@ bool TickCodeInfo::edit_tick(std::set<TickCode>::iterator it, double print_z)
 
 void TickCodeInfo::switch_code(Type type_from, Type type_to)
 {
+    // [INTENT] Bulk-convert every marker of one semantic type into another while preserving the sorted container contract.
     for (auto it{ticks.begin()}, end{ticks.end()}; it != end;)
         if (it->type == type_from) {
             TickCode tick = *it;
@@ -167,8 +192,10 @@ void TickCodeInfo::switch_code(Type type_from, Type type_to)
 
 bool TickCodeInfo::switch_code_for_tick(std::set<TickCode>::iterator it, Type type_to, const int extruder)
 {
+    // [STATE] Per-tick conversion recomputes the color immediately so the row can be re-rendered without a second lookup pass.
     const std::string color = get_color_for_tick(*it, type_to, extruder);
-    if (color.empty()) return false;
+    if (color.empty())
+        return false;
 
     TickCode changed_tick = *it;
     changed_tick.type     = type_to;
@@ -183,6 +210,7 @@ bool TickCodeInfo::switch_code_for_tick(std::set<TickCode>::iterator it, Type ty
 
 void TickCodeInfo::erase_all_ticks_with_code(Type type)
 {
+    // [EVENT] Deletion is a straight container sweep; the caller owns any UI refresh that follows the mutation.
     for (auto it{ticks.begin()}, end{ticks.end()}; it != end;) {
         if (it->type == type)
             it = ticks.erase(it);
@@ -193,12 +221,14 @@ void TickCodeInfo::erase_all_ticks_with_code(Type type)
 
 bool TickCodeInfo::has_tick_with_code(Type type)
 {
-    for (const TickCode &tick : ticks)
-        if (tick.type == type) return true;
+    // [INTENT] These queries are lightweight membership checks for UI affordances such as enabling/disabling marker actions.
+    for (const TickCode& tick : ticks)
+        if (tick.type == type)
+            return true;
 
     return false;
 }
 
 bool TickCodeInfo::has_tick(int tick) { return ticks.find(TickCode{tick}) != ticks.end(); }
 
-}}
+}} // namespace Slic3r::GUI

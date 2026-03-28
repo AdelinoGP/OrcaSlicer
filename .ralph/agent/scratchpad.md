@@ -179,3 +179,7 @@
 - Completed T616 (`src/slic3r/GUI/ThermalPreconditioningDialog.hpp`) as the declaration boundary for the same countdown modal.
 - The header now captures the UI-thread timer ownership, device-id lookup, countdown text refresh, and the Unity split to a modal overlay controller with a scheduled tick.
 - Verification: `git diff --check -- src/slic3r/GUI/ThermalPreconditioningDialog.hpp` is clean; next step after commit is T617 (`src/slic3r/GUI/TickCode.cpp`).
+
+- Completed T617 (`src/slic3r/GUI/TickCode.cpp`) with boundary comments for color resolution, tick mutation, deletion, and membership queries.
+- Verified the annotation patch with `git diff --check`; the compiler diagnostics are include-path noise from `TickCode.hpp`, not a syntax regression in the inserted comments.
+- Next active task should be T618 (`src/slic3r/GUI/TickCode.hpp`).

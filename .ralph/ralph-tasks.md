@@ -535,7 +535,7 @@ Last updated: 2026-03-28T05:18:23Z
 - [x] T614 annotate: src/slic3r/GUI/TextLines.hpp
 - [x] T615 annotate: src/slic3r/GUI/ThermalPreconditioningDialog.cpp
 - [ ] T616 annotate: src/slic3r/GUI/ThermalPreconditioningDialog.hpp
-- [ ] T617 annotate: src/slic3r/GUI/TickCode.cpp
+- [x] T617 annotate: src/slic3r/GUI/TickCode.cpp
 - [ ] T618 annotate: src/slic3r/GUI/TickCode.hpp
 - [ ] T619 annotate: src/slic3r/GUI/UnsavedChangesDialog.cpp
 - [ ] T620 annotate: src/slic3r/GUI/UnsavedChangesDialog.hpp

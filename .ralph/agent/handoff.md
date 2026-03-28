@@ -2070,3 +2070,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 P2, 1 P3
 - Git: TextLines.cpp annotate: emboss preview mesh boundary annotations
 - Next recommended Phase 1 task: T614 `src/slic3r/GUI/TextLines.hpp`
+
+## Phase 1 - Task T617 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/TickCode.cpp
+- Deliverables: src/slic3r/GUI/TickCode.cpp, .ralph/agent/handoff.md, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md
+- Substantive additions: 6 boundary comments covering color resolution, add/edit/switch mutation, deletion, and membership queries
+- Verification excerpt: `[UNITY] Model this as a retained marker view-model plus a pure color-resolution service, so row edits do not own palette math.`
+- Unity-impact summary: sorted-set marker model stays explicit; color derivation should live in a shared service; edit/erase semantics depend on container ordering
+- Hazards found: P2 x1, P3 x1
+- Git: pending commit
+- Next recommended Phase 1 task: T618 annotate: src/slic3r/GUI/TickCode.hpp
