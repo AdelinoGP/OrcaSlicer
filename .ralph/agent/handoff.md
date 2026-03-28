@@ -1967,3 +1967,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 P3 (manual capture/release click semantics).
 - Git: Annotate TabButton sidebar control
 - Next recommended Phase 1 task: T608 annotate: src/slic3r/GUI/TabButton.hpp
+
+## Phase 1 - Task T608 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/TabButton.hpp
+- Deliverables: src/slic3r/GUI/TabButton.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md, .ralph/ralph-tasks.md
+- Substantive additions: 4 boundary comments covering cached layout/interaction state, class intent, property mutators, and event forwarding
+- Verification excerpt: `[UNITY] Map to a retained UI Toolkit Button/Toggle with icon+label visuals and parent-owned selection state.`
+- Unity-impact summary: the tab button becomes a retained toggle row; bitmap/label changes should invalidate layout explicitly; mouse presses still translate into command-style selection events
+- Hazards found: P2 x1 (implicit click model and custom paint/event bridge)
+- Git: Annotate TabButton header boundary
+- Next recommended Phase 1 task: T609 annotate: src/slic3r/GUI/Tab.cpp

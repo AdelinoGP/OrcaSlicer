@@ -143,3 +143,8 @@
 - Completed T606 (`src/slic3r/GUI/Tabbook.hpp`) with boundary annotations covering the tab-rail controller, selection and insertion event flow, focus/navigation choreography, page-visibility policy, and the Unity split between a retained tab rail and the notebook host.
 - Verification: `git diff --check` is clean for the annotation patch; the header now carries concrete `[INTENT]`, `[STATE]`, `[EVENT]`, `[UNITY]`, and `[PORTING_HAZARD]` notes at the class and method boundaries.
 - Next step after commit: close T606 in the runtime/task registry, then move to T607 (`src/slic3r/GUI/TabButton.cpp`).
+
+- Started T608 (`src/slic3r/GUI/TabButton.hpp`) as the declaration boundary for the custom tab button widget.
+- The header only needs a compact annotation set: class intent, cached layout/interaction state, mouse-to-command event translation, and a concrete Unity mapping to a retained toggle/button row.
+- Plan: keep the notes focused on ownership, hover/press state, and the custom paint/event bridge, then verify with `git diff --check` and close the task.
+- Reconciled the task registry so T607 is marked done in `.ralph/ralph-tasks.md`; T608 is the current active task.
