@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-28T03:18:21Z
+Last updated: 2026-03-28T04:07:39Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -521,7 +521,7 @@ Last updated: 2026-03-28T03:18:21Z
 - [x] T600 annotate: src/slic3r/GUI/SurfaceDrag.hpp
 - [x] T601 annotate: src/slic3r/GUI/SyncAmsInfoDialog.cpp
 - [x] T602 annotate: src/slic3r/GUI/SyncAmsInfoDialog.hpp
-- [ ] T603 annotate: src/slic3r/GUI/SysInfoDialog.cpp
+- [x] T603 annotate: src/slic3r/GUI/SysInfoDialog.cpp
 - [ ] T604 annotate: src/slic3r/GUI/SysInfoDialog.hpp
 - [ ] T605 annotate: src/slic3r/GUI/Tabbook.cpp
 - [ ] T606 annotate: src/slic3r/GUI/Tabbook.hpp

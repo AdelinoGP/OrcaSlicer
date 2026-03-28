@@ -259,6 +259,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - [x] T121-part3: annotate src/slic3r/GUI/Plater.cpp (4001-6000)
 - [x] T121-part4: src/slic3r/GUI/Plater.cpp (6001-8000)
 
+## Phase 1 - Task T603 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SysInfoDialog.cpp
+- Deliverables: src/slic3r/GUI/SysInfoDialog.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 7 boundary comments covering report-text assembly, live memory/undo-stack stats, modal dialog ownership, Windows-only blacklist inspection, DPI rescaling, clipboard export, and modal dismissal
+- Verification excerpt: `[UNITY] Map this to a modal overlay or popup with a retained text model, two scroll views, and a command button.`
+- Unity-impact summary: the dialog becomes a retained modal shell with reusable report text; platform-specific process inspection should move behind a service boundary; clipboard export remains an explicit command path
+- Hazards found: P2 x3, P3 x1
+- Git: Annotate SysInfoDialog.cpp system report dialog
+- Next recommended Phase 1 task: T604 annotate: src/slic3r/GUI/SysInfoDialog.hpp
+
 ## Phase 1 - Task T602 complete
 
 - Task type: annotate
