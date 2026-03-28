@@ -161,6 +161,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: SurfaceDrag header annotations
 - Next recommended Phase 1 task: T601 annotate: src/slic3r/GUI/SyncAmsInfoDialog.cpp
 
+## Phase 1 - Task T601 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SyncAmsInfoDialog.cpp
+- Deliverables: src/slic3r/GUI/SyncAmsInfoDialog.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 7 boundary comments covering the modal controller, UI event wiring, worker-thread printer refresh, status gating, row-popup flow, thumbnail compositing, and sync-toast frames
+- Verification excerpt: `[THREAD] Fetches remote print info on a worker thread, then posts back to mutate dialog state and repopulate the printer list.`
+- Unity-impact summary: modal controller should split from data-bound views; async printer refresh needs a main-thread completion bridge; thumbnail preview math is CPU-side and should move to a texture job/shader path
+- Hazards found: P2 x2, P3 x1
+- Git: SyncAmsInfoDialog.cpp annotations
+- Next recommended Phase 1 task: T602 annotate: src/slic3r/GUI/SyncAmsInfoDialog.hpp
+
 ## Phase 1 - Task T593 complete
 
 - Task type: annotate

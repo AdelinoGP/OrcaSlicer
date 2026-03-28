@@ -112,3 +112,10 @@
 - Started T600 (`src/slic3r/GUI/SurfaceDrag.hpp`) as the declaration boundary for the transient drag session and geometry helpers.
 - The header now needs to spell out the non-owning drag cache, the mouse-event gate, and the fix-up transform pipeline so Unity can mirror the controller/service split without hiding selection lifetime assumptions.
 - Verification target: keep the annotation compact but cover state ownership, event flow, and the transform helpers that bridge selection space to world/surface space.
+
+- T600 was already closed in the runtime registry, so the active work for this iteration is T601 (`src/slic3r/GUI/SyncAmsInfoDialog.cpp`).
+- SyncAmsInfoDialog.cpp is the AMS synchronization modal: dialog setup, printer-info refresh, status gating, custom filament rows, thumbnail recoloring, and the final sync toasts all live here.
+- Annotation plan: keep a handful of boundary comments for the modal controller, UI event wiring, worker-thread refresh, row popup flow, and CPU-side preview pipeline.
+
+- T601 now has boundary comments for the modal controller, event wiring, async printer refresh, status gating, popup-backed rows, thumbnail compositing, and the transient sync-success toasts.
+- Next iteration should move to T602 (`src/slic3r/GUI/SyncAmsInfoDialog.hpp`) after commit.
