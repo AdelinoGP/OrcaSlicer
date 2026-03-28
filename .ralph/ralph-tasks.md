@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-28T04:27:04Z
+Last updated: 2026-03-28T04:53:09Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -528,8 +528,8 @@ Last updated: 2026-03-28T04:27:04Z
 - [x] T607 annotate: src/slic3r/GUI/TabButton.cpp
 - [x] T608 annotate: src/slic3r/GUI/TabButton.hpp
 - [ ] T609 annotate: src/slic3r/GUI/Tab.cpp
-- [ ] T610 annotate: src/slic3r/GUI/Tab.hpp
-- [ ] T611 annotate: src/slic3r/GUI/TaskManager.cpp
+- [x] T610 annotate: src/slic3r/GUI/Tab.hpp
+- [~] T611 annotate: src/slic3r/GUI/TaskManager.cpp
 - [ ] T612 annotate: src/slic3r/GUI/TaskManager.hpp
 - [ ] T613 annotate: src/slic3r/GUI/TextLines.cpp
 - [ ] T614 annotate: src/slic3r/GUI/TextLines.hpp

@@ -8,54 +8,40 @@
 using namespace nlohmann;
 
 namespace Slic3r {
+// [INTENT][EVENT][UNITY] Throttled multi-printer send scheduler: it batches local tasks, polls remote task state,
+// and forwards progress/cancel callbacks into GUI code that Unity should replace with a retained queue service
+// plus a main-thread marshaling layer.
 wxDEFINE_EVENT(EVT_MULTI_SEND_LIMIT, wxCommandEvent);
 
 int TaskManager::MaxSendingAtSameTime = 5;
-int TaskManager::SendingInterval = 180;
+int TaskManager::SendingInterval      = 180;
 
 std::string get_task_state_enum_str(TaskState ts)
 {
     switch (ts) {
-    case TaskState::TS_PENDING:
-        return "task pending";
-    case TaskState::TS_SENDING:
-        return "task sending";
-    case TaskState::TS_SEND_COMPLETED:
-        return "task sending completed";
-    case TaskState::TS_SEND_CANCELED:
-        return "task sending canceled";
-    case TaskState::TS_SEND_FAILED:
-        return "task sending failed";
-    case TaskState::TS_PRINTING:
-        return "task printing";
-    case TaskState::TS_PRINT_SUCCESS:
-        return "task print success";
-    case TaskState::TS_PRINT_FAILED:
-        return "task print failed";
-    case TaskState::TS_IDLE:
-        return "task idle";
-    case TaskState::TS_REMOVED:
-        return "task removed";
-    default:
-        assert(false);
+    case TaskState::TS_PENDING: return "task pending";
+    case TaskState::TS_SENDING: return "task sending";
+    case TaskState::TS_SEND_COMPLETED: return "task sending completed";
+    case TaskState::TS_SEND_CANCELED: return "task sending canceled";
+    case TaskState::TS_SEND_FAILED: return "task sending failed";
+    case TaskState::TS_PRINTING: return "task printing";
+    case TaskState::TS_PRINT_SUCCESS: return "task print success";
+    case TaskState::TS_PRINT_FAILED: return "task print failed";
+    case TaskState::TS_IDLE: return "task idle";
+    case TaskState::TS_REMOVED: return "task removed";
+    default: assert(false);
     }
     return "unknown task state";
 }
 
 TaskState parse_task_status(int status)
 {
-    switch (status)
-    {
-    case 1:
-        return TaskState::TS_PRINTING;
-    case 2:
-        return TaskState::TS_PRINT_SUCCESS;
-    case 3:
-        return TaskState::TS_PRINT_FAILED;
-    case 4:
-        return TaskState::TS_PRINTING;
-    default:
-        return TaskState::TS_PRINTING;
+    switch (status) {
+    case 1: return TaskState::TS_PRINTING;
+    case 2: return TaskState::TS_PRINT_SUCCESS;
+    case 3: return TaskState::TS_PRINT_FAILED;
+    case 4: return TaskState::TS_PRINTING;
+    default: return TaskState::TS_PRINTING;
     }
     return TaskState::TS_PRINTING;
 }
@@ -63,49 +49,41 @@ TaskState parse_task_status(int status)
 int TaskStateInfo::g_task_info_id = 0;
 
 TaskStateInfo::TaskStateInfo(PrintParams param)
-    : m_state(TaskState::TS_PENDING)
-    , m_params(param)
-    , m_sending_percent(0)
-    , m_state_changed_fn(nullptr)
-    , m_cancel(false)
+    : m_state(TaskState::TS_PENDING), m_params(param), m_sending_percent(0), m_state_changed_fn(nullptr), m_cancel(false)
 {
     task_info_id = ++TaskStateInfo::g_task_info_id;
 
+    // [STATE][THREAD][PORTING_HAZARD:P2] Per-task callbacks capture this object so the worker thread can push
+    // progress/cancel state back into the UI model; the direct mainframe CallAfter path is a Unity migration seam.
     this->set_task_name(param.project_name);
     this->set_device_name(param.dev_name);
 
-    cancel_fn = [this]() {
-        return m_cancel;
-    };
+    cancel_fn        = [this]() { return m_cancel; };
     update_status_fn = [this](int stage, int code, std::string msg) {
-
-        if (stage == PrintingStageLimit)
-        {
-            //limit
-            //wxCommandEvent event(EVT_MULTI_SEND_LIMIT);
-            //wxPostEvent(this, event);
-            GUI::wxGetApp().mainframe->CallAfter([]() {
-                GUI::wxGetApp().show_dialog("The printing task exceeds the limit, supporting a maximum of 6 printers.");
-            });
+        if (stage == PrintingStageLimit) {
+            // limit
+            // wxCommandEvent event(EVT_MULTI_SEND_LIMIT);
+            // wxPostEvent(this, event);
+            GUI::wxGetApp().mainframe->CallAfter(
+                []() { GUI::wxGetApp().show_dialog("The printing task exceeds the limit, supporting a maximum of 6 printers."); });
         }
 
-        const int StagePercentPoint[(int)PrintingStageFinished + 1] = {
-                10,    // PrintingStageCreate
-                25,    // PrintingStageUpload
-                70,    // PrintingStageWaiting
-                75,    // PrintingStageRecord
-                90,    // PrintingStageSending
-                95,    // PrintingStageFinished
-                100    // PrintingStageFinished
+        const int StagePercentPoint[(int) PrintingStageFinished + 1] = {
+            10, // PrintingStageCreate
+            25, // PrintingStageUpload
+            70, // PrintingStageWaiting
+            75, // PrintingStageRecord
+            90, // PrintingStageSending
+            95, // PrintingStageFinished
+            100 // PrintingStageFinished
         };
         BOOST_LOG_TRIVIAL(trace) << "task_manager: update task, " << m_params.dev_id << ", stage = " << stage << "code = " << code;
         // update current percnet
         int curr_percent = 0;
-        if (stage >= 0 && stage <= (int)PrintingStageFinished) {
+        if (stage >= 0 && stage <= (int) PrintingStageFinished) {
             curr_percent = StagePercentPoint[stage];
-            if ((stage == SendingPrintJobStage::PrintingStageUpload
-                || stage == SendingPrintJobStage::PrintingStageRecord)
-                && (code > 0 && code <= 100)) {
+            if ((stage == SendingPrintJobStage::PrintingStageUpload || stage == SendingPrintJobStage::PrintingStageRecord) &&
+                (code > 0 && code <= 100)) {
                 curr_percent = (StagePercentPoint[stage + 1] - StagePercentPoint[stage]) * code / 100 + StagePercentPoint[stage];
                 BOOST_LOG_TRIVIAL(trace) << "task_manager: percent = " << curr_percent;
             }
@@ -124,6 +102,8 @@ TaskStateInfo::TaskStateInfo(PrintParams param)
 
 void TaskStateInfo::cancel()
 {
+    // [STATE][EVENT] Cancel flips the local lifecycle immediately and notifies observers even if the task never left
+    // the pending queue; Unity should preserve this as an explicit state transition event.
     m_cancel = true;
     if (m_state == TaskState::TS_PENDING)
         m_state = TaskState::TS_REMOVED;
@@ -132,11 +112,13 @@ void TaskStateInfo::cancel()
 
 bool TaskGroup::need_schedule(std::chrono::system_clock::time_point last, TaskStateInfo* task)
 {
+    // [STATE][INTENT] Only pending tasks enter the scheduler, and each send is paced by a global interval gate so the
+    // queue behaves like a throttled dispatch window rather than a free-running job list.
     /* only pending task will be scheduled */
     if (task->state() != TaskState::TS_PENDING)
         return false;
     std::chrono::system_clock::time_point curr_time = std::chrono::system_clock::now();
-    auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(curr_time - last);
+    auto                                  diff      = std::chrono::duration_cast<std::chrono::milliseconds>(curr_time - last);
     if (diff.count() > TaskManager::SendingInterval * 1000) {
         BOOST_LOG_TRIVIAL(trace) << "task_manager: diff count = " << diff.count() << " milliseconds";
         return true;
@@ -144,23 +126,17 @@ bool TaskGroup::need_schedule(std::chrono::system_clock::time_point last, TaskSt
     return false;
 }
 
-void TaskManager::set_max_send_at_same_time(int count)
-{
-    TaskManager::MaxSendingAtSameTime = count;
-}
+void TaskManager::set_max_send_at_same_time(int count) { TaskManager::MaxSendingAtSameTime = count; }
 
-TaskManager::TaskManager(NetworkAgent* agent)
-    :m_agent(agent)
-{
-    ;
-}
-
+TaskManager::TaskManager(NetworkAgent* agent) : m_agent(agent) { ; }
 
 int TaskManager::start_print(const std::vector<PrintParams>& params, TaskSettings* settings)
 {
+    // [STATE][THREAD][UNITY] This is the ingestion boundary: it snapshots UI settings, builds a batch of task state
+    // objects, and appends them to the shared cache that the background scheduler drains later.
     BOOST_LOG_TRIVIAL(info) << "task_manager: start_print size = " << params.size();
     TaskManager::MaxSendingAtSameTime = settings->max_sending_at_same_time;
-    TaskManager::SendingInterval = settings->sending_interval;
+    TaskManager::SendingInterval      = settings->sending_interval;
     m_map_mutex.lock();
     TaskGroup task_group(*settings);
     task_group.tasks.reserve(params.size());
@@ -184,23 +160,30 @@ static int start_print_test(PrintParams& params, OnUpdateStatusFn update_fn, Was
             }
         }
         if (i == tick) {
-            if (update_fn) update_fn(PrintingStageCreate, 0, "");
+            if (update_fn)
+                update_fn(PrintingStageCreate, 0, "");
         }
         if (i >= 20 * tick && i <= 70 * tick) {
             int percent = (i - 20 * tick) * 2 / tick;
-            if (update_fn) update_fn(PrintingStageUpload, percent, "");
+            if (update_fn)
+                update_fn(PrintingStageUpload, percent, "");
         }
 
         if (i == 80 * tick)
-            if (update_fn) update_fn(PrintingStageSending, 0, "");
+            if (update_fn)
+                update_fn(PrintingStageSending, 0, "");
         if (i == 99 * tick)
-            if (update_fn) update_fn(PrintingStageFinished, 0, "");
+            if (update_fn)
+                update_fn(PrintingStageFinished, 0, "");
     }
     return 0;
 }
 
 int TaskManager::schedule(TaskStateInfo* task)
 {
+    // [THREAD][PORTING_HAZARD:P2] Scheduling spins up a dedicated worker thread per send, updates task state before
+    // dispatch, and removes completed work from the active list under a mutex; Unity should collapse this into an
+    // async job/coroutine queue with explicit lifetime ownership instead of raw boost::thread pointers.
     if (!m_agent) {
         assert(false);
         return -1;
@@ -212,65 +195,61 @@ int TaskManager::schedule(TaskStateInfo* task)
 
     BOOST_LOG_TRIVIAL(trace) << "task_manager: schedule a task to dev_id = " << task->params().dev_id;
     boost::thread* new_sending_thread = new boost::thread();
-    *new_sending_thread = Slic3r::create_thread(
-        [this, task] {
-            if (!m_agent) {
-                BOOST_LOG_TRIVIAL(trace) << "task_manager: NetworkAgent is nullptr";
-                return;
-            }
-            assert(m_agent);
+    *new_sending_thread               = Slic3r::create_thread([this, task] {
+        if (!m_agent) {
+            BOOST_LOG_TRIVIAL(trace) << "task_manager: NetworkAgent is nullptr";
+            return;
+        }
+        assert(m_agent);
 // DEBUG FOR TEST
 #if 0
             int result = start_print_test(task->get_params(), task->update_status_fn, task->cancel_fn, task->wait_fn);
 #else
-            int result = m_agent->start_print(task->get_params(), task->update_status_fn, task->cancel_fn, task->wait_fn);
+        int result = m_agent->start_print(task->get_params(), task->update_status_fn, task->cancel_fn, task->wait_fn);
 #endif
-            if (result == 0) {
-                last_sent_timestamp = std::chrono::system_clock::now();
-                task->set_sent_time(last_sent_timestamp);
-                task->set_state(TaskState::TS_SEND_COMPLETED);
+        if (result == 0) {
+            last_sent_timestamp = std::chrono::system_clock::now();
+            task->set_sent_time(last_sent_timestamp);
+            task->set_state(TaskState::TS_SEND_COMPLETED);
+        } else {
+            if (!task->is_canceled()) {
+                task->set_state(TaskState::TS_SEND_FAILED);
+            } else {
+                task->set_state(TaskState::TS_SEND_CANCELED);
             }
-            else {
-                if (!task->is_canceled()) {
-                    task->set_state(TaskState::TS_SEND_FAILED);
-                } else {
-                    task->set_state(TaskState::TS_SEND_CANCELED);
-                }
-            }
-     
-            /* remove from sending task list */
-            m_scedule_mutex.lock();
-            auto it = std::find(m_scedule_list.begin(), m_scedule_list.end(), task);
-            if (it != m_scedule_list.end()) {
-                BOOST_LOG_TRIVIAL(trace) << "task_manager: schedule, scedule task has removed from list";
-                m_scedule_list.erase(it);
-            }
-            else {
-                /*assert(false);*/
-            }
-            m_scedule_mutex.unlock();
         }
-    );
+
+        /* remove from sending task list */
+        m_scedule_mutex.lock();
+        auto it = std::find(m_scedule_list.begin(), m_scedule_list.end(), task);
+        if (it != m_scedule_list.end()) {
+            BOOST_LOG_TRIVIAL(trace) << "task_manager: schedule, scedule task has removed from list";
+            m_scedule_list.erase(it);
+        } else {
+            /*assert(false);*/
+        }
+        m_scedule_mutex.unlock();
+    });
     m_sending_thread_list.push_back(new_sending_thread);
     return 0;
 }
 
 void TaskManager::start()
 {
+    // [THREAD][STATE] Background scheduler loop: it periodically scans queued task groups, enforces the concurrency
+    // cap, and emits work items into the send list until stop() clears m_started.
     if (m_started) {
         return;
     }
-    m_started = true;
-    m_scedule_thread = Slic3r::create_thread(
-        [this] {
+    m_started        = true;
+    m_scedule_thread = Slic3r::create_thread([this] {
         BOOST_LOG_TRIVIAL(trace) << "task_manager: thread start()";
         while (m_started) {
             m_map_mutex.lock();
             for (auto it = m_cache_map.begin(); it != m_cache_map.end(); it++) {
                 for (auto iter = it->tasks.begin(); iter != it->tasks.end(); iter++) {
                     m_scedule_mutex.lock();
-                    if (m_scedule_list.size() < TaskManager::MaxSendingAtSameTime
-                        && it->need_schedule(last_sent_timestamp, *iter)) {
+                    if (m_scedule_list.size() < TaskManager::MaxSendingAtSameTime && it->need_schedule(last_sent_timestamp, *iter)) {
                         m_scedule_list.push_back(*iter);
                     }
                     m_scedule_mutex.unlock();
@@ -278,7 +257,7 @@ void TaskManager::start()
             }
             m_map_mutex.unlock();
             if (!m_scedule_list.empty()) {
-                //BOOST_LOG_TRIVIAL(trace) << "task_manager: need scedule task count = " << m_scedule_list.size();
+                // BOOST_LOG_TRIVIAL(trace) << "task_manager: need scedule task count = " << m_scedule_list.size();
                 m_scedule_mutex.lock();
                 for (auto it = m_scedule_list.begin(); it != m_scedule_list.end(); it++) {
                     this->schedule(*it);
@@ -304,11 +283,9 @@ std::map<int, TaskStateInfo*> TaskManager::get_local_task_list()
     m_map_mutex.lock();
     for (auto it = m_cache_map.begin(); it != m_cache_map.end(); it++) {
         for (auto iter = (*it).tasks.begin(); iter != (*it).tasks.end(); iter++) {
-            if ((*iter)->state() == TaskState::TS_PENDING
-                || (*iter)->state() == TaskState::TS_SENDING
-                || (*iter)->state() == TaskState::TS_SEND_CANCELED
-                || (*iter)->state() == TaskState::TS_SEND_COMPLETED
-                || (*iter)->state() == TaskState::TS_SEND_FAILED) {
+            if ((*iter)->state() == TaskState::TS_PENDING || (*iter)->state() == TaskState::TS_SENDING ||
+                (*iter)->state() == TaskState::TS_SEND_CANCELED || (*iter)->state() == TaskState::TS_SEND_COMPLETED ||
+                (*iter)->state() == TaskState::TS_SEND_FAILED) {
                 out.insert(std::make_pair((*iter)->task_info_id, *iter));
             }
         }
@@ -319,13 +296,15 @@ std::map<int, TaskStateInfo*> TaskManager::get_local_task_list()
 
 std::map<std::string, TaskStateInfo> TaskManager::get_task_list(int curr_page, int page_count, int& total)
 {
+    // [THREAD][STATE][UNCLEAR] Remote task-list sync: JSON hits are mapped into TaskStateInfo snapshots for UI display;
+    // the id/job/profile fields are partially asymmetric here, so the precise canonical identifier is a hypothesis.
     std::map<std::string, TaskStateInfo> out;
     if (m_agent) {
         TaskQueryParams task_query_params;
-        task_query_params.limit = page_count;
+        task_query_params.limit  = page_count;
         task_query_params.offset = curr_page * page_count;
         std::string task_info;
-        int result = m_agent->get_user_tasks(task_query_params, &task_info);
+        int         result = m_agent->get_user_tasks(task_query_params, &task_info);
         BOOST_LOG_TRIVIAL(trace) << "task_manager: get_task_list task_info=" << task_info;
         if (result == 0) {
             try {
@@ -339,7 +318,7 @@ std::map<std::string, TaskStateInfo> TaskManager::get_task_list(int curr_page, i
                 BOOST_LOG_TRIVIAL(trace) << "task_manager: get_task_list task count =" << j["hits"].size();
                 for (auto& hit : j["hits"]) {
                     TaskStateInfo task_info;
-                    int64_t design_id = 0;
+                    int64_t       design_id = 0;
                     if (hit.contains("designId")) {
                         design_id = hit["designId"].get<int64_t>();
                     }
@@ -368,9 +347,7 @@ std::map<std::string, TaskStateInfo> TaskManager::get_task_list(int curr_page, i
                     if (!task_info.get_job_id().empty())
                         out.insert(std::make_pair(task_info.get_job_id(), task_info));
                 }
-            }
-            catch(...) {
-            }
+            } catch (...) {}
         }
     }
     return out;
@@ -378,6 +355,8 @@ std::map<std::string, TaskStateInfo> TaskManager::get_task_list(int curr_page, i
 
 TaskState TaskManager::query_task_state(std::string dev_id)
 {
+    // [STATE][INTENT] Fast local priority lookup for a device: sending wins over pending, otherwise idle is the
+    // fallback. Unity can model this as a cached device-status reducer.
     /* priority: TS_SENDING > TS_PENDING > TS_IDLE */
     TaskState ts = TaskState::TS_IDLE;
     m_map_mutex.lock();

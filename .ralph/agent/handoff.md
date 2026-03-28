@@ -218,6 +218,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Verification excerpt: `[INTENT] This file is the printer-status dashboard: it composes the monitor/printing cards,`
 - Unity-impact summary: split the dashboard into a retained page controller with reusable child panels and explicit subview state instead of one monolithic wxWidgets panel
 - Hazards found: P2 x0 in the new annotations; the main integration risk is the size and cross-cutting nature of the retained dashboard
+
+## Phase 1 - Task T611 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/TaskManager.cpp
+- Deliverables: src/slic3r/GUI/TaskManager.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 6 boundary comments covering scheduler intent, task cancel flow, pacing policy, ingestion, worker-thread dispatch, remote task sync, and local state lookup
+- Verification excerpt: `[THREAD][PORTING_HAZARD:P2] Scheduling spins up a dedicated worker thread per send`
+- Unity-impact summary: retained queue/service for throttled sends; async job/coroutine replacement for boost threads; main-thread marshaling for UI callbacks
+- Hazards found: P2 x1, UNCLEAR x1
+- Git: Annotate TaskManager scheduler boundary
+- Next recommended Phase 1 task: T612 annotate: src/slic3r/GUI/TaskManager.hpp
 - Git: annotate StatusPanel dashboard boundary
 - Next recommended Phase 1 task: T596 annotate: src/slic3r/GUI/StatusPanel.hpp
 

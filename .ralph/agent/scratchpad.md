@@ -152,3 +152,7 @@
 - The header only needs a compact annotation set: class intent, cached layout/interaction state, mouse-to-command event translation, and a concrete Unity mapping to a retained toggle/button row.
 - Plan: keep the notes focused on ownership, hover/press state, and the custom paint/event bridge, then verify with `git diff --check` and close the task.
 - Reconciled the task registry so T607 is marked done in `.ralph/ralph-tasks.md`; T608 is the current active task.
+
+- Handled the pending phase1.task.done event for T610 by treating `src/slic3r/GUI/Tab.hpp` as completed in the runtime narrative; the next active file task is T611 (`src/slic3r/GUI/TaskManager.cpp`).
+- T611 is the throttled multi-printer send scheduler: task ingestion snapshots settings into a shared cache, a background loop gates dispatch by concurrency/interval, and worker threads bridge progress callbacks back to the UI.
+- The verification target for T611 is `git diff --check` plus a focused review of the inserted boundary annotations; the main Unity mapping is an async queue/service with main-thread marshaling instead of raw boost thread ownership.
