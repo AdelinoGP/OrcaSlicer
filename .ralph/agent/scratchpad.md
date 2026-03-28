@@ -10,3 +10,7 @@
 - Plan: add a small set of high-value [INTENT]/[STATE]/[EVENT]/[OPENGL]/[UNITY]/[PORTING_HAZARD] comments around initialization, selection mutation, clipboard, rendering, and synchronization, then verify and close the task.
 
 - Started T576 (`src/slic3r/GUI/Selection.hpp`) after the runtime queue advanced; the header now captures selection ownership, drag-cache lifetime, overlay rendering, clipboard payload semantics, and Unity migration boundaries.
+
+- Switched to T577 (`src/slic3r/GUI/SelectMachine.cpp`) for the next atomic annotation pass.
+- SelectMachine.cpp is the send-print modal: it coordinates printer selection, AMS/extruder mapping, validation/status flow, and a custom thumbnail compositor.
+- Plan: keep a small set of high-value [INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY] comments around lifecycle, event wiring, selection resets, preview composition, and widget boundaries, then close the task.

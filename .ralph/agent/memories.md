@@ -2,6 +2,26 @@
 
 ## Patterns
 
+### mem-1774659581-0d00
+> SelectMachine.cpp is a monolithic send-print modal that mixes printer selection, AMS mapping, validation/status flow, and thumbnail recoloring; Unity should split it into a modal controller plus a CPU texture-compositing preview step.
+<!-- tags: gui, unity, dialog, thumbnail | created: 2026-03-28 -->
+
+### mem-1774658678-9856
+> Selection.hpp is the selection controller boundary: it owns selection indices, drag caches, retained GL overlay helpers, clipboard payload state, and sibling-instance sync fan-out; Unity should model that as a controller plus explicit overlay renderer and payload-based clipboard.
+<!-- tags: gui, unity, selection | created: 2026-03-28 -->
+
+### mem-1774657337-a5a1
+> Search.hpp declares the preset/object search popup boundary: keep the floating search panel, filtered list, and custom event handoff separate from the search index. Unity should use a reusable overlay controller with a persistent ListView and explicit dismissal state.
+<!-- tags: gui, unity, search | created: 2026-03-28 -->
+
+### mem-1774657010-7b78
+> Search.cpp models preset-option search and object search as two popup controllers sharing fuzzy filtering, custom-painted rows, and wx event handoff; Unity should use a floating search panel with a persistent filtered list and explicit dismiss/focus handling.
+<!-- tags: gui, unity, annotation | created: 2026-03-28 -->
+
+### mem-1774603084-cb06
+> SceneRaycaster uses bucket-ordered mesh raycasting with a sticky selected-volume bias and a debug-only OpenGL hit overlay; Unity should preserve pick priority explicitly in a scene-query service.
+<!-- tags: gui, unity, raycasting | created: 2026-03-27 -->
+
 ### mem-1774602321-2d97
 > SavePresetDialog.hpp is the declaration boundary for the preset-save modal: keep row ownership, validation flags, printer-context state, and Unity-mapping notes in the header; the save flow can trigger overwrite and printer/project side effects from one confirm action.
 <!-- tags: gui, unity, dialog, preset | created: 2026-03-27 -->
@@ -129,6 +149,14 @@
 ## Decisions
 
 ## Fixes
+
+### mem-1774657753-8baa
+> failure: cmd=/home/admin/.config/nvm/versions/node/v24.14.0/lib/node_modules/@ralph-orchestrator/ralph-cli/node_modules/.bin_real/ralph tools skill load ralph-tools, exit=1, error=Skill "ralph-tools" not found; available skills: none, next=proceed without loading a skill
+<!-- tags: tooling, error-handling | created: 2026-03-28 -->
+
+### mem-1774657490-2aee
+> failure: cmd=apply_patch scratchpad update, exit=1, error=Failed to find expected lines in .ralph/agent/scratchpad.md, next=read the file first and patch against the actual current lines
+<!-- tags: tooling, error-handling | created: 2026-03-28 -->
 
 ### mem-1774595683-7aa6
 > failure: cmd=ralph tools task start gui:T188, exit=1, error=Task gui:T188 not found, next=start the reused task by its returned id task-1773880086-cb14

@@ -1536,3 +1536,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x2, P3 x1
 - Git: Annotate Selection header
 - Next recommended Phase 1 task: T577 annotate: src/slic3r/GUI/SelectMachine.cpp
+
+## Phase 1 - Task T577 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SelectMachine.cpp
+- Deliverables: src/slic3r/GUI/SelectMachine.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 11 annotation blocks covering dialog lifecycle, event wiring, mode transitions, thumbnail compositing, and custom widget boundaries
+- Verification excerpt: `[UNITY] In Unity this would be a texture-processing step feeding a preview RawImage; keep the original and recolored variants separate.`
+- Unity-impact summary:
+  - Model the send workflow as a modal controller with explicit state transitions and printer-selection reset semantics.
+  - Treat the thumbnail pipeline as a CPU texture-compositing step feeding a UI preview image.
+  - Replace the painted segmented controls and printer selector compound widget with reusable UI Toolkit controls.
+- Hazards found: P2 x1
+- Git: Annotate SelectMachine send-print flow
+- Next recommended Phase 1 task: T578 annotate: src/slic3r/GUI/SelectMachine.hpp

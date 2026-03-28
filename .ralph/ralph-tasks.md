@@ -495,7 +495,7 @@ Last updated: 2026-03-28T00:42:13Z
 - [ ] T574 annotate: src/slic3r/GUI/Search.hpp
 - [ ] T575 annotate: src/slic3r/GUI/Selection.cpp
 - [x] T576 annotate: src/slic3r/GUI/Selection.hpp
-- [ ] T577 annotate: src/slic3r/GUI/SelectMachine.cpp
+- [x] T577 annotate: src/slic3r/GUI/SelectMachine.cpp
 - [ ] T578 annotate: src/slic3r/GUI/SelectMachine.hpp
 - [ ] T579 annotate: src/slic3r/GUI/SelectMachinePop.cpp
 - [ ] T580 annotate: src/slic3r/GUI/SelectMachinePop.hpp
