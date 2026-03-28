@@ -513,7 +513,7 @@ Last updated: 2026-03-28T02:54:10Z
 - [x] T592 annotate: src/slic3r/GUI/SliceInfoPanel.hpp
 - [x] T593 annotate: src/slic3r/GUI/SlicingProgressNotification.cpp
 - [x] T594 annotate: src/slic3r/GUI/SlicingProgressNotification.hpp
-- [ ] T595 annotate: src/slic3r/GUI/StatusPanel.cpp
+- [x] T595 annotate: src/slic3r/GUI/StatusPanel.cpp
 - [ ] T596 annotate: src/slic3r/GUI/StatusPanel.hpp
 - [ ] T597 annotate: src/slic3r/GUI/StepMeshDialog.cpp
 - [ ] T598 annotate: src/slic3r/GUI/StepMeshDialog.hpp

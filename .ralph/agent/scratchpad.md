@@ -86,3 +86,7 @@
 - Started T594 (`src/slic3r/GUI/SlicingProgressNotification.hpp`) as the declaration boundary for the same overlay.
 - The header needs class-level intent plus the key state fields: progress mode, sidebar fade behavior, export availability, cancel callback, and the embedded DailyTipsPanel.
 - Plan: add compact boundary comments that preserve the current fade/state semantics and spell out the Unity split as a screen-space HUD controller with a reusable child panel, then verify with `git diff --check` and close the task.
+
+- Started T595 (`src/slic3r/GUI/StatusPanel.cpp`) as the large printer-status dashboard/controller.
+- The file mixes extruder glyph rendering, AMS switching feedback, printing-progress cards, camera/control scaffolding, and the rating/upload modal; Unity should split it into retained subviews plus a shared dashboard model.
+- Plan: keep the annotation focused on the major class boundaries and the async thumbnail/upload seam, then verify whitespace with `git diff --check`, append handoff evidence, and close the task.

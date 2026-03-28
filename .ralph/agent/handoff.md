@@ -113,7 +113,19 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Unity-impact summary: screen-space HUD controller keeps the state machine explicit; DailyTips stays as a reusable child panel; worker-thread mutation remains out of band
 - Hazards found: P2 x1 (lifecycle, rendering, and interaction are coupled in one overlay class)
 - Git: Annotate SlicingProgressNotification header boundary
-- Next recommended Phase 1 task: T595 annotate: src/slic3r/GUI/StatusPanel.cpp
+- Next recommended Phase 1 task: T596 annotate: src/slic3r/GUI/StatusPanel.hpp
+
+## Phase 1 - Task T595 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/StatusPanel.cpp
+- Deliverables: src/slic3r/GUI/StatusPanel.cpp, .ralph/agent/handoff.md, .ralph/ralph-tasks.md
+- Substantive additions: 6 boundary comments covering dashboard intent, retained Unity mapping, subordinate widget ownership, transient confirmation flow, shared monitoring-page state, and the concrete action wiring; plus state notes for the nozzle selector and related cached UI state
+- Verification excerpt: `[INTENT] This file is the printer-status dashboard: it composes the monitor/printing cards,`
+- Unity-impact summary: split the dashboard into a retained page controller with reusable child panels and explicit subview state instead of one monolithic wxWidgets panel
+- Hazards found: P2 x0 in the new annotations; the main integration risk is the size and cross-cutting nature of the retained dashboard
+- Git: annotate StatusPanel dashboard boundary
+- Next recommended Phase 1 task: T596 annotate: src/slic3r/GUI/StatusPanel.hpp
 
 ## Tasks
 
@@ -788,7 +800,20 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - [ ] T592 annotate: src/slic3r/GUI/SliceInfoPanel.hpp
 - [ ] T593 annotate: src/slic3r/GUI/SlicingProgressNotification.cpp
 - [ ] T594 annotate: src/slic3r/GUI/SlicingProgressNotification.hpp
-- [ ] T595 annotate: src/slic3r/GUI/StatusPanel.cpp
+- [x] T595 annotate: src/slic3r/GUI/StatusPanel.cpp
+
+## Phase 1 - Task T595 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/StatusPanel.cpp
+- Deliverables: src/slic3r/GUI/StatusPanel.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md
+- Substantive additions: 6 comment blocks covering file intent, extruder glyph state, AMS switching UI, printing task card, dashboard ownership, and async score thumbnails
+- Verification excerpt: `[UNITY] Port this as a retained dashboard page with reusable child panels and a data-bound view model rather than one monolithic panel class.`
+- Unity-impact summary: split the dashboard into reusable subviews; keep async thumbnail fetch/upload off the view tree; route printer actions through explicit commands
+- Hazards found: P2 x1
+- Git: Annotate StatusPanel.cpp for Unity port
+- Next recommended Phase 1 task: T596 annotate: src/slic3r/GUI/StatusPanel.hpp
+- [x] T595 annotate: src/slic3r/GUI/StatusPanel.cpp
 - [ ] T596 annotate: src/slic3r/GUI/StatusPanel.hpp
 - [ ] T597 annotate: src/slic3r/GUI/StepMeshDialog.cpp
 - [ ] T598 annotate: src/slic3r/GUI/StepMeshDialog.hpp
@@ -1173,7 +1198,7 @@ Continue the previous work. Remaining tasks (336):
 - T592 annotate: src/slic3r/GUI/SliceInfoPanel.hpp
 - T593 annotate: src/slic3r/GUI/SlicingProgressNotification.cpp
 - T594 annotate: src/slic3r/GUI/SlicingProgressNotification.hpp
-- T595 annotate: src/slic3r/GUI/StatusPanel.cpp
+- [x] T595 annotate: src/slic3r/GUI/StatusPanel.cpp
 - T596 annotate: src/slic3r/GUI/StatusPanel.hpp
 - T597 annotate: src/slic3r/GUI/StepMeshDialog.cpp
 - T598 annotate: src/slic3r/GUI/StepMeshDialog.hpp
