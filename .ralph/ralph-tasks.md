@@ -516,8 +516,8 @@ Last updated: 2026-03-28T03:18:21Z
 - [x] T595 annotate: src/slic3r/GUI/StatusPanel.cpp
 - [x] T596 annotate: src/slic3r/GUI/StatusPanel.hpp
 - [x] T597 annotate: src/slic3r/GUI/StepMeshDialog.cpp
-- [ ] T598 annotate: src/slic3r/GUI/StepMeshDialog.hpp
-- [ ] T599 annotate: src/slic3r/GUI/SurfaceDrag.cpp
+- [x] T598 annotate: src/slic3r/GUI/StepMeshDialog.hpp
+- [x] T599 annotate: src/slic3r/GUI/SurfaceDrag.cpp
 - [ ] T600 annotate: src/slic3r/GUI/SurfaceDrag.hpp
 - [ ] T601 annotate: src/slic3r/GUI/SyncAmsInfoDialog.cpp
 - [ ] T602 annotate: src/slic3r/GUI/SyncAmsInfoDialog.hpp

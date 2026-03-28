@@ -103,3 +103,8 @@
 - Started T598 (`src/slic3r/GUI/StepMeshDialog.hpp`) as the declaration boundary for the same STEP import dialog.
 - The header now captures the modal tessellation controller, cached raw-vs-valid numeric state, worker-thread ownership, and the Unity split between validation UI and async mesh estimation.
 - Next step after commit: close T598 and move to T599 (`src/slic3r/GUI/SurfaceDrag.cpp`).
+
+- Started T599 (`src/slic3r/GUI/SurfaceDrag.cpp`) as the drag-tool implementation for embossed / surface-snapped placement.
+- The file is a transient controller that caches cursor offsets, raycast filters, fix transforms, and initial angle/distance, then converts pointer motion into a deterministic scene transform.
+- Unity mapping to preserve: a dedicated pointer-drag controller with explicit hit-test state, a model-layer transform helper, and a scene-query service for direct-hit plus nearest-point fallbacks.
+- Verification so far: `git diff --check` will be used as the whitespace/patch sanity check before commit; the local LSP diagnostics are still the known include-path noise from `libslic3r/Point.hpp`.

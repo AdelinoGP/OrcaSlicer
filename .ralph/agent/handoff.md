@@ -133,6 +133,22 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate StepMeshDialog header for Unity port
 - Next recommended Phase 1 task: T599 annotate: src/slic3r/GUI/SurfaceDrag.cpp
 
+## Reconciliation note
+
+- `.ralph/ralph-tasks.md` still showed T598 as open after the completion event had already been processed; I reconciled the manifest by marking T598 done before starting T599.
+
+## Phase 1 - Task T599 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SurfaceDrag.cpp
+- Deliverables: src/slic3r/GUI/SurfaceDrag.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 6 boundary comments covering the drag-tool state model, mouse event gate, raycast-driven surface snapping, fix-transform wrapping, camera-facing emboss orientation, and drag-update flow
+- Verification excerpt: `[UNITY] This should become a drag-controller update tick that reuses the cached hit filter and writes the resulting transform back through the scene model.`
+- Unity-impact summary: explicit pointer-drag controller; scene-query service for direct-hit and nearest-point fallbacks; model-layer transform helpers instead of view mutation
+- Hazards found: P2 x2 (hover-gated gesture start, embossed volume/object policy split)
+- Git: Annotate SurfaceDrag drag controller
+- Next recommended Phase 1 task: T600 annotate: src/slic3r/GUI/SurfaceDrag.hpp
+
 ## Phase 1 - Task T593 complete
 
 - Task type: annotate

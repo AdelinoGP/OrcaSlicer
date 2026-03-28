@@ -12,11 +12,14 @@
 #include "GUI_App.hpp"
 #include "Gizmos/GizmoObjectManipulation.hpp"
 
-
 using namespace Slic3r;
 using namespace Slic3r::GUI;
 
-namespace{
+namespace {
+// [INTENT] SurfaceDrag is the transient controller state for moving an embossed or surface-snapped volume.
+// [STATE] It caches cursor offsets, raycast filters, anchor transforms, and the initial angle/distance so each mouse-move can be replayed
+// deterministically. [UNITY] Port this as a dedicated drag-tool controller with explicit hit-test state and a small data model, not as ad-hoc
+// widget state. [PORTING_HAZARD:P2] The current flow assumes the selected volume is also the hovered drag target when the gesture starts.
 // Distance of embossed volume from surface to be represented as distance surface
 // Maximal distance is also enlarge by size of emboss depth
 constexpr Slic3r::MinMax<double> surface_distance_sq{1e-4, 10.}; // [in mm]
@@ -26,37 +29,36 @@ constexpr Slic3r::MinMax<double> surface_distance_sq{1e-4, 10.}; // [in mm]
 /// </summary>
 /// <param name="mouse_event">Event</param>
 /// <returns>Position</returns>
-Vec2d mouse_position(const wxMouseEvent &mouse_event);
+Vec2d mouse_position(const wxMouseEvent& mouse_event);
 
-bool start_dragging(const Vec2d                 &mouse_pos,
-                    const Camera                &camera,
-                    std::optional<SurfaceDrag>  &surface_drag,
-                    GLCanvas3D                  &canvas,
-                    RaycastManager              &raycast_manager,
-                    const std::optional<double> &up_limit);
+bool start_dragging(const Vec2d&                 mouse_pos,
+                    const Camera&                camera,
+                    std::optional<SurfaceDrag>&  surface_drag,
+                    GLCanvas3D&                  canvas,
+                    RaycastManager&              raycast_manager,
+                    const std::optional<double>& up_limit);
 
-bool dragging(const Vec2d                 &mouse_pos,
-              const Camera                &camera,
-              SurfaceDrag                 &surface_drag, // need to write whether exist hit
-              GLCanvas3D                  &canvas,
-              const RaycastManager        &raycast_manager,
-              const std::optional<double> &up_limit);
+bool dragging(const Vec2d&                 mouse_pos,
+              const Camera&                camera,
+              SurfaceDrag&                 surface_drag, // need to write whether exist hit
+              GLCanvas3D&                  canvas,
+              const RaycastManager&        raycast_manager,
+              const std::optional<double>& up_limit);
 
-Transform3d get_volume_transformation(
-    Transform3d world, // from volume
-    const Vec3d& world_dir, // wanted new direction
-    const Vec3d& world_position, // wanted new position
-    const std::optional<Transform3d>& fix, // [optional] fix matrix
-    // Invers transformation of text volume instance
-    // Help convert world transformation to instance space 
-    const Transform3d& instance_inv,
-    // initial rotation in Z axis
-    std::optional<float> current_angle = {},    
-    const std::optional<double> &up_limit = {}); 
+Transform3d get_volume_transformation(Transform3d                       world,          // from volume
+                                      const Vec3d&                      world_dir,      // wanted new direction
+                                      const Vec3d&                      world_position, // wanted new position
+                                      const std::optional<Transform3d>& fix,            // [optional] fix matrix
+                                      // Invers transformation of text volume instance
+                                      // Help convert world transformation to instance space
+                                      const Transform3d& instance_inv,
+                                      // initial rotation in Z axis
+                                      std::optional<float>         current_angle = {},
+                                      const std::optional<double>& up_limit      = {});
 
-// distinguish between transformation of volume inside object 
+// distinguish between transformation of volume inside object
 // and object(single full instance with one volume)
-bool is_embossed_object(const Selection &selection);
+bool is_embossed_object(const Selection& selection);
 
 /// <summary>
 /// Get fix transformation for selected volume
@@ -64,12 +66,12 @@ bool is_embossed_object(const Selection &selection);
 /// </summary>
 /// <param name="selection">Select only wanted volume</param>
 /// <returns>Pointer on fix transformation from ModelVolume when exists otherwise nullptr</returns>
-const Transform3d *get_fix_transformation(const Selection &selection);
-}
+const Transform3d* get_fix_transformation(const Selection& selection);
+} // namespace
 
 namespace Slic3r::GUI {
- // Calculate scale in world for check in debug
-[[maybe_unused]] static std::optional<double> calc_scale(const Matrix3d &from, const Matrix3d &to, const Vec3d &dir)
+// Calculate scale in world for check in debug
+[[maybe_unused]] static std::optional<double> calc_scale(const Matrix3d& from, const Matrix3d& to, const Vec3d& dir)
 {
     Vec3d  from_dir      = from * dir;
     Vec3d  to_dir        = to * dir;
@@ -80,15 +82,17 @@ namespace Slic3r::GUI {
     return sqrt(from_scale_sq / to_scale_sq);
 }
 
-bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
-                           const Camera               &camera,
-                           std::optional<SurfaceDrag> &surface_drag,
-                           GLCanvas3D                 &canvas,
-                           RaycastManager             &raycast_manager,
-                           const std::optional<double>&up_limit)
+bool on_mouse_surface_drag(const wxMouseEvent&          mouse_event,
+                           const Camera&                camera,
+                           std::optional<SurfaceDrag>&  surface_drag,
+                           GLCanvas3D&                  canvas,
+                           RaycastManager&              raycast_manager,
+                           const std::optional<double>& up_limit)
 {
-    // Fix when leave window during dragging
-    // Fix when click right button
+    // [EVENT] This is the drag gesture state machine: mouse-down starts the surface tool, mouse-move updates it, and mouse-up commits it
+    // back into the model. [STATE] The function also flips canvas picking/moving flags so the drag path owns input until release. [UNITY]
+    // Mirror this with a pointer-drag tool that owns capture/release explicitly instead of depending on wx event reentry. Fix when leave
+    // window during dragging Fix when click right button
     if (surface_drag.has_value() && !mouse_event.Dragging()) {
         // write transformation from UI into model
         canvas.do_move(L("Move over surface"));
@@ -120,14 +124,19 @@ bool on_mouse_surface_drag(const wxMouseEvent         &mouse_event,
     return false;
 }
 
-std::optional<Vec3d> calc_surface_offset(const Selection &selection, RaycastManager &raycast_manager) {
-    const GLVolume *gl_volume_ptr = get_selected_gl_volume(selection);
+std::optional<Vec3d> calc_surface_offset(const Selection& selection, RaycastManager& raycast_manager)
+{
+    // [INTENT] Resolve the target offset for snapping a selected volume onto nearby geometry, including the fallback to the closest
+    // available point when the ideal emboss ray misses. [STATE] The raycaster is refreshed from the current model instance before each
+    // query so the drag tool sees the latest object transforms. [UNITY] This wants a scene-query service that can refresh acceleration
+    // structures and return both direct hits and nearest-point fallbacks.
+    const GLVolume* gl_volume_ptr = get_selected_gl_volume(selection);
     if (gl_volume_ptr == nullptr)
         return {};
     const GLVolume& gl_volume = *gl_volume_ptr;
 
-    const ModelObjectPtrs &objects = selection.get_model()->objects;
-    const ModelVolume* volume = get_model_volume(gl_volume, objects);
+    const ModelObjectPtrs& objects = selection.get_model()->objects;
+    const ModelVolume*     volume  = get_model_volume(gl_volume, objects);
     if (volume == nullptr)
         return {};
 
@@ -140,8 +149,8 @@ std::optional<Vec3d> calc_surface_offset(const Selection &selection, RaycastMana
     raycast_manager.actualize(*instance, &cond);
 
     Transform3d to_world = world_matrix_fixed(gl_volume, objects);
-    Vec3d point = to_world.translation();
-    Vec3d dir = -get_z_base(to_world);
+    Vec3d       point    = to_world.translation();
+    Vec3d       dir      = -get_z_base(to_world);
     // ray in direction of text projection(from volume zero to z-dir)
     std::optional<RaycastManager::Hit> hit_opt = raycast_manager.closest_hit(point, dir, &cond);
 
@@ -158,35 +167,35 @@ std::optional<Vec3d> calc_surface_offset(const Selection &selection, RaycastMana
         if (close_point_opt->squared_distance < EPSILON)
             return {};
 
-        const RaycastManager::ClosePoint &close_point = *close_point_opt;
-        Transform3d hit_tr = raycast_manager.get_transformation(close_point.tr_key);
-        Vec3d    hit_world = hit_tr * close_point.point;
-        Vec3d offset_world = hit_world - point; // vector in world
-        Vec3d offset_volume = to_world.inverse().linear() * offset_world;
+        const RaycastManager::ClosePoint& close_point   = *close_point_opt;
+        Transform3d                       hit_tr        = raycast_manager.get_transformation(close_point.tr_key);
+        Vec3d                             hit_world     = hit_tr * close_point.point;
+        Vec3d                             offset_world  = hit_world - point; // vector in world
+        Vec3d                             offset_volume = to_world.inverse().linear() * offset_world;
         return offset_volume;
     }
 
     // It is no neccesary to move with origin by very small value
-    const RaycastManager::Hit &hit = *hit_opt;
+    const RaycastManager::Hit& hit = *hit_opt;
     if (hit.squared_distance < EPSILON)
         return {};
-    Transform3d hit_tr = raycast_manager.get_transformation(hit.tr_key);
-    Vec3d hit_world    = hit_tr * hit.position;
-    Vec3d offset_world = hit_world - point; // vector in world
+    Transform3d hit_tr       = raycast_manager.get_transformation(hit.tr_key);
+    Vec3d       hit_world    = hit_tr * hit.position;
+    Vec3d       offset_world = hit_world - point; // vector in world
     // TIP: It should be close to only z move
     Vec3d offset_volume = to_world.inverse().linear() * offset_world;
     return offset_volume;
 }
 
-std::optional<float> calc_distance(const GLVolume &gl_volume, RaycastManager &raycaster, GLCanvas3D &canvas)
+std::optional<float> calc_distance(const GLVolume& gl_volume, RaycastManager& raycaster, GLCanvas3D& canvas)
 {
-    const ModelObject *object = get_model_object(gl_volume, canvas.get_model()->objects);
+    const ModelObject* object = get_model_object(gl_volume, canvas.get_model()->objects);
     assert(object != nullptr);
     if (object == nullptr)
         return {};
 
-    const ModelInstance *instance = get_model_instance(gl_volume, *object);
-    const ModelVolume   *volume   = get_model_volume(gl_volume, *object);
+    const ModelInstance* instance = get_model_instance(gl_volume, *object);
+    const ModelVolume*   volume   = get_model_volume(gl_volume, *object);
     assert(instance != nullptr && volume != nullptr);
     if (object == nullptr || instance == nullptr || volume == nullptr)
         return {};
@@ -196,58 +205,61 @@ std::optional<float> calc_distance(const GLVolume &gl_volume, RaycastManager &ra
 
     if (!volume->emboss_shape.has_value())
         return {};
-        
+
     RaycastManager::AllowVolumes condition = create_condition(object->volumes, volume->id());
-    RaycastManager::Meshes meshes = create_meshes(canvas, condition);
+    RaycastManager::Meshes       meshes    = create_meshes(canvas, condition);
     raycaster.actualize(*instance, &condition, &meshes);
     return calc_distance(gl_volume, raycaster, &condition, volume->emboss_shape->fix_3mf_tr);
 }
 
-std::optional<float> calc_distance(const GLVolume &gl_volume, const RaycastManager &raycaster, 
-    const RaycastManager::ISkip *condition, const std::optional<Slic3r::Transform3d>& fix) {
+std::optional<float> calc_distance(const GLVolume&                           gl_volume,
+                                   const RaycastManager&                     raycaster,
+                                   const RaycastManager::ISkip*              condition,
+                                   const std::optional<Slic3r::Transform3d>& fix)
+{
     Transform3d w = gl_volume.world_matrix();
     if (fix.has_value())
         w = w * fix->inverse();
-    Vec3d p = w.translation();
-    Vec3d dir = -get_z_base(w);
-    auto hit_opt = raycaster.closest_hit(p, dir, condition);
+    Vec3d p       = w.translation();
+    Vec3d dir     = -get_z_base(w);
+    auto  hit_opt = raycaster.closest_hit(p, dir, condition);
     if (!hit_opt.has_value())
         return {};
 
-    const RaycastManager::Hit &hit = *hit_opt;
+    const RaycastManager::Hit& hit = *hit_opt;
     // NOTE: hit.squared_distance is in volume space not world
 
-    const Transform3d &tr = raycaster.get_transformation(hit.tr_key);
-    Vec3d hit_world = tr * hit.position;
-    Vec3d p_to_hit = hit_world - p;
-    double distance_sq = p_to_hit.squaredNorm();
+    const Transform3d& tr          = raycaster.get_transformation(hit.tr_key);
+    Vec3d              hit_world   = tr * hit.position;
+    Vec3d              p_to_hit    = hit_world - p;
+    double             distance_sq = p_to_hit.squaredNorm();
 
     // too small distance is calculated as zero distance
     if (distance_sq < ::surface_distance_sq.min)
         return {};
 
     // check maximal distance
-    const BoundingBoxf3& bb = gl_volume.bounding_box();
-    double max_squared_distance = std::max(std::pow(2 * bb.size().z(), 2), ::surface_distance_sq.max);
+    const BoundingBoxf3& bb                   = gl_volume.bounding_box();
+    double               max_squared_distance = std::max(std::pow(2 * bb.size().z(), 2), ::surface_distance_sq.max);
     if (distance_sq > max_squared_distance)
-        return {};   
-    
+        return {};
+
     // calculate sign
-    float sign = (p_to_hit.dot(dir) > 0)? 1.f : -1.f;
+    float sign = (p_to_hit.dot(dir) > 0) ? 1.f : -1.f;
 
     // distiguish sign
     return sign * static_cast<float>(sqrt(distance_sq));
 }
 
-std::optional<float> calc_angle(const Selection &selection)
+std::optional<float> calc_angle(const Selection& selection)
 {
-    const GLVolume *gl_volume = selection.get_first_volume();
+    const GLVolume* gl_volume = selection.get_first_volume();
     assert(gl_volume != nullptr);
     if (gl_volume == nullptr)
         return {};
 
-    Transform3d to_world = gl_volume->world_matrix();
-    const ModelVolume *volume = get_model_volume(*gl_volume, selection.get_model()->objects);
+    Transform3d        to_world = gl_volume->world_matrix();
+    const ModelVolume* volume   = get_model_volume(*gl_volume, selection.get_model()->objects);
     assert(volume != nullptr);
     assert(volume->emboss_shape.has_value());
     if (volume == nullptr || !volume->emboss_shape.has_value() || !volume->emboss_shape->fix_3mf_tr)
@@ -258,28 +270,28 @@ std::optional<float> calc_angle(const Selection &selection)
     return Emboss::calc_up(to_world, UP_LIMIT);
 }
 
-Transform3d world_matrix_fixed(const GLVolume &gl_volume, const ModelObjectPtrs &objects)
+Transform3d world_matrix_fixed(const GLVolume& gl_volume, const ModelObjectPtrs& objects)
 {
     Transform3d res = gl_volume.world_matrix();
 
-    const ModelVolume *mv = get_model_volume(gl_volume, objects);
+    const ModelVolume* mv = get_model_volume(gl_volume, objects);
     if (!mv)
         return res;
 
-    const std::optional<EmbossShape> &es = mv->emboss_shape;
+    const std::optional<EmbossShape>& es = mv->emboss_shape;
     if (!es.has_value())
         return res;
 
-    const std::optional<Transform3d> &fix = es->fix_3mf_tr;
+    const std::optional<Transform3d>& fix = es->fix_3mf_tr;
     if (!fix.has_value())
         return res;
 
     return res * fix->inverse();
 }
 
-Transform3d world_matrix_fixed(const Selection &selection)
+Transform3d world_matrix_fixed(const Selection& selection)
 {
-    const GLVolume *gl_volume = get_selected_gl_volume(selection);
+    const GLVolume* gl_volume = get_selected_gl_volume(selection);
     assert(gl_volume != nullptr);
     if (gl_volume == nullptr)
         return Transform3d::Identity();
@@ -287,11 +299,15 @@ Transform3d world_matrix_fixed(const Selection &selection)
     return world_matrix_fixed(*gl_volume, selection.get_model()->objects);
 }
 
-void selection_transform(Selection &selection, const std::function<void()> &selection_transformation_fnc)
-{   
-    if (const Transform3d *fix = get_fix_transformation(selection); fix != nullptr) {        
+void selection_transform(Selection& selection, const std::function<void()>& selection_transformation_fnc)
+{
+    // [INTENT] Apply a selection mutation while temporarily removing any baked 3MF fix transform, then restore it so saved geometry stays
+    // stable. [STATE] The cache is rebuilt before and after the callback because downstream selection math depends on derived bounds and
+    // indices staying in sync. [UNITY] Port this as a model-layer transform wrapper rather than letting the view mutate object matrices
+    // directly.
+    if (const Transform3d* fix = get_fix_transformation(selection); fix != nullptr) {
         // NOTE: need editable gl volume .. can't use selection.get_first_volume()
-        GLVolume *gl_volume = selection.get_volume(*selection.get_volume_idxs().begin());
+        GLVolume*   gl_volume = selection.get_volume(*selection.get_volume_idxs().begin());
         Transform3d volume_tr = gl_volume->get_volume_transformation().get_matrix();
         gl_volume->set_volume_transformation(volume_tr * fix->inverse());
         selection.setup_cache();
@@ -309,34 +325,38 @@ void selection_transform(Selection &selection, const std::function<void()> &sele
         selection.synchronize_unselected_instances(Selection::SyncRotationType::GENERAL);
 }
 
-bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas, const std::optional<double> &wanted_up_limit)
+bool face_selected_volume_to_camera(const Camera& camera, GLCanvas3D& canvas, const std::optional<double>& wanted_up_limit)
 {
-    GLVolume *gl_volume_ptr = get_selected_gl_volume(canvas);
+    // [INTENT] Reorient the selected embossed volume so its local Z axis follows the camera-facing emboss direction, while preserving
+    // object-vs-volume semantics. [PORTING_HAZARD:P2] The transform path branches on embossed-object vs volume editing, which is a policy
+    // decision the Unity port should keep in a shared transform service. [UNITY] This maps to a controller that computes a target
+    // orientation and submits it to the scene model, with camera direction provided by the viewport.
+    GLVolume* gl_volume_ptr = get_selected_gl_volume(canvas);
     if (gl_volume_ptr == nullptr)
         return false;
-    GLVolume &gl_volume = *gl_volume_ptr;
+    GLVolume& gl_volume = *gl_volume_ptr;
 
-    const ModelObjectPtrs &objects = canvas.get_model()->objects;
-    ModelObject *object_ptr = get_model_object(gl_volume, objects);
+    const ModelObjectPtrs& objects    = canvas.get_model()->objects;
+    ModelObject*           object_ptr = get_model_object(gl_volume, objects);
     assert(object_ptr != nullptr);
     if (object_ptr == nullptr)
         return false;
-    ModelObject &object = *object_ptr;
+    ModelObject& object = *object_ptr;
 
-    const ModelInstance *instance_ptr = get_model_instance(gl_volume, object);
+    const ModelInstance* instance_ptr = get_model_instance(gl_volume, object);
     assert(instance_ptr != nullptr);
     if (instance_ptr == nullptr)
         return false;
-    const ModelInstance &instance = *instance_ptr;
+    const ModelInstance& instance = *instance_ptr;
 
-    ModelVolume *volume_ptr = get_model_volume(gl_volume, object);
+    ModelVolume* volume_ptr = get_model_volume(gl_volume, object);
     assert(volume_ptr != nullptr);
     if (volume_ptr == nullptr)
         return false;
-    ModelVolume &volume = *volume_ptr;
+    ModelVolume& volume = *volume_ptr;
 
     // Calculate new volume transformation
-    Transform3d volume_tr = volume.get_matrix();
+    Transform3d                volume_tr = volume.get_matrix();
     std::optional<Transform3d> fix;
     if (volume.emboss_shape.has_value()) {
         fix = volume.emboss_shape->fix_3mf_tr;
@@ -344,32 +364,30 @@ bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas, co
             volume_tr = volume_tr * fix->inverse();
     }
 
-    Transform3d instance_tr     = instance.get_matrix();
-    Transform3d instance_tr_inv = instance_tr.inverse();
-    Transform3d world_tr        = instance_tr * volume_tr; // without sla !!!
+    Transform3d          instance_tr     = instance.get_matrix();
+    Transform3d          instance_tr_inv = instance_tr.inverse();
+    Transform3d          world_tr        = instance_tr * volume_tr; // without sla !!!
     std::optional<float> current_angle;
     if (wanted_up_limit.has_value())
         current_angle = Emboss::calc_up(world_tr, *wanted_up_limit);
 
-    Vec3d world_position = gl_volume.world_matrix()*Vec3d::Zero();
+    Vec3d world_position = gl_volume.world_matrix() * Vec3d::Zero();
 
-    assert(camera.get_type() == Camera::EType::Perspective || 
-           camera.get_type() == Camera::EType::Ortho);
-    Vec3d wanted_direction = (camera.get_type() == Camera::EType::Perspective) ?
-        Vec3d(camera.get_position() - world_position) : 
-        (-camera.get_dir_forward());
-    
-    Transform3d new_volume_tr = get_volume_transformation(world_tr, wanted_direction, world_position,
-        fix, instance_tr_inv, current_angle, wanted_up_limit);
+    assert(camera.get_type() == Camera::EType::Perspective || camera.get_type() == Camera::EType::Ortho);
+    Vec3d wanted_direction = (camera.get_type() == Camera::EType::Perspective) ? Vec3d(camera.get_position() - world_position) :
+                                                                                 (-camera.get_dir_forward());
 
-    Selection &selection = canvas.get_selection();
+    Transform3d new_volume_tr = get_volume_transformation(world_tr, wanted_direction, world_position, fix, instance_tr_inv, current_angle,
+                                                          wanted_up_limit);
+
+    Selection& selection = canvas.get_selection();
     if (is_embossed_object(selection)) {
         // transform instance instead of volume
-        Transform3d new_instance_tr = instance_tr * new_volume_tr * volume.get_matrix().inverse();        
+        Transform3d new_instance_tr = instance_tr * new_volume_tr * volume.get_matrix().inverse();
         gl_volume.set_instance_transformation(new_instance_tr);
-        
+
         // set same transformation to other instances when instance is embossed object
-        if (selection.is_single_full_instance()) 
+        if (selection.is_single_full_instance())
             selection.synchronize_unselected_instances(Selection::SyncRotationType::GENERAL);
     } else {
         // write result transformation
@@ -386,24 +404,27 @@ bool face_selected_volume_to_camera(const Camera &camera, GLCanvas3D &canvas, co
     return true;
 }
 
-void do_local_z_rotate(Selection &selection, double relative_angle) {
+void do_local_z_rotate(Selection& selection, double relative_angle)
+{
     assert(!selection.is_empty());
-    if(selection.is_empty()) return;
+    if (selection.is_empty())
+        return;
 
     bool is_single_volume = selection.volumes_count() == 1;
     assert(is_single_volume);
-    if (!is_single_volume) return;
+    if (!is_single_volume)
+        return;
 
     // Fix angle for mirrored volume
-    bool is_mirrored = false;
-    const GLVolume* gl_volume = selection.get_first_volume();
+    bool            is_mirrored = false;
+    const GLVolume* gl_volume   = selection.get_first_volume();
     if (gl_volume != nullptr) {
-        const ModelInstance *instance = get_model_instance(*gl_volume, selection.get_model()->objects);
-        bool is_instance_mirrored = (instance != nullptr)? has_reflection(instance->get_matrix()) : false;
+        const ModelInstance* instance             = get_model_instance(*gl_volume, selection.get_model()->objects);
+        bool                 is_instance_mirrored = (instance != nullptr) ? has_reflection(instance->get_matrix()) : false;
         if (is_embossed_object(selection)) {
-                is_mirrored = is_instance_mirrored;
+            is_mirrored = is_instance_mirrored;
         } else {
-            const ModelVolume *volume = get_model_volume(*gl_volume, selection.get_model()->objects);
+            const ModelVolume* volume = get_model_volume(*gl_volume, selection.get_model()->objects);
             if (volume != nullptr)
                 is_mirrored = is_instance_mirrored != has_reflection(volume->get_matrix());
         }
@@ -412,15 +433,17 @@ void do_local_z_rotate(Selection &selection, double relative_angle) {
         relative_angle *= -1;
 
     selection.setup_cache();
-    auto selection_rotate_fnc = [&selection, &relative_angle](){
+    auto selection_rotate_fnc = [&selection, &relative_angle]() {
         selection.rotate(Vec3d(0., 0., relative_angle), get_drag_transformation_type(selection));
     };
     selection_transform(selection, selection_rotate_fnc);
 }
 
-void do_local_z_move(Selection &selection, double relative_move) {
+void do_local_z_move(Selection& selection, double relative_move)
+{
     assert(!selection.is_empty());
-    if (selection.is_empty()) return;
+    if (selection.is_empty())
+        return;
 
     selection.setup_cache();
     auto selection_translate_fnc = [&selection, relative_move]() {
@@ -430,14 +453,10 @@ void do_local_z_move(Selection &selection, double relative_move) {
     selection_transform(selection, selection_translate_fnc);
 }
 
-TransformationType get_drag_transformation_type(const Selection &selection)
-{
-    return is_embossed_object(selection) ?
-        TransformationType::Instance_Relative_Joint : 
-        TransformationType::Local_Relative_Joint;
-}
+TransformationType get_drag_transformation_type(const Selection& selection)
+{ return is_embossed_object(selection) ? TransformationType::Instance_Relative_Joint : TransformationType::Local_Relative_Joint; }
 
-void dragging_rotate_gizmo(double gizmo_angle, std::optional<float>& current_angle, std::optional<float> &start_angle, Selection &selection)
+void dragging_rotate_gizmo(double gizmo_angle, std::optional<float>& current_angle, std::optional<float>& start_angle, Selection& selection)
 {
     if (!start_angle.has_value())
         // create cache for initial angle
@@ -447,7 +466,7 @@ void dragging_rotate_gizmo(double gizmo_angle, std::optional<float>& current_ang
 
     double new_angle = gizmo_angle + *start_angle;
 
-    const GLVolume *gl_volume = selection.get_first_volume();
+    const GLVolume* gl_volume = selection.get_first_volume();
     assert(gl_volume != nullptr);
     if (gl_volume == nullptr)
         return;
@@ -460,9 +479,9 @@ void dragging_rotate_gizmo(double gizmo_angle, std::optional<float>& current_ang
     // move to range <-M_PI, M_PI>
     Geometry::to_range_pi_pi(new_angle);
 
-    const Transform3d* fix = get_fix_transformation(selection);
-    double z_rotation = (fix!=nullptr) ? (new_angle - current_angle.value_or(0.f)) : // relative angle
-                                         gizmo_angle; // relativity is keep by selection cache
+    const Transform3d* fix        = get_fix_transformation(selection);
+    double             z_rotation = (fix != nullptr) ? (new_angle - current_angle.value_or(0.f)) : // relative angle
+                                                       gizmo_angle;                                // relativity is keep by selection cache
 
     auto selection_rotate_fnc = [z_rotation, &selection]() {
         selection.rotate(Vec3d(0., 0., z_rotation), get_drag_transformation_type(selection));
@@ -482,41 +501,44 @@ void dragging_rotate_gizmo(double gizmo_angle, std::optional<float>& current_ang
 // private implementation
 namespace {
 
-Vec2d mouse_position(const wxMouseEvent &mouse_event){
+Vec2d mouse_position(const wxMouseEvent& mouse_event)
+{
     // wxCoord == int --> wx/types.h
     Vec2i32 mouse_coord(mouse_event.GetX(), mouse_event.GetY());
     return mouse_coord.cast<double>();
 }
 
-bool start_dragging(const Vec2d                &mouse_pos,
-                    const Camera               &camera,
-                    std::optional<SurfaceDrag> &surface_drag,
-                    GLCanvas3D                 &canvas,
-                    RaycastManager             &raycast_manager,
-                    const std::optional<double>&up_limit)
+bool start_dragging(const Vec2d&                 mouse_pos,
+                    const Camera&                camera,
+                    std::optional<SurfaceDrag>&  surface_drag,
+                    GLCanvas3D&                  canvas,
+                    RaycastManager&              raycast_manager,
+                    const std::optional<double>& up_limit)
 {
-    // selected volume
-    GLVolume *gl_volume_ptr = get_selected_gl_volume(canvas);
+    // [EVENT] Begin only if the hovered volume is the selected target; this keeps the tool aligned with the visible manipulator state.
+    // [STATE] The function seeds the drag snapshot (angles, offset, instance inverse, and raycast filters) and disables generic canvas
+    // picking until release. selected volume
+    GLVolume* gl_volume_ptr = get_selected_gl_volume(canvas);
     if (gl_volume_ptr == nullptr)
         return false;
-    const GLVolume &gl_volume = *gl_volume_ptr;
+    const GLVolume& gl_volume = *gl_volume_ptr;
 
     // is selected volume closest hovered?
-    const GLVolumePtrs &gl_volumes = canvas.get_volumes().volumes;
+    const GLVolumePtrs& gl_volumes = canvas.get_volumes().volumes;
     if (int hovered_idx = canvas.get_first_hover_volume_idx(); hovered_idx < 0)
         return false;
     else if (auto hovered_idx_ = static_cast<size_t>(hovered_idx);
              hovered_idx_ >= gl_volumes.size() || gl_volumes[hovered_idx_] != gl_volume_ptr)
         return false;
 
-    const ModelObjectPtrs &objects = canvas.get_model()->objects;
-    const ModelObject     *object  = get_model_object(gl_volume, objects);
+    const ModelObjectPtrs& objects = canvas.get_model()->objects;
+    const ModelObject*     object  = get_model_object(gl_volume, objects);
     assert(object != nullptr);
     if (object == nullptr)
         return false;
 
-    const ModelInstance *instance = get_model_instance(gl_volume, *object);
-    const ModelVolume   *volume   = get_model_volume(gl_volume, *object);
+    const ModelInstance* instance = get_model_instance(gl_volume, *object);
+    const ModelVolume*   volume   = get_model_volume(gl_volume, *object);
     assert(instance != nullptr && volume != nullptr);
     if (object == nullptr || instance == nullptr || volume == nullptr)
         return false;
@@ -526,7 +548,7 @@ bool start_dragging(const Vec2d                &mouse_pos,
         return false;
 
     RaycastManager::AllowVolumes condition = create_condition(object->volumes, volume->id());
-    RaycastManager::Meshes meshes = create_meshes(canvas, condition);
+    RaycastManager::Meshes       meshes    = create_meshes(canvas, condition);
     // initialize raycasters
     // INFO: It could slows down for big objects
     // (may be move to thread and do not show drag until it finish)
@@ -538,7 +560,7 @@ bool start_dragging(const Vec2d                &mouse_pos,
     // zero point of volume in world coordinate system
     Vec3d volume_center = to_world.translation();
     // screen coordinate of volume center
-    auto coor                           = CameraUtils::project(camera, volume_center);
+    auto  coor                           = CameraUtils::project(camera, volume_center);
     Vec2d mouse_offset                   = coor.cast<double>() - mouse_pos;
     Vec2d mouse_offset_without_sla_shift = mouse_offset;
     if (double sla_shift = gl_volume.get_sla_shift_z(); !is_approx(sla_shift, 0.)) {
@@ -555,15 +577,15 @@ bool start_dragging(const Vec2d                &mouse_pos,
     Transform3d volume_tr = gl_volume.get_volume_transformation().get_matrix();
 
     // fix baked transformation from .3mf store process
-    if (const std::optional<EmbossShape> &es_opt = volume->emboss_shape; es_opt.has_value()) {
-        const std::optional<Slic3r::Transform3d> &fix = es_opt->fix_3mf_tr;
+    if (const std::optional<EmbossShape>& es_opt = volume->emboss_shape; es_opt.has_value()) {
+        const std::optional<Slic3r::Transform3d>& fix = es_opt->fix_3mf_tr;
         if (fix.has_value())
             volume_tr = volume_tr * fix->inverse();
     }
 
-    Transform3d instance_tr     = instance->get_matrix();
-    Transform3d instance_tr_inv = instance_tr.inverse();
-    Transform3d world_tr        = instance_tr * volume_tr;
+    Transform3d          instance_tr     = instance->get_matrix();
+    Transform3d          instance_tr_inv = instance_tr.inverse();
+    Transform3d          world_tr        = instance_tr * volume_tr;
     std::optional<float> start_angle;
     if (up_limit.has_value()) {
         start_angle = Emboss::calc_up(world_tr, *up_limit);
@@ -584,18 +606,19 @@ bool start_dragging(const Vec2d                &mouse_pos,
     return true;
 }
 
-Transform3d get_volume_transformation(
-    Transform3d world, // from volume
-    const Vec3d& world_dir, // wanted new direction
-    const Vec3d& world_position, // wanted new position
-    const std::optional<Transform3d>& fix, // [optional] fix matrix
-    // Invers transformation of text volume instance
-    // Help convert world transformation to instance space 
-    const Transform3d& instance_inv,
-    // initial rotation in Z axis
-    std::optional<float> current_angle,    
-    const std::optional<double> &up_limit) 
+Transform3d get_volume_transformation(Transform3d                       world,          // from volume
+                                      const Vec3d&                      world_dir,      // wanted new direction
+                                      const Vec3d&                      world_position, // wanted new position
+                                      const std::optional<Transform3d>& fix,            // [optional] fix matrix
+                                      // Invers transformation of text volume instance
+                                      // Help convert world transformation to instance space
+                                      const Transform3d& instance_inv,
+                                      // initial rotation in Z axis
+                                      std::optional<float>         current_angle,
+                                      const std::optional<double>& up_limit)
 {
+    // [INTENT] Synthesize the final volume transform from a world-space drag ray, while normalizing skew, preserving scale, and reapplying
+    // any baked fix transform. [UNITY] This is best expressed as a pure math helper feeding a scene command, not as an in-place widget transform.
     auto world_linear = world.linear().eval();
     // Calculate offset: transformation to wanted position
     {
@@ -612,7 +635,7 @@ Transform3d get_volume_transformation(
     auto        world_new_linear = world_new.linear().eval();
 
     // Fix direction of up vector to zero initial rotation
-    if(up_limit.has_value()){
+    if (up_limit.has_value()) {
         Vec3d z_world = world_new_linear.col(2);
         z_world.normalize();
         Vec3d wanted_up = Emboss::suggest_up(z_world, *up_limit);
@@ -623,7 +646,7 @@ Transform3d get_volume_transformation(
         world_new        = y_rotation * world_new;
         world_new_linear = world_new.linear();
     }
-    
+
     // Edit position from right
     Transform3d volume_new{Eigen::Translation<double, 3>(instance_inv * world_position)};
     volume_new.linear() = instance_inv.linear() * world_new_linear;
@@ -644,19 +667,21 @@ Transform3d get_volume_transformation(
     // apply move in Z direction and rotation by up vector
     Emboss::apply_transformation(current_angle, {}, volume_new);
 
-    return volume_new;    
+    return volume_new;
 }
 
-bool dragging(const Vec2d                 &mouse_pos,
-              const Camera                &camera,
-              SurfaceDrag                 &surface_drag,
-              GLCanvas3D                  &canvas,
-              const RaycastManager        &raycast_manager,
-              const std::optional<double> &up_limit)
+bool dragging(const Vec2d&                 mouse_pos,
+              const Camera&                camera,
+              SurfaceDrag&                 surface_drag,
+              GLCanvas3D&                  canvas,
+              const RaycastManager&        raycast_manager,
+              const std::optional<double>& up_limit)
 {
-    Vec2d offseted_mouse = mouse_pos + surface_drag.mouse_offset_without_sla_shift;
-    std::optional<RaycastManager::Hit> hit = ray_from_camera(
-        raycast_manager, offseted_mouse, camera, &surface_drag.condition);
+    // [EVENT] Pointer motion updates the live transform from the cached drag snapshot; if the ray misses, the tool only requests a redraw
+    // so the crosshair state can recover. [UNITY] This should become a drag-controller update tick that reuses the cached hit filter and
+    // writes the resulting transform back through the scene model.
+    Vec2d                              offseted_mouse = mouse_pos + surface_drag.mouse_offset_without_sla_shift;
+    std::optional<RaycastManager::Hit> hit            = ray_from_camera(raycast_manager, offseted_mouse, camera, &surface_drag.condition);
 
     surface_drag.exist_hit = hit.has_value();
     if (!hit.has_value()) {
@@ -665,19 +690,16 @@ bool dragging(const Vec2d                 &mouse_pos,
         return true;
     }
 
-    const ModelVolume *volume = get_model_volume(*surface_drag.gl_volume, canvas.get_model()->objects);
+    const ModelVolume*         volume = get_model_volume(*surface_drag.gl_volume, canvas.get_model()->objects);
     std::optional<Transform3d> fix;
-    if (volume !=nullptr && 
-        volume->emboss_shape.has_value() && 
-        volume->emboss_shape->fix_3mf_tr.has_value())
+    if (volume != nullptr && volume->emboss_shape.has_value() && volume->emboss_shape->fix_3mf_tr.has_value())
         fix = volume->emboss_shape->fix_3mf_tr;
-    Transform3d volume_new = get_volume_transformation(surface_drag.world, hit->normal, hit->position,
-        fix, surface_drag.instance_inv, surface_drag.start_angle, up_limit);
+    Transform3d volume_new = get_volume_transformation(surface_drag.world, hit->normal, hit->position, fix, surface_drag.instance_inv,
+                                                       surface_drag.start_angle, up_limit);
 
     // Update transformation for all instances
-    for (GLVolume *vol : canvas.get_volumes().volumes) {
-        if (vol->object_idx() != surface_drag.gl_volume->object_idx() || 
-            vol->volume_idx() != surface_drag.gl_volume->volume_idx())
+    for (GLVolume* vol : canvas.get_volumes().volumes) {
+        if (vol->object_idx() != surface_drag.gl_volume->object_idx() || vol->volume_idx() != surface_drag.gl_volume->volume_idx())
             continue;
         vol->set_volume_transformation(volume_new);
     }
@@ -688,24 +710,25 @@ bool dragging(const Vec2d                 &mouse_pos,
     return true;
 }
 
-bool is_embossed_object(const Selection &selection)
+bool is_embossed_object(const Selection& selection)
 {
     assert(selection.volumes_count() == 1);
     return selection.is_single_full_object() || selection.is_single_full_instance();
 }
 
-const Transform3d *get_fix_transformation(const Selection &selection) {
-    const GLVolume *gl_volume = get_selected_gl_volume(selection);
+const Transform3d* get_fix_transformation(const Selection& selection)
+{
+    const GLVolume* gl_volume = get_selected_gl_volume(selection);
     assert(gl_volume != nullptr);
     if (gl_volume == nullptr)
         return nullptr;
 
-    const ModelVolume *volume = get_model_volume(*gl_volume, selection.get_model()->objects);
+    const ModelVolume* volume = get_model_volume(*gl_volume, selection.get_model()->objects);
     assert(volume != nullptr);
     if (volume == nullptr)
         return nullptr;
 
-    const std::optional<EmbossShape> &es = volume->emboss_shape;
+    const std::optional<EmbossShape>& es = volume->emboss_shape;
     if (!volume->emboss_shape.has_value())
         return nullptr;
     if (!es->fix_3mf_tr.has_value())
