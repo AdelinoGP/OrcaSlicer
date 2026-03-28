@@ -2,6 +2,10 @@
 
 ## Patterns
 
+### mem-1774675403-0a0a
+> ThermalPreconditioningDialog.hpp is the declaration boundary for the thermal countdown modal: it owns the UI-thread wxTimer, device-id lookup, and dismiss/update controls, so Unity should use a modal overlay controller with a scheduled tick and explicit lifetime ownership.
+<!-- tags: gui, unity, dialog, threading | created: 2026-03-28 -->
+
 ### mem-1774675021-483b
 > ThermalPreconditioningDialog is a UI-thread modal countdown that polls DeviceManager with wxTimer ticks; stage_curr == 58 is the thermal-preconditioning gate and should become an explicit state enum in Unity.
 <!-- tags: gui, unity, dialog, threading | created: 2026-03-28 -->

@@ -218,6 +218,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Verification excerpt: `[INTENT] This file is the printer-status dashboard: it composes the monitor/printing cards,`
 - Unity-impact summary: split the dashboard into a retained page controller with reusable child panels and explicit subview state instead of one monolithic wxWidgets panel
 - Hazards found: P2 x0 in the new annotations; the main integration risk is the size and cross-cutting nature of the retained dashboard
+
+## Phase 1 - Task T616 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/ThermalPreconditioningDialog.hpp
+- Deliverables: src/slic3r/GUI/ThermalPreconditioningDialog.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md, .ralph/ralph-tasks.md
+- Substantive additions: 7 boundary comments covering modal intent, countdown state, event flow, UI-thread timer ownership, Unity mapping, and a P2 porting hazard; plus member-level state notes
+- Verification excerpt: `[UNITY] Map this to a modal overlay controller with a scheduled tick (eg. coroutine/InvokeRepeating) plus bound text fields.`
+- Unity-impact summary: the timer-driven countdown becomes an explicit scheduled tick; dialog state stays in a retained controller; close/update actions need clear lifetime ownership in Unity
+- Hazards found: P2 x1 (timer/lifetime coupling)
+- Git: Annotate ThermalPreconditioningDialog.hpp boundary
+- Next recommended Phase 1 task: T617 annotate: src/slic3r/GUI/TickCode.cpp
 - Git: annotate StatusPanel dashboard boundary
 - Next recommended Phase 1 task: T596 annotate: src/slic3r/GUI/StatusPanel.hpp
 

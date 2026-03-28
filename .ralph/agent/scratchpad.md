@@ -175,3 +175,7 @@
 - Started T615 (`src/slic3r/GUI/ThermalPreconditioningDialog.cpp`) as the thermal preconditioning countdown dialog.
 - The file is a short-lived modal status window driven by a UI-thread wxTimer; it polls DeviceManager for the selected machine, formats the remaining time, and closes through the OK event.
 - Plan: keep the annotations centered on event-table routing, timer ownership/lifetime, countdown state, and the Unity split to a modal controller with a scheduled tick, then verify with `git diff --check` and close the task.
+
+- Completed T616 (`src/slic3r/GUI/ThermalPreconditioningDialog.hpp`) as the declaration boundary for the same countdown modal.
+- The header now captures the UI-thread timer ownership, device-id lookup, countdown text refresh, and the Unity split to a modal overlay controller with a scheduled tick.
+- Verification: `git diff --check -- src/slic3r/GUI/ThermalPreconditioningDialog.hpp` is clean; next step after commit is T617 (`src/slic3r/GUI/TickCode.cpp`).
