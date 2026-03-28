@@ -55,3 +55,10 @@
 - Started T587 (`src/slic3r/GUI/SingleChoiceDialog.cpp`) as a compact modal choice dialog.
 - The file is a thin DPIDialog wrapper around a read-only ComboBox plus OK/Cancel dismissal, with one obvious Unity hazard: it assumes a non-empty choice list when seeding the combo.
 - Plan: keep the annotations focused on the modal wrapper boundary, transient selection state, button/event flow, the empty-list hazard, and the fixed-layout DPI hook, then close the task and move to T588 (`src/slic3r/GUI/SingleChoiceDialog.hpp`).
+
+- Starting T588 (`src/slic3r/GUI/SingleChoiceDialog.hpp`) as the declaration boundary for the same modal chooser.
+- The header is small, so the goal is to anchor the class purpose, widget ownership, combo-box exposure, and Unity mapping without bloating it.
+- Likely annotation focus: dialog intent, combo ownership/lifetime, DPI override boundary, and a Unity note for a modal overlay with a dropdown-backed selection model.
+
+- Completed T588 with a minimal header annotation set: class intent, transient ComboBox ownership, DPI event boundary, and a P2 porting hazard for the raw accessor plus empty-list assumption.
+- The header stayed syntactically clean after patching; the only parser noise was from unresolved external includes in the local LSP environment, not from the comment insertion itself.

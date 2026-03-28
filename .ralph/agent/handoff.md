@@ -43,6 +43,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate SingleChoiceDialog selection flow
 - Next recommended Phase 1 task: T588 annotate: src/slic3r/GUI/SingleChoiceDialog.hpp
 
+## Phase 1 - Task T588 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SingleChoiceDialog.hpp
+- Deliverables: src/slic3r/GUI/SingleChoiceDialog.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 4 boundary comments covering dialog intent, transient combo-box state, Unity mapping, and a raw-pointer/empty-list porting hazard
+- Verification excerpt: `[PORTING_HAZARD:P2] The public raw ComboBox accessor and the constructor's choice-list assumption make validation and ownership boundaries implicit; a Unity port should normalize empty lists before opening.`
+- Unity-impact summary: modal chooser maps to a dropdown-backed controller; selection ownership stays inside the dialog; callers should not rely on widget internals in the Unity port
+- Hazards found: P2 x1 (raw ComboBox exposure and empty-list assumption)
+- Git: Annotate SingleChoiceDialog.hpp boundary
+- Next recommended Phase 1 task: T589 annotate: src/slic3r/GUI/SkipPartCanvas.cpp
+
 ## Tasks
 
 ### Completed
