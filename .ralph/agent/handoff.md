@@ -1943,3 +1943,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 P2
 - Git: Annotate Tabbook sidebar tab rail
 - Next recommended Phase 1 task: T606 annotate: src/slic3r/GUI/Tabbook.hpp
+
+## Phase 1 - Task T606 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Tabbook.hpp
+- Deliverables: src/slic3r/GUI/Tabbook.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 14 boundary comments covering tab-rail ownership, selection and insertion events, page lifetime, focus traversal, page transitions, and Unity migration guidance
+- Verification excerpt: `[UNITY] Port as a page-host controller with a separate tab-rail view and explicit page swap events rather than a single monolithic notebook widget.`
+- Unity-impact summary: retain the tab rail as its own view; keep page swap and focus routing explicit; preserve page transition state separately from selection
+- Hazards found: P2 x2, P3 x1
+- Git: Annotate Tabbook.hpp boundary
+- Next recommended Phase 1 task: T607 annotate: src/slic3r/GUI/TabButton.cpp

@@ -135,3 +135,7 @@
 - Started T605 (`src/slic3r/GUI/Tabbook.cpp`) as the sidebar tab-rail controller.
 - Tabbook.cpp owns the custom tab strip chrome: it reparents a caller-owned sizer subtree, paints only the selected-page band and separator, forwards button clicks via `wxCUSTOMEVT_TABBOOK_SEL_CHANGED`, and keeps a late-bound footer label for contextual hints.
 - Plan: keep the annotation compact but cover selection ownership, custom paint flow, per-tab badges/icons, DPI rescales, and the Unity mapping to a retained vertical tab rail with reusable button items, then verify with `git diff --check` and commit the atomic change.
+
+- Completed T606 (`src/slic3r/GUI/Tabbook.hpp`) with boundary annotations covering the tab-rail controller, selection and insertion event flow, focus/navigation choreography, page-visibility policy, and the Unity split between a retained tab rail and the notebook host.
+- Verification: `git diff --check` is clean for the annotation patch; the header now carries concrete `[INTENT]`, `[STATE]`, `[EVENT]`, `[UNITY]`, and `[PORTING_HAZARD]` notes at the class and method boundaries.
+- Next step after commit: close T606 in the runtime/task registry, then move to T607 (`src/slic3r/GUI/TabButton.cpp`).
