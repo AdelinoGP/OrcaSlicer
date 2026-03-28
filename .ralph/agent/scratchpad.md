@@ -30,3 +30,7 @@
 - Started T581 (`src/slic3r/GUI/SendMultiMachinePage.cpp`) and annotated the modal controller boundary, row widget behavior, device-list rebuild flow, AMS mapping serialization, send workflow, rename validation, thumbnail defaults, and periodic refresh tick.
 - The page is a composite send-to-multi-device dialog: it mixes a cached device roster, a popup-based AMS mapper, app-config-backed options, and synchronous send/export actions, so Unity should split it into reusable subviews plus a service-backed view model.
 - Next step after commit: close T581, record completion evidence in handoff, and move to the next ready annotation task.
+
+- Started T582 (`src/slic3r/GUI/SendMultiMachinePage.hpp`) and added declaration-level annotations for the custom-painted device row controller and the modal multi-printer workflow boundary.
+- The header makes the Unity split explicit: prefabbed recyclable device rows, a modal shell, and a separate AMS mapping/settings model with main-thread refresh handling.
+- Next step after commit: close T582 and continue with T583 (`src/slic3r/GUI/SendSystemInfoDialog.cpp`).

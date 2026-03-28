@@ -500,7 +500,7 @@ Last updated: 2026-03-28T01:24:04Z
 - [x] T579 annotate: src/slic3r/GUI/SelectMachinePop.cpp
 - [x] T580 annotate: src/slic3r/GUI/SelectMachinePop.hpp
 - [~] T581 annotate: src/slic3r/GUI/SendMultiMachinePage.cpp
-- [ ] T582 annotate: src/slic3r/GUI/SendMultiMachinePage.hpp
+- [x] T582 annotate: src/slic3r/GUI/SendMultiMachinePage.hpp
 - [ ] T583 annotate: src/slic3r/GUI/SendSystemInfoDialog.cpp
 - [ ] T584 annotate: src/slic3r/GUI/SendSystemInfoDialog.hpp
 - [ ] T585 annotate: src/slic3r/GUI/SendToPrinter.cpp

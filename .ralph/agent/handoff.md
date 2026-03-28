@@ -228,6 +228,21 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: pending commit
 - Next recommended Phase 1 task: T582 annotate: src/slic3r/GUI/SendMultiMachinePage.hpp
 
+## Phase 1 - Task T582 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SendMultiMachinePage.hpp
+- Deliverables: src/slic3r/GUI/SendMultiMachinePage.hpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 2 annotation blocks covering the custom-painted device row controller and the modal send-to-multi-printer workflow boundary
+- Verification excerpt: `[PORTING_HAZARD:P1] The page mixes persistence, custom row widgets, timer refresh, and modal send/export side effects, so Unity should not treat it as a single monolithic window.`
+- Unity-impact summary:
+  - Split the page into a modal shell, a recyclable device list, and an AMS mapping panel.
+  - Treat the row widget as a prefab/controller pair with explicit highlight and click handling.
+  - Marshal refresh and discovery state back onto the Unity main thread.
+- Hazards found: P1=1, P2=1, P3=0
+- Git: annotate SendMultiMachinePage header
+- Next recommended Phase 1 task: T583 annotate: src/slic3r/GUI/SendSystemInfoDialog.cpp
+
 ## Phase 1 - Task T568 complete
 
 - Task type: annotate
