@@ -1,4 +1,6 @@
 // [UNITY] Use Unity UI Toolkit (VisualElement) or uGUI for Tab-based interfaces.
+// [PORTING_HAZARD:P1] This file mixes preset persistence, page-tree navigation, custom-painted controls, and destructive preset actions,
+// so a Unity port needs a retained controller with explicit subviews and command routing.
 #include "Tab.hpp"
 #include "PresetHints.hpp"
 #include "libslic3r/PresetBundle.hpp"
@@ -77,6 +79,9 @@ static const std::vector<std::string> plate_keys = {"curr_bed_type",
 
 void Tab::Highlighter::set_timer_owner(wxEvtHandler* owner, int timerid /* = wxID_ANY*/) { m_timer.SetOwner(owner, timerid); }
 
+// [INTENT] Highlighter is the transient blink helper for search hits and focused fields; it owns a short-lived timer and mutable target
+// pointers. [STATE] The cached widget pointer and show-flash flag are the only live state, so Unity should model this as a one-shot
+// highlight animation on the retained option row rather than a timer embedded in the page controller.
 void Tab::Highlighter::init(std::pair<OG_CustomCtrl*, bool*> params)
 {
     if (m_timer.IsRunning())
@@ -119,6 +124,9 @@ void Tab::Highlighter::blink()
         invalidate();
 }
 
+// [INTENT] The constructor wires the tab shell, but create_preset_tab() performs the heavy retained-widget build for preset selection,
+// search, compatibility toggles, and the page tree. [UNITY] Split this into an initialization controller plus reusable header/rail/panel
+// prefabs; the current wx notebook/tree/layout choreography is tightly coupled to widget lifetime.
 // BBS: GUI refactor
 Tab::Tab(ParamsPanel* parent, const wxString& title, Preset::Type type) : m_parent(parent), m_title(title), m_type(type)
 {
@@ -179,6 +187,11 @@ void Tab::set_type()
 // BBS: GUI refactor, change tab to fit into ParamsPanel
 void Tab::create_preset_tab()
 {
+    // [INTENT] This is the main composition pass for the preset editor shell: it builds the preset selector, toolbar actions, search box,
+    // mode toggle, and the tree-backed page navigator. [STATE] Much of the UI is cached on the Tab object so later updates can mutate the
+    // same controls in place. [EVENT] Button and tree selection handlers fan back into preset selection, search, rollback, and page-switch
+    // logic. [UNITY] Treat this as a retained TabController with a toolbar/header row, a searchable preset picker, and a vertical page
+    // navigator rather than a single notebook widget.
     // move to ParamsPanel
     /*#ifdef __WINDOWS__
         SetDoubleBuffered(true);
@@ -909,11 +922,15 @@ void Tab::filter_diff_option(std::vector<std::string>& options)
 // Update UI according to changes
 void Tab::update_changed_ui()
 {
+    // [INTENT] Recompute dirty-state decoration from the active preset diff and push it into fields, page labels, and the tab tree.
+    // [STATE] This is the central cache-to-UI sync point for modified/system/default flags. [EVENT] It also schedules a deferred tree
+    // update through CallAfter to avoid touching the tree while the tab is mid-update. [UNITY] Keep the diff model separate from the view
+    // tree and update row badges through a main-thread binding step.
     if (m_postpone_update_ui)
         return;
 
     const bool deep_compare   = (m_type == Preset::TYPE_PRINTER || m_type == Preset::TYPE_PRINT || m_type == Preset::TYPE_FILAMENT ||
-                               m_type == Preset::TYPE_SLA_MATERIAL || m_type == Preset::TYPE_MODEL);
+                                 m_type == Preset::TYPE_SLA_MATERIAL || m_type == Preset::TYPE_MODEL);
     auto       dirty_options  = m_presets->current_dirty_options(deep_compare);
     auto       nonsys_options = m_presets->current_different_from_parent_options(deep_compare);
     if (m_type == Preset::TYPE_PRINTER && static_cast<TabPrinter*>(this)->m_printer_technology == ptFFF) {
@@ -957,9 +974,7 @@ void Tab::update_changed_ui()
 
 template<class T>
 void add_correct_opts_to_options_list(const std::string& opt_key, std::map<std::string, int>& map, Tab* tab, const int& value)
-{
-    map.emplace(opt_key + "#0", value);
-}
+{ map.emplace(opt_key + "#0", value); }
 
 void Tab::init_options_list()
 {
@@ -1042,6 +1057,9 @@ void Tab::get_sys_and_mod_flags(const std::string& opt_key, bool& sys_page, bool
 
 void Tab::update_changed_tree_ui()
 {
+    // [INTENT] Mirror the option-level diff state into the page tree, including page title coloring and per-page modified/non-system flags.
+    // [PORTING_HAZARD:P2] The tree is rebuilt from translated page titles and option maps, so the Unity equivalent needs stable IDs instead
+    // of string matching on localized labels.
     if (m_options_list.empty()) {
         if (m_type == Preset::Type::TYPE_PLATE) {
             for (auto page : m_pages) {
@@ -1267,6 +1285,10 @@ void Tab::update_mode()
 
 void Tab::update_visibility()
 {
+    // [INTENT] Recompute which pages are visible for the current mode and rebuild the page tree around that filtered set.
+    // [STATE] Freeze/Thaw is used as a visual guard while the retained widgets are shown/hidden and relaid out.
+    // [UNITY] The closest match is a retained page stack with explicit visibility toggles and a separate tree/list model, not a live
+    // wxNotebook refresh.
     Freeze(); // There is needed Freeze/Thaw to avoid a flashing after Show/Layout
 
     for (auto page : m_pages)
@@ -1376,9 +1398,7 @@ void Tab::sys_color_changed()
 }
 
 Field* Tab::get_field(const t_config_option_key& opt_key, int opt_index /* = -1*/) const
-{
-    return m_active_page ? m_active_page->get_field(opt_key, opt_index) : nullptr;
-}
+{ return m_active_page ? m_active_page->get_field(opt_key, opt_index) : nullptr; }
 
 Line* Tab::get_line(const t_config_option_key& opt_key) { return m_active_page ? m_active_page->get_line(opt_key) : nullptr; }
 
@@ -1471,12 +1491,13 @@ static wxString support_combo_value_for_config(const DynamicPrintConfig& config,
 }
 
 static wxString pad_combo_value_for_config(const DynamicPrintConfig& config)
-{
-    return config.opt_bool("pad_enable") ? (config.opt_bool("pad_around_object") ? _("Around object") : _("Below object")) : _("None");
-}
+{ return config.opt_bool("pad_enable") ? (config.opt_bool("pad_around_object") ? _("Around object") : _("Below object")) : _("None"); }
 
 void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
 {
+    // [EVENT] Every option edit converges here, where the tab may update sibling widgets, warn about dangerous combinations, and push
+    // config mutations back into the plater. [THREAD] The dialog branches are UI-thread only; Unity should keep the validation/warning
+    // path on the main thread and route background-derived changes through a marshaled completion event.
     if (wxGetApp().plater() == nullptr) {
         return;
     }
@@ -1677,7 +1698,7 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
         int interface_filament_id = m_config->opt_int("support_interface_filament") - 1;
         if (is_support_filament(filament_id, false) && !is_soluble_filament(filament_id) && !has_filaments({"TPU", "TPU-AMS"})) {
             wxString           msg_text = _L("Non-soluble support materials are not recommended for support base.\n"
-                                                       "Are you sure to use them for support base?\n");
+                                             "Are you sure to use them for support base?\n");
             MessageDialog      dialog(wxGetApp().plater(), msg_text, "", wxICON_WARNING | wxYES | wxNO);
             DynamicPrintConfig new_conf = *m_config;
             if (dialog.ShowModal() == wxID_NO) {
@@ -1760,8 +1781,8 @@ void Tab::on_value_change(const std::string& opt_key, const boost::any& value)
         // Orca: show warning dialog if rotate template for solid infill if not support
         const auto _sparse_infill_pattern = m_config->option<ConfigOptionEnum<InfillPattern>>("sparse_infill_pattern")->value;
         bool       is_safe_to_rotate      = _sparse_infill_pattern == ipRectilinear || _sparse_infill_pattern == ipLine ||
-                                 _sparse_infill_pattern == ipZigZag || _sparse_infill_pattern == ipCrossZag ||
-                                 _sparse_infill_pattern == ipLockedZag;
+                                            _sparse_infill_pattern == ipZigZag || _sparse_infill_pattern == ipCrossZag ||
+                                            _sparse_infill_pattern == ipLockedZag;
 
         auto new_value    = boost::any_cast<std::string>(value);
         is_safe_to_rotate = is_safe_to_rotate || new_value.empty();
@@ -3407,9 +3428,7 @@ void TabPrintPlate::update_custom_dirty(std::vector<std::string>& dirty_options,
 }
 
 TabPrintObject::TabPrintObject(ParamsPanel* parent) : TabPrintModel(parent, concat(PrintObjectConfig().keys(), PrintRegionConfig().keys()))
-{
-    m_parent_tab = wxGetApp().get_tab(Preset::TYPE_PRINT);
-}
+{ m_parent_tab = wxGetApp().get_tab(Preset::TYPE_PRINT); }
 
 void TabPrintObject::notify_changed(ObjectBase* object)
 {
@@ -3420,9 +3439,7 @@ void TabPrintObject::notify_changed(ObjectBase* object)
 // BBS: GUI refactor
 
 TabPrintPart::TabPrintPart(ParamsPanel* parent) : TabPrintModel(parent, PrintRegionConfig().keys())
-{
-    m_parent_tab = wxGetApp().get_model_tab();
-}
+{ m_parent_tab = wxGetApp().get_model_tab(); }
 
 void TabPrintPart::notify_changed(ObjectBase* object)
 {
@@ -3432,9 +3449,7 @@ void TabPrintPart::notify_changed(ObjectBase* object)
 
 static std::string layer_height = "layer_height";
 TabPrintLayer::TabPrintLayer(ParamsPanel* parent) : TabPrintModel(parent, concat({layer_height}, PrintRegionConfig().keys()))
-{
-    m_parent_tab = wxGetApp().get_model_tab();
-}
+{ m_parent_tab = wxGetApp().get_model_tab(); }
 
 void TabPrintLayer::notify_changed(ObjectBase* object)
 {
@@ -3559,10 +3574,10 @@ void TabFilament::add_filament_overrides_page()
                                 field->update_na_value(_(L("N/A")));
                                 field->set_last_meaningful_value();
                             } else {
-                                const std::string printer_opt_key = opt_key.substr(strlen("filament_"));
-                                const auto        printer_config  = m_preset_bundle->printers.get_edited_preset().config;
+                                const std::string printer_opt_key      = opt_key.substr(strlen("filament_"));
+                                const auto        printer_config       = m_preset_bundle->printers.get_edited_preset().config;
                                 const boost::any  printer_config_value = optgroup_sh->get_config_value(printer_config, printer_opt_key,
-                                                                                                                        opt_index);
+                                                                                                       opt_index);
                                 field->update_na_value(printer_config_value);
                                 field->set_na_value();
                             }
@@ -3606,10 +3621,10 @@ void TabFilament::add_filament_overrides_page()
                         if (Field* field = optgroup_sh->get_fieldc(opt_key, opt_index); field != nullptr) {
                             field->toggle(is_checked);
 
-                            const std::string   process_opt_key = opt_key.substr(strlen("filament_"));
-                            const auto          process_config  = m_preset_bundle->prints.get_edited_preset().config;
-                            const ConfigOption* process_option  = process_config.option(process_opt_key);
-                            const auto*         process_vector = dynamic_cast<const ConfigOptionVectorBase*>(process_option);
+                            const std::string   process_opt_key   = opt_key.substr(strlen("filament_"));
+                            const auto          process_config    = m_preset_bundle->prints.get_edited_preset().config;
+                            const ConfigOption* process_option    = process_config.option(process_opt_key);
+                            const auto*         process_vector    = dynamic_cast<const ConfigOptionVectorBase*>(process_option);
                             const size_t        target_index      = opt_index < 0 ? 0 : static_cast<size_t>(opt_index);
                             bool                has_process_value = process_option != nullptr;
                             if (has_process_value) {
@@ -3633,7 +3648,7 @@ void TabFilament::add_filament_overrides_page()
                                             filament_vector->set_at(process_clone.get(), target_index, source_index);
 
                                             const boost::any filament_config_value = optgroup_sh->get_config_value(*m_config, opt_key,
-                                                                                                                                    opt_index);
+                                                                                                                   opt_index);
                                             field->set_value(filament_config_value, false);
                                             field->update_na_value(_(L("N/A")));
                                             applied_value = true;
@@ -3650,7 +3665,7 @@ void TabFilament::add_filament_overrides_page()
                             } else {
                                 if (has_process_value) {
                                     const boost::any process_config_value = optgroup_sh->get_config_value(process_config, process_opt_key,
-                                                                                                                           opt_index);
+                                                                                                          opt_index);
                                     field->update_na_value(process_config_value);
                                 } else {
                                     field->update_na_value(_(L("N/A")));
@@ -3891,9 +3906,9 @@ void TabFilament::build()
     line.append_option(optgroup->get_option("eng_plate_temp"));
     optgroup->append_line(line);
 
-    line            = {L("Smooth PEI Plate / High Temp Plate"),
-                       L("Bed temperature when the Smooth PEI Plate/High Temperature Plate is installed. A value of 0 means the filament does not "
-                                    "support printing on the Smooth PEI Plate/High Temp Plate.")};
+    line = {L("Smooth PEI Plate / High Temp Plate"),
+            L("Bed temperature when the Smooth PEI Plate/High Temperature Plate is installed. A value of 0 means the filament does not "
+              "support printing on the Smooth PEI Plate/High Temp Plate.")};
     line.label_path = "material_temperatures#bed";
     line.append_option(optgroup->get_option("hot_plate_temp_initial_layer"));
     line.append_option(optgroup->get_option("hot_plate_temp"));
@@ -3960,9 +3975,9 @@ void TabFilament::build()
     optgroup->append_single_option_line("full_fan_speed_layer", "material_cooling#full-fan-speed-at-layer");
 
     optgroup = page->new_optgroup(L("Part cooling fan"), L"param_cooling_part_fan");
-    line     = {L("Min fan speed threshold"), L("Part cooling fan speed will start to run at min speed when the estimated layer time is no "
-                                                    "longer than the layer time in setting. When layer time is shorter than threshold, fan speed "
-                                                    "is interpolated between the minimum and maximum fan speed according to layer printing time")};
+    line = {L("Min fan speed threshold"), L("Part cooling fan speed will start to run at min speed when the estimated layer time is no "
+                                            "longer than the layer time in setting. When layer time is shorter than threshold, fan speed "
+                                            "is interpolated between the minimum and maximum fan speed according to layer printing time")};
     line.label_path = "material_cooling#material-part-cooling-fan";
     line.append_option(optgroup->get_option("fan_min_speed"));
     line.append_option(optgroup->get_option("fan_cooling_layer_time"));
@@ -4297,6 +4312,10 @@ bool Tab::current_preset_is_dirty() const { return m_presets->current_is_dirty()
 
 void TabPrinter::build()
 {
+    // [INTENT] Printer tabs are built twice: once for the inactive technology and once for the selected technology so the search index and
+    // page set stay warm. [STATE] This seeds technology-specific page caches, extruder counts, and per-technology page vectors.
+    // [PORTING_HAZARD:P2] The technology swap path is a large rebuild, so Unity should preserve the same invalidation boundary instead of
+    // hot-swapping child controls one by one.
     m_presets            = &m_preset_bundle->printers;
     m_printer_technology = m_presets->get_selected_preset().printer_technology();
 
@@ -4331,9 +4350,9 @@ void TabPrinter::build_fff()
     const Preset* parent_preset = m_printer_technology == ptSLA ? nullptr // just for first build, if SLA printer preset is selected
                                                                   :
                                                                   m_presets->get_selected_preset_parent();
-    m_sys_extruders_count       = parent_preset == nullptr ?
-                                      0 :
-                                      static_cast<const ConfigOptionFloats*>(parent_preset->config.option("nozzle_diameter"))->values.size();
+    m_sys_extruders_count = parent_preset == nullptr ?
+                                0 :
+                                static_cast<const ConfigOptionFloats*>(parent_preset->config.option("nozzle_diameter"))->values.size();
 
     auto page     = add_options_page(L("Basic information"), "custom-gcode_object-info"); // ORCA: icon only visible on placeholders
     auto optgroup = page->new_optgroup(L("Printable space"), "param_printable_space");
@@ -4761,10 +4780,14 @@ PageShp TabPrinter::build_kinematics_page()
  * */
 void TabPrinter::build_unregular_pages(bool from_initial_build /* = false*/)
 {
+    // [INTENT] Rebuild the technology-dependent pages that can appear/disappear with flavor or extruder count changes.
+    // [STATE] This function mutates m_pages in place, including the special motion-ability and single-extruder-MM pages.
+    // [EVENT] The nested CallAfter handler defers extruder-count changes until the current rebuild finishes, which is a key main-thread
+    // ordering constraint for Unity.
     size_t n_before_extruders = 2; //	Count of pages before Extruder pages
     auto   flavor             = m_config->option<ConfigOptionEnum<GCodeFlavor>>("gcode_flavor")->value;
     bool   is_marlin_flavor   = (flavor == gcfMarlinLegacy || flavor == gcfMarlinFirmware || flavor == gcfKlipper ||
-                             flavor == gcfRepRapFirmware);
+                                 flavor == gcfRepRapFirmware);
 
     /* ! Freeze/Thaw in this function is needed to avoid call OnPaint() for erased pages
      * and be cause of application crash, when try to change Preset in moment,
@@ -5394,6 +5417,9 @@ void Tab::reactive_preset_combo_box()
 // Initialize the UI from the current preset
 void Tab::load_current_preset()
 {
+    // [INTENT] Load a newly selected preset into the tab shell, then propagate compatibility, page rebuilding, and dependent-tab refreshes.
+    // [STATE] This is the main preset-switch orchestrator and also updates derived printer technology/extruder caches. [UNITY] A Unity port
+    // should model this as a state transition with explicit dependent-tab notifications, not as direct widget mutation.
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": enter, m_type %1%") % Preset::get_type_string(m_type);
     const Preset&            preset = m_presets->get_edited_preset();
     std::vector<std::string> prev_variant_list;
@@ -5657,6 +5683,9 @@ bool Tab::select_preset(std::string        preset_name,
                         bool               force_select,
                         bool               force_no_transfer)
 {
+    // [INTENT] Select a new preset or delete the current one while preserving compatibility and dirty-state rules across dependent tabs.
+    // [PORTING_HAZARD:P1] This branch can delete cloud-linked presets and cascade across printer/filament/process presets, so Unity needs
+    // an explicit confirmation/workflow service rather than a simple dropdown callback.
     BOOST_LOG_TRIVIAL(info) << boost::format("select preset, name %1%, delete_current %2%") % preset_name % delete_current;
     if (preset_name.empty()) {
         if (delete_current) {
@@ -5742,7 +5771,7 @@ bool Tab::select_preset(std::string        preset_name,
         bool                    old_preset_dirty      = dependent.current_is_dirty();
         bool                    new_preset_compatible = is_compatible_with_print(dependent.get_edited_preset_with_vendor_profile(),
                                                                                  m_presets->get_preset_with_vendor_profile(
-                                                                  *m_presets->find_preset(preset_name, true)),
+                                                                                     *m_presets->find_preset(preset_name, true)),
                                                                                  printer_profile);
         if (!canceled)
             canceled = old_preset_dirty && !may_discard_current_dirty_preset(&dependent, preset_name) && !new_preset_compatible &&
@@ -6141,6 +6170,9 @@ void Tab::activate_selected_page(std::function<void()> throw_if_canceled)
 // BBS: GUI refactor
 bool Tab::update_current_page_in_background(int& item)
 {
+    // [INTENT] This is the background-safe page selection probe used while the tree is being rebuilt or the tab is inactive.
+    // [THREAD] It deliberately avoids activating controls when the tab is not visible, then clears/rebuilds page content on the UI thread
+    // boundary. [UNITY] The equivalent is a deferred selection change that only hydrates the page when the container is active.
     Page* page = nullptr;
 
     const auto selection = item >= 0 ? m_tabctrl->GetItemText(item) : "";
@@ -6189,6 +6221,10 @@ bool Tab::update_current_page_in_background(int& item)
 // BBS: GUI refactor
 bool Tab::tree_sel_change_delayed(wxCommandEvent& event)
 {
+    // [INTENT] This is the page-switch state machine for the tree control: it resolves the selected page, clears the outgoing page,
+    // activates the new one, and cancels stale work if another selection arrives. [THREAD] The Freeze/Thaw and CallAfter sequencing are
+    // there to keep page rebuilds on the UI thread. [UNITY] Model this as an explicit page transition coroutine/state machine rather than a
+    // direct selection callback.
     // The issue apparently manifests when Show()ing a window with overlay scrollbars while the UI is frozen. For this reason,
     // we will Thaw the UI prematurely on Linux. This means destroing the no_updates object prematurely.
 #ifdef __linux__
@@ -7090,7 +7126,7 @@ void Page::update_visibility(ConfigOptionMode mode, bool update_contolls_visibil
 #endif
     for (auto group : m_optgroups) {
         ret_val = (update_contolls_visibility ? group->update_visibility(mode) : // update visibility for all controlls in group
-                                                group->is_visible(mode)                                   // just detect visibility for the group
+                                                group->is_visible(mode)          // just detect visibility for the group
                    ) ||
                   ret_val;
 #if HIDE_FIRST_SPLIT_LINE

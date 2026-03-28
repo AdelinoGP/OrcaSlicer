@@ -272,3 +272,6 @@
 - Completed T640 (`src/slic3r/GUI/Widgets/AMSControl.hpp`) as the declaration boundary for the retained AMS dashboard.
 - The header now records the selection/page caches, widget ownership groups, virtual-AMS state, event handlers, and the Unity split between a presenter controller and popup overlays.
 - Next step after commit: close T640 in the runtime registry, then move to T641 (`src/slic3r/GUI/Widgets/AMSItem.cpp`).
+
+- T609 is the current atomic task for this iteration.
+- Tab.cpp needs the preset-shell, dirty-state, and deletion hazards called out explicitly so Unity can split the page tree and modal preset workflow cleanly.

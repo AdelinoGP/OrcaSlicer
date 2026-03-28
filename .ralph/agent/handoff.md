@@ -367,6 +367,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate SysInfoDialog.cpp system report dialog
 - Next recommended Phase 1 task: T604 annotate: src/slic3r/GUI/SysInfoDialog.hpp
 
+## Phase 1 - Task T609 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Tab.cpp
+- Deliverables: src/slic3r/GUI/Tab.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 10 boundary comments covering the file hazard, highlighter state, tab-shell composition, dirty-state propagation, page-tree sync, option-change routing, visibility rebuilds, printer rebuilds, and preset selection/deletion flow
+- Verification excerpt: `[PORTING_HAZARD:P1] This file mixes preset persistence, page-tree navigation, custom-painted controls, and destructive preset actions,`
+- Unity-impact summary: retained TabController with explicit header/rail/page subviews; diff/badging stays in a separate model binding step; destructive preset changes need a dedicated workflow service
+- Hazards found: P1 x1, P2 x3
+- Git: Annotate Tab preset controller boundary
+- Next recommended Phase 1 task: T630 annotate: src/slic3r/GUI/WebDownPluginDlg.hpp
+
 ## Phase 1 - Task T604 complete
 
 - Task type: annotate
