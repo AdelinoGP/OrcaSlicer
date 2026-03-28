@@ -62,3 +62,7 @@
 
 - Completed T588 with a minimal header annotation set: class intent, transient ComboBox ownership, DPI event boundary, and a P2 porting hazard for the raw accessor plus empty-list assumption.
 - The header stayed syntactically clean after patching; the only parser noise was from unresolved external includes in the local LSP environment, not from the comment insertion itself.
+
+- Started T589 on `src/slic3r/GUI/SkipPartCanvas.cpp` and annotated the canvas boundary, image reload state reset, immediate-mode OpenGL render path, hover/click/drag event flow, and the embedded 3MF metadata parser.
+- The file mixes color-encoded hit testing with custom OpenGL stencil drawing, so the Unity split should be a retained controller over explicit hit data plus a separate import/parser service.
+- Next step after commit: close T589 and move to T590 (`src/slic3r/GUI/SkipPartCanvas.hpp`).

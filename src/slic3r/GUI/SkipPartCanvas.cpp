@@ -16,11 +16,15 @@
 wxDEFINE_EVENT(EVT_ZOOM_PERCENT, wxCommandEvent);
 wxDEFINE_EVENT(EVT_CANVAS_PART, wxCommandEvent);
 
-namespace Slic3r {
-namespace GUI {
+namespace Slic3r { namespace GUI {
 
-SkipPartCanvas::SkipPartCanvas(wxWindow *parent, const wxGLAttributes& dispAttrs)
-    : wxGLCanvas(parent, dispAttrs) {
+// [INTENT] This canvas is a color-encoded part selector: it decodes a pick image into contour meshes,
+// tracks per-part state, and exposes zoom/pan/input events to a parent dialog.
+// [UNITY] Port this as a custom controller over a RenderTexture-backed image view with explicit hit-test data,
+// not as a standard image widget, because the part outlines and stencil passes are hand-authored.
+// [PORTING_HAZARD:P2] The interaction model assumes immediate-mode OpenGL plus mouse-wheel zoom around cursor position.
+SkipPartCanvas::SkipPartCanvas(wxWindow* parent, const wxGLAttributes& dispAttrs) : wxGLCanvas(parent, dispAttrs)
+{
     context_ = new wxGLContext(this);
     this->Bind(wxEVT_PAINT, &SkipPartCanvas::OnPaint, this);
     this->Bind(wxEVT_MOUSEWHEEL, &SkipPartCanvas::OnMouseWheel, this);
@@ -33,11 +37,16 @@ SkipPartCanvas::SkipPartCanvas(wxWindow *parent, const wxGLAttributes& dispAttrs
     this->Bind(wxEVT_MOTION, &SkipPartCanvas::OnMouseMotion, this);
 }
 
-void SkipPartCanvas::LoadPickImage(const std::string & path)
+void SkipPartCanvas::LoadPickImage(const std::string& path)
 {
-    if(!std::filesystem::exists(path)) return;
+    if (!std::filesystem::exists(path))
+        return;
 
-    auto ParseShapeId = [](cv::Mat image, const std::vector<std::vector<cv::Point>> &contours, const std::vector<cv::Vec4i> &hierarchy, int root_idx) -> uint32_t {
+    // [STATE] Loading a new pick image resets all cached part geometry and selection state;
+    // the file is treated as an encoded mask, not as a user-visible preview.
+    // [PORTING_HAZARD:P3] The ID decode depends on the source image preserving exact RGB triples across the pipeline.
+    auto ParseShapeId = [](cv::Mat image, const std::vector<std::vector<cv::Point>>& contours, const std::vector<cv::Vec4i>& hierarchy,
+                           int root_idx) -> uint32_t {
         cv::Mat mask = cv::Mat::zeros(image.size(), CV_8UC1);
 
         cv::drawContours(mask, contours, root_idx, 255, cv::FILLED);
@@ -50,19 +59,22 @@ void SkipPartCanvas::LoadPickImage(const std::string & path)
         std::vector<cv::Vec3b> pixels;
         for (int y = 0; y < image.rows; ++y) {
             for (int x = 0; x < image.cols; ++x) {
-                if (mask.at<uchar>(y, x)) { pixels.push_back(image.at<cv::Vec3b>(y, x)); }
+                if (mask.at<uchar>(y, x)) {
+                    pixels.push_back(image.at<cv::Vec3b>(y, x));
+                }
             }
         }
 
-        std::map<cv::Vec3b, int, std::function<bool(const cv::Vec3b &, const cv::Vec3b &)>> colorCount(
-            [](const cv::Vec3b &a, const cv::Vec3b &b) { return std::lexicographical_compare(a.val, a.val + 3, b.val, b.val + 3); });
+        std::map<cv::Vec3b, int, std::function<bool(const cv::Vec3b&, const cv::Vec3b&)>> colorCount(
+            [](const cv::Vec3b& a, const cv::Vec3b& b) { return std::lexicographical_compare(a.val, a.val + 3, b.val, b.val + 3); });
 
-        for (auto &c : pixels) colorCount[c]++;
+        for (auto& c : pixels)
+            colorCount[c]++;
 
         cv::Vec3b main_color;
         int       max_count   = 0;
         int       total_count = 0;
-        for (const auto &kv : colorCount) {
+        for (const auto& kv : colorCount) {
             if (kv.second > max_count) {
                 max_count  = kv.second;
                 main_color = kv.first;
@@ -78,7 +90,7 @@ void SkipPartCanvas::LoadPickImage(const std::string & path)
     parts_state_.clear();
     parts_triangles_.clear();
     pick_parts_.clear();
-    int preffered_w{FromDIP(400)}, preffered_h{FromDIP(400)};
+    int     preffered_w{FromDIP(400)}, preffered_h{FromDIP(400)};
     cv::Mat src_image = cv::imread(path, cv::IMREAD_UNCHANGED);
     cv::cvtColor(src_image, src_image, cv::COLOR_BGRA2BGR); // remove alpha
     float zoom_x{static_cast<float>(preffered_w) / src_image.cols};
@@ -89,9 +101,9 @@ void SkipPartCanvas::LoadPickImage(const std::string & path)
     else
         image_scale = zoom_y;
     image_view_scale_ = 1 / image_scale;
-    pick_image_ = src_image;
+    pick_image_       = src_image;
     std::vector<cv::Mat> channels;
-    cv::Mat gray; // convert to gray
+    cv::Mat              gray; // convert to gray
     cv::cvtColor(pick_image_, gray, cv::COLOR_BGR2GRAY);
     cv::Mat mask; // convery to binary
     cv::threshold(gray, mask, 0, 255, cv::THRESH_BINARY);
@@ -109,7 +121,8 @@ void SkipPartCanvas::LoadPickImage(const std::string & path)
     for (int i = 0; i < pick_counters.size(); ++i) {
         int depth  = compute_depth(i);
         int parent = hierarchy[i][3];
-        if (parent != -1) continue;
+        if (parent != -1)
+            continue;
 
         auto id = ParseShapeId(pick_image_, pick_counters, hierarchy, i);
         if (id > 0) {
@@ -119,7 +132,7 @@ void SkipPartCanvas::LoadPickImage(const std::string & path)
             // part body
             {
                 polygon.emplace_back();
-                for (const auto &pt : pick_counters[i]) {
+                for (const auto& pt : pick_counters[i]) {
                     FloatPoint fp{pt.x * 1.0f, pt.y * 1.0f};
                     polygon.back().push_back(fp);
                     flat_points.push_back(fp);
@@ -127,7 +140,7 @@ void SkipPartCanvas::LoadPickImage(const std::string & path)
                 int child = hierarchy[i][2];
                 while (child != -1) {
                     polygon.emplace_back();
-                    for (const auto &pt : pick_counters[child]) {
+                    for (const auto& pt : pick_counters[child]) {
                         FloatPoint fp{pt.x * 1.0f, pt.y * 1.0f};
                         polygon.back().push_back(fp);
                         flat_points.push_back(fp);
@@ -153,7 +166,8 @@ void SkipPartCanvas::LoadPickImage(const std::string & path)
                     child = hierarchy[child][0];
                 }
             }
-            if (parts_state_.find(id) == parts_state_.end()) parts_state_.emplace(id, psUnCheck);
+            if (parts_state_.find(id) == parts_state_.end())
+                parts_state_.emplace(id, psUnCheck);
         }
     }
 }
@@ -175,7 +189,6 @@ void SkipPartCanvas::SwitchDrag(const bool drag_on)
     fixed_draging_ = drag_on;
     AutoSetCursor();
 }
-
 
 void SkipPartCanvas::UpdatePartsInfo(const PartsInfo& parts)
 {
@@ -230,25 +243,28 @@ void DrawRoundedRect(float x, float y, float width, float height, float radius, 
         glBegin(GL_TRIANGLE_FAN);
         glVertex2f(cx, cy);
         for (int i = 0; i <= segments; ++i) {
-            float angle = startAngle + (M_PI * 0.5f) * (float)i / segments;
+            float angle = startAngle + (M_PI * 0.5f) * (float) i / segments;
             glVertex2f(cx + cosf(angle) * radius, cy + sinf(angle) * radius);
         }
         glEnd();
     };
 
-    drawCorner(x + radius, y + radius, M_PI);             // bottom-left
-    drawCorner(x + width - radius, y + radius, 1.5f * M_PI); // bottom-right
+    drawCorner(x + radius, y + radius, M_PI);                  // bottom-left
+    drawCorner(x + width - radius, y + radius, 1.5f * M_PI);   // bottom-right
     drawCorner(x + width - radius, y + height - radius, 0.0f); // top-right
-    drawCorner(x + radius, y + height - radius, 0.5f * M_PI); // top-left
+    drawCorner(x + radius, y + height - radius, 0.5f * M_PI);  // top-left
 }
-
 
 void SkipPartCanvas::Render()
 {
-    constexpr float border_w = 3.f;
-    constexpr int  uncheckd_stencil =1;
-    constexpr int  checkd_stencil = 2;
-    constexpr int  skipped_stencil = 3;
+    // [OPENGL] This is an immediate-mode stencil renderer: it draws filled triangles for the selected state,
+    // then replays outlines to produce hover/selection borders around the encoded parts.
+    // [UNITY] Replace this with retained geometry plus a dedicated material/shader pass, or with a CPU-prepared
+    // mesh overlay if the part count stays modest.
+    constexpr float border_w         = 3.f;
+    constexpr int   uncheckd_stencil = 1;
+    constexpr int   checkd_stencil   = 2;
+    constexpr int   skipped_stencil  = 3;
 
     SetCurrent(*context_);
     glPushAttrib(GL_ALL_ATTRIB_BITS);
@@ -271,10 +287,10 @@ void SkipPartCanvas::Render()
     glClearColor(parent_color_.r(), parent_color_.g(), parent_color_.b(), 1.f);
     glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-    float rx = offset_.x;
-    float ry = offset_.y;
-    float rw = view_rect.x - offset_.x;
-    float rh = view_rect.y - offset_.y;
+    float rx     = offset_.x;
+    float ry     = offset_.y;
+    float rw     = view_rect.x - offset_.x;
+    float rh     = view_rect.y - offset_.y;
     float radius = std::min(rw, rh) * 0.05f;
 
     DrawRoundedRect(rx, ry, rw, rh, radius, ColorRGB{0.9f, 0.9f, 0.9f});
@@ -297,7 +313,7 @@ void SkipPartCanvas::Render()
             if (part_info == parts_state_.end() || part_info->second != part_type)
                 continue;
             glColor3f(1, 1, 1);
-            for (const auto &contour_item : contour.second) {
+            for (const auto& contour_item : contour.second) {
                 glBegin(GL_TRIANGLES);
                 for (size_t i = 0; i < contour_item.size(); i += 3) {
                     glVertex2f(contour_item[i][0], contour_item[i][1]);
@@ -309,16 +325,19 @@ void SkipPartCanvas::Render()
         }
 
         for (const auto& contour : pick_parts_) {
-            if (contour.first != this->hover_id_) continue;
+            if (contour.first != this->hover_id_)
+                continue;
             auto part_info = parts_state_.find(contour.first);
             if (part_info == parts_state_.end() || part_info->second != part_type)
                 continue;
 
             glColor3f(rgb.r(), rgb.g(), rgb.b());
             glLineWidth(border_w);
-            for (const auto &contour_item : contour.second) {
+            for (const auto& contour_item : contour.second) {
                 glBegin(GL_LINE_LOOP);
-                for (const auto &pt : contour_item) { glVertex2f(pt.x, pt.y); }
+                for (const auto& pt : contour_item) {
+                    glVertex2f(pt.x, pt.y);
+                }
                 glEnd();
             }
         }
@@ -335,11 +354,11 @@ void SkipPartCanvas::Render()
     // stencil3 => skipped
     draw_shape(skipped_stencil, psSkipped, ColorRGB{95 / 255.f, 95 / 255.f, 95 / 255.f});
 
-    auto draw_mask = [this, view_rect, border_w, w, h](const int stencil, const PartState part_type,
-        const ColorRGB& background, const ColorRGB& line, const ColorRGB& bound) {
+    auto draw_mask = [this, view_rect, border_w, w, h](const int stencil, const PartState part_type, const ColorRGB& background,
+                                                       const ColorRGB& line, const ColorRGB& bound) {
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
         glStencilFunc(GL_EQUAL, stencil, 0xFF);
-        glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);          // Don't change stencil
+        glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP); // Don't change stencil
         glColor3f(background.r(), background.g(), background.b());
         glBegin(GL_POLYGON);
         glVertex2f(offset_.x, offset_.y);
@@ -356,19 +375,21 @@ void SkipPartCanvas::Render()
                 continue;
             glColor3f(bound.r(), bound.g(), bound.b());
             glLineWidth(border_w);
-            for (const auto &contour_item : contour.second) {
+            for (const auto& contour_item : contour.second) {
                 glBegin(GL_LINE_LOOP);
-                for (const auto &pt : contour_item) { glVertex2f(pt.x, pt.y); }
+                for (const auto& pt : contour_item) {
+                    glVertex2f(pt.x, pt.y);
+                }
                 glEnd();
             }
         }
     };
 
-    draw_mask(checkd_stencil, psChecked, ColorRGB{239 / 255.f, 175 / 255.f, 175 / 255.f},
-        ColorRGB{225 / 255.f, 71 / 255.f, 71 / 255.f}, ColorRGB{208 / 255.f, 27 / 255.f, 27 / 255.f});
+    draw_mask(checkd_stencil, psChecked, ColorRGB{239 / 255.f, 175 / 255.f, 175 / 255.f}, ColorRGB{225 / 255.f, 71 / 255.f, 71 / 255.f},
+              ColorRGB{208 / 255.f, 27 / 255.f, 27 / 255.f});
 
-    draw_mask(skipped_stencil, psSkipped, ColorRGB{159 / 255.f, 159 / 255.f, 159 / 255.f},
-        ColorRGB{95 / 255.f, 95 / 255.f, 95 / 255.f}, ColorRGB{95 / 255.f, 95 / 255.f, 95 / 255.f});
+    draw_mask(skipped_stencil, psSkipped, ColorRGB{159 / 255.f, 159 / 255.f, 159 / 255.f}, ColorRGB{95 / 255.f, 95 / 255.f, 95 / 255.f},
+              ColorRGB{95 / 255.f, 95 / 255.f, 95 / 255.f});
 
     glDisable(GL_STENCIL_TEST);
 
@@ -378,39 +399,35 @@ void SkipPartCanvas::Render()
 
 void SkipPartCanvas::DebugLogLine(std::string str)
 {
-    //if (!log_ctrl)
-    //    return;
-    //log_ctrl->AppendText(str + "\n");
+    // if (!log_ctrl)
+    //     return;
+    // log_ctrl->AppendText(str + "\n");
 }
 
-void SkipPartCanvas::SendSelectEvent(int id, PartState state) {
+void SkipPartCanvas::SendSelectEvent(int id, PartState state)
+{
     wxCommandEvent evt(EVT_CANVAS_PART);
     evt.SetExtraLong(id);
     evt.SetInt(static_cast<int>(state));
     wxPostEvent(this, evt);
 }
-void SkipPartCanvas::SendZoomEvent(int zoom_percent) {
+void SkipPartCanvas::SendZoomEvent(int zoom_percent)
+{
     wxCommandEvent evt(EVT_ZOOM_PERCENT);
     evt.SetInt(zoom_percent_);
     wxPostEvent(this, evt);
 }
 
-inline double SkipPartCanvas::Zoom() const
-{
-    return zoom_percent_ / 100.0f;
-}
+inline double SkipPartCanvas::Zoom() const { return zoom_percent_ / 100.0f; }
 
 inline wxPoint SkipPartCanvas::ViewPtToImagePt(const wxPoint& view_pt) const
-{
-    return wxPoint(view_pt.x * image_view_scale_ / Zoom(), view_pt.y * image_view_scale_ / Zoom()) + offset_;
-}
+{ return wxPoint(view_pt.x * image_view_scale_ / Zoom(), view_pt.y * image_view_scale_ / Zoom()) + offset_; }
 
 uint32_t SkipPartCanvas::GetIdAtImagePt(const wxPoint& image_pt) const
 {
-    if (image_pt.x >= 0 && image_pt.x < pick_image_.cols
-        && image_pt.y >= 0 && image_pt.y < pick_image_.rows) {
+    if (image_pt.x >= 0 && image_pt.x < pick_image_.cols && image_pt.y >= 0 && image_pt.y < pick_image_.rows) {
         // at(row, col)=>at(y, x)
-        cv::Vec3b bgr = pick_image_.at<cv::Vec3b>(image_pt.y, image_pt.x);
+        cv::Vec3b    bgr = pick_image_.at<cv::Vec3b>(image_pt.y, image_pt.x);
         SkipIdHelper helper{bgr[2], bgr[1], bgr[0]};
         helper.reverse();
         return helper.value;
@@ -447,7 +464,7 @@ void SkipPartCanvas::SetOffset(const wxPoint& value)
 
 void SkipPartCanvas::AutoSetCursor()
 {
-    if(is_draging_ || fixed_draging_)
+    if (is_draging_ || fixed_draging_)
         SetCursor(wxCursor(wxCURSOR_HAND));
     else
         SetCursor(wxCursor(wxCURSOR_NONE));
@@ -455,23 +472,25 @@ void SkipPartCanvas::AutoSetCursor()
 
 void SkipPartCanvas::StartDrag(const wxPoint& mouse_pt)
 {
-    drag_start_pt_ = mouse_pt;
+    drag_start_pt_     = mouse_pt;
     drag_start_offset_ = offset_;
-    is_draging_ = true;
+    is_draging_        = true;
     AutoSetCursor();
 }
 
 void SkipPartCanvas::ProcessDrag(const wxPoint& mouse_pt)
 {
     wxPoint drag_offset = (mouse_pt - drag_start_pt_) * image_view_scale_;
-    SetOffset(- wxPoint(drag_offset.x / Zoom(), drag_offset.y / Zoom()) + drag_start_offset_);
+    SetOffset(-wxPoint(drag_offset.x / Zoom(), drag_offset.y / Zoom()) + drag_start_offset_);
     Refresh();
 }
 
 void SkipPartCanvas::ProcessHover(const wxPoint& mouse_pt)
 {
+    // [EVENT] Hover only matters for unchecked parts; the canvas uses it to preview the next toggle target
+    // and trigger a repaint when the cursor crosses a different encoded region.
     auto id_at_mouse = GetIdAtViewPt(mouse_pt);
-    int new_hover_id { -1 };
+    int  new_hover_id{-1};
     auto part_state = parts_state_.find(id_at_mouse);
     if (part_state != parts_state_.end() && part_state->second == psUnCheck) {
         new_hover_id = id_at_mouse;
@@ -488,21 +507,19 @@ void SkipPartCanvas::EndDrag()
     AutoSetCursor();
 }
 
- void SkipPartCanvas::OnPaint(wxPaintEvent &event)
- {
+void SkipPartCanvas::OnPaint(wxPaintEvent& event)
+{
     wxPaintDC dc(this);
-    if (!IsShown()) return;
+    if (!IsShown())
+        return;
 
     SetCurrent(*context_);
 
     Render();
     SwapBuffers();
- }
-
-void SkipPartCanvas::OnSize(wxSizeEvent& event)
-{
-    event.Skip();
 }
+
+void SkipPartCanvas::OnSize(wxSizeEvent& event) { event.Skip(); }
 
 void SkipPartCanvas::OnMouseLeftDown(wxMouseEvent& event)
 {
@@ -526,8 +543,10 @@ void SkipPartCanvas::OnMouseLeftUp(wxMouseEvent& event)
         return;
     }
     auto id_at_mouse = GetIdAtViewPt(wxPoint(event.GetX(), event.GetY()));
-    auto part_state = parts_state_.find(id_at_mouse);
+    auto part_state  = parts_state_.find(id_at_mouse);
     if (part_state != parts_state_.end() && part_state->second != psSkipped) {
+        // [STATE] Left click toggles unchecked<->checked while preserving skipped parts as an immutable state.
+        // [EVENT] The selection result is forwarded through a custom wx event so the parent dialog owns persistence.
         if (part_state->second == psUnCheck)
             part_state = parts_state_.insert_or_assign(part_state->first, psChecked).first;
         else
@@ -568,6 +587,8 @@ void SkipPartCanvas::OnMouseRightUp(wxMouseEvent& event)
 
 void SkipPartCanvas::OnMouseMotion(wxMouseEvent& event)
 {
+    // [EVENT] Right-drag pans the image, while left-drag only pans when fixed_draging_ is enabled; otherwise
+    // motion is used purely for hover tracking and the event is allowed to propagate.
     ProcessHover(wxPoint(event.GetX(), event.GetY()));
     if (!event.RightIsDown() && !(event.LeftIsDown() && fixed_draging_)) {
         event.Skip();
@@ -578,17 +599,19 @@ void SkipPartCanvas::OnMouseMotion(wxMouseEvent& event)
 
 void SkipPartCanvas::OnMouseWheel(wxMouseEvent& event)
 {
-    wxPoint view_mouse = wxPoint(event.GetX(), event.GetY());
-    auto pre_image_pos = ViewPtToImagePt(view_mouse);
+    wxPoint view_mouse    = wxPoint(event.GetX(), event.GetY());
+    auto    pre_image_pos = ViewPtToImagePt(view_mouse);
     SetZoomPercent(zoom_percent_ + 10 * (event.GetWheelRotation() / 120.0));
     auto now_image_pos = ViewPtToImagePt(view_mouse);
     SetOffset(offset_ - (now_image_pos - pre_image_pos));
     Refresh();
 }
 
-// Base class with error messages management
+// [INTENT] The 3MF helper below is a synchronous XML parser that extracts plate/object metadata for the skip-part UI.
+// [THREAD] Error collection is mutex-protected, but parsing itself is single-threaded and caller-owned.
+// [UNITY] Move this into a background import/service layer in Unity so the canvas only consumes normalized plate data.
 
-void _BBS_3MF_Base::add_error(const std::string &error) const
+void _BBS_3MF_Base::add_error(const std::string& error) const
 {
     boost::unique_lock l(mutex);
     m_errors.push_back(error);
@@ -597,11 +620,11 @@ void _BBS_3MF_Base::clear_errors() { m_errors.clear(); }
 
 void _BBS_3MF_Base::log_errors()
 {
-    for (const std::string &error : m_errors) BOOST_LOG_TRIVIAL(error) << error;
+    for (const std::string& error : m_errors)
+        BOOST_LOG_TRIVIAL(error) << error;
 }
 
-
-ModelSettingHelper::ModelSettingHelper(const std::string &path) : path_(path) {}
+ModelSettingHelper::ModelSettingHelper(const std::string& path) : path_(path) {}
 
 bool ModelSettingHelper::Parse()
 {
@@ -628,8 +651,7 @@ bool ModelSettingHelper::Parse()
                 return false;
             }
         }
-    }
-    catch (std::exception& e) {
+    } catch (std::exception& e) {
         add_error(std::string("exception:") + e.what());
         XML_ParserFree(parser);
         return false;
@@ -638,33 +660,41 @@ bool ModelSettingHelper::Parse()
     return true;
 }
 
-void XMLCALL ModelSettingHelper::StartElementHandler(void *userData, const XML_Char *name, const XML_Char **atts)
+void XMLCALL ModelSettingHelper::StartElementHandler(void* userData, const XML_Char* name, const XML_Char** atts)
 {
-    ModelSettingHelper *self = static_cast<ModelSettingHelper *>(userData);
+    ModelSettingHelper* self = static_cast<ModelSettingHelper*>(userData);
     if (strcmp(name, "plate") == 0) {
         self->context_.current_plate = PlateInfo(); // start a new plate
         self->context_.in_plate      = true;
     } else if (strcmp(name, "metadata") == 0 && self->context_.in_plate) {
         std::string key, value;
         for (int i = 0; atts[i]; i += 2) {
-            if (strcmp(atts[i], "key") == 0) key = atts[i + 1];
-            if (strcmp(atts[i], "value") == 0) value = atts[i + 1];
+            if (strcmp(atts[i], "key") == 0)
+                key = atts[i + 1];
+            if (strcmp(atts[i], "value") == 0)
+                value = atts[i + 1];
         }
-        if (key == "index") { self->context_.current_plate.index = std::stoi(value); }
-        if (key == "label_object_enabled") { self->context_.current_plate.label_object_enabled = value == "true"; }
+        if (key == "index") {
+            self->context_.current_plate.index = std::stoi(value);
+        }
+        if (key == "label_object_enabled") {
+            self->context_.current_plate.label_object_enabled = value == "true";
+        }
     } else if (strcmp(name, "object") == 0 && self->context_.in_plate) {
         ObjectInfo obj;
         for (int i = 0; atts[i]; i += 2) {
-            if (strcmp(atts[i], "identify_id") == 0) obj.identify_id = atoi(atts[i + 1]);
-            if (strcmp(atts[i], "name") == 0) obj.name = atts[i + 1];
+            if (strcmp(atts[i], "identify_id") == 0)
+                obj.identify_id = atoi(atts[i + 1]);
+            if (strcmp(atts[i], "name") == 0)
+                obj.name = atts[i + 1];
         }
         self->context_.current_plate.objects.push_back(obj);
     }
 }
 
-void XMLCALL ModelSettingHelper::EndElementHandler(void *userData, const XML_Char *name)
+void XMLCALL ModelSettingHelper::EndElementHandler(void* userData, const XML_Char* name)
 {
-    ModelSettingHelper *self = static_cast<ModelSettingHelper *>(userData);
+    ModelSettingHelper* self = static_cast<ModelSettingHelper*>(userData);
     if (strcmp(name, "plate") == 0 && self->context_.in_plate) {
         self->context_.plates.push_back(self->context_.current_plate);
         self->context_.current_plate = PlateInfo(); // reset
@@ -672,8 +702,9 @@ void XMLCALL ModelSettingHelper::EndElementHandler(void *userData, const XML_Cha
     }
 }
 
-std::vector<ObjectInfo> ModelSettingHelper::GetPlateObjects(int plate_idx) {
-    for (const auto &plate : context_.plates) {
+std::vector<ObjectInfo> ModelSettingHelper::GetPlateObjects(int plate_idx)
+{
+    for (const auto& plate : context_.plates) {
         if (plate.index == plate_idx) {
             return plate.objects;
         }
@@ -683,15 +714,16 @@ std::vector<ObjectInfo> ModelSettingHelper::GetPlateObjects(int plate_idx) {
 
 bool ModelSettingHelper::GetLabelObjectEnabled(int plate_idx)
 {
-    for (const auto &plate : context_.plates) {
-        if (plate.index == plate_idx) { return plate.label_object_enabled; }
+    for (const auto& plate : context_.plates) {
+        if (plate.index == plate_idx) {
+            return plate.label_object_enabled;
+        }
     }
     return false;
 }
 
-void ModelSettingHelper::DataHandler(const XML_Char *s, int len)
+void ModelSettingHelper::DataHandler(const XML_Char* s, int len)
 {
     // do nothing
 }
-}
-}
+}} // namespace Slic3r::GUI

@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-28T02:16:06Z
+Last updated: 2026-03-28T02:22:16Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -507,7 +507,7 @@ Last updated: 2026-03-28T02:16:06Z
 - [x] T586 annotate: src/slic3r/GUI/SendToPrinter.hpp
 - [x] T587 annotate: src/slic3r/GUI/SingleChoiceDialog.cpp
 - [x] T588 annotate: src/slic3r/GUI/SingleChoiceDialog.hpp
-- [ ] T589 annotate: src/slic3r/GUI/SkipPartCanvas.cpp
+- [x] T589 annotate: src/slic3r/GUI/SkipPartCanvas.cpp
 - [ ] T590 annotate: src/slic3r/GUI/SkipPartCanvas.hpp
 - [ ] T591 annotate: src/slic3r/GUI/SliceInfoPanel.cpp
 - [ ] T592 annotate: src/slic3r/GUI/SliceInfoPanel.hpp

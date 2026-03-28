@@ -55,6 +55,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate SingleChoiceDialog.hpp boundary
 - Next recommended Phase 1 task: T589 annotate: src/slic3r/GUI/SkipPartCanvas.cpp
 
+## Phase 1 - Task T589 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SkipPartCanvas.cpp
+- Deliverables: src/slic3r/GUI/SkipPartCanvas.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md, .ralph/ralph-tasks.md
+- Substantive additions: 6 boundary comments covering canvas intent, encoded-image state reset, OpenGL stencil rendering, hover/click/drag routing, and the 3MF metadata parser boundary
+- Verification excerpt: `[UNITY] Port this as a custom controller over a RenderTexture-backed image view with explicit hit-test data,`
+- Unity-impact summary: color-encoded hit testing becomes a retained controller with explicit pick data; the immediate-mode stencil pass maps to a mesh/shader overlay; 3MF parsing should move behind an import/service layer
+- Hazards found: P2 x1 (immediate-mode GL interaction model), P3 x1 (image-color ID pipeline stability)
+- Git: Annotate SkipPartCanvas canvas and parser boundary
+- Next recommended Phase 1 task: T590 annotate: src/slic3r/GUI/SkipPartCanvas.hpp
+
 ## Tasks
 
 ### Completed
