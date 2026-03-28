@@ -245,3 +245,6 @@
 - Started T631 (`src/slic3r/GUI/WebGuideDialog.cpp`) as the web-based setup wizard controller.
 - This file mixes embedded web navigation, JSON script-command handling, preset bundle import/export, and async preset loading, so the annotations need to call out the webview bridge, the shared wizard state, the worker-thread handoff, and the config/preset side effects that Unity must isolate.
 - Memory search for `WebGuideDialog` returned no existing reusable pattern, so I am annotating the file directly and will record the wizard/controller pattern if it holds after verification.
+
+- T632 is now annotated in `src/slic3r/GUI/WebGuideDialog.hpp` with class-level intent/state/event/thread/Unity/porting-hazard notes plus retained-state comments for the browser host, startup loader, and script round-trip fields.
+- Verification passed with `git diff --check -- src/slic3r/GUI/WebGuideDialog.hpp`; next recommended file is T635 (`src/slic3r/GUI/WebUserLoginDialog.cpp`).

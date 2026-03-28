@@ -2282,3 +2282,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x2, P3 x1, UNCLEAR x1
 - Git: pending commit
 - Next recommended Phase 1 task: T632 annotate: src/slic3r/GUI/WebGuideDialog.hpp
+
+## Phase 1 - Task T632 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/WebGuideDialog.hpp
+- Deliverables: src/slic3r/GUI/WebGuideDialog.hpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 8 boundary comments covering wizard intent, shared state, event flow, background loading, and Unity migration boundaries
+- Verification excerpt: `[PORTING_HAZARD:P2] This class mixes navigation, persistence, plugin installation, and script execution in one`
+- Unity-impact summary:
+  - WebView host stays, but config/file/plugin mutations need a typed controller/service split.
+  - Background profile loading needs cancellable async marshaling back to the main thread.
+  - The header now marks the retained state that the C# port must preserve explicitly.
+- Hazards found: P2 x1
+- Git: pending commit
+- Next recommended Phase 1 task: T635 annotate: src/slic3r/GUI/WebUserLoginDialog.cpp
