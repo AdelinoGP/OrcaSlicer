@@ -1487,3 +1487,14 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x4, P3 x1, P1 x0
 - Git: annotate Search popup flow
 - Next recommended Phase 1 task: T574 annotate `src/slic3r/GUI/Search.hpp`
+## Phase 1 - Task T574 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Search.hpp
+- Deliverables: src/slic3r/GUI/Search.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 11 declaration-level comment blocks covering popup boundary, DTO/state, manual row painting, and both dialog controllers
+- Verification excerpt: `[UNITY] Model these as query-driven overlay controllers backed by a reusable filtered list view and explicit dismiss/focus state.`
+- Unity-impact summary: floating overlay controller; persistent list view adapter; explicit focus-loss dismissal state
+- Hazards found: 1 P2
+- Git: Annotate search popup boundary in Search.hpp
+- Next recommended Phase 1 task: T575 annotate: src/slic3r/GUI/Selection.cpp
