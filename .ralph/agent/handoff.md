@@ -118,6 +118,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate Tab preset controller boundary
 - Next recommended Phase 1 task: T611 annotate: src/slic3r/GUI/TaskManager.cpp
 
+## Phase 1 - Task T631 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/WebGuideDialog.cpp
+- Deliverables: .ralph/ralph-tasks.md, .ralph/agent/handoff.md, .ralph/agent/scratchpad.md
+- Substantive additions: 8 boundary comment groups covering the shared wizard model, dialog/controller boundary, script-message bridge, background preset loading, config commit flow, bundle import/export, plugin install trigger, and download status hook
+- Verification excerpt: `[THREAD] This background task scans preset JSON files off the UI thread and posts completion back with CallAfter once the aggregate wizard model is ready.`
+- Unity-impact summary: embedded wizard should become a modal browser host plus typed command router; async preset loading needs cancellable main-thread marshaling; config/preset side effects should move behind a staged service
+- Hazards found: P1 x0, P2 x3, P3 x1
+- Git: pending commit for WebGuideDialog bookkeeping sync
+- Next recommended Phase 1 task: T632 annotate: src/slic3r/GUI/WebGuideDialog.hpp
+
 ## Phase 1 - Task T618 complete
 
 - Task type: annotate

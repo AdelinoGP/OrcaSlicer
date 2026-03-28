@@ -2,6 +2,18 @@
 
 ## Patterns
 
+### mem-1774681882-3462
+> WebGuideDialog is the web-based setup wizard controller: embedded page JS posts typed-ish JSON commands for onboarding, while a background preset loader populates the shared profile model and posts back to the UI thread. Unity should split this into a modal browser host plus a cancellable async import service.
+<!-- tags: gui, unity, webview, dialog, threading | created: 2026-03-28 -->
+
+### mem-1774680782-d56a
+> WebDownPluginDlg uses wxWebView as a retained plugin-install host: page JS sends JSON command packets that directly trigger download/install/restart/close/file-open actions through GUI_App callbacks, so a Unity port needs a typed, validated command bridge plus main-thread marshaling.
+<!-- tags: gui, unity, webview, plugins | created: 2026-03-28 -->
+
+### mem-1774679484-2513
+> UserManager.cpp is a thin network-auth adapter: it only handles bind-success JSON and directly mutates GUI/DeviceManager state, so a Unity port should route typed auth-result messages through a main-thread completion handler instead of parsing in the view layer.
+<!-- tags: gui, unity, network, auth | created: 2026-03-28 -->
+
 ### mem-1774678922-eca9
 > UpgradePanel.hpp is the declaration boundary for the firmware-upgrade dashboard: root scroller plus machine card, accessory rows, confirm dialogs, and dynamic show/hide state. Unity should use a scrollable retained controller with reusable row prefabs and modal prompt overlays.
 <!-- tags: gui, unity, dialog | created: 2026-03-28 -->
@@ -293,6 +305,10 @@
 ## Decisions
 
 ## Fixes
+
+### mem-1774682239-61df
+> failure: cmd=/home/admin/.config/nvm/versions/node/v24.14.0/lib/node_modules/@ralph-orchestrator/ralph-cli/node_modules/.bin_real/ralph tools task list --format json | python - <<'PY'\nimport sys, json\nitems=json.load(sys.stdin)\nPY, exit=1, error=JSONDecodeError from empty stdin; cmd=/home/admin/.config/nvm/versions/node/v24.14.0/lib/node_modules/@ralph-orchestrator/ralph-cli/node_modules/.bin_real/ralph tools task list --status in_progress --format table | python - <<'PY'\nimport sys\nfor line in sys.stdin:\n    if 'WebGuideDialog' in line:\n        print(line.rstrip())\nPY, exit=1, error=SyntaxError from piping table output into heredoc python; next=parse task output via temp file or table text, not JSON
+<!-- tags: tooling, error-handling | created: 2026-03-28 -->
 
 ### mem-1774673200-a877
 > failure: cmd=read /mnt/vm_shared/slicerProject/OrcaSlicerDocumented_tests/src/slic3r/GUI/Widgets/TabButton.hpp, exit=1, error=File not found; correct file is src/slic3r/GUI/TabButton.hpp, next=use the actual repo-relative path or glob before reading

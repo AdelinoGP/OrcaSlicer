@@ -238,6 +238,10 @@
 - Plan: add compact [INTENT]/[STATE]/[EVENT]/[THREAD]/[UNITY]/[PORTING_HAZARD] comments around class purpose, browser ownership, event handlers, script bridge, and progress callback state, then verify with `git diff --check` and close the task.
 - T630 annotation is complete in the working tree; next step is to commit the atomic header change and move to T631 (`src/slic3r/GUI/WebGuideDialog.cpp`).
 
+- T631 was already annotated in the source tree, but the runtime registry still had the task marked active in `.ralph/ralph-tasks.md`; I reconciled that state by treating the file as complete and syncing the task registry/handoff evidence.
+- WebGuideDialog.cpp is the web-based setup wizard controller: embedded navigation, JSON script commands, async preset loading, and config/preset commit side effects all live in one modal flow.
+- Current work is bookkeeping only for this iteration; the next real code task is T632 (`src/slic3r/GUI/WebGuideDialog.hpp`).
+
 - Started T631 (`src/slic3r/GUI/WebGuideDialog.cpp`) as the web-based setup wizard controller.
 - This file mixes embedded web navigation, JSON script-command handling, preset bundle import/export, and async preset loading, so the annotations need to call out the webview bridge, the shared wizard state, the worker-thread handoff, and the config/preset side effects that Unity must isolate.
 - Memory search for `WebGuideDialog` returned no existing reusable pattern, so I am annotating the file directly and will record the wizard/controller pattern if it holds after verification.
