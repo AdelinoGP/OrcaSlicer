@@ -289,3 +289,7 @@
 
 - Reconciled the stale runtime state for T630 (`src/slic3r/GUI/WebDownPluginDlg.hpp`): the task registry and handoff already show the header as complete, so this iteration is bookkeeping only.
 - Current action is to close the runtime task, keep the existing annotation evidence as-is, and continue from the next open Phase 1 task (`T643`).
+
+- Started T643 (`src/slic3r/GUI/Widgets/AnimaController.cpp`) as the tiny animated status icon widget.
+- The file is a fixed-size wxPanel that caches scaled frames, advances them with a UI-thread wxTimer, and rebroadcasts bitmap clicks to the parent panel.
+- Plan: keep the annotations focused on the timer/frame loop, the event rebroadcast seam, the steady-state enable bitmap, and the Unity mapping to a compact sprite-swap controller; then verify with `git diff --check` and close the task atomically.

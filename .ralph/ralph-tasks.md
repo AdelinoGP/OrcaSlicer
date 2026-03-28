@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-28T21:46:26Z
+Last updated: 2026-03-28T22:29:43Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -561,7 +561,7 @@ Last updated: 2026-03-28T21:46:26Z
 - [x] T640 annotate: src/slic3r/GUI/Widgets/AMSControl.hpp
 - [x] T641 annotate: src/slic3r/GUI/Widgets/AMSItem.cpp
 - [x] T642 annotate: src/slic3r/GUI/Widgets/AMSItem.hpp
-- [ ] T643 annotate: src/slic3r/GUI/Widgets/AnimaController.cpp
+- [x] T643 annotate: src/slic3r/GUI/Widgets/AnimaController.cpp
 - [ ] T644 annotate: src/slic3r/GUI/Widgets/AnimaController.hpp
 - [ ] T645 annotate: src/slic3r/GUI/Widgets/AxisCtrlButton.cpp
 - [ ] T646 annotate: src/slic3r/GUI/Widgets/AxisCtrlButton.hpp

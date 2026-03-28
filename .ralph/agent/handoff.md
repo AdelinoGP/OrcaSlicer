@@ -2429,3 +2429,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x3, P3 x1
 - Git: Annotate AMSItem.hpp boundaries
 - Next recommended Phase 1 task: T643 annotate: src/slic3r/GUI/Widgets/AnimaController.cpp
+
+## Phase 1 - Task T643 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/AnimaController.cpp
+- Deliverables: src/slic3r/GUI/Widgets/AnimaController.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 8 boundary comments covering widget intent, cached frames, timer-driven playback, click rebroadcast, teardown, enable-state swap, and playback state
+- Verification excerpt: `[UNITY] Map to a compact Image/RawImage controller with a coroutine or Update-driven sprite frame swap, not a full animation timeline.`
+- Unity-impact summary:
+  - Treat the widget as a tiny sprite-swap controller, not a generalized animation system.
+  - Keep input rebroadcast explicit in Unity instead of relying on wx event bubbling.
+  - Model the timer as a main-thread tick source with fixed-size icon state.
+- Hazards found: P2 x1, P3 x1
+- Git: Annotate AnimaController animated icon
+- Next recommended Phase 1 task: T644 annotate: src/slic3r/GUI/Widgets/AnimaController.hpp
