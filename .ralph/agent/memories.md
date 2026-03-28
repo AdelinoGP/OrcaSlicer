@@ -2,6 +2,10 @@
 
 ## Patterns
 
+### mem-1774683100-d04c
+> WebUserLoginDialog.cpp is a dual-mode modal login host: it either shows a network-plugin-missing notice or embeds a wxWebView auth flow. JS messages are the command surface (login setup, autotest token, localhost handoff, third-party login, new_webpage), and modal completion is carefully deferred via EndModal + CallAfter to avoid reentrancy.
+<!-- tags: gui, unity, webview, auth, threading | created: 2026-03-28 -->
+
 ### mem-1774681882-3462
 > WebGuideDialog is the web-based setup wizard controller: embedded page JS posts typed-ish JSON commands for onboarding, while a background preset loader populates the shared profile model and posts back to the UI thread. Unity should split this into a modal browser host plus a cancellable async import service.
 <!-- tags: gui, unity, webview, dialog, threading | created: 2026-03-28 -->
@@ -305,6 +309,10 @@
 ## Decisions
 
 ## Fixes
+
+### mem-1774682896-6b59
+> failure: cmd=/home/admin/.config/nvm/versions/node/v24.14.0/lib/node_modules/@ralph-orchestrator/ralph-cli/node_modules/.bin_real/ralph tools task list --format json | python - <<'PY' ...\nPY, exit=1, error=JSONDecodeError from empty stdin; next=parse task list output from saved file or use a direct JSON parse without stdin confusion
+<!-- tags: tooling, error-handling | created: 2026-03-28 -->
 
 ### mem-1774682239-61df
 > failure: cmd=/home/admin/.config/nvm/versions/node/v24.14.0/lib/node_modules/@ralph-orchestrator/ralph-cli/node_modules/.bin_real/ralph tools task list --format json | python - <<'PY'\nimport sys, json\nitems=json.load(sys.stdin)\nPY, exit=1, error=JSONDecodeError from empty stdin; cmd=/home/admin/.config/nvm/versions/node/v24.14.0/lib/node_modules/@ralph-orchestrator/ralph-cli/node_modules/.bin_real/ralph tools task list --status in_progress --format table | python - <<'PY'\nimport sys\nfor line in sys.stdin:\n    if 'WebGuideDialog' in line:\n        print(line.rstrip())\nPY, exit=1, error=SyntaxError from piping table output into heredoc python; next=parse task output via temp file or table text, not JSON

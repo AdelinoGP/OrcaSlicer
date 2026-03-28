@@ -248,3 +248,7 @@
 
 - T632 is now annotated in `src/slic3r/GUI/WebGuideDialog.hpp` with class-level intent/state/event/thread/Unity/porting-hazard notes plus retained-state comments for the browser host, startup loader, and script round-trip fields.
 - Verification passed with `git diff --check -- src/slic3r/GUI/WebGuideDialog.hpp`; next recommended file is T635 (`src/slic3r/GUI/WebUserLoginDialog.cpp`).
+
+- Completed T635 (`src/slic3r/GUI/WebUserLoginDialog.cpp`) as the embedded login host / fallback error flow.
+- The file now calls out the dual-mode modal shell, browser event surface, UI-thread timeout, command-style JS bridge, cached script state, and the error-page fallback.
+- Next step after commit: close T635 and move to T636 (`src/slic3r/GUI/WebUserLoginDialog.hpp`).

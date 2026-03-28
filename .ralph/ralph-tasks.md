@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-28T07:20:00Z
+Last updated: 2026-03-28T07:30:32Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -553,7 +553,7 @@ Last updated: 2026-03-28T07:20:00Z
 - [x] T632 annotate: src/slic3r/GUI/WebGuideDialog.hpp
 - [x] T633 skip-trivial: src/slic3r/GUI/WebUpdatePlugin.cpp
 - [x] T634 skip-trivial: src/slic3r/GUI/WebUpdatePlugin.hpp
-- [ ] T635 annotate: src/slic3r/GUI/WebUserLoginDialog.cpp
+- [x] T635 annotate: src/slic3r/GUI/WebUserLoginDialog.cpp
 - [ ] T636 annotate: src/slic3r/GUI/WebUserLoginDialog.hpp
 - [ ] T637 annotate: src/slic3r/GUI/WebViewDialog.cpp
 - [ ] T638 annotate: src/slic3r/GUI/WebViewDialog.hpp

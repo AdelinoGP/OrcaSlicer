@@ -2297,3 +2297,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1
 - Git: pending commit
 - Next recommended Phase 1 task: T635 annotate: src/slic3r/GUI/WebUserLoginDialog.cpp
+
+## Phase 1 - Task T635 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/WebUserLoginDialog.cpp
+- Deliverables: src/slic3r/GUI/WebUserLoginDialog.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 7 boundary comment blocks covering the modal split, browser event wiring, timeout path, navigation behavior, JS command bridge, cached script state, and fallback error-page flow
+- Verification excerpt: `[UNITY] Model this as a typed command DTO router with validation plus a main-thread completion queue.`
+- Unity-impact summary:
+  - Login should become a modal shell with a retained web host plus a separate offline/plugin-missing view.
+  - Script-message handling needs a typed bridge and main-thread completion queue instead of raw JSON command parsing.
+  - Error handling should become an explicit failure state, not an HTML navigation side effect.
+- Hazards found: P2 x2, P3 x2
+- Git: pending commit
+- Next recommended Phase 1 task: T636 annotate: src/slic3r/GUI/WebUserLoginDialog.hpp

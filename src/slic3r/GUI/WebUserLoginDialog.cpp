@@ -40,18 +40,24 @@ END_EVENT_TABLE()
 
 int ZUserLogin::web_sequence_id = 20000;
 
-ZUserLogin::ZUserLogin() : wxDialog((wxWindow *) (wxGetApp().mainframe), wxID_ANY, "OrcaSlicer")
+ZUserLogin::ZUserLogin() : wxDialog((wxWindow*) (wxGetApp().mainframe), wxID_ANY, "OrcaSlicer")
 {
+    // [INTENT] This dialog owns a split login flow: either a fallback notice when the network plugin is missing,
+    // or an embedded web-auth host when the cloud agent is available.
+    // [STATE] `TargetUrl`, `m_browser`, `m_networkOk`, `m_loopback_port`, and `m_bbl_user_agent` carry the
+    // runtime host/session state across the modal lifetime.
+    // [UNITY] Port this as a modal login shell with a retained web-content panel plus a separate offline/plugin-missing panel.
+    // [PORTING_HAZARD:P2] The constructor mixes capability probing, layout, and host selection, so Unity should move
+    // environment checks into a service before opening the modal.
     SetBackgroundColour(*wxWHITE);
-    const auto bblnetwork_enabled =wxGetApp().app_config->get_bool("installed_networking");
+    const auto bblnetwork_enabled = wxGetApp().app_config->get_bool("installed_networking");
     // Url
     NetworkAgent* agent = wxGetApp().getAgent();
     if (!agent && bblnetwork_enabled) {
-
         SetBackgroundColour(*wxWHITE);
 
         wxBoxSizer* m_sizer_main = new wxBoxSizer(wxVERTICAL);
-        auto m_line_top = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(-1, 1));
+        auto        m_line_top   = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(-1, 1));
         m_line_top->SetBackgroundColour(wxColour(166, 169, 170));
         m_sizer_main->Add(m_line_top, 0, wxEXPAND, 0);
 
@@ -74,12 +80,11 @@ ZUserLogin::ZUserLogin() : wxDialog((wxWindow *) (wxGetApp().mainframe), wxID_AN
         Layout();
         Fit();
         CentreOnParent();
-    }
-    else {
+    } else {
         // Get the login URL from the cloud service agent
         wxString strlang = wxGetApp().current_language_code_safe();
         strlang.Replace("_", "-");
-        TargetUrl = wxString::FromUTF8(agent->get_cloud_login_url(strlang.ToStdString()));
+        TargetUrl   = wxString::FromUTF8(agent->get_cloud_login_url(strlang.ToStdString()));
         m_networkOk = TargetUrl.StartsWith("file://");
 
         BOOST_LOG_TRIVIAL(info) << "login url = " << TargetUrl.ToStdString();
@@ -103,7 +108,10 @@ ZUserLogin::ZUserLogin() : wxDialog((wxWindow *) (wxGetApp().mainframe), wxID_AN
         // m_browser->GetClassInfo()->GetClassName(),wxWebView::GetBackendVersionInfo().ToString());
         // wxLogMessage("User Agent: %s", m_browser->GetUserAgent());
 
-        // Connect the webview events
+        // [EVENT] The browser is wired through explicit wxWebView events rather than a generic callback bus;
+        // navigation, load, error, title, fullscreen, and script-message notifications all feed back into this dialog.
+        // [UNITY] Mirror this with a retained web-view host component that forwards typed navigation and JS bridge events
+        // to a login controller.
         Bind(wxEVT_WEBVIEW_NAVIGATING, &ZUserLogin::OnNavigationRequest, this, m_browser->GetId());
         Bind(wxEVT_WEBVIEW_NAVIGATED, &ZUserLogin::OnNavigationComplete, this, m_browser->GetId());
         Bind(wxEVT_WEBVIEW_LOADED, &ZUserLogin::OnDocumentLoaded, this, m_browser->GetId());
@@ -123,16 +131,17 @@ ZUserLogin::ZUserLogin() : wxDialog((wxWindow *) (wxGetApp().mainframe), wxID_AN
         wxSize pSize = FromDIP(wxSize(650, 840));
         SetSize(pSize);
 
-        int screenheight = wxSystemSettings::GetMetric(wxSYS_SCREEN_Y, NULL);
-        int screenwidth = wxSystemSettings::GetMetric(wxSYS_SCREEN_X, NULL);
-        int MaxY = (screenheight - pSize.y) > 0 ? (screenheight - pSize.y) / 2 : 0;
+        int     screenheight = wxSystemSettings::GetMetric(wxSYS_SCREEN_Y, NULL);
+        int     screenwidth  = wxSystemSettings::GetMetric(wxSYS_SCREEN_X, NULL);
+        int     MaxY         = (screenheight - pSize.y) > 0 ? (screenheight - pSize.y) / 2 : 0;
         wxPoint tmpPT((screenwidth - pSize.x) / 2, MaxY);
         Move(tmpPT);
     }
     wxGetApp().UpdateDlgDarkUI(this);
 }
 
-ZUserLogin::~ZUserLogin() {
+ZUserLogin::~ZUserLogin()
+{
     if (m_timer != NULL) {
         m_timer->Stop();
         delete m_timer;
@@ -140,16 +149,20 @@ ZUserLogin::~ZUserLogin() {
     }
 }
 
-void ZUserLogin::OnTimer(wxTimerEvent &event) {
+void ZUserLogin::OnTimer(wxTimerEvent& event)
+{
     m_timer->Stop();
 
-    if (m_networkOk == false)
-    {
+    if (m_networkOk == false) {
         ShowErrorPage();
     }
 }
 
-bool ZUserLogin::run() {
+bool ZUserLogin::run()
+{
+    // [THREAD] The timeout is UI-thread-owned wxTimer state; it exists only to force the modal into the error page
+    // if the auth page never becomes network-reachable.
+    // [UNITY] Replace this with cancellation-aware async timeout handling on the controller instead of a raw timer.
     m_timer = new wxTimer(this, NETWORK_OFFLINE_TIMER_ID);
     m_timer->Start(8000);
 
@@ -160,14 +173,13 @@ bool ZUserLogin::run() {
     }
 }
 
-
-void ZUserLogin::load_url(wxString &url)
+void ZUserLogin::load_url(wxString& url)
 {
     m_browser->LoadURL(url);
     m_browser->SetFocus();
+    // [STATE] Keep the last injected URL/update path in sync with browser focus so the dialog stays in a single-host mode.
     UpdateState();
 }
-
 
 /**
  * Method that retrieves the current state from the web control and updates
@@ -178,7 +190,7 @@ void ZUserLogin::UpdateState()
     // SetTitle(m_browser->GetCurrentTitle());
 }
 
-void ZUserLogin::OnIdle(wxIdleEvent &WXUNUSED(evt))
+void ZUserLogin::OnIdle(wxIdleEvent& WXUNUSED(evt))
 {
     if (m_browser->IsBusy()) {
         wxSetCursor(wxCURSOR_ARROWWAIT);
@@ -196,9 +208,9 @@ void ZUserLogin::OnIdle(wxIdleEvent &WXUNUSED(evt))
  * Callback invoked when there is a request to load a new page (for instance
  * when the user clicks a link)
  */
-void ZUserLogin::OnNavigationRequest(wxWebViewEvent &evt)
+void ZUserLogin::OnNavigationRequest(wxWebViewEvent& evt)
 {
-    //wxLogMessage("%s", "Navigation request to '" + evt.GetURL() + "'(target='" + evt.GetTarget() + "')");
+    // wxLogMessage("%s", "Navigation request to '" + evt.GetURL() + "'(target='" + evt.GetTarget() + "')");
 
     UpdateState();
 }
@@ -206,9 +218,11 @@ void ZUserLogin::OnNavigationRequest(wxWebViewEvent &evt)
 /**
  * Callback invoked when a navigation request was accepted
  */
-void ZUserLogin::OnNavigationComplete(wxWebViewEvent &evt)
+void ZUserLogin::OnNavigationComplete(wxWebViewEvent& evt)
 {
     // wxLogMessage("%s", "Navigation complete; url='" + evt.GetURL() + "'");
+    // [EVENT] New navigation is treated as a same-window transition; the dialog remains a single embedded browser surface.
+    // [PORTING_HAZARD:P3] Browser-specific same-window coercion should become an explicit route decision in Unity.
     m_browser->Show();
     Layout();
     UpdateState();
@@ -217,12 +231,14 @@ void ZUserLogin::OnNavigationComplete(wxWebViewEvent &evt)
 /**
  * Callback invoked when a page is finished loading
  */
-void ZUserLogin::OnDocumentLoaded(wxWebViewEvent &evt)
+void ZUserLogin::OnDocumentLoaded(wxWebViewEvent& evt)
 {
     // Only notify if the document is the main frame, not a subframe
-    wxString tmpUrl = evt.GetURL();
-    NetworkAgent* agent = wxGetApp().getAgent();
-    std::string strHost = agent->get_cloud_service_host();
+    // [STATE] `m_networkOk` flips only when the loaded page matches the expected local file:// bootstrap or cloud host.
+    // [UNITY] Prefer an explicit reachability/auth-state flag in the controller rather than inferring it from URL strings.
+    wxString      tmpUrl  = evt.GetURL();
+    NetworkAgent* agent   = wxGetApp().getAgent();
+    std::string   strHost = agent->get_cloud_service_host();
 
     if (tmpUrl.StartsWith("file://") || tmpUrl.Contains(strHost)) {
         m_networkOk = true;
@@ -235,11 +251,13 @@ void ZUserLogin::OnDocumentLoaded(wxWebViewEvent &evt)
 /**
  * On new window, we veto to stop extra windows appearing
  */
-void ZUserLogin::OnNewWindow(wxWebViewEvent &evt)
+void ZUserLogin::OnNewWindow(wxWebViewEvent& evt)
 {
     wxString flag = " (other)";
 
-    if (evt.GetNavigationAction() == wxWEBVIEW_NAV_ACTION_USER) { flag = " (user)"; }
+    if (evt.GetNavigationAction() == wxWEBVIEW_NAV_ACTION_USER) {
+        flag = " (user)";
+    }
 
     // wxLogMessage("%s", "New window; url='" + evt.GetURL() + "'" + flag);
 
@@ -250,26 +268,34 @@ void ZUserLogin::OnNewWindow(wxWebViewEvent &evt)
     UpdateState();
 }
 
-void ZUserLogin::OnTitleChanged(wxWebViewEvent &evt)
+void ZUserLogin::OnTitleChanged(wxWebViewEvent& evt)
 {
     // SetTitle(evt.GetString());
     // wxLogMessage("%s", "Title changed; title='" + evt.GetString() + "'");
 }
 
-void ZUserLogin::OnFullScreenChanged(wxWebViewEvent &evt)
+void ZUserLogin::OnFullScreenChanged(wxWebViewEvent& evt)
 {
     // wxLogMessage("Full screen changed; status = %d", evt.GetInt());
     ShowFullScreen(evt.GetInt() != 0);
 }
 
-void ZUserLogin::OnScriptMessage(wxWebViewEvent &evt)
+void ZUserLogin::OnScriptMessage(wxWebViewEvent& evt)
 {
+    // [INTENT] JavaScript messages are the dialog's command surface: login setup, token echo, localhost handoff,
+    // third-party sign-in, and page-open requests all flow through here.
+    // [STATE] `m_AutotestToken` and `m_loopback_port` are cached across page round-trips so the provider can negotiate
+    // PKCE/loopback details without re-deriving them from the UI tree.
+    // [THREAD] `EndModal()` happens before the follow-up `CallAfter()` so the handler cannot re-enter the modal loop
+    // while app callbacks run.
+    // [UNITY] Model this as a typed command DTO router with validation plus a main-thread completion queue.
+    // [PORTING_HAZARD:P2] The current behavior depends on modal-loop reentrancy and stringly-typed JSON payloads.
     wxString str_input = evt.GetString();
 
     try {
-        json j = json::parse(into_u8(str_input));
+        json     j      = json::parse(into_u8(str_input));
         wxString strCmd = j["command"];
-        
+
         NetworkAgent* agent = wxGetApp().getAgent();
         if (agent && strCmd == "get_login_cmd" && agent->get_cloud_agent()) {
             // Return login config (backend_url, apikey, pkce)
@@ -316,77 +342,74 @@ void ZUserLogin::OnScriptMessage(wxWebViewEvent &evt)
             return;
         }
 
-        if (strCmd == "autotest_token")
-        {
+        if (strCmd == "autotest_token") {
             m_AutotestToken = j["data"]["token"];
         }
         if (strCmd == "user_login") {
             j["data"]["autotest_token"] = m_AutotestToken;
-            std::string message_json = j.dump();
+            std::string message_json    = j.dump();
 
-            // End modal dialog first to unblock event loop before processing callbacks
+            // End modal dialog first to unblock event loop before processing callbacks.
             EndModal(wxID_OK);
 
             // Handle message after modal dialog ends to avoid deadlock
             // Use wxTheApp->CallAfter to ensure it runs after modal loop exits
-            wxTheApp->CallAfter([message_json]() {
-                wxGetApp().handle_script_message(message_json);
-            });
-        }
-        else if (strCmd == "get_localhost_url") {
+            wxTheApp->CallAfter([message_json]() { wxGetApp().handle_script_message(message_json); });
+        } else if (strCmd == "get_localhost_url") {
             int loopback_port = m_loopback_port > 0 ? m_loopback_port : LOCALHOST_PORT;
             wxGetApp().start_http_server(loopback_port);
             std::string sequence_id = j["sequence_id"].get<std::string>();
             CallAfter([this, sequence_id] {
                 json ack_j;
-                ack_j["command"] = "get_localhost_url";
-                int loopback_port = m_loopback_port > 0 ? m_loopback_port : LOCALHOST_PORT;
+                ack_j["command"]              = "get_localhost_url";
+                int loopback_port             = m_loopback_port > 0 ? m_loopback_port : LOCALHOST_PORT;
                 ack_j["response"]["base_url"] = std::string(LOCALHOST_URL) + std::to_string(loopback_port);
-                ack_j["response"]["result"] = "success";
-                ack_j["sequence_id"] = sequence_id;
-                wxString str_js = wxString::Format("window.postMessage(%s)", ack_j.dump());
+                ack_j["response"]["result"]   = "success";
+                ack_j["sequence_id"]          = sequence_id;
+                wxString str_js               = wxString::Format("window.postMessage(%s)", ack_j.dump());
                 this->RunScript(str_js);
             });
-        }
-        else if (strCmd == "thirdparty_login") {
+        } else if (strCmd == "thirdparty_login") {
             if (j["data"].contains("url")) {
-                std::string jump_url = j["data"]["url"].get<std::string>();
-                int loopback_port = m_loopback_port > 0 ? m_loopback_port : LOCALHOST_PORT;
+                std::string jump_url      = j["data"]["url"].get<std::string>();
+                int         loopback_port = m_loopback_port > 0 ? m_loopback_port : LOCALHOST_PORT;
                 wxGetApp().start_http_server(loopback_port);
                 CallAfter([this, jump_url] {
                     wxString url = wxString::FromUTF8(jump_url);
                     wxLaunchDefaultBrowser(url);
-                    });
+                });
             }
-        }
-        else if (strCmd == "new_webpage") {
+        } else if (strCmd == "new_webpage") {
             if (j["data"].contains("url")) {
                 std::string jump_url = j["data"]["url"].get<std::string>();
                 CallAfter([this, jump_url] {
                     wxString url = wxString::FromUTF8(jump_url);
                     wxLaunchDefaultBrowser(url);
-                    });
+                });
             }
             return;
         }
-    } catch (std::exception &e) {
+    } catch (std::exception& e) {
         wxMessageBox(e.what(), "parse json failed", wxICON_WARNING);
         Close();
     }
 }
 
-void ZUserLogin::RunScript(const wxString &javascript)
+void ZUserLogin::RunScript(const wxString& javascript)
 {
     // Remember the script we run in any case, so the next time the user opens
     // the "Run Script" dialog box, it is shown there for convenient updating.
+    // [STATE] Cache the last JS snippet because this bridge is effectively a request/response channel, not a
+    // fire-and-forget browser helper.
     m_javascript = javascript;
 
-    if (!m_browser) return;
+    if (!m_browser)
+        return;
 
     WebView::RunScript(m_browser, javascript);
 }
 #if wxUSE_WEBVIEW_IE
-void ZUserLogin::OnRunScriptObjectWithEmulationLevel(wxCommandEvent &WXUNUSED(evt))
+void ZUserLogin::OnRunScriptObjectWithEmulationLevel(wxCommandEvent& WXUNUSED(evt))
 {
     wxWebViewIE::MSWSetModernEmulationLevel();
     RunScript("function f(){var person = new Object();person.name = 'Foo'; \
@@ -394,7 +417,7 @@ void ZUserLogin::OnRunScriptObjectWithEmulationLevel(wxCommandEvent &WXUNUSED(ev
     wxWebViewIE::MSWSetModernEmulationLevel(false);
 }
 
-void ZUserLogin::OnRunScriptDateWithEmulationLevel(wxCommandEvent &WXUNUSED(evt))
+void ZUserLogin::OnRunScriptDateWithEmulationLevel(wxCommandEvent& WXUNUSED(evt))
 {
     wxWebViewIE::MSWSetModernEmulationLevel();
     RunScript("function f(){var d = new Date('10/08/2017 21:30:40'); \
@@ -403,7 +426,7 @@ void ZUserLogin::OnRunScriptDateWithEmulationLevel(wxCommandEvent &WXUNUSED(evt)
     wxWebViewIE::MSWSetModernEmulationLevel(false);
 }
 
-void ZUserLogin::OnRunScriptArrayWithEmulationLevel(wxCommandEvent &WXUNUSED(evt))
+void ZUserLogin::OnRunScriptArrayWithEmulationLevel(wxCommandEvent& WXUNUSED(evt))
 {
     wxWebViewIE::MSWSetModernEmulationLevel();
     RunScript("function f(){ return [\"foo\", \"bar\"]; }f();");
@@ -414,8 +437,12 @@ void ZUserLogin::OnRunScriptArrayWithEmulationLevel(wxCommandEvent &WXUNUSED(evt
 /**
  * Callback invoked when a loading error occurs
  */
-void ZUserLogin::OnError(wxWebViewEvent &evt)
+void ZUserLogin::OnError(wxWebViewEvent& evt)
 {
+    // [INTENT] Connection failures are handled as a fallback-to-error-page signal, not as an inline browser error state.
+    // [STATE] The timer is stopped before switching content so the timeout path cannot race the error-page load.
+    // [UNITY] Use an explicit failure state in the modal controller and a reusable error panel instead of navigating
+    // the embedded page to an HTML error asset.
 #define WX_ERROR_CASE(type) \
     case type: category = #type; break;
 
@@ -431,12 +458,11 @@ void ZUserLogin::OnError(wxWebViewEvent &evt)
         WX_ERROR_CASE(wxWEBVIEW_NAV_ERR_OTHER);
     }
 
-    if( evt.GetInt()==wxWEBVIEW_NAV_ERR_CONNECTION )
-    {
-        if(m_timer!=NULL)
+    if (evt.GetInt() == wxWEBVIEW_NAV_ERR_CONNECTION) {
+        if (m_timer != NULL)
             m_timer->Stop();
 
-        if (m_networkOk==false)
+        if (m_networkOk == false)
             ShowErrorPage();
     }
 
@@ -450,7 +476,7 @@ void ZUserLogin::OnError(wxWebViewEvent &evt)
     UpdateState();
 }
 
-void ZUserLogin::OnScriptResponseMessage(wxCommandEvent &WXUNUSED(evt))
+void ZUserLogin::OnScriptResponseMessage(wxCommandEvent& WXUNUSED(evt))
 {
     // if (!m_response_js.empty())
     //{
@@ -461,13 +487,14 @@ void ZUserLogin::OnScriptResponseMessage(wxCommandEvent &WXUNUSED(evt))
     // RunScript("postMessage(\"AABBCCDD\");");
 }
 
-bool  ZUserLogin::ShowErrorPage()
+bool ZUserLogin::ShowErrorPage()
 {
+    // [UNITY] This fallback page is a UI state, not a navigation feature; the Unity version should swap to a dedicated
+    // error view instead of reloading HTML from disk.
     wxString ErrortUrl = from_u8((boost::filesystem::path(resources_dir()) / "web\\login\\error.html").make_preferred().string());
     load_url(ErrortUrl);
 
     return true;
 }
-
 
 }} // namespace Slic3r::GUI
