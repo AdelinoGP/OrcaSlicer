@@ -131,3 +131,7 @@
 - Completed T604 (`src/slic3r/GUI/SysInfoDialog.hpp`) as the declaration boundary for the system-information modal.
 - The header now records the retained report panes, logo bitmap scaling, clipboard command wiring, Unity split into a modal overlay with a report-text model, and the clipboard/process-inspection porting hazard.
 - Next step after commit: close T604 in the runtime registry, then move to T605 (`src/slic3r/GUI/Tabbook.cpp`).
+
+- Started T605 (`src/slic3r/GUI/Tabbook.cpp`) as the sidebar tab-rail controller.
+- Tabbook.cpp owns the custom tab strip chrome: it reparents a caller-owned sizer subtree, paints only the selected-page band and separator, forwards button clicks via `wxCUSTOMEVT_TABBOOK_SEL_CHANGED`, and keeps a late-bound footer label for contextual hints.
+- Plan: keep the annotation compact but cover selection ownership, custom paint flow, per-tab badges/icons, DPI rescales, and the Unity mapping to a retained vertical tab rail with reusable button items, then verify with `git diff --check` and commit the atomic change.

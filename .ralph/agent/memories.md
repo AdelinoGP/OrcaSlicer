@@ -2,6 +2,42 @@
 
 ## Patterns
 
+### mem-1774671570-142f
+> TabButtonsListCtrl is a custom left-rail notebook shell: it reparents a caller-owned sizer, paints only the selected-page chrome, posts wxCUSTOMEVT_TABBOOK_SEL_CHANGED on button click, and a Unity port should use a vertical tab rail with shared selection state and a separate footer row.
+<!-- tags: gui, unity, tabs | created: 2026-03-28 -->
+
+### mem-1774671282-eb43
+> SysInfoDialog.hpp is the declaration boundary for the system-information modal: it owns the rescaled logo bitmap, summary/report panes, and clipboard command wiring, so Unity should split report text into a retained model and keep process inspection/clipboard behind services.
+<!-- tags: gui, unity, dialog | created: 2026-03-28 -->
+
+### mem-1774670979-3aaa
+> SysInfoDialog.cpp is a modal system-report dialog: it should map to a retained popup/overlay with a reusable report-text service, a platform inspection service for process/graphics metadata, and a separate clipboard command path.
+<!-- tags: gui, unity, dialog, clipboard | created: 2026-03-28 -->
+
+### mem-1774670381-c481
+> SyncAmsInfoDialog.hpp is the declaration boundary for the AMS sync modal: it owns printer selection, async refresh state, thumbnail preview composition, and two transparent overlay frames, so Unity should split it into a modal controller plus anchored overlay prefabs.
+<!-- tags: gui, unity, annotation, threading | created: 2026-03-28 -->
+
+### mem-1774669510-f143
+> SurfaceDrag.hpp is the declaration boundary for the transient drag session: it owns only non-owning drag state, raycast filters, and fixed-transform helpers, so Unity should model it as a pointer-drag controller plus a pure geometry/service layer.
+<!-- tags: gui, unity, annotation | created: 2026-03-28 -->
+
+### mem-1774669212-16c8
+> SurfaceDrag.cpp is a transient drag controller: it caches cursor offsets, raycast filters, fix transforms, and initial angle/distance, then replays pointer motion through a pure transform helper; Unity should implement this as a dedicated drag tool with a scene-query service and explicit hit-test state.
+<!-- tags: gui, unity, selection | created: 2026-03-28 -->
+
+### mem-1774668037-5c54
+> StepMeshDialog couples STEP import validation, slider/text sync, and a worker-thread triangle-count preview; Unity should split the dialog from the async mesh-estimation service because the current code blocks on join during cancel/confirm.
+<!-- tags: gui, unity, threading, step | created: 2026-03-28 -->
+
+### mem-1774667694-6e46
+> StatusPanel.hpp is the declaration boundary for the full machine-status dashboard: it owns extruder-image state, score upload state, task-panel actions, and async wxWebRequest thumbnail refresh, so Unity should split it into a retained dashboard root with popup/dialog services.
+<!-- tags: gui, unity, annotation, threading | created: 2026-03-28 -->
+
+### mem-1774666506-0f05
+> SlicingProgressNotification.hpp is the declaration boundary for the UI-thread-owned slicing HUD: it owns the progress mode, fade policy, cancel callback, and embedded DailyTipsPanel, so the Unity port should keep it as a retained screen-space controller with a reusable child panel.
+<!-- tags: gui, unity, annotation, threading | created: 2026-03-28 -->
+
 ### mem-1774666014-194f
 > SlicingProgressNotification is a UI-thread-owned immediate-mode ImGui overlay: it maintains a small progress state machine, embeds Daily Tips, and should become a retained Unity HUD controller with explicit state transitions.
 <!-- tags: gui, unity, notification, immediate-mode | created: 2026-03-28 -->
@@ -201,6 +237,10 @@
 ## Decisions
 
 ## Fixes
+
+### mem-1774669621-68df
+> failure: cmd=/home/admin/.config/nvm/versions/node/v24.14.0/lib/node_modules/@ralph-orchestrator/ralph-cli/node_modules/.bin_real/ralph tools task list --format json | python - <<'PY'\nimport sys, json\nitems=json.load(sys.stdin)\nPY, exit=1, error=JSONDecodeError from empty stdin, next=inspect task list output format before piping
+<!-- tags: tooling, error-handling | created: 2026-03-28 -->
 
 ### mem-1774664045-93eb
 > failure: cmd="/home/admin/.config/nvm/versions/node/v24.14.0/lib/node_modules/@ralph-orchestrator/ralph-cli/node_modules/.bin_real/ralph tools task start task-1773880087-1f?", exit=1, error=zsh glob pattern mistake in task id, next=start the intended task with the exact runtime id task-1773880087-aff1

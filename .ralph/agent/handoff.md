@@ -1931,3 +1931,15 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1 (stale async thumbnail responses can race popup state)
 - Git: Annotate SliceInfoPanel header boundary
 - Next recommended Phase 1 task: T593 annotate: src/slic3r/GUI/SlicingProgressNotification.cpp
+
+## Phase 1 - Task T605 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Tabbook.cpp
+- Deliverables: src/slic3r/GUI/Tabbook.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 8 boundary comments covering ownership, paint flow, DPI rescale, selection/event flow, tab badge state, page icon/text state, padding, and footer behavior
+- Verification excerpt: [UNITY] Map this to a vertical tab rail (ScrollRect/ListView or a button column) with a shared selection model and reusable button prefabs rather than reparenting live widgets.
+- Unity-impact summary: retained selection model; reusable tab button items; separate footer/status row
+- Hazards found: 1 P2
+- Git: Annotate Tabbook sidebar tab rail
+- Next recommended Phase 1 task: T606 annotate: src/slic3r/GUI/Tabbook.hpp
