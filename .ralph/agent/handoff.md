@@ -213,6 +213,21 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: annotate SelectMachinePop header
 - Next recommended Phase 1 task: T581 annotate: src/slic3r/GUI/SendMultiMachinePage.cpp
 
+## Phase 1 - Task T581 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/SendMultiMachinePage.cpp
+- Deliverables: src/slic3r/GUI/SendMultiMachinePage.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 11 annotation blocks covering the page boundary, row widget behavior, device-list refresh, print payload assembly, send workflow, AMS mapping callback, page composition, filament rebuild, thumbnail defaults, rename validation, and polling refresh
+- Verification excerpt: `[UNITY] Port as a modal controller with a scrollable list of recyclable device-row prefabs, a dedicated AMS-mapping subpanel, and a ScriptableObject-backed settings model.`
+- Unity-impact summary:
+  - Split the page into a modal shell plus reusable list-row, mapping, and settings subviews.
+  - Move device polling/subscription into a cached service that refreshes the UI on the main thread.
+  - Replace pipe-delimited mapping payloads with a typed DTO boundary in Unity.
+- Hazards found: P2=2, P3=2, P1=0
+- Git: pending commit
+- Next recommended Phase 1 task: T582 annotate: src/slic3r/GUI/SendMultiMachinePage.hpp
+
 ## Phase 1 - Task T568 complete
 
 - Task type: annotate

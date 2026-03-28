@@ -26,3 +26,7 @@
 - Completed T580 (`src/slic3r/GUI/SelectMachinePop.hpp`) as the next atomic annotation pass.
 - The header now frames the popup boundary, row widget intent, worker-thread fetch boundary, custom event routing, and the rename modal mapping for Unity migration.
 - Next step: move to T581 (`src/slic3r/GUI/SendMultiMachinePage.cpp`) after committing this atomic annotation.
+
+- Started T581 (`src/slic3r/GUI/SendMultiMachinePage.cpp`) and annotated the modal controller boundary, row widget behavior, device-list rebuild flow, AMS mapping serialization, send workflow, rename validation, thumbnail defaults, and periodic refresh tick.
+- The page is a composite send-to-multi-device dialog: it mixes a cached device roster, a popup-based AMS mapper, app-config-backed options, and synchronous send/export actions, so Unity should split it into reusable subviews plus a service-backed view model.
+- Next step after commit: close T581, record completion evidence in handoff, and move to the next ready annotation task.
