@@ -130,6 +130,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate TickCode.hpp boundary
 - Next recommended Phase 1 task: T619 annotate: src/slic3r/GUI/UnsavedChangesDialog.cpp
 
+## Phase 1 - Task T619 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/UnsavedChangesDialog.cpp
+- Deliverables: src/slic3r/GUI/UnsavedChangesDialog.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 7 boundary comment blocks covering diff-tree ownership, the data-view controller, the unsaved-changes modal, the refresh path, the full-text compare popup, and the preset-compare dialog
+- Verification excerpt: `[UNITY] Model this as a modal controller with a retained diff tree, a separate preset-save subdialog, and explicit confirmation actions bound to command buttons.`
+- Unity-impact summary: retained diff-tree model; modal decision flow stays separate from preset save/transfer side effects; compare presets becomes a paired selection workspace
+- Hazards found: P2 x2, P3 x2
+- Git: Annotate UnsavedChangesDialog workflow
+- Next recommended Phase 1 task: T620 annotate: src/slic3r/GUI/UnsavedChangesDialog.hpp
+
 ## Phase 1 - Task T597 complete
 
 - Task type: annotate

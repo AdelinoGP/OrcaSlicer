@@ -83,6 +83,11 @@
 - The file is a UI-thread-owned immediate-mode notification that drives a small progress state machine, late print-info enrichment, and an embedded Daily Tips panel on the canvas overlay.
 - Plan: keep the annotation focused on the state transitions, render path, button events, and Unity mapping to a retained HUD controller, then verify with a diff check and close the task.
 
+- Started T619 (`src/slic3r/GUI/UnsavedChangesDialog.cpp`) as the diff-and-compare workflow for preset changes.
+- The file spans a toggleable diff tree, a long-text compare popup, and a paired preset comparison dialog that can post a transfer event back to the main flow.
+- Unity mapping to preserve: modal controller plus retained diff tree, separate save/transfer subdialog, and explicit paired preset selection/compatibility logic.
+- Verification target: `git diff --check` after the annotation patch; the local include-path/LSP noise is expected and not a syntax signal for the inserted comments.
+
 - Started T594 (`src/slic3r/GUI/SlicingProgressNotification.hpp`) as the declaration boundary for the same overlay.
 - The header needs class-level intent plus the key state fields: progress mode, sidebar fade behavior, export availability, cancel callback, and the embedded DailyTipsPanel.
 - Plan: add compact boundary comments that preserve the current fade/state semantics and spell out the Unity split as a screen-space HUD controller with a reusable child panel, then verify with `git diff --check` and close the task.

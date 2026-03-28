@@ -41,6 +41,14 @@ namespace GUI {
 wxDEFINE_EVENT(EVT_DIFF_DIALOG_TRANSFER, SimpleEvent);
 
 
+// [INTENT] DiffModel uses ModelNode as a hierarchical, toggleable diff tree so the dialogs can
+// render preset/category/group/option changes without flattening the config structure.
+// [STATE] Each node caches display text, toggle state, and optional old/new color bitmaps that
+// are regenerated when the dialog rescales or when a parent toggle changes.
+// [UNITY] Port this as a retained tree view model with explicit row objects and a separate
+// formatter for color swatches/text markup instead of mutating wxDataViewItem payloads in place.
+// [PORTING_HAZARD:P2] The node tree mutates both topology and presentation state together, so a
+// Unity port needs a clear model/view split to avoid stale selection and formatting bugs.
 // ----------------------------------------------------------------------------
 //                  ModelNode: a node inside DiffModel
 // ----------------------------------------------------------------------------
@@ -219,6 +227,14 @@ void ModelNode::UpdateIcons()
 }
 
 
+// [INTENT] DiffModel owns the preset diff hierarchy and bridges row edits back to the wx data view
+// so checkbox toggles cascade across parents/children and icon/text columns stay in sync.
+// [STATE] The model retains top-level preset nodes and uses the control pointer for expansion and
+// item-added/item-deleted notifications; this is not a passive data container.
+// [UNITY] Implement this as a retained diff-tree data source feeding a ListView/TreeView with
+// explicit expand-collapse commands and observable row updates.
+// [PORTING_HAZARD:P3] wxDataView model callbacks hide a lot of implicit refresh behavior, so the
+// Unity version should make row invalidation and parent/child propagation explicit.
 // ----------------------------------------------------------------------------
 //                          DiffModel
 // ----------------------------------------------------------------------------
@@ -578,6 +594,14 @@ static std::string get_pure_opt_key(std::string opt_key)
     return opt_key;
 }
 
+// [INTENT] DiffViewCtrl is the interactive tree controller: it configures the columns, translates
+// item toggles into model updates, and opens a full-value popup when text is truncated.
+// [EVENT] The control binds context-menu, activation, and value-changed events directly on the
+// wxDataViewCtrl so the same row can drive selection, editing, and long-text inspection.
+// [UNITY] Use a TreeView/ListView with custom row renderers plus a right-click action that opens a
+// modal detail dialog for truncated values.
+// [PORTING_HAZARD:P2] The controller keeps its own long-string map and selection heuristics, so a
+// Unity port should move hit testing and popup selection into the view layer explicitly.
 // ----------------------------------------------------------------------------
 //                  DiffViewCtrl
 // ----------------------------------------------------------------------------
@@ -766,6 +790,16 @@ std::vector<std::string> DiffViewCtrl::selected_options()
 }
 
 
+// [INTENT] UnsavedChangesDialog summarizes dirty preset changes and routes the user into save,
+// transfer, or discard flows while preserving a "remember my choice" shortcut in app config.
+// [STATE] It clones/snapshots preset data into a human-readable diff tree, tracks button mode
+// flags, and remembers the exit action so the caller can apply the chosen policy later.
+// [EVENT] Button hover/click handlers update the info line, validate transfer eligibility, and
+// post a transfer event back to the host when needed.
+// [UNITY] Model this as a modal controller with a retained diff tree, a separate preset-save
+// subdialog, and explicit confirmation actions bound to command buttons.
+// [PORTING_HAZARD:P2] The dialog mixes selection, persistence, and cross-tab preset mutation, so
+// Unity needs clear ownership boundaries around the cloned preset bundles and "remember choice".
 //------------------------------------------
 //          UnsavedChangesDialog
 //------------------------------------------
@@ -1034,6 +1068,9 @@ void UnsavedChangesDialog::build(Preset::Type type, PresetCollection *dependent_
     show_info_line(Action::Undef);
 }
 
+// [UNCLEAR] This helper currently returns immediately, so the hover/help-line behavior appears to
+// be intentionally disabled in this build; keep the hypothesis until the header/caller contract is
+// confirmed.
 void UnsavedChangesDialog::show_info_line(Action action, std::string preset_name)
 {
     return;
@@ -1375,6 +1412,10 @@ static wxString get_string_value(std::string opt_key, const DynamicPrintConfig& 
     return out;
 }
 
+// [STATE] update() refreshes the dialog caption/body based on whether we are editing one preset or
+// the global project state, and it rebinds hover copy to match the current action buttons.
+// [UNITY] Treat this as the dialog's data-refresh pass: rebuild the retained list model from the
+// preset snapshot, then recompute the action CTA text from the current mode.
 void UnsavedChangesDialog::update(Preset::Type type, PresetCollection* dependent_presets, const std::string& new_selected_preset, const wxString& header)
 {
     PresetCollection* presets = dependent_presets;
@@ -1630,6 +1671,15 @@ std::string UnsavedChangesDialog::subreplace(std::string resource_str, std::stri
     return dst_str;
 }
 
+// [INTENT] update_tree() converts dirty preset options into a display-ready table by querying the
+// search index, formatting config values, and preserving category/group ordering for the scrollable
+// summary list.
+// [STATE] The function temporarily sorts the shared search index by key, then restores label sort
+// at the end; this side effect matters if another dialog relies on search ordering.
+// [UNITY] Build the same list from a data-backed view model so search metadata stays out of the UI
+// row objects and the sort-mode flip is isolated to the presenter layer.
+// [PORTING_HAZARD:P3] The implementation depends on searcher ordering and several preset-specific
+// config special cases, so a naive data binding pass would miss the formatting exceptions.
 void UnsavedChangesDialog::update_tree(Preset::Type type, PresetCollection* presets_)
 {
     Search::OptionsSearcher& searcher = wxGetApp().sidebar().get_searcher();
@@ -1744,6 +1794,12 @@ bool UnsavedChangesDialog::check_option_valid()
 }
 
 
+// [INTENT] FullCompareDialog is a one-off read-only diff popup for truncated option values; it
+// expands whitespace-separated strings into set diffs so the user can inspect exact additions.
+// [UNITY] Port as a small modal text comparison panel with two scrollable read-only panes and a
+// shared OK button row.
+// [PORTING_HAZARD:P3] The popup uses ad-hoc string tokenization/highlighting instead of a reusable
+// diff engine, so the Unity version should isolate that formatter if other dialogs reuse it.
 //------------------------------------------
 //          FullCompareDialog
 //------------------------------------------
@@ -1838,6 +1894,16 @@ static PresetCollection* get_preset_collection(Preset::Type type, PresetBundle* 
             nullptr;
 }
 
+// [INTENT] DiffPresetDialog compares two preset bundles side-by-side, lets the user pick matching
+// presets for each type, and shows a tree of dirty options for the selected pair.
+// [STATE] It owns cloned left/right PresetBundle snapshots so selection changes do not mutate the
+// live app state until the user confirms the transfer path.
+// [EVENT] Combo-box selection changes, the equal-button shortcut, and the transfer/cancel buttons
+// all feed back into tree rebuilds and compatibility recalculation.
+// [UNITY] Represent this as a modal comparison workspace with paired dropdowns, a sync button, and a
+// diff tree bound to cloned view-model state.
+// [PORTING_HAZARD:P2] The dialog conditionally swaps visible preset types based on printer
+// technology, so Unity needs an explicit compatibility policy rather than implicit widget hiding.
 //------------------------------------------
 //          DiffPresetDialog
 //------------------------------------------
