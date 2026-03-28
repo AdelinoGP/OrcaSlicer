@@ -274,4 +274,8 @@
 - Next step after commit: close T640 in the runtime registry, then move to T641 (`src/slic3r/GUI/Widgets/AMSItem.cpp`).
 
 - T609 is the current atomic task for this iteration.
+
+- Completed T641 (`src/slic3r/GUI/Widgets/AMSItem.cpp`) with boundary comments for the AMS tray cache, refresh button, slot cards, humidity badge, route overlays, and the composite `AmsItem` root.
+- The file also picked up some whitespace/format churn while the annotation blocks landed, but the added engineering content is concentrated on selection flow, pass-road highlighting, and Unity prefab decomposition.
+- Next step is to commit this atomic annotation, record the handoff evidence, and move to T642 (`src/slic3r/GUI/Widgets/AMSItem.hpp`).
 - Tab.cpp needs the preset-shell, dirty-state, and deletion hazards called out explicitly so Unity can split the page tree and modal preset workflow cleanly.

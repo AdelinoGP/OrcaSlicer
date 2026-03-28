@@ -2,6 +2,10 @@
 
 ## Patterns
 
+### mem-1774735565-184a
+> AMSItem.cpp is the composite AMS dashboard: it owns tray cards, refresh indicators, humidity badges, route overlays, and selection fan-out, so Unity should split it into a retained root prefab with child tray/route view controllers.
+<!-- tags: gui, unity, widgets, ams | created: 2026-03-28 -->
+
 ### mem-1774685334-3cdf
 > AMSControl.hpp is the declaration boundary for the retained AMS dashboard: it caches current slot/page state, owns popup/controller pointers, and should port as a presenter MonoBehaviour with separate overlay controllers.
 <!-- tags: gui, unity, widgets, ams | created: 2026-03-28 -->

@@ -2399,3 +2399,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1
 - Git: Annotate AMSControl.hpp boundary
 - Next recommended Phase 1 task: T641 annotate: src/slic3r/GUI/Widgets/AMSItem.cpp
+
+## Phase 1 - Task T641 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/AMSItem.cpp
+- Deliverables: src/slic3r/GUI/Widgets/AMSItem.cpp, .ralph/agent/scratchpad.md, .ralph/agent/memories.md, .ralph/agent/handoff.md
+- Substantive additions: 12 boundary comment groups covering AMS cache parsing, refresh control, slot cards, route overlays, humidity badges, preview tiles, and the composite AmsItem root
+- Verification excerpt: `[UNITY] This wants a retained root prefab with child tray prefabs, route-line renderer, and slot lookup dictionaries.`
+- Unity-impact summary:
+  - Split the AMS dashboard into a retained root prefab plus per-slot card controllers.
+  - Treat humidity, route lines, and refresh affordances as separate child views/services.
+  - Preserve click gating and pass-road fan-out as explicit selection state.
+- Hazards found: P2 x2, P3 x1
+- Git: Annotate AMSItem.cpp boundaries
+- Next recommended Phase 1 task: T642 annotate: src/slic3r/GUI/Widgets/AMSItem.hpp
