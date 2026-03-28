@@ -222,3 +222,6 @@
 - Verification target: `git diff --check -- src/slic3r/GUI/UserManager.hpp` after annotation, then commit the atomic header change and close the task.
 
 - T627 turned out to be a namespace-only 5-line stub, so the correct classification is `skip-trivial`. The next real behavior boundary should be `UserNotification.hpp` rather than this .cpp file.
+
+- T628 (`src/slic3r/GUI/UserNotification.hpp`) is also semantically inert: the header only exposes a small enum plus an empty constructor shell, so it was normalized from `annotate` to `skip-trivial` and marked done.
+- Next recommended task after commit is T629 (`src/slic3r/GUI/WebDownPluginDlg.cpp`).

@@ -2216,3 +2216,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: none
 - Git: Skip trivial UserNotification.cpp
 - Next recommended Phase 1 task: T628 annotate: src/slic3r/GUI/UserNotification.hpp
+
+## Phase 1 - Task T628 complete
+
+- Task type: skip-trivial
+- File: src/slic3r/GUI/UserNotification.hpp
+- Deliverables: .ralph/ralph-tasks.md, .ralph/agent/handoff.md, .ralph/agent/scratchpad.md
+- Substantive additions: 0; the header is a 20-line enum + empty shell with no behavior, state, or event flow to port
+- Verification excerpt: `class UserNotification { public: UserNotification() {} };`
+- Unity-impact summary:
+  - No first-party GUI behavior is present in this header.
+  - Keep migration notes focused on the real implementation file and surrounding callers.
+  - The task title was normalized from `annotate` to `skip-trivial` to match the file's semantics.
+- Hazards found: none
+- Git: pending commit `Skip trivial UserNotification header`
+- Next recommended Phase 1 task: T629 annotate: src/slic3r/GUI/WebDownPluginDlg.cpp
