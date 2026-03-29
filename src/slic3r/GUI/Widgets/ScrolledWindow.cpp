@@ -8,7 +8,15 @@
 #include "ScrolledWindow.hpp"
 #include "Scrollbar.hpp"
 
-ScrolledWindow::ScrolledWindow(wxWindow *parent, wxWindowID id, wxPoint position, wxSize size, long style, int marginWidth, int scrollbarWidth, int tipLength)
+// [INTENT] This wrapper replaces wxScrolled's built-in bars with a user panel plus custom MyScrollbar controls.
+// [STATE] It caches the split layout, margin thickness, and whether both axes are active so resize logic can keep the
+// custom scroll affordances in sync with wxScrolled's logical view state.
+// [UNITY] Port as a retained scroll container with a content viewport and separate custom scrollbar controllers, not as
+// a native scroll-view wrapper.
+// [PORTING_HAZARD:P2] The layout is hand-synchronized through splitter sizes, manual refreshes, and SetViewStart calls,
+// so Unity should treat the scrollbars and viewport as one coordinated controller instead of independent widgets.
+ScrolledWindow::ScrolledWindow(
+    wxWindow* parent, wxWindowID id, wxPoint position, wxSize size, long style, int marginWidth, int scrollbarWidth, int tipLength)
     : wxScrolled<wxWindow>(parent, id, position, size, style)
 {
     bool bVertical   = (style & wxVSCROLL) != 0;
@@ -22,7 +30,7 @@ ScrolledWindow::ScrolledWindow(wxWindow *parent, wxWindowID id, wxPoint position
     m_verticalSplitter   = NULL;
     m_horizontalSplitter = NULL;
 
-    m_marginWidth        = marginWidth;
+    m_marginWidth = marginWidth;
 
     wxSize hsSize = size;
     hsSize.SetWidth(hsSize.GetWidth() - marginWidth);
@@ -31,19 +39,21 @@ ScrolledWindow::ScrolledWindow(wxWindow *parent, wxWindowID id, wxPoint position
     wxSize vsSize = size;
     vsSize.SetWidth(vsSize.GetWidth() - marginWidth);
 
-
     if (bVertical) {
         m_verticalSplitter = new wxWindow(this, -1, position, vsSize);
         m_userPanel        = new wxPanel(m_verticalSplitter, -1, wxPoint(0, 0), wxSize(size.GetWidth() - marginWidth, size.GetHeight()));
-        m_scroll_win      = new wxWindow(m_verticalSplitter, -1, wxPoint(size.GetWidth() - marginWidth, 0), wxSize(marginWidth, size.GetHeight()));
-        m_rightScrollbar   = new MyScrollbar(m_scroll_win, -1, wxPoint(0, 0), wxSize(scrollbarWidth, size.GetHeight()), this, wxVSCROLL, scrollbarWidth, tipLength);
+        m_scroll_win       = new wxWindow(m_verticalSplitter, -1, wxPoint(size.GetWidth() - marginWidth, 0),
+                                          wxSize(marginWidth, size.GetHeight()));
+        m_rightScrollbar   = new MyScrollbar(m_scroll_win, -1, wxPoint(0, 0), wxSize(scrollbarWidth, size.GetHeight()), this, wxVSCROLL,
+                                             scrollbarWidth, tipLength);
     } else if (bHorizontal) {
         m_horizontalSplitter = new wxSplitterWindow(this, -1, position, hsSize);
-        m_userPanel          = new wxPanel(m_horizontalSplitter, -1, wxPoint(0, 0), wxSize(size.GetWidth() - marginWidth, size.GetHeight() - marginWidth));
+        m_userPanel          = new wxPanel(m_horizontalSplitter, -1, wxPoint(0, 0),
+                                           wxSize(size.GetWidth() - marginWidth, size.GetHeight() - marginWidth));
         m_userPanel->SetBackgroundColour(parent->GetBackgroundColour());
 
-        m_bottomScrollbar = new MyScrollbar(m_horizontalSplitter, -1, wxPoint(0, 0), wxSize(size.GetWidth() - marginWidth, marginWidth), this, wxHSCROLL, scrollbarWidth,
-                                            tipLength);
+        m_bottomScrollbar = new MyScrollbar(m_horizontalSplitter, -1, wxPoint(0, 0), wxSize(size.GetWidth() - marginWidth, marginWidth),
+                                            this, wxHSCROLL, scrollbarWidth, tipLength);
         m_horizontalSplitter->SplitHorizontally(m_userPanel, m_bottomScrollbar, -marginWidth);
         m_horizontalSplitter->SetSashInvisible();
     }
@@ -62,8 +72,11 @@ ScrolledWindow::ScrolledWindow(wxWindow *parent, wxWindowID id, wxPoint position
     Bind(wxEVT_MOUSEWHEEL, &ScrolledWindow::OnMouseWheel, this);
 }
 
-void ScrolledWindow::OnMouseWheel(wxMouseEvent &event)
+void ScrolledWindow::OnMouseWheel(wxMouseEvent& event)
 {
+    // [EVENT] Wheel input is forwarded to the custom scrollbar so it owns the scrolling policy and thumb movement.
+    // [UNCLEAR] The legacy immediate scroll math is left commented out; the live path appears to rely entirely on the
+    // scrollbar event handler, so a Unity port should preserve that single source of truth unless behavior proves missing.
     m_rightScrollbar->GetEventHandler()->ProcessEvent(event);
 
     // int dMotion, actualDim;
@@ -106,12 +119,17 @@ void ScrolledWindow::OnMouseWheel(wxMouseEvent &event)
 
 void ScrolledWindow::SetTipColor(wxColour color)
 {
-    if (m_rightScrollbar) m_rightScrollbar->SetTipColor(color);
-    if (m_bottomScrollbar) m_bottomScrollbar->SetTipColor(color);
+    // [STATE] Tip styling is fanned out to both axes so the custom scrollbars stay visually consistent.
+    if (m_rightScrollbar)
+        m_rightScrollbar->SetTipColor(color);
+    if (m_bottomScrollbar)
+        m_bottomScrollbar->SetTipColor(color);
 }
 
 void ScrolledWindow::Refresh()
 {
+    // [INTENT] This override is intentionally inert; repaint orchestration is handled elsewhere by the resize/scroll
+    // synchronization path rather than by a generic refresh cascade.
     // m_rightScrollbar->SetViewStart(0);
     // m_rightScrollbar->Refresh();
     // m_rightScrollbar->Update();
@@ -123,47 +141,68 @@ void ScrolledWindow::Refresh()
 
 void ScrolledWindow::SetBackgroundColour(wxColour color)
 {
-    wxWindow::SetBackgroundColour(color); 
-    m_verticalSplitter->SetBackgroundColour(color); 
+    // [STATE] The background color is propagated to the wrapper, content panel, and spacer windows so the custom shell
+    // does not reveal mismatched default platform chrome.
+    wxWindow::SetBackgroundColour(color);
+    m_verticalSplitter->SetBackgroundColour(color);
     m_userPanel->SetBackgroundColour(color);
     m_scroll_win->SetBackgroundColour(color);
 }
 
 void ScrolledWindow::SetMarginColor(wxColour color)
 {
-    if (m_rightScrollbar) m_rightScrollbar->SetMarginColor(color);
-    if (m_bottomScrollbar) m_bottomScrollbar->SetMarginColor(color);
+    // [STATE] The right/bottom gutters use the same margin palette, which Unity should model as a shared gutter style
+    // rather than two unrelated decorations.
+    if (m_rightScrollbar)
+        m_rightScrollbar->SetMarginColor(color);
+    if (m_bottomScrollbar)
+        m_bottomScrollbar->SetMarginColor(color);
 }
 
 void ScrolledWindow::SetScrollbarColor(wxColour color)
 {
-    if (m_rightScrollbar) m_rightScrollbar->SetScrollbarColor(color);
-    if (m_bottomScrollbar) m_bottomScrollbar->SetScrollbarColor(color);
+    // [STATE] Thumb/track colors are pushed to both custom scrollbar instances together.
+    if (m_rightScrollbar)
+        m_rightScrollbar->SetScrollbarColor(color);
+    if (m_bottomScrollbar)
+        m_bottomScrollbar->SetScrollbarColor(color);
 }
 
 void ScrolledWindow::SetScrollbarTip(int len)
 {
-    if (m_rightScrollbar) m_rightScrollbar->SetScrollbarTip(len);
-    if (m_bottomScrollbar) m_bottomScrollbar->SetScrollbarTip(len);
+    // [STATE] The tip length is part of the scrollbar presentation state, not the content viewport state.
+    if (m_rightScrollbar)
+        m_rightScrollbar->SetScrollbarTip(len);
+    if (m_bottomScrollbar)
+        m_bottomScrollbar->SetScrollbarTip(len);
 }
 
 void ScrolledWindow::SetVirtualSize(int x, int y) { SetScrollbars(1, 1, x, y); }
 
-void ScrolledWindow::SetVirtualSize(wxSize &size) { SetScrollbars(1, 1, size.GetWidth(), size.GetHeight()); }
+void ScrolledWindow::SetVirtualSize(wxSize& size) { SetScrollbars(1, 1, size.GetWidth(), size.GetHeight()); }
 
 void ScrolledWindow::SetScrollbars(int pixelsPerUnitX, int pixelsPerUnitY, int noUnitsX, int noUnitsY, int xPos, int yPos, bool noRefresh)
 {
+    // [STATE] Virtual dimensions are mirrored into both wxScrolled and the custom bars so logical scroll range and
+    // rendered thumb range stay aligned.
     wxScrolled<wxWindow>::SetScrollbars(pixelsPerUnitX, pixelsPerUnitY, noUnitsX, noUnitsY, xPos, yPos, noRefresh);
     wxScrolled<wxWindow>::SetVirtualSize(pixelsPerUnitX * noUnitsX, pixelsPerUnitY * noUnitsY); // So that GetVirtualSize gives good values
-    if (m_rightScrollbar) m_rightScrollbar->SetVirtualDim(pixelsPerUnitY, noUnitsY);
-    if (m_bottomScrollbar) m_bottomScrollbar->SetVirtualDim(pixelsPerUnitX, noUnitsX);
+    if (m_rightScrollbar)
+        m_rightScrollbar->SetVirtualDim(pixelsPerUnitY, noUnitsY);
+    if (m_bottomScrollbar)
+        m_bottomScrollbar->SetVirtualDim(pixelsPerUnitX, noUnitsX);
 }
 
-void ScrolledWindow::OnSize(wxSizeEvent &event)
+void ScrolledWindow::OnSize(wxSizeEvent& event)
 {
+    // [EVENT] Resize events recompute both the content panel and the custom scrollbar visibility/size, effectively
+    // acting as the layout engine for this composite control.
+    // [UNITY] In Unity this should become a single layout pass that derives viewport size, scrollbar visibility, and
+    // thumb extents from the same cached virtual dimensions.
     int startX, startY, virtX, virtY, clientW, clientH;
 
-    if (!m_verticalSplitter && !m_horizontalSplitter) return;
+    if (!m_verticalSplitter && !m_horizontalSplitter)
+        return;
 
     GetViewStart(&startX, &startY);
     GetVirtualSize(&virtX, &virtY);
@@ -171,10 +210,14 @@ void ScrolledWindow::OnSize(wxSizeEvent &event)
 
     // trace / log in the output / console window
     // wxString str; str.sprintf("Actual=(%d,%d). Virtual=(%d,%d)\n", clientW, clientH, virtX, virtY); OutputDebugString(str);
-    if (m_verticalSplitter) m_verticalSplitter->SetSize(clientW, clientH);
-    if (m_horizontalSplitter) m_horizontalSplitter->SetSize(clientW, clientH);
+    if (m_verticalSplitter)
+        m_verticalSplitter->SetSize(clientW, clientH);
+    if (m_horizontalSplitter)
+        m_horizontalSplitter->SetSize(clientW, clientH);
 
     if (m_rightScrollbar) {
+        // [PORTING_HAZARD:P3] The scrollbar can disappear by expanding the user panel, so visibility is coupled to
+        // content fit rather than being a fixed child hierarchy.
         if (clientH >= virtY) // hide the scrollbar by enlarging the user panel
         {
             // m_verticalSplitter->SetSashPosition(clientW);
@@ -190,6 +233,8 @@ void ScrolledWindow::OnSize(wxSizeEvent &event)
         m_rightScrollbar->Update(); // we want to repaint
     }
     if (m_bottomScrollbar) {
+        // [PORTING_HAZARD:P3] The horizontal case shares the same manual sash logic, including the special handling
+        // when a vertical scrollbar is also present.
         if (clientW >= virtX) // hide the scrollbar by enlarging the user panel
         {
             m_horizontalSplitter->SetSashPosition(clientH); // we don't need horizontal scrollbar
@@ -212,8 +257,10 @@ void ScrolledWindow::OnSize(wxSizeEvent &event)
     AdjustScrollbars();
 }
 
-void ScrolledWindow::OnScroll(wxScrollWinEvent &event)
+void ScrolledWindow::OnScroll(wxScrollWinEvent& event)
 {
+    // [EVENT] Native scroll events are treated as an external source of truth and mirrored back into the custom
+    // scrollbar thumbs so the wrapper and chrome stay synchronized.
     int startX, startY;
     GetViewStart(&startX, &startY);
     if (m_rightScrollbar) {

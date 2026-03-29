@@ -82,6 +82,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate Scrollbar.hpp for Unity port
 - Next recommended Phase 1 task: T685 annotate: src/slic3r/GUI/Widgets/ScrolledWindow.cpp
 
+## Phase 1 - Task T685 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/ScrolledWindow.cpp
+- Deliverables: `src/slic3r/GUI/Widgets/ScrolledWindow.cpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 10 comment blocks covering composite scroll intent, shared state propagation, wheel routing, resize synchronization, and Unity mapping
+- Verification excerpt: `[UNITY] Port as a retained scroll container with a content viewport and separate custom scrollbar controllers, not as a native scroll-view wrapper.`
+- Unity-impact summary:
+  - Keep viewport sizing and scrollbar visibility in one retained controller.
+  - Derive thumb/view state from shared virtual dimensions instead of duplicating scroll math.
+  - Preserve the single wheel-to-scrollbar event path so drag and wheel stay synchronized.
+- Hazards found: P2 x1, P3 x2
+- Git: Annotate ScrolledWindow.cpp for Unity port
+- Next recommended Phase 1 task: T686 annotate: src/slic3r/GUI/Widgets/ScrolledWindow.hpp
+
 ## Tasks
 
 ### Completed

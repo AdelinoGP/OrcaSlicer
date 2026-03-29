@@ -603,7 +603,7 @@ Last updated: 2026-03-29T03:05:00Z
 - [x] T682 annotate: src/slic3r/GUI/Widgets/RoundedRectangle.hpp
 - [x] T683 annotate: src/slic3r/GUI/Widgets/Scrollbar.cpp
 - [x] T684 annotate: src/slic3r/GUI/Widgets/Scrollbar.hpp
-- [ ] T685 annotate: src/slic3r/GUI/Widgets/ScrolledWindow.cpp
+- [x] T685 annotate: src/slic3r/GUI/Widgets/ScrolledWindow.cpp
 - [ ] T686 annotate: src/slic3r/GUI/Widgets/ScrolledWindow.hpp
 - [ ] T687 annotate: src/slic3r/GUI/Widgets/SideButton.cpp
 - [ ] T688 annotate: src/slic3r/GUI/Widgets/SideButton.hpp

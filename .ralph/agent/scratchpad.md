@@ -26,3 +26,8 @@
 - Picked Phase 1 task T684 for `src/slic3r/GUI/Widgets/Scrollbar.hpp`.
 - The header now carries the declaration-boundary intent, cached scroll state, and Unity migration notes that the cpp relies on.
 - Next step: record completion evidence, close T684, and move to T685.
+
+- Picked Phase 1 task T685 for `src/slic3r/GUI/Widgets/ScrolledWindow.cpp`.
+- This composite wrapper owns the content viewport plus custom scrollbars, mirrors virtual size into wxScrolled and the custom chrome, and resizes by hand to hide/show scrollbars as content fits.
+- The porting risk is the tight coupling between splitter geometry, SetViewStart mirroring, and scrollbar refresh/update calls; Unity should model this as one retained controller with shared scroll state.
+- Next step: commit the annotation, close T685, and hand off T686 for `ScrolledWindow.hpp`.
