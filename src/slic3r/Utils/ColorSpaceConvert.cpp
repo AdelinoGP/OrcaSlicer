@@ -1,3 +1,6 @@
+// [INTENT] Implementation of color space conversions and color difference algorithms.
+// Contains standard formulas for sRGB to/from XYZ and Lab, plus CIEDE2000, CIE94, and CIE76 Delta E calculations.
+// [UNITY] Map to static utility methods in C#; replace wxColour with UnityEngine.Color or UnityEngine.Color32.
 #include "ColorSpaceConvert.hpp"
 
 #include <algorithm>

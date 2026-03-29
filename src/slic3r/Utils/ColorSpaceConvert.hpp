@@ -1,3 +1,6 @@
+// [INTENT] Provides mathematical functions for converting between various color spaces (RGB, YUV, XYZ, Lab, HSV) and calculating color differences (DeltaE).
+// Also provides utilities to serialize/deserialize wxColour to/from strings.
+// [UNITY] The pure mathematical conversions can be ported directly to static C# methods. The wxColour serialization should be mapped to UnityEngine.Color or UnityEngine.Color32 serialization.
 #ifndef slic3r_Utils_ColorSpaceConvert_hpp_
 #define slic3r_Utils_ColorSpaceConvert_hpp_
 #include <string>
