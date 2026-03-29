@@ -35,3 +35,10 @@
 - Read `bambu_networking.hpp`. The file defines the C++ ABI and DTOs for the Bambu network plugin.
 - Added `[INTENT]` and `[UNITY]` annotations describing the C# P/Invoke `DllImport` requirements if the native plugin is retained.
 - Completed and committed.
+
+## T727, T728 annotate: src/slic3r/Utils/BBLCloudServiceAgent.cpp / hpp
+- Started tasks task-1773880088-aa55 and task-1773880088-c51e
+- Read files. This class acts as a pass-through abstraction over `BBLNetworkPlugin` for cloud operations.
+- Added `[INTENT]` and `[UNITY]` annotations detailing its delegation role and the mapping to either a C# P/Invoke wrapper or a pure C# network service.
+- Added `[STATE]` annotation to `m_enable_track`.
+- Completed and committed.

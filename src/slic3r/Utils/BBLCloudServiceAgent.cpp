@@ -5,6 +5,9 @@
 
 namespace Slic3r {
 
+// [UNITY] All methods here act as pass-throughs to the BBLNetworkPlugin singleton. 
+// A Unity implementation will likely replace this entirely with a managed C# networking layer, 
+// or maintain a similar wrapper layer if the DLL is still used via P/Invoke.
 BBLCloudServiceAgent::BBLCloudServiceAgent() = default;
 
 BBLCloudServiceAgent::~BBLCloudServiceAgent() = default;

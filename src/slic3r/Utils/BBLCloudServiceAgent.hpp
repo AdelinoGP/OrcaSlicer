@@ -13,6 +13,10 @@ namespace Slic3r {
  * Delegates all cloud service and authentication operations to the proprietary
  * BBL network DLL through function pointers obtained from BBLNetworkPlugin singleton.
  * This class combines the functionality of the former BBLAuthAgent and BBLCloudServiceAgent.
+ *
+ * [INTENT] Provide a high-level C++ abstraction over the dynamic BBL network DLL for cloud services.
+ * [UNITY] In a Unity port, this interface should map directly to a singleton service that either 
+ * delegates to a native C# P/Invoke wrapper of the DLL, or calls a completely native C# networking implementation.
  */
 class BBLCloudServiceAgent : public ICloudServiceAgent {
 public:
@@ -128,6 +132,7 @@ public:
     int set_queue_on_main_fn(QueueOnMainFn fn) override;
 
 private:
+    // [STATE] Tracks if analytics/telemetry is enabled for the current session.
     bool m_enable_track{false};
 };
 
