@@ -1,6 +1,18 @@
 #ifndef slic3r_GUI_wxExtensions_hpp_
 #define slic3r_GUI_wxExtensions_hpp_
 
+/*
+ * [INTENT]
+ * A collection of custom UI components, bitmap scalers, and menu helpers extending base wxWidgets functionality.
+ * Groups together diverse utilities such as color picker tools, scalable UI elements (buttons/bitmaps), and dropdown popups.
+ * 
+ * [UNITY]
+ * The individual widgets here (ModeButton, LockButton, ScalableButton) should map to custom UI Toolkit components 
+ * or reusable Prefabs in Unity.
+ * Bitmap generation and scaling tools should be replaced by Unity's native Sprite rendering and layout scaling (Canvas Scaler or Panel Settings).
+ * Menu item helpers should map to Unity's dropdown or context-menu implementations.
+ */
+
 #include <wx/checklst.h>
 #include <wx/combo.h>
 #include <wx/dataview.h>
@@ -92,6 +104,17 @@ void apply_extruder_selector(Slic3r::GUI::BitmapComboBox** ctrl,
                              wxSize size = wxDefaultSize,
                              bool use_thin_icon = false);
 
+/*
+ * [INTENT]
+ * A ComboBox popup built on top of a CheckListBox. Used for multi-select dropdowns.
+ * 
+ * [UNITY]
+ * Map to a custom dropdown component in UI Toolkit where the popup content is a ListView of toggles.
+ * 
+ * [PORTING_HAZARD:P3]
+ * The class implements custom logic to forward list box selections to checklistbox events
+ * which behaves differently across platforms. In Unity, rely purely on state-bound toggle elements.
+ */
 class wxCheckListBoxComboPopup : public wxCheckListBox, public wxComboPopup
 {
     static const unsigned int DefaultWidth;
@@ -130,6 +153,13 @@ public:
 
 // ***  wxDataViewTreeCtrlComboBox  ***
 
+/*
+ * [INTENT]
+ * A ComboBox popup built around a DataViewTreeCtrl. Used for hierarchical dropdown selections.
+ * 
+ * [UNITY]
+ * Map to a custom UI Toolkit dropdown containing a TreeView element.
+ */
 class wxDataViewTreeCtrlComboPopup: public wxDataViewTreeCtrl, public wxComboPopup
 {
     static const unsigned int DefaultWidth;
@@ -156,6 +186,14 @@ public:
 // ScalableBitmap
 // ----------------------------------------------------------------------------
 
+/*
+ * [INTENT]
+ * A wrapper for wxBitmap that handles dynamic DPI rescaling, caching, and grayscale/color modifications.
+ * 
+ * [UNITY]
+ * Maps to an Image or Sprite element. Unity's native UI system inherently handles responsive scaling, 
+ * so the explicit bitmap-rescaling logic is unnecessary. Color tinting can be done via `style.unityBackgroundImageTintColor`.
+ */
 class ScalableBitmap
 {
 public:
@@ -198,6 +236,16 @@ private:
 // LockButton
 // ----------------------------------------------------------------------------
 
+/*
+ * [INTENT]
+ * A toggle button showing an open/closed lock icon.
+ * 
+ * [STATE]
+ * m_is_pushed tracks the locked/unlocked state.
+ * 
+ * [UNITY]
+ * Map to a standard Toggle component styled as a lock icon without text.
+ */
 class LockButton : public wxButton
 {
 public:
@@ -237,6 +285,13 @@ private:
 // ScalableButton
 // ----------------------------------------------------------------------------
 
+/*
+ * [INTENT]
+ * A button displaying a ScalableBitmap, with support for different states (hover, disabled, etc.) and auto-rescaling.
+ * 
+ * [UNITY]
+ * Replace with a standard UI Toolkit Button. Use USS pseudo-classes (:hover, :disabled, :active) to manage state-based sprites/colors.
+ */
 class ScalableButton : public wxButton
 {
 public:
@@ -289,6 +344,16 @@ private:
 // ModeButton
 // ----------------------------------------------------------------------------
 
+/*
+ * [INTENT]
+ * A specialized ScalableButton used to toggle UI modes (Simple/Advanced).
+ * 
+ * [STATE]
+ * m_is_selected indicates active state.
+ * 
+ * [UNITY]
+ * Replace with a UI Toolkit RadioButton or grouped Toggle.
+ */
 class ModeButton : public ScalableButton
 {
 public:
@@ -333,6 +398,13 @@ private:
 // ModeSizer
 // ----------------------------------------------------------------------------
 
+/*
+ * [INTENT]
+ * A layout container organizing ModeButton instances.
+ * 
+ * [UNITY]
+ * Map to a horizontal VisualElement (e.g., flex-direction: row) containing mode toggles.
+ */
 class ModeSizer : public wxFlexGridSizer
 {
 public:
@@ -359,6 +431,13 @@ private:
 // MenuWithSeparators
 // ----------------------------------------------------------------------------
 
+/*
+ * [INTENT]
+ * A menu that explicitly manages and can destroy two separators.
+ * 
+ * [UNITY]
+ * Menu constructs translate to custom generic context menus in Unity.
+ */
 class MenuWithSeparators : public wxMenu
 {
 public:
@@ -384,6 +463,13 @@ private:
 // BlinkingBitmap
 // ----------------------------------------------------------------------------
 
+/*
+ * [INTENT]
+ * An icon that blinks by swapping between an active bitmap and an empty bitmap.
+ * 
+ * [UNITY]
+ * Map to an Image component controlled by a script or simple Animation/Animator that toggles the `display` style or `color.a` over time.
+ */
 class BlinkingBitmap : public wxStaticBitmap
 {
 public:
@@ -410,6 +496,13 @@ private:
 // ImageTransientPopup
 // ----------------------------------------------------------------------------
 
+/*
+ * [INTENT]
+ * A transient popup window containing an image, optionally inside a scroll view.
+ * 
+ * [UNITY]
+ * Replace with a transient full-screen overlay or contextual popup Panel that displays a texture.
+ */
 class ImageTransientPopup : public PopupWindow
 {
     public:

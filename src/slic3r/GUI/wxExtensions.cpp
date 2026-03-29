@@ -24,6 +24,13 @@
 // msw_menuitem_bitmaps is used for MSW and OSX
 static std::map<int, std::string> msw_menuitem_bitmaps;
 #ifdef __WXMSW__
+/*
+ * [INTENT]
+ * Iterates through OS-specific or scaled bitmap replacements for wxMenuItems.
+ * 
+ * [UNITY]
+ * Unity's native UI system handles menu scaling and images. Not needed in Unity.
+ */
 void msw_rescale_menu(wxMenu* menu)
 {
 	struct update_icons {
@@ -62,6 +69,16 @@ void enable_menu_item(wxUpdateUIEvent& evt, std::function<bool()> const cb_condi
 #endif // __WXOSX__
 }
 
+/*
+ * [INTENT]
+ * Helpers for appending menu items and binding command events to them.
+ * 
+ * [EVENT]
+ * Binds `wxEVT_MENU` to standard menu commands, and `wxEVT_UPDATE_UI` to dynamic enablement conditions.
+ * 
+ * [UNITY]
+ * Map to UI Toolkit context menus (GenericDropdownMenu) using callback actions instead of separate UI/Menu events.
+ */
 wxMenuItem* append_menu_item(wxMenu* menu, int id, const wxString& string, const wxString& description,
     std::function<void(wxCommandEvent& event)> cb, const wxBitmap& icon, wxEvtHandler* event_handler,
     std::function<bool()> const cb_condition, wxWindow* parent, int insert_pos/* = wxNOT_FOUND*/)
@@ -232,6 +249,13 @@ wxSize wxCheckListBoxComboPopup::GetAdjustedSize(int minWidth, int prefHeight, i
         return wxSize(DefaultWidth, DefaultHeight);
 }
 
+/*
+ * [INTENT]
+ * Overrides key events on wxCheckListBoxComboPopup to suppress keys that don't work properly in this popup.
+ * 
+ * [EVENT]
+ * Intercepts navigation keys.
+ */
 void wxCheckListBoxComboPopup::OnKeyEvent(wxKeyEvent& evt)
 {
     // filters out all the keys which are not working properly
@@ -491,6 +515,17 @@ wxBitmap create_scaled_bitmap2(const std::string& bmp_name_in, Slic3r::GUI::Bitm
 }
 
 
+/*
+ * [INTENT]
+ * Generates custom painted extruder color icons, caching them by name and size.
+ * Uses wxMemoryDC to draw colors or text onto bitmaps.
+ * 
+ * [STATE]
+ * Uses a static BitmapCache `bmp_cache`.
+ * 
+ * [UNITY]
+ * Map to a custom Image or UI Toolkit VisualElement where `style.backgroundColor` is set directly, and a Label child handles text. No manual bitmap painting necessary.
+ */
 wxBitmap* get_default_extruder_color_icon(bool thin_icon/* = false*/)
 {
     static Slic3r::GUI::BitmapCache bmp_cache;
@@ -584,6 +619,16 @@ std::vector<std::vector<std::string>> read_color_pack(std::vector<std::string> c
     return color_info;
 }
 
+/*
+ * [INTENT]
+ * Triggers a native system color picker dialog, reading/writing custom colors to the app_config.
+ * 
+ * [STATE]
+ * Interacts with `Slic3r::GUI::wxGetApp().app_config` to get/set custom colors.
+ * 
+ * [UNITY]
+ * Unity requires a custom color picker prefab or an OS-native dialogue plugin for full OS color pickers.
+ */
 wxColourData show_sys_picker_dialog(wxWindow *parent, const wxColourData &clr_data)
 {
     wxColourData data = clr_data;
@@ -750,6 +795,13 @@ wxBitmap *get_extruder_color_icon(std::string color, std::string label, int icon
     }
     return bitmap;
 }
+/*
+ * [INTENT]
+ * Applies a list of generated extruder color icons to a BitmapComboBox.
+ * 
+ * [UNITY]
+ * Populate a standard UI Toolkit DropdownField/PopupField configured with custom item visual elements containing color swatches and text.
+ */
 void apply_extruder_selector(Slic3r::GUI::BitmapComboBox** ctrl,
                              wxWindow* parent,
                              const std::string& first_item/* = ""*/,
