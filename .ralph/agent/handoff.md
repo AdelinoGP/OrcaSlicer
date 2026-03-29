@@ -2707,3 +2707,15 @@ Reconciliation note: the task registry entry for `T663` was still open even thou
 - Hazards found: P2 x2
 - Git: PopupWindow transient popup shell annotations
 - Next recommended Phase 1 task: T672 annotate: src/slic3r/GUI/Widgets/PopupWindow.hpp
+
+## Phase 1 - Task T672 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/PopupWindow.hpp
+- Deliverables: src/slic3r/GUI/Widgets/PopupWindow.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 6 boundary comments covering popup intent, retained hover state, platform event hooks, Unity mapping, and the transient-window hazard
+- Verification excerpt: `// [UNITY] Port this as a floating popup controller anchored to a host panel, with explicit outside-click and focus-loss dismissal instead of native transient-window behavior.`
+- Unity-impact summary: retained popup controller should own dismissal rules; macOS hover replay becomes explicit pointer routing; platform activation listeners need a main-thread lifecycle bridge
+- Hazards found: P2 x1
+- Git: PopupWindow.hpp annotation pass
+- Next recommended Phase 1 task: T673 annotate: src/slic3r/GUI/Widgets/ProgressBar.cpp

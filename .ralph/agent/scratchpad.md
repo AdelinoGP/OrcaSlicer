@@ -392,3 +392,7 @@
 - Started T671 (`src/slic3r/GUI/Widgets/PopupWindow.cpp`) and annotated the transient popup shell, host-parent lookup, platform-specific create/dismiss hooks, and macOS hit-testing path.
 - The file now makes the retained-popup Unity split explicit: a popup controller with focus-loss/outside-click dismissal, separate pointer-over routing, and host-window lifecycle listeners instead of native transient-window behavior.
 - Verification plan: run `git diff --check`, append the completion evidence block, mark T671 done in the registry, commit this atomic popup-shell pass, then continue with T672 (`src/slic3r/GUI/Widgets/PopupWindow.hpp`).
+
+- Started T672 (`src/slic3r/GUI/Widgets/PopupWindow.hpp`) as the declaration boundary for the transient popup shell.
+- The header only carries a small amount of retained state, but it still exposes the platform-specific activation hooks, the macOS hover relay, and the transient dismissal contract that Unity needs to reproduce explicitly.
+- Plan: keep the annotations focused on intent/state/event/Unity/hazard boundaries, verify with `git diff --check -- src/slic3r/GUI/Widgets/PopupWindow.hpp`, record the handoff evidence, commit the atomic header annotation, and then move to T673 (`src/slic3r/GUI/Widgets/ProgressBar.cpp`).
