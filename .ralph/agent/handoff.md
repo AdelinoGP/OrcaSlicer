@@ -2613,3 +2613,18 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1, UNCLEAR x1
 - Git: Annotate FilamentLoad header boundary
 - Next recommended Phase 1 task: T663 annotate: src/slic3r/GUI/Widgets/HyperLink.cpp
+
+## Phase 1 - Task T663 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/HyperLink.cpp
+- Deliverables: src/slic3r/GUI/Widgets/HyperLink.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 3 annotation blocks covering the hyperlink affordance, font preservation, and URL/tooltip state sync
+- Verification excerpt: `[UNITY] UI Toolkit \`TextElement\`/\`Button\` with pointer-enter/exit handlers and \`Application.OpenURL\` for navigation.`
+- Unity-impact summary:
+  - Map to a `TextElement`/`Button` with pointer hover state.
+  - Use an explicit `Application.OpenURL` bridge for click handling.
+  - Preserve underline/color semantics as retained UI state.
+- Hazards found: P3 x1
+- Git: Annotate HyperLink link affordance
+- Next recommended Phase 1 task: T664 annotate: src/slic3r/GUI/Widgets/HyperLink.hpp

@@ -354,3 +354,7 @@
 - Started T662 (`src/slic3r/GUI/Widgets/FilamentLoad.hpp`) as the declaration boundary for the retained filament-change wizard shell.
 - The header now needs class-level intent/state/Unity notes plus member-level ownership and porting-hazard comments so the retained `wxSimplebook` pages are treated as explicit workflow states in Unity.
 - Plan: keep the annotation compact, verify with `git diff --check`, record completion evidence in `.ralph/agent/handoff.md`, mark the task done, commit the atomic change, and continue with T663 (`src/slic3r/GUI/Widgets/HyperLink.cpp`).
+
+- Started T663 (`src/slic3r/GUI/Widgets/HyperLink.cpp`) as the tiny hyperlink label controller.
+- The file is a thin `wxStaticText` wrapper, but it still encodes the visual identity (underline/font/cursor/colors), URL ownership, and browser-launch event bridge that need explicit Unity mapping.
+- Plan: annotate the constructor and helper methods with [INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD] boundaries, verify with `git diff --check -- src/slic3r/GUI/Widgets/HyperLink.cpp`, record the handoff evidence, and commit this single-file task before moving to the header next.
