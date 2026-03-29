@@ -369,3 +369,8 @@
 - Plan: add a compact boundary annotation for the shared toggle state, custom paint/layout, hover/click dispatch, and the Unity split into a retained image-button prefab plus a text/image state controller; then verify with `git diff --check`, record handoff evidence, and commit this atomic file before moving to T666.
 
 - Completed T665 with comments for the shared image toggle and the fan-specific variant; the main migration note is that both controls depend on immediate wxDC measurement and ad-hoc label placement, so Unity needs explicit layout rules rather than paint-time sizing.
+
+- Starting T666 (`src/slic3r/GUI/Widgets/ImageSwitchButton.hpp`) as the declaration boundary for the paired image-toggle widgets.
+- The header now gets class-level [INTENT]/[STATE]/[UNITY]/[PORTING_HAZARD] notes plus member-level state comments for the toggle bitmaps, cached measurement, hover/press flags, and the fan-specific speed/text variant.
+- Main risk to call out is the layout coupling: the cpp measures text and centers content manually, and the fan variant hardcodes copy-specific spacing for literal labels.
+- Plan: verify with `git diff --check -- src/slic3r/GUI/Widgets/ImageSwitchButton.hpp`, append handoff evidence, commit the atomic header annotation, then close T666 and stop for this iteration.

@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-29T00:13:52Z
+Last updated: 2026-03-29T00:47:00Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -584,7 +584,7 @@ Last updated: 2026-03-29T00:13:52Z
 - [x] T663 annotate: src/slic3r/GUI/Widgets/HyperLink.cpp
 - [x] T664 annotate: src/slic3r/GUI/Widgets/HyperLink.hpp
 - [x] T665 annotate: src/slic3r/GUI/Widgets/ImageSwitchButton.cpp
-- [ ] T666 annotate: src/slic3r/GUI/Widgets/ImageSwitchButton.hpp
+- [x] T666 annotate: src/slic3r/GUI/Widgets/ImageSwitchButton.hpp
 - [x] T667 annotate: src/slic3r/GUI/Widgets/Label.cpp
 - [ ] T668 annotate: src/slic3r/GUI/Widgets/LabeledStaticBox.cpp
 - [ ] T669 annotate: src/slic3r/GUI/Widgets/LabeledStaticBox.hpp

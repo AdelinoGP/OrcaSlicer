@@ -2654,3 +2654,15 @@ Reconciliation note: the task registry entry for `T663` was still open even thou
 - Hazards found: P2 x1, P3 x1
 - Git: Annotate ImageSwitchButton toggle controls
 - Next recommended Phase 1 task: T666 annotate: src/slic3r/GUI/Widgets/ImageSwitchButton.hpp
+
+## Phase 1 - Task T666 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/ImageSwitchButton.hpp
+- Deliverables: src/slic3r/GUI/Widgets/ImageSwitchButton.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 8 boundary comments covering class intent, retained toggle state, cached measurement, event flow, fan-specific presentation state, and Unity mapping
+- Verification excerpt: `[PORTING_HAZARD:P2] Size is recomputed from wxDC text measurement and manual centering, so Unity needs a layout-driven rule instead of paint-time geometry.`
+- Unity-impact summary: retained toggle prefab plus fan-specific variant; manual label/icon centering becomes explicit layout logic; string-specific spacing should be replaced by a presentation enum
+- Hazards found: P2 x1, P3 x1
+- Git: Annotate ImageSwitchButton header boundary
+- Next recommended Phase 1 task: T668 annotate: src/slic3r/GUI/Widgets/LabeledStaticBox.cpp
