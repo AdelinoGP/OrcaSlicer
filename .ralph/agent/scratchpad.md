@@ -107,3 +107,7 @@
 - StaticGroup is a thin `LabeledStaticBox` wrapper with a lazily toggled badge bitmap and a custom border/label draw pass that anchors the badge to the header's right edge.
 - I annotated the cpp with intent, cached-state, event-toggle, Unity mapping, and porting-hazard notes, then reconciled the registry entry that still had T700 marked active.
 - Next step: commit the atomic annotation, close T701, and hand off T702 for `src/slic3r/GUI/Widgets/StaticGroup.hpp`.
+
+- Picked Phase 1 task T702 for `src/slic3r/GUI/Widgets/StaticGroup.hpp` and annotated the declaration boundary.
+- The header now makes the optional badge overlay explicit and carries the Unity mapping/hazard note that the badge is injected through custom border/label painting.
+- Next step: commit this atomic header annotation, close T702, and continue with T705 for `src/slic3r/GUI/Widgets/StepCtrl.cpp` since T703 is still blocked.

@@ -262,6 +262,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate StaticBox.cpp for Unity port
 - Next recommended Phase 1 task: T700 annotate: src/slic3r/GUI/Widgets/StaticBox.hpp
 
+## Phase 1 - Task T702 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/StaticGroup.hpp
+- Deliverables: `src/slic3r/GUI/Widgets/StaticGroup.hpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 5 comment blocks covering class intent, retained state, event/state toggle semantics, draw override intent, and Unity mapping
+- Verification excerpt: `[UNITY] Port as a retained panel with a header row and an optional top-right overlay sprite backed by a shared asset cache.`
+- Unity-impact summary:
+  - Keep the badge as optional overlay chrome, not a separate child control.
+  - Preserve the custom border/label draw override as a layout-driven header treatment in Unity.
+  - Treat badge bitmap lifetime as shared asset-cache state rather than per-toggle loading.
+- Hazards found: P3 x1
+- Git: Annotate StaticGroup.hpp for Unity port
+- Next recommended Phase 1 task: T705 annotate: src/slic3r/GUI/Widgets/StepCtrl.cpp
+
 ## Tasks
 
 ### Completed
