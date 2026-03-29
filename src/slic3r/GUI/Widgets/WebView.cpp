@@ -43,6 +43,9 @@ webkit_javascript_result_unref              (WebKitJavascriptResult *js_result);
 
 #ifdef __WIN32__
 // Run Download and Install in another thread so we don't block the UI thread
+// [INTENT] Downloads and installs WebView2 runtime asynchronously on Windows via shell execution.
+// [THREAD] Blocking HTTP fetch and process wait. Should only be called from a worker thread.
+// [PORTING_HAZARD:P2] Unity plugins might include their own embedded CEF/Chromium binaries or require different setup.
 DWORD DownloadAndInstallWV2RT() {
 
   int returnCode = 2; // Download failed
@@ -235,6 +238,10 @@ public:
     wxWebView *m_webView;
 };
 
+// [INTENT] Factory method that instantiates the correct platform-specific wxWebView wrapper.
+// [STATE] Tracks all created instances in `g_webviews` and manages script handler initialization via `g_delay_webviews`.
+// [UNITY] Use the chosen WebView plugin's factory or instantiate the corresponding prefab. Theme info 
+// can be passed via JS or plugin-specific settings instead of injecting into the user agent.
 wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
 {
 #if wxUSE_WEBVIEW_EDGE
@@ -351,6 +358,8 @@ void WebView::LoadUrl(wxWebView * webView, wxString const &url)
     webView->LoadURL(url2);
 }
 
+// [THREAD] JS execution may be synchronous or asynchronous depending on the backend.
+// [UNITY] Unity WebView plugins generally evaluate JS asynchronously and return a task or use callbacks.
 bool WebView::RunScript(wxWebView *webView, wxString const &javascript)
 {
     if (Slic3r::GUI::wxGetApp().app_config->get("internal_developer_mode") == "true"

@@ -1400,3 +1400,44 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2 x1, UNCLEAR x1
 - Git: Annotate TempInput.cpp for Unity port
 - Next recommended Phase 1 task: T712 annotate: src/slic3r/GUI/Widgets/TempInput.hpp
+
+## Phase 1 - Task T714 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/TextInput.hpp
+- Deliverables: src/slic3r/GUI/Widgets/TextInput.hpp
+- Substantive additions: Added INTENT, STATE, UNITY, and PORTING_HAZARD tags for the Skinned text-input wrapper.
+- Verification excerpt: `[UNITY] Use a standard Unity UI Toolkit TextField with a custom structural wrapper (label, icons) and USS styles for hover/focus outlines.`
+- Unity-impact summary:
+  - Needs a wrapper around standard TextField or custom styling to allow inline icons and labels.
+  - Custom drawing logic for borders based on StateColor should be mapped to USS states (hover, focus, disabled).
+  - Explicit size measurement logic should be replaced by Unity UI layout primitives.
+- Hazards found: 1 P3 (manual DoSetSize layout calculation).
+- Git: pending commit
+- Next recommended Phase 1 task: gui:T713 annotate: src/slic3r/GUI/Widgets/TextInput.cpp
+
+## Phase 1 - Task T713 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/TextInput.cpp
+- Deliverables: src/slic3r/GUI/Widgets/TextInput.cpp
+- Substantive additions: Added INTENT, EVENT, UNITY, and PORTING_HAZARD for custom layout and painting of the Skinned text-input widget.
+- Verification excerpt: `[UNITY] Map to a standard UI Toolkit TextField. The manual coordinate-based layout in DoSetSize and custom drawing in render should be replaced by Unity UI layout structures and USS state-based styles.`
+- Unity-impact summary:
+  - Custom drawing logic (`wxPaintDC`) with manual sizing logic (`DoSetSize` / `messureSize`) must map to USS layout structures.
+  - Manual text truncation handles should be delegated to UI Toolkit's text-overflow features.
+- Hazards found: 1 P3 (manual geometry calculation).
+- Git: pending commit
+- Next recommended Phase 1 task: Next available task in ready-tasks.
+
+## Phase 1 - Task T715, T716 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/WebView.cpp, src/slic3r/GUI/Widgets/WebView.hpp
+- Deliverables: src/slic3r/GUI/Widgets/WebView.cpp, src/slic3r/GUI/Widgets/WebView.hpp
+- Substantive additions: 4 additions covering INTENT, STATE, THREAD, PORTING_HAZARD, UNITY.
+- Verification excerpt: `// [UNITY] Use the chosen WebView plugin's factory or instantiate the corresponding prefab. Theme info`
+- Unity-impact summary:
+  - Requires a third-party WebView plugin (like Vuplex) as Unity's UI Toolkit has no built-in web browser control.
+  - Asynchronous JS evaluation in Unity will need mapping to the current synchronous/callback-based RunScript implementations.
+  - Platform-specific workarounds (like WebView2 bootstrapper) might be superseded by the chosen Unity plugin's installation mechanism.
+- Hazards found: 1 P2 (WebView dependencies and JS interop vary heavily between platforms)
+- Git: commit
+- Next recommended Phase 1 task: T717 annotate: src/slic3r/GUI/WipeTowerDialog.cpp
