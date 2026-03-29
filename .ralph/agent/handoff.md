@@ -67,6 +67,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate Scrollbar.cpp for Unity port
 - Next recommended Phase 1 task: T684 annotate: src/slic3r/GUI/Widgets/Scrollbar.hpp
 
+## Phase 1 - Task T684 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/Scrollbar.hpp
+- Deliverables: `src/slic3r/GUI/Widgets/Scrollbar.hpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 8 comment blocks covering class intent, cached state, input/event surface, Unity mapping, and a P2 porting hazard
+- Verification excerpt: `[UNITY] Port as a retained scroll controller with a custom thumb VisualElement and a shared normalized scroll model for both drag and wheel input.`
+- Unity-impact summary:
+  - Keep the scrollbar as a retained controller, not a pixel-drawn immediate-mode widget.
+  - Share one normalized scroll model between drag and wheel input.
+  - Preserve the non-owning ScrolledWindow bridge as a separate content-view dependency.
+- Hazards found: P2 x1
+- Git: Annotate Scrollbar.hpp for Unity port
+- Next recommended Phase 1 task: T685 annotate: src/slic3r/GUI/Widgets/ScrolledWindow.cpp
+
 ## Tasks
 
 ### Completed

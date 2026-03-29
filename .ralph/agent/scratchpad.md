@@ -22,3 +22,7 @@
 - The widget is a custom-painted scroll controller: it computes thumb geometry from virtual vs. visible size, captures mouse drags, and forwards scroll positions back into `ScrolledWindow` on wheel/drag input.
 - Unity mapping should be a retained scroll bridge with a normalized scroll model, not a pixel-faithful port of the current math.
 - Next step: commit this atomic annotation, close T683, and hand off T684 for `Scrollbar.hpp`.
+
+- Picked Phase 1 task T684 for `src/slic3r/GUI/Widgets/Scrollbar.hpp`.
+- The header now carries the declaration-boundary intent, cached scroll state, and Unity migration notes that the cpp relies on.
+- Next step: record completion evidence, close T684, and move to T685.
