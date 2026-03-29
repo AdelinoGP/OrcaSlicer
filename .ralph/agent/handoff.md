@@ -7,6 +7,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - **Branch:** `agent/gui-analysis`
 - **HEAD:** 55b416c97a: chore: auto-commit before merge (loop primary)
 
+## Phase 1 - Task T680 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/RadioGroup.hpp
+- Deliverables: `src/slic3r/GUI/Widgets/RadioGroup.hpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 14 comment blocks covering class intent, layout rebuild flow, selection/event semantics, child ownership, cached state, and Unity mapping
+- Verification excerpt: `[UNITY] Port as a retained radio-list component with a single selected index`
+- Unity-impact summary: 
+  - Treat each option as one interactive row, not two separate widgets.
+  - Preserve the group-level selection event and wraparound keyboard navigation.
+  - Model enabled/selection/hover as derived state rather than per-child state.
+- Hazards found: P3 x1
+- Git: Annotate RadioGroup.hpp for Unity port
+- Next recommended Phase 1 task: T681 annotate: src/slic3r/GUI/Widgets/RoundedRectangle.cpp
+
 ## Tasks
 
 ### Completed
