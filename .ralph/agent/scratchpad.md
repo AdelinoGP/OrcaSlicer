@@ -17,3 +17,8 @@
 - Picked Phase 1 task T682 for `src/slic3r/GUI/Widgets/RoundedRectangle.hpp`.
 - This declaration boundary keeps the retained style inputs and paint-only surface explicit for the Unity port.
 - Next step: verify the header annotation, record the handoff evidence, close T682, and continue to the next widget file.
+
+- Picked Phase 1 task T683 for `src/slic3r/GUI/Widgets/Scrollbar.cpp`.
+- The widget is a custom-painted scroll controller: it computes thumb geometry from virtual vs. visible size, captures mouse drags, and forwards scroll positions back into `ScrolledWindow` on wheel/drag input.
+- Unity mapping should be a retained scroll bridge with a normalized scroll model, not a pixel-faithful port of the current math.
+- Next step: commit this atomic annotation, close T683, and hand off T684 for `Scrollbar.hpp`.

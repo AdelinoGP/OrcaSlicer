@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-29T02:18:00Z
+Last updated: 2026-03-29T03:05:00Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -601,7 +601,7 @@ Last updated: 2026-03-29T02:18:00Z
 - [x] T680 annotate: src/slic3r/GUI/Widgets/RadioGroup.hpp
 - [x] T681 annotate: src/slic3r/GUI/Widgets/RoundedRectangle.cpp
 - [x] T682 annotate: src/slic3r/GUI/Widgets/RoundedRectangle.hpp
-- [ ] T683 annotate: src/slic3r/GUI/Widgets/Scrollbar.cpp
+- [x] T683 annotate: src/slic3r/GUI/Widgets/Scrollbar.cpp
 - [ ] T684 annotate: src/slic3r/GUI/Widgets/Scrollbar.hpp
 - [ ] T685 annotate: src/slic3r/GUI/Widgets/ScrolledWindow.cpp
 - [ ] T686 annotate: src/slic3r/GUI/Widgets/ScrolledWindow.hpp

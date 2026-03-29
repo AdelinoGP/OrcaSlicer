@@ -52,6 +52,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate RoundedRectangle.hpp for Unity port
 - Next recommended Phase 1 task: T683 annotate: src/slic3r/GUI/Widgets/Scrollbar.cpp
 
+## Phase 1 - Task T683 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/Scrollbar.cpp
+- Deliverables: `src/slic3r/GUI/Widgets/Scrollbar.cpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 8 comment blocks covering controller intent, retained state, resize flow, paint math, drag capture, wheel input, and Unity mapping
+- Verification excerpt: `[UNITY] This should become a scroll-wheel bridge that updates the same normalized scroll model used by the thumb-drag path.`
+- Unity-impact summary:
+  - Port as a retained scroll controller with a shared normalized offset model.
+  - Keep drag capture and wheel handling as explicit input-bridge behavior.
+  - Do not replicate the immediate-mode pixel math directly in Unity; let layout size the thumb.
+- Hazards found: P2 x1
+- Git: Annotate Scrollbar.cpp for Unity port
+- Next recommended Phase 1 task: T684 annotate: src/slic3r/GUI/Widgets/Scrollbar.hpp
+
 ## Tasks
 
 ### Completed
