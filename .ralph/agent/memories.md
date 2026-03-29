@@ -2,6 +2,42 @@
 
 ## Patterns
 
+### mem-1774754439-b799
+> SpinInput.cpp is a skinned numeric stepper: keep clamped integer state, manual label/button layout, and timer-backed press-and-hold repeat as a shared controller; Unity should use a TextInput plus two icon buttons with one value-changed callback.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774754160-af32
+> SideTools.hpp is the declaration boundary for the sidebar status stack: SideToolsPanel owns the monitor-strip state/timer gate, while SideTools owns the composite status/error drawer and presenter-facing update surface. Unity should split them into a retained status row plus a presenter-driven sidebar controller.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774753812-a484
+> SideTools.cpp is a composite sidebar/status module: a custom-painted monitor header strip, a collapsible connection-error drawer, and presenter methods that derive banner and wifi-signal state from MachineObject/MonitorStatus. Unity should split it into retained subviews with a presenter-fed status model and a dedicated layout helper for text truncation.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774753038-2677
+> SideMenuPopup is a transient popup shell that measures button min widths, resizes each SideButton to a shared column width, and clamps screen placement against the active display; Unity should model it as a retained floating container with explicit open/close state and shared visibility signaling.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774752469-97a4
+> SideButton.hpp is the declaration boundary for the skinned button: keep layout/orientation state, state-color palettes, minimum-size overrides, and custom click dispatch explicit so Unity can port it as a retained button controller with a shared icon-label layout model.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774752188-3469
+> SideButton.cpp is a skinned button-like wxWindow: it composes optional icon+label content, stores state-colored border/text/background palettes, and translates mouse capture/release into a command-click event. Unity should treat it as a retained custom button with explicit icon-text layout and shared state-driven styling.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774751385-f00b
+> Scrollbar.hpp is the declaration boundary for the custom scrollbar: keep cached virtual/actual dimensions, non-owning ScrolledWindow ownership, and normalized drag/wheel scroll state explicit for Unity migration.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774751181-17b6
+> Scrollbar.cpp is a custom scroll controller: it paints its own thumb/tips, captures drag gestures, translates wheel input into a fixed motion quantum, and should port as a retained normalized scroll bridge rather than a pixel-faithful widget.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774750346-af57
+> RoundedRectangle.cpp is a minimal wxWindow that only stores fill/outline mode, color, and radius, then redraws a rounded rectangle on EVT_PAINT; Unity can model it as a retained rounded-corner style control with explicit fill-vs-outline state.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
 ### mem-1774749623-9681
 > RadioGroup.cpp is a composite radio-list widget: it couples bitmap icons and text buttons, wraps selection with arrow keys, and splits hover across sibling controls; a Unity port should keep each row as one retained interactive option.
 <!-- tags: gui, unity, widgets, annotation | created: 2026-03-29 -->

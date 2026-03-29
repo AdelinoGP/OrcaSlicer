@@ -62,3 +62,8 @@
 - This header is the declaration boundary for the sidebar status stack: `SideToolsPanel` owns the monitor strip state, interval timer gate, and paint/mouse callbacks, while `SideTools` owns the composite status/error drawer and presenter-facing update surface.
 - The annotation pass added class-level `[INTENT]`, `[STATE]`, `[EVENT]`, `[UNITY]`, and `[PORTING_HAZARD:P2]` notes so the later Unity port can split it into a retained status card plus a presenter-driven model.
 - Next step is to capture the handoff evidence, commit the atomic header annotation, close T692, and continue with T693.
+
+- Picked Phase 1 task T693 for `src/slic3r/GUI/Widgets/SpinInput.cpp`.
+- The widget is a skinned numeric stepper: text entry, spin buttons, manual sizing, clamped integer state, keyboard/wheel support, and timer-backed press-and-hold auto-repeat.
+- I annotated the file with retained-state, event-flow, layout, and Unity-mapping comments; the main migration hazard is the mouse-capture + timer repeat loop that needs a dedicated Unity input controller.
+- Next step is to commit this atomic annotation, close T693, and move to T694 for `SpinInput.hpp`.

@@ -172,6 +172,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate SideTools.hpp for Unity port prep
 - Next recommended Phase 1 task: T693 annotate: src/slic3r/GUI/Widgets/SpinInput.cpp
 
+## Phase 1 - Task T693 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/SpinInput.cpp
+- Deliverables: `src/slic3r/GUI/Widgets/SpinInput.cpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 7 comment blocks covering class intent, retained state, manual layout, button auto-repeat, commit-on-focus-loss, keyboard dispatch, and external event contract
+- Verification excerpt: `[UNITY] Port as a retained numeric stepper made from a TextInput, two icon buttons, and a shared value model; emit a typed "value changed" callback rather than relying on wxCommandEvent propagation.`
+- Unity-impact summary:
+  - Keep the stepper as a shared value model with explicit button/text synchronization.
+  - Preserve press-and-hold auto-repeat as a dedicated controller rather than a stock button.
+  - Route every input path through one normalized value-change callback.
+- Hazards found: P2 x1
+- Git: Annotate SpinInput.cpp for Unity port
+- Next recommended Phase 1 task: T694 annotate: src/slic3r/GUI/Widgets/SpinInput.hpp
+
 ## Tasks
 
 ### Completed

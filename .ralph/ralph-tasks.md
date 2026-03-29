@@ -611,7 +611,7 @@ Last updated: 2026-03-29T03:16:46Z
 - [x] T690 annotate: src/slic3r/GUI/Widgets/SideMenuPopup.hpp
 - [x] T691 annotate: src/slic3r/GUI/Widgets/SideTools.cpp
 - [x] T692 annotate: src/slic3r/GUI/Widgets/SideTools.hpp
-- [ ] T693 annotate: src/slic3r/GUI/Widgets/SpinInput.cpp
+- [x] T693 annotate: src/slic3r/GUI/Widgets/SpinInput.cpp
 - [ ] T694 annotate: src/slic3r/GUI/Widgets/SpinInput.hpp
 - [ ] T695 annotate: src/slic3r/GUI/Widgets/StateColor.cpp
 - [x] T696 annotate: src/slic3r/GUI/Widgets/StateColor.hpp
