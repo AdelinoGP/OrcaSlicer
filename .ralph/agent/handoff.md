@@ -1441,3 +1441,57 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 P2 (WebView dependencies and JS interop vary heavily between platforms)
 - Git: commit
 - Next recommended Phase 1 task: T717 annotate: src/slic3r/GUI/WipeTowerDialog.cpp
+
+## Phase 1 - Task T717, T718 complete
+- Task type: annotate
+- File: src/slic3r/GUI/WipeTowerDialog.cpp, src/slic3r/GUI/WipeTowerDialog.hpp
+- Deliverables: src/slic3r/GUI/WipeTowerDialog.cpp, src/slic3r/GUI/WipeTowerDialog.hpp
+- Substantive additions: Added method-level `[INTENT]`, `[EVENT]`, `[STATE]` to the C++ implementation. Added `[PORTING_HAZARD:P1]` regarding `wxWebView`.
+- Verification excerpt: `// [INTENT] Constructor for the WipingDialog, sets up the webview and its script message handler.`
+- Unity-impact summary:
+  - `RammingDialog` maps neatly to a modal parameter window using UI Toolkit or similar.
+  - `WipingDialog` is heavily coupled to HTML/JS via `wxWebView`. Requires a complete UI rewrite in Unity or a native browser plugin to handle complex grid inputs.
+  - Webview message-passing involves JSON-serialized state from `full_config` which should be cleanly decoupled in Unity.
+- Hazards found: 1 P1 (Webview), 1 P2 (Event bindings)
+- Git: 848c2501eb Annotate WipeTowerDialog for Unity port preparation
+- Next recommended Phase 1 task: T719
+## Phase 1 - Task T719 complete
+- Task type: annotate
+- File: src/slic3r/GUI/wxExtensions.cpp
+- Deliverables: src/slic3r/GUI/wxExtensions.cpp
+- Substantive additions: Annotated utility functions like `msw_rescale_menu`, `append_menu_item`, `get_default_extruder_color_icon`, `show_sys_picker_dialog`.
+- Verification excerpt: `[UNITY] Unity requires a custom color picker prefab or an OS-native dialogue plugin for full OS color pickers.`
+- Unity-impact summary:
+  - Menu rescaling is native in Unity.
+  - Context menu item events need to map to Unity actions.
+  - Native color pickers require a plugin or custom prefab in Unity.
+- Hazards found: None critical
+- Git: 5e4e017fe4
+- Next recommended Phase 1 task: any available T724-T740
+
+## Phase 1 - Task T720 complete
+- Task type: annotate
+- File: src/slic3r/GUI/wxExtensions.hpp
+- Deliverables: src/slic3r/GUI/wxExtensions.hpp
+- Substantive additions: Class-level annotations for `ScalableBitmap`, `LockButton`, `ScalableButton`, `ModeButton`, `MenuWithSeparators`, `ImageTransientPopup`.
+- Verification excerpt: `[UNITY] Maps to an Image or Sprite element. Unity's native UI system inherently handles responsive scaling`
+- Unity-impact summary:
+  - Custom bitmap rescale wrappers are largely unnecessary in Unity since images scale naturally.
+  - Transient popup with images maps to full-screen or contextual UI overlays in Unity.
+- Hazards found: P3 in CheckListBox Combo popup platform variations.
+- Git: 5e4e017fe4
+- Next recommended Phase 1 task: any available T724-T740
+
+## Phase 1 - Task T724, T725 complete
+- Task type: annotate
+- File: src/slic3r/Utils/AstroBox.hpp, src/slic3r/Utils/AstroBox.cpp
+- Deliverables: src/slic3r/Utils/AstroBox.hpp, src/slic3r/Utils/AstroBox.cpp
+- Substantive additions: Added class-level [INTENT], [UNITY] and method-level [THREAD] annotations.
+- Verification excerpt: `// [THREAD] The upload method is called from a worker thread (by PrintHostJob).`
+- Unity-impact summary:
+  - AstroBox implements PrintHost functionality over HTTP.
+  - Unity needs `UnityWebRequest` mapping for both auth and file uploads.
+  - Callbacks bridge back to UI, so coroutines/tasks on the main thread or strict thread boundary management is necessary.
+- Hazards found: None major, simple HTTP wrap.
+- Git: pending commit
+- Next recommended Phase 1 task: T726 annotate: src/slic3r/Utils/bambu_networking.hpp

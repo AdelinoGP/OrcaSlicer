@@ -12,6 +12,10 @@ namespace Slic3r {
 class DynamicPrintConfig;
 class Http;
 
+// [INTENT] AstroBox implements the PrintHost interface to handle printer discovery, validation, and file
+// uploads for AstroBox devices.
+// [UNITY] Use UnityWebRequest to replicate the HTTP flows, ensuring custom certificate handling 
+// (if required by CA files) and specific form-data upload mechanics are ported.
 class AstroBox : public PrintHost
 {
 public:

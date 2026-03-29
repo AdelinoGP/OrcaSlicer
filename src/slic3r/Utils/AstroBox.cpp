@@ -94,6 +94,9 @@ wxString AstroBox::get_test_failed_msg (wxString &msg) const
         % _utf8(L("Note: AstroBox version 1.1.0 or higher is required."))).str());
 }
 
+// [THREAD] The upload method is called from a worker thread (by PrintHostJob). Callbacks (progress_fn, error_fn, info_fn) 
+// map back to the main UI thread, so any Unity port must maintain this thread boundary or use coroutines/async await 
+// on the main thread to avoid blocking.
 bool AstroBox::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const
 {
     const char *name = get_name();
