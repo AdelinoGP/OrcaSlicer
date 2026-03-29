@@ -8,3 +8,8 @@
 - Picked Phase 1 task T680 for `src/slic3r/GUI/Widgets/RadioGroup.hpp` after the cpp task.
 - The header now carries the declaration-boundary intent, state ownership, event surface, and Unity migration notes that the cpp implementation relies on.
 - Next step: commit this atomic header annotation, close T680, and move to T681.
+
+- Picked Phase 1 task T681 for `src/slic3r/GUI/Widgets/RoundedRectangle.cpp`.
+- The file is a minimal custom-painted wxWindow: constructor stores fill/border mode, color, and radius; paint handler redraws from current bounds.
+- Unity mapping is straightforward: a retained rounded-rect control with style-driven fill/outline behavior, plus a small hazard note for the ad-hoc integer mode.
+- Next step: commit the annotation, close T681, and hand off T682 for the header boundary.

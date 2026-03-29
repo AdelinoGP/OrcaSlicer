@@ -22,6 +22,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate RadioGroup.hpp for Unity port
 - Next recommended Phase 1 task: T681 annotate: src/slic3r/GUI/Widgets/RoundedRectangle.cpp
 
+## Phase 1 - Task T681 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/RoundedRectangle.cpp
+- Deliverables: `src/slic3r/GUI/Widgets/RoundedRectangle.cpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 4 comment blocks covering intent, state, event flow, porting hazard, and Unity mapping
+- Verification excerpt: `[UNITY] Map this to a retained VisualElement with background/border radius styling for the filled case`
+- Unity-impact summary:
+  - Keep fill-vs-outline as explicit retained style state.
+  - Model paint as pure redraw from current size, not cached geometry.
+  - Use a simple retained control rather than an interactive widget.
+- Hazards found: P3 x1
+- Git: Annotate RoundedRectangle.cpp for Unity port
+- Next recommended Phase 1 task: T682 annotate: src/slic3r/GUI/Widgets/RoundedRectangle.hpp
+
 ## Tasks
 
 ### Completed
