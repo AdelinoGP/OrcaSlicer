@@ -50,3 +50,9 @@
 - Added class-level `[INTENT]` and `[UNITY]` annotations detailing the P/Invoke model `[DllImport]` vs manual `LoadLibrary`/`dlopen`.
 - Added a `[PORTING_HAZARD:P1]` to `BBLNetworkPlugin::initialize()` explaining the friction of dynamic runtime loading in Unity vs static P/Invoke.
 - Completed and committed.
+
+## T731, T732 annotate: src/slic3r/Utils/BBLPrinterAgent.cpp / hpp
+- Started tasks task-1773880088-135d and task-1773880088-2fae
+- Read files. This class acts as a pass-through abstraction over `BBLNetworkPlugin` for printer control.
+- Added `[INTENT]` and `[UNITY]` annotations detailing its delegation role and the mapping to either a C# P/Invoke wrapper or a pure C# MQTT/Networking client.
+- Completed and committed.

@@ -6,6 +6,8 @@
 
 namespace Slic3r {
 
+// [UNITY] All methods here act as pass-throughs to the BBLNetworkPlugin singleton.
+// Unity implementations will likely replace this entirely with a managed C# MQTT/Networking client.
 BBLPrinterAgent::BBLPrinterAgent() = default;
 
 BBLPrinterAgent::~BBLPrinterAgent() = default;

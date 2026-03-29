@@ -1534,3 +1534,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: `[PORTING_HAZARD:P1]` Manual OS-level dynamic library symbol extraction.
 - Git: pending commit
 - Next recommended Phase 1 task: T731 annotate: src/slic3r/Utils/BBLPrinterAgent.cpp
+
+## Phase 1 - Task T731, T732 complete
+- Task type: annotate
+- File: src/slic3r/Utils/BBLPrinterAgent.hpp, src/slic3r/Utils/BBLPrinterAgent.cpp
+- Deliverables: src/slic3r/Utils/BBLPrinterAgent.hpp, src/slic3r/Utils/BBLPrinterAgent.cpp
+- Substantive additions: Added class-level [INTENT] and [UNITY] notes.
+- Verification excerpt: `// [UNITY] In Unity, this maps either to a P/Invoke bridge managing the native DLL handles, or is replaced entirely by a managed C# networking/MQTT implementation.`
+- Unity-impact summary:
+  - This is pure abstraction over the BBL DLL.
+  - Replaces or bridges functionality depending on whether Unity uses the native DLL or a new C# layer.
+- Hazards found: Inherits DLL coupling from BBLNetworkPlugin.
+- Git: pending commit
+- Next recommended Phase 1 task: T733 annotate: src/slic3r/Utils/Bonjour.cpp

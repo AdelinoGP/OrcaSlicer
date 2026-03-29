@@ -13,6 +13,10 @@ namespace Slic3r {
  *
  * Delegates all printer operations to the proprietary BBL network DLL
  * through function pointers obtained from BBLNetworkPlugin singleton.
+ *
+ * [INTENT] Provide a C++ object abstraction over the dynamically loaded BBL network DLL for printer control.
+ * [UNITY] In Unity, this maps either to a P/Invoke bridge managing the native DLL handles, or is replaced 
+ * entirely by a managed C# networking/MQTT implementation.
  */
 class BBLPrinterAgent : public IPrinterAgent {
 public:
