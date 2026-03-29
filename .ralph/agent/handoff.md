@@ -277,6 +277,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate StaticGroup.hpp for Unity port
 - Next recommended Phase 1 task: T705 annotate: src/slic3r/GUI/Widgets/StepCtrl.cpp
 
+## Phase 1 - Task T705 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/StepCtrl.cpp
+- Deliverables: `src/slic3r/GUI/Widgets/StepCtrl.cpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 14 comment blocks covering the shared step model, vetoable selection events, drag/capture flow, three render variants, slot metadata, and Unity mapping
+- Verification excerpt: `[UNITY] Port as a retained segmented control with a drag handle and explicit pointer-capture state in a MonoBehaviour or UI Toolkit controller.`
+- Unity-impact summary:
+  - Keep the selection model and the render variant split in one shared controller.
+  - Preserve the vetoable change event and mouse-capture drag lifecycle as explicit input state.
+  - Split the filament banner from the step rail when mapping to Unity.
+- Hazards found: P2 x3, P3 x2, UNCLEAR x1
+- Git: Annotate StepCtrl.cpp for Unity port
+- Next recommended Phase 1 task: T706 annotate: src/slic3r/GUI/Widgets/StepCtrl.hpp
+
 ## Tasks
 
 ### Completed

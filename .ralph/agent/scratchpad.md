@@ -111,3 +111,7 @@
 - Picked Phase 1 task T702 for `src/slic3r/GUI/Widgets/StaticGroup.hpp` and annotated the declaration boundary.
 - The header now makes the optional badge overlay explicit and carries the Unity mapping/hazard note that the badge is injected through custom border/label painting.
 - Next step: commit this atomic header annotation, close T702, and continue with T705 for `src/slic3r/GUI/Widgets/StepCtrl.cpp` since T703 is still blocked.
+
+- Picked Phase 1 task T705 for `src/slic3r/GUI/Widgets/StepCtrl.cpp` and annotated the shared stepper implementation.
+- The file now documents the shared model/controller, the interactive drag-and-click flow, the vetoable selection event contract, and the specialized vertical/filament render variants.
+- Verification so far is a direct file review after patching; the editor diagnostics still report the existing wx include-path issue, but the annotation text and task flow are intact.

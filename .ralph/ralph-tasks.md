@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-29T04:04:53Z
+Last updated: 2026-03-29T04:12:18Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -623,7 +623,7 @@ Last updated: 2026-03-29T04:04:53Z
 - [x] T702 annotate: src/slic3r/GUI/Widgets/StaticGroup.hpp
 - [ ] T703 annotate: src/slic3r/GUI/Widgets/StaticLine.cpp
 - [x] T704 annotate: src/slic3r/GUI/Widgets/StaticLine.hpp
-- [ ] T705 annotate: src/slic3r/GUI/Widgets/StepCtrl.cpp
+- [x] T705 annotate: src/slic3r/GUI/Widgets/StepCtrl.cpp
 - [ ] T706 annotate: src/slic3r/GUI/Widgets/StepCtrl.hpp
 - [ ] T707 annotate: src/slic3r/GUI/Widgets/SwitchButton.cpp
 - [ ] T708 annotate: src/slic3r/GUI/Widgets/SwitchButton.hpp
