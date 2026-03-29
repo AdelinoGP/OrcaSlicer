@@ -39,3 +39,7 @@
 - Picked Phase 1 task T687 for `src/slic3r/GUI/Widgets/SideButton.cpp`.
 - This control is a skinned button-like wxWindow with optional icon+label content, state-colored surfaces, manual min-size math, and explicit mouse capture/release click translation.
 - Plan: annotate the render/layout/event boundaries with concrete `[INTENT]`, `[STATE]`, `[EVENT]`, `[UNITY]`, and porting-hazard notes, then record evidence and move to the next widget task.
+
+- Picked Phase 1 task T688 for `src/slic3r/GUI/Widgets/SideButton.hpp`.
+- The header is the declaration boundary for the skinned side button: it exposes layout/orientation state, palette mutation entry points, and the custom event surface that the cpp drives.
+- Plan: keep the header annotations focused on retained state, event flow, and Unity mapping, then close the task and continue with the next widget file.

@@ -37,6 +37,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate RoundedRectangle.cpp for Unity port
 - Next recommended Phase 1 task: T682 annotate: src/slic3r/GUI/Widgets/RoundedRectangle.hpp
 
+## Phase 1 - Task T688 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/SideButton.hpp
+- Deliverables: `src/slic3r/GUI/Widgets/SideButton.hpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 6 comment blocks covering class intent, retained layout state, min-size override semantics, cached state, event flow, Unity mapping, and a P2 porting hazard
+- Verification excerpt: `[UNITY] Port as a retained button controller with explicit icon-label layout and a custom painter rather than stock button styling.`
+- Unity-impact summary:
+  - Keep icon/text layout, padding, and radius as explicit retained state.
+  - Preserve the custom click translation instead of delegating to stock button chrome.
+  - Treat hover/press/disable styling as a shared state-model concern.
+- Hazards found: P2 x1
+- Git: Annotate SideButton.hpp for Unity port
+- Next recommended Phase 1 task: T687 annotate: src/slic3r/GUI/Widgets/SideButton.cpp
+
 ## Phase 1 - Task T682 complete
 
 - Task type: annotate
