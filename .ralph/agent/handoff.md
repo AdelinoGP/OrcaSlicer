@@ -232,6 +232,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate StateHandler.hpp for Unity port
 - Next recommended Phase 1 task: T699 annotate: src/slic3r/GUI/Widgets/StaticBox.cpp
 
+## Phase 1 - Task T700 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/StaticBox.hpp
+- Deliverables: `src/slic3r/GUI/Widgets/StaticBox.hpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 2 comment blocks covering declaration intent, retained state, event flow, Unity mapping, and the paint/compositing hazard
+- Verification excerpt: `[UNITY] Port as a retained panel or VisualElement with a custom draw component plus layered border/fill/badge visuals and a separate style model.`
+- Unity-impact summary:
+  - Keep the skinned container as a retained panel with explicit style state, not stock group-box chrome.
+  - Treat `StateHandler` as a non-owning palette bridge and `badge` as optional overlay chrome.
+  - Preserve the immediate-mode gradient/offscreen-bitmap behavior as a migration hazard, not a direct implementation target.
+- Hazards found: P2 x1
+- Git: StaticBox header annotations for Unity port prep
+- Next recommended Phase 1 task: T701 annotate: src/slic3r/GUI/Widgets/StaticGroup.cpp
+
 ## Phase 1 - Task T699 complete
 
 - Task type: annotate

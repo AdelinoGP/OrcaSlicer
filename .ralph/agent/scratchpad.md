@@ -94,3 +94,11 @@
 - StaticBox is a paint-only skinned container: it owns corner radius, border width/style, three StateColor palettes, a lazily created badge overlay, and a StateHandler-backed state bridge.
 - The Unity port should keep gradient fill and badge composition as layered visuals in a retained panel/custom draw component; the Windows offscreen bitmap path is the main migration hazard.
 - Next step is to commit the annotation, close T699, and continue with T700 for `src/slic3r/GUI/Widgets/StaticBox.hpp`.
+
+- Picked Phase 1 task T700 for `src/slic3r/GUI/Widgets/StaticBox.hpp`.
+- The header is the declaration boundary for the skinned container: it exposes the retained style inputs, the StateHandler bridge, and the badge overlay toggle that the cpp paints against.
+- Plan: add class-level annotation comments for intent/state/event/Unity mapping, then record the handoff evidence, close T700, and move to T701 for `src/slic3r/GUI/Widgets/StaticGroup.cpp`.
+
+- Completed the T700 header annotation and verified the patch with `git diff --check` plus a direct file read.
+- The editor/LSP diagnostics still complain about missing wx headers in the existing include graph, but the annotation itself is in place and the task evidence has been recorded.
+- Next step after commit: close T700 and continue with T701 for `src/slic3r/GUI/Widgets/StaticGroup.cpp`.

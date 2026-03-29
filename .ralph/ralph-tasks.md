@@ -618,7 +618,7 @@ Last updated: 2026-03-29T04:10:00Z
 - [x] T697 annotate: src/slic3r/GUI/Widgets/StateHandler.cpp
 - [x] T698 annotate: src/slic3r/GUI/Widgets/StateHandler.hpp
 - [x] T699 annotate: src/slic3r/GUI/Widgets/StaticBox.cpp
-- [ ] T700 annotate: src/slic3r/GUI/Widgets/StaticBox.hpp
+- [~] T700 annotate: src/slic3r/GUI/Widgets/StaticBox.hpp
 - [ ] T701 annotate: src/slic3r/GUI/Widgets/StaticGroup.cpp
 - [ ] T702 annotate: src/slic3r/GUI/Widgets/StaticGroup.hpp
 - [ ] T703 annotate: src/slic3r/GUI/Widgets/StaticLine.cpp
