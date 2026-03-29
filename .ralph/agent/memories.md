@@ -2,6 +2,10 @@
 
 ## Patterns
 
+### mem-1774767272-344d
+> TempInput.hpp is the declaration boundary for a skinned temperature row: keep owned text/popup child pointers, edit-progress guard, range limits, and custom commit event explicit so Unity can port it as a retained row prefab with an anchored validation overlay.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
 ### mem-1774760304-2087
 > TempInput is a composite temperature row: it owns inline numeric validation, a lazily-created warning PopupWindow, and manual DC-based layout/painting, so Unity should port it as a retained row prefab with an anchored validation overlay.
 <!-- tags: gui, unity, widgets | created: 2026-03-29 -->
@@ -481,6 +485,10 @@
 ## Decisions
 
 ## Fixes
+
+### mem-1774767119-647e
+> failure: cmd=ralph tools task start task-1773880088-1f1b --format quiet, exit=1, error=unexpected argument '--format' found, next=run task start without --format or use -- for passthrough
+<!-- tags: tooling, error-handling | created: 2026-03-29 -->
 
 ### mem-1774737149-25cd
 > failure: cmd=/home/admin/.config/nvm/versions/node/v24.14.0/lib/node_modules/@ralph-orchestrator/ralph-cli/node_modules/.bin_real/ralph tools task start task-1773880088-?, exit=1, error=zsh glob pattern mistake in task id, next=start the intended task with the exact runtime id task-1773880088-023d

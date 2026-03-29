@@ -337,6 +337,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate TabCtrl.hpp for Unity port
 - Next recommended Phase 1 task: T711 annotate: src/slic3r/GUI/Widgets/TempInput.cpp
 
+## Phase 1 - Task T712 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/TempInput.hpp
+- Deliverables: `src/slic3r/GUI/Widgets/TempInput.hpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 7 comment blocks covering class intent, retained state, owned child controls, warning type semantics, create/setup flow, commit guard, and Unity mapping
+- Verification excerpt: `[UNITY] Port as a retained row prefab with icon slots, a text input, and an anchored validation tooltip/overlay controller.`
+- Unity-impact summary:
+  - Keep validation, edit mode, and warning popup lifetimes inside one retained row controller.
+  - Model the text field and warning popup as owned child controllers rather than ad hoc draw state.
+  - Preserve the commit/navigation hazard as an explicit validation state machine in Unity.
+- Hazards found: P2 x1
+- Git: Annotate TempInput.hpp for Unity port
+- Next recommended Phase 1 task: T713 annotate: src/slic3r/GUI/Widgets/TextInput.cpp
+
 ## Tasks
 
 ### Completed

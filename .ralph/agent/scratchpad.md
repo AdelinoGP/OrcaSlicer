@@ -144,3 +144,7 @@
 - TempInput is a composite temperature row with inline validation, a transient warning popup, and custom DC painting; the Unity target should be a retained row prefab with a text field, icon slots, and an overlay tooltip controller.
 - I added comments around intent/state/event flow, manual layout, render path, popup ownership, and the focus-navigation hazard, then marked the task done in the runtime task file.
 - Next step is to commit this atomic annotation and continue to T712 for `src/slic3r/GUI/Widgets/TempInput.hpp`.
+
+- Picked Phase 1 task T712 for `src/slic3r/GUI/Widgets/TempInput.hpp`.
+- The header is the declaration boundary for the temperature row: keep the owned text control, lazily created warning popup, edit-progress guard, range limits, and custom finish event explicit so the Unity port can keep validation and commit semantics together.
+- Next step is to commit this atomic header annotation, close T712, and hand off T713 for `src/slic3r/GUI/Widgets/TextInput.cpp`.
