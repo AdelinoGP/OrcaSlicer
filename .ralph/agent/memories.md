@@ -486,6 +486,10 @@
 
 ## Fixes
 
+### mem-1774767607-271d
+> failure: cmd=rm .ralph/.__smb004A, exit=1, error=No such file or directory, next=ignore transient hidden temp artifacts if they disappear before cleanup
+<!-- tags: tooling, error-handling | created: 2026-03-29 -->
+
 ### mem-1774767119-647e
 > failure: cmd=ralph tools task start task-1773880088-1f1b --format quiet, exit=1, error=unexpected argument '--format' found, next=run task start without --format or use -- for passthrough
 <!-- tags: tooling, error-handling | created: 2026-03-29 -->
