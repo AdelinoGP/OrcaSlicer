@@ -1570,3 +1570,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Manifest total: ~800
 - Remaining: ~67
 - Status: CONTINUING
+## Phase 1 - Task T735, T736 complete
+- Task type: annotate
+- File: src/slic3r/Utils/CalibUtils.cpp, src/slic3r/Utils/CalibUtils.hpp
+- Deliverables: src/slic3r/Utils/CalibUtils.cpp, src/slic3r/Utils/CalibUtils.hpp
+- Substantive additions: Added missing [INTENT], [UNITY], and [THREAD] tags to calibration structures and core flow methods.
+- Verification excerpt: `// [UNITY] Split into pure C# job-builder services. The print_worker global state should be refactored into a dependency-injected job queue rather than a static singleton.`
+- Unity-impact summary:
+  - Calibration logic is highly coupled with slicing options and network APIs, creating a massive bridge class.
+  - The single `print_worker` restricts concurrent calibration tasks.
+  - Generating specialized G-code using multi-filament logic inside C++ has strong assumptions about model loading and bounding boxes.
+- Hazards found: P1 hazard on single global worker `print_worker` limiting task scheduling.
+- Git: T735, T736
+- Next recommended Phase 1 task: T737

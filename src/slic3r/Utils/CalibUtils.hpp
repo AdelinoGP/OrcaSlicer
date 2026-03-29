@@ -16,13 +16,14 @@ extern const double MAX_PA_K_VALUE;
 class CalibInfo
 {
 public:
-    // [STATE] This is the UI-to-slicing handoff record for one calibration lane: it mixes the chosen
+    // [INTENT] This is the UI-to-slicing handoff record for one calibration lane: it mixes the chosen
     // preset snapshots, resolved AMS slot, runtime progress sink, and the `Calib_Params` sweep that will
     // later be baked into a temporary 3MF plus print job.
     // [MEMORY] Presets are borrowed as raw pointers from the live preset bundle rather than owned here,
     // so callers must ensure the presets outlive any calibration job built from this struct.
     // [COUPLING] The struct bridges GUI device state (`MachineObject`, AMS, progress bars) with
     // libslic3r configuration and model generation, which makes calibration setup span both layers.
+    // [UNITY] Map to a C# class/struct used as a DTO between the calibration UI wizard and the async job-generation service.
     int                                index = -1;
     int                                extruder_id = 0;
     int                                ams_id = 0;
@@ -41,6 +42,8 @@ public:
     std::shared_ptr<ProgressIndicator> process_bar;
 };
 
+// [INTENT] A static namespace/utility class for generating, configuring, and dispatching calibration print jobs.
+// [UNITY] Split into pure C# job-builder services. The `print_worker` global state should be refactored into a dependency-injected job queue rather than a static singleton.
 class CalibUtils
 {
 public:

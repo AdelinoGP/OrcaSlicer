@@ -63,3 +63,9 @@
 - Added `[INTENT]` and `[UNITY]` to `Bonjour` class detailing the need for a C# mDNS/Zeroconf library as Unity lacks native mDNS.
 - Added `[THREAD]` annotations to `lookup()` and `resolve()` noting that boost::asio is run on a detached `std::thread` and callbacks fire on that background thread.
 - Completed and committed.
+## T735, T736 annotate: src/slic3r/Utils/CalibUtils.cpp / hpp
+- Started task-1773880088-7f98 and task-1773880088-9abf
+- The files were mostly annotated with [INTENT] and [HAZARD] tags, but lacked [UNITY] notes at the class and structural level.
+- Added [UNITY] to map `CalibInfo` to C# DTOs and `CalibUtils` to C# job-builder services.
+- Replaced [STATE] with [INTENT] on the `CalibInfo` struct summary to better fit the tag convention.
+- Completed and committed.

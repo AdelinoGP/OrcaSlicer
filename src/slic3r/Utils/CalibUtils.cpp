@@ -1383,6 +1383,8 @@ bool CalibUtils::get_pa_k_n_value_by_cali_idx(const MachineObject *obj, int cali
     return false;
 }
 
+// [INTENT] Validates that the selected printer and nozzle match the calibration preset requirements.
+// [UNITY] Reimplement as a validation pass in the C# UI wizard or job-dispatch service, returning typed error enums/structs instead of out-param strings.
 bool CalibUtils::check_printable_status_before_cali(const MachineObject *obj, const X1CCalibInfos &cali_infos, wxString &error_message)
 {
     if (!obj) {
@@ -1449,6 +1451,8 @@ bool CalibUtils::check_printable_status_before_cali(const MachineObject *obj, co
     return true;
 }
 
+// [INTENT] Validates that the selected printer and nozzle match the calibration preset requirements.
+// [UNITY] Reimplement as a validation pass in the C# UI wizard or job-dispatch service, returning typed error enums/structs instead of out-param strings.
 bool CalibUtils::check_printable_status_before_cali(const MachineObject *obj, const std::vector<CalibInfo> &cali_infos, wxString &error_message)
 {
     if (!obj) {
@@ -1518,6 +1522,8 @@ bool CalibUtils::check_printable_status_before_cali(const MachineObject *obj, co
     return true;
 }
 
+// [INTENT] Validates that the selected printer and nozzle match the calibration preset requirements.
+// [UNITY] Reimplement as a validation pass in the C# UI wizard or job-dispatch service, returning typed error enums/structs instead of out-param strings.
 bool CalibUtils::check_printable_status_before_cali(const MachineObject* obj, const CalibInfo& cali_info, wxString& error_message)
 {
     if (!obj) {
@@ -1761,6 +1767,9 @@ bool CalibUtils::process_and_store_3mf(Model *model, const DynamicPrintConfig &f
     return true;
 }
 
+// [INTENT] Dispatches the baked calibration 3MF to the printer over the network plugin.
+// [THREAD] This initiates an asynchronous worker task and replaces the global `print_worker`.
+// [UNITY] Map to an async/await method in a job-submission service. Avoid static global worker tracking; use a dedicated JobManager.
 void CalibUtils::send_to_print(const CalibInfo &calib_info, wxString &error_message, int flow_ratio_mode)
 {
     {  // before send
@@ -1891,6 +1900,8 @@ void CalibUtils::send_to_print(const CalibInfo &calib_info, wxString &error_mess
     replace_job(*print_worker, std::move(print_job));
 }
 
+// [INTENT] Dispatches multi-filament auto-calibration print jobs.
+// [UNITY] Similar to the single-calibration dispatcher, use an async/await upload service.
 void CalibUtils::send_to_print(const std::vector<CalibInfo> &calib_infos, wxString &error_message, int flow_ratio_mode)
 {
     std::string                        dev_id      = calib_infos[0].dev_id;
