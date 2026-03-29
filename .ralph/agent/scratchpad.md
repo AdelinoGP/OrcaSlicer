@@ -135,3 +135,7 @@
 - TabCtrl is a custom tab-strip container with child Button ownership, a vetoable two-phase selection event, keyboard navigation, dynamic overflow-driven relayout, and a custom underline paint pass.
 - I annotated the cpp with `[INTENT]`, `[STATE]`, `[EVENT]`, `[UNITY]`, and `[PORTING_HAZARD:P2]` notes around selection, deletion/reset, image-list ownership, overflow layout, input routing, and paint output.
 - Verification will be a focused review of the patch and diff; the editor diagnostics are still the existing wx include-path issue and are not from these comments.
+
+- Picked Phase 1 task T710 for `src/slic3r/GUI/Widgets/TabCtrl.hpp` after no prior memory match for TabCtrl-specific guidance.
+- The header now carries class-level intent/state/Unity notes plus method-boundary annotations for append/delete/select, relayout, keyboard routing, and the two-phase selection event surface.
+- The only diagnostics after patching are the pre-existing wx include-path issues from the repo environment; they do not change the annotation content.

@@ -322,6 +322,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate SwitchButton.hpp for Unity port
 - Next recommended Phase 1 task: T709 annotate: src/slic3r/GUI/Widgets/TabCtrl.cpp
 
+## Phase 1 - Task T710 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/TabCtrl.hpp
+- Deliverables: `src/slic3r/GUI/Widgets/TabCtrl.hpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 11 comment blocks covering class intent, raw-child ownership, image-list lifetime, selection state, append/delete/visibility helpers, keyboard routing, and Unity mapping
+- Verification excerpt: `[UNITY] Port this as a retained tab-strip controller with child tab visuals, a cancelable pre-change callback, and a confirmed-change callback after the active index commits.`
+- Unity-impact summary:
+  - Keep the tab strip as a retained controller with explicit selection and overflow policy.
+  - Preserve the two-phase selection event contract so vetoable tab changes still work.
+  - Treat the image-list pointer and child raw pointers as explicit ownership boundaries in Unity.
+- Hazards found: P2 x1, UNCLEAR x1
+- Git: Annotate TabCtrl.hpp for Unity port
+- Next recommended Phase 1 task: T711 annotate: src/slic3r/GUI/Widgets/TempInput.cpp
+
 ## Tasks
 
 ### Completed
