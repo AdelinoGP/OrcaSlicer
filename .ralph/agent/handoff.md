@@ -262,6 +262,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate StaticBox.cpp for Unity port
 - Next recommended Phase 1 task: T700 annotate: src/slic3r/GUI/Widgets/StaticBox.hpp
 
+## Phase 1 - Task T706 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/StepCtrl.hpp
+- Deliverables: `src/slic3r/GUI/Widgets/StepCtrl.hpp`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 11 comment blocks covering shared step-model intent, retained selection/drag state, public event flow, derived view roles, and Unity mapping
+- Verification excerpt: `[UNITY] Port as a retained stepper controller with a data model plus separate visual rows/thumb indicator and explicit selection callbacks.`
+- Unity-impact summary:
+  - Keep the selection model and the rendered step chrome separate in Unity.
+  - Preserve vetoable changing/changed selection events as explicit controller callbacks.
+  - Treat mouse capture and drag-threshold behavior as a custom input bridge, not a stock widget.
+- Hazards found: P2 x1
+- Git: Annotate StepCtrl.hpp for Unity port
+- Next recommended Phase 1 task: T707 annotate: src/slic3r/GUI/Widgets/SwitchButton.cpp
+
 ## Phase 1 - Task T702 complete
 
 - Task type: annotate

@@ -115,3 +115,7 @@
 - Picked Phase 1 task T705 for `src/slic3r/GUI/Widgets/StepCtrl.cpp` and annotated the shared stepper implementation.
 - The file now documents the shared model/controller, the interactive drag-and-click flow, the vetoable selection event contract, and the specialized vertical/filament render variants.
 - Verification so far is a direct file review after patching; the editor diagnostics still report the existing wx include-path issue, but the annotation text and task flow are intact.
+
+- Picked Phase 1 task T706 for `src/slic3r/GUI/Widgets/StepCtrl.hpp` and annotated the declaration boundary.
+- The header now spells out the shared step model, cached drag/thumb state, vetoable selection events, and the concrete Unity split between retained controller/model and custom-rendered rows.
+- Verification is a focused file review after patching; the diagnostics remain the pre-existing wx include-path issue and do not affect the annotation content.

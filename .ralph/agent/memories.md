@@ -2,6 +2,14 @@
 
 ## Patterns
 
+### mem-1774757958-dfd7
+> StepCtrl.hpp is the declaration boundary for the shared stepper controller: keep the retained step model, vetoable selection events, drag/thumb state, and derived StepCtrl/StepIndicator/FilamentStepIndicator roles explicit so Unity can split model, interactive controller, and read-only progress view.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774757709-7cd6
+> StepCtrl.cpp is a shared step-model controller: vetoable EVT_STEP_CHANGING/EVT_STEP_CHANGED selection, mouse-capture drag preview, and three render variants (horizontal StepCtrl, vertical StepIndicator, filament StepIndicator). Unity should split the retained model from the views and preserve the drag/cancel event contract.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
 ### mem-1774756165-e372
 > StaticBox.cpp is a skinned container: keep corner radius, border width/style, StateColor palettes, optional badge overlay, and StateHandler-driven color resolution explicit; Unity should port it as a retained panel with layered visuals rather than stock group-box chrome.
 <!-- tags: gui, unity, widgets | created: 2026-03-29 -->
