@@ -232,6 +232,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate StateHandler.hpp for Unity port
 - Next recommended Phase 1 task: T699 annotate: src/slic3r/GUI/Widgets/StaticBox.cpp
 
+## Phase 1 - Task T699 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/StaticBox.cpp
+- Deliverables: `src/slic3r/GUI/Widgets/StaticBox.cpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 6 comment blocks covering class intent, retained state, event surface, parent-background inheritance, paint/render flow, Unity mapping, and the gradient/badge porting hazard
+- Verification excerpt: `[UNITY] Port as a retained panel/VisualElement with a custom draw component and a separate style model`
+- Unity-impact summary:
+  - Keep border/fill/badge styling as retained visual state instead of stock group-box chrome.
+  - Treat the gradient fill and badge as layered visuals with explicit paint ordering.
+  - Preserve the StateHandler-driven color resolution as a separate style bridge.
+- Hazards found: P2 x1
+- Git: Annotate StaticBox.cpp for Unity port
+- Next recommended Phase 1 task: T700 annotate: src/slic3r/GUI/Widgets/StaticBox.hpp
+
 ## Tasks
 
 ### Completed

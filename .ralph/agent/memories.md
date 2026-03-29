@@ -2,6 +2,14 @@
 
 ## Patterns
 
+### mem-1774756165-e372
+> StaticBox.cpp is a skinned container: keep corner radius, border width/style, StateColor palettes, optional badge overlay, and StateHandler-driven color resolution explicit; Unity should port it as a retained panel with layered visuals rather than stock group-box chrome.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774754687-b5f4
+> SpinInput.hpp is the declaration boundary for the skinned numeric stepper: keep cached label geometry, child widget pointers, clamped value/range/step state, and repeat-timer ownership explicit so Unity can port it as a TextInput plus two icon buttons with one value-changed callback.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
 ### mem-1774754439-b799
 > SpinInput.cpp is a skinned numeric stepper: keep clamped integer state, manual label/button layout, and timer-backed press-and-hold repeat as a shared controller; Unity should use a TextInput plus two icon buttons with one value-changed callback.
 <!-- tags: gui, unity, widgets | created: 2026-03-29 -->

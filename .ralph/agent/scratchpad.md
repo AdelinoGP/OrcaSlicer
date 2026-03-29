@@ -89,3 +89,8 @@
 - Picked Phase 1 task T698 for `src/slic3r/GUI/Widgets/StateHandler.hpp`.
 - The header now documents the aggregate state bridge, ownership split, event surface, and Unity mapping for explicit subscription wiring.
 - Next step is to commit this atomic header annotation, close T698, and move to T699 for `StaticBox.cpp`.
+
+- Picked Phase 1 task T699 for `src/slic3r/GUI/Widgets/StaticBox.cpp`.
+- StaticBox is a paint-only skinned container: it owns corner radius, border width/style, three StateColor palettes, a lazily created badge overlay, and a StateHandler-backed state bridge.
+- The Unity port should keep gradient fill and badge composition as layered visuals in a retained panel/custom draw component; the Windows offscreen bitmap path is the main migration hazard.
+- Next step is to commit the annotation, close T699, and continue with T700 for `src/slic3r/GUI/Widgets/StaticBox.hpp`.

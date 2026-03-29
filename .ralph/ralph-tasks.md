@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-29T03:54:00Z
+Last updated: 2026-03-29T04:10:00Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -617,7 +617,7 @@ Last updated: 2026-03-29T03:54:00Z
 - [x] T696 annotate: src/slic3r/GUI/Widgets/StateColor.hpp
 - [x] T697 annotate: src/slic3r/GUI/Widgets/StateHandler.cpp
 - [x] T698 annotate: src/slic3r/GUI/Widgets/StateHandler.hpp
-- [ ] T699 annotate: src/slic3r/GUI/Widgets/StaticBox.cpp
+- [x] T699 annotate: src/slic3r/GUI/Widgets/StaticBox.cpp
 - [ ] T700 annotate: src/slic3r/GUI/Widgets/StaticBox.hpp
 - [ ] T701 annotate: src/slic3r/GUI/Widgets/StaticGroup.cpp
 - [ ] T702 annotate: src/slic3r/GUI/Widgets/StaticGroup.hpp
