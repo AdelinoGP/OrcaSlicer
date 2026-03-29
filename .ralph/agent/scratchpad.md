@@ -29,3 +29,9 @@
 - Files were partially annotated. Added class-level `[INTENT]` and `[UNITY]` annotations to the header.
 - Added `[THREAD]` annotation to the `upload` method in `.cpp` detailing thread boundary assumptions.
 - Completed and committed.
+
+## T726 annotate: src/slic3r/Utils/bambu_networking.hpp
+- Started task-1773880088-90ba
+- Read `bambu_networking.hpp`. The file defines the C++ ABI and DTOs for the Bambu network plugin.
+- Added `[INTENT]` and `[UNITY]` annotations describing the C# P/Invoke `DllImport` requirements if the native plugin is retained.
+- Completed and committed.

@@ -14,6 +14,12 @@ extern std::string g_log_start_time;
 
 namespace Slic3r {
 
+// [INTENT] This header defines the C++ ABI, error codes, and data structures for interfacing with the 
+// dynamically loaded proprietary Bambu network plugin.
+// [UNITY] If using the native Bambu plugin, this maps to a C# P/Invoke (DllImport) interface with matching 
+// struct layouts and UnmanagedFunctionPointer delegates for callbacks. If reimplementing the network protocol 
+// natively in C#, this file serves as the specification for the expected states and DTOs.
+
 #define BAMBU_NETWORK_SUCCESS 0
 #define BAMBU_NETWORK_ERR_INVALID_HANDLE -1
 #define BAMBU_NETWORK_ERR_CONNECT_FAILED -2

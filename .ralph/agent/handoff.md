@@ -1495,3 +1495,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: None major, simple HTTP wrap.
 - Git: pending commit
 - Next recommended Phase 1 task: T726 annotate: src/slic3r/Utils/bambu_networking.hpp
+
+## Phase 1 - Task T726 complete
+- Task type: annotate
+- File: src/slic3r/Utils/bambu_networking.hpp
+- Deliverables: src/slic3r/Utils/bambu_networking.hpp
+- Substantive additions: Added class-level [INTENT] and [UNITY] mapping to P/Invoke (DllImport).
+- Verification excerpt: `// [UNITY] If using the native Bambu plugin, this maps to a C# P/Invoke (DllImport) interface with matching struct layouts`
+- Unity-impact summary:
+  - The C++ ABI here requires exact struct layout translation to C#.
+  - Callbacks will need `UnmanagedFunctionPointer` decorators.
+- Hazards found: `[COUPLING]` The callback typedef block is effectively the C++ ABI between GUI/runtime code and the proprietary Bambu networking implementation.
+- Git: pending commit
+- Next recommended Phase 1 task: T727 annotate: src/slic3r/Utils/BBLCloudServiceAgent.cpp
