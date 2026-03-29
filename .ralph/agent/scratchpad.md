@@ -363,3 +363,9 @@
 - The header now makes the retained URL state, hover colors, and underline-preserving override explicit so the Unity port can treat link behavior as owned state rather than a label-only wrapper.
 - Reconciled a stale task-registry mismatch by marking T663 done to match the already-recorded HyperLink.cpp handoff.
 - Next step after sync: continue with T665 (`src/slic3r/GUI/Widgets/ImageSwitchButton.cpp`).
+
+- Started T665 (`src/slic3r/GUI/Widgets/ImageSwitchButton.cpp`) as the paired image-toggle widget used by the status panel.
+- The file contains two closely related custom controls: a generic on/off image switch and the fan-specific variant with alternate label text and a speed value hook.
+- Plan: add a compact boundary annotation for the shared toggle state, custom paint/layout, hover/click dispatch, and the Unity split into a retained image-button prefab plus a text/image state controller; then verify with `git diff --check`, record handoff evidence, and commit this atomic file before moving to T666.
+
+- Completed T665 with comments for the shared image toggle and the fan-specific variant; the main migration note is that both controls depend on immediate wxDC measurement and ad-hoc label placement, so Unity needs explicit layout rules rather than paint-time sizing.

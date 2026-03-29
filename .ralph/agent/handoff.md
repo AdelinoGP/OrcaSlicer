@@ -2642,3 +2642,15 @@ This prompt governs **Phase 1 only**.
 - Next recommended Phase 1 task: T665 annotate: src/slic3r/GUI/Widgets/ImageSwitchButton.cpp
 
 Reconciliation note: the task registry entry for `T663` was still open even though the handoff already recorded it complete, so I synced `.ralph/ralph-tasks.md` to `[x]` before continuing.
+
+## Phase 1 - Task T665 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/ImageSwitchButton.cpp
+- Deliverables: src/slic3r/GUI/Widgets/ImageSwitchButton.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md, .ralph/ralph-tasks.md
+- Substantive additions: 2 boundary comment blocks covering the generic image toggle and the fan-specific variant, with shared state/event/Unity guidance
+- Verification excerpt: `[UNITY] Port this as a compact prefab with an Image and TextMeshPro label plus explicit pointer-enter/down/up handlers.`
+- Unity-impact summary: retained toggle prefab with explicit hover/press state; fan label variant needs declarative layout; click dispatch remains command-style
+- Hazards found: P2 x1, P3 x1
+- Git: Annotate ImageSwitchButton toggle controls
+- Next recommended Phase 1 task: T666 annotate: src/slic3r/GUI/Widgets/ImageSwitchButton.hpp

@@ -30,17 +30,26 @@ END_EVENT_TABLE()
 static const wxColour DEFAULT_HOVER_COL = wxColour(0, 150, 136);
 static const wxColour DEFAULT_PRESS_COL = wxColour(238, 238, 238);
 
-ImageSwitchButton::ImageSwitchButton(wxWindow *parent, ScalableBitmap &img_on, ScalableBitmap &img_off, long style)
+// [INTENT] ImageSwitchButton is a retained two-state image toggle used by the status/dashboard UI.
+// [STATE] It owns paired on/off bitmaps, label variants, hover/press flags, and cached text extents so repainting can stay local.
+// [EVENT] wxWidgets mouse and paint events are translated into a command-style click event after the control flips its own boolean state.
+// [UNITY] Port this as a compact prefab with an Image and TextMeshPro label plus explicit pointer-enter/down/up handlers.
+// [PORTING_HAZARD:P2] The control's visible size is derived from immediate wxDC measurement, so Unity needs layout-driven sizing instead of
+// paint-time recomputation.
+ImageSwitchButton::ImageSwitchButton(wxWindow* parent, ScalableBitmap& img_on, ScalableBitmap& img_off, long style)
     : text_color(std::make_pair(0x6B6B6B, (int) StateColor::Disabled), std::make_pair(*wxBLACK, (int) StateColor::Normal))
 {
-    radius = 0;
-    m_padding = 0;
-    m_on         = img_on;
-    m_off        = img_off;
-    background_color = StateColor(std::make_pair(*wxWHITE, (int) StateColor::Disabled), std::make_pair(DEFAULT_PRESS_COL, (int) StateColor::Pressed),
+    radius           = 0;
+    m_padding        = 0;
+    m_on             = img_on;
+    m_off            = img_off;
+    background_color = StateColor(std::make_pair(*wxWHITE, (int) StateColor::Disabled),
+                                  std::make_pair(DEFAULT_PRESS_COL, (int) StateColor::Pressed),
                                   std::make_pair(*wxWHITE, (int) StateColor::Normal));
-    border_color = StateColor(std::make_pair(*wxWHITE, (int) StateColor::Disabled), std::make_pair(DEFAULT_HOVER_COL, (int) StateColor::Focused),
-                              std::make_pair(DEFAULT_HOVER_COL, (int) StateColor::Hovered), std::make_pair(*wxWHITE, (int) StateColor::Normal));
+    border_color     = StateColor(std::make_pair(*wxWHITE, (int) StateColor::Disabled),
+                                  std::make_pair(DEFAULT_HOVER_COL, (int) StateColor::Focused),
+                                  std::make_pair(DEFAULT_HOVER_COL, (int) StateColor::Hovered),
+                                  std::make_pair(*wxWHITE, (int) StateColor::Normal));
 
     StaticBox::Create(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, style);
 
@@ -48,10 +57,10 @@ ImageSwitchButton::ImageSwitchButton(wxWindow *parent, ScalableBitmap &img_on, S
     Refresh();
 }
 
-void ImageSwitchButton::SetLabels(wxString const &lbl_on, wxString const &lbl_off)
+void ImageSwitchButton::SetLabels(wxString const& lbl_on, wxString const& lbl_off)
 {
-	labels[0] = lbl_on;
-	labels[1] = lbl_off;
+    labels[0]     = lbl_on;
+    labels[1]     = lbl_off;
     auto fina_txt = GetValue() ? labels[0] : labels[1];
     if (GetToolTipText() != fina_txt)
         SetToolTip(fina_txt);
@@ -59,17 +68,17 @@ void ImageSwitchButton::SetLabels(wxString const &lbl_on, wxString const &lbl_of
     Refresh();
 }
 
-void ImageSwitchButton::SetImages(ScalableBitmap &img_on, ScalableBitmap &img_off)
+void ImageSwitchButton::SetImages(ScalableBitmap& img_on, ScalableBitmap& img_off)
 {
-	m_on = img_on;
-	m_off = img_off;
+    m_on  = img_on;
+    m_off = img_off;
     messureSize();
     Refresh();
 }
 
-void ImageSwitchButton::SetTextColor(StateColor const &color)
+void ImageSwitchButton::SetTextColor(StateColor const& color)
 {
-	text_color = color;
+    text_color = color;
     state_handler.update_binds();
     messureSize();
     Refresh();
@@ -91,36 +100,36 @@ void ImageSwitchButton::SetPadding(int padding)
 
 void ImageSwitchButton::messureSize()
 {
-	wxClientDC dc(this);
+    wxClientDC dc(this);
     dc.SetFont(GetFont());
-	textSize = dc.GetTextExtent(GetValue() ? labels[0] : labels[1]);
+    textSize = dc.GetTextExtent(GetValue() ? labels[0] : labels[1]);
 }
 
-void ImageSwitchButton::paintEvent(wxPaintEvent &evt)
+void ImageSwitchButton::paintEvent(wxPaintEvent& evt)
 {
-	wxPaintDC dc(this);
-	render(dc);
+    wxPaintDC dc(this);
+    render(dc);
 }
 
 void ImageSwitchButton::render(wxDC& dc)
 {
-	StaticBox::render(dc);
-    int states = state_handler.states();
-	wxSize size = GetSize();
+    StaticBox::render(dc);
+    int    states = state_handler.states();
+    wxSize size   = GetSize();
 
-	wxSize szIcon;
-	wxSize szContent = textSize;
-    ScalableBitmap &icon      = GetValue() ? m_on : m_off;
+    wxSize          szIcon;
+    wxSize          szContent = textSize;
+    ScalableBitmap& icon      = GetValue() ? m_on : m_off;
 
-	int content_height = icon.GetBmpHeight() + textSize.y + m_padding;
+    int content_height = icon.GetBmpHeight() + textSize.y + m_padding;
 
-	wxPoint pt = wxPoint((size.x - icon.GetBmpWidth()) / 2, (size.y - content_height) / 2);
-	if (icon.bmp().IsOk()) {
-		dc.DrawBitmap(icon.bmp(), pt);
-		pt.y += m_padding + icon.GetBmpHeight();
-	}
-	pt.x = (size.x - textSize.x) / 2;
-	dc.SetFont(GetFont());
+    wxPoint pt = wxPoint((size.x - icon.GetBmpWidth()) / 2, (size.y - content_height) / 2);
+    if (icon.bmp().IsOk()) {
+        dc.DrawBitmap(icon.bmp(), pt);
+        pt.y += m_padding + icon.GetBmpHeight();
+    }
+    pt.x = (size.x - textSize.x) / 2;
+    dc.SetFont(GetFont());
     if (!IsEnabled())
         dc.SetTextForeground(text_color.colorForStates(StateColor::Disabled));
     else
@@ -142,12 +151,9 @@ void ImageSwitchButton::render(wxDC& dc)
     }
 }
 
-void ImageSwitchButton::Rescale()
-{
-	messureSize();
-}
+void ImageSwitchButton::Rescale() { messureSize(); }
 
-void ImageSwitchButton::mouseDown(wxMouseEvent &event)
+void ImageSwitchButton::mouseDown(wxMouseEvent& event)
 {
     event.Skip();
     pressedDown = true;
@@ -155,7 +161,7 @@ void ImageSwitchButton::mouseDown(wxMouseEvent &event)
     CaptureMouse();
 }
 
-void ImageSwitchButton::mouseReleased(wxMouseEvent &event)
+void ImageSwitchButton::mouseReleased(wxMouseEvent& event)
 {
     event.Skip();
     if (pressedDown) {
@@ -167,7 +173,7 @@ void ImageSwitchButton::mouseReleased(wxMouseEvent &event)
     }
 }
 
-void ImageSwitchButton::mouseEnterWindow(wxMouseEvent &event)
+void ImageSwitchButton::mouseEnterWindow(wxMouseEvent& event)
 {
     if (!hover) {
         hover = true;
@@ -175,7 +181,7 @@ void ImageSwitchButton::mouseEnterWindow(wxMouseEvent &event)
     }
 }
 
-void ImageSwitchButton::mouseLeaveWindow(wxMouseEvent &event)
+void ImageSwitchButton::mouseLeaveWindow(wxMouseEvent& event)
 {
     if (hover) {
         hover = false;
@@ -190,18 +196,27 @@ void ImageSwitchButton::sendButtonEvent()
     GetEventHandler()->ProcessEvent(event);
 }
 
+// [INTENT] FanSwitchButton reuses the same toggle mechanics but specializes the label/image presentation for fan controls.
+// [STATE] It adds an explicit fan-speed value and a freeform text label, so the status panel can switch between fan-centric copy modes.
+// [EVENT] The click/hover pipeline matches ImageSwitchButton, but the rendered text path is tuned for the dashboard's fan and air-condition
+// variants. [UNITY] Model this as the same retained image-toggle prefab with a second presentation mode driven by a view-state enum.
+// [PORTING_HAZARD:P3] The fan label path contains hand-tuned text placement for specific strings, which will need a more declarative layout
+// rule in Unity.
 FanSwitchButton::FanSwitchButton(wxWindow* parent, ScalableBitmap& img_on, ScalableBitmap& img_off, long style)
-    : text_color(std::make_pair(0x6B6B6B, (int)StateColor::Disabled), std::make_pair(*wxBLACK, (int)StateColor::Normal))
+    : text_color(std::make_pair(0x6B6B6B, (int) StateColor::Disabled), std::make_pair(*wxBLACK, (int) StateColor::Normal))
 {
-    radius = 0;
-    m_padding = 0;
-    m_speed = 0;
-    m_on = img_on;
-    m_off = img_off;
-    background_color = StateColor(std::make_pair(*wxWHITE, (int)StateColor::Disabled), std::make_pair(DEFAULT_PRESS_COL, (int)StateColor::Pressed),
-        std::make_pair(*wxWHITE, (int)StateColor::Normal));
-    border_color = StateColor(std::make_pair(*wxWHITE, (int)StateColor::Disabled), std::make_pair(DEFAULT_HOVER_COL, (int)StateColor::Focused),
-        std::make_pair(DEFAULT_HOVER_COL, (int)StateColor::Hovered), std::make_pair(*wxWHITE, (int)StateColor::Normal));
+    radius           = 0;
+    m_padding        = 0;
+    m_speed          = 0;
+    m_on             = img_on;
+    m_off            = img_off;
+    background_color = StateColor(std::make_pair(*wxWHITE, (int) StateColor::Disabled),
+                                  std::make_pair(DEFAULT_PRESS_COL, (int) StateColor::Pressed),
+                                  std::make_pair(*wxWHITE, (int) StateColor::Normal));
+    border_color     = StateColor(std::make_pair(*wxWHITE, (int) StateColor::Disabled),
+                                  std::make_pair(DEFAULT_HOVER_COL, (int) StateColor::Focused),
+                                  std::make_pair(DEFAULT_HOVER_COL, (int) StateColor::Hovered),
+                                  std::make_pair(*wxWHITE, (int) StateColor::Normal));
 
     StaticBox::Create(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, style);
 
@@ -211,8 +226,8 @@ FanSwitchButton::FanSwitchButton(wxWindow* parent, ScalableBitmap& img_on, Scala
 
 void FanSwitchButton::SetLabels(wxString const& lbl_on, wxString const& lbl_off)
 {
-    labels[0] = lbl_on;
-    labels[1] = lbl_off;
+    labels[0]     = lbl_on;
+    labels[1]     = lbl_off;
     auto fina_txt = GetValue() ? labels[0] : labels[1];
     SetToolTip(fina_txt);
     messureSize();
@@ -221,7 +236,7 @@ void FanSwitchButton::SetLabels(wxString const& lbl_on, wxString const& lbl_off)
 
 void FanSwitchButton::SetImages(ScalableBitmap& img_on, ScalableBitmap& img_off)
 {
-    m_on = img_on;
+    m_on  = img_on;
     m_off = img_off;
     messureSize();
     Refresh();
@@ -265,14 +280,14 @@ void FanSwitchButton::paintEvent(wxPaintEvent& evt)
 void FanSwitchButton::render(wxDC& dc)
 {
     StaticBox::render(dc);
-    int states = state_handler.states();
-    wxSize size = GetSize();
+    int    states = state_handler.states();
+    wxSize size   = GetSize();
 
-    wxSize szIcon;
-    wxSize szContent = textSize;
-    ScalableBitmap& icon = GetValue() ? m_on : m_off;
+    wxSize          szIcon;
+    wxSize          szContent = textSize;
+    ScalableBitmap& icon      = GetValue() ? m_on : m_off;
 
-    //int content_height = icon.GetBmpHeight() + textSize.y + m_padding;
+    // int content_height = icon.GetBmpHeight() + textSize.y + m_padding;
 
     wxPoint pt = wxPoint(FromDIP(10), (size.y - icon.GetBmpHeight()) / 2);
 
@@ -280,8 +295,7 @@ void FanSwitchButton::render(wxDC& dc)
         dc.DrawBitmap(icon.bmp(), pt);
     }
 
-    if (!m_text.empty())
-    {
+    if (!m_text.empty()) {
         if (m_text == _L("Fan")) {
             dc.SetFont(::Label::Head_15);
             pt.x += icon.GetBmpWidth() + FromDIP(9);
@@ -292,11 +306,11 @@ void FanSwitchButton::render(wxDC& dc)
 
         auto text_size = dc.GetMultiLineTextExtent(m_text);
         pt.y           = (size.y - text_size.GetHeight()) / 2;
-        //dc.SetTextForeground(0x6b6b6b);
+        // dc.SetTextForeground(0x6b6b6b);
         dc.DrawText(m_text, pt);
     }
 
-    //int content_height = icon.GetBmpHeight() + textSize.y + m_padding;
+    // int content_height = icon.GetBmpHeight() + textSize.y + m_padding;
     /*int content_height = m_padding;
 
     wxPoint pt = wxPoint((size.x - icon.GetBmpWidth()) / 2, (size.y - content_height) / 2);
@@ -343,10 +357,7 @@ void FanSwitchButton::render(wxDC& dc)
     dc.DrawText(speed, pt);*/
 }
 
-void FanSwitchButton::Rescale()
-{
-    messureSize();
-}
+void FanSwitchButton::Rescale() { messureSize(); }
 
 void FanSwitchButton::setFanValue(int val)
 {
@@ -357,10 +368,9 @@ void FanSwitchButton::setFanValue(int val)
 void FanSwitchButton::UseTextFan() { SetText(_L("Fan")); }
 void FanSwitchButton::UseTextAirCondition() { SetText(_L("Air Condition")); }
 
-void FanSwitchButton::SetText(const wxString &text)
+void FanSwitchButton::SetText(const wxString& text)
 {
-    if (m_text != text)
-    {
+    if (m_text != text) {
         m_text = text;
         Refresh();
     }
@@ -380,7 +390,7 @@ void FanSwitchButton::mouseReleased(wxMouseEvent& event)
     if (pressedDown) {
         pressedDown = false;
         ReleaseMouse();
-        //m_on_off = !m_on_off;
+        // m_on_off = !m_on_off;
         Refresh();
         sendButtonEvent();
     }
