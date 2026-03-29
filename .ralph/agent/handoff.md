@@ -1310,3 +1310,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P3 x1
 - Git: Annotate StaticGroup.cpp for Unity port
 - Next recommended Phase 1 task: T702 annotate: src/slic3r/GUI/Widgets/StaticGroup.hpp
+
+## Phase 1 - Task T707 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/SwitchButton.cpp
+- Deliverables: `src/slic3r/GUI/Widgets/SwitchButton.cpp`, `.ralph/agent/handoff.md`
+- Substantive additions: 7 comment blocks covering file intent, retained state, events, Unity mapping, and porting hazards
+- Verification excerpt: `[UNITY] Use a custom MonoBehaviour or UI Toolkit control that owns two labeled segments and a controller-driven selected index.`
+- Unity-impact summary:
+  - Keep the bitmap toggle as a retained control with explicit label and palette state.
+  - Keep the board as a segmented switch with one selected side and a disabled gate.
+  - Replace bitmap rescaling and DC composition with layout-driven UI in Unity.
+- Hazards found: P2 x2, P3 x1
+- Git: Annotate SwitchButton switch controls
+- Next recommended Phase 1 task: T708 annotate: src/slic3r/GUI/Widgets/SwitchButton.hpp

@@ -119,3 +119,7 @@
 - Picked Phase 1 task T706 for `src/slic3r/GUI/Widgets/StepCtrl.hpp` and annotated the declaration boundary.
 - The header now spells out the shared step model, cached drag/thumb state, vetoable selection events, and the concrete Unity split between retained controller/model and custom-rendered rows.
 - Verification is a focused file review after patching; the diagnostics remain the pre-existing wx include-path issue and do not affect the annotation content.
+
+- Picked Phase 1 task T707 for `src/slic3r/GUI/Widgets/SwitchButton.cpp`.
+- Added file-level notes that frame the bitmap toggle and segmented switch as retained-state controls with stringly-typed selection and DC-based rendering hazards.
+- The Unity port should treat both widgets as a retained segmented-switch controller, not as immediate-mode drawing; next step is to commit this atomic annotation and hand off T708.
