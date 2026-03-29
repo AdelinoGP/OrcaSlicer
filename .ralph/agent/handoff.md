@@ -142,6 +142,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate SideMenuPopup.hpp coverage gap
 - Next recommended Phase 1 task: T691 annotate: src/slic3r/GUI/Widgets/SideTools.cpp
 
+## Phase 1 - Task T691 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/SideTools.cpp
+- Deliverables: `src/slic3r/GUI/Widgets/SideTools.cpp`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 7 comment blocks covering panel intent, debounce timing, paint/render flow, composite wrapper ownership, status translation, and Unity mapping
+- Verification excerpt: `[UNITY] Port this as a retained vertical container with a banner row, collapsible detail card, and an embedded status-strip child.`
+- Unity-impact summary:
+  - Split the monitor header, connection banner, and error drawer into separate retained subviews.
+  - Replace the pixel-measured text truncation and bitmap placement with a Unity layout helper.
+  - Move status derivation out of widgets so the view consumes a presenter-fed state model.
+- Hazards found: P2 x3, P3 x2
+- Git: Annotate SideTools.cpp for Unity port
+- Next recommended Phase 1 task: T692 annotate: src/slic3r/GUI/Widgets/SideTools.hpp
+
 ## Tasks
 
 ### Completed

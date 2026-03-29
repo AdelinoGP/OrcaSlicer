@@ -52,3 +52,8 @@
 - Picked Phase 1 task T690 for `src/slic3r/GUI/Widgets/SideMenuPopup.hpp`.
 - The header already carries the needed annotation block: transient popup intent, caller-owned button list state, popup/show/dismiss event surface, Unity mapping, and a placement hazard.
 - Next step is to close the metadata gap for T690 by recording completion evidence, marking the task done, and committing the atomic task update.
+
+- Picked Phase 1 task T691 for `src/slic3r/GUI/Widgets/SideTools.cpp`.
+- This file is a composite sidebar/status module: a custom-painted monitor header strip, a collapsible connection-error drawer, and presenter methods that translate `MachineObject`/`MonitorStatus` into banner, detail, and wifi-signal state.
+- I annotated the file with explicit `[INTENT]`, `[STATE]`, `[EVENT]`, `[UNITY]`, and `[PORTING_HAZARD]` notes around the header strip, debounce timer, paint path, composite wrapper, and status translation methods.
+- Next step is to record the handoff evidence, close T691, and move to T692 for `src/slic3r/GUI/Widgets/SideTools.hpp`.

@@ -609,7 +609,7 @@ Last updated: 2026-03-29T03:01:21Z
 - [x] T688 annotate: src/slic3r/GUI/Widgets/SideButton.hpp
 - [x] T689 annotate: src/slic3r/GUI/Widgets/SideMenuPopup.cpp
 - [x] T690 annotate: src/slic3r/GUI/Widgets/SideMenuPopup.hpp
-- [ ] T691 annotate: src/slic3r/GUI/Widgets/SideTools.cpp
+- [x] T691 annotate: src/slic3r/GUI/Widgets/SideTools.cpp
 - [ ] T692 annotate: src/slic3r/GUI/Widgets/SideTools.hpp
 - [ ] T693 annotate: src/slic3r/GUI/Widgets/SpinInput.cpp
 - [ ] T694 annotate: src/slic3r/GUI/Widgets/SpinInput.hpp
