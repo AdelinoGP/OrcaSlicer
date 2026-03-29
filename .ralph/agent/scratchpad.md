@@ -400,3 +400,7 @@
 - Started T672 (`src/slic3r/GUI/Widgets/PopupWindow.hpp`) as the declaration boundary for the transient popup shell.
 - The header only carries a small amount of retained state, but it still exposes the platform-specific activation hooks, the macOS hover relay, and the transient dismissal contract that Unity needs to reproduce explicitly.
 - Plan: keep the annotations focused on intent/state/event/Unity/hazard boundaries, verify with `git diff --check -- src/slic3r/GUI/Widgets/PopupWindow.hpp`, record the handoff evidence, commit the atomic header annotation, and then move to T673 (`src/slic3r/GUI/Widgets/ProgressBar.cpp`).
+
+- Started T674 (`src/slic3r/GUI/Widgets/ProgressBar.hpp`) after the ProgressBar.cpp task completed.
+- The header is the declaration boundary for the custom-painted bar: cached geometry/state, the latched disable message, and the paint/event hooks all need explicit notes so the Unity port can split retained value state from draw-time clipping.
+- Plan: keep the annotations compact but explicit about state ownership, repaint triggers, geometry coupling, and the draw-vs-value hazard, then verify with `git diff --check`, record the handoff evidence, and close the task atomically.

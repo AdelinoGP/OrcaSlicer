@@ -2731,3 +2731,15 @@ Reconciliation note: the task registry entry for `T663` was still open even thou
 - Hazards found: P2 x1, P3 x1
 - Git: Annotate ProgressBar widget boundary
 - Next recommended Phase 1 task: T674 annotate: src/slic3r/GUI/Widgets/ProgressBar.hpp
+
+## Phase 1 - Task T674 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/ProgressBar.hpp
+- Deliverables: src/slic3r/GUI/Widgets/ProgressBar.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 7 boundary comments covering the declaration boundary, cached progress state, palette state, disable-message latch, repaint mutators, height/radius coupling, and size/render hooks
+- Verification excerpt: `[PORTING_HAZARD:P2] Geometry is derived from widget size and paint-time state, so Unity should separate value updates from draw/layout.`
+- Unity-impact summary: retained fill-bar prefab with a separate label; disabled presentation becomes a dedicated view-model state; draw-time geometry derivation should move out of the renderer
+- Hazards found: P2 x1, P3 x1
+- Git: Annotate ProgressBar.hpp boundary
+- Next recommended Phase 1 task: T675 annotate: src/slic3r/GUI/Widgets/ProgressBar.cpp

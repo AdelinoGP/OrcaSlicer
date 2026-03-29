@@ -592,7 +592,7 @@ Last updated: 2026-03-29T01:10:48Z
 - [x] T671 annotate: src/slic3r/GUI/Widgets/PopupWindow.cpp
 - [x] T672 annotate: src/slic3r/GUI/Widgets/PopupWindow.hpp
 - [x] T673 annotate: src/slic3r/GUI/Widgets/ProgressBar.cpp
-- [ ] T674 annotate: src/slic3r/GUI/Widgets/ProgressBar.hpp
+- [x] T674 annotate: src/slic3r/GUI/Widgets/ProgressBar.hpp
 - [ ] T675 annotate: src/slic3r/GUI/Widgets/ProgressDialog.cpp
 - [ ] T676 annotate: src/slic3r/GUI/Widgets/ProgressDialog.hpp
 - [ ] T677 annotate: src/slic3r/GUI/Widgets/RadioBox.cpp
