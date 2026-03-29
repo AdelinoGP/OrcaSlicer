@@ -9,72 +9,91 @@
 
 class Button;
 
+// [INTENT] Skinned numeric stepper that combines a text field, increment/decrement buttons,
+// and wheel/keyboard input into one bounded integer control.
+// [UNITY] Port as a retained input composite: TextInput + two icon buttons + one value-changed
+// callback, with a shared view-model for range/step/formatting.
+// [PORTING_HAZARD:P2] Layout, validation, and press-and-hold repeat are fused here, so the Unity
+// version needs a controller rather than a 1:1 widget swap.
 class SpinInput : public wxNavigationEnabled<StaticBox>
 {
-    wxSize labelSize;
-    StateColor   label_color;
-    StateColor   text_color;
-    wxTextCtrl * text_ctrl;
-    Button * button_inc;
-    Button * button_dec;
+    // [STATE] Cached label geometry and palette colors drive manual layout and repainting.
+    wxSize     labelSize;
+    StateColor label_color;
+    StateColor text_color;
+    // [STATE] Child widgets are owned by wx, but this wrapper keeps direct pointers so it can
+    // mirror edits, sizing, and focus across the composite control.
+    wxTextCtrl* text_ctrl;
+    Button*     button_inc;
+    Button*     button_dec;
+    // [STATE] Press-and-hold repeat timer backs button auto-repeat and wheel/key acceleration.
     wxTimer timer;
 
+    // [STATE] Value/range/step are the authoritative numeric model for the widget.
     int val;
     int min;
     int max;
     int delta;
     int step;
 
-    static const int SpinInputWidth = 200;
+    static const int SpinInputWidth  = 200;
     static const int SpinInputHeight = 50;
 
 public:
+    // [INTENT] Default construction leaves the control uninitialized until Create() wires the
+    // embedded child widgets and event bindings.
     SpinInput();
 
-    SpinInput(wxWindow *     parent,
-              wxString       text,
-              wxString       label = "",
-              const wxPoint &pos   = wxDefaultPosition,
-              const wxSize & size  = wxDefaultSize,
-              long           style = 0,
-              int min = 0, int max = 100, int initial = 0, const int& step = 1);
-
-    void Create(wxWindow *     parent,
+    SpinInput(wxWindow*      parent,
               wxString       text,
               wxString       label   = "",
-              const wxPoint &pos     = wxDefaultPosition,
-              const wxSize & size    = wxDefaultSize,
+              const wxPoint& pos     = wxDefaultPosition,
+              const wxSize&  size    = wxDefaultSize,
               long           style   = 0,
               int            min     = 0,
               int            max     = 100,
               int            initial = 0,
-              int            step    = 1);
+              const int&     step    = 1);
 
+    void Create(wxWindow*      parent,
+                wxString       text,
+                wxString       label   = "",
+                const wxPoint& pos     = wxDefaultPosition,
+                const wxSize&  size    = wxDefaultSize,
+                long           style   = 0,
+                int            min     = 0,
+                int            max     = 100,
+                int            initial = 0,
+                int            step    = 1);
+
+    // [STATE] Appearance setters mutate the cached chrome and force relayout/repaint.
     void SetCornerRadius(double radius);
 
-    void SetLabel(const wxString &label) wxOVERRIDE;
+    void SetLabel(const wxString& label) wxOVERRIDE;
 
-    void SetLabelColor(StateColor const &color);
+    void SetLabelColor(StateColor const& color);
 
-    void SetTextColor(StateColor const &color);
+    void SetTextColor(StateColor const& color);
 
-    void SetSize(wxSize const &size);
+    void SetSize(wxSize const& size);
 
     void Rescale();
 
+    // [EVENT] Enable/disable must stay synchronized across the composite children and timer state.
     virtual bool Enable(bool enable = true) wxOVERRIDE;
 
-    wxTextCtrl * GetTextCtrl() { return text_ctrl; }
+    wxTextCtrl* GetTextCtrl() { return text_ctrl; }
 
-    void SetValue(const wxString &text);
+    // [STATE] Text and integer setters clamp through the shared numeric model before dispatching.
+    void SetValue(const wxString& text);
 
-    void SetValue (int value);
+    void SetValue(int value);
 
-    int GetValue () const;
+    int GetValue() const;
 
     void SetStep(int value) { step = value; };
 
-    int  GetStep() { return step; };
+    int GetStep() { return step; };
 
     void SetRange(int min, int max);
 
@@ -82,24 +101,29 @@ public:
     int GetMax() const { return this->max; }
 
 protected:
-    void DoSetToolTipText(wxString const &tip) override;
+    // [EVENT] Tooltip text is pushed through the composite shell so the child widgets inherit
+    // the same hover explanation.
+    void DoSetToolTipText(wxString const& tip) override;
 
 private:
+    // [OPENGL] none; paint path is custom wxDC drawing for the control chrome.
     void paintEvent(wxPaintEvent& evt);
 
     void render(wxDC& dc);
 
     void messureSize();
 
-    Button *createButton(bool inc);
+    Button* createButton(bool inc);
 
-    // some useful events
+    // [EVENT] Input handlers fan into the shared numeric state and repeat-timer controller.
     void mouseWheelMoved(wxMouseEvent& event);
     void keyPressed(wxKeyEvent& event);
-    void onTimer(wxTimerEvent &evnet);
-    void onTextLostFocus(wxEvent &event);
-    void onTextEnter(wxCommandEvent &event);
+    void onTimer(wxTimerEvent& evnet);
+    void onTextLostFocus(wxEvent& event);
+    void onTextEnter(wxCommandEvent& event);
 
+    // [EVENT] Centralized emission point for the value-changed notification used by the rest
+    // of the GUI.
     void sendSpinEvent();
 
     DECLARE_EVENT_TABLE()

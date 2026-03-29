@@ -1141,6 +1141,18 @@ Continue the previous work. Remaining tasks (213):
 - T817 annotate: src/slic3r/Utils/WebSocketClient.hpp
 - T818 annotate: src/slic3r/Utils/WxFontUtils.cpp
 - T819 annotate: src/slic3r/Utils/WxFontUtils.hpp
+
+## Phase 1 - Task T694 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/SpinInput.hpp
+- Deliverables: `src/slic3r/GUI/Widgets/SpinInput.hpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/handoff.md`, `.ralph/agent/scratchpad.md`
+- Substantive additions: 10 comments covering class intent, cached state, timer repeat behavior, event flow, and Unity mapping
+- Verification excerpt: `// [UNITY] Port as a retained input composite: TextInput + two icon buttons + one value-changed`
+- Unity-impact summary: retained composite needs one controller and three child widgets; timer-backed repeat is a controller concern; range/step/state should live outside the view
+- Hazards found: P2 x1
+- Git: Annotate SpinInput header behavior
+- Next recommended Phase 1 task: T695 annotate: src/slic3r/GUI/Widgets/StateColor.cpp
 - annotate: src/slic3r/GUI/2DBed.cpp
 - annotate: src/slic3r/GUI/2DBed.hpp
 - annotate: src/slic3r/GUI/3DBed.cpp

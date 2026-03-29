@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-29T03:16:46Z
+Last updated: 2026-03-29T03:26:23Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -612,7 +612,7 @@ Last updated: 2026-03-29T03:16:46Z
 - [x] T691 annotate: src/slic3r/GUI/Widgets/SideTools.cpp
 - [x] T692 annotate: src/slic3r/GUI/Widgets/SideTools.hpp
 - [x] T693 annotate: src/slic3r/GUI/Widgets/SpinInput.cpp
-- [ ] T694 annotate: src/slic3r/GUI/Widgets/SpinInput.hpp
+- [x] T694 annotate: src/slic3r/GUI/Widgets/SpinInput.hpp
 - [ ] T695 annotate: src/slic3r/GUI/Widgets/StateColor.cpp
 - [x] T696 annotate: src/slic3r/GUI/Widgets/StateColor.hpp
 - [ ] T697 annotate: src/slic3r/GUI/Widgets/StateHandler.cpp

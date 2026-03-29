@@ -67,3 +67,8 @@
 - The widget is a skinned numeric stepper: text entry, spin buttons, manual sizing, clamped integer state, keyboard/wheel support, and timer-backed press-and-hold auto-repeat.
 - I annotated the file with retained-state, event-flow, layout, and Unity-mapping comments; the main migration hazard is the mouse-capture + timer repeat loop that needs a dedicated Unity input controller.
 - Next step is to commit this atomic annotation, close T693, and move to T694 for `SpinInput.hpp`.
+
+- Picked Phase 1 task T694 for `src/slic3r/GUI/Widgets/SpinInput.hpp` and annotated the declaration boundary.
+- The header now makes the composite state explicit: cached label geometry, child widget pointers, the repeat timer, and clamped numeric model fields.
+- Unity mapping is now concrete in the header comments: retain it as a TextInput plus two icon buttons under one controller, because the layout/validation/repeat loop cannot be ported as a direct widget swap.
+- Next step is to record handoff evidence, mark T694 done, commit the atomic change, and then continue to the next Phase 1 task.
