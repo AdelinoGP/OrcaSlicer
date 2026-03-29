@@ -1250,3 +1250,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 P2
 - Git: Annotate SideButton layout and events
 - Next recommended Phase 1 task: T688 annotate: src/slic3r/GUI/Widgets/SideButton.hpp
+
+## Phase 1 - Task T701 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/StaticGroup.cpp
+- Deliverables: `src/slic3r/GUI/Widgets/StaticGroup.cpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/handoff.md`, `.ralph/agent/scratchpad.md`
+- Substantive additions: 3 comment blocks covering wrapper intent, cached badge state, toggle/repaint flow, custom draw path, and Unity mapping
+- Verification excerpt: `[UNITY] Use a layout-driven overlay anchored to the header container's right edge; do not depend on a custom DC draw pass for the final badge placement.`
+- Unity-impact summary:
+  - Keep the badge as explicit retained overlay state rather than a paint-only bitmap side effect.
+  - Preserve the header-anchored placement as layout logic in Unity.
+  - Treat `ShowBadge()` as a controller toggle that invalidates the view only when visibility changes.
+- Hazards found: P3 x1
+- Git: Annotate StaticGroup.cpp for Unity port
+- Next recommended Phase 1 task: T702 annotate: src/slic3r/GUI/Widgets/StaticGroup.hpp

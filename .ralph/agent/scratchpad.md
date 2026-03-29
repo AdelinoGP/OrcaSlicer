@@ -102,3 +102,8 @@
 - Completed the T700 header annotation and verified the patch with `git diff --check` plus a direct file read.
 - The editor/LSP diagnostics still complain about missing wx headers in the existing include graph, but the annotation itself is in place and the task evidence has been recorded.
 - Next step after commit: close T700 and continue with T701 for `src/slic3r/GUI/Widgets/StaticGroup.cpp`.
+
+- Picked Phase 1 task T701 for `src/slic3r/GUI/Widgets/StaticGroup.cpp`.
+- StaticGroup is a thin `LabeledStaticBox` wrapper with a lazily toggled badge bitmap and a custom border/label draw pass that anchors the badge to the header's right edge.
+- I annotated the cpp with intent, cached-state, event-toggle, Unity mapping, and porting-hazard notes, then reconciled the registry entry that still had T700 marked active.
+- Next step: commit the atomic annotation, close T701, and hand off T702 for `src/slic3r/GUI/Widgets/StaticGroup.hpp`.
