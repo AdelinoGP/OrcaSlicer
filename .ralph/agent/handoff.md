@@ -127,6 +127,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: c2a0ec6671 - Annotate ScrolledWindow.hpp for Unity port
 - Next recommended Phase 1 task: T687 annotate: src/slic3r/GUI/Widgets/SideButton.cpp
 
+## Phase 1 - Task T690 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/SideMenuPopup.hpp
+- Deliverables: `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 1 task-status update and 1 scratchpad note confirming the file already had the required annotation block
+- Verification excerpt: `[UNITY] Map this to a floating panel/overlay controller with a vertical layout and explicit open/close state.`
+- Unity-impact summary:
+  - Keep the popup as a retained floating container, not a transient native menu.
+  - Preserve caller-owned button population and shared-width layout as explicit controller state.
+  - Model placement clamping and dismissal as controller logic tied to focus/screen bounds.
+- Hazards found: P2 x1
+- Git: Annotate SideMenuPopup.hpp coverage gap
+- Next recommended Phase 1 task: T691 annotate: src/slic3r/GUI/Widgets/SideTools.cpp
+
 ## Tasks
 
 ### Completed

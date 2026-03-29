@@ -48,3 +48,7 @@
 - The popup is a transient floating shell around a caller-populated stack of SideButton children; it measures max child width, reflows every button to that width, and clamps placement against the current display bounds.
 - Unity mapping is a retained popup/container controller with a vertical layout and shared open/close state; the main hazard is the app-global side-menu visibility flag and the focus-relative positioning logic.
 - Completed the annotation pass for T689 and recorded evidence in the handoff; next step is commit + task close for T689, then hand off T690.
+
+- Picked Phase 1 task T690 for `src/slic3r/GUI/Widgets/SideMenuPopup.hpp`.
+- The header already carries the needed annotation block: transient popup intent, caller-owned button list state, popup/show/dismiss event surface, Unity mapping, and a placement hazard.
+- Next step is to close the metadata gap for T690 by recording completion evidence, marking the task done, and committing the atomic task update.
