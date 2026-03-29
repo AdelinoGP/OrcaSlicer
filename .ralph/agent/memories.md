@@ -2,6 +2,10 @@
 
 ## Patterns
 
+### mem-1774759780-c432
+> TabCtrl.hpp is the declaration boundary for the skinned tab strip: keep raw Button child order, replacement-based image-list ownership, the two-phase tab-selection event contract, and overflow-driven relayout explicit so Unity can port it as a retained tab controller with cancelable selection callbacks.
+<!-- tags: gui, unity, tabs | created: 2026-03-29 -->
+
 ### mem-1774757958-dfd7
 > StepCtrl.hpp is the declaration boundary for the shared stepper controller: keep the retained step model, vetoable selection events, drag/thumb state, and derived StepCtrl/StepIndicator/FilamentStepIndicator roles explicit so Unity can split model, interactive controller, and read-only progress view.
 <!-- tags: gui, unity, widgets | created: 2026-03-29 -->
