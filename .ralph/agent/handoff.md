@@ -1560,3 +1560,13 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: Background thread execution for boost::asio.
 - Git: pending commit
 - Next recommended Phase 1 task: T735 annotate: src/slic3r/Utils/CalibUtils.cpp
+
+## Phase 1 checkpoint
+- Files newly accounted for in this batch: 11
+- Cumulative annotated: ~713
+- Cumulative skip-trivial: ~20
+- Cumulative skip-vendored: ~0
+- Total accounted for: ~733
+- Manifest total: ~800
+- Remaining: ~67
+- Status: CONTINUING
