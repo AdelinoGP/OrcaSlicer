@@ -388,3 +388,7 @@
 
 - T669 annotation is complete in the working tree; `git diff --check` was clean after adding the class boundary notes, theme/state caches, custom draw hook, and sizer padding contract.
 - Next step after commit: move to T671 (`src/slic3r/GUI/Widgets/PopupWindow.cpp`).
+
+- Started T671 (`src/slic3r/GUI/Widgets/PopupWindow.cpp`) and annotated the transient popup shell, host-parent lookup, platform-specific create/dismiss hooks, and macOS hit-testing path.
+- The file now makes the retained-popup Unity split explicit: a popup controller with focus-loss/outside-click dismissal, separate pointer-over routing, and host-window lifecycle listeners instead of native transient-window behavior.
+- Verification plan: run `git diff --check`, append the completion evidence block, mark T671 done in the registry, commit this atomic popup-shell pass, then continue with T672 (`src/slic3r/GUI/Widgets/PopupWindow.hpp`).

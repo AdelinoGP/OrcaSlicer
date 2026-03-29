@@ -2692,3 +2692,18 @@ Reconciliation note: the task registry entry for `T663` was still open even thou
 - Hazards found: P2 x1
 - Git: `LabeledStaticBox.hpp annotation pass`
 - Next recommended Phase 1 task: T671 annotate: src/slic3r/GUI/Widgets/PopupWindow.cpp
+
+## Phase 1 - Task T671 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/PopupWindow.cpp
+- Deliverables: src/slic3r/GUI/Widgets/PopupWindow.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 5 boundary comment groups covering popup-shell intent, host-parent lookup, GTK/macOS create hooks, teardown unbinding, and platform-specific mouse/focus dismissal
+- Verification excerpt: `// [UNITY] Port this as a retained popup controller with explicit focus-loss and outside-click dismissal instead of a native popup window.`
+- Unity-impact summary:
+  - Retained popup shell should own dismissal and focus-loss rules explicitly
+  - Platform-specific mouse replay becomes pointer-over routing plus child hit testing
+  - Host-window bindings need a unified main-thread lifecycle watcher in Unity
+- Hazards found: P2 x2
+- Git: PopupWindow transient popup shell annotations
+- Next recommended Phase 1 task: T672 annotate: src/slic3r/GUI/Widgets/PopupWindow.hpp
