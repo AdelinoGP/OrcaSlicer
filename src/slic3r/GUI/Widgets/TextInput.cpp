@@ -12,6 +12,10 @@ EVT_PAINT(TextInput::paintEvent)
 
 END_EVENT_TABLE()
 
+// [INTENT] Implementation of the skinned text-input widget. Manages custom painting, layout of internal text control and icons, and focus/hover state.
+// [EVENT] Binds wxEVT_PAINT for custom rendering and wxEVT_KILL_FOCUS / wxEVT_TEXT_ENTER to trigger custom OnEdit behavior.
+// [UNITY] Map to a standard UI Toolkit TextField. The manual coordinate-based layout in `DoSetSize` and custom drawing in `render` should be replaced by Unity UI layout structures and USS state-based styles.
+// [PORTING_HAZARD:P3] Heavy reliance on wxPaintDC and manual geometry calculations for text ellipsize, icons, and tips. Should be replaced entirely by UI Toolkit flex layout and text-overflow USS properties.
 /*
  * Called by the system of by wxWidgets when the panel needs
  * to be redrawn. You can also trigger this call by
