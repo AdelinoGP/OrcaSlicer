@@ -580,7 +580,7 @@ Last updated: 2026-03-29T00:13:52Z
 - [x] T659 annotate: src/slic3r/GUI/Widgets/FanControl.cpp
 - [x] T660 annotate: src/slic3r/GUI/Widgets/FanControl.hpp
 - [x] T661 annotate: src/slic3r/GUI/Widgets/FilamentLoad.cpp
-- [ ] T662 annotate: src/slic3r/GUI/Widgets/FilamentLoad.hpp
+- [x] T662 annotate: src/slic3r/GUI/Widgets/FilamentLoad.hpp
 - [ ] T663 annotate: src/slic3r/GUI/Widgets/HyperLink.cpp
 - [ ] T664 annotate: src/slic3r/GUI/Widgets/HyperLink.hpp
 - [ ] T665 annotate: src/slic3r/GUI/Widgets/ImageSwitchButton.cpp

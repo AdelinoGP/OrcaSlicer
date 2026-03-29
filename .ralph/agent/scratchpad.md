@@ -350,3 +350,7 @@
 - I also briefly closed the wrong runtime task id when trying to sync the stale T660 event and immediately reopened it; no code was affected, but the registry state is now back in sync.
 - FilamentLoad.cpp itself is a retained filament-change wizard host: the main porting concern is replacing implicit wxSimplebook page indices and special-cased confirm steps with an explicit state model and retained subviews.
 - T661 annotation is complete in the working tree and the task registry now marks it done; next step is to commit this atomic file plus the synchronized task/handoff updates.
+
+- Started T662 (`src/slic3r/GUI/Widgets/FilamentLoad.hpp`) as the declaration boundary for the retained filament-change wizard shell.
+- The header now needs class-level intent/state/Unity notes plus member-level ownership and porting-hazard comments so the retained `wxSimplebook` pages are treated as explicit workflow states in Unity.
+- Plan: keep the annotation compact, verify with `git diff --check`, record completion evidence in `.ralph/agent/handoff.md`, mark the task done, commit the atomic change, and continue with T663 (`src/slic3r/GUI/Widgets/HyperLink.cpp`).
