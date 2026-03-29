@@ -157,6 +157,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate SideTools.cpp for Unity port
 - Next recommended Phase 1 task: T692 annotate: src/slic3r/GUI/Widgets/SideTools.hpp
 
+## Phase 1 - Task T692 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/SideTools.hpp
+- Deliverables: `src/slic3r/GUI/Widgets/SideTools.hpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 2 class-level annotation blocks covering the monitor strip/controller boundary, retained state, event flow, Unity mapping, and P2 porting hazards
+- Verification excerpt: `[UNITY] Port as a retained sidebar card with a nested status header, collapsible error drawer, and a separate presenter/service that maps MachineObject state into view-model data.`
+- Unity-impact summary:
+  - Keep `SideToolsPanel` as a retained status-row child with presenter-fed data and interval/debounce state.
+  - Model `SideTools` as a composite sidebar controller with a collapsible error drawer instead of direct child mutation.
+  - Preserve the wxTimer/mouse-driven interaction split as an explicit input/state bridge in Unity.
+- Hazards found: P2 x2
+- Git: Annotate SideTools.hpp for Unity port prep
+- Next recommended Phase 1 task: T693 annotate: src/slic3r/GUI/Widgets/SpinInput.cpp
+
 ## Tasks
 
 ### Completed

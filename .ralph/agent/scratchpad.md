@@ -57,3 +57,8 @@
 - This file is a composite sidebar/status module: a custom-painted monitor header strip, a collapsible connection-error drawer, and presenter methods that translate `MachineObject`/`MonitorStatus` into banner, detail, and wifi-signal state.
 - I annotated the file with explicit `[INTENT]`, `[STATE]`, `[EVENT]`, `[UNITY]`, and `[PORTING_HAZARD]` notes around the header strip, debounce timer, paint path, composite wrapper, and status translation methods.
 - Next step is to record the handoff evidence, close T691, and move to T692 for `src/slic3r/GUI/Widgets/SideTools.hpp`.
+
+- Picked Phase 1 task T692 for `src/slic3r/GUI/Widgets/SideTools.hpp`.
+- This header is the declaration boundary for the sidebar status stack: `SideToolsPanel` owns the monitor strip state, interval timer gate, and paint/mouse callbacks, while `SideTools` owns the composite status/error drawer and presenter-facing update surface.
+- The annotation pass added class-level `[INTENT]`, `[STATE]`, `[EVENT]`, `[UNITY]`, and `[PORTING_HAZARD:P2]` notes so the later Unity port can split it into a retained status card plus a presenter-driven model.
+- Next step is to capture the handoff evidence, commit the atomic header annotation, close T692, and continue with T693.
