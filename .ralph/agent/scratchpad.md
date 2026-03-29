@@ -13,3 +13,7 @@
 - The file is a minimal custom-painted wxWindow: constructor stores fill/border mode, color, and radius; paint handler redraws from current bounds.
 - Unity mapping is straightforward: a retained rounded-rect control with style-driven fill/outline behavior, plus a small hazard note for the ad-hoc integer mode.
 - Next step: commit the annotation, close T681, and hand off T682 for the header boundary.
+
+- Picked Phase 1 task T682 for `src/slic3r/GUI/Widgets/RoundedRectangle.hpp`.
+- This declaration boundary keeps the retained style inputs and paint-only surface explicit for the Unity port.
+- Next step: verify the header annotation, record the handoff evidence, close T682, and continue to the next widget file.

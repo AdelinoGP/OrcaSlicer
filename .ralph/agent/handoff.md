@@ -37,6 +37,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate RoundedRectangle.cpp for Unity port
 - Next recommended Phase 1 task: T682 annotate: src/slic3r/GUI/Widgets/RoundedRectangle.hpp
 
+## Phase 1 - Task T682 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/RoundedRectangle.hpp
+- Deliverables: `src/slic3r/GUI/Widgets/RoundedRectangle.hpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 5 comment blocks covering declaration intent, retained state, paint-only event surface, Unity mapping, and a typed-mode porting hazard
+- Verification excerpt: `[UNITY] Port this as a retained VisualElement/custom graphic with rounded-corner styling for fill mode and an explicit outline renderer for border-only mode.`
+- Unity-impact summary:
+  - Keep the fill-vs-outline split explicit in the retained control.
+  - Treat the widget as paint-only state with no interaction or cached bitmap layer.
+  - Preserve the integer mode as a distinct migration hazard rather than collapsing it into a generic shape style.
+- Hazards found: P3 x1
+- Git: Annotate RoundedRectangle.hpp for Unity port
+- Next recommended Phase 1 task: T683 annotate: src/slic3r/GUI/Widgets/Scrollbar.cpp
+
 ## Tasks
 
 ### Completed

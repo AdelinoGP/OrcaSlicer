@@ -600,7 +600,7 @@ Last updated: 2026-03-29T02:18:00Z
 - [x] T679 annotate: src/slic3r/GUI/Widgets/RadioGroup.cpp
 - [x] T680 annotate: src/slic3r/GUI/Widgets/RadioGroup.hpp
 - [x] T681 annotate: src/slic3r/GUI/Widgets/RoundedRectangle.cpp
-- [ ] T682 annotate: src/slic3r/GUI/Widgets/RoundedRectangle.hpp
+- [x] T682 annotate: src/slic3r/GUI/Widgets/RoundedRectangle.hpp
 - [ ] T683 annotate: src/slic3r/GUI/Widgets/Scrollbar.cpp
 - [ ] T684 annotate: src/slic3r/GUI/Widgets/Scrollbar.hpp
 - [ ] T685 annotate: src/slic3r/GUI/Widgets/ScrolledWindow.cpp
