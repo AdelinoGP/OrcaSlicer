@@ -404,3 +404,6 @@
 - Started T674 (`src/slic3r/GUI/Widgets/ProgressBar.hpp`) after the ProgressBar.cpp task completed.
 - The header is the declaration boundary for the custom-painted bar: cached geometry/state, the latched disable message, and the paint/event hooks all need explicit notes so the Unity port can split retained value state from draw-time clipping.
 - Plan: keep the annotations compact but explicit about state ownership, repaint triggers, geometry coupling, and the draw-vs-value hazard, then verify with `git diff --check`, record the handoff evidence, and close the task atomically.
+
+- Reconciled the stale T674 narrative with the task registry: `ProgressBar.hpp` is already marked done, so the next actual atomic task is T675 (`src/slic3r/GUI/Widgets/ProgressDialog.cpp`).
+- ProgressDialog.cpp needed comments around the modal event-loop bootstrap, adaptive title layout, re-entrant update/pulse flow, and the OS-window disable/reenable contract; Unity needs a host-driven modal controller, not nested wx loops.

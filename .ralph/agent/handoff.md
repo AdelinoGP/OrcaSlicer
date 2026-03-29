@@ -2743,3 +2743,15 @@ Reconciliation note: the task registry entry for `T663` was still open even thou
 - Hazards found: P2 x1, P3 x1
 - Git: Annotate ProgressBar.hpp boundary
 - Next recommended Phase 1 task: T675 annotate: src/slic3r/GUI/Widgets/ProgressBar.cpp
+
+## Phase 1 - Task T675 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/ProgressDialog.cpp
+- Deliverables: src/slic3r/GUI/Widgets/ProgressDialog.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 13 boundary comments covering modal intent, adaptive title layout, modal creation, ETA smoothing, event-loop bootstrap, row creation, update/pulse flow, re-entrant update gating, resume/show behavior, range scaling, event handlers, destruction cleanup, and message relayout
+- Verification excerpt: `[PORTING_HAZARD:P1] The modal creation path combines dialog construction with event-loop bootstrap and global window disabling, which is a major architectural mismatch for Unity.`
+- Unity-impact summary: modal progress becomes a host-driven controller; text wrapping and ETA smoothing should move into retained layout/model layers; nested wx event loops and window disabling need a different lifecycle contract
+- Hazards found: P1 x2, P2 x4
+- Git: Annotate ProgressDialog modal lifecycle
+- Next recommended Phase 1 task: T676 annotate: src/slic3r/GUI/Widgets/ProgressDialog.hpp
