@@ -46,6 +46,9 @@ struct BonjourReply
 std::ostream& operator<<(std::ostream &, const BonjourReply &);
 
 /// Bonjour lookup performer
+// [INTENT] Implements a minimal mDNS/DNS-SD client using boost::asio to discover printers on the local network.
+// [UNITY] Unity provides no native mDNS client. This should be replaced with a managed C# mDNS/Zeroconf library 
+// (e.g., Makaretu.Dns or similar) to handle UDP multicasting and PTR/SRV/TXT record decoding.
 class Bonjour : public std::enable_shared_from_this<Bonjour> {
 private:
 	struct priv;

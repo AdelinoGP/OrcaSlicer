@@ -1547,3 +1547,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: Inherits DLL coupling from BBLNetworkPlugin.
 - Git: pending commit
 - Next recommended Phase 1 task: T733 annotate: src/slic3r/Utils/Bonjour.cpp
+
+## Phase 1 - Task T733, T734 complete
+- Task type: annotate
+- File: src/slic3r/Utils/Bonjour.hpp, src/slic3r/Utils/Bonjour.cpp
+- Deliverables: src/slic3r/Utils/Bonjour.hpp, src/slic3r/Utils/Bonjour.cpp
+- Substantive additions: Added [INTENT], [UNITY], and [THREAD] annotations.
+- Verification excerpt: `// [THREAD] This method spawns a dedicated std::thread running the boost::asio event loop.`
+- Unity-impact summary:
+  - C# has no built-in mDNS client in the standard library. A third-party package like Makaretu.Dns is needed.
+  - Background discovery callbacks must be marshaled to the Unity main thread to interact with the UI.
+- Hazards found: Background thread execution for boost::asio.
+- Git: pending commit
+- Next recommended Phase 1 task: T735 annotate: src/slic3r/Utils/CalibUtils.cpp

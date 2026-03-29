@@ -1166,6 +1166,9 @@ Bonjour& Bonjour::on_resolve(ResolveFn fn)
 	return *this;
 }
 
+// [THREAD] This method spawns a dedicated std::thread running the boost::asio event loop.
+// The `replyfn` and `completefn` callbacks will fire on this background thread. Unity ports must 
+// marshal these events back to the main UI thread.
 Bonjour::Ptr Bonjour::lookup()
 {
 	auto self = std::make_shared<Bonjour>(std::move(*this));
@@ -1181,6 +1184,9 @@ Bonjour::Ptr Bonjour::lookup()
 }
 
 
+// [THREAD] This method spawns a dedicated std::thread running the boost::asio event loop.
+// The `resolvefn` callback will fire on this background thread. Unity ports must 
+// marshal these events back to the main UI thread.
 Bonjour::Ptr Bonjour::resolve()
 {
 	auto self = std::make_shared<Bonjour>(std::move(*this));

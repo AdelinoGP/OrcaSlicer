@@ -56,3 +56,10 @@
 - Read files. This class acts as a pass-through abstraction over `BBLNetworkPlugin` for printer control.
 - Added `[INTENT]` and `[UNITY]` annotations detailing its delegation role and the mapping to either a C# P/Invoke wrapper or a pure C# MQTT/Networking client.
 - Completed and committed.
+
+## T733, T734 annotate: src/slic3r/Utils/Bonjour.cpp / hpp
+- Started tasks task-1773880088-4a74 and task-1773880088-6565
+- Read `Bonjour.hpp` and `Bonjour.cpp`.
+- Added `[INTENT]` and `[UNITY]` to `Bonjour` class detailing the need for a C# mDNS/Zeroconf library as Unity lacks native mDNS.
+- Added `[THREAD]` annotations to `lookup()` and `resolve()` noting that boost::asio is run on a detached `std::thread` and callbacks fire on that background thread.
+- Completed and committed.
