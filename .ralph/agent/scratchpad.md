@@ -336,3 +336,8 @@
 - T658 is now complete in the runtime narrative and T659 (`src/slic3r/GUI/Widgets/FanControl.cpp`) is the active atomic annotation.
 - FanControl.cpp is a three-layer fan UI: passive gauge, interactive +/- strip, and modal popup/controller for duct modes and per-part fan tiles.
 - Plan: keep the file-level comments focused on ownership, screen-space hit testing, device-command bridging, and the optional cooling-filter submode; then verify with `git diff --check`, record handoff evidence, and commit the atomic change.
+
+- Completed T660 (`src/slic3r/GUI/Widgets/FanControl.hpp`) as the declaration boundary for the fan gauge/operate/popup stack.
+- The header now distinguishes the passive gauge, the interactive +/- strip, the per-row fan controller, the binary switch helper, and the modal popup that assembles ducts/modes from `AirDuctData`.
+- Key Unity mapping: retained gauge prefab plus a reusable fan-row prefab and modal settings dialog, with a marshaled command/service bridge in place of the raw `MachineObject*` mutation path.
+- Next step after commit: close T660 and move to T661 (`src/slic3r/GUI/Widgets/FilamentLoad.cpp`).

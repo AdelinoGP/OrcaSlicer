@@ -2,6 +2,14 @@
 
 ## Patterns
 
+### mem-1774742520-3291
+> FanControl.hpp is the declaration boundary for the fan gauge/operate/popup stack: keep the passive gauge, interactive +/- strip, per-row controller, binary switch, and modal popup separate; the raw MachineObject* command path is the Unity P1 hazard and should become a marshaled service boundary.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774742061-e621
+> FanControl.cpp is a three-layer fan UI: a passive gauge, an interactive +/- strip with shared printing warning suppression, and a modal popup that rebuilds mode chips, per-part fan tiles, and an optional cooling-filter submode from AirDuctData snapshots.
+<!-- tags: gui, unity, widgets | created: 2026-03-28 -->
+
 ### mem-1774741088-c45d
 > ErrorMsgStaticText.hpp is a declaration boundary for a custom-painted wrapped error label: keep the transient message, paint-event sizing hazard, and layout-driven Unity mapping separate from the draw path.
 <!-- tags: gui, unity, widgets | created: 2026-03-28 -->

@@ -2566,6 +2566,18 @@ This prompt governs **Phase 1 only**.
 - Git: pending commit for ErrorMsgStaticText.hpp annotation
 - Next recommended Phase 1 task: T659 annotate: src/slic3r/GUI/Widgets/FanControl.cpp
 
+## Phase 1 - Task T660 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/FanControl.hpp
+- Deliverables: src/slic3r/GUI/Widgets/FanControl.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 5 class-level boundary notes covering the gauge, operate strip, row controller, switch panel, and modal popup
+- Verification excerpt: [PORTING_HAZARD:P1] The view mutates device state through a raw MachineObject* back-pointer, so the Unity side needs a marshaled command/service boundary.
+- Unity-impact summary: retained gauge prefab; reusable fan-row prefab; modal settings dialog with typed command bridge
+- Hazards found: P1: 1, P2: 3
+- Git: Annotate FanControl.hpp fan controls
+- Next recommended Phase 1 task: T661 annotate: src/slic3r/GUI/Widgets/FilamentLoad.cpp
+
 ## Phase 1 - Task T659 complete
 
 - Task type: annotate
