@@ -2666,3 +2666,15 @@ Reconciliation note: the task registry entry for `T663` was still open even thou
 - Hazards found: P2 x1, P3 x1
 - Git: Annotate ImageSwitchButton header boundary
 - Next recommended Phase 1 task: T668 annotate: src/slic3r/GUI/Widgets/LabeledStaticBox.cpp
+
+## Phase 1 - Task T668 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/LabeledStaticBox.cpp
+- Deliverables: src/slic3r/GUI/Widgets/LabeledStaticBox.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 6 boundary comment groups covering retained static-box intent, cached theme/label state, enable-state event surfacing, CPU paint fallback, label strip drawing, and sizer border contract
+- Verification excerpt: `[UNITY] Map this to a retained panel/container with a themed border and a separate title Text element, not a single native group box.`
+- Unity-impact summary: border/title become separate retained UI pieces; paint-time label measurement becomes layout state; platform padding differences need explicit Unity rules
+- Hazards found: P2 x1, P3 x1
+- Git: Annotate LabeledStaticBox paint path
+- Next recommended Phase 1 task: T669 annotate: src/slic3r/GUI/Widgets/LabeledStaticBox.hpp

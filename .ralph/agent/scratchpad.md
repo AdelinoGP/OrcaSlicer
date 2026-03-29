@@ -374,3 +374,10 @@
 - The header now gets class-level [INTENT]/[STATE]/[UNITY]/[PORTING_HAZARD] notes plus member-level state comments for the toggle bitmaps, cached measurement, hover/press flags, and the fan-specific speed/text variant.
 - Main risk to call out is the layout coupling: the cpp measures text and centers content manually, and the fan variant hardcodes copy-specific spacing for literal labels.
 - Plan: verify with `git diff --check -- src/slic3r/GUI/Widgets/ImageSwitchButton.hpp`, append handoff evidence, commit the atomic header annotation, then close T666 and stop for this iteration.
+
+- Started T668 (`src/slic3r/GUI/Widgets/LabeledStaticBox.cpp`) as the custom static-box painter.
+- The file is a small wrapper, but it still owns the border/label palette, DPI-scaled label measurements, platform-specific paint path, and enable-state event bridge that need explicit Unity mapping.
+- Plan: add compact boundary comments for intent, state, paint/update flow, platform hazards, and the retained-panel Unity split; verify with `git diff --check`, record handoff evidence, commit this atomic file, and leave the header task for T669.
+
+- Completed T668 with boundary comments for the retained static-box shell, cached theme state, enable-event surfacing, CPU paint fallback, label-strip drawing, and sizer padding contract.
+- Verification was clean with `git diff --check`; next step is to commit this atomic annotation and then move to the header task T669.

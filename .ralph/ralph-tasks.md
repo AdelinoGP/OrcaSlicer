@@ -586,7 +586,7 @@ Last updated: 2026-03-29T00:47:00Z
 - [x] T665 annotate: src/slic3r/GUI/Widgets/ImageSwitchButton.cpp
 - [x] T666 annotate: src/slic3r/GUI/Widgets/ImageSwitchButton.hpp
 - [x] T667 annotate: src/slic3r/GUI/Widgets/Label.cpp
-- [ ] T668 annotate: src/slic3r/GUI/Widgets/LabeledStaticBox.cpp
+- [x] T668 annotate: src/slic3r/GUI/Widgets/LabeledStaticBox.cpp
 - [ ] T669 annotate: src/slic3r/GUI/Widgets/LabeledStaticBox.hpp
 - [x] T670 annotate: src/slic3r/GUI/Widgets/Label.hpp
 - [ ] T671 annotate: src/slic3r/GUI/Widgets/PopupWindow.cpp
