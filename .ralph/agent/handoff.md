@@ -217,6 +217,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate StateHandler.cpp for Unity port
 - Next recommended Phase 1 task: T698 annotate: src/slic3r/GUI/Widgets/StateHandler.hpp
 
+## Phase 1 - Task T698 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/StateHandler.hpp
+- Deliverables: `src/slic3r/GUI/Widgets/StateHandler.hpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 1 class-level annotation block covering aggregate state ownership, event rebinding, Unity mapping, and the parent/child refresh hazard
+- Verification excerpt: `[UNITY] Port as a retained controller tree with explicit C# event subscriptions and a derived visual-state resolver, not as reflective Bind/ Unbind calls on the view hierarchy.`
+- Unity-impact summary:
+  - Keep the state bridge as a controller concern, not a widget primitive.
+  - Preserve child-to-parent state folding so hover/press/checked visuals stay consistent.
+  - Replace wx handler rebinding with explicit subscription wiring in Unity.
+- Hazards found: P2 x1
+- Git: Annotate StateHandler.hpp for Unity port
+- Next recommended Phase 1 task: T699 annotate: src/slic3r/GUI/Widgets/StaticBox.cpp
+
 ## Tasks
 
 ### Completed

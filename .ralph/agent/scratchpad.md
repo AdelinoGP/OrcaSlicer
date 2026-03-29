@@ -85,3 +85,7 @@
 - The file is the state-aggregation bridge for custom widget styling: it owns event rebinding, descendant-state folding, and owner refresh decisions from a merged enabled/hover/focus/press/check model.
 - I annotated the cpp with explicit `[INTENT]`, `[STATE]`, `[EVENT]`, `[THREAD]`, `[UNITY]`, and `[PORTING_HAZARD]` notes so Unity can replace reflective wx handler rebinding with explicit controller subscriptions.
 - Next step is to stage and commit this atomic annotation, close T697, and hand off T698 for `StateHandler.hpp`.
+
+- Picked Phase 1 task T698 for `src/slic3r/GUI/Widgets/StateHandler.hpp`.
+- The header now documents the aggregate state bridge, ownership split, event surface, and Unity mapping for explicit subscription wiring.
+- Next step is to commit this atomic header annotation, close T698, and move to T699 for `StaticBox.cpp`.
