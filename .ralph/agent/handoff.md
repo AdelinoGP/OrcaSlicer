@@ -202,6 +202,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate StateColor.cpp for Unity port
 - Next recommended Phase 1 task: T697 annotate: src/slic3r/GUI/Widgets/StateHandler.cpp
 
+## Phase 1 - Task T697 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/StateHandler.cpp
+- Deliverables: `src/slic3r/GUI/Widgets/StateHandler.cpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 8 comment blocks covering event intent, handler lifetime, state aggregation, child ownership, bind/update flow, UI-thread event handling, and Unity mapping
+- Verification excerpt: `[UNITY] In Unity this should be an explicit subscription set on the controller, not reflective Bind/Unbind calls.`
+- Unity-impact summary:
+  - Model the state handler as a retained controller tree with computed visual-state inheritance.
+  - Preserve the direct-owner vs. child-state split, since refresh decisions depend on both.
+  - Replace runtime wx event rebinding with explicit controller subscriptions and callbacks.
+- Hazards found: P2 x1, P3 x1
+- Git: Annotate StateHandler.cpp for Unity port
+- Next recommended Phase 1 task: T698 annotate: src/slic3r/GUI/Widgets/StateHandler.hpp
+
 ## Tasks
 
 ### Completed

@@ -80,3 +80,8 @@
 - Completed T695 for `src/slic3r/GUI/Widgets/StateColor.cpp`. The file now carries explicit notes for the global dark-mode palette map, LAB/lightness helpers, ordered state matching, and unsynchronized palette mutation.
 - Verification was a focused content review after the annotation pass; the only diagnostics surfaced were pre-existing include-path issues in the editor/LSP environment, not from the new comments.
 - Next step in the loop: commit the atomic annotation update, close T695, and move to T697 for `src/slic3r/GUI/Widgets/StateHandler.cpp`.
+
+- Picked Phase 1 task T697 for `src/slic3r/GUI/Widgets/StateHandler.cpp`.
+- The file is the state-aggregation bridge for custom widget styling: it owns event rebinding, descendant-state folding, and owner refresh decisions from a merged enabled/hover/focus/press/check model.
+- I annotated the cpp with explicit `[INTENT]`, `[STATE]`, `[EVENT]`, `[THREAD]`, `[UNITY]`, and `[PORTING_HAZARD]` notes so Unity can replace reflective wx handler rebinding with explicit controller subscriptions.
+- Next step is to stage and commit this atomic annotation, close T697, and hand off T698 for `StateHandler.hpp`.
