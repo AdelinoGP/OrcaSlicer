@@ -2767,3 +2767,15 @@ Reconciliation note: the task registry entry for `T663` was still open even thou
 - Hazards found: P1 x1
 - Git: Annotate ProgressDialog header boundary
 - Next recommended Phase 1 task: T677 annotate: src/slic3r/GUI/Widgets/RadioBox.cpp
+
+## Phase 1 - Task T677 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/RadioBox.cpp
+- Deliverables: src/slic3r/GUI/Widgets/RadioBox.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 6 boundary comments covering widget intent, mirrored toggle state, value updates, logical reads, DPI rescale, and bitmap sync
+- Verification excerpt: `[UNITY] Port as a small retained toggle component with three sprites (on/off/disabled) and a single bool backing model.`
+- Unity-impact summary: bitmap state becomes a retained three-sprite toggle; rescale is an explicit DPI/layout refresh; disabled visuals stay distinct from enabled state
+- Hazards found: P3 x1
+- Git: Annotate RadioBox toggle surrogate
+- Next recommended Phase 1 task: T678 annotate: src/slic3r/GUI/Widgets/RadioBox.hpp

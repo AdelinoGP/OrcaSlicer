@@ -253,6 +253,10 @@
 - T632 is now annotated in `src/slic3r/GUI/WebGuideDialog.hpp` with class-level intent/state/event/thread/Unity/porting-hazard notes plus retained-state comments for the browser host, startup loader, and script round-trip fields.
 - Verification passed with `git diff --check -- src/slic3r/GUI/WebGuideDialog.hpp`; next recommended file is T635 (`src/slic3r/GUI/WebUserLoginDialog.cpp`).
 
+- Started T677 (`src/slic3r/GUI/Widgets/RadioBox.cpp`) as the bitmap-backed radio/toggle surrogate.
+- The file is intentionally tiny but still needs explicit notes for the value/state mirror, DPI rescale path, and the disabled-art fallback so Unity can treat it as a retained three-sprite toggle instead of a native radio control.
+- Verification target: `git diff --check -- src/slic3r/GUI/Widgets/RadioBox.cpp`; next recommended task after commit is T678 (`src/slic3r/GUI/Widgets/RadioBox.hpp`).
+
 - Started T673 (`src/slic3r/GUI/Widgets/ProgressBar.cpp`) as the next atomic widget annotation.
 - The file is a custom-painted progress indicator with a latched disable mode, optional percentage text, and platform-specific buffered painting on Windows.
 - Plan: add a compact set of boundary comments for the widget intent, mutable progress/disable state, event/render flow, and Unity mapping to a retained fill-bar prefab with a separate label layer, then verify with `git diff --check` and close the task.

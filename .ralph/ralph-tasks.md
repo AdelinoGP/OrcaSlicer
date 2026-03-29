@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-29T01:30:01Z
+Last updated: 2026-03-29T01:41:03Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -595,7 +595,7 @@ Last updated: 2026-03-29T01:30:01Z
 - [x] T674 annotate: src/slic3r/GUI/Widgets/ProgressBar.hpp
 - [x] T675 annotate: src/slic3r/GUI/Widgets/ProgressDialog.cpp
 - [x] T676 annotate: src/slic3r/GUI/Widgets/ProgressDialog.hpp
-- [ ] T677 annotate: src/slic3r/GUI/Widgets/RadioBox.cpp
+- [x] T677 annotate: src/slic3r/GUI/Widgets/RadioBox.cpp
 - [ ] T678 annotate: src/slic3r/GUI/Widgets/RadioBox.hpp
 - [ ] T679 annotate: src/slic3r/GUI/Widgets/RadioGroup.cpp
 - [ ] T680 annotate: src/slic3r/GUI/Widgets/RadioGroup.hpp
