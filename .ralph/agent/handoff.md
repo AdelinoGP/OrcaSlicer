@@ -1583,3 +1583,40 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P1 hazard on single global worker `print_worker` limiting task scheduling.
 - Git: T735, T736
 - Next recommended Phase 1 task: T737
+
+## Phase 1 - Task T737, T738 complete
+- Task type: annotate
+- File: src/slic3r/Utils/ColorSpaceConvert.cpp, src/slic3r/Utils/ColorSpaceConvert.hpp
+- Deliverables: src/slic3r/Utils/ColorSpaceConvert.cpp, src/slic3r/Utils/ColorSpaceConvert.hpp
+- Substantive additions: 2 class/file-level annotations
+- Verification excerpt: The pure mathematical conversions can be ported directly to static C# methods.
+- Unity-impact summary: 
+  - Pure mathematical equations (DeltaE, RGB/YUV/Lab, etc.) can map directly to C#.
+  - wxColour serialization maps to UnityEngine.Color or UnityEngine.Color32.
+- Hazards found: none
+- Git: c505f90bc5 Annotate src/slic3r/Utils/ColorSpaceConvert.cpp and .hpp
+- Next recommended Phase 1 task: T739 annotate: src/slic3r/Utils/CrealityPrint.cpp
+## Phase 1 - Task T739 complete
+- Task type: annotate
+- File: src/slic3r/Utils/CrealityPrint.cpp
+- Deliverables: src/slic3r/Utils/CrealityPrint.cpp
+- Substantive additions: 2 (added [THREAD] and [UNITY] notes)
+- Verification excerpt: [THREAD] Upload operations block the calling thread synchronously via Http::perform_sync; Unity should make this an async Task
+- Unity-impact summary:
+  - Migrate synchronous Http upload to an async UnityWebRequest.
+  - Implement print initiation over `System.Net.WebSockets.ClientWebSocket`.
+- Hazards found: 0
+- Git: pending
+- Next recommended Phase 1 task: T741
+
+## Phase 1 - Task T740 complete
+- Task type: annotate
+- File: src/slic3r/Utils/CrealityPrint.hpp
+- Deliverables: src/slic3r/Utils/CrealityPrint.hpp
+- Substantive additions: 1 (added [INTENT] and [UNITY] annotations at class level)
+- Verification excerpt: [UNITY] Map to a C# implementation of the IPrintHost interface, using UnityWebRequest for REST calls and System.Net.WebSockets.ClientWebSocket
+- Unity-impact summary:
+  - Implement network adapter for uploading to and starting prints on Creality.
+- Hazards found: 0
+- Git: pending
+- Next recommended Phase 1 task: T741

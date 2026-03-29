@@ -69,3 +69,15 @@
 - Added [UNITY] to map `CalibInfo` to C# DTOs and `CalibUtils` to C# job-builder services.
 - Replaced [STATE] with [INTENT] on the `CalibInfo` struct summary to better fit the tag convention.
 - Completed and committed.
+## T737, T738 annotate: src/slic3r/Utils/ColorSpaceConvert.cpp / hpp
+- Started task-1773880088-b6f4 and task-1773880088-d316
+- The files contain purely mathematical color space conversions and string serializers for wxColour.
+- Added [INTENT] and [UNITY] notes explaining they map cleanly to static C# functions and `UnityEngine.Color`.
+- Completed and committed.
+
+
+## T739, T740 annotate: src/slic3r/Utils/CrealityPrint.cpp / hpp
+- Started task-1773880088-ed97 and task-1773880088-07e4
+- Read files. This class handles sending gcode to Creality printers via REST, then switching to a WebSockets channel to trigger the start command.
+- Added [INTENT] and [UNITY] notes outlining the need for C# async Tasks and `ClientWebSocket` for the command channel since it blocks `Http::perform_sync`.
+- Completed and committed.

@@ -118,6 +118,8 @@ PrintHostPostUploadActions CrealityPrint::get_post_upload_actions() const { retu
 
 bool CrealityPrint::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const
 {
+    // [THREAD] Upload operations block the calling thread synchronously via Http::perform_sync; Unity should make
+    // this an async Task to avoid stalling the main thread during large file transfers.
     const char* name               = get_name();
     const auto  upload_filename    = upload_data.upload_path.filename();
     const auto  upload_parent_path = upload_data.upload_path.parent_path();
@@ -201,6 +203,7 @@ void CrealityPrint::start_print(const std::string& filename) const
 
         // [COUPLING] Upload completion immediately pivots from REST to a proprietary WebSocket command channel on a
         // fixed port, so any port has to preserve both transports and the printer-side path convention.
+        // [UNITY] Use System.Net.WebSockets.ClientWebSocket to replicate this command transmission.
         auto const results = resolver.resolve(host, port);
 
         auto ep = net::connect(ws.next_layer(), results);

@@ -13,6 +13,9 @@ namespace Slic3r {
 
 class DynamicPrintConfig;
 class Http;
+// [INTENT] Network adapter for uploading to and starting prints on Creality network printers.
+// [UNITY] Map to a C# implementation of the IPrintHost interface, using UnityWebRequest for REST calls
+// and System.Net.WebSockets.ClientWebSocket for the subsequent print-start command.
 class CrealityPrint : public PrintHost
 {
 public:
