@@ -1521,3 +1521,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: None directly here, though it inherits DLL coupling from BBLNetworkPlugin.
 - Git: pending commit
 - Next recommended Phase 1 task: T729 annotate: src/slic3r/Utils/BBLNetworkPlugin.cpp
+
+## Phase 1 - Task T729, T730 complete
+- Task type: annotate
+- File: src/slic3r/Utils/BBLNetworkPlugin.hpp, src/slic3r/Utils/BBLNetworkPlugin.cpp
+- Deliverables: src/slic3r/Utils/BBLNetworkPlugin.hpp, src/slic3r/Utils/BBLNetworkPlugin.cpp
+- Substantive additions: Added class-level [INTENT] and [UNITY] notes, plus [PORTING_HAZARD:P1] for manual DLL loading.
+- Verification excerpt: `// [PORTING_HAZARD:P1] Manual library loading (LoadLibrary/dlopen) and symbol mapping is incompatible with standard Unity native plugin architecture`
+- Unity-impact summary:
+  - If retaining the Bambu DLL, Unity handles loading via `[DllImport]` natively, making most of this dynamic symbol resolution unnecessary unless dynamic plugin versions are explicitly loaded at runtime via `NativeLibrary.Load`.
+  - Alternatively, rewriting the networking layer in managed C# eliminates this class entirely.
+- Hazards found: `[PORTING_HAZARD:P1]` Manual OS-level dynamic library symbol extraction.
+- Git: pending commit
+- Next recommended Phase 1 task: T731 annotate: src/slic3r/Utils/BBLPrinterAgent.cpp

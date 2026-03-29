@@ -146,6 +146,11 @@ typedef int (*func_send_message_to_printer_legacy)(void* agent, std::string dev_
  *       plugin.create_agent(log_dir);
  *       // Now BBLCloudServiceAgent/BBLPrinterAgent can use plugin
  *   }
+ * 
+ * [INTENT] Manages the loading, symbol resolution, and lifecycle of the external Bambu Lab networking DLL.
+ * [UNITY] Native DLL loading (LoadLibrary/dlopen) should be replaced with Unity Native Plugins `[DllImport]` 
+ * or entirely rewritten in C# managed code. Unity automatically handles dynamic library binding, 
+ * bypassing the need for manual symbol extraction if using P/Invoke.
  */
 class BBLNetworkPlugin {
 public:

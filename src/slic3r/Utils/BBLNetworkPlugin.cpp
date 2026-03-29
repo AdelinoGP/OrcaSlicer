@@ -56,6 +56,9 @@ BBLNetworkPlugin::~BBLNetworkPlugin()
 // Module Lifecycle
 // ============================================================================
 
+// [PORTING_HAZARD:P1] Manual library loading (LoadLibrary/dlopen) and symbol mapping is incompatible with 
+// standard Unity native plugin architecture, which expects static `[DllImport]` declarations or explicit 
+// NativeLibrary.Load calls if dynamically loading different module versions at runtime.
 int BBLNetworkPlugin::initialize(bool using_backup, const std::string& version)
 {
     clear_load_error();

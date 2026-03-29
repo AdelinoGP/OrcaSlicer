@@ -42,3 +42,11 @@
 - Added `[INTENT]` and `[UNITY]` annotations detailing its delegation role and the mapping to either a C# P/Invoke wrapper or a pure C# network service.
 - Added `[STATE]` annotation to `m_enable_track`.
 - Completed and committed.
+
+## T729, T730 annotate: src/slic3r/Utils/BBLNetworkPlugin.cpp / hpp
+- Started tasks task-1773880088-dd5f and task-1773880088-f89f
+- Read `BBLNetworkPlugin.cpp` and `BBLNetworkPlugin.hpp`.
+- The files were already extensively annotated with `[MEMORY]`, `[INTENT]`, `[COUPLING]`, and `[STATE]` tags from a previous or manual pass.
+- Added class-level `[INTENT]` and `[UNITY]` annotations detailing the P/Invoke model `[DllImport]` vs manual `LoadLibrary`/`dlopen`.
+- Added a `[PORTING_HAZARD:P1]` to `BBLNetworkPlugin::initialize()` explaining the friction of dynamic runtime loading in Unity vs static P/Invoke.
+- Completed and committed.
