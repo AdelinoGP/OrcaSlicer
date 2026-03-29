@@ -77,6 +77,8 @@ RammingDialog::RammingDialog(wxWindow* parent, const std::string& parameters)
 #define style wxSP_ARROW_KEYS
 #endif
 
+// [INTENT] Constructor for the RammingPanel, initializes the chart and parameter widgets.
+// [UNITY] Map to UI Toolkit custom element initialization, binding input elements to the chart data.
 RammingPanel::RammingPanel(wxWindow* parent, const std::string& parameters)
     : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize /*,wxPoint(50,50), wxSize(800,350),wxBORDER_RAISED*/)
 {
@@ -189,12 +191,14 @@ RammingPanel::RammingPanel(wxWindow* parent, const std::string& parameters)
     Refresh(true); // erase background
 }
 
+// [INTENT] Updates internal variables when line parameters are changed via spin controls.
 void RammingPanel::line_parameters_changed()
 {
     m_ramming_line_width_multiplicator = m_widget_ramming_line_width_multiplicator->GetValue();
     m_ramming_step_multiplicator       = m_widget_ramming_step_multiplicator->GetValue();
 }
 
+// [INTENT] Serializes the panel's current ramming parameters into a string.
 std::string RammingPanel::get_parameters()
 {
     std::vector<float>                   speeds  = m_chart->get_ramming_speed(0.25f);
@@ -212,6 +216,8 @@ std::string RammingPanel::get_parameters()
 static const float g_min_flush_multiplier = 0.f;
 static const float g_max_flush_multiplier = 3.f;
 
+// [INTENT] Checks if the flush volume configuration differs from the calculated default values.
+// [STATE] Reads project_config flush_volumes_matrix and flush_multiplier.
 bool is_flush_config_modified()
 {
     const auto&                project_config    = wxGetApp().preset_bundle->project_config;
@@ -243,6 +249,8 @@ bool is_flush_config_modified()
     return has_modify;
 }
 
+// [INTENT] Opens the wiping dialog and updates project configuration on confirmation.
+// [EVENT] Posts wxEvent back to the parent upon successful confirmation.
 void open_flushing_dialog(wxEvtHandler* parent, const wxEvent& event)
 {
     auto& project_config = wxGetApp().preset_bundle->project_config;
@@ -263,6 +271,7 @@ void open_flushing_dialog(wxEvtHandler* parent, const wxEvent& event)
     }
 }
 
+// [INTENT] Helper to flatten a 2D volume matrix into a 1D vector.
 static std::vector<float> MatrixFlatten(const WipingDialog::VolumeMatrix& matrix)
 {
     std::vector<float> vec;
@@ -273,6 +282,8 @@ static std::vector<float> MatrixFlatten(const WipingDialog::VolumeMatrix& matrix
     return vec;
 }
 
+// [INTENT] Constructs a JSON string containing the initialization data for the webview UI (colors, limits, matrices).
+// [STATE] Builds state object from full_config settings.
 wxString WipingDialog::BuildTableObjStr()
 {
     auto full_config          = wxGetApp().preset_bundle->full_config();
@@ -328,6 +339,7 @@ wxString WipingDialog::BuildTableObjStr()
     return obj_str;
 }
 
+// [INTENT] Constructs a JSON string containing localized UI text for the webview interface.
 wxString WipingDialog::BuildTextObjStr(bool multi_language)
 {
     wxString auto_flush_tip;
@@ -382,6 +394,9 @@ wxString WipingDialog::BuildTextObjStr(bool multi_language)
     return text_obj;
 }
 
+// [INTENT] Constructor for the WipingDialog, sets up the webview and its script message handler.
+// [PORTING_HAZARD:P1] Relies heavily on wxWebView to render the flush volume matrix UI and handle interaction via JSON messages.
+// [UNITY] Implement as a native Unity UI Toolkit layout rather than embedding a browser, or use a webview plugin if 1:1 UI is strictly required.
 WipingDialog::WipingDialog(wxWindow* parent, const int max_flush_volume)
     : wxDialog(parent, wxID_ANY, _(L("Flushing volumes for filament change")), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
     , m_max_flush_volume(max_flush_volume)
@@ -441,6 +456,8 @@ WipingDialog::WipingDialog(wxWindow* parent, const int max_flush_volume)
     //         });
     //     });
 
+    // [EVENT] Handles JSON messages sent from the JavaScript side of the webview (init, updateMatrix, storeData, quit).
+    // [THREAD] Uses CallAfter to queue UI updates on the main thread from the script callback.
     m_webview->Bind(wxEVT_WEBVIEW_SCRIPT_MESSAGE_RECEIVED, [this](wxWebViewEvent& evt) {
         std::string message = evt.GetString().ToStdString();
         BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << "Received message: " << message;
@@ -507,12 +524,14 @@ WipingDialog::WipingDialog(wxWindow* parent, const int max_flush_volume)
     });
 }
 
+// [INTENT] Calculates the flushing volume required when switching between two specific colors.
 int WipingDialog::CalcFlushingVolume(const wxColour& from, const wxColour& to, int min_flush_volume, int nozzle_flush_dataset)
 {
     Slic3r::FlushVolCalculator calculator(min_flush_volume, Slic3r::g_max_flush_volume, nozzle_flush_dataset);
     return calculator.calc_flush_vol(from.Alpha(), from.Red(), from.Green(), from.Blue(), to.Alpha(), to.Red(), to.Green(), to.Blue());
 }
 
+// [INTENT] Calculates the default flushing volume matrix for all colors associated with the given extruder.
 WipingDialog::VolumeMatrix WipingDialog::CalcFlushingVolumes(int extruder_id)
 {
     auto& preset_bundle            = wxGetApp().preset_bundle;
@@ -580,6 +599,7 @@ WipingDialog::VolumeMatrix WipingDialog::CalcFlushingVolumes(int extruder_id)
     return matrix;
 }
 
+// [INTENT] Updates internal flush matrices and multipliers with new data from the webview UI.
 void WipingDialog::StoreFlushData(int                                     extruder_num,
                                   const std::vector<std::vector<double>>& flush_volume_vecs,
                                   const std::vector<double>&              flush_multipliers)
@@ -588,6 +608,7 @@ void WipingDialog::StoreFlushData(int                                     extrud
     m_raw_matrixs       = flush_volume_vecs;
 }
 
+// [INTENT] Retrieves the current flush volume matrices as a flattened 1D vector.
 std::vector<double> WipingDialog::GetFlattenMatrix() const
 {
     std::vector<double> ret;
@@ -597,4 +618,5 @@ std::vector<double> WipingDialog::GetFlattenMatrix() const
     return ret;
 }
 
+// [INTENT] Retrieves the current flush multipliers.
 std::vector<double> WipingDialog::GetMultipliers() const { return m_flush_multipliers; }
