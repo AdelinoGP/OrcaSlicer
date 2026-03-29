@@ -213,6 +213,10 @@
 - The header now calls out the retained-scroll-view Unity split and the dynamic row/show-hide hazard that will need explicit state in C#.
 - Next step after commit: close T624 and move to T625 (`src/slic3r/GUI/UserManager.cpp`).
 
+- Reconciled the fresh loop state with the ready-task list: the runtime queue did not expose T676 directly, so I reused `task-1773880088-7331` for `src/slic3r/GUI/Widgets/ProgressDialog.hpp` and started it explicitly.
+- ProgressDialog.hpp is the declaration boundary for the modal progress dialog: it owns the nested wxEventLoop / wxWindowDisabler path, adaptive 1-line/2-line layouts, time-estimation caches, and the cancel/skip event surface.
+- Plan: keep the annotations centered on modal lifecycle state, UI-thread ownership, the parent-disable contract, and a concrete Unity split into a modal overlay controller plus async progress reporting; then verify with `git diff --check`, record handoff evidence, and close the atomic task.
+
 - Started T625 (`src/slic3r/GUI/UserManager.cpp`) as the network-auth payload adapter.
 - The file is a thin JSON parser that only reacts to `bind` success, updates the device selection through GUI singletons, and may be called from a network callback path.
 - Unity mapping: typed auth-result message + main-thread completion handler; the transport layer should not own modal dialog closure or selected-machine state.

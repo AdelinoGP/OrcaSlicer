@@ -2755,3 +2755,15 @@ Reconciliation note: the task registry entry for `T663` was still open even thou
 - Hazards found: P1 x2, P2 x4
 - Git: Annotate ProgressDialog modal lifecycle
 - Next recommended Phase 1 task: T676 annotate: src/slic3r/GUI/Widgets/ProgressDialog.hpp
+
+## Phase 1 - Task T676 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/ProgressDialog.hpp
+- Deliverables: src/slic3r/GUI/Widgets/ProgressDialog.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 10 boundary comments covering modal intent, state/layout modes, UI-thread/event flow, nested event-loop hazards, Unity mapping, and retained widget/state ownership
+- Verification excerpt: `[PORTING_HAZARD:P1] wxEventLoop, wxWindowDisabler, and direct parent disabling encode native modal-loop behavior that has no 1:1 Unity equivalent and must be flattened into host-driven state.`
+- Unity-impact summary: modal overlay controller plus retained progress view; async task/service boundary for progress updates; explicit main-thread marshaling for cancel/skip completion
+- Hazards found: P1 x1
+- Git: Annotate ProgressDialog header boundary
+- Next recommended Phase 1 task: T677 annotate: src/slic3r/GUI/Widgets/RadioBox.cpp

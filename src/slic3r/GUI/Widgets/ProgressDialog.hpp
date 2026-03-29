@@ -14,30 +14,51 @@ class WXDLLIMPEXP_FWD_CORE wxGauge;
 class WXDLLIMPEXP_FWD_CORE wxStaticText;
 class WXDLLIMPEXP_FWD_CORE wxWindowDisabler;
 
-#define PROGRESSDIALOG_SIMPLEBOOK_SIZE wxSize(FromDIP(320),FromDIP(38))
+#define PROGRESSDIALOG_SIMPLEBOOK_SIZE wxSize(FromDIP(320), FromDIP(38))
 #define PROGRESSDIALOG_GAUGE_SIZE wxSize(FromDIP(320), FromDIP(6))
 #define PROGRESSDIALOG_CANCEL_BUTTON_SIZE wxSize(FromDIP(60), FromDIP(24))
-#define PROGRESSDIALOG_DEF_BK wxColour(255,255,255)
-#define PROGRESSDIALOG_GREY_700 wxColour(107,107,107)
+#define PROGRESSDIALOG_DEF_BK wxColour(255, 255, 255)
+#define PROGRESSDIALOG_GREY_700 wxColour(107, 107, 107)
 
 #define wxPD_NO_PROGRESS 0x0100
 
 namespace Slic3r { namespace GUI {
 
+// [INTENT] Modal progress dialog that owns the user-facing progress workflow: title/message formatting,
+//          elapsed/estimated/remaining time updates, and the optional cancel/skip controls.
+// [STATE] The dialog keeps separate layout modes, a cached progress range/value pair, adaptive sizing,
+//         and a top-level parent reference so the window can be disabled/re-enabled while shown.
+// [EVENT] Update(), Pulse(), OnCancel(), OnSkip(), and OnClose() form the public progress/cancel surface;
+//         the private helpers coordinate button state, message updates, and the nested modal lifecycle.
+// [THREAD] This API assumes UI-thread ownership. The internal wxEventLoop / wxWindowDisabler pair makes
+//          the dialog re-entrant-sensitive and difficult to mirror with a purely passive Unity panel.
+// [UNITY] Port as a modal overlay controller with a retained progress view, a separate async task/service
+//         for progress reporting, and explicit main-thread marshaling for cancel/skip completion.
+// [PORTING_HAZARD:P1] wxEventLoop, wxWindowDisabler, and direct parent disabling encode native modal-loop
+//                    behavior that has no 1:1 Unity equivalent and must be flattened into host-driven state.
 class WXDLLIMPEXP_CORE ProgressDialog : public wxDialog
 {
 public:
     ProgressDialog();
-    ProgressDialog(const wxString &title, const wxString &message, int maximum = 100, wxWindow *parent = NULL, int style = wxPD_APP_MODAL | wxPD_AUTO_HIDE, bool adaptive = false);
+    ProgressDialog(const wxString& title,
+                   const wxString& message,
+                   int             maximum  = 100,
+                   wxWindow*       parent   = NULL,
+                   int             style    = wxPD_APP_MODAL | wxPD_AUTO_HIDE,
+                   bool            adaptive = false);
 
-	void OnPaint(wxPaintEvent &evt);
+    void OnPaint(wxPaintEvent& evt);
     virtual ~ProgressDialog();
 
     virtual void DoSetSize(int x, int y, int width, int height, int sizeFlags = wxSIZE_AUTO);
-    bool Create(const wxString &title, const wxString &message, int maximum = 100, wxWindow *parent = NULL, int style = wxPD_APP_MODAL | wxPD_AUTO_HIDE);
+    bool         Create(const wxString& title,
+                        const wxString& message,
+                        int             maximum = 100,
+                        wxWindow*       parent  = NULL,
+                        int             style   = wxPD_APP_MODAL | wxPD_AUTO_HIDE);
 
-    virtual bool Update(int value, const wxString &newmsg = wxEmptyString, bool *skip = NULL);
-    virtual bool Pulse(const wxString &newmsg = wxEmptyString, bool *skip = NULL);
+    virtual bool Update(int value, const wxString& newmsg = wxEmptyString, bool* skip = NULL);
+    virtual bool Pulse(const wxString& newmsg = wxEmptyString, bool* skip = NULL);
     bool         WasCanceled() const;
 
     virtual void Resume();
@@ -69,18 +90,24 @@ public:
         Dismissed          // was closed by user after finishing
     };
 
-    int m_mode = 0;          // 0 is 1line mode 1 is 2line mode
+    // [STATE] Layout mode switch: single-line mode uses the simplebook/page split, while two-line mode
+    //         exposes the larger message area and time estimate labels.
+    int m_mode = 0; // 0 is 1line mode 1 is 2line mode
 
-    bool                m_adaptive = {false};
-    wxSizer *           m_sizer_main = {nullptr};
-    wxPanel *           m_top_line= {nullptr};
-    wxSimplebook *      m_simplebook= {nullptr};
-    wxPanel *           m_panel_2line= {nullptr};
-    wxPanel *           m_panel_1line= {nullptr};
-    Button*             m_button_cancel = {nullptr};
-    //wxWindow *          m_block_left = {nullptr};
-    //wxWindow *          m_block_right = {nullptr};
-    wxScrolledWindow*   m_msg_scrolledWindow = {nullptr};
+    // [STATE] Adaptive sizing toggles whether the dialog resizes itself around message/content changes.
+    bool m_adaptive = {false};
+    // [STATE] Root layout and retained subpanels for the two presentation modes.
+    wxSizer*      m_sizer_main  = {nullptr};
+    wxPanel*      m_top_line    = {nullptr};
+    wxSimplebook* m_simplebook  = {nullptr};
+    wxPanel*      m_panel_2line = {nullptr};
+    wxPanel*      m_panel_1line = {nullptr};
+    // [STATE] Optional cancel affordance exposed by the dialog configuration.
+    Button* m_button_cancel = {nullptr};
+    // wxWindow *          m_block_left = {nullptr};
+    // wxWindow *          m_block_right = {nullptr};
+    //  [STATE] Scrollable message surface used by the wrapped progress text path.
+    wxScrolledWindow* m_msg_scrolledWindow = {nullptr};
 
 protected:
     // Update just the m_maximum field, this is used by public SetRange() but,
@@ -105,7 +132,7 @@ protected:
 
     // Updates estimated times from a given progress bar value and stores the
     // results in provided arguments.
-    void UpdateTimeEstimates(int value, unsigned long &elapsedTime, unsigned long &estimatedTime, unsigned long &remainingTime);
+    void UpdateTimeEstimates(int value, unsigned long& elapsedTime, unsigned long& estimatedTime, unsigned long& remainingTime);
 
     // Converts seconds to HH:mm:ss format.
     static wxString GetFormattedTime(unsigned long timeInSec);
@@ -114,13 +141,13 @@ protected:
     void EnsureActiveEventLoopExists();
 
     // callback for optional abort button
-    void OnCancel(wxCommandEvent &);
+    void OnCancel(wxCommandEvent&);
 
     // callback for optional skip button
-    void OnSkip(wxCommandEvent &);
+    void OnSkip(wxCommandEvent&);
 
     // callback to disable "hard" window closing
-    void OnClose(wxCloseEvent &);
+    void OnClose(wxCloseEvent&);
 
     // called to disable the other windows while this dialog is shown
     void DisableOtherWindows();
@@ -131,16 +158,16 @@ protected:
 
     // Store the parent window as wxWindow::m_parent and also set the top level
     // parent reference we store in this class itself.
-    void SetTopParent(wxWindow *parent);
+    void SetTopParent(wxWindow* parent);
 
-	wxString FormatString(wxString title);
+    wxString FormatString(wxString title);
     // return the top level parent window of this dialog (may be NULL)
-    wxWindow *GetTopParent() const { return m_parentTop; }
+    wxWindow* GetTopParent() const { return m_parentTop; }
 
-    // continue processing or not (return value for Update())
+    // [STATE] Continue/cancel lifecycle state returned by Update()/Pulse() and the close handlers.
     State m_state;
 
-    // the maximum value
+    // [STATE] Progress maximum and, on Windows, the reduced-factor bridge to the native gauge range.
     int m_maximum;
 
 #if defined(__WXMSW__)
@@ -149,29 +176,27 @@ protected:
     size_t m_factor;
 #endif // __WXMSW__
 
-    // time when the dialog was created
+    // [STATE] Timing snapshot used for elapsed/estimated/remaining labels and update throttling.
     unsigned long m_timeStart;
-    // time when the dialog was closed or cancelled
     unsigned long m_timeStop;
-    // time between the moment the dialog was closed/cancelled and resume
     unsigned long m_break;
 
 private:
     // update the label to show the given time (in seconds)
-    static void SetTimeLabel(unsigned long val, wxStaticText *label);
+    static void SetTimeLabel(unsigned long val, wxStaticText* label);
 
     // common part of all ctors
     void Init();
 
     // create the label with given text and another one to show the time nearby
     // as the next windows in the sizer, returns the created control
-    wxStaticText *CreateLabel(const wxString &text, wxSizer *sizer);
+    wxStaticText* CreateLabel(const wxString& text, wxSizer* sizer);
 
     // updates the label message
-    void UpdateMessage(const wxString &newmsg);
+    void UpdateMessage(const wxString& newmsg);
 
     // common part of Update() and Pulse(), returns true if not cancelled
-    bool DoBeforeUpdate(bool *skip);
+    bool DoBeforeUpdate(bool* skip);
 
     // common part of Update() and Pulse()
     void DoAfterUpdate();
@@ -183,50 +208,34 @@ private:
     void DisableSkip() { EnableSkip(false); }
     void DisableAbort() { EnableAbort(false); }
 
-    // the widget displaying current status (may be NULL)
-    wxGauge *m_gauge;
-    // the message displayed
-    wxStaticText *m_msg;
-    wxStaticText *m_msg_2line;
-    // displayed elapsed, estimated, remaining time
+    // [STATE] Retained progress widgets and labels; they are updated in place instead of recreated.
+    wxGauge*      m_gauge;
+    wxStaticText* m_msg;
+    wxStaticText* m_msg_2line;
     wxStaticText *m_elapsed, *m_estimated, *m_remaining;
 
-    // Reference to the parent top level window, automatically becomes NULL if
-    // it it is destroyed and could be always NULL if it's not given at all.
+    // [STATE] Non-owning top-level parent reference; auto-null behavior avoids dangling disable/reenable calls.
     wxWindowRef m_parentTop;
 
-    // Progress dialog styles: this is not the same as m_windowStyle because
-    // wxPD_XXX constants clash with the existing TLW styles so to be sure we
-    // don't have any conflicts we just use a separate variable for storing
-    // them.
+    // [STATE] ProgressDialog-specific style bits are stored separately from wxWindow styles to avoid flag collisions.
     int m_pdStyle;
 
-    // skip some portion
+    // [STATE] Skip flag propagated through Update()/Pulse() when the optional skip button is used.
     bool m_skip;
 
-    // the abort and skip buttons (or NULL if none)
-    wxButton *m_btnAbort;
-    wxButton *m_btnSkip;
+    // [STATE] Optional command buttons and throttled time-estimation caches.
+    wxButton* m_btnAbort;
+    wxButton* m_btnSkip;
 
-    // saves the time when elapsed time was updated so there is only one
-    // update per second
+    // [STATE] Time-of-last-update and smoothing parameters used to avoid noisy time estimates.
     unsigned long m_last_timeupdate;
-
-    // tells how often a change of the estimated time has to be confirmed
-    // before it is actually displayed - this reduces the frequency of updates
-    // of estimated and remaining time
-    int m_delay;
-
-    // counts the confirmations
+    int           m_delay;
     int           m_ctdelay;
     unsigned long m_display_estimated;
 
-    // for wxPD_APP_MODAL case
-    wxWindowDisabler *m_winDisabler;
-
-    // Temporary event loop created by the dialog itself if there is no
-    // currently active loop when it is created.
-    wxEventLoop *m_tempEventLoop;
+    // [STATE] Native modal-loop helpers: window disabler plus temporary event loop when the caller lacks one.
+    wxWindowDisabler* m_winDisabler;
+    wxEventLoop*      m_tempEventLoop;
 
     wxDECLARE_NO_COPY_CLASS(ProgressDialog);
 };
