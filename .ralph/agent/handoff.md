@@ -97,6 +97,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate ScrolledWindow.cpp for Unity port
 - Next recommended Phase 1 task: T686 annotate: src/slic3r/GUI/Widgets/ScrolledWindow.hpp
 
+## Phase 1 - Task T686 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/ScrolledWindow.hpp
+- Deliverables: `src/slic3r/GUI/Widgets/ScrolledWindow.hpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 13 comment blocks covering class intent, retained scroll state, event surface, chrome ownership, and Unity migration guidance
+- Verification excerpt: `[UNITY] Port as one retained scroll-container controller with a content viewport plus separate scrollbar prefabs, driven by a shared normalized scroll model.`
+- Unity-impact summary:
+  - Keep the viewport, splitters, and custom scrollbars as one coordinated retained controller.
+  - Model wheel/size/scroll callbacks as explicit input and layout events around a shared scroll state.
+  - Preserve the manual chrome synchronization behavior as a migration hazard, not an implementation detail.
+- Hazards found: P2 x1
+- Git: Annotate ScrolledWindow.hpp for Unity port
+- Next recommended Phase 1 task: T687 annotate: src/slic3r/GUI/Widgets/SideButton.cpp
+
 ## Tasks
 
 ### Completed

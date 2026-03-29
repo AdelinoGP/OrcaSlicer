@@ -31,3 +31,7 @@
 - This composite wrapper owns the content viewport plus custom scrollbars, mirrors virtual size into wxScrolled and the custom chrome, and resizes by hand to hide/show scrollbars as content fits.
 - The porting risk is the tight coupling between splitter geometry, SetViewStart mirroring, and scrollbar refresh/update calls; Unity should model this as one retained controller with shared scroll state.
 - Next step: commit the annotation, close T685, and hand off T686 for `ScrolledWindow.hpp`.
+
+- Picked Phase 1 task T686 for `src/slic3r/GUI/Widgets/ScrolledWindow.hpp`.
+- The header is the declaration boundary for the composite scroll wrapper: it exposes the hosted panel, the mirrored scrollbar/splitter state, and the wheel/size/scroll event surface that the cpp drives.
+- Unity mapping needs a single retained scroll-container controller with a shared normalized scroll model plus separate chrome prefabs; the biggest hazard is the manual splitter and SetViewStart synchronization logic.
