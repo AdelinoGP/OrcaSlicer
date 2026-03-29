@@ -581,8 +581,8 @@ Last updated: 2026-03-29T00:13:52Z
 - [x] T660 annotate: src/slic3r/GUI/Widgets/FanControl.hpp
 - [x] T661 annotate: src/slic3r/GUI/Widgets/FilamentLoad.cpp
 - [x] T662 annotate: src/slic3r/GUI/Widgets/FilamentLoad.hpp
-- [ ] T663 annotate: src/slic3r/GUI/Widgets/HyperLink.cpp
-- [ ] T664 annotate: src/slic3r/GUI/Widgets/HyperLink.hpp
+- [x] T663 annotate: src/slic3r/GUI/Widgets/HyperLink.cpp
+- [x] T664 annotate: src/slic3r/GUI/Widgets/HyperLink.hpp
 - [ ] T665 annotate: src/slic3r/GUI/Widgets/ImageSwitchButton.cpp
 - [ ] T666 annotate: src/slic3r/GUI/Widgets/ImageSwitchButton.hpp
 - [x] T667 annotate: src/slic3r/GUI/Widgets/Label.cpp

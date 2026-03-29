@@ -358,3 +358,8 @@
 - Started T663 (`src/slic3r/GUI/Widgets/HyperLink.cpp`) as the tiny hyperlink label controller.
 - The file is a thin `wxStaticText` wrapper, but it still encodes the visual identity (underline/font/cursor/colors), URL ownership, and browser-launch event bridge that need explicit Unity mapping.
 - Plan: annotate the constructor and helper methods with [INTENT]/[STATE]/[EVENT]/[UNITY]/[PORTING_HAZARD] boundaries, verify with `git diff --check -- src/slic3r/GUI/Widgets/HyperLink.cpp`, record the handoff evidence, and commit this single-file task before moving to the header next.
+
+- Started and completed T664 (`src/slic3r/GUI/Widgets/HyperLink.hpp`) as the hyperlink declaration boundary.
+- The header now makes the retained URL state, hover colors, and underline-preserving override explicit so the Unity port can treat link behavior as owned state rather than a label-only wrapper.
+- Reconciled a stale task-registry mismatch by marking T663 done to match the already-recorded HyperLink.cpp handoff.
+- Next step after sync: continue with T665 (`src/slic3r/GUI/Widgets/ImageSwitchButton.cpp`).

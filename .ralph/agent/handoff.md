@@ -2628,3 +2628,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P3 x1
 - Git: Annotate HyperLink link affordance
 - Next recommended Phase 1 task: T664 annotate: src/slic3r/GUI/Widgets/HyperLink.hpp
+
+## Phase 1 - Task T664 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/HyperLink.hpp
+- Deliverables: src/slic3r/GUI/Widgets/HyperLink.hpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md, .ralph/ralph-tasks.md
+- Substantive additions: 1 class-level boundary block plus API/member comments covering retained URL state, hover colors, font preservation, tooltip sync, and Unity mapping
+- Verification excerpt: [PORTING_HAZARD:P3] `wxStaticText` has no native link behavior, so the Unity port must own click/hover semantics explicitly.
+- Unity-impact summary: retained link label should be an explicit control with stored URL, hover state, and browser-launch bridge
+- Hazards found: P3 x1
+- Git: Annotate HyperLink header boundary
+- Next recommended Phase 1 task: T665 annotate: src/slic3r/GUI/Widgets/ImageSwitchButton.cpp
+
+Reconciliation note: the task registry entry for `T663` was still open even though the handoff already recorded it complete, so I synced `.ralph/ralph-tasks.md` to `[x]` before continuing.
