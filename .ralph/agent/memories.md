@@ -2,6 +2,10 @@
 
 ## Patterns
 
+### mem-1774749623-9681
+> RadioGroup.cpp is a composite radio-list widget: it couples bitmap icons and text buttons, wraps selection with arrow keys, and splits hover across sibling controls; a Unity port should keep each row as one retained interactive option.
+<!-- tags: gui, unity, widgets, annotation | created: 2026-03-29 -->
+
 ### mem-1774748890-82af
 > RadioBox.hpp is the declaration boundary for the bitmap toggle surrogate: keep the inherited toggle semantics, DPI-rescaled on/off/disabled art, and update() synchronization explicit so Unity can port it as a retained icon toggle with separate pressed and disabled states.
 <!-- tags: gui, unity, widgets | created: 2026-03-29 -->
