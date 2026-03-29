@@ -35,3 +35,7 @@
 - Picked Phase 1 task T686 for `src/slic3r/GUI/Widgets/ScrolledWindow.hpp`.
 - The header is the declaration boundary for the composite scroll wrapper: it exposes the hosted panel, the mirrored scrollbar/splitter state, and the wheel/size/scroll event surface that the cpp drives.
 - Unity mapping needs a single retained scroll-container controller with a shared normalized scroll model plus separate chrome prefabs; the biggest hazard is the manual splitter and SetViewStart synchronization logic.
+
+- Picked Phase 1 task T687 for `src/slic3r/GUI/Widgets/SideButton.cpp`.
+- This control is a skinned button-like wxWindow with optional icon+label content, state-colored surfaces, manual min-size math, and explicit mouse capture/release click translation.
+- Plan: annotate the render/layout/event boundaries with concrete `[INTENT]`, `[STATE]`, `[EVENT]`, `[UNITY]`, and porting-hazard notes, then record evidence and move to the next widget task.

@@ -1062,3 +1062,17 @@ Continue the previous work. Remaining tasks (213):
 
 Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Port Preparation## Phase BoundaryThis prompt governs **Phase 1 only**.- Phase 0 is already complete.- Do **not** revisit Phase 0...
 ```
+## Phase 1 - Task T687 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/SideButton.cpp
+- Deliverables: src/slic3r/GUI/Widgets/SideButton.cpp, .ralph/agent/scratchpad.md, .ralph/agent/handoff.md
+- Substantive additions: 15 boundary comments covering intent, state, events, Unity mapping, and one porting hazard
+- Verification excerpt: `[UNITY] Port this as a retained UI Toolkit button/control with a custom painter and explicit icon+text layout rather than relying on stock button chrome.`
+- Unity-impact summary:
+  - Treat SideButton as a retained skinned button, not a default button widget.
+  - Preserve the manual size math and mouse-capture click semantics in the port.
+  - Move the state-colored border/fill/text logic into one reusable layout/presenter layer.
+- Hazards found: 1 P2
+- Git: Annotate SideButton layout and events
+- Next recommended Phase 1 task: T688 annotate: src/slic3r/GUI/Widgets/SideButton.hpp
