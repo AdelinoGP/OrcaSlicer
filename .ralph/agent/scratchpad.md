@@ -139,3 +139,8 @@
 - Picked Phase 1 task T710 for `src/slic3r/GUI/Widgets/TabCtrl.hpp` after no prior memory match for TabCtrl-specific guidance.
 - The header now carries class-level intent/state/Unity notes plus method-boundary annotations for append/delete/select, relayout, keyboard routing, and the two-phase selection event surface.
 - The only diagnostics after patching are the pre-existing wx include-path issues from the repo environment; they do not change the annotation content.
+
+- Picked Phase 1 task T711 for `src/slic3r/GUI/Widgets/TempInput.cpp`.
+- TempInput is a composite temperature row with inline validation, a transient warning popup, and custom DC painting; the Unity target should be a retained row prefab with a text field, icon slots, and an overlay tooltip controller.
+- I added comments around intent/state/event flow, manual layout, render path, popup ownership, and the focus-navigation hazard, then marked the task done in the runtime task file.
+- Next step is to commit this atomic annotation and continue to T712 for `src/slic3r/GUI/Widgets/TempInput.hpp`.

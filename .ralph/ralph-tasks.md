@@ -629,7 +629,7 @@ Last updated: 2026-03-29T04:42:21Z
 - [~] T708 annotate: src/slic3r/GUI/Widgets/SwitchButton.hpp
 - [x] T709 annotate: src/slic3r/GUI/Widgets/TabCtrl.cpp
 - [x] T710 annotate: src/slic3r/GUI/Widgets/TabCtrl.hpp
-- [ ] T711 annotate: src/slic3r/GUI/Widgets/TempInput.cpp
+- [x] T711 annotate: src/slic3r/GUI/Widgets/TempInput.cpp
 - [ ] T712 annotate: src/slic3r/GUI/Widgets/TempInput.hpp
 - [ ] T713 annotate: src/slic3r/GUI/Widgets/TextInput.cpp
 - [ ] T714 annotate: src/slic3r/GUI/Widgets/TextInput.hpp

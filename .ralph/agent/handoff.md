@@ -1370,3 +1370,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2 x1
 - Git: Annotate TabCtrl.cpp for Unity port
 - Next recommended Phase 1 task: T710 annotate: src/slic3r/GUI/Widgets/TabCtrl.hpp
+
+## Phase 1 - Task T711 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/TempInput.cpp
+- Deliverables: `src/slic3r/GUI/Widgets/TempInput.cpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 8 comment blocks covering composite row intent, state ownership, validation flow, popup lifetime, manual layout, custom paint, and empty-event rationale
+- Verification excerpt: `[UNITY] Port this as a retained row prefab with a TMP_InputField, icon slots, and a sibling tooltip/validation overlay controller.`
+- Unity-impact summary:
+  - Keep the temperature editor as one retained row with explicit edit/validation state.
+  - Model the warning popup as an anchored overlay instead of a native transient window.
+  - Preserve the manual width/height solver as layout logic in Unity, not draw-time math.
+- Hazards found: P2 x1, UNCLEAR x1
+- Git: Annotate TempInput.cpp for Unity port
+- Next recommended Phase 1 task: T712 annotate: src/slic3r/GUI/Widgets/TempInput.hpp
