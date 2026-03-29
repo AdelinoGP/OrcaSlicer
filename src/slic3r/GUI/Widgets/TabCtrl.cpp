@@ -2,8 +2,16 @@
 
 #include <wx/dc.h>
 
-wxDEFINE_EVENT( wxEVT_TAB_SEL_CHANGING, wxCommandEvent );
-wxDEFINE_EVENT( wxEVT_TAB_SEL_CHANGED, wxCommandEvent );
+wxDEFINE_EVENT(wxEVT_TAB_SEL_CHANGING, wxCommandEvent);
+wxDEFINE_EVENT(wxEVT_TAB_SEL_CHANGED, wxCommandEvent);
+
+// [INTENT] TabCtrl is a skinned tab-strip container that owns a variable-length Button list,
+// mirrors selection through custom wxCommandEvents, and trims/expands tab chrome at paint time.
+// [STATE] The layout depends on selected index, cached bold font, image list ownership, and
+// the sizer's visibility toggles; Unity should model this as a retained tab-strip controller
+// with explicit selection and overflow/clipping state instead of hand-managed sizer math.
+// [PORTING_HAZARD:P2] Selection changes, button state updates, and visibility layout are coupled
+// into one pass, so a Unity port needs a split between model updates and a separate repaint.
 
 BEGIN_EVENT_TABLE(TabCtrl, StaticBox)
 
@@ -22,11 +30,7 @@ END_EVENT_TABLE()
 #define TAB_BUTTON_PADDING_Y 2
 #define TAB_BUTTON_PADDING TAB_BUTTON_PADDING_X, TAB_BUTTON_PADDING_Y
 
-TabCtrl::TabCtrl(wxWindow *      parent,
-                   wxWindowID      id,
-                   const wxPoint & pos,
-                   const wxSize &  size,
-                   long            style)
+TabCtrl::TabCtrl(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size, long style)
     : StaticBox(parent, id, pos, size, style)
 {
 #if 0
@@ -42,31 +46,32 @@ TabCtrl::TabCtrl(wxWindow *      parent,
     hsizer->Add(sizer, 0, wxEXPAND | wxBOTTOM, border_width * 4);
     SetSizer(hsizer);
     Bind(wxEVT_COMMAND_BUTTON_CLICKED, &TabCtrl::buttonClicked, this);
-    //wxString reason;
-    //IsTransparentBackgroundSupported(&reason);
+    // wxString reason;
+    // IsTransparentBackgroundSupported(&reason);
 }
 
-TabCtrl::~TabCtrl()
-{
-    delete images;
-}
+TabCtrl::~TabCtrl() { delete images; }
 
 int TabCtrl::GetSelection() const { return sel; }
 
 void TabCtrl::SelectItem(int item)
 {
+    // [EVENT] Selection is vetoable through wxEVT_TAB_SEL_CHANGING, then echoed back to the
+    // old/new Button children via synthetic checkbox events so they repaint their active state.
+    // [UNITY] This maps to a retained tab controller that raises cancelable selection callbacks
+    // before committing the new active tab and refreshing child visuals.
     if (item == sel || !sendTabCtrlEvent(true))
         return;
     if (sel >= 0) {
         wxCommandEvent e(wxEVT_CHECKBOX);
-        auto b = btns[sel];
+        auto           b = btns[sel];
         e.SetEventObject(b);
         b->GetEventHandler()->ProcessEvent(e);
     }
     sel = item;
     if (sel >= 0) {
         wxCommandEvent e(wxEVT_CHECKBOX);
-        auto b = btns[sel];
+        auto           b = btns[sel];
         e.SetEventObject(b);
         b->GetEventHandler()->ProcessEvent(e);
     }
@@ -75,14 +80,11 @@ void TabCtrl::SelectItem(int item)
     Refresh();
 }
 
-void TabCtrl::Unselect()
-{
-    SelectItem(-1);
-}
+void TabCtrl::Unselect() { SelectItem(-1); }
 
 void TabCtrl::Rescale()
 {
-    for (auto & b : btns)
+    for (auto& b : btns)
         b->Rescale();
 }
 
@@ -95,16 +97,13 @@ bool TabCtrl::SetFont(wxFont const& font)
     return true;
 }
 
-int TabCtrl::AppendItem(const wxString &item,
-                     int image, int selImage,
-                     void * clientData)
+int TabCtrl::AppendItem(const wxString& item, int image, int selImage, void* clientData)
 {
-    Button * btn = new Button();
+    Button* btn = new Button();
     btn->Create(this, item, "", wxBORDER_NONE);
     btn->SetFont(GetFont());
-    btn->SetTextColor(StateColor(
-        std::make_pair(0x6B6B6C, (int) StateColor::NotChecked),
-        std::make_pair(*wxLIGHT_GREY, (int) StateColor::Normal)));
+    btn->SetTextColor(
+        StateColor(std::make_pair(0x6B6B6C, (int) StateColor::NotChecked), std::make_pair(*wxLIGHT_GREY, (int) StateColor::Normal)));
     btn->SetBackgroundColor(StateColor());
     btn->SetCornerRadius(0);
     btn->SetPaddingSize({TAB_BUTTON_PADDING});
@@ -119,6 +118,8 @@ int TabCtrl::AppendItem(const wxString &item,
 
 bool TabCtrl::DeleteItem(int item)
 {
+    // [STATE] Removing an item can shift the active index, so the pre-delete selection check
+    // intentionally fires the changing event before the child is destroyed and the sizer shrinks.
     if (item < 0 || item >= btns.size()) {
         return false;
     }
@@ -136,7 +137,7 @@ bool TabCtrl::DeleteItem(int item)
         sizer->GetItem(sizer->GetItemCount() - 1)->SetMinSize({0, 0});
 
     if (selection_changed) {
-        sel--;  // `relayout()` uses `sel` so we need to update this before calling `relayout()`
+        sel--; // `relayout()` uses `sel` so we need to update this before calling `relayout()`
     }
     relayout();
     if (selection_changed) {
@@ -148,6 +149,8 @@ bool TabCtrl::DeleteItem(int item)
 
 void TabCtrl::DeleteAllItems()
 {
+    // [STATE] Clearing the control resets both child ownership and selected-tab state; callers
+    // should treat this as a full model reset rather than a cosmetic refresh.
     sizer->Clear(true);
     sizer->AddSpacer(10);
     btns.clear();
@@ -159,74 +162,72 @@ void TabCtrl::DeleteAllItems()
 
 unsigned int TabCtrl::GetCount() const { return btns.size(); }
 
-wxString TabCtrl::GetItemText(unsigned int item) const
-{
-    return item < btns.size() ? btns[item]->GetLabel() : wxString{};
-}
+wxString TabCtrl::GetItemText(unsigned int item) const { return item < btns.size() ? btns[item]->GetLabel() : wxString{}; }
 
-void TabCtrl::SetItemText(unsigned int item, wxString const &value)
+void TabCtrl::SetItemText(unsigned int item, wxString const& value)
 {
-    if (item >= btns.size()) return;
+    if (item >= btns.size())
+        return;
     btns[item]->SetLabel(value);
 }
 
 bool TabCtrl::GetItemBold(unsigned int item) const
 {
-    if (item >= btns.size()) return false;
+    if (item >= btns.size())
+        return false;
     return btns[item]->GetFont() == bold;
 }
 
 void TabCtrl::SetItemBold(unsigned int item, bool bold)
 {
-    if (item >= btns.size()) return;
+    if (item >= btns.size())
+        return;
     btns[item]->SetFont(bold ? this->bold : GetFont());
     btns[item]->Rescale();
 }
 
 void* TabCtrl::GetItemData(unsigned int item) const
 {
-    if (item >= btns.size()) return nullptr;
+    if (item >= btns.size())
+        return nullptr;
     return btns[item]->GetClientData();
 }
 
 void TabCtrl::SetItemData(unsigned int item, void* clientData)
 {
-    if (item >= btns.size()) return;
+    if (item >= btns.size())
+        return;
     btns[item]->SetClientData(clientData);
 }
 
 void TabCtrl::AssignImageList(wxImageList* imageList)
 {
-    if (images == imageList) return;
+    // [STATE] Image list ownership is transferred by pointer replacement; the control deletes the
+    // previous list immediately, so any Unity port needs a clear asset/reference ownership rule.
+    if (images == imageList)
+        return;
     delete images;
     images = imageList;
 }
 
-void TabCtrl::SetItemTextColour(unsigned int item, const StateColor &col)
+void TabCtrl::SetItemTextColour(unsigned int item, const StateColor& col)
 {
-    if (item >= btns.size()) return;
+    if (item >= btns.size())
+        return;
     btns[item]->SetTextColor(col);
 }
 
-int TabCtrl::GetFirstVisibleItem() const
-{
-    return btns.size() == 0 ? -1 : 0;
-}
+int TabCtrl::GetFirstVisibleItem() const { return btns.size() == 0 ? -1 : 0; }
 
-int TabCtrl::GetNextVisible(int item) const
-{
-    return ++item < btns.size() ? item : -1;
-}
+int TabCtrl::GetNextVisible(int item) const { return ++item < btns.size() ? item : -1; }
 
-bool TabCtrl::IsVisible(unsigned int item) const
-{
-    return true;
-}
+bool TabCtrl::IsVisible(unsigned int item) const { return true; }
 
 void TabCtrl::DoSetSize(int x, int y, int width, int height, int sizeFlags)
 {
     wxWindow::DoSetSize(x, y, width, height, sizeFlags);
-    if (sizeFlags & wxSIZE_USE_EXISTING) return;
+    if (sizeFlags & wxSIZE_USE_EXISTING)
+        return;
     relayout();
 }
 
@@ -234,7 +235,9 @@ void TabCtrl::DoSetSize(int x, int y, int width, int height, int sizeFlags)
 
 WXLRESULT TabCtrl::MSWWindowProc(WXUINT nMsg, WXWPARAM wParam, WXLPARAM lParam)
 {
-    if (nMsg == WM_GETDLGCODE) { return DLGC_WANTARROWS; }
+    if (nMsg == WM_GETDLGCODE) {
+        return DLGC_WANTARROWS;
+    }
     return wxWindow::MSWWindowProc(nMsg, wParam, lParam);
 }
 
@@ -242,14 +245,18 @@ WXLRESULT TabCtrl::MSWWindowProc(WXUINT nMsg, WXWPARAM wParam, WXLPARAM lParam)
 
 void TabCtrl::relayout()
 {
+    // [INTENT] Recompute which tabs remain visible and how much spacer remains after the active
+    // item so the current selection stays reachable even when the row overflows the available width.
+    // [PORTING_HAZARD:P2] This is not a standard tab-bar layout; the chosen tab is preserved while
+    // neighbors are hidden/shown dynamically, which requires explicit overflow policy in Unity.
     int offset = 10;
-    int item = sel + 1;
-    int first = 0;
+    int item   = sel + 1;
+    int first  = 0;
     for (int i = 0; i < item; ++i)
         offset += btns[i]->GetMinSize().x + TAB_BUTTON_SPACE * 2;
     if (item < btns.size())
         offset += btns[item]->GetMinSize().x + TAB_BUTTON_SPACE * 2;
-    int  width = GetSize().x;
+    int width = GetSize().x;
     for (int i = 0; i < btns.size(); ++i) {
         auto size = btns[i]->GetMinSize().x + TAB_BUTTON_SPACE * 2;
         if (i < sel && offset > width) {
@@ -272,23 +279,27 @@ void TabCtrl::relayout()
         sizer->GetItem(i * 2 + 2)->SetMinSize({0, 0});
     }
     if (item >= btns.size())
-        -- item;
+        --item;
     // Keep spacing 2 ~ 10 TAB_BUTTON_SPACE
     int b = GetSize().x - offset - 10 - (item + 1 - first) * TAB_BUTTON_SPACE * 8;
     sizer->GetItem(item * 2 + 2)->SetMinSize({b > 0 ? b : 0, 0});
     Layout();
 }
 
-void TabCtrl::buttonClicked(wxCommandEvent &event)
+void TabCtrl::buttonClicked(wxCommandEvent& event)
 {
+    // [EVENT] Child buttons route through this handler so the strip can claim focus and normalize
+    // arbitrary button hits back into a single selection index.
     SetFocus();
     auto btn  = event.GetEventObject();
     auto iter = std::find(btns.begin(), btns.end(), btn);
     SelectItem(iter == btns.end() ? -1 : iter - btns.begin());
 }
 
-void TabCtrl::keyDown(wxKeyEvent &event)
+void TabCtrl::keyDown(wxKeyEvent& event)
 {
+    // [EVENT] Arrow-key navigation only advances within the current list; no wraparound or direct
+    // tab activation shortcuts are implemented here.
     switch (event.GetKeyCode()) {
     case WXK_UP:
     case WXK_DOWN:
@@ -305,12 +316,18 @@ void TabCtrl::keyDown(wxKeyEvent &event)
 
 void TabCtrl::doRender(wxDC& dc)
 {
-    wxSize size = GetSize();
-    int states = state_handler.states();
-    if (sel < 0) { return; }
+    // [INTENT] Custom paint only draws the bottom border and selected underline, leaving the child
+    // Button widgets to render labels and active-state fills.
+    // [UNITY] This is a layered retained render: one background/frame pass plus a selected-tab
+    // highlight overlay, not a full bespoke bitmap atlas.
+    wxSize size   = GetSize();
+    int    states = state_handler.states();
+    if (sel < 0) {
+        return;
+    }
 
-    auto x1 = btns[sel]->GetPosition().x;
-    auto x2 = x1 + btns[sel]->GetSize().x;
+    auto      x1  = btns[sel]->GetPosition().x;
+    auto      x2  = x1 + btns[sel]->GetSize().x;
     const int BS2 = (1 + border_width) / 2;
 #if 0
     const int BS = border_width / 2;
@@ -338,6 +355,9 @@ void TabCtrl::doRender(wxDC& dc)
 
 bool TabCtrl::sendTabCtrlEvent(bool changing)
 {
+    // [EVENT] The public contract is two-phase: CHANGING first for veto, CHANGED after commit.
+    // [UNITY] Preserve this as a cancelable pre-change callback followed by a confirmed change
+    // notification so consumers that block tab switches keep working.
     wxCommandEvent event(changing ? wxEVT_TAB_SEL_CHANGING : wxEVT_TAB_SEL_CHANGED, GetId());
     event.SetEventObject(this);
     event.SetInt(sel);

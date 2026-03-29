@@ -1340,3 +1340,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2 x2, P3 x1
 - Git: Annotate SwitchButton switch controls
 - Next recommended Phase 1 task: T708 annotate: src/slic3r/GUI/Widgets/SwitchButton.hpp
+
+## Phase 1 - Task T709 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/TabCtrl.cpp
+- Deliverables: `src/slic3r/GUI/Widgets/TabCtrl.cpp`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 8 comment blocks covering class intent/state, selection veto flow, item deletion/reset, image-list ownership, overflow relayout, button/key event routing, paint output, and two-phase event dispatch
+- Verification excerpt: `[UNITY] This maps to a retained tab controller that raises cancelable selection callbacks before committing the new active tab and refreshing child visuals.`
+- Unity-impact summary:
+  - Keep the tab strip as a retained controller with explicit active-index and overflow state.
+  - Preserve the cancelable pre-change event contract before committing selection.
+  - Model the underline/frame paint as a separate overlay pass rather than a stock notebook control.
+- Hazards found: P2 x1
+- Git: Annotate TabCtrl.cpp for Unity port
+- Next recommended Phase 1 task: T710 annotate: src/slic3r/GUI/Widgets/TabCtrl.hpp

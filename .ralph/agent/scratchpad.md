@@ -130,3 +130,8 @@
 
 - T708 annotation is in place: SwitchButton now carries the bitmap-toggle mapping, and SwitchBoard documents the opaque payload bridge as a Unity presenter hazard.
 - Next step is to commit the atomic documentation change, then close the runtime task and move to T709 in the next iteration.
+
+- Picked Phase 1 task T709 for `src/slic3r/GUI/Widgets/TabCtrl.cpp`.
+- TabCtrl is a custom tab-strip container with child Button ownership, a vetoable two-phase selection event, keyboard navigation, dynamic overflow-driven relayout, and a custom underline paint pass.
+- I annotated the cpp with `[INTENT]`, `[STATE]`, `[EVENT]`, `[UNITY]`, and `[PORTING_HAZARD:P2]` notes around selection, deletion/reset, image-list ownership, overflow layout, input routing, and paint output.
+- Verification will be a focused review of the patch and diff; the editor diagnostics are still the existing wx include-path issue and are not from these comments.

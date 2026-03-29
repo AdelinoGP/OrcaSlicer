@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-29T04:32:24Z
+Last updated: 2026-03-29T04:42:21Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -627,7 +627,7 @@ Last updated: 2026-03-29T04:32:24Z
 - [ ] T706 annotate: src/slic3r/GUI/Widgets/StepCtrl.hpp
 - [x] T707 annotate: src/slic3r/GUI/Widgets/SwitchButton.cpp
 - [~] T708 annotate: src/slic3r/GUI/Widgets/SwitchButton.hpp
-- [ ] T709 annotate: src/slic3r/GUI/Widgets/TabCtrl.cpp
+- [x] T709 annotate: src/slic3r/GUI/Widgets/TabCtrl.cpp
 - [ ] T710 annotate: src/slic3r/GUI/Widgets/TabCtrl.hpp
 - [ ] T711 annotate: src/slic3r/GUI/Widgets/TempInput.cpp
 - [ ] T712 annotate: src/slic3r/GUI/Widgets/TempInput.hpp
