@@ -249,6 +249,10 @@
 - T632 is now annotated in `src/slic3r/GUI/WebGuideDialog.hpp` with class-level intent/state/event/thread/Unity/porting-hazard notes plus retained-state comments for the browser host, startup loader, and script round-trip fields.
 - Verification passed with `git diff --check -- src/slic3r/GUI/WebGuideDialog.hpp`; next recommended file is T635 (`src/slic3r/GUI/WebUserLoginDialog.cpp`).
 
+- Started T673 (`src/slic3r/GUI/Widgets/ProgressBar.cpp`) as the next atomic widget annotation.
+- The file is a custom-painted progress indicator with a latched disable mode, optional percentage text, and platform-specific buffered painting on Windows.
+- Plan: add a compact set of boundary comments for the widget intent, mutable progress/disable state, event/render flow, and Unity mapping to a retained fill-bar prefab with a separate label layer, then verify with `git diff --check` and close the task.
+
 - Started T658 (`src/slic3r/GUI/Widgets/ErrorMsgStaticText.hpp`) as the declaration boundary for the custom-painted wrapped error label.
 - The header is intentionally thin: it only needs to capture the custom paint intent, transient message state, and the Unity split to a layout-driven text element instead of paint-time resizing.
 - Plan: keep the annotation to one high-value boundary block, verify with `git diff --check -- src/slic3r/GUI/Widgets/ErrorMsgStaticText.hpp`, then commit and move to T659.

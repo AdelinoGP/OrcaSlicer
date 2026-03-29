@@ -2719,3 +2719,15 @@ Reconciliation note: the task registry entry for `T663` was still open even thou
 - Hazards found: P2 x1
 - Git: PopupWindow.hpp annotation pass
 - Next recommended Phase 1 task: T673 annotate: src/slic3r/GUI/Widgets/ProgressBar.cpp
+
+## Phase 1 - Task T673 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/ProgressBar.cpp
+- Deliverables: src/slic3r/GUI/Widgets/ProgressBar.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 6 boundary comments covering widget intent, native creation, disable-state semantics, size/radius coupling, paint-event routing, and the retained rendering split
+- Verification excerpt: `[UNITY] Port this as a retained fill-bar prefab with a separate centered text element and a view-model for disabled status.`
+- Unity-impact summary: retain fill width and label as separate UI pieces; keep disabled text as model state; separate value updates from paint-time clamping
+- Hazards found: P2 x1, P3 x1
+- Git: Annotate ProgressBar widget boundary
+- Next recommended Phase 1 task: T674 annotate: src/slic3r/GUI/Widgets/ProgressBar.hpp
