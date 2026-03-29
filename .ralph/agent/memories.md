@@ -2,6 +2,42 @@
 
 ## Patterns
 
+### mem-1774748890-82af
+> RadioBox.hpp is the declaration boundary for the bitmap toggle surrogate: keep the inherited toggle semantics, DPI-rescaled on/off/disabled art, and update() synchronization explicit so Unity can port it as a retained icon toggle with separate pressed and disabled states.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774748552-5825
+> RadioBox.cpp is a bitmap-backed toggle surrogate: it mirrors bool state through wxBitmapToggleButton and swaps between on/off/disabled sprites, so Unity should model it as a retained three-sprite toggle with explicit DPI rescale handling.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774747329-fead
+> ProgressBar.hpp is the declaration boundary for the custom fill bar: keep cached ratio/height/radius state, the latched disable message, and the paint/event hooks explicit so Unity can split retained value state from draw-time clipping.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774746999-13a9
+> ProgressBar.cpp is a custom-painted wxWindow progress bar: it latches a disabled-message state, recomputes rounded fill geometry from cached height/radius, and should port as a retained fill-bar prefab with a separate centered label and explicit value-vs-render separation.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774746634-3cd2
+> PopupWindow.hpp is the declaration boundary for the transient popup shell: keep the non-owning hover bridge, platform-specific activation listeners, and explicit outside-click/focus-loss dismissal semantics visible so Unity can port it as a floating popup controller.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774746389-0f53
+> PopupWindow.cpp is a retained transient-popup shell: GTK binds host activation, macOS replays mouse events through depth-first hit testing, and Windows uses separate activation/iconize/show unfocus listeners; Unity should model this as one popup controller with unified focus lifecycle and explicit pointer-over routing.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774744467-0bc5
+> HyperLink.hpp is the declaration boundary for the tiny hyperlink label wrapper: keep the retained URL, hover colors, tooltip sync, and underline-preserving font override explicit so Unity can model it as a retained clickable text control.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774743637-306f
+> FilamentLoad.hpp is the declaration boundary for the filament-change wizard host: keep the retained step indicators, AMS/slot identity, public label table, and capability-driven state explicit, and port the wxSimplebook pages as workflow states instead of hidden page indices.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
+### mem-1774743332-5369
+> FilamentLoad.cpp is a retained filament-change wizard host: it swaps load/unload/VT-load step indicators inside a wxSimplebook, rebuilds step lists from AMS/extrusion capability flags, and uses explicit idle/reset paths instead of teardown. Unity should model the workflow as explicit states with retained subviews and a typed step dataset.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
 ### mem-1774742520-3291
 > FanControl.hpp is the declaration boundary for the fan gauge/operate/popup stack: keep the passive gauge, interactive +/- strip, per-row controller, binary switch, and modal popup separate; the raw MachineObject* command path is the Unity P1 hazard and should become a marshaled service boundary.
 <!-- tags: gui, unity, widgets | created: 2026-03-29 -->

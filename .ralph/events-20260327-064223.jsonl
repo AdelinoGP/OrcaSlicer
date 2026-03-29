@@ -1,0 +1,9 @@
+{"ts":"2026-03-27T06:42:23.561298776+00:00","iteration":0,"hat":"loop","topic":"task.start","triggered":"planner","payload":"# PROMPT - Phase 1: GUI File-by-File Annotation for Unity Port Preparation\r\r\r\r## Phase Boundary\r\r\r\rThis prompt governs **Phase 1 only**.\r\r\r\r- Phase 0 is already complete.\r\r- Do **not** revisit Phase 0 work.\r\r- Do **not** begin Phase 2 documentation deliverables here.\r\r- Do **not** begin Phase 3 review or finalization work here.\r\r\r\rYour goal in this phase is to annotate every in-scope GUI source file so later agents can reimplement the GUI layer in Unity/C# with minimal ambiguity.\r\r\r\r## Mission\r\r... [truncated, 12697 chars total]"}
+{"payload":"T555 annotate ProjectDirtyStateManager.hpp complete","topic":"phase1.task.done","ts":"2026-03-27T07:04:06.254514528+00:00"}
+{"payload":"T557 publish dialog annotated and committed","topic":"task.done","ts":"2026-03-27T07:26:03.207470470+00:00"}
+{"payload":"T560 annotated and committed; next T561","topic":"task.done","ts":"2026-03-27T07:46:49.564270441+00:00"}
+{"payload":"T563 complete: ReleaseNote.cpp annotated and committed","topic":"task.done","ts":"2026-03-27T08:08:14.692325107+00:00"}
+{"payload":"T565 complete: RemovableDriveManager.cpp","topic":"task.done","ts":"2026-03-27T08:27:44.948226075+00:00"}
+{"payload":"T567 annotate SafetyOptionsDialog.cpp complete; commit 4087159d82","topic":"task.done","ts":"2026-03-27T08:44:51.149239970+00:00"}
+{"payload":"T569 SavePresetDialog.cpp annotated and closed","topic":"task.done","ts":"2026-03-27T09:02:47.823321886+00:00"}
+{"payload":"T571 annotate SceneRaycaster.cpp complete","topic":"task.done","ts":"2026-03-27T09:18:15.892576150+00:00"}
