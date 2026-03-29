@@ -307,6 +307,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate StepCtrl.cpp for Unity port
 - Next recommended Phase 1 task: T706 annotate: src/slic3r/GUI/Widgets/StepCtrl.hpp
 
+## Phase 1 - Task T708 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/SwitchButton.hpp
+- Deliverables: `src/slic3r/GUI/Widgets/SwitchButton.hpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 2 class-level annotation blocks covering the bitmap toggle intent/state/event surface and the SwitchBoard wrapper's state bridge
+- Verification excerpt: `[UNITY] Port as a retained Toggle with a custom graphic child or a two-state segmented control controller, backed by a shared visual-state model for track/thumb/text colors.`
+- Unity-impact summary:
+  - Keep the bitmap toggle and the wrapper board as separate retained controllers.
+  - Treat `client_data` as a typed presenter dependency in Unity, not an opaque `void*`.
+  - Preserve custom painting and selection state as explicit view-model data.
+- Hazards found: P2 x2
+- Git: Annotate SwitchButton.hpp for Unity port
+- Next recommended Phase 1 task: T709 annotate: src/slic3r/GUI/Widgets/TabCtrl.cpp
+
 ## Tasks
 
 ### Completed

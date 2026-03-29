@@ -123,3 +123,10 @@
 - Picked Phase 1 task T707 for `src/slic3r/GUI/Widgets/SwitchButton.cpp`.
 - Added file-level notes that frame the bitmap toggle and segmented switch as retained-state controls with stringly-typed selection and DC-based rendering hazards.
 - The Unity port should treat both widgets as a retained segmented-switch controller, not as immediate-mode drawing; next step is to commit this atomic annotation and hand off T708.
+
+- Picked Phase 1 task T708 for `src/slic3r/GUI/Widgets/SwitchButton.hpp` after confirming it is the next open ready task.
+- The header needs a retained-toggle annotation that covers the bitmap art, label palette state, the nested SwitchBoard wrapper, and the raw `client_data` bridge into printer/status state.
+- Plan: add class-level `[INTENT]`, `[STATE]`, `[EVENT]`, `[UNITY]`, and `[PORTING_HAZARD:P2]` notes, verify the file text, then commit and close T708 before exiting this iteration.
+
+- T708 annotation is in place: SwitchButton now carries the bitmap-toggle mapping, and SwitchBoard documents the opaque payload bridge as a Unity presenter hazard.
+- Next step is to commit the atomic documentation change, then close the runtime task and move to T709 in the next iteration.
