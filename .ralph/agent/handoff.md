@@ -109,7 +109,7 @@ _Generated: 2026-03-29 01:50:17 UTC_
   - Model wheel/size/scroll callbacks as explicit input and layout events around a shared scroll state.
   - Preserve the manual chrome synchronization behavior as a migration hazard, not an implementation detail.
 - Hazards found: P2 x1
-- Git: Annotate ScrolledWindow.hpp for Unity port
+- Git: c2a0ec6671 - Annotate ScrolledWindow.hpp for Unity port
 - Next recommended Phase 1 task: T687 annotate: src/slic3r/GUI/Widgets/SideButton.cpp
 
 ## Tasks
