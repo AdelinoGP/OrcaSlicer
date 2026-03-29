@@ -2,6 +2,10 @@
 
 ## Patterns
 
+### mem-1774760304-2087
+> TempInput is a composite temperature row: it owns inline numeric validation, a lazily-created warning PopupWindow, and manual DC-based layout/painting, so Unity should port it as a retained row prefab with an anchored validation overlay.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
 ### mem-1774759780-c432
 > TabCtrl.hpp is the declaration boundary for the skinned tab strip: keep raw Button child order, replacement-based image-list ownership, the two-phase tab-selection event contract, and overflow-driven relayout explicit so Unity can port it as a retained tab controller with cancelable selection callbacks.
 <!-- tags: gui, unity, tabs | created: 2026-03-29 -->
