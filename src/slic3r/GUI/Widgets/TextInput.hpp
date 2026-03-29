@@ -4,6 +4,12 @@
 #include <wx/textctrl.h>
 #include "StaticBox.hpp"
 
+// [INTENT] A skinned text-input wrapper that combines a standard wxTextCtrl with custom-painted chrome:
+// optional icons, a prefix label, hover/focus outlines, and static tips.
+// [STATE] Caches metrics for label and tip text, and stores StateColor palettes for label/text.
+// [UNITY] Use a standard Unity UI Toolkit TextField with a custom structural wrapper (label, icons) and USS styles for hover/focus outlines.
+// [PORTING_HAZARD:P3] The implementation manually overrides DoSetSize to position the internal wxTextCtrl within its painted borders. Unity's layout engine should handle this structurally.
+
 class TextInput : public wxNavigationEnabled<StaticBox>
 {
 
