@@ -187,6 +187,21 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - Git: Annotate SpinInput.cpp for Unity port
 - Next recommended Phase 1 task: T694 annotate: src/slic3r/GUI/Widgets/SpinInput.hpp
 
+## Phase 1 - Task T695 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/StateColor.cpp
+- Deliverables: `src/slic3r/GUI/Widgets/StateColor.cpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 6 comment blocks covering global palette intent, LAB conversion, dark-mode toggle state, ordered palette construction, state-mask resolution, and UI-thread-only palette mutation
+- Verification excerpt: `[UNITY] Model this as a theme/palette service backed by a ScriptableObject or static color dictionary, not as per-control ad-hoc remapping.`
+- Unity-impact summary:
+  - Move the shared color remap into one application-wide theme service.
+  - Keep the LAB/lightness helpers as a reusable color utility, not inline widget logic.
+  - Preserve the ordered state-mask matching semantics when porting hover/focus palettes.
+- Hazards found: P2 x1, P3 x1
+- Git: Annotate StateColor.cpp for Unity port
+- Next recommended Phase 1 task: T697 annotate: src/slic3r/GUI/Widgets/StateHandler.cpp
+
 ## Tasks
 
 ### Completed

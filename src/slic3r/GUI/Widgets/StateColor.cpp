@@ -1,9 +1,15 @@
 #include "StateColor.hpp"
 #include <cmath>
 
+// [INTENT] Centralize the widget palette translation helpers that turn a declarative state mask into a concrete wxColour.
+// [STATE] `gDarkMode` is the process-wide switch for palette remapping; `gDarkColors` is the canonical light->dark lookup table shared by all
+// state-color users.
+// [THREAD] These globals are read and mutated from GUI code only; there is no locking, so a Unity port needs main-thread theme updates or a
+// serialized settings service.
+// [UNITY] Model this as a theme/palette service backed by a ScriptableObject or static color dictionary, not as per-control ad-hoc remapping.
 static bool gDarkMode = false;
 
-static bool operator<(wxColour const &l, wxColour const &r) { return l.GetRGBA() < r.GetRGBA(); }
+static bool operator<(wxColour const& l, wxColour const& r) { return l.GetRGBA() < r.GetRGBA(); }
 
 static std::map<wxColour, wxColour> gDarkColors{
     {"#009688", "#00675b"}, // rgb(0, 150, 136)    ORCA color
@@ -26,15 +32,15 @@ static std::map<wxColour, wxColour> gDarkColors{
     {"#F8F8F8", "#36363C"}, // rgb(248, 248, 248)  Sidebar > Titlebar > Gradient Top | BBL monitor page titlebar bg
     {"#F1F1F1", "#36363B"}, // rgb(241, 241, 241)  Sidebar > Titlebar > Gradient Bottom
     {"#3B4446", "#2D2D30"}, // rgb(59, 68, 78)     Top Bar / Main tab bar bg color
-    {"#CECECE", "#54545B"}, // rgb(206, 206, 206)  Sidebar wxPanel bg | 
+    {"#CECECE", "#54545B"}, // rgb(206, 206, 206)  Sidebar wxPanel bg |
     {"#DBFDD5", "#3B3B40"}, // rgb(219, 253, 213)  Not Used anymore // Was used for BBS combo boxes etc
     {"#000000", "#FFFFFE"}, // rgb(0, 0, 0)        Mostly Text color wxBlack
     {"#F4F4F4", "#36363D"}, // rgb(244, 244, 244)  ???
     {"#DBDBDB", "#4A4A51"}, // rgb(219, 219, 219)  Input/Combo Box Border Color
     {"#EDFAF2", "#283232"}, // rgb(229, 240, 238)  Not Used anymore // Was used for BBS Combo / Dropdown focused background color
-    {"#323A3C", "#E5E5E6"}, // rgb(50, 58, 60)     Text color used on search list | 
+    {"#323A3C", "#E5E5E6"}, // rgb(50, 58, 60)     Text color used on search list |
     {"#303A3C", "#E5E5E5"}, // rgb(48, 58, 60)     Object Table > Column header text color | StaticBox Border Color
-    {"#FEFFFF", "#242428"}, // rgb(254, 255, 255)  Side Tabbar bg | 
+    {"#FEFFFF", "#242428"}, // rgb(254, 255, 255)  Side Tabbar bg |
     {"#A6A9AA", "#2D2D29"}, // rgb(166, 169, 170)  Seperator color
     {"#363636", "#B2B3B5"}, // rgb(54, 54, 54)     Sidebar > Parameter Label/Title color | Sidebar tab text | Create Filament window text
     {"#F0F0F1", "#333337"}, // rgb(240, 240, 241)  Disabled element background // ORCA Used better background color for dark mode
@@ -50,16 +56,21 @@ static std::map<wxColour, wxColour> gDarkColors{
     {"#E5F0EE", "#283232"}, // rgb(229, 240, 238)  Combo / Dropdown focused background color > ORCA color with %10 opacity
 };
 
-std::tuple<double, double, double> StateColor::GetLAB(const wxColour& color) {
+// [INTENT] Convert wxColour values into LAB space so lightness and perceptual distance adjustments remain visually stable.
+// [UNITY] Unity can keep this as a pure color utility, but should operate on `Color.linear` / `Mathf` helpers or a tested conversion
+// utility rather than reproducing these formulas inline at each widget. [PORTING_HAZARD:P3] The visual output depends on exact color-space
+// math and clamping behavior; any Unity replacement should be validated against representative palette samples.
+std::tuple<double, double, double> StateColor::GetLAB(const wxColour& color)
+{
     // Convert color to RGB color space
     double r = color.Red() / 255.0;
     double g = color.Green() / 255.0;
     double b = color.Blue() / 255.0;
 
     // Convert to XYZ color space
-    double x = 0.412453*r + 0.357580*g + 0.180423*b;
-    double y = 0.212671*r + 0.715160*g + 0.072169*b;
-    double z = 0.019334*r + 0.119193*g + 0.950227*b;
+    double x = 0.412453 * r + 0.357580 * g + 0.180423 * b;
+    double y = 0.212671 * r + 0.715160 * g + 0.072169 * b;
+    double z = 0.019334 * r + 0.119193 * g + 0.950227 * b;
 
     // Normalize XYZ values
     double x_n = x / 0.950456;
@@ -68,35 +79,36 @@ std::tuple<double, double, double> StateColor::GetLAB(const wxColour& color) {
 
     // Convert to LAB color space
     double epsilon = 0.008856;
-    double kappa = 903.3;
-    double fx = (x_n > epsilon) ? cbrt(x_n) : (kappa*x_n + 16.0) / 116.0;
-    double fy = (y_n > epsilon) ? cbrt(y_n) : (kappa*y_n + 16.0) / 116.0;
-    double fz = (z_n > epsilon) ? cbrt(z_n) : (kappa*z_n + 16.0) / 116.0;
+    double kappa   = 903.3;
+    double fx      = (x_n > epsilon) ? cbrt(x_n) : (kappa * x_n + 16.0) / 116.0;
+    double fy      = (y_n > epsilon) ? cbrt(y_n) : (kappa * y_n + 16.0) / 116.0;
+    double fz      = (z_n > epsilon) ? cbrt(z_n) : (kappa * z_n + 16.0) / 116.0;
 
-    double l = 116.0 * fy - 16.0;
-    double a = 500.0 * (fx - fy);
+    double l     = 116.0 * fy - 16.0;
+    double a     = 500.0 * (fx - fy);
     double b_lab = 200.0 * (fy - fz);
 
     return std::tuple<double, double, double>(l, a, b_lab);
 }
 
-double StateColor::LAB_Delta_E(const wxColour& color1, const wxColour& color2) {
+double StateColor::LAB_Delta_E(const wxColour& color1, const wxColour& color2)
+{
     auto [l1, a1, b1] = GetLAB(color1);
     auto [l2, a2, b2] = GetLAB(color2);
     return sqrt((l1 - l2) * (l1 - l2) + (a1 - a2) * (a1 - a2) + (b1 - b2) * (b1 - b2));
 }
 
-double StateColor::GetColorDifference(const wxColour& color1, const wxColour& color2) {
-    return LAB_Delta_E(color1, color2);
-}
+double StateColor::GetColorDifference(const wxColour& color1, const wxColour& color2) { return LAB_Delta_E(color1, color2); }
 
-double StateColor::GetLightness(const wxColour& color) {
+double StateColor::GetLightness(const wxColour& color)
+{
     auto [l, a, b_lab] = GetLAB(color);
     return l;
 }
 
 // Function to lighten or darken a wxColour using LAB color space
-wxColour StateColor::SetLightness(const wxColour& color, double lightness) {
+wxColour StateColor::SetLightness(const wxColour& color, double lightness)
+{
     auto [l, a, b_lab] = GetLAB(color);
 
     // Clamp lightness value
@@ -108,10 +120,10 @@ wxColour StateColor::SetLightness(const wxColour& color, double lightness) {
     double fz_3 = fy_3 - b_lab / 200.0;
 
     double epsilon = 0.008856;
-    double kappa = 903.3;
-    double x_3 = (fx_3 > epsilon) ? fx_3 * fx_3 * fx_3 : (116.0 * fx_3 - 16.0) / kappa;
-    double y_3 = (l > kappa*epsilon) ? fy_3 * fy_3 * fy_3 : l / kappa;
-    double z_3 = (fz_3 > epsilon) ? fz_3 * fz_3 * fz_3 : (116.0 * fz_3 - 16.0) / kappa;
+    double kappa   = 903.3;
+    double x_3     = (fx_3 > epsilon) ? fx_3 * fx_3 * fx_3 : (116.0 * fx_3 - 16.0) / kappa;
+    double y_3     = (l > kappa * epsilon) ? fy_3 * fy_3 * fy_3 : l / kappa;
+    double z_3     = (fz_3 > epsilon) ? fz_3 * fz_3 * fz_3 : (116.0 * fz_3 - 16.0) / kappa;
 
     // Denormalize XYZ values
     double x = x_3 * 0.950456;
@@ -119,9 +131,9 @@ wxColour StateColor::SetLightness(const wxColour& color, double lightness) {
     double z = z_3 * 1.088754;
 
     // Convert XYZ to RGB
-    double r_new = 3.240479*x - 1.537150*y - 0.498535*z;
-    double g_new = -0.969256*x + 1.875992*y + 0.041556*z;
-    double b_new = 0.055648*x - 0.204043*y + 1.057311*z;
+    double r_new = 3.240479 * x - 1.537150 * y - 0.498535 * z;
+    double g_new = -0.969256 * x + 1.875992 * y + 0.041556 * z;
+    double b_new = 0.055648 * x - 0.204043 * y + 1.057311 * z;
 
     // Clamp RGB values
     r_new = std::max(0.0, std::min(1.0, r_new));
@@ -136,7 +148,8 @@ wxColour StateColor::SetLightness(const wxColour& color, double lightness) {
     return wxColour(r_int, g_int, b_int);
 }
 
-wxColour StateColor::LightenDarkenColor(const wxColour& color, int amount) {
+wxColour StateColor::LightenDarkenColor(const wxColour& color, int amount)
+{
     auto [l, a, b_lab] = GetLAB(color);
 
     // Modify lightness
@@ -151,10 +164,10 @@ wxColour StateColor::LightenDarkenColor(const wxColour& color, int amount) {
     double fz_3 = fy_3 - b_lab / 200.0;
 
     double epsilon = 0.008856;
-    double kappa = 903.3;
-    double x_3 = (fx_3 > epsilon) ? fx_3 * fx_3 * fx_3 : (116.0 * fx_3 - 16.0) / kappa;
-    double y_3 = (l > kappa*epsilon) ? fy_3 * fy_3 * fy_3 : l / kappa;
-    double z_3 = (fz_3 > epsilon) ? fz_3 * fz_3 * fz_3 : (116.0 * fz_3 - 16.0) / kappa;
+    double kappa   = 903.3;
+    double x_3     = (fx_3 > epsilon) ? fx_3 * fx_3 * fx_3 : (116.0 * fx_3 - 16.0) / kappa;
+    double y_3     = (l > kappa * epsilon) ? fy_3 * fy_3 * fy_3 : l / kappa;
+    double z_3     = (fz_3 > epsilon) ? fz_3 * fz_3 * fz_3 : (116.0 * fz_3 - 16.0) / kappa;
 
     // Denormalize XYZ values
     double x = x_3 * 0.950456;
@@ -162,9 +175,9 @@ wxColour StateColor::LightenDarkenColor(const wxColour& color, int amount) {
     double z = z_3 * 1.088754;
 
     // Convert XYZ to RGB
-    double r_new = 3.240479*x - 1.537150*y - 0.498535*z;
-    double g_new = -0.969256*x + 1.875992*y + 0.041556*z;
-    double b_new = 0.055648*x - 0.204043*y + 1.057311*z;
+    double r_new = 3.240479 * x - 1.537150 * y - 0.498535 * z;
+    double g_new = -0.969256 * x + 1.875992 * y + 0.041556 * z;
+    double b_new = 0.055648 * x - 0.204043 * y + 1.057311 * z;
 
     // Clamp RGB values
     r_new = std::max(0.0, std::min(1.0, r_new));
@@ -179,52 +192,57 @@ wxColour StateColor::LightenDarkenColor(const wxColour& color, int amount) {
     return wxColour(r_int, g_int, b_int);
 }
 
-std::map<wxColour, wxColour> const & StateColor::GetDarkMap()
-{
-    return gDarkColors;
-}
+std::map<wxColour, wxColour> const& StateColor::GetDarkMap() { return gDarkColors; }
 
+// [STATE] Toggle the shared palette remapper globally; every later `darkModeColorFor` call reads this bit and returns a translated color.
+// [UNITY] Wire the equivalent through an application-wide theme state change so all controls refresh together when the theme flips.
 void StateColor::SetDarkMode(bool dark) { gDarkMode = dark; }
 
-inline wxColour darkModeColorFor2(wxColour const &color)
+inline wxColour darkModeColorFor2(wxColour const& color)
 {
     if (!gDarkMode)
         return color;
     auto iter = gDarkColors.find(color);
-    if (iter != gDarkColors.end()) return iter->second;
+    if (iter != gDarkColors.end())
+        return iter->second;
     return color;
 }
 
-std::map<wxColour, wxColour> revert(std::map<wxColour, wxColour> const & map)
+std::map<wxColour, wxColour> revert(std::map<wxColour, wxColour> const& map)
 {
     std::map<wxColour, wxColour> map2;
-    for (auto &p : map) map2.emplace(p.second, p.first);
+    for (auto& p : map)
+        map2.emplace(p.second, p.first);
     return map2;
 }
 
-wxColour StateColor::lightModeColorFor(wxColour const &color)
+wxColour StateColor::lightModeColorFor(wxColour const& color)
 {
     static std::map<wxColour, wxColour> gLightColors = revert(gDarkColors);
-    auto iter = gLightColors.find(color);
-    if (iter != gLightColors.end()) return iter->second;
+    auto                                iter         = gLightColors.find(color);
+    if (iter != gLightColors.end())
+        return iter->second;
     return color;
 }
 
-wxColour StateColor::darkModeColorFor(wxColour const &color) { return darkModeColorFor2(color); }
+wxColour StateColor::darkModeColorFor(wxColour const& color) { return darkModeColorFor2(color); }
 
-StateColor::StateColor(wxColour const &color) { append(color, 0); }
+// [INTENT] Build palette entries from one or more color/state pairs so widget chrome can describe hover/focus/disabled variants declaratively.
+// [STATE] The two parallel vectors preserve insertion order; the matcher scans them sequentially and returns the first mask that fits.
+// [UNITY] This maps cleanly to a serialized list of `(SelectableState mask, Color)` rows or a small palette asset consumed by a controller.
+StateColor::StateColor(wxColour const& color) { append(color, 0); }
 
-StateColor::StateColor(wxString const &color) { append(color, 0); }
+StateColor::StateColor(wxString const& color) { append(color, 0); }
 
 StateColor::StateColor(unsigned long color) { append(color, 0); }
 
-void StateColor::append(wxColour const & color, int states)
+void StateColor::append(wxColour const& color, int states)
 {
     statesList_.push_back(states);
     colors_.push_back(color);
 }
 
-void StateColor::append(wxString const & color, int states)
+void StateColor::append(wxString const& color, int states)
 {
     wxColour c1(color);
     append(c1, states);
@@ -234,7 +252,8 @@ void StateColor::append(unsigned long color, int states)
 {
     if ((color & 0xff000000) == 0)
         color |= 0xff000000;
-    wxColour cl; cl.SetRGBA((color & 0xff00ff00) | ((color & 0xff) << 16) | ((color >> 16) & 0xff));
+    wxColour cl;
+    cl.SetRGBA((color & 0xff00ff00) | ((color & 0xff) << 16) | ((color >> 16) & 0xff));
     append(cl, states);
 }
 
@@ -244,26 +263,32 @@ void StateColor::clear()
     colors_.clear();
 }
 
+// [STATE] `states()` collapses the ordered palette into a single bitmask and preserves the special focus-as-hover behavior used by the
+// custom controls.
+// [PORTING_HAZARD:P2] The mask logic depends on the paired `Not*` high-bit flags and the fallback search order; Unity must keep the same
+// matching semantics or control chrome will shift between states.
 int StateColor::states() const
 {
     int states = 0;
-    for (auto s : statesList_) states |= s;
+    for (auto s : statesList_)
+        states |= s;
     states = (states & 0xffff) | (states >> 16);
     if (takeFocusedAsHovered_ && (states & Hovered))
         states |= Focused;
     return states;
 }
 
-wxColour StateColor::defaultColor() {
-    return colorForStates(0);
-}
+wxColour StateColor::defaultColor() { return colorForStates(0); }
 
+// [INTENT] Resolve the first palette entry whose affirmative and negative state bits both match the requested mask.
+// [STATE] The matcher prefers insertion order, with optional focus-as-hover widening before it falls back to transparent black.
+// [UNITY] Mirror this as a deterministic palette resolver inside the retained widget controller, not as per-render branching in the view.
 wxColour StateColor::colorForStates(int states)
 {
     bool focused = takeFocusedAsHovered_ && (states & Focused);
     for (int i = 0; i < statesList_.size(); ++i) {
-        int s = statesList_[i];
-        int on = s & 0xffff;
+        int s   = statesList_[i];
+        int on  = s & 0xffff;
         int off = s >> 16;
         if ((on & states) == on && (off & ~states) == off) {
             return darkModeColorFor2(colors_[i]);
@@ -283,8 +308,8 @@ wxColour StateColor::colorForStatesNoDark(int states)
 {
     bool focused = takeFocusedAsHovered_ && (states & Focused);
     for (int i = 0; i < statesList_.size(); ++i) {
-        int s = statesList_[i];
-        int on = s & 0xffff;
+        int s   = statesList_[i];
+        int on  = s & 0xffff;
         int off = s >> 16;
         if ((on & states) == on && (off & ~states) == off) {
             return colors_[i];
@@ -306,13 +331,17 @@ int StateColor::colorIndexForStates(int states)
         int s   = statesList_[i];
         int on  = s & 0xffff;
         int off = s >> 16;
-        if ((on & states) == on && (off & ~states) == off) { return i; }
+        if ((on & states) == on && (off & ~states) == off) {
+            return i;
+        }
     }
     return -1;
 }
 
-bool StateColor::setColorForStates(wxColour const &color, int states)
+bool StateColor::setColorForStates(wxColour const& color, int states)
 {
+    // [STATE] Palette mutation is an overwrite-by-exact-mask operation so controls can restyle a specific state without rebuilding the full
+    // list. [THREAD] The helper is unsynchronized and assumes UI-thread access from palette construction or live theme editing.
     for (int i = 0; i < statesList_.size(); ++i) {
         if (statesList_[i] == states) {
             colors_[i] = color;

@@ -72,3 +72,11 @@
 - The header now makes the composite state explicit: cached label geometry, child widget pointers, the repeat timer, and clamped numeric model fields.
 - Unity mapping is now concrete in the header comments: retain it as a TextInput plus two icon buttons under one controller, because the layout/validation/repeat loop cannot be ported as a direct widget swap.
 - Next step is to record handoff evidence, mark T694 done, commit the atomic change, and then continue to the next Phase 1 task.
+
+- Picked Phase 1 task T695 for `src/slic3r/GUI/Widgets/StateColor.cpp`.
+- The file is the shared color helper for widget state palettes: it owns the dark-mode translation table, LAB/lightness math, state-mask matching, and palette mutation helpers used by the custom wxWidgets controls.
+- Plan: annotate the global palette/state helpers with explicit `[INTENT]`, `[STATE]`, `[THREAD]`, `[UNITY]`, and `[PORTING_HAZARD]` notes, then record completion evidence, close T695, and move to the next ready annotation task.
+
+- Completed T695 for `src/slic3r/GUI/Widgets/StateColor.cpp`. The file now carries explicit notes for the global dark-mode palette map, LAB/lightness helpers, ordered state matching, and unsynchronized palette mutation.
+- Verification was a focused content review after the annotation pass; the only diagnostics surfaced were pre-existing include-path issues in the editor/LSP environment, not from the new comments.
+- Next step in the loop: commit the atomic annotation update, close T695, and move to T697 for `src/slic3r/GUI/Widgets/StateHandler.cpp`.
