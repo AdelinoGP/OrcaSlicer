@@ -415,3 +415,6 @@
 
 - Reconciled the stale T674 narrative with the task registry: `ProgressBar.hpp` is already marked done, so the next actual atomic task is T675 (`src/slic3r/GUI/Widgets/ProgressDialog.cpp`).
 - ProgressDialog.cpp needed comments around the modal event-loop bootstrap, adaptive title layout, re-entrant update/pulse flow, and the OS-window disable/reenable contract; Unity needs a host-driven modal controller, not nested wx loops.
+- Completed T677 (`src/slic3r/GUI/Widgets/RadioBox.cpp`) in the runtime narrative, and T678 is now the active file task for `src/slic3r/GUI/Widgets/RadioBox.hpp`.
+- RadioBox.hpp is a short declaration boundary, so the comments focus on the inherited bitmap-toggle semantics, DPI rescale path, and the Unity split to a retained icon toggle with explicit pressed/disabled states.
+- Verification for T678 passed via `git diff --check`; the remaining work is to record the handoff evidence, mark the task done, commit the atomic header annotation, and continue with T679.

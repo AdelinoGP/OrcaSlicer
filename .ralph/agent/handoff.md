@@ -2779,3 +2779,15 @@ Reconciliation note: the task registry entry for `T663` was still open even thou
 - Hazards found: P3 x1
 - Git: Annotate RadioBox toggle surrogate
 - Next recommended Phase 1 task: T678 annotate: src/slic3r/GUI/Widgets/RadioBox.hpp
+
+## Phase 1 - Task T678 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/RadioBox.hpp
+- Deliverables: src/slic3r/GUI/Widgets/RadioBox.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 5 boundary comments covering class intent, setter/update flow, DPI rescale state, enable/disable event exposure, and cached sprite state
+- Verification excerpt: `[UNITY] Port as a retained icon toggle (Image + Button/Toggle) with explicit pressed, disabled, and rescale states instead of swapping sprites in paint.`
+- Unity-impact summary: bitmap toggle becomes a retained icon toggle; DPI rescaling stays explicit; state remains centralized in the toggle/update path
+- Hazards found: P3 x1 (radio-vs-toggle semantic mismatch)
+- Git: Annotate RadioBox.hpp boundary
+- Next recommended Phase 1 task: T679 annotate: src/slic3r/GUI/Widgets/RadioGroup.cpp
