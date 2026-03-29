@@ -391,6 +391,18 @@ _Generated: 2026-03-26 08:10:14 UTC_
 - Git: Annotate SysInfoDialog.cpp system report dialog
 - Next recommended Phase 1 task: T604 annotate: src/slic3r/GUI/SysInfoDialog.hpp
 
+## Phase 1 - Task T661 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/FilamentLoad.cpp
+- Deliverables: src/slic3r/GUI/Widgets/FilamentLoad.cpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 5 boundary comment groups covering the retained wizard host, step update flow, capability-driven step list rebuild, empty-filament reset, and shared size propagation
+- Verification excerpt: `[UNITY] Port this as a state-driven wizard panel with three retained subviews and a typed step model instead of relying on wxSimplebook page indices.`
+- Unity-impact summary: replace implicit wxSimplebook page indices with an explicit workflow state model; regenerate the stepper dataset from capability flags; keep the empty-filament path as a reset, not teardown
+- Hazards found: P2 x1, UNCLEAR x1
+- Git: Annotate FilamentLoad step workflow
+- Next recommended Phase 1 task: T662 annotate: src/slic3r/GUI/Widgets/FilamentLoad.hpp
+
 ## Phase 1 - Task T609 complete
 
 - Task type: annotate

@@ -341,3 +341,12 @@
 - The header now distinguishes the passive gauge, the interactive +/- strip, the per-row fan controller, the binary switch helper, and the modal popup that assembles ducts/modes from `AirDuctData`.
 - Key Unity mapping: retained gauge prefab plus a reusable fan-row prefab and modal settings dialog, with a marshaled command/service bridge in place of the raw `MachineObject*` mutation path.
 - Next step after commit: close T660 and move to T661 (`src/slic3r/GUI/Widgets/FilamentLoad.cpp`).
+
+- Starting T661 (`src/slic3r/GUI/Widgets/FilamentLoad.cpp`) as the filament-load widget implementation.
+- The file likely bridges a load-progress UI/control surface with printer/filament state, so I need to inspect ownership, event flow, and any thread/process boundary before annotating.
+- Plan: add compact boundary comments for intent, state, events, Unity mapping, and any porting hazard, then verify with `git diff --check`, record handoff evidence, and commit this single-file annotation.
+
+- T660 was already complete in the handoff, but `.ralph/ralph-tasks.md` still had it open; I reconciled the registry to mark it done before continuing with T661.
+- I also briefly closed the wrong runtime task id when trying to sync the stale T660 event and immediately reopened it; no code was affected, but the registry state is now back in sync.
+- FilamentLoad.cpp itself is a retained filament-change wizard host: the main porting concern is replacing implicit wxSimplebook page indices and special-cased confirm steps with an explicit state model and retained subviews.
+- T661 annotation is complete in the working tree and the task registry now marks it done; next step is to commit this atomic file plus the synchronized task/handoff updates.
