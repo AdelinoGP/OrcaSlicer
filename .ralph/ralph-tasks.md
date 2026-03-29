@@ -607,7 +607,7 @@ Last updated: 2026-03-29T03:26:00Z
 - [x] T686 annotate: src/slic3r/GUI/Widgets/ScrolledWindow.hpp
 - [ ] T687 annotate: src/slic3r/GUI/Widgets/SideButton.cpp
 - [x] T688 annotate: src/slic3r/GUI/Widgets/SideButton.hpp
-- [ ] T689 annotate: src/slic3r/GUI/Widgets/SideMenuPopup.cpp
+- [x] T689 annotate: src/slic3r/GUI/Widgets/SideMenuPopup.cpp
 - [ ] T690 annotate: src/slic3r/GUI/Widgets/SideMenuPopup.hpp
 - [ ] T691 annotate: src/slic3r/GUI/Widgets/SideTools.cpp
 - [ ] T692 annotate: src/slic3r/GUI/Widgets/SideTools.hpp

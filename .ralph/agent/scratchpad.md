@@ -43,3 +43,8 @@
 - Picked Phase 1 task T688 for `src/slic3r/GUI/Widgets/SideButton.hpp`.
 - The header is the declaration boundary for the skinned side button: it exposes layout/orientation state, palette mutation entry points, and the custom event surface that the cpp drives.
 - Plan: keep the header annotations focused on retained state, event flow, and Unity mapping, then close the task and continue with the next widget file.
+
+- Picked Phase 1 task T689 for `src/slic3r/GUI/Widgets/SideMenuPopup.cpp`.
+- The popup is a transient floating shell around a caller-populated stack of SideButton children; it measures max child width, reflows every button to that width, and clamps placement against the current display bounds.
+- Unity mapping is a retained popup/container controller with a vertical layout and shared open/close state; the main hazard is the app-global side-menu visibility flag and the focus-relative positioning logic.
+- Completed the annotation pass for T689 and recorded evidence in the handoff; next step is commit + task close for T689, then hand off T690.

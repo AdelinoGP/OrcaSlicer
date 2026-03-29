@@ -692,7 +692,7 @@ _Generated: 2026-03-29 01:50:17 UTC_
 - [ ] T686 annotate: src/slic3r/GUI/Widgets/ScrolledWindow.hpp
 - [ ] T687 annotate: src/slic3r/GUI/Widgets/SideButton.cpp
 - [ ] T688 annotate: src/slic3r/GUI/Widgets/SideButton.hpp
-- [ ] T689 annotate: src/slic3r/GUI/Widgets/SideMenuPopup.cpp
+- [x] T689 annotate: src/slic3r/GUI/Widgets/SideMenuPopup.cpp
 - [ ] T690 annotate: src/slic3r/GUI/Widgets/SideMenuPopup.hpp
 - [ ] T691 annotate: src/slic3r/GUI/Widgets/SideTools.cpp
 - [ ] T692 annotate: src/slic3r/GUI/Widgets/SideTools.hpp
@@ -947,6 +947,18 @@ Continue the previous work. Remaining tasks (213):
 - T691 annotate: src/slic3r/GUI/Widgets/SideTools.cpp
 - T692 annotate: src/slic3r/GUI/Widgets/SideTools.hpp
 - T693 annotate: src/slic3r/GUI/Widgets/SpinInput.cpp
+
+## Phase 1 - Task T689 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/SideMenuPopup.cpp
+- Deliverables: `src/slic3r/GUI/Widgets/SideMenuPopup.cpp`, `src/slic3r/GUI/Widgets/SideMenuPopup.hpp`
+- Substantive additions: 8 comments covering popup lifecycle, layout sizing, dismissal, and Unity mapping
+- Verification excerpt: `// [PORTING_HAZARD:P2] Layout width is recomputed from child min sizes and the popup is positioned against the focus widget and screen bounds.`
+- Unity-impact summary: floating popup shell with vertical button stack; shared visibility state should be externalized; screen-edge clamping needs a retained layout/controller equivalent
+- Hazards found: P2 x2, P3 x1
+- Git: Annotate SideMenuPopup popup behavior
+- Next recommended Phase 1 task: T690 annotate: src/slic3r/GUI/Widgets/SideMenuPopup.hpp
 - T694 annotate: src/slic3r/GUI/Widgets/SpinInput.hpp
 - T695 annotate: src/slic3r/GUI/Widgets/StateColor.cpp
 - T697 annotate: src/slic3r/GUI/Widgets/StateHandler.cpp
