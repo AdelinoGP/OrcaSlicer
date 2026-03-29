@@ -381,3 +381,10 @@
 
 - Completed T668 with boundary comments for the retained static-box shell, cached theme state, enable-event surfacing, CPU paint fallback, label-strip drawing, and sizer padding contract.
 - Verification was clean with `git diff --check`; next step is to commit this atomic annotation and then move to the header task T669.
+
+- Started T669 (`src/slic3r/GUI/Widgets/LabeledStaticBox.hpp`) as the declaration boundary for the custom static-box shell.
+- The header should emphasize the retained theme/border/font state, the custom border/label drawing contract, and the sizer padding override so Unity can port it as a themed container rather than a plain `wxStaticBox`.
+- Plan: add compact class/method/member annotations, verify with `git diff --check`, append handoff evidence, and commit this single-file header pass before moving on.
+
+- T669 annotation is complete in the working tree; `git diff --check` was clean after adding the class boundary notes, theme/state caches, custom draw hook, and sizer padding contract.
+- Next step after commit: move to T671 (`src/slic3r/GUI/Widgets/PopupWindow.cpp`).

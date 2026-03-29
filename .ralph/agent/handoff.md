@@ -2678,3 +2678,17 @@ Reconciliation note: the task registry entry for `T663` was still open even thou
 - Hazards found: P2 x1, P3 x1
 - Git: Annotate LabeledStaticBox paint path
 - Next recommended Phase 1 task: T669 annotate: src/slic3r/GUI/Widgets/LabeledStaticBox.hpp
+## Phase 1 - Task T669 complete
+
+- Task type: annotate
+- File: src/slic3r/GUI/Widgets/LabeledStaticBox.hpp
+- Deliverables: src/slic3r/GUI/Widgets/LabeledStaticBox.hpp, .ralph/agent/scratchpad.md, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions: 6 annotation blocks covering class intent/state/event/unity hazards and draw/sizer helpers
+- Verification excerpt: `// [UNITY] Port as a retained group-box/container panel with serialized style properties and an explicit custom-draw pass.`
+- Unity-impact summary:
+  - Treat this as a retained themed container instead of stock `wxStaticBox`
+  - Preserve explicit label measurement and padding
+  - Keep custom draw separate from layout chrome
+- Hazards found: P2 x1
+- Git: `LabeledStaticBox.hpp annotation pass`
+- Next recommended Phase 1 task: T671 annotate: src/slic3r/GUI/Widgets/PopupWindow.cpp
