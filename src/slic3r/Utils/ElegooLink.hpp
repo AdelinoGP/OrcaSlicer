@@ -15,6 +15,12 @@ namespace Slic3r {
 class DynamicPrintConfig;
 class Http;
 
+// [INTENT] ElegooLink implements the PrintHost interface, inheriting from OctoPrint for HTTP probing and chunked uploads,
+// but adding a custom WebSocket-based SDCP protocol for starting and monitoring prints.
+// [UNITY] Map to a C# implementation that composes an HTTP client (UnityWebRequest or HttpClient) and a WebSocket client (ClientWebSocket). The inheritance from OctoPrint should preferably be replaced by composition.
+// [INTENT] ElegooLink implements the PrintHost interface, inheriting from OctoPrint for HTTP probing and chunked uploads,
+// but adding a custom WebSocket-based SDCP protocol for starting and monitoring prints.
+// [UNITY] Map to a C# implementation that composes an HTTP client (UnityWebRequest or HttpClient) and a WebSocket client (ClientWebSocket). The inheritance from OctoPrint should preferably be replaced by composition.
 class ElegooLink : public OctoPrint
 {
 public:

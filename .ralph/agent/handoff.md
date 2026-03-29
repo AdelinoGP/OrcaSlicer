@@ -1620,3 +1620,29 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 0
 - Git: pending
 - Next recommended Phase 1 task: T741
+
+## Phase 1 - Task T741, T742 complete
+- Task type: annotate
+- File: src/slic3r/Utils/Duet.hpp, src/slic3r/Utils/Duet.cpp
+- Deliverables: both files annotated
+- Substantive additions: class intent, unity mapping, thread mapping for uploads
+- Verification excerpt: `// [UNITY] Implement this as an async Task using HttpClient or UnityWebRequest, taking an IProgress<T> and CancellationToken.`
+- Unity-impact summary: 
+  - Duet API protocol split (RRF vs DSF) needs to be preserved
+  - Blocking HTTP requests must become async tasks
+- Hazards found: 0
+- Git: pending commit
+- Next recommended Phase 1 task: T745
+
+## Phase 1 - Task T743, T744 complete
+- Task type: annotate
+- File: src/slic3r/Utils/ElegooLink.hpp, src/slic3r/Utils/ElegooLink.cpp
+- Deliverables: both files annotated
+- Substantive additions: class intent, composition mapping, threading hazards for busy-waits
+- Verification excerpt: `// [THREAD] print and checkResult methods perform synchronous WebSocket sends and busy-wait loops with std::this_thread::sleep_for()`
+- Unity-impact summary:
+  - Inheritance from OctoPrint should probably be refactored to composition
+  - Busy-wait loops must be replaced with async state machines
+- Hazards found: 0
+- Git: pending commit
+- Next recommended Phase 1 task: T745

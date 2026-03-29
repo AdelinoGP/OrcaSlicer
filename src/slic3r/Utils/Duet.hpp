@@ -11,6 +11,12 @@ namespace Slic3r {
 class DynamicPrintConfig;
 class Http;
 
+// [INTENT] Duet implements the PrintHost interface to upload G-code and start prints on Duet/RepRapFirmware devices.
+// It supports both the legacy RRF (RepRapFirmware) API and the newer DSF (Duet Software Framework) API.
+// [UNITY] Map to a C# PrintHost interface implementation. The logic of selecting between RRF and DSF APIs should be preserved.
+// [INTENT] Duet implements the PrintHost interface to upload G-code and start prints on Duet/RepRapFirmware devices.
+// It supports both the legacy RRF (RepRapFirmware) API and the newer DSF (Duet Software Framework) API.
+// [UNITY] Map to a C# PrintHost interface implementation. The logic of selecting between RRF and DSF APIs should be preserved.
 class Duet : public PrintHost
 {
 public:

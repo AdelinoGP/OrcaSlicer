@@ -54,6 +54,10 @@ wxString Duet::get_test_failed_msg (wxString &msg) const
                     % std::string(msg.ToUTF8())).str());
 }
 
+// [THREAD] The upload method creates an async Http request object but then calls `perform_sync()`, blocking the calling thread.
+// [UNITY] Implement this as an async Task using HttpClient or UnityWebRequest, taking an IProgress<T> and CancellationToken.
+// [THREAD] The upload method creates an async Http request object but then calls `perform_sync()`, blocking the calling thread.
+// [UNITY] Implement this as an async Task using HttpClient or UnityWebRequest, taking an IProgress<T> and CancellationToken.
 bool Duet::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const
 {
 	wxString connect_msg;

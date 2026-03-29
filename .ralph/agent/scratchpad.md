@@ -81,3 +81,17 @@
 - Read files. This class handles sending gcode to Creality printers via REST, then switching to a WebSockets channel to trigger the start command.
 - Added [INTENT] and [UNITY] notes outlining the need for C# async Tasks and `ClientWebSocket` for the command channel since it blocks `Http::perform_sync`.
 - Completed and committed.
+
+## T741, T742 annotate: src/slic3r/Utils/Duet.cpp / hpp
+- Started tasks task-1773880088-21cf and task-1773880088-3d6a
+- Read files. Duet is a PrintHost adapter that supports both RRF and DSF APIs.
+- Added class-level [INTENT] and [UNITY] notes to the header.
+- Added [THREAD] note to the `upload` method detailing the blocking `perform_sync()` and mapping to an async C# Task.
+- Completed and committed.
+
+## T743, T744 annotate: src/slic3r/Utils/ElegooLink.cpp / hpp
+- Started tasks task-1773880089-1524 and task-1773880089-2ec7
+- Read files. ElegooLink inherits OctoPrint adapter for uploads, but uses SDCP via WebSockets for print commands.
+- Added class-level [INTENT] and [UNITY] annotations noting the inheritance/composition change.
+- Added [THREAD] and [UNITY] to `loopUpload` and `print` methods, explicitly calling out the `sleep_for` and blocking HTTP calls.
+- Completed and committed.

@@ -490,6 +490,8 @@ bool ElegooLink::uploadPart(Http&       http,
     return result;
 }
 
+// [THREAD] loopUpload performs synchronous HTTP chunk uploads in a loop, blocking the calling thread.
+// [UNITY] This should be ported to a C# async Task, yielding control during I/O and progressing via await.
 bool ElegooLink::loopUpload(std::string url, PrintHostUpload upload_data, ProgressFn progress_fn, ErrorFn error_fn, InfoFn info_fn) const
 {
     const char* name            = get_name();
@@ -656,6 +658,10 @@ bool ElegooLink::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, Err
 #endif // WIN32
 }
 
+// [THREAD] print and checkResult methods perform synchronous WebSocket sends and busy-wait loops with `std::this_thread::sleep_for()`, blocking the calling thread.
+// [UNITY] Must be refactored into async loops or state machines using `ClientWebSocket.ReceiveAsync()`.
+// [THREAD] print and checkResult methods perform synchronous WebSocket sends and busy-wait loops with `std::this_thread::sleep_for()`, blocking the calling thread.
+// [UNITY] Must be refactored into async loops or state machines using `ClientWebSocket.ReceiveAsync()`.
 bool ElegooLink::print(WebSocketClient&  client,
                        std::string       timeLapse,
                        std::string       heatedBedLeveling,
