@@ -1,3 +1,4 @@
+// [ANNOTATED]
 #include "SimplyPrint.hpp"
 
 #include <openssl/sha.h>

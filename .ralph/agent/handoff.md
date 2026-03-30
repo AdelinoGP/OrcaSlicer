@@ -1278,3 +1278,31 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 0
 - Git: skip-trivial: src/slic3r/Utils/SerialMessageType.hpp
 - Next recommended Phase 1 task: T810 src/slic3r/Utils/SimplyPrint.hpp
+
+## Phase 1 - Task T810 complete
+- Task type: annotate
+- File: src/slic3r/Utils/SimplyPrint.hpp
+- Deliverables: src/slic3r/Utils/SimplyPrint.hpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Cloud-based print host using account-scoped OAuth credentials.
+  - Supports browser-based PKCE flow and temporary file imports.
+  - Chunked upload protocol for large files (>100MB).
+- Hazards found: 1 (P3: Manual multi-request protocol for large uploads requires explicit cleanup)
+- Git: annotate: src/slic3r/Utils/SimplyPrint.hpp
+- Next recommended Phase 1 task: T809 src/slic3r/Utils/SimplyPrint.cpp
+
+## Phase 1 - Task T809 complete
+- Task type: annotate
+- File: src/slic3r/Utils/SimplyPrint.cpp
+- Deliverables: src/slic3r/Utils/SimplyPrint.cpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Implementation of OAuth 2.0 PKCE flow with localhost callback server.
+  - Automated retry-on-401 logic shared across all API calls.
+  - Hands off artifacts to external browser or monitor tab for final import.
+- Hazards found: 1 (P3: Partial upload failures can leave orphaned server-side chunks)
+- Git: annotate: src/slic3r/Utils/SimplyPrint.cpp
+- Next recommended Phase 1 task: T812 src/slic3r/Utils/SnapmakerPrinterAgent.hpp
