@@ -1783,3 +1783,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2 x1 (CGI/FAT assumptions)
 - Git: add10f4372
 - Next recommended Phase 1 task: T757 annotate: src/slic3r/Utils/Flashforge.cpp
+
+## Phase 1 - Task T801 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/RaycastManager.hpp
+- Deliverables: `src/slic3r/Utils/RaycastManager.hpp`
+- Substantive additions: 8 comment blocks covering class intent, cache lifecycle, coordinate space coupling, Unity mapping, and a P2 porting hazard regarding poly counts and BVH optimization.
+- Verification excerpt: `[UNITY] Port as a persistent RaycastService or SceneQueryManager. Use Unity's native raycasting if per-instance MeshColliders are acceptable; otherwise, use a custom BVH system.`
+- Unity-impact summary:
+  - Decouple hit-testing from OpenGL-specific types by using a shared RaycastService.
+  - Preserve the "no collider" lightweight hit-testing pattern to handle high-poly slicer models.
+  - Map `actualize()` to a dictionary-backed cache synchronization logic.
+- Hazards found: P2 x1
+- Git: Annotate RaycastManager.hpp for Unity port
+- Next recommended Phase 1 task: T800 annotate: src/slic3r/Utils/RaycastManager.cpp

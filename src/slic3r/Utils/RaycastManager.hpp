@@ -19,6 +19,12 @@ namespace Slic3r::GUI{
 // the full slicer pipeline.
 // [COUPLING] The type sits directly on libslic3r geometry (`AABBMesh`, `Transform3d`, `ModelVolume`) but
 // is consumed by GUI gizmos, emboss tools, and surface dragging, so any extraction must preserve this seam.
+// [UNITY] Port as a persistent RaycastService or SceneQueryManager. Use Unity's native raycasting if 
+// per-instance MeshColliders are acceptable; otherwise, use a custom BVH system (e.g., Unity.Physics 
+// or a Mesh-based BVH) to maintain the "no collider" lightweight hit-testing pattern.
+// [PORTING_HAZARD:P2] Slicer models often have high poly counts that exceed typical real-time collider 
+// budgets. The Unity port must either use simplified collision meshes or a deferred mesh-raycast 
+// system that mimics the `AABBMesh` optimization seen here.
 class RaycastManager
 {
 // Public structures used by RaycastManager
@@ -99,6 +105,7 @@ public:
     /// <param name="meshes">Speed up for already created AABBtrees</param>
     // [STATE] `actualize()` is destructive cache synchronization: it deletes removed volume meshes / transforms,
     // updates live transforms, and may steal prebuilt BVHs from `meshes` for faster tool startup.
+// [UNITY] Map to a dictionary-backed cache sync in the RaycastService; use ModelID to track stale meshes.
     void actualize(const ModelObject &object, const ISkip *skip = nullptr, Meshes *meshes = nullptr);
     void actualize(const ModelInstance &instance, const ISkip *skip = nullptr, Meshes* meshes = nullptr);
 
@@ -131,6 +138,7 @@ public:
     /// + key, to know hitted instance and volume</returns>
     // [INTENT] `first_hit()` follows the screen ray direction only, which is what painting / emboss placement
     // needs when it wants the visually front-most surface under the cursor.
+// [UNITY] Use RaycastService.GetFirstHit(mouseRay) which wraps Physics.Raycast or custom mesh BVH query.
     std::optional<Hit> first_hit(const Vec3d &point, const Vec3d &direction, const ISkip *skip = nullptr) const;
 
     /// <summary>
@@ -143,6 +151,7 @@ public:
     /// <returns>Position on surface, normal direction and transformation key, which define hitted object instance</returns>
     // [INTENT] `closest_hit()` treats the query as an infinite line rather than a forward-only ray so drag tools can
     // reproject points even when the cursor starts inside geometry or slightly past the target surface.
+// [UNITY] Use RaycastService.GetClosestHitOnInfiniteLine(ray) to allow hits "behind" or "past" the origin.
     std::optional<Hit> closest_hit(const Vec3d &point, const Vec3d &direction, const ISkip *skip = nullptr) const;
 
     /// <summary>
@@ -153,6 +162,7 @@ public:
     /// <returns></returns>
     // [INTENT] `closest()` is the fallback geometric snap: it ignores ray direction and asks each cached mesh for the
     // nearest surface point, which keeps move/drag tools usable when direct projection misses.
+// [UNITY] Map to Mesh.ClosestPoint or a custom BVH search that ignores ray direction.
     std::optional<ClosePoint> closest(const Vec3d &point, const ISkip *skip = nullptr) const;
 
     /// <summary>
@@ -162,6 +172,7 @@ public:
     /// <returns>Transformation for key</returns>
     // [COUPLING] Callers recover the winning world transform by opaque `(instance, volume)` ids instead of keeping raw
     // object pointers, which avoids dangling GUI references when the model graph mutates.
+// [UNITY] In Unity, this should return a standard Matrix4x4 or Transform component reference.
     Transform3d get_transformation(const TrKey &tr_key) const;
 };
 
@@ -174,6 +185,7 @@ class GLCanvas3D;
 /// <returns>Meshes</returns>
 // [COUPLING] This helper clones GUI scene raycasters back into libslic3r `AABBMesh` form so transient tools can reuse
 // the canvas's already-built acceleration data without reaching into OpenGL-only types afterward.
+// [UNITY] Map to a shared MeshCache that converts ModelVolume geometry into high-performance BVH assets.
 RaycastManager::Meshes create_meshes(GLCanvas3D &canvas, const RaycastManager::AllowVolumes &condition);
 
 struct Camera;
@@ -185,6 +197,7 @@ struct Camera;
 /// <param name="skip">Define which caster will be skipped, null mean no skip</param>
 /// <returns>Position on surface, normal direction in world coorinate
 /// + key, to know hitted instance and volume</returns>
+// [UNITY] Port as a service call that derives the world ray from Camera.ScreenPointToRay(mousePos) and executes a RaycastService query.
 std::optional<RaycastManager::Hit> ray_from_camera(const RaycastManager        &raycaster,
                                                    const Vec2d                 &mouse_pos,
                                                    const Camera                &camera,
