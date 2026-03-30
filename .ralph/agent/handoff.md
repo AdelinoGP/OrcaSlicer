@@ -1933,3 +1933,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2 x1 (non-atomic persistence), P3 x3 (coupling and validation dependencies)
 - Git: Annotate InstanceID.cpp for Unity port prep
 - Next recommended Phase 1 task: T767 annotate: src/slic3r/Utils/InstanceID.hpp
+
+## Phase 1 - Task T767 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/InstanceID.hpp
+- Deliverables: src/slic3r/Utils/InstanceID.hpp
+- Substantive additions: Class-level annotations covering IID interface intent, singleton state dependency, and Unity mapping.
+- Verification excerpt: [UNITY] Map the ensure() call to a Unity ScriptableObject provider or a static InstanceIDProvider.Instance.ID property.
+- Unity-impact summary:
+  - Expose as a ScriptableObject service or static singleton.
+  - Decouple first-run resolution from the monolithic AppConfig.
+- Hazards found: P3 x1 (coupling to AppConfig)
+- Git: Annotate InstanceID.hpp for Unity port prep
+- Next recommended Phase 1 task: T768 annotate: src/slic3r/Utils/IPrinterAgent.hpp
