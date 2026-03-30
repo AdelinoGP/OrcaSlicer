@@ -12,17 +12,22 @@ namespace Slic3r {
 class DynamicPrintConfig;
 class Http;
 
+// [INTENT] Flashforge-specific PrintHost implementation that handles printer connection,
+// upload, and print commands using a custom TCP protocol over the Flashforge console port.
+// [UNITY] Map to a C# class implementing a shared IPrintHost interface, using a dedicated
+// FlashforgeProtocol class to handle the command-response sequence.
 class Flashforge : public PrintHost
 {
 public:
-    explicit Flashforge(DynamicPrintConfig *config);
+    explicit Flashforge(DynamicPrintConfig* config);
     ~Flashforge() override = default;
 
-    const char *get_name() const override;
+    const char* get_name() const override;
 
-    bool                       test(wxString &curl_msg) const override;
-    wxString                   get_test_ok_msg() const override;
-    wxString                   get_test_failed_msg(wxString &msg) const override;
+    bool     test(wxString& curl_msg) const override;
+    wxString get_test_ok_msg() const override;
+    wxString get_test_failed_msg(wxString& msg) const override;
+    // [THREAD] Upload is typically called from a worker thread in the plater/sender context.
     bool                       upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const override;
     bool                       has_auto_discovery() const override { return false; }
     bool                       can_test() const override { return true; }
@@ -30,26 +35,28 @@ public:
     std::string                get_host() const override { return m_host; }
 
 private:
+    // [STATE] Connection parameters and printer identity derived from DynamicPrintConfig.
     std::string m_host;
     std::string m_console_port;
-    const int m_bufferSize;
-    // [COUPLING] The serial handshake depends on libslic3r's selected GCodeFlavor because Klipper-targeted output
+    const int   m_bufferSize;
+    // [STATE] The serial handshake depends on libslic3r's selected GCodeFlavor because Klipper-targeted output
     // requires a different connection preamble than the legacy Flashforge firmware path.
     GCodeFlavor m_gcFlavor;
     // [STATE] These canned SerialMessage values encode a vendor-specific upload state machine that TCPConsole
     // replays verbatim; downstream ports should model them as protocol commands, not generic strings.
-    Slic3r::Utils::SerialMessage controlCommand          = {"~M601 S1\r\n",Slic3r::Utils::Command};
-    Slic3r::Utils::SerialMessage connectKlipperCommand   = {"~M640\r\n",Slic3r::Utils::Command};
-    Slic3r::Utils::SerialMessage connectLegacyCommand    = {"~M650\r\n",Slic3r::Utils::Command};
-    Slic3r::Utils::SerialMessage nozzlePosCommand        = {"~M114\r\n", Slic3r::Utils::Command};
-    Slic3r::Utils::SerialMessage deviceInfoCommand       = {"~M115\r\n", Slic3r::Utils::Command};
-    Slic3r::Utils::SerialMessage statusCommand           = {"~M119\r\n",Slic3r::Utils::Command};
-    Slic3r::Utils::SerialMessage tempStatusCommand       = {"~M105\r\n", Slic3r::Utils::Command};
-    Slic3r::Utils::SerialMessage printStatusCommand      = {"~M27\r\n", Slic3r::Utils::Command};
-    Slic3r::Utils::SerialMessage saveFileCommand         = {"~M29\r\n",Slic3r::Utils::Command};
-    int  get_err_code_from_body(const std::string &body) const;
-    bool connect(wxString& msg) const;
-    bool start_print(wxString& msg, const std::string& filename) const;
+    // [PORTING_HAZARD:P3] These literal command strings are hardcoded protocols; consider a data-driven approach in C#.
+    Slic3r::Utils::SerialMessage controlCommand        = {"~M601 S1\r\n", Slic3r::Utils::Command};
+    Slic3r::Utils::SerialMessage connectKlipperCommand = {"~M640\r\n", Slic3r::Utils::Command};
+    Slic3r::Utils::SerialMessage connectLegacyCommand  = {"~M650\r\n", Slic3r::Utils::Command};
+    Slic3r::Utils::SerialMessage nozzlePosCommand      = {"~M114\r\n", Slic3r::Utils::Command};
+    Slic3r::Utils::SerialMessage deviceInfoCommand     = {"~M115\r\n", Slic3r::Utils::Command};
+    Slic3r::Utils::SerialMessage statusCommand         = {"~M119\r\n", Slic3r::Utils::Command};
+    Slic3r::Utils::SerialMessage tempStatusCommand     = {"~M105\r\n", Slic3r::Utils::Command};
+    Slic3r::Utils::SerialMessage printStatusCommand    = {"~M27\r\n", Slic3r::Utils::Command};
+    Slic3r::Utils::SerialMessage saveFileCommand       = {"~M29\r\n", Slic3r::Utils::Command};
+    int                          get_err_code_from_body(const std::string& body) const;
+    bool                         connect(wxString& msg) const;
+    bool                         start_print(wxString& msg, const std::string& filename) const;
 };
 
 } // namespace Slic3r
