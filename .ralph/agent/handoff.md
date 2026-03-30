@@ -1442,3 +1442,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2 (Custom rendering in MObjectPanel, Blocking join in SelectMObjectPopup destructor)
 - Git: N/A (will commit next)
 - Next recommended Phase 1 task: T193 annotate: src/slic3r/GUI/CalibrationWizardCaliPage.cpp
+
+## Phase 1 - Task T193 & T194 complete
+- Task type: annotate
+- File: src/slic3r/GUI/CalibrationWizardCaliPage.cpp, src/slic3r/GUI/CalibrationWizardCaliPage.hpp
+- Deliverables: src/slic3r/GUI/CalibrationWizardCaliPage.cpp, src/slic3r/GUI/CalibrationWizardCaliPage.hpp
+- Substantive additions: Class-level [INTENT], [STATE], [EVENT], [UNITY] annotations.
+- Verification excerpt: "CalibrationCaliPage is a specific step within the calibration wizard that displays the active printing/calibration status."
+- Unity-impact summary:
+  - CalibrationCaliPage -> Sub-page within a larger Wizard MonoBehaviour.
+  - PrintingTaskPanel -> UI Toolkit composite component with ProgressBar and Control Buttons.
+- Hazards found: None major.
+- Git: N/A (will commit next)
+- Next recommended Phase 1 task: T195 annotate: src/slic3r/GUI/CalibrationWizard.cpp
