@@ -2208,3 +2208,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: P2 x1 (Dynamic DLL loading for BBL plugin)
 - Git: Annotate NetworkAgentFactory.cpp for Unity port
 - Next recommended Phase 1 task: T780 annotate: src/slic3r/Utils/NetworkAgentFactory.hpp
+
+## Phase 1 - Task T780 complete
+- Task type: annotate
+- File: src/slic3r/Utils/NetworkAgentFactory.hpp
+- Deliverables: src/slic3r/Utils/NetworkAgentFactory.hpp
+- Substantive additions: 3 blocks (INTENT/STATE/UNITY, PORTING_HAZARD)
+- Verification excerpt: [UNITY] Maps to a C# Service Locator or Dependency Injection (DI) registry.
+- Unity-impact summary:
+  - Decouple agent creation into a C# service registry.
+  - Handle native DLL loading for BBL via P/Invoke or native plugins.
+- Hazards found: 1 (P2: Native DLL dependency)
+- Git: annotate: src/slic3r/Utils/NetworkAgentFactory.hpp
+- Next recommended Phase 1 task: T782 annotate: src/slic3r/Utils/Obico.cpp

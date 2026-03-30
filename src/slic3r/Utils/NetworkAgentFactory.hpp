@@ -16,6 +16,21 @@
 namespace Slic3r {
 
 /**
+ * [INTENT]
+ * Static factory and registry for network communication agents.
+ * Decouples the UI and slicing layers from specific printer/cloud protocols (Orca native vs Bambu Lab DLL).
+ * 
+ * [STATE]
+ * Manages a registry of PrinterAgentInfo (id, name, factory) and handles provider-specific 
+ * instantiation of ICloudServiceAgent and IPrinterAgent.
+ * 
+ * [UNITY]
+ * Maps to a C# Service Locator or Dependency Injection (DI) registry. 
+ * Implementations (Orca, BBL, etc.) should be registered as Services in a Unity lifecycle 
+ * (e.g., via a CoreServices MonoBehaviour or a dedicated NetworkManager ScriptableObject).
+ */
+
+/**
  * CloudAgentProvider - Specifies which implementation to use for each agent type.
  *
  * - Orca: Native Orca cloud implementations (OrcaCloudServiceAgent)
@@ -146,6 +161,8 @@ public:
         case CloudAgentProvider::BBL: {
             // [COUPLING] The BBL path depends on a dynamically loaded plugin singleton; factory success is therefore
             // gated by runtime DLL availability rather than compile-time linkage alone.
+            // [PORTING_HAZARD:P2] Native DLL loading (BBLNetworkPlugin) is platform-specific and requires 
+            // a custom C# wrapper (P/Invoke) or a Unity-compatible native plugin architecture.
             auto& plugin = BBLNetworkPlugin::instance();
             if (!plugin.is_loaded()) {
                 return nullptr;
