@@ -21,3 +21,12 @@
 3. Annotate with [INTENT], [STATE], [EVENT], [UNITY], etc.
 4. Update handoff and mark task complete.
 5. Commit and exit.
+
+# Phase 1: GUI File-by-File Annotation - src/slic3r/GUI/CalibrationPanel.cpp
+
+## Plan
+1. Start task for `src/slic3r/GUI/CalibrationPanel.cpp` (T191).
+2. Read the file.
+3. Annotate with [INTENT], [STATE], [EVENT], [UNITY], etc.
+4. Update handoff and mark task complete.
+5. Commit and exit.

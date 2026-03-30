@@ -11,7 +11,41 @@
 
 namespace Slic3r { namespace GUI {
 
-#define REFRESH_INTERVAL       1000
+/*
+[INTENT]
+CalibrationPanel manages the printer calibration workflow, including printer selection
+and various calibration wizards (Pressure Advance, Flow Rate, etc.).
+It coordinates between the hardware device state (MachineObject) and the UI wizards.
+
+[STATE]
+- m_cali_panels: Array of calibration wizards.
+- obj: Currently selected MachineObject being calibrated.
+- m_mobjectlist_popup: Popup for printer selection.
+- last_status: Cached MonitorStatus to avoid redundant UI updates.
+
+[EVENT]
+- EVT_FINISHED_UPDATE_MLIST: Signal when machine list refresh finishes.
+- EVT_UPDATE_USER_MLIST: Signal to refresh machine list in UI.
+- wxEVT_TIMER: Periodic update of printer status and wizard state.
+
+[THREAD]
+- SelectMObjectPopup spawns a background thread (get_print_info_thread) to fetch printer info via NetworkAgent.
+- CallAfter is used to marshal network results back to the UI thread.
+
+[UNITY]
+- Main calibration view should be a MonoBehaviour-based screen/panel.
+- MObjectPanel -> Recyclable ListView item or UI Toolkit template.
+- SelectMObjectPopup -> Floating UI Toolkit panel or anchored popup.
+- Wizards -> State machine driven views or sub-prefabs.
+
+[PORTING_HAZARD:P2]
+- The manual rendering (doRender) in MObjectPanel with wxDC is common in this codebase; Unity should use standard UI Toolkit elements with
+USS for these layouts.
+- Background thread join in SelectMObjectPopup destructor might block the UI thread; Unity should use async/await or Coroutines with proper
+cancellation tokens.
+*/
+
+#define REFRESH_INTERVAL 1000
 
 #define INITIAL_NUMBER_OF_MACHINES 0
 #define LIST_REFRESH_INTERVAL 200
@@ -22,18 +56,12 @@ wxDEFINE_EVENT(EVT_UPDATE_USER_MLIST, wxCommandEvent);
 wxString get_calibration_type_name(CalibMode cali_mode)
 {
     switch (cali_mode) {
-    case CalibMode::Calib_PA_Line:
-        return _L("Flow Dynamics");
-    case CalibMode::Calib_Flow_Rate:
-        return _L("Flow Rate");
-    case CalibMode::Calib_Vol_speed_Tower:
-        return _L("Max Volumetric Speed");
-    case CalibMode::Calib_Temp_Tower:
-        return _L("Temperature");
-    case CalibMode::Calib_Retraction_tower:
-        return _L("Retraction");
-    default:
-        return "";
+    case CalibMode::Calib_PA_Line: return _L("Flow Dynamics");
+    case CalibMode::Calib_Flow_Rate: return _L("Flow Rate");
+    case CalibMode::Calib_Vol_speed_Tower: return _L("Max Volumetric Speed");
+    case CalibMode::Calib_Temp_Tower: return _L("Temperature");
+    case CalibMode::Calib_Retraction_tower: return _L("Retraction");
+    default: return "";
     }
 }
 
@@ -43,21 +71,18 @@ MObjectPanel::MObjectPanel(wxWindow* parent, wxWindowID id, const wxPoint& pos, 
     Bind(wxEVT_PAINT, &MObjectPanel::OnPaint, this);
     SetBackgroundColour(StateColor::darkModeColorFor(*wxWHITE));
 
-
     m_printer_status_offline = ScalableBitmap(this, "printer_status_offline", 12);
-    m_printer_status_busy = ScalableBitmap(this, "printer_status_busy", 12);
-    m_printer_status_idle = ScalableBitmap(this, "printer_status_idle", 12);
-    m_printer_status_lock = ScalableBitmap(this, "printer_status_lock", 16);
-    m_printer_in_lan = ScalableBitmap(this, "printer_in_lan", 16);
+    m_printer_status_busy    = ScalableBitmap(this, "printer_status_busy", 12);
+    m_printer_status_idle    = ScalableBitmap(this, "printer_status_idle", 12);
+    m_printer_status_lock    = ScalableBitmap(this, "printer_status_lock", 16);
+    m_printer_in_lan         = ScalableBitmap(this, "printer_in_lan", 16);
 
     Bind(wxEVT_ENTER_WINDOW, &MObjectPanel::on_mouse_enter, this);
     Bind(wxEVT_LEAVE_WINDOW, &MObjectPanel::on_mouse_leave, this);
     Bind(wxEVT_LEFT_UP, &MObjectPanel::on_mouse_left_up, this);
 }
 
-
 MObjectPanel::~MObjectPanel() {}
-
 
 void MObjectPanel::set_printer_state(PrinterState state)
 {
@@ -65,7 +90,7 @@ void MObjectPanel::set_printer_state(PrinterState state)
     Refresh();
 }
 
-void MObjectPanel::OnPaint(wxPaintEvent & event)
+void MObjectPanel::OnPaint(wxPaintEvent& event)
 {
     wxPaintDC dc(this);
     doRender(dc);
@@ -78,7 +103,7 @@ void MObjectPanel::render(wxDC& dc)
     wxMemoryDC memdc;
     wxBitmap   bmp(size.x, size.y);
     memdc.SelectObject(bmp);
-    memdc.Blit({ 0, 0 }, size, &dc, { 0, 0 });
+    memdc.Blit({0, 0}, size, &dc, {0, 0});
 
     {
         wxGCDC dc2(memdc);
@@ -92,6 +117,11 @@ void MObjectPanel::render(wxDC& dc)
 #endif
 }
 
+/*
+[OPENGL]
+While this uses wxDC/GCDC for 2D software rendering, in Unity these machine status items
+should be implemented as standard UI Toolkit VisualElements or Sprite-based UI components.
+*/
 void MObjectPanel::doRender(wxDC& dc)
 {
     auto   left = 10;
@@ -99,11 +129,21 @@ void MObjectPanel::doRender(wxDC& dc)
     dc.SetPen(*wxTRANSPARENT_PEN);
 
     auto dwbitmap = m_printer_status_offline;
-    if (m_state == PrinterState::IDLE) { dwbitmap = m_printer_status_idle; }
-    if (m_state == PrinterState::BUSY) { dwbitmap = m_printer_status_busy; }
-    if (m_state == PrinterState::OFFLINE) { dwbitmap = m_printer_status_offline; }
-    if (m_state == PrinterState::LOCK) { dwbitmap = m_printer_status_lock; }
-    if (m_state == PrinterState::IN_LAN) { dwbitmap = m_printer_in_lan; }
+    if (m_state == PrinterState::IDLE) {
+        dwbitmap = m_printer_status_idle;
+    }
+    if (m_state == PrinterState::BUSY) {
+        dwbitmap = m_printer_status_busy;
+    }
+    if (m_state == PrinterState::OFFLINE) {
+        dwbitmap = m_printer_status_offline;
+    }
+    if (m_state == PrinterState::LOCK) {
+        dwbitmap = m_printer_status_lock;
+    }
+    if (m_state == PrinterState::IN_LAN) {
+        dwbitmap = m_printer_in_lan;
+    }
 
     // dc.DrawCircle(left, size.y / 2, 3);
     dc.DrawBitmap(dwbitmap.bmp(), wxPoint(left, (size.y - dwbitmap.GetBmpSize().y) / 2));
@@ -120,8 +160,8 @@ void MObjectPanel::doRender(wxDC& dc)
             dev_name += _L("(LAN)");
         }
     }
-    auto        sizet = dc.GetTextExtent(dev_name);
-    auto        text_end = size.x - FromDIP(15);
+    auto sizet    = dc.GetTextExtent(dev_name);
+    auto text_end = size.x - FromDIP(15);
 
     wxString finally_name = dev_name;
     if (sizet.x > (text_end - left)) {
@@ -137,18 +177,16 @@ void MObjectPanel::doRender(wxDC& dc)
 
     dc.DrawText(finally_name, wxPoint(left, (size.y - sizet.y) / 2));
 
-
     if (m_hover) {
         dc.SetPen(SELECT_MACHINE_BRAND);
         dc.SetBrush(*wxTRANSPARENT_BRUSH);
         dc.DrawRectangle(0, 0, size.x, size.y);
     }
-
 }
 
 void MObjectPanel::update_machine_info(MachineObject* info, bool is_my_devices)
 {
-    m_info = info;
+    m_info          = info;
     m_is_my_devices = is_my_devices;
     Refresh();
 }
@@ -165,19 +203,25 @@ void MObjectPanel::on_mouse_leave(wxMouseEvent& evt)
     Refresh();
 }
 
+/*
+[EVENT]
+Handles printer selection and notifies the DeviceManager.
+Dismisses the machine list popup after selection.
+*/
 void MObjectPanel::on_mouse_left_up(wxMouseEvent& evt)
 {
     if (m_is_my_devices) {
         if (m_info && m_info->is_lan_mode_printer()) {
             if (m_info->has_access_right() && m_info->is_avaliable()) {
                 Slic3r::DeviceManager* dev = Slic3r::GUI::wxGetApp().getDeviceManager();
-                if (!dev) return;
+                if (!dev)
+                    return;
                 dev->set_selected_machine(m_info->get_dev_id());
             }
-        }
-        else {
+        } else {
             Slic3r::DeviceManager* dev = Slic3r::GUI::wxGetApp().getDeviceManager();
-            if (!dev) return;
+            if (!dev)
+                return;
             dev->set_selected_machine(m_info->get_dev_id());
         }
         wxCommandEvent event(EVT_DISSMISS_MACHINE_LIST);
@@ -186,13 +230,11 @@ void MObjectPanel::on_mouse_left_up(wxMouseEvent& evt)
     }
 }
 
-SelectMObjectPopup::SelectMObjectPopup(wxWindow* parent)
-    :PopupWindow(parent, wxBORDER_NONE | wxPU_CONTAINS_CONTROLS), m_dismiss(false)
+SelectMObjectPopup::SelectMObjectPopup(wxWindow* parent) : PopupWindow(parent, wxBORDER_NONE | wxPU_CONTAINS_CONTROLS), m_dismiss(false)
 {
 #ifdef __WINDOWS__
     SetDoubleBuffered(true);
 #endif //__WINDOWS__
-
 
     SetSize(SELECT_MACHINE_POPUP_SIZE);
     SetMinSize(SELECT_MACHINE_POPUP_SIZE);
@@ -201,8 +243,6 @@ SelectMObjectPopup::SelectMObjectPopup(wxWindow* parent)
     Freeze();
     wxBoxSizer* m_sizer_main = new wxBoxSizer(wxVERTICAL);
     SetBackgroundColour(SELECT_MACHINE_GREY400);
-
-
 
     m_scrolledWindow = new wxScrolledWindow(this, wxID_ANY, wxDefaultPosition, SELECT_MACHINE_LIST_SIZE, wxHSCROLL | wxVSCROLL);
     m_scrolledWindow->SetBackgroundColour(*wxWHITE);
@@ -215,7 +255,6 @@ SelectMObjectPopup::SelectMObjectPopup(wxWindow* parent)
 
     m_sizer_my_devices = new wxBoxSizer(wxVERTICAL);
     m_sizxer_scrolledWindow->Add(m_sizer_my_devices, 0, wxEXPAND, 0);
-
 
     m_sizer_main->Add(m_scrolledWindow, 0, wxALL | wxEXPAND, FromDIP(2));
 
@@ -236,6 +275,11 @@ SelectMObjectPopup::SelectMObjectPopup(wxWindow* parent)
 
 SelectMObjectPopup::~SelectMObjectPopup() { delete m_refresh_timer; }
 
+/*
+[THREAD]
+Starts a background thread to fetch user print info via NetworkAgent.
+Uses CallAfter to update UI state (m_print_info) and trigger a machine list refresh.
+*/
 void SelectMObjectPopup::Popup(wxWindow* WXUNUSED(focus))
 {
     BOOST_LOG_TRIVIAL(trace) << "get_print_info: start";
@@ -248,16 +292,17 @@ void SelectMObjectPopup::Popup(wxWindow* WXUNUSED(focus))
         if (!get_print_info_thread) {
             get_print_info_thread = new boost::thread(Slic3r::create_thread([this, token = std::weak_ptr<int>(m_token)] {
                 NetworkAgent* agent = wxGetApp().getAgent();
-                unsigned int http_code;
-                std::string body;
-                int result = agent->get_user_print_info(&http_code, &body);
+                unsigned int  http_code;
+                std::string   body;
+                int           result = agent->get_user_print_info(&http_code, &body);
 
                 wxGetApp().CallAfter([token, this, result, body]() {
-                    if (token.expired()) {return;}
+                    if (token.expired()) {
+                        return;
+                    }
                     if (result == 0) {
                         m_print_info = body;
-                    }
-                    else {
+                    } else {
                         m_print_info = "";
                     }
 
@@ -294,11 +339,10 @@ void SelectMObjectPopup::OnDismiss()
     wxPostEvent(this, event);
 }
 
-bool SelectMObjectPopup::ProcessLeftDown(wxMouseEvent& event) {
-    return PopupWindow::ProcessLeftDown(event);
-}
+bool SelectMObjectPopup::ProcessLeftDown(wxMouseEvent& event) { return PopupWindow::ProcessLeftDown(event); }
 
-bool SelectMObjectPopup::Show(bool show) {
+bool SelectMObjectPopup::Show(bool show)
+{
     if (show) {
         for (int i = 0; i < m_user_list_machine_panel.size(); i++) {
             m_user_list_machine_panel[i]->mPanel->update_machine_info(nullptr);
@@ -316,10 +360,16 @@ void SelectMObjectPopup::on_timer(wxTimerEvent& event)
     wxPostEvent(this, user_event);
 }
 
+/*
+[STATE]
+Synchronizes the machine list from DeviceManager and updates MObjectPanel sub-widgets.
+Handles various printer connection states (LAN, online, offline, busy, idle, locked).
+*/
 void SelectMObjectPopup::update_user_devices()
 {
     Slic3r::DeviceManager* dev = Slic3r::GUI::wxGetApp().getDeviceManager();
-    if (!dev) return;
+    if (!dev)
+        return;
 
     if (!m_print_info.empty()) {
         dev->parse_user_print_info(m_print_info);
@@ -329,7 +379,7 @@ void SelectMObjectPopup::update_user_devices()
     m_bind_machine_list.clear();
     m_bind_machine_list = dev->get_my_machine_list();
 
-    //sort list
+    // sort list
     std::vector<std::pair<std::string, MachineObject*>> user_machine_list;
     for (auto& it : m_bind_machine_list) {
         user_machine_list.push_back(it);
@@ -340,7 +390,7 @@ void SelectMObjectPopup::update_user_devices()
             return a.second->get_dev_name().compare(b.second->get_dev_name()) < 0;
         }
         return false;
-        });
+    });
 
     BOOST_LOG_TRIVIAL(trace) << "SelectMObjectPopup update_machine_list start";
     this->Freeze();
@@ -349,13 +399,12 @@ void SelectMObjectPopup::update_user_devices()
 
     for (auto& elem : user_machine_list) {
         MachineObject* mobj = elem.second;
-        MObjectPanel* op = nullptr;
+        MObjectPanel*  op   = nullptr;
         if (i < m_user_list_machine_panel.size()) {
             op = m_user_list_machine_panel[i]->mPanel;
             op->Show();
-        }
-        else {
-            op = new MObjectPanel(m_scrolledWindow, wxID_ANY);
+        } else {
+            op             = new MObjectPanel(m_scrolledWindow, wxID_ANY);
             MPanel* mpanel = new MPanel();
             mpanel->mIndex = wxString::Format("%d", i);
             mpanel->mPanel = op;
@@ -364,32 +413,27 @@ void SelectMObjectPopup::update_user_devices()
         }
         i++;
         op->update_machine_info(mobj, true);
-        //set in lan
+        // set in lan
         if (mobj->is_lan_mode_printer()) {
             if (!mobj->is_online()) {
                 continue;
-            }
-            else {
+            } else {
                 if (mobj->has_access_right() && mobj->is_avaliable()) {
                     op->set_printer_state(PrinterState::IN_LAN);
                     op->SetToolTip(_L("Online"));
-                }
-                else {
+                } else {
                     op->set_printer_state(PrinterState::LOCK);
                 }
             }
-        }
-        else {
+        } else {
             if (!mobj->is_online()) {
                 op->SetToolTip(_L("Offline"));
                 op->set_printer_state(PrinterState::OFFLINE);
-            }
-            else {
+            } else {
                 if (mobj->is_in_printing()) {
                     op->SetToolTip(_L("Busy"));
                     op->set_printer_state(PrinterState::BUSY);
-                }
-                else {
+                } else {
                     op->SetToolTip(_L("Online"));
                     op->set_printer_state(PrinterState::IDLE);
                 }
@@ -401,7 +445,7 @@ void SelectMObjectPopup::update_user_devices()
         m_user_list_machine_panel[j]->mPanel->update_machine_info(nullptr);
         m_user_list_machine_panel[j]->mPanel->Hide();
     }
-    //m_sizer_my_devices->Layout();
+    // m_sizer_my_devices->Layout();
 
     if (m_my_devices_count != i) {
         m_scrolledWindow->Fit();
@@ -414,10 +458,7 @@ void SelectMObjectPopup::update_user_devices()
     m_my_devices_count = i;
 }
 
-void SelectMObjectPopup::on_dissmiss_win(wxCommandEvent& event)
-{
-    Dismiss();
-}
+void SelectMObjectPopup::on_dissmiss_win(wxCommandEvent& event) { Dismiss(); }
 
 void SelectMObjectPopup::update_machine_list(wxCommandEvent& event)
 {
@@ -427,15 +468,16 @@ void SelectMObjectPopup::update_machine_list(wxCommandEvent& event)
 
 void SelectMObjectPopup::OnLeftUp(wxMouseEvent& event)
 {
-    auto mouse_pos = ClientToScreen(event.GetPosition());
+    auto mouse_pos        = ClientToScreen(event.GetPosition());
     auto wxscroll_win_pos = m_scrolledWindow->ClientToScreen(wxPoint(0, 0));
 
-    if (mouse_pos.x > wxscroll_win_pos.x && mouse_pos.y > wxscroll_win_pos.y && mouse_pos.x < (wxscroll_win_pos.x + m_scrolledWindow->GetSize().x) &&
+    if (mouse_pos.x > wxscroll_win_pos.x && mouse_pos.y > wxscroll_win_pos.y &&
+        mouse_pos.x < (wxscroll_win_pos.x + m_scrolledWindow->GetSize().x) &&
         mouse_pos.y < (wxscroll_win_pos.y + m_scrolledWindow->GetSize().y)) {
-
         for (MPanel* p : m_user_list_machine_panel) {
             auto p_rect = p->mPanel->ClientToScreen(wxPoint(0, 0));
-            if (mouse_pos.x > p_rect.x && mouse_pos.y > p_rect.y && mouse_pos.x < (p_rect.x + p->mPanel->GetSize().x) && mouse_pos.y < (p_rect.y + p->mPanel->GetSize().y)) {
+            if (mouse_pos.x > p_rect.x && mouse_pos.y > p_rect.y && mouse_pos.x < (p_rect.x + p->mPanel->GetSize().x) &&
+                mouse_pos.y < (p_rect.y + p->mPanel->GetSize().y)) {
                 wxMouseEvent event(wxEVT_LEFT_UP);
                 auto         tag_pos = p->mPanel->ScreenToClient(mouse_pos);
                 event.SetPosition(tag_pos);
@@ -446,10 +488,8 @@ void SelectMObjectPopup::OnLeftUp(wxMouseEvent& event)
     }
 }
 
-
 CalibrationPanel::CalibrationPanel(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size, long style)
-    : wxPanel(parent, id, pos, size, style),
-    m_mobjectlist_popup(SelectMObjectPopup(this))
+    : wxPanel(parent, id, pos, size, style), m_mobjectlist_popup(SelectMObjectPopup(this))
 {
     SetBackgroundColour(*wxWHITE);
 
@@ -465,38 +505,36 @@ CalibrationPanel::CalibrationPanel(wxWindow* parent, wxWindowID id, const wxPoin
     Bind(wxEVT_TIMER, &CalibrationPanel::on_timer, this);
 }
 
-void CalibrationPanel::init_tabpanel() {
+void CalibrationPanel::init_tabpanel()
+{
     m_side_tools = new SideTools(this, wxID_ANY);
     m_side_tools->get_panel()->Connect(wxEVT_LEFT_DOWN, wxMouseEventHandler(CalibrationPanel::on_printer_clicked), NULL, this);
-
 
     wxBoxSizer* sizer_side_tools = new wxBoxSizer(wxVERTICAL);
     sizer_side_tools->Add(m_side_tools, 1, wxEXPAND, 0);
 
-    m_tabpanel = new Tabbook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, sizer_side_tools, wxNB_LEFT | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME);
+    m_tabpanel = new Tabbook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, sizer_side_tools,
+                             wxNB_LEFT | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME);
     m_side_tools->set_table_panel(m_tabpanel);
     m_tabpanel->SetBackgroundColour(wxColour("#FEFFFF")); // ORCA match sidebar background color
 
     m_cali_panels[0] = new PressureAdvanceWizard(m_tabpanel);
     m_cali_panels[1] = new FlowRateWizard(m_tabpanel);
-    //m_cali_panels[2] = new MaxVolumetricSpeedWizard(m_tabpanel);
+    // m_cali_panels[2] = new MaxVolumetricSpeedWizard(m_tabpanel);
 
-    for (int i = 0; i < (int)CALI_MODE_COUNT; i++) {
+    for (int i = 0; i < (int) CALI_MODE_COUNT; i++) {
         bool selected = false;
         if (i == 0)
             selected = true;
-        m_tabpanel->AddPage(m_cali_panels[i],
-            get_calibration_type_name(m_cali_panels[i]->get_calibration_mode()),
-            "",
-            selected);
+        m_tabpanel->AddPage(m_cali_panels[i], get_calibration_type_name(m_cali_panels[i]->get_calibration_mode()), "", selected);
     }
 
     // ORCA use standard paddings and keep arrow icon for consistent look between sidebars
-    //for (int i = 0; i < (int)CALI_MODE_COUNT; i++)
+    // for (int i = 0; i < (int)CALI_MODE_COUNT; i++)
     //    m_tabpanel->SetPageImage(i, "");
 
-    //auto padding_size = m_tabpanel->GetBtnsListCtrl()->GetPaddingSize(0);
-    //m_tabpanel->GetBtnsListCtrl()->SetPaddingSize({ FromDIP(15), padding_size.y });
+    // auto padding_size = m_tabpanel->GetBtnsListCtrl()->GetPaddingSize(0);
+    // m_tabpanel->GetBtnsListCtrl()->SetPaddingSize({ FromDIP(15), padding_size.y });
 
     m_initialized = true;
 }
@@ -509,11 +547,10 @@ void CalibrationPanel::init_timer()
     wxPostEvent(this, wxCommandEvent(wxEVT_TIMER));
 }
 
-void CalibrationPanel::on_timer(wxTimerEvent& event) {
-    update_all();
-}
+void CalibrationPanel::on_timer(wxTimerEvent& event) { update_all(); }
 
-void CalibrationPanel::update_print_error_info(int code, std::string msg, std::string extra) {
+void CalibrationPanel::update_print_error_info(int code, std::string msg, std::string extra)
+{
     // update current wizard only
     int curr_selected = m_tabpanel->GetSelection();
     if (curr_selected >= 0 && curr_selected < CALI_MODE_COUNT) {
@@ -533,17 +570,25 @@ void CalibrationPanel::update_print_error_info(int code, std::string msg, std::s
     }
 }
 
-void CalibrationPanel::update_all() {
-
-    NetworkAgent* m_agent = wxGetApp().getAgent();
-    Slic3r::DeviceManager* dev = Slic3r::GUI::wxGetApp().getDeviceManager();
-    if (!dev) return;
+/*
+[STATE]
+Updates the entire calibration UI state based on the selected machine.
+Checks if the machine is still valid and connected.
+Updates the side tools status strip and the active wizard.
+*/
+void CalibrationPanel::update_all()
+{
+    NetworkAgent*          m_agent = wxGetApp().getAgent();
+    Slic3r::DeviceManager* dev     = Slic3r::GUI::wxGetApp().getDeviceManager();
+    if (!dev)
+        return;
     obj = dev->get_selected_machine();
 
     // check valid machine
     if (obj && dev->get_my_machine(obj->get_dev_id()) == nullptr) {
         dev->set_selected_machine("");
-        if (m_agent) m_agent->set_user_selected_machine("");
+        if (m_agent)
+            m_agent->set_user_selected_machine("");
         show_status((int) MONITOR_NO_PRINTER);
         return;
     }
@@ -572,23 +617,22 @@ void CalibrationPanel::update_all() {
     m_side_tools->update_status(obj);
 
     if (!obj) {
-        show_status((int)MONITOR_NO_PRINTER);
+        show_status((int) MONITOR_NO_PRINTER);
         return;
     }
 
     if (obj->is_connecting()) {
         show_status(MONITOR_CONNECTING);
         return;
-    }
-    else if (!obj->is_connected()) {
+    } else if (!obj->is_connected()) {
         int server_status = 0;
         // only disconnected server in cloud mode
         if (obj->connection_type() != "lan") {
             if (m_agent) {
-                server_status = m_agent->is_server_connected() ? 0 : (int)MONITOR_DISCONNECTED_SERVER;
+                server_status = m_agent->is_server_connected() ? 0 : (int) MONITOR_DISCONNECTED_SERVER;
             }
         }
-        show_status((int)MONITOR_DISCONNECTED + server_status);
+        show_status((int) MONITOR_DISCONNECTED + server_status);
         return;
     }
 
@@ -597,31 +641,29 @@ void CalibrationPanel::update_all() {
 
 void CalibrationPanel::show_status(int status)
 {
-    if (!m_initialized) return;
-    if (last_status == status)return;
+    if (!m_initialized)
+        return;
+    if (last_status == status)
+        return;
     last_status = status;
 
     BOOST_LOG_TRIVIAL(info) << "monitor: show_status = " << status;
 
-
     Freeze();
     // update panels
-    if (m_side_tools) { m_side_tools->show_status(status); };
+    if (m_side_tools) {
+        m_side_tools->show_status(status);
+    };
 
-    if ((status & (int)MonitorStatus::MONITOR_NO_PRINTER) != 0) {
+    if ((status & (int) MonitorStatus::MONITOR_NO_PRINTER) != 0) {
         set_default();
         m_tabpanel->Layout();
-    }
-    else if (((status & (int)MonitorStatus::MONITOR_NORMAL) != 0)
-        || ((status & (int)MonitorStatus::MONITOR_DISCONNECTED) != 0)
-        || ((status & (int)MonitorStatus::MONITOR_DISCONNECTED_SERVER) != 0)
-        || ((status & (int)MonitorStatus::MONITOR_CONNECTING) != 0))
-    {
-
-        if (((status & (int)MonitorStatus::MONITOR_DISCONNECTED) != 0)
-            || ((status & (int)MonitorStatus::MONITOR_DISCONNECTED_SERVER) != 0)
-            || ((status & (int)MonitorStatus::MONITOR_CONNECTING) != 0))
-        {
+    } else if (((status & (int) MonitorStatus::MONITOR_NORMAL) != 0) || ((status & (int) MonitorStatus::MONITOR_DISCONNECTED) != 0) ||
+               ((status & (int) MonitorStatus::MONITOR_DISCONNECTED_SERVER) != 0) ||
+               ((status & (int) MonitorStatus::MONITOR_CONNECTING) != 0)) {
+        if (((status & (int) MonitorStatus::MONITOR_DISCONNECTED) != 0) ||
+            ((status & (int) MonitorStatus::MONITOR_DISCONNECTED_SERVER) != 0) ||
+            ((status & (int) MonitorStatus::MONITOR_CONNECTING) != 0)) {
             set_default();
         }
         m_tabpanel->Layout();
@@ -630,7 +672,8 @@ void CalibrationPanel::show_status(int status)
     Thaw();
 }
 
-bool CalibrationPanel::Show(bool show) {
+bool CalibrationPanel::Show(bool show)
+{
     if (show) {
         m_refresh_timer->Stop();
         m_refresh_timer->SetOwner(this);
@@ -639,18 +682,16 @@ bool CalibrationPanel::Show(bool show) {
 
         DeviceManager* dev = Slic3r::GUI::wxGetApp().getDeviceManager();
         if (dev) {
-            //set a default machine when obj is null
+            // set a default machine when obj is null
             obj = dev->get_selected_machine();
             if (obj == nullptr) {
                 dev->load_last_machine();
-            }
-            else {
+            } else {
                 obj->reset_update_time();
             }
         }
 
-    }
-    else {
+    } else {
         m_refresh_timer->Stop();
     }
     return wxPanel::Show(show);
@@ -658,8 +699,8 @@ bool CalibrationPanel::Show(bool show) {
 
 void CalibrationPanel::on_printer_clicked(wxMouseEvent& event)
 {
-    auto mouse_pos = ClientToScreen(event.GetPosition());
-    wxPoint rect = m_side_tools->ClientToScreen(wxPoint(0, 0));
+    auto    mouse_pos = ClientToScreen(event.GetPosition());
+    wxPoint rect      = m_side_tools->ClientToScreen(wxPoint(0, 0));
 
     if (!m_side_tools->is_in_interval()) {
         wxPoint pos = m_side_tools->ClientToScreen(wxPoint(0, 0));
@@ -678,29 +719,30 @@ void CalibrationPanel::on_printer_clicked(wxMouseEvent& event)
 
 void CalibrationPanel::set_default()
 {
-    obj = nullptr;
+    obj            = nullptr;
     last_conn_type = "undefined";
 }
 
 void CalibrationPanel::msw_rescale()
 {
-    for (int i = 0; i < (int)CALI_MODE_COUNT; i++) {
+    for (int i = 0; i < (int) CALI_MODE_COUNT; i++) {
         m_cali_panels[i]->msw_rescale();
     }
 }
 
 void CalibrationPanel::on_sys_color_changed()
 {
-    for (int i = 0; i < (int)CALI_MODE_COUNT; i++) {
+    for (int i = 0; i < (int) CALI_MODE_COUNT; i++) {
         m_cali_panels[i]->on_sys_color_changed();
     }
 }
 
-CalibrationPanel::~CalibrationPanel() {
+CalibrationPanel::~CalibrationPanel()
+{
     m_side_tools->get_panel()->Disconnect(wxEVT_LEFT_DOWN, wxMouseEventHandler(CalibrationPanel::on_printer_clicked), NULL, this);
     if (m_refresh_timer)
         m_refresh_timer->Stop();
     delete m_refresh_timer;
 }
 
-}}
+}} // namespace Slic3r::GUI

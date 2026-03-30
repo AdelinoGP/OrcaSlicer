@@ -1428,3 +1428,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 2 (P1: Heavy wxWidgets/OpenGL coupling; P2: Custom GL drawing logic for specialized tools)
 - Git: annotate: src/slic3r/GUI/GLCanvas3D.hpp
 - Next recommended Phase 1 task: T356 src/slic3r/GUI/GLCanvas3D.cpp
+
+## Phase 1 - Task T191 & T192 complete
+- Task type: annotate
+- File: src/slic3r/GUI/CalibrationPanel.cpp, src/slic3r/GUI/CalibrationPanel.hpp
+- Deliverables: src/slic3r/GUI/CalibrationPanel.cpp, src/slic3r/GUI/CalibrationPanel.hpp
+- Substantive additions: Class-level [INTENT], [STATE], [THREAD], [EVENT], [UNITY] annotations.
+- Verification excerpt: "CalibrationPanel manages the printer calibration workflow, including printer selection and various calibration wizards"
+- Unity-impact summary:
+  - MObjectPanel -> Recyclable ListView item or UI Toolkit template.
+  - SelectMObjectPopup -> Floating UI Toolkit panel or anchored popup.
+  - Background thread join in SelectMObjectPopup destructor might block the UI thread; Unity should use async/await or Coroutines.
+- Hazards found: P2 (Custom rendering in MObjectPanel, Blocking join in SelectMObjectPopup destructor)
+- Git: N/A (will commit next)
+- Next recommended Phase 1 task: T193 annotate: src/slic3r/GUI/CalibrationWizardCaliPage.cpp
