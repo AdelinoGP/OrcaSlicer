@@ -2110,3 +2110,42 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P1 x1 (raw thread management)
 - Git: Annotate MoonrakerPrinterAgent.hpp for Unity port prep
 - Next recommended Phase 1 task: T778 annotate: src/slic3r/Utils/NetworkAgent.cpp
+
+## Phase 1 - Task T759 complete
+- Task type: annotate
+- File: src/slic3r/Utils/FontConfigHelp.cpp
+- Deliverables: src/slic3r/Utils/FontConfigHelp.cpp
+- Substantive additions: 6 comment blocks covering intent, Unity mapping, P2 hazard, state, and thread safety.
+- Verification excerpt: [UNITY] Unity manages fonts via Font assets or TMP_FontAsset. On Linux, Unity handles system font discovery internally.
+- Unity-impact summary:
+  - Replace manual FontConfig queries with Unity's internal font discovery.
+  - Use Font.GetOSInstalledFontNames() if raw font paths are truly necessary.
+- Hazards found: P2 x1
+- Git: 8b23da2116
+- Next recommended Phase 1 task: T760 annotate: src/slic3r/Utils/FontConfigHelp.hpp
+
+## Phase 1 - Task T760 complete
+- Task type: annotate
+- File: src/slic3r/Utils/FontConfigHelp.hpp
+- Deliverables: src/slic3r/Utils/FontConfigHelp.hpp
+- Substantive additions: 3 comment blocks covering intent and Unity mapping.
+- Verification excerpt: [INTENT] Declaration for Linux-specific font resolution utility.
+- Unity-impact summary:
+  - Utility declaration to be replaced by Unity's font management system.
+- Hazards found: 0
+- Git: 8b23da2116
+- Next recommended Phase 1 task: T761 annotate: src/slic3r/Utils/HexFile.cpp
+
+## Phase 1 - Task T761 complete
+- Task type: annotate
+- File: src/slic3r/Utils/HexFile.cpp
+- Deliverables: src/slic3r/Utils/HexFile.cpp, src/slic3r/Utils/HexFile.hpp
+- Substantive additions: 3 comment blocks covering helper intent, constructor parsing flow, state mutation, and threading behavior
+- Verification excerpt: `[INTENT] Constructor that performs the actual parsing. It reads the file line by line, collecting comment lines (starting with ';') until it hits the first hex record (starting with ':').`
+- Unity-impact summary:
+  - This is a pure data utility. 
+  - Port as a simple C# class or struct with a static factory method using `System.IO` and regex/string splitting for parsing.
+  - The INI-style header embedded in comments should be parsed using standard C# string manipulation.
+- Hazards found: P3 x1 (Boost dependencies)
+- Git: Annotate HexFile.cpp for Unity port
+- Next recommended Phase 1 task: T762 annotate: src/slic3r/Utils/HexFile.hpp
