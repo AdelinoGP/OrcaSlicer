@@ -32,16 +32,21 @@ namespace fs = boost::filesystem;
 namespace pt = boost::property_tree;
 
 namespace Slic3r {
+// [INTENT] ESP3D is a PrintHost adapter that manages G-code uploads and print initiation via a web interface.
+// [UNITY] Map this to a C# service using UnityWebRequest for HTTP operations.
 
 ESP3D::ESP3D(DynamicPrintConfig* config) : m_host(config->opt_string("print_host")), m_console_port("8888") {}
 
 const char* ESP3D::get_name() const { return "ESP3D"; }
 
+// [THREAD] This test runs synchronously on the calling thread (usually a background worker thread) 
+// using perform_sync(), which blocks until the HTTP request completes or times out.
 bool ESP3D::test(wxString& msg) const
 {
     bool        ret      = false;
     std::string url_test = format_command("/command", "plain", "M105");
     auto        http     = Http::get(url_test);
+            // [EVENT] Completion/error callbacks are executed inline during the perform_sync() call.
     http.on_complete([&](std::string body, unsigned status) {
             // check  for OK
             ret = true;
@@ -67,7 +72,7 @@ bool ESP3D::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn 
     std::string short_name = get_short_name(upload_data.upload_path.string());
     bool        res        = false;
 
-    // [HAZARD] ESP3D is limited to DOS 8.3 names; truncation is therefore part of the wire protocol and can make
+    // [PORTING_HAZARD:P1] ESP3D is limited to DOS 8.3 names; truncation is therefore part of the wire protocol and can make
     // two distinct long filenames collide on the printer-side storage.
     auto http = Http::post((boost::format("http://%1%/upload_serial") % m_host).str());
     http.header("Connection", "keep-alive")
@@ -111,7 +116,7 @@ bool ESP3D::start_print(wxString& msg, const std::string& filename) const
     // For some reason printer firmware does not want to respond on gcode commands immediately after file upload.
     // So we just introduce artificial delay to workaround it.
     // ESP3D also locks the serial during SD transfer, this is safer
-    // [CONCURRENCY] This sleep is a readiness barrier on the queue worker; an async port still needs an equivalent
+    // [THREAD] This sleep is a readiness barrier on the queue worker; an async port still needs an equivalent
     // device-state handshake before issuing M23/M24 or the firmware may reject the commands.
     std::this_thread::sleep_for(std::chrono::milliseconds(1500));
 
