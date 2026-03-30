@@ -1,3 +1,4 @@
+// [ANNOTATED]
 #include "json_diff.hpp"
 #include <string>
 #include <atomic>

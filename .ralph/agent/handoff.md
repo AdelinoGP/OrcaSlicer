@@ -864,3 +864,31 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P1: Synchronous return values for networking methods)
 - Git: annotate: src/slic3r/Utils/IPrinterAgent.hpp
 - Next recommended Phase 1 task: T765 src/slic3r/Utils/ICloudServiceAgent.hpp
+
+## Phase 1 - Task T770 complete
+- Task type: annotate
+- File: src/slic3r/Utils/json_diff.hpp
+- Deliverables: src/slic3r/Utils/json_diff.hpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Stateful JSON diff/patch codec for network bandwidth optimization.
+  - Maintains sync window with baseline settings and cached payloads.
+  - Re-implement using Newtonsoft.Json or System.Text.Json with recursive visitor.
+- Hazards found: 1 (P2: Strictly stateful and sequential; message loss causes corruption)
+- Git: annotate: src/slic3r/Utils/json_diff.hpp
+- Next recommended Phase 1 task: T769 src/slic3r/Utils/json_diff.cpp
+
+## Phase 1 - Task T769 complete
+- Task type: annotate
+- File: src/slic3r/Utils/json_diff.cpp
+- Deliverables: src/slic3r/Utils/json_diff.cpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Recursive JSON diffing and patching logic implementation.
+  - Stateful stream codec behavior (mutates base after successful encode).
+  - Recovery heuristic based on decode error count.
+- Hazards found: 2 (P3: Compatibility baselines from disk; P2: Recovery via error count threshold)
+- Git: annotate: src/slic3r/Utils/json_diff.cpp
+- Next recommended Phase 1 task: T771 src/slic3r/Utils/MacDarkMode.hpp

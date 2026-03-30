@@ -1,3 +1,4 @@
+// [ANNOTATED]
 #ifndef __JSON_DIFF_HPP
 #define __JSON_DIFF_HPP
 
