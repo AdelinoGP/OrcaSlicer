@@ -1,3 +1,4 @@
+// [ANNOTATED]
 #ifndef slic3r_MacDarkMode_hpp_
 #define slic3r_MacDarkMode_hpp_
 

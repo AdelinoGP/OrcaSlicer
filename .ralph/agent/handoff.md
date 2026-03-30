@@ -892,3 +892,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 2 (P3: Compatibility baselines from disk; P2: Recovery via error count threshold)
 - Git: annotate: src/slic3r/Utils/json_diff.cpp
 - Next recommended Phase 1 task: T771 src/slic3r/Utils/MacDarkMode.hpp
+
+## Phase 1 - Task T771 complete
+- Task type: annotate
+- File: src/slic3r/Utils/MacDarkMode.hpp
+- Deliverables: src/slic3r/Utils/MacDarkMode.hpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Platform-specific shims for macOS native GUI behaviors (Dark Mode, WKWebView, gestures).
+  - Bridges wxWidgets to NSWindow/NSView via void pointers.
+  - Standard Unity PlayerSettings and UI Toolkit handle these behaviors natively.
+- Hazards found: 1 (P3: Platform-specific hacks for title bar coloring)
+- Git: annotate: src/slic3r/Utils/MacDarkMode.hpp
+- Next recommended Phase 1 task: T773 src/slic3r/Utils/minilzo_extension.hpp
