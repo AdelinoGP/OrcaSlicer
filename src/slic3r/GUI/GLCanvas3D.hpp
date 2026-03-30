@@ -1,3 +1,4 @@
+// [ANNOTATED]
 #ifndef slic3r_GLCanvas3D_hpp_
 #define slic3r_GLCanvas3D_hpp_
 
@@ -196,6 +197,13 @@ wxDECLARE_EVENT(EVT_GLCANVAS_RESET_LAYER_HEIGHT_PROFILE, SimpleEvent);
 wxDECLARE_EVENT(EVT_GLCANVAS_ADAPTIVE_LAYER_HEIGHT_PROFILE, Event<float>);
 wxDECLARE_EVENT(EVT_GLCANVAS_SMOOTH_LAYER_HEIGHT_PROFILE, HeightProfileSmoothEvent);
 
+/*
+ [INTENT] Core 3D viewport controller managing rendering, picking, input handling, and 3D UI overlays (toolbars, gizmos).
+ [STATE] Manages selection, mouse interaction state, layers editing, gizmos, 3D volumes (GLVolumeCollection), G-code viewer, and camera.
+ [EVENT] Coordinates high-frequency UI events including selection changes, plate updates, and interactive tool feedback.
+ [UNITY] Maps to a complex ViewportController MonoBehaviour. 3D rendering moves to Unity Universal Render Pipeline (URP).
+ [PORTING_HAZARD:P1] Heavy coupling between wxWidgets event loop and raw OpenGL rendering. Unity should decouple UI (UI Toolkit) from Scene interaction.
+*/
 class GLCanvas3D
 {
     static const double DefaultCameraZoomToBoxMarginFactor;
@@ -205,6 +213,7 @@ class GLCanvas3D
     static void update_render_colors();
     static void load_render_colors();
 
+        // [INTENT] Manages interactive variable layer height editing via specialized OpenGL overlays.
     class LayersEditing
     {
     public:
@@ -318,6 +327,7 @@ class GLCanvas3D
 
         static float thickness_bar_width(const GLCanvas3D& canvas);
     };
+    // [STATE] Tracks transient mouse interaction state, including dragging thresholds and 3D scene projection.
 
     struct Mouse
     {
@@ -555,9 +565,12 @@ private:
     bool m_extra_frame_requested;
     bool m_event_handlers_bound{ false };
 
+    // [STATE] Collection of 3D meshes (GLVolume) currently present in the scene.
+    // [STATE] Managed state for G-code visualization, including toolpaths and legend.
     GLVolumeCollection m_volumes;
     GCodeViewer m_gcode_viewer;
 
+    // [STATE] Tracks currently selected objects and instances in the 3D scene.
     RenderTimer m_render_timer;
 
     Selection m_selection;
@@ -900,6 +913,7 @@ public:
 
     void update_volumes_colors_by_extruder();
 
+    // [OPENGL] Main entry point for the viewport render pass. Coordinates bed, volumes, toolbars, and gizmos.
     bool is_dragging() const { return m_gizmos.is_dragging() || m_moving; }
 
     void render(bool only_init = false);

@@ -1414,3 +1414,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Manifest total: 719
 - Remaining: 283
 - Status: CONTINUING
+
+## Phase 1 - Task T357 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GLCanvas3D.hpp
+- Deliverables: src/slic3r/GUI/GLCanvas3D.hpp
+- Substantive additions: 7 ([ANNOTATED] tag, class-level intent/state/event/unity/hazard notes, and member-level notes)
+- Verification excerpt: [INTENT] Core 3D viewport controller managing rendering, picking, input handling, and 3D UI overlays.
+- Unity-impact summary:
+  - Maps to a complex ViewportController MonoBehaviour managing 3D scene interaction.
+  - 3D rendering (bed, volumes, toolpaths) moves to Unity Universal Render Pipeline (URP).
+  - wxWidgets toolbars and gizmo overlays should be refactored into Unity UI Toolkit VisualElements or specialized 3D handles.
+- Hazards found: 2 (P1: Heavy wxWidgets/OpenGL coupling; P2: Custom GL drawing logic for specialized tools)
+- Git: annotate: src/slic3r/GUI/GLCanvas3D.hpp
+- Next recommended Phase 1 task: T356 src/slic3r/GUI/GLCanvas3D.cpp
