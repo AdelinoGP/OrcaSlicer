@@ -21,6 +21,9 @@ using ModuleHandle = void *;
 #endif
 
 namespace Slic3r {
+// [INTENT] Abstraction layer for the file transfer C API provided by the networking plugin.
+// It defines the data structures and function pointers used to interface with the plugin.
+// [UNITY] Map to C# structs with [StructLayout] and delegate types for callbacks.
 
 extern "C" {
 
@@ -168,8 +171,10 @@ private:
         }
     }
 
+    // [STATE] Current connection status of the tunnel.
     int                 status_{};
     FileTransferModule *m_{};
+    // [STATE] Native handle to the tunnel object in the plugin.
     FT_TunnelHandle    *h_{};
     ConnectionCb        conn_cb_{};
     TunnelStatusCb      status_cb_{};
@@ -223,9 +228,11 @@ private:
 
     FileTransferModule    *m_{};
     FT_JobHandle          *h_{};
+    // [STATE] Native handle to the job object in the plugin.
     ResultCb               result_cb_{};
     MsgCb                  msg_cb_{};
     bool                   finished_ = false;
+    // [STATE] Flag indicating if the job has completed.
     int                    res_      = 0;
     int                    resp_ec_  = 0;
     std::string            res_json_;
