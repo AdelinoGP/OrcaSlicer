@@ -1183,3 +1183,31 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 2 (P2: Heuristic series matching; P3: Loose INI parser silently ignores errors)
 - Git: annotate: src/slic3r/Utils/QidiPrinterAgent.cpp
 - Next recommended Phase 1 task: T803 src/slic3r/Utils/Repetier.hpp
+
+## Phase 1 - Task T803 complete
+- Task type: annotate
+- File: src/slic3r/Utils/Repetier.hpp
+- Deliverables: src/slic3r/Utils/Repetier.hpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Repetier-Server print host implementation supporting multi-printer deployments.
+  - Supports groups and printer slugs for routing.
+  - Port to a C# class inheriting from PrintHost using UnityWebRequest.
+- Hazards found: 1 (P3: Tight coupling of backend-specific grouping model to UI)
+- Git: annotate: src/slic3r/Utils/Repetier.hpp
+- Next recommended Phase 1 task: T802 src/slic3r/Utils/Repetier.cpp
+
+## Phase 1 - Task T802 complete
+- Task type: annotate
+- File: src/slic3r/Utils/Repetier.cpp
+- Deliverables: src/slic3r/Utils/Repetier.cpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Invariant software field check for server type detection (handles rebranding).
+  - Uses specific API paths for jobs vs models based on post-upload action.
+  - Multi-group and multi-printer enumeration logic.
+- Hazards found: 1 (P3: Multi-printer routing via PrintHostUpload carrying backend-specific 'group')
+- Git: annotate: src/slic3r/Utils/Repetier.cpp
+- Next recommended Phase 1 task: T804 src/slic3r/Utils/RetinaHelper.hpp
