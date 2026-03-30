@@ -1903,3 +1903,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P1 x1
 - Git: Annotate Http.cpp for Unity port prep
 - Next recommended Phase 1 task: T765 annotate: src/slic3r/Utils/ICloudServiceAgent.hpp
+
+## Phase 1 - Task T765 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/ICloudServiceAgent.hpp
+- Deliverables: src/slic3r/Utils/ICloudServiceAgent.hpp
+- Substantive additions: ~60 annotation tags covering Mega-Facade intent, user session state, async event flow, main-thread marshaling hazards, and Unity service-split mapping.
+- Verification excerpt: [PORTING_HAZARD:P1] This interface is a "Mega-Facade" that couples many unrelated domains.
+- Unity-impact summary:
+  - Split into specialized services (IAuthService, ISyncService, etc.) coordinated by a CloudProvider.
+  - Use async/await and UnityWebRequest instead of synchronous int/bool returns.
+  - Replace manual main-thread marshaling with SynchronizationContext or Task-based UI dispatch.
+- Hazards found: P1 x2, P2 x3
+- Git: Annotate ICloudServiceAgent.hpp for Unity port prep
+- Next recommended Phase 1 task: T766 annotate: src/slic3r/Utils/InstanceID.cpp

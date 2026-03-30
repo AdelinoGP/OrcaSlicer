@@ -20,3 +20,22 @@ Current objective: Annotate GUI source files for Unity port prep.
 3. Update handoff.md.
 4. Update ralph-tasks.md.
 5. Commit changes.
+
+## Completed T763
+- Annotated `src/slic3r/Utils/Http.cpp` with [INTENT], [STATE], [THREAD], [UNITY], and [PORTING_HAZARD].
+- Noted P1 hazard for synchronous HTTP requests.
+- Updated registry and handoff.
+- Committed changes.
+
+## Next Step
+- T765 annotate: src/slic3r/Utils/ICloudServiceAgent.hpp
+
+## Completed T765
+- Annotated `src/slic3r/Utils/ICloudServiceAgent.hpp` with ~60 tags.
+- Documented P1 Mega-Facade hazard and main-thread marshaling dependency.
+- Proposed Unity split into specialized services.
+- Updated handoff.
+- Committed changes.
+
+## Next Step
+- T766 annotate: src/slic3r/Utils/InstanceID.cpp
