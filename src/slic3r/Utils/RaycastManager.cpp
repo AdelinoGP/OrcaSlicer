@@ -23,6 +23,8 @@ template<typename VecType> inline void erase(std::vector<VecType> &vec, const st
 }
 
 void RaycastManager::actualize(const ModelObject &object, const ISkip *skip, Meshes *meshes)
+// [STATE] `m_meshes` caches precomputed BVHs by volume ID to avoid redundant work.
+// [UNITY] Map to a dictionary-backed cache sync in the `RaycastService`; use `ModelID` to track stale meshes.
 {
     // actualize MeshRaycaster
     ::actualize(m_meshes, object.volumes, skip, meshes);
@@ -100,6 +102,7 @@ void RaycastManager::actualize(const ModelInstance &instance, const ISkip *skip,
 }
  
 std::optional<RaycastManager::Hit> RaycastManager::first_hit(const Vec3d& point, const Vec3d& direction, const ISkip *skip) const
+// [UNITY] Use `RaycastService.GetFirstHit(mouseRay)` which wraps `Physics.Raycast` or custom mesh BVH query.
 {
     // Improve: it is not neccessaru to use AABBMesh and calc normal for every hit
     
@@ -154,6 +157,7 @@ std::optional<RaycastManager::Hit> RaycastManager::first_hit(const Vec3d& point,
         pts[i] = tr * hit_mesh->vertices(tri[i]).cast<double>();
     Vec3d normal_world = (pts[1] - pts[0]).cross(pts[2] - pts[1]);
     if (has_reflection(*hit_tramsformation))
+// [PORTING_HAZARD:P2] Reflections (negative scaling) require flipping the computed normal. Unity's `Mesh.Raycast` handles this natively if using colliders, but custom BVH queries must explicitly check the determinant of the world matrix.
         normal_world *= -1;
     normal_world.normalize();
 
@@ -162,6 +166,7 @@ std::optional<RaycastManager::Hit> RaycastManager::first_hit(const Vec3d& point,
 }
 
 std::optional<RaycastManager::Hit> RaycastManager::closest_hit(const Vec3d &point, const Vec3d &direction, const ISkip *skip) const
+// [UNITY] Use `RaycastService.GetClosestHitOnInfiniteLine(ray)` to allow hits "behind" or "past" the origin.
 {
     std::optional<Hit> closest;
     for (const auto &[key, transformation] : m_transformations) {
@@ -194,6 +199,7 @@ std::optional<RaycastManager::Hit> RaycastManager::closest_hit(const Vec3d &poin
 }
 
 std::optional<RaycastManager::ClosePoint> RaycastManager::closest(const Vec3d &point, const ISkip *skip) const
+// [UNITY] Map to `Mesh.ClosestPoint` or a custom BVH search that ignores ray direction.
 {
     std::optional<ClosePoint> closest;
     for (const auto &[key, transformation] : m_transformations) {
@@ -315,6 +321,7 @@ template<typename VecType> inline void erase(std::vector<VecType> &vec, const st
 namespace Slic3r::GUI{
 
 RaycastManager::Meshes create_meshes(GLCanvas3D &canvas, const RaycastManager::AllowVolumes &condition)
+// [UNITY] Use a shared `MeshCache` that converts `ModelVolume` geometry into high-performance BVH assets.
 {
     SceneRaycaster::EType type = SceneRaycaster::EType::Volume;
     auto scene_casters = canvas.get_raycasters_for_picking(type);
@@ -350,6 +357,7 @@ RaycastManager::Meshes create_meshes(GLCanvas3D &canvas, const RaycastManager::A
 
 
 std::optional<RaycastManager::Hit> ray_from_camera(const RaycastManager        &raycaster,
+// [UNITY] Port as a service call that derives the world ray from `Camera.ScreenPointToRay(mousePos)` and executes a `RaycastService` query.
                                                    const Vec2d                 &mouse_pos,
                                                    const Camera                &camera,
                                                    const RaycastManager::ISkip *skip)

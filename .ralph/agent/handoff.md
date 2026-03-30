@@ -1798,3 +1798,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2 x1
 - Git: Annotate RaycastManager.hpp for Unity port
 - Next recommended Phase 1 task: T800 annotate: src/slic3r/Utils/RaycastManager.cpp
+
+## Phase 1 - Task T800 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/RaycastManager.cpp
+- Deliverables: `src/slic3r/Utils/RaycastManager.cpp`
+- Substantive additions: 8 comment blocks covering cache synchronization, hit-testing logic, normal calculation under reflection, and Unity mapping.
+- Verification excerpt: `[PORTING_HAZARD:P2] Reflections (negative scaling) require flipping the computed normal. Unity's Mesh.Raycast handles this natively if using colliders.`
+- Unity-impact summary:
+  - Coordinate transformations must explicitly account for mesh-space vs world-space.
+  - Normal flipping for reflected (negatively scaled) objects is a porting hazard.
+  - Sourcing acceleration data from `GLCanvas3D` (GUI scene) can be replaced by a shared Unity `MeshCache` or native `MeshCollider` data.
+- Hazards found: P2 x1
+- Git: Annotate RaycastManager.cpp for Unity port prep
+- Next recommended Phase 1 task: T816 annotate: src/slic3r/Utils/UndoRedo.hpp
