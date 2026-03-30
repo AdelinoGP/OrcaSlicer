@@ -7,6 +7,9 @@
 #include "PrintHost.hpp"
 
 
+// [INTENT] Toshiba FlashAir SD card upload protocol implementation.
+// [UNITY] Port as a C# class implementing IPrintHost, using UnityWebRequest.
+// Replace synchronous calls with async Task/await.
 namespace Slic3r {
 
 class DynamicPrintConfig;
@@ -29,8 +32,9 @@ public:
     PrintHostPostUploadActions get_post_upload_actions() const override { return {}; }
 	std::string get_host() const override { return host; }
     
+	// [STATE] stores host IP or hostname
 private:
-	// [HAZARD] FlashAir is not a printer-native API but an SD-card CGI protocol with FAT-specific assumptions, so
+	// [PORTING_HAZARD:P2] FlashAir is not a printer-native API but an SD-card CGI protocol with FAT-specific assumptions, so
 	// ports must preserve its URL and timestamp quirks exactly or uploads become card-firmware dependent.
 	std::string host;
 
