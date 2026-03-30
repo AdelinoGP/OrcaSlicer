@@ -12,6 +12,20 @@
 
 namespace Slic3r { namespace GUI {
 
+/*
+[INTENT]
+Declaration boundary for the calibration wizard framework and its specific implementations.
+
+[STATE]
+- CalibrationWizardPageStep: Linked list node for wizard flow.
+- CalibrationWizard: Base panel for sequence management.
+- PressureAdvanceWizard, FlowRateWizard, MaxVolumetricSpeedWizard: Specialized flows.
+
+[UNITY]
+- Wizard steps should be modeled as separate UI Documents or Views.
+- Chaining should use a central NavigationController or StateMachine.
+*/
+
 
 class CalibrationWizardPageStep
 {

@@ -1455,3 +1455,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: None major.
 - Git: N/A (will commit next)
 - Next recommended Phase 1 task: T195 annotate: src/slic3r/GUI/CalibrationWizard.cpp
+
+## Phase 1 - Task T195 & T196 complete
+- Task type: annotate
+- File: src/slic3r/GUI/CalibrationWizard.cpp, src/slic3r/GUI/CalibrationWizard.hpp
+- Deliverables: src/slic3r/GUI/CalibrationWizard.cpp, src/slic3r/GUI/CalibrationWizard.hpp
+- Substantive additions: Class-level [INTENT], [STATE], [EVENT], [UNITY] annotations.
+- Verification excerpt: "CalibrationWizard is the base framework for multi-step calibration workflows."
+- Unity-impact summary:
+  - Base CalibrationWizard should be a MonoBehaviour that handles state transitions.
+  - Wizard Steps -> Separate UI Toolkit documents or Prefabs managed by the main controller.
+- Hazards found: P2 (Heavy coupling with wxWidgets UI constructs and internal calibration APIs)
+- Git: N/A (will commit next)
+- Next recommended Phase 1 task: T197 annotate: src/slic3r/GUI/CalibrationWizardPage.cpp

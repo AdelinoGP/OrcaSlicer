@@ -9,6 +9,32 @@
 
 namespace Slic3r { namespace GUI {
 
+
+/*
+[INTENT]
+CalibrationWizard is the base framework for multi-step calibration workflows.
+It manages a collection of CalibrationWizardPageStep objects and coordinates
+the transitions between them based on printer state and user actions.
+
+[STATE]
+- m_mode: The active calibration mode (Flow Dynamics, Flow Rate, etc.).
+- m_curr_step: Pointer to the current active step in the wizard.
+- m_page_steps: Vector of all steps in the wizard.
+- curr_obj: The MachineObject being calibrated.
+
+[EVENT]
+- EVT_CALIBRATION_JOB_FINISHED: Triggered when a calibration print completes.
+- EVT_CALI_ACTION: Sent by individual pages to trigger wizard-level actions (Next, Prev, Start, Save).
+
+[UNITY]
+- Base CalibrationWizard should be a MonoBehaviour that handles state transitions.
+- Wizard Steps -> Separate UI Toolkit documents or Prefabs managed by the main controller.
+- Chaining logic (CalibrationWizardPageStep) -> Map to a formal State Machine or Unity's Graph-based UI management if complex.
+
+[PORTING_HAZARD:P2]
+- The wizard logic is heavily coupled with wxScrolledWindow and manual sizer management.
+- Calibration results are saved back to the printer or local presets using complex internal APIs (CalibUtils, PresetCollection).
+*/
 #define CALIBRATION_DEBUG
 
 wxDEFINE_EVENT(EVT_DEVICE_CHANGED, wxCommandEvent);
