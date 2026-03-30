@@ -30,6 +30,18 @@ namespace pt = boost::property_tree;
 
 namespace Slic3r {
 
+/**
+ * [INTENT]
+ * Network adapter for the Obico cloud service (formerly The Spaghetti Detective).
+ * Implements IPrintHost to handle authentication, remote printer discovery, and G-code upload.
+ * 
+ * [UNITY]
+ * Maps to a C# class implementing a shared IPrintHost interface.
+ * - Replace Http::get/post with UnityWebRequest.
+ * - Replace boost::property_tree with Newtonsoft.Json or Unity's JsonUtility.
+ * - Replace boost::log with UnityEngine.Debug or a dedicated logger service.
+ */
+
 Obico::Obico(DynamicPrintConfig* config)
     : m_host(config->opt_string("print_host"))
     , m_web_ui(config->opt_string("print_host_webui"))
@@ -40,6 +52,8 @@ Obico::Obico(DynamicPrintConfig* config)
 {
     // [STATE] The selected Obico printer id is carried in `m_port`, reusing a generic print-host config slot for a
     // cloud-specific concept that later upload calls depend on.
+    // [PORTING_HAZARD:P2] Semantic reuse of `m_port` for `printer_id` should be explicitly named in C# 
+    // (e.g., a `RemotePrinterId` property) to avoid confusion with physical network ports.
 }
 
 const char* Obico::get_name() const { return "Obico"; }

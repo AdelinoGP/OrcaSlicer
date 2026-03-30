@@ -2221,3 +2221,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P2: Native DLL dependency)
 - Git: annotate: src/slic3r/Utils/NetworkAgentFactory.hpp
 - Next recommended Phase 1 task: T782 annotate: src/slic3r/Utils/Obico.cpp
+
+## Phase 1 - Task T782 complete
+- Task type: annotate
+- File: src/slic3r/Utils/Obico.cpp
+- Deliverables: src/slic3r/Utils/Obico.cpp
+- Substantive additions: 2 blocks (INTENT/UNITY, PORTING_HAZARD)
+- Verification excerpt: [UNITY] Maps to a C# class implementing a shared IPrintHost interface.
+- Unity-impact summary:
+  - Implement IPrintHost in C# using UnityWebRequest.
+  - Decouple printer_id from m_port semantic reuse.
+- Hazards found: 1 (P2: Semantic reuse of m_port)
+- Git: annotate: src/slic3r/Utils/Obico.cpp
+- Next recommended Phase 1 task: T783 annotate: src/slic3r/Utils/Obico.hpp
