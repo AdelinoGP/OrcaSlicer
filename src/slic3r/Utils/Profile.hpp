@@ -1,3 +1,4 @@
+// SKIP_TRIVIAL
 #ifndef slic3r_GUI_Profile_hpp_
 #define slic3r_GUI_Profile_hpp_
 

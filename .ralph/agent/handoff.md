@@ -1129,3 +1129,29 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P3: Encodes deployment assumptions like sibling exe names)
 - Git: annotate: src/slic3r/Utils/Process.cpp
 - Next recommended Phase 1 task: T797 src/slic3r/Utils/Profile.hpp
+
+## Phase 1 - Task T797 complete
+- Task type: skip-trivial
+- File: src/slic3r/Utils/Profile.hpp
+- Deliverables: src/slic3r/Utils/Profile.hpp
+- Substantive additions: 0 (marked as skip-trivial)
+- Verification excerpt: // SKIP_TRIVIAL
+- Unity-impact summary:
+  - Contains macros for intrusive profiling (Shiny).
+  - No domain logic or porting consequence.
+- Hazards found: 0
+- Git: skip-trivial: src/slic3r/Utils/Profile.hpp
+- Next recommended Phase 1 task: T796 src/slic3r/Utils/ProfileDescription.hpp
+
+## Phase 1 - Task T796 complete
+- Task type: skip-trivial
+- File: src/slic3r/Utils/ProfileDescription.hpp
+- Deliverables: src/slic3r/Utils/ProfileDescription.hpp
+- Substantive additions: 0 (marked as skip-trivial)
+- Verification excerpt: // SKIP_TRIVIAL
+- Unity-impact summary:
+  - Static collection of localized strings for profile descriptions.
+  - Should be moved to Unity's localization system or a ScriptableObject.
+- Hazards found: 0
+- Git: skip-trivial: src/slic3r/Utils/ProfileDescription.hpp
+- Next recommended Phase 1 task: T799 src/slic3r/Utils/QidiPrinterAgent.hpp
