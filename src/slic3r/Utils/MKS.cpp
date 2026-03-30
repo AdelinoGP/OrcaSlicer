@@ -33,126 +33,126 @@ namespace pt = boost::property_tree;
 
 namespace Slic3r {
 
-MKS::MKS(DynamicPrintConfig* config) :
-	m_host(config->opt_string("print_host")), m_console_port("8080")
-{}
+// [INTENT] Print host implementation for MKS-based printers.
+// It coordinates a dual-transport workflow: HTTP for uploading G-code files
+// and a separate TCP console for triggering print execution via M-codes (M23/M24).
+//
+// [STATE] Immutable host/port configuration derived from `DynamicPrintConfig`.
+//
+// [UNITY] Map to a C# service inheriting from a \`IPrintHost\` interface.
+// - Use \`UnityWebRequest\` for HTTP uploads.
+// - Use \`System.Net.Sockets.TcpClient\` for the serial console bridge.
+// - Replace \`perform_sync()\` with \`await\`-able async operations.
+//
+// [PORTING_HAZARD:P1] The use of \`perform_sync()\` in \`upload()\` blocks the calling thread
+// until the entire upload and follow-up TCP commands complete. This must be
+// asynchronous in Unity to avoid UI hangs.
+//
+
+MKS::MKS(DynamicPrintConfig* config) : m_host(config->opt_string("print_host")), m_console_port("8080") {}
 
 const char* MKS::get_name() const { return "MKS"; }
 
 bool MKS::test(wxString& msg) const
 {
-	// [COUPLING] Reachability is tested over TCPConsole instead of the HTTP upload endpoint, so this backend's
-	// health model depends on a second transport that must stay in sync with file-transfer capabilities.
-	Utils::TCPConsole console(m_host, m_console_port);
-	Slic3r::Utils::SerialMessage s("M105", Slic3r::Utils::Command);
-	console.enqueue_cmd(s);
-	bool ret = console.run_queue();
+    // [PORTING_HAZARD:P3] Reachability is tested over TCPConsole instead of the HTTP upload endpoint, so this backend's
+    // health model depends on a second transport that must stay in sync with file-transfer capabilities.
+    Utils::TCPConsole            console(m_host, m_console_port);
+    Slic3r::Utils::SerialMessage s("M105", Slic3r::Utils::Command);
+    console.enqueue_cmd(s);
+    bool ret = console.run_queue();
 
-	if (!ret)
-		msg = wxString::FromUTF8(console.error_message().c_str());
+    if (!ret)
+        msg = wxString::FromUTF8(console.error_message().c_str());
 
-	return ret;
+    return ret;
 }
 
-wxString MKS::get_test_ok_msg() const
-{
-	return _(L("Connection to MKS is working correctly."));
-}
+wxString MKS::get_test_ok_msg() const { return _(L("Connection to MKS is working correctly.")); }
 
 wxString MKS::get_test_failed_msg(wxString& msg) const
-{
-	return GUI::from_u8((boost::format("%s: %s")
-		% _utf8(L("Could not connect to MKS"))
-		% std::string(msg.ToUTF8())).str());
-}
+{ return GUI::from_u8((boost::format("%s: %s") % _utf8(L("Could not connect to MKS")) % std::string(msg.ToUTF8())).str()); }
 
 bool MKS::upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const
 {
-	bool res = true;
+    bool res = true;
 
-	// [INTENT] MKS splits work across transports: HTTP stores the file, then TCPConsole sends M23/M24 to select and
-	// start the uploaded path once the web endpoint reports success.
-	auto upload_cmd = get_upload_url(upload_data.upload_path.string());
-	BOOST_LOG_TRIVIAL(info) << boost::format("MKS: Uploading file %1%, filepath: %2%, print: %3%, command: %4%")
-		% upload_data.source_path
-		% upload_data.upload_path
-		% (upload_data.post_action == PrintHostPostUploadAction::StartPrint)
-		% upload_cmd;
+    // [INTENT] MKS splits work across transports: HTTP stores the file, then TCPConsole sends M23/M24 to select and
+    // start the uploaded path once the web endpoint reports success.
+    auto upload_cmd = get_upload_url(upload_data.upload_path.string());
+    BOOST_LOG_TRIVIAL(info) << boost::format("MKS: Uploading file %1%, filepath: %2%, print: %3%, command: %4%") % upload_data.source_path %
+                                   upload_data.upload_path % (upload_data.post_action == PrintHostPostUploadAction::StartPrint) %
+                                   upload_cmd;
 
-	auto http = Http::post(std::move(upload_cmd));
-	http.set_post_body(upload_data.source_path);
+    auto http = Http::post(std::move(upload_cmd));
+    http.set_post_body(upload_data.source_path);
 
-	http.on_complete([&](std::string body, unsigned status) {
-		BOOST_LOG_TRIVIAL(debug) << boost::format("MKS: File uploaded: HTTP %1%: %2%") % status % body;
+    http.on_complete([&](std::string body, unsigned status) {
+            BOOST_LOG_TRIVIAL(debug) << boost::format("MKS: File uploaded: HTTP %1%: %2%") % status % body;
 
-		int err_code = get_err_code_from_body(body);
-		if (err_code != 0) {
-			BOOST_LOG_TRIVIAL(error) << boost::format("MKS: Request completed but error code was received: %1%") % err_code;
-			error_fn(format_error(body, L("Unknown error occurred"), 0));
-			res = false;
-		}
-		else if (upload_data.post_action == PrintHostPostUploadAction::StartPrint) {
-			wxString errormsg;
-			res = start_print(errormsg, upload_data.upload_path.string());
-			if (!res) {
-				error_fn(std::move(errormsg));
-			}
-		}
-		})
-		.on_error([&](std::string body, std::string error, unsigned status) {
-			BOOST_LOG_TRIVIAL(error) << boost::format("MKS: Error uploading file: %1%, HTTP %2%, body: `%3%`") % error % status % body;
-			error_fn(format_error(body, error, status));
-			res = false;
-		})
-		.on_progress([&](Http::Progress progress, bool& cancel) {
-			prorgess_fn(std::move(progress), cancel);
-			if (cancel) {
-				// Upload was canceled
-				BOOST_LOG_TRIVIAL(info) << "MKS: Upload canceled";
-				res = false;
-			}
-		}).perform_sync();
+            int err_code = get_err_code_from_body(body);
+            if (err_code != 0) {
+                BOOST_LOG_TRIVIAL(error) << boost::format("MKS: Request completed but error code was received: %1%") % err_code;
+                error_fn(format_error(body, L("Unknown error occurred"), 0));
+                res = false;
+            } else if (upload_data.post_action == PrintHostPostUploadAction::StartPrint) {
+                wxString errormsg;
+                res = start_print(errormsg, upload_data.upload_path.string());
+                if (!res) {
+                    error_fn(std::move(errormsg));
+                }
+            }
+        })
+        .on_error([&](std::string body, std::string error, unsigned status) {
+            BOOST_LOG_TRIVIAL(error) << boost::format("MKS: Error uploading file: %1%, HTTP %2%, body: `%3%`") % error % status % body;
+            error_fn(format_error(body, error, status));
+            res = false;
+        })
+        .on_progress([&](Http::Progress progress, bool& cancel) {
+            prorgess_fn(std::move(progress), cancel);
+            if (cancel) {
+                // Upload was canceled
+                BOOST_LOG_TRIVIAL(info) << "MKS: Upload canceled";
+                res = false;
+            }
+        })
+        .perform_sync();
 
-
-	return res;
+    return res;
 }
 
 std::string MKS::get_upload_url(const std::string& filename) const
-{
-	return (boost::format("http://%1%/upload?X-Filename=%2%")
-		% m_host
-		% Http::url_encode(filename)).str();
-}
+{ return (boost::format("http://%1%/upload?X-Filename=%2%") % m_host % Http::url_encode(filename)).str(); }
 
 bool MKS::start_print(wxString& msg, const std::string& filename) const
 {
-	// For some reason printer firmware does not want to respond on gcode commands immediately after file upload.
-	// So we just introduce artificial delay to workaround it.
-	// TODO: Inspect reasons
-	// [CONCURRENCY] This blocking wait is the current device-readiness barrier on the single queue worker thread.
-	std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+    // For some reason printer firmware does not want to respond on gcode commands immediately after file upload.
+    // So we just introduce artificial delay to workaround it.
+    // TODO: Inspect reasons
+    // [PORTING_HAZARD:P2] This blocking wait is the current device-readiness barrier. In Unity, use \`await Task.Delay(1500)\`.
+    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
 
-	Utils::TCPConsole console(m_host, m_console_port);
-	Slic3r::Utils::SerialMessage s(std::string("M23 ") + filename, Slic3r::Utils::Command);
-	console.enqueue_cmd(s);
-	s.message = "M24";
-	console.enqueue_cmd(s);
+    Utils::TCPConsole            console(m_host, m_console_port);
+    Slic3r::Utils::SerialMessage s(std::string("M23 ") + filename, Slic3r::Utils::Command);
+    console.enqueue_cmd(s);
+    s.message = "M24";
+    console.enqueue_cmd(s);
 
-	bool ret = console.run_queue();
+    bool ret = console.run_queue();
 
-	if (!ret)
-		msg = wxString::FromUTF8(console.error_message().c_str());
+    if (!ret)
+        msg = wxString::FromUTF8(console.error_message().c_str());
 
-	return ret;
+    return ret;
 }
 
 int MKS::get_err_code_from_body(const std::string& body) const
 {
-	pt::ptree root;
-	std::istringstream iss(body); // wrap returned json to istringstream
-	pt::read_json(iss, root);
+    pt::ptree          root;
+    std::istringstream iss(body); // wrap returned json to istringstream
+    pt::read_json(iss, root);
 
-	return root.get<int>("err", 0);
+    return root.get<int>("err", 0);
 }
 
-} // Slic3r
+} // namespace Slic3r

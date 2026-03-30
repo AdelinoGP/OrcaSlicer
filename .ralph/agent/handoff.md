@@ -2032,3 +2032,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P3 x1 (inherited thread-safety concern)
 - Git: Annotate minilzo_extension.hpp for Unity port prep
 - Next recommended Phase 1 task: T774 annotate: src/slic3r/Utils/MKS.cpp
+
+## Phase 1 - Task T774 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/MKS.cpp
+- Deliverables: src/slic3r/Utils/MKS.cpp
+- Substantive additions: Annotations for the MKS print host implementation, covering dual-transport HTTP/TCP workflow and blocking hazards.
+- Verification excerpt: [PORTING_HAZARD:P1] The use of perform_sync() in upload() blocks the calling thread until the entire upload and follow-up TCP commands complete.
+- Unity-impact summary:
+  - Implement as an async service using `UnityWebRequest` and `TcpClient`.
+  - Replace blocking `sleep_for` with `await Task.Delay`.
+- Hazards found: P1 x1 (blocking synchronization), P2 x1 (artificial delay), P3 x1 (transport coupling)
+- Git: Annotate MKS.cpp for Unity port prep
+- Next recommended Phase 1 task: T775 annotate: src/slic3r/Utils/MKS.hpp
