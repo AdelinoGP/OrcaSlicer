@@ -14,6 +14,30 @@
 
 namespace Slic3r {
 
+// [INTENT] Klipper/Moonraker printer agent interface and internal state.
+// It provides the concrete implementation of `IPrinterAgent` for Klipper machines,
+// managing both REST-based control and WebSocket-based telemetry.
+//
+// [STATE] Comprehensive device and runtime state:
+// - `MoonrakerDeviceInfo`: Connection and identity snapshot.
+// - `status_cache`: Merged JSON snapshot of printer status.
+// - `available_objects`: Dynamic feature detection result.
+// - `connect_generation`: Latch for avoiding races with detached threads.
+//
+// [THREAD] Managed concurrency:
+// - `ws_thread`: Continuous telemetry stream.
+// - `connect_thread`: Transient handshake worker.
+// - Recursive mutexes: Domain-specific synchronization (`state_mutex`, `payload_mutex`, `connect_mutex`).
+//
+// [UNITY] Map to a C# class inheriting from `IPrinterAgent`.
+// - Represent `MoonrakerDeviceInfo` and `AmsTrayData` as C# \`struct\` or \`record\`.
+// - Replace `std::thread` with `Task`-based async patterns.
+// - Use `System.Collections.Concurrent` collections or `lock` for thread safety.
+//
+// [PORTING_HAZARD:P1] The class manages its own thread lifecycle using raw `std::thread`
+// and `detach()`. A Unity port must ensure these are wrapped in cancellable
+// `Task`s to prevent resource leaks on device switching or application exit.
+//
 class MoonrakerPrinterAgent : public IPrinterAgent
 {
 public:
@@ -33,7 +57,7 @@ public:
     int send_message_to_printer(std::string dev_id, std::string json_str, int qos, int flag) override;
 
     // Certificates
-    int check_cert() override;
+    int  check_cert() override;
     void install_device_cert(std::string dev_id, bool lan_only) override;
 
     // Discovery
@@ -42,14 +66,15 @@ public:
     // Binding
     int ping_bind(std::string ping_code) override;
     int bind_detect(std::string dev_ip, std::string sec_link, detectResult& detect) override;
-    int bind(std::string dev_ip, std::string dev_id, std::string sec_link, std::string timezone, bool improved, OnUpdateStatusFn update_fn) override;
+    int bind(std::string dev_ip, std::string dev_id, std::string sec_link, std::string timezone, bool improved, OnUpdateStatusFn update_fn)
+        override;
     int unbind(std::string dev_id) override;
     int request_bind_ticket(std::string* ticket) override;
     int set_server_callback(OnServerErrFn fn) override;
 
     // Machine Selection
     std::string get_user_selected_machine() override;
-    int set_user_selected_machine(std::string dev_id) override;
+    int         set_user_selected_machine(std::string dev_id) override;
 
     // Print Job Operations
     int start_print(PrintParams params, OnUpdateStatusFn update_fn, WasCancelledFn cancel_fn, OnWaitFn wait_fn) override;
@@ -70,7 +95,7 @@ public:
 
     // Pull-mode agent (on-demand filament sync)
     FilamentSyncMode get_filament_sync_mode() const override { return FilamentSyncMode::pull; }
-    bool fetch_filament_info(std::string dev_id) override;
+    bool             fetch_filament_info(std::string dev_id) override;
 
 protected:
     struct MoonrakerDeviceInfo
@@ -88,14 +113,15 @@ protected:
     } device_info;
 
     // Tray data for AMS payload building
-    struct AmsTrayData {
-        int         slot_index = 0;      // 0-based slot index
+    struct AmsTrayData
+    {
+        int         slot_index   = 0; // 0-based slot index
         bool        has_filament = false;
-        std::string tray_type;           // Material type (e.g., "PLA", "ASA")
-        std::string tray_color;          // Raw color (#RRGGBB, 0xRRGGBB, or RRGGBBAA)
-        std::string tray_info_idx;       // Setting ID (optional)
-        int         bed_temp = 0;        // Optional
-        int         nozzle_temp = 0;     // Optional
+        std::string tray_type;       // Material type (e.g., "PLA", "ASA")
+        std::string tray_color;      // Raw color (#RRGGBB, 0xRRGGBB, or RRGGBBAA)
+        std::string tray_info_idx;   // Setting ID (optional)
+        int         bed_temp    = 0; // Optional
+        int         nozzle_temp = 0; // Optional
     };
 
     // Build ams JSON and call parser
@@ -103,10 +129,13 @@ protected:
 
     // Methods that derived classes may need to override or access
     virtual bool init_device_info(std::string dev_id, std::string dev_ip, std::string username, std::string password, bool use_ssl);
-    virtual bool fetch_device_info(const std::string& base_url, const std::string& api_key, MoonrakerDeviceInfo& info, std::string& error) const;
+    virtual bool fetch_device_info(const std::string&   base_url,
+                                   const std::string&   api_key,
+                                   MoonrakerDeviceInfo& info,
+                                   std::string&         error) const;
 
     // State access for derived classes
-    mutable std::recursive_mutex       state_mutex;
+    mutable std::recursive_mutex state_mutex;
 
     // Helpers
     bool        is_numeric(const std::string& value);
@@ -125,19 +154,22 @@ private:
     int send_version_info(const std::string& dev_id);
     int send_access_code(const std::string& dev_id);
 
-    bool fetch_object_list(const std::string& base_url, const std::string& api_key, std::set<std::string>& objects, std::string& error) const;
+    bool fetch_object_list(const std::string&     base_url,
+                           const std::string&     api_key,
+                           std::set<std::string>& objects,
+                           std::string&           error) const;
     bool query_printer_status(const std::string& base_url, const std::string& api_key, nlohmann::json& status, std::string& error) const;
     bool send_gcode(const std::string& dev_id, const std::string& gcode) const;
 
-    void announce_printhost_device();
-    void dispatch_local_connect(int state, const std::string& dev_id, const std::string& msg);
-    void dispatch_printer_connected(const std::string& dev_id);
-    void dispatch_message(const std::string& dev_id, const std::string& payload);
-    void start_status_stream(const std::string& dev_id, const std::string& base_url, const std::string& api_key);
-    void stop_status_stream();
-    void run_status_stream(std::string dev_id, std::string base_url, std::string api_key);
-    void handle_ws_message(const std::string& dev_id, const std::string& payload);
-    void update_status_cache(const nlohmann::json& updates);
+    void           announce_printhost_device();
+    void           dispatch_local_connect(int state, const std::string& dev_id, const std::string& msg);
+    void           dispatch_printer_connected(const std::string& dev_id);
+    void           dispatch_message(const std::string& dev_id, const std::string& payload);
+    void           start_status_stream(const std::string& dev_id, const std::string& base_url, const std::string& api_key);
+    void           stop_status_stream();
+    void           run_status_stream(std::string dev_id, std::string base_url, std::string api_key);
+    void           handle_ws_message(const std::string& dev_id, const std::string& payload);
+    void           update_status_cache(const nlohmann::json& updates);
     nlohmann::json build_print_payload_locked() const;
 
     // Print control helpers
@@ -146,19 +178,21 @@ private:
     int cancel_print(const std::string& dev_id);
 
     // File upload
-    bool upload_gcode(const std::string& local_path, const std::string& filename,
-                      const std::string& base_url, const std::string& api_key,
-                      OnUpdateStatusFn update_fn, WasCancelledFn cancel_fn);
+    bool upload_gcode(const std::string& local_path,
+                      const std::string& filename,
+                      const std::string& base_url,
+                      const std::string& api_key,
+                      OnUpdateStatusFn   update_fn,
+                      WasCancelledFn     cancel_fn);
 
     // JSON-RPC helper
-    bool send_jsonrpc_command(const std::string& base_url, const std::string& api_key,
-                              const nlohmann::json& request, std::string& response) const;
+    bool send_jsonrpc_command(const std::string&    base_url,
+                              const std::string&    api_key,
+                              const nlohmann::json& request,
+                              std::string&          response) const;
 
     // Connection thread management
-    void perform_connection_async(const std::string& dev_id,
-                                   const std::string& base_url,
-                                   const std::string& api_key,
-                                   uint64_t generation);
+    void perform_connection_async(const std::string& dev_id, const std::string& base_url, const std::string& api_key, uint64_t generation);
 
     // System-specific filament fetch methods
     bool fetch_hh_filament_info(std::vector<AmsTrayData>& trays, int& max_lane_index);
@@ -166,47 +200,47 @@ private:
 
     // JSON helper methods
     static std::string safe_json_string(const nlohmann::json& obj, const char* key);
-    static int safe_json_int(const nlohmann::json& obj, const char* key);
+    static int         safe_json_int(const nlohmann::json& obj, const char* key);
     static std::string safe_array_string(const nlohmann::json& arr, int idx);
-    static int safe_array_int(const nlohmann::json& arr, int idx);
+    static int         safe_array_int(const nlohmann::json& arr, int idx);
     static std::string normalize_color_value(const std::string& color);
 
-    std::string                        ssdp_announced_host;
-    std::string                        ssdp_announced_id;
+    std::string                         ssdp_announced_host;
+    std::string                         ssdp_announced_id;
     std::shared_ptr<ICloudServiceAgent> m_cloud_agent;
-    std::string                        selected_machine;
+    std::string                         selected_machine;
 
-    OnMsgArrivedFn       on_ssdp_msg_fn;
-    OnPrinterConnectedFn on_printer_connected_fn;
+    OnMsgArrivedFn        on_ssdp_msg_fn;
+    OnPrinterConnectedFn  on_printer_connected_fn;
     GetSubscribeFailureFn on_subscribe_failure_fn;
-    OnMessageFn          on_message_fn;
-    OnMessageFn          on_user_message_fn;
-    OnLocalConnectedFn   on_local_connect_fn;
-    OnMessageFn          on_local_message_fn;
-    QueueOnMainFn        queue_on_main_fn;
-    OnServerErrFn        on_server_err_fn;
+    OnMessageFn           on_message_fn;
+    OnMessageFn           on_user_message_fn;
+    OnLocalConnectedFn    on_local_connect_fn;
+    OnMessageFn           on_local_message_fn;
+    QueueOnMainFn         queue_on_main_fn;
+    OnServerErrFn         on_server_err_fn;
 
     mutable std::recursive_mutex payload_mutex;
-    nlohmann::json     status_cache;
+    nlohmann::json               status_cache;
 
-    std::atomic<int>       next_jsonrpc_id{1};
-    std::set<std::string>  available_objects;  // Track for feature detection
+    std::atomic<int>      next_jsonrpc_id{1};
+    std::set<std::string> available_objects; // Track for feature detection
 
-    std::atomic<bool>   ws_stop{false};
-    std::atomic<bool>   ws_reconnect_requested{false};  // Flag to trigger reconnection
+    std::atomic<bool>     ws_stop{false};
+    std::atomic<bool>     ws_reconnect_requested{false}; // Flag to trigger reconnection
     std::atomic<uint64_t> ws_last_emit_ms{0};
-    std::thread         ws_thread;
+    std::thread           ws_thread;
 
     // Throttling configuration for WebSocket updates
     // Critical changes (state transitions) dispatch immediately; telemetry is throttled
-    static constexpr uint64_t STATUS_UPDATE_INTERVAL_MS = 1000;  // 1 update/sec for telemetry
-    std::atomic<uint64_t> ws_last_dispatch_ms{0};
-    std::string last_print_state;  // Track state for immediate dispatch on change
+    static constexpr uint64_t STATUS_UPDATE_INTERVAL_MS = 1000; // 1 update/sec for telemetry
+    std::atomic<uint64_t>     ws_last_dispatch_ms{0};
+    std::string               last_print_state; // Track state for immediate dispatch on change
 
     // Connection thread management
-    std::atomic<uint64_t>  connect_generation{0};
-    std::thread            connect_thread;
-    std::recursive_mutex   connect_mutex;
+    std::atomic<uint64_t> connect_generation{0};
+    std::thread           connect_thread;
+    std::recursive_mutex  connect_mutex;
 };
 
 } // namespace Slic3r

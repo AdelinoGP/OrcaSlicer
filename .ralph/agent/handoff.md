@@ -2095,3 +2095,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P1 x1 (manual threading), P2 x2 (detached threads, protocol coupling)
 - Git: Annotate MoonrakerPrinterAgent.cpp for Unity port prep
 - Next recommended Phase 1 task: T777 annotate: src/slic3r/Utils/MoonrakerPrinterAgent.hpp
+
+## Phase 1 - Task T777 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/MoonrakerPrinterAgent.hpp
+- Deliverables: src/slic3r/Utils/MoonrakerPrinterAgent.hpp
+- Substantive additions: Header-level annotations for the Moonraker agent, covering device and runtime state, managed concurrency, and Unity mapping requirements.
+- Verification excerpt: [PORTING_HAZARD:P1] The class manages its own thread lifecycle using raw std::thread and detach(). A Unity port must ensure these are wrapped in cancellable Tasks.
+- Unity-impact summary:
+  - Map internal structs (`MoonrakerDeviceInfo`, `AmsTrayData`) to C# types.
+  - Replace recursive mutexes with async-safe synchronization.
+  - Use `System.Collections.Concurrent` for status caches.
+- Hazards found: P1 x1 (raw thread management)
+- Git: Annotate MoonrakerPrinterAgent.hpp for Unity port prep
+- Next recommended Phase 1 task: T778 annotate: src/slic3r/Utils/NetworkAgent.cpp
