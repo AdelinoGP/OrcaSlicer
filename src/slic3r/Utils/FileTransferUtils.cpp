@@ -5,6 +5,11 @@
 #include "slic3r/GUI/DeviceCore/DevManager.h"
 
 namespace Slic3r {
+// [INTENT] Wrapper classes for the dynamic networking module C-style API (ft_* symbols).
+// It provides object-oriented abstractions for Tunnels (connections) and Jobs (operations) 
+// implemented in a external dynamic library.
+// [UNITY] Map to C# P/Invoke (DllImport) for the dynamic library symbols, or reimplement the logic in managed C# if the plugin source is available.
+// [PORTING_HAZARD:P1] Dynamic symbol lookup via sym_lookup is used to bind to an external module at runtime. This must be replaced with [DllImport] or a dynamic loading service in Unity/C#.
 
 FileTransferModule::FileTransferModule(ModuleHandle networking_module, int required_abi_version) : networking_(networking_module)
 {
@@ -46,6 +51,7 @@ FileTransferTunnel::FileTransferTunnel(FileTransferModule &m, const std::string 
     h_ = h;
 
     // C API: ft_status_cb(void* user, int old_status, int new_status, int err, const char* msg)
+    // [EVENT] Trampoline function to bridge C-style callback from the plugin to the C++ TunnelStatusCb.
     auto tramp = [](void *user, int old_status, int new_status, int err_code, const char *msg) noexcept {
         auto *self    = reinterpret_cast<FileTransferTunnel *>(user);
         self->status_ = new_status;
@@ -61,6 +67,7 @@ void FileTransferTunnel::start_connect()
 {
     // C API: ft_conn_cb(void* user, int ok, int err, const char* msg)
     auto tramp = [](void *user, int ok, int ec, const char *msg) noexcept {
+    // [EVENT] Trampoline function to bridge C-style callback from the plugin to the C++ ConnectionCb.
         auto *pcb = reinterpret_cast<ConnectionCb *>(user);
         if (!pcb) return;
         try {
@@ -92,6 +99,7 @@ FileTransferJob::FileTransferJob(FileTransferModule &m, const std::string &param
     h_ = h;
 
     // C API: ft_job_result_cb(void* user, int tunnel_err, ft_job_result result)
+    // [EVENT] Trampoline function to bridge C-style callback from the plugin to the C++ ResultCb.
     auto tramp = [](void *user, ft_job_result r) noexcept {
         auto *self = reinterpret_cast<FileTransferJob *>(user);
         if (!self) return;
@@ -149,6 +157,7 @@ void FileTransferJob::on_msg(MsgCb cb)
     if (!h_) return;
 
     // C API: ft_job_msg_cb(void* user, ft_job_msg msg)
+    // [EVENT] Trampoline function to bridge C-style callback from the plugin to the C++ MsgCb.
     auto tramp = [](void *user, ft_job_msg m) noexcept {
         auto *self = reinterpret_cast<FileTransferJob *>(user);
         if (!self) return;
