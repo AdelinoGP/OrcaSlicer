@@ -2060,3 +2060,38 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P3 x1 (dual-transport requirement)
 - Git: Annotate MKS.hpp for Unity port prep
 - Next recommended Phase 1 task: T776 annotate: src/slic3r/Utils/MoonrakerPrinterAgent.cpp
+
+## Phase 1 checkpoint
+- Files newly accounted for in this batch: 10
+- Cumulative annotated: 10
+- Cumulative skip-trivial: 0
+- Cumulative skip-vendored: 0
+- Total accounted for: 10
+- Manifest total: 54
+- Remaining: 44
+- Status: CONTINUING
+
+## Phase 1 checkpoint (Revised)
+- Files newly accounted for in this batch: 10
+- Cumulative annotated: 413
+- Cumulative skip-trivial: 11
+- Cumulative skip-vendored: 0
+- Total accounted for: 424
+- Manifest total: 724
+- Remaining: 300
+- Status: CONTINUING
+
+## Phase 1 - Task T776 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/MoonrakerPrinterAgent.cpp
+- Deliverables: src/slic3r/Utils/MoonrakerPrinterAgent.cpp
+- Substantive additions: In-depth annotations for the Moonraker (Klipper) backend, covering protocol adaptation, complex multi-threading lifecycle, and state synchronization.
+- Verification excerpt: [PORTING_HAZARD:P1] Manual thread management (detach/join) and reliance on recursive mutexes for complex cross-thread state synchronization.
+- Unity-impact summary:
+  - Replace manual thread management with `Task.Run` or async/await.
+  - Use `ClientWebSocket` for real-time telemetry and `UnityWebRequest` for REST calls.
+  - Preserve the protocol adaptation logic (`build_ams_payload`) to remain compatible with existing GUI parsers.
+- Hazards found: P1 x1 (manual threading), P2 x2 (detached threads, protocol coupling)
+- Git: Annotate MoonrakerPrinterAgent.cpp for Unity port prep
+- Next recommended Phase 1 task: T777 annotate: src/slic3r/Utils/MoonrakerPrinterAgent.hpp

@@ -92,6 +92,35 @@ std::string map_moonraker_state(std::string state)
 
 namespace Slic3r {
 
+// [INTENT] Klipper/Moonraker printer agent implementation. It acts as a protocol 
+// adapter that translates Moonraker's HTTP and WebSocket APIs into the 
+// Bambu-centric internal JSON schemas expected by OrcaSlicer's GUI.
+//
+// [STATE] Managed state across several domains:
+// - Connection: `device_info`, `connect_generation`, `connect_thread`.
+// - Telemetry: `status_cache`, `available_objects`, `ws_thread`, `ws_stop`.
+// - UI: `selected_machine`, `on_ssdp_msg_fn`, etc.
+// All shared state is protected by domain-specific recursive mutexes (`connect_mutex`, 
+// `state_mutex`, `payload_mutex`).
+//
+// [THREAD] This class is highly multi-threaded:
+// - `connect_thread`: Background thread for asynchronous device handshake.
+// - `ws_thread`: Dedicated worker for the long-lived WebSocket status stream.
+// - UI Thread: Entry points for commands (send_message, connect_printer).
+// Results are marshaled back to the UI thread via `QueueOnMainFn`.
+//
+// [UNITY] Re-implement as a Mono-Behavior or a persistent C# service.
+// - Use `UnityWebRequest` for REST calls and `ClientWebSocket` for telemetry.
+// - Replace `std::thread` with `Task.Run` or async/await.
+// - Replace recursive mutexes with `lock` or async-compatible primitives.
+// - Replace `set_queue_on_main_fn` with `SynchronizationContext.Post`.
+//
+// [PORTING_HAZARD:P1] Manual thread management (detach/join) and reliance on 
+// recursive mutexes for complex cross-thread state synchronization. 
+// Detached threads (`connect_thread.detach()`) are particularly hard to 
+// track during application shutdown or rapid device switching.
+
+
 const std::string MoonrakerPrinterAgent_VERSION = "1.0.0";
 
 MoonrakerPrinterAgent::MoonrakerPrinterAgent(std::string log_dir) : m_cloud_agent(nullptr) { (void) log_dir; }
@@ -155,6 +184,7 @@ int MoonrakerPrinterAgent::connect_printer(std::string dev_id, std::string dev_i
         if (connect_thread.joinable()) {
             // [HAZARD] Detaching abandons ownership of the prior worker and relies on the generation counter to keep a
             // stale thread from committing its results. That avoids a UI stall, but makes lifetime reasoning harder.
+            // [PORTING_HAZARD:P2] Detached threads abandon ownership and make lifetime reasoning difficult.
             connect_thread.detach();
         }
     }
@@ -187,6 +217,7 @@ int MoonrakerPrinterAgent::disconnect_printer()
         device_info = MoonrakerDeviceInfo{};
         ++connect_generation; // Invalidate any in-flight connection
         if (connect_thread.joinable()) {
+            // [PORTING_HAZARD:P2] Detached threads abandon ownership and make lifetime reasoning difficult.
             connect_thread.detach();
         }
     }
@@ -455,6 +486,9 @@ int MoonrakerPrinterAgent::set_queue_on_main_fn(QueueOnMainFn fn)
 }
 
 void MoonrakerPrinterAgent::build_ams_payload(int ams_count, int max_lane_index, const std::vector<AmsTrayData>& trays)
+    // [EVENT] Translates Moonraker filament data into Bambu-style AMS JSON expected by Orca's 
+    // internal DeviceManager and GUI components. This coupling ensures Moonraker printers 
+    // can reuse existing tray-management UI elements.
 {
     // [INTENT] Moonraker filament inventories are translated into the Bambu-style AMS JSON grammar expected by the
     // existing GUI/device parser so Klipper-based machines can reuse Orca's preset-sync and tray-status UI.
