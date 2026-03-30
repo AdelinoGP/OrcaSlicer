@@ -1404,3 +1404,13 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P3: No cross-platform abstraction for font file access)
 - Git: annotate: src/slic3r/Utils/WxFontUtils.cpp
 - Next recommended Phase 1 task: Audit Phase 1 progress
+
+## Phase 1 checkpoint
+- Files newly accounted for in this batch: 41
+- Cumulative annotated: 425
+- Cumulative skip-trivial: 11
+- Cumulative skip-vendored: 0
+- Total accounted for: 436
+- Manifest total: 719
+- Remaining: 283
+- Status: CONTINUING
