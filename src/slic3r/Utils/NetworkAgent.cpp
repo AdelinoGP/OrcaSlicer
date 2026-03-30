@@ -12,6 +12,26 @@
 
 namespace Slic3r {
 
+// [INTENT] Composed bridge managing dynamic plugin loading and multi-backend printer communication.
+// It acts as a single facade for the GUI and core logic, delegating cloud and printer operations
+// to specialized sub-agents (ICloudServiceAgent and IPrinterAgent). It handles the lifecycle
+// of the proprietary Bambu network plugin and coordinates agent hot-swapping with callback preservation.
+//
+// [STATE] Managed implementation state:
+// - `m_cloud_agent`: Composed provider for user login, sync, and telemetry.
+// - `m_printer_agent`: Composed provider for LAN/Cloud printer control.
+// - `m_printer_callbacks`: Cached set of UI-bound callbacks replayed during agent swaps.
+// - `m_agent_mutex`: Serializes access during implementation transitions.
+//
+// [THREAD] Thread-safe facade. Most methods delegate to thread-safe sub-agents. 
+// Callback application (`set_on_*`) uses a local shared_ptr snapshot pattern to avoid 
+// holding the mutex during external callback registration.
+//
+// [UNITY] Map to a persistent singleton service (e.g., `NetworkService`) that manages 
+// sub-service implementations (MonoBehaviours or pure C# classes). Replace the dynamic 
+// DLL loading with standard Unity native plugins or managed C# implementations. 
+// Use C# `event`s for callback propagation.
+//
 bool NetworkAgent::use_legacy_network = true;
 
 // ============================================================================
@@ -239,6 +259,9 @@ int NetworkAgent::start()
     return -1;
 }
 
+// [EVENT] Registration of SSDP discovery callback. The callback is cached in m_printer_callbacks
+// and re-applied to the active printer agent.
+// [THREAD] Thread-safe via agent mutex; registration on the sub-agent is performed after unlocking.
 int NetworkAgent::set_on_ssdp_msg_fn(OnMsgArrivedFn fn)
 {
     std::shared_ptr<IPrinterAgent> printer_agent;
@@ -257,6 +280,8 @@ int NetworkAgent::set_on_user_login_fn(OnUserLoginFn fn)
     return -1;
 }
 
+// [EVENT] Registration of printer connection callback.
+// [THREAD] Thread-safe via agent mutex; registration on the sub-agent is performed after unlocking.
 int NetworkAgent::set_on_printer_connected_fn(OnPrinterConnectedFn fn)
 {
     std::shared_ptr<IPrinterAgent> printer_agent;
@@ -287,6 +312,8 @@ int NetworkAgent::set_get_country_code_fn(GetCountryCodeFn fn)
     return -1;
 }
 
+// [EVENT] Registration of subscription failure callback.
+// [THREAD] Thread-safe via agent mutex; registration on the sub-agent is performed after unlocking.
 int NetworkAgent::set_on_subscribe_failure_fn(GetSubscribeFailureFn fn)
 {
     std::shared_ptr<IPrinterAgent> printer_agent;
@@ -299,6 +326,8 @@ int NetworkAgent::set_on_subscribe_failure_fn(GetSubscribeFailureFn fn)
     return -1;
 }
 
+// [EVENT] Registration of general message callback (e.g. MQTT).
+// [THREAD] Thread-safe via agent mutex; registration on the sub-agent is performed after unlocking.
 int NetworkAgent::set_on_message_fn(OnMessageFn fn)
 {
     std::shared_ptr<IPrinterAgent> printer_agent;
@@ -311,6 +340,8 @@ int NetworkAgent::set_on_message_fn(OnMessageFn fn)
     return -1;
 }
 
+// [EVENT] Registration of user-specific message callback.
+// [THREAD] Thread-safe via agent mutex; registration on the sub-agent is performed after unlocking.
 int NetworkAgent::set_on_user_message_fn(OnMessageFn fn)
 {
     std::shared_ptr<IPrinterAgent> printer_agent;
@@ -323,6 +354,8 @@ int NetworkAgent::set_on_user_message_fn(OnMessageFn fn)
     return -1;
 }
 
+// [EVENT] Registration of LAN connection callback.
+// [THREAD] Thread-safe via agent mutex; registration on the sub-agent is performed after unlocking.
 int NetworkAgent::set_on_local_connect_fn(OnLocalConnectedFn fn)
 {
     std::shared_ptr<IPrinterAgent> printer_agent;
@@ -335,6 +368,8 @@ int NetworkAgent::set_on_local_connect_fn(OnLocalConnectedFn fn)
     return -1;
 }
 
+// [EVENT] Registration of LAN message callback.
+// [THREAD] Thread-safe via agent mutex; registration on the sub-agent is performed after unlocking.
 int NetworkAgent::set_on_local_message_fn(OnMessageFn fn)
 {
     std::shared_ptr<IPrinterAgent> printer_agent;
