@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-29T06:53:45Z
+Last updated: 2026-03-30T01:20:00Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -665,16 +665,16 @@ Last updated: 2026-03-29T06:53:45Z
 - [ ] T744 annotate: src/slic3r/Utils/ElegooLink.hpp
 - [ ] T745 annotate: src/slic3r/Utils/EmbossStyleManager.cpp
 - [ ] T746 annotate: src/slic3r/Utils/EmbossStyleManager.hpp
-- [ ] T747 annotate: src/slic3r/Utils/ESP3D.cpp
-- [ ] T748 annotate: src/slic3r/Utils/ESP3D.hpp
-- [ ] T749 annotate: src/slic3r/Utils/FileHelp.cpp
-- [ ] T750 annotate: src/slic3r/Utils/FileHelp.hpp
-- [ ] T751 annotate: src/slic3r/Utils/FileTransferUtils.cpp
-- [ ] T752 annotate: src/slic3r/Utils/FileTransferUtils.hpp
-- [ ] T753 annotate: src/slic3r/Utils/FixModelByWin10.cpp
-- [ ] T754 annotate: src/slic3r/Utils/FixModelByWin10.hpp
-- [ ] T755 annotate: src/slic3r/Utils/FlashAir.cpp
-- [ ] T756 annotate: src/slic3r/Utils/FlashAir.hpp
+- [x] T747 annotate: src/slic3r/Utils/ESP3D.cpp
+- [x] T748 annotate: src/slic3r/Utils/ESP3D.hpp
+- [x] T749 skip-trivial: src/slic3r/Utils/FileHelp.cpp
+- [x] T750 skip-trivial: src/slic3r/Utils/FileHelp.hpp
+- [x] T751 annotate: src/slic3r/Utils/FileTransferUtils.cpp
+- [x] T752 annotate: src/slic3r/Utils/FileTransferUtils.hpp
+- [x] T753 annotate: src/slic3r/Utils/FixModelByWin10.cpp
+- [x] T754 annotate: src/slic3r/Utils/FixModelByWin10.hpp
+- [x] T755 annotate: src/slic3r/Utils/FlashAir.cpp
+- [x] T756 annotate: src/slic3r/Utils/FlashAir.hpp
 - [ ] T757 annotate: src/slic3r/Utils/Flashforge.cpp
 - [ ] T758 annotate: src/slic3r/Utils/Flashforge.hpp
 - [ ] T759 annotate: src/slic3r/Utils/FontConfigHelp.cpp

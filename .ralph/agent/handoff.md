@@ -1646,3 +1646,140 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 0
 - Git: pending commit
 - Next recommended Phase 1 task: T745
+
+## Phase 1 - Task T747 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/ESP3D.cpp
+- Deliverables: src/slic3r/Utils/ESP3D.cpp
+- Substantive additions: 5 comment blocks covering intent, threading model, event callbacks, Unity mapping, and 8.3 filename hazards.
+- Verification excerpt: `[UNITY] Map this to a C# service using UnityWebRequest for HTTP operations.`
+- Unity-impact summary:
+  - Replace synchronous `perform_sync()` calls with async/await patterns.
+  - Preserve the 8.3 filename shortening logic for legacy firmware compatibility.
+  - Maintain the 1.5s readiness delay before issuing print commands.
+- Hazards found: P1 x1 (8.3 filename collision)
+- Git: annotate: src/slic3r/Utils/ESP3D.cpp
+- Next recommended Phase 1 task: T748 annotate: src/slic3r/Utils/ESP3D.hpp
+
+## Phase 1 - Task T747 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/ESP3D.cpp
+- Deliverables: src/slic3r/Utils/ESP3D.cpp
+- Substantive additions: 5 comment blocks covering intent, threading model, event callbacks, Unity mapping, and 8.3 filename hazards.
+- Verification excerpt: `[UNITY] Map this to a C# service using UnityWebRequest for HTTP operations.`
+- Unity-impact summary:
+  - Replace synchronous `perform_sync()` calls with async/await patterns.
+  - Preserve the 8.3 filename shortening logic for legacy firmware compatibility.
+  - Maintain the 1.5s readiness delay before issuing print commands.
+- Hazards found: P1 x1 (8.3 filename collision)
+- Git: 0cccb1175e annotate: src/slic3r/Utils/ESP3D.cpp
+- Next recommended Phase 1 task: T748 annotate: src/slic3r/Utils/ESP3D.hpp
+
+## Phase 1 - Task T748 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/ESP3D.hpp
+- Deliverables: src/slic3r/Utils/ESP3D.hpp
+- Substantive additions: Class-level INTENT and UNITY annotations.
+- Verification excerpt: `[UNITY] Port as a C# class inheriting from a base PrintHostService, using UnityWebRequest.`
+- Unity-impact summary:
+  - Define a common interface for PrintHost services in C#.
+- Hazards found: None.
+- Git: 301edb50a5 annotate: src/slic3r/Utils/ESP3D.hpp
+- Next recommended Phase 1 task: T749 annotate: src/slic3r/Utils/FileHelp.cpp
+
+## Phase 1 - Task T749, T750 complete
+
+- Task type: skip-trivial
+- File: src/slic3r/Utils/FileHelp.cpp, src/slic3r/Utils/FileHelp.hpp
+- Deliverables: none
+- Substantive additions: none
+- Verification excerpt: `Extremely small utility wrapper for file size check and path normalization. Under 50 lines and semantically inert for GUI porting purposes as C# has equivalent native APIs.`
+- Unity-impact summary:
+  - Use `System.IO` for file size and path operations in C#.
+- Hazards found: None.
+- Git: none (skipped)
+- Next recommended Phase 1 task: T751 annotate: src/slic3r/Utils/FileTransferUtils.cpp
+
+## Phase 1 - Task T751 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/FileTransferUtils.cpp
+- Deliverables: src/slic3r/Utils/FileTransferUtils.cpp
+- Substantive additions: 5 comment blocks covering module intent, dynamic symbol hazards, Unity P/Invoke strategy, and callback trampolines.
+- Verification excerpt: `// [UNITY] Map to C# P/Invoke (DllImport) for the dynamic library symbols, or reimplement the logic in managed C# if the plugin source is available.`
+- Unity-impact summary:
+  - Requires explicit `[DllImport]` or `NativeLibrary.Load` for external networking plugin integration.
+  - Callback trampolines must use `UnmanagedFunctionPointer` in C#.
+- Hazards found: P1 x1 (Dynamic symbol lookup)
+- Git: 20bd839d1f annotate: src/slic3r/Utils/FileTransferUtils.cpp
+- Next recommended Phase 1 task: T752 annotate: src/slic3r/Utils/FileTransferUtils.hpp
+
+## Phase 1 - Task T752 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/FileTransferUtils.hpp
+- Deliverables: src/slic3r/Utils/FileTransferUtils.hpp
+- Substantive additions: Class-level INTENT and UNITY annotations, plus member-level STATE tags.
+- Verification excerpt: `[UNITY] Map to C# structs with [StructLayout] and delegate types for callbacks.`
+- Unity-impact summary:
+  - Define exact C# struct layouts for `ft_job_result` and `ft_job_msg`.
+  - Use `IntPtr` for opaque handles like `FT_TunnelHandle`.
+- Hazards found: None.
+- Git: 05decec20d annotate: src/slic3r/Utils/FileTransferUtils.hpp
+- Next recommended Phase 1 task: T753 annotate: src/slic3r/Utils/FixModelByWin10.cpp
+
+## Phase 1 - Task T753 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/FixModelByWin10.cpp
+- Deliverables: src/slic3r/Utils/FixModelByWin10.cpp
+- Substantive additions: 4 comment blocks covering WinRT intent, threading models (MTA/STA), progress events, and Unity mapping.
+- Verification excerpt: `[UNITY] Map to native C# WinRT calls (Windows.Graphics.Printing3D) or a dedicated mesh repair plugin. This is Windows-only logic and needs a fallback for other platforms.`
+- Unity-impact summary:
+  - Can use direct WinRT interop in C# for Windows builds.
+  - Requires a cross-platform alternative for mesh repair on non-Windows systems.
+- Hazards found: P1 x1 (Windows-specific WinRT/COM dependency)
+- Git: 615115ab9b annotate: src/slic3r/Utils/FixModelByWin10.cpp
+- Next recommended Phase 1 task: T754 annotate: src/slic3r/Utils/FixModelByWin10.hpp
+
+## Phase 1 - Task T754 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/FixModelByWin10.hpp
+- Deliverables: src/slic3r/Utils/FixModelByWin10.hpp
+- Substantive additions: INTENT and UNITY annotations.
+- Verification excerpt: `[UNITY] Use conditional compilation (#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN) to wrap WinRT calls in C#.`
+- Unity-impact summary:
+  - Keep the repair interface abstracted to allow platform-specific implementations.
+- Hazards found: None.
+- Git: 499aee663f annotate: src/slic3r/Utils/FixModelByWin10.hpp
+- Next recommended Phase 1 task: T755 annotate: src/slic3r/Utils/FlashAir.cpp
+
+## Phase 1 - Task T755 complete
+- Task type: annotate
+- File: src/slic3r/Utils/FlashAir.cpp
+- Deliverables: src/slic3r/Utils/FlashAir.cpp
+- Substantive additions: 4 comment blocks covering class intent, multi-step upload workflow, sync network test, and Unity mapping.
+- Verification excerpt: "// [UNITY] Port this as a managed C# service implementing IPrintHost, using UnityWebRequest for network operations."
+- Unity-impact summary:
+  - Implement sequential awaited UnityWebRequest calls for the card-side CGI state transitions.
+  - Map synchronous test and upload methods to async Tasks.
+- Hazards found: P2 x1 (stateful CGI sequence)
+- Git: add10f4372
+- Next recommended Phase 1 task: T757 annotate: src/slic3r/Utils/Flashforge.cpp
+
+## Phase 1 - Task T756 complete
+- Task type: annotate
+- File: src/slic3r/Utils/FlashAir.hpp
+- Deliverables: src/slic3r/Utils/FlashAir.hpp
+- Substantive additions: 3 class-level annotations covering intent, mapping, and state.
+- Verification excerpt: "// [INTENT] Toshiba FlashAir SD card upload protocol implementation."
+- Unity-impact summary:
+  - Port as a C# class inheriting from a base PrintHostService interface.
+  - Preserve URL and timestamp quirks for card-firmware compatibility.
+- Hazards found: P2 x1 (CGI/FAT assumptions)
+- Git: add10f4372
+- Next recommended Phase 1 task: T757 annotate: src/slic3r/Utils/Flashforge.cpp
