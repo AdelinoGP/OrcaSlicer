@@ -13,6 +13,18 @@
 namespace Slic3r {
 namespace {
 
+// [INTENT] Thread-safe registry and instance cache for printer and cloud agents.
+// Decouples the UI and app initialization from specific vendor implementations (Orca, BBL, Qidi, etc.).
+//
+// [STATE] Static registry and instance cache:
+// - `get_printer_agents()`: Registry of available implementations and their factory functions.
+// - `get_printer_agent_cache()`: Persistent cache of active/connected agents.
+//
+// [UNITY] Map to a persistent singleton `NetworkService` or `AgentManager` in Unity. 
+// Use a Service Locator or Abstract Factory pattern to swap implementations. 
+// The cache should be handled by the service lifecycle rather than static maps.
+//
+
 static std::mutex s_registry_mutex;
 
 std::map<std::string, PrinterAgentInfo>& get_printer_agents()

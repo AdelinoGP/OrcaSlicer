@@ -696,10 +696,10 @@ Last updated: 2026-03-30T01:50:00Z
 - [x] T775 annotate: src/slic3r/Utils/MKS.hpp
 - [x] T776 annotate: src/slic3r/Utils/MoonrakerPrinterAgent.cpp
 - [x] T777 annotate: src/slic3r/Utils/MoonrakerPrinterAgent.hpp
-- [ ] T778 annotate: src/slic3r/Utils/NetworkAgent.cpp
-- [ ] T779 annotate: src/slic3r/Utils/NetworkAgentFactory.cpp
+- [x] T778 annotate: src/slic3r/Utils/NetworkAgent.cpp
+- [x] T779 annotate: src/slic3r/Utils/NetworkAgentFactory.cpp
 - [ ] T780 annotate: src/slic3r/Utils/NetworkAgentFactory.hpp
-- [ ] T781 annotate: src/slic3r/Utils/NetworkAgent.hpp
+- [x] T781 annotate: src/slic3r/Utils/NetworkAgent.hpp
 - [ ] T782 annotate: src/slic3r/Utils/Obico.cpp
 - [ ] T783 annotate: src/slic3r/Utils/Obico.hpp
 - [ ] T784 annotate: src/slic3r/Utils/OctoPrint.cpp

@@ -1324,7 +1324,21 @@ Continue the previous work. Remaining tasks (213):
 - annotate: src/slic3r/GUI/AboutDialog.cpp
 - annotate: src/slic3r/GUI/AboutDialog.hpp
 
-Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Port Preparation## Phase BoundaryThis prompt governs **Phase 1 only**.- Phase 0 is already complete.- Do **not** revisit Phase 0...
+Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Port Preparation
+
+
+
+## Phase Boundary
+
+
+
+This prompt governs **Phase 1 only**.
+
+
+
+- Phase 0 is already complete.
+
+- Do **not** revisit Phase 0...
 ```
 ## Phase 1 - Task T687 complete
 
@@ -2149,3 +2163,48 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P3 x1 (Boost dependencies)
 - Git: Annotate HexFile.cpp for Unity port
 - Next recommended Phase 1 task: T762 annotate: src/slic3r/Utils/HexFile.hpp
+
+## Phase 1 - Task T778 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/NetworkAgent.cpp
+- Deliverables: src/slic3r/Utils/NetworkAgent.cpp
+- Substantive additions: Class-level block covering bridge intent, agent state, thread-safety, and Unity mapping. Method-level annotations for all callback registration paths.
+- Verification excerpt: `[INTENT] Composed bridge managing dynamic plugin loading and multi-backend printer communication.`
+- Unity-impact summary:
+  - Port as a persistent singleton service managing specialized sub-service implementations.
+  - Replace OS-level DLL loading with standard Unity native plugins or managed C# implementations.
+  - Use C# `event`s for callback propagation and `Task`-based async patterns for network ops.
+- Hazards found: P2 x1 (dynamic agent swapping complexity)
+- Git: annotate: src/slic3r/Utils/NetworkAgent.cpp (T778)
+- Next recommended Phase 1 task: T781 annotate: src/slic3r/Utils/NetworkAgent.hpp
+
+## Phase 1 - Task T781 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/NetworkAgent.hpp
+- Deliverables: src/slic3r/Utils/NetworkAgent.hpp
+- Substantive additions: Class-level annotations covering bridge intent, sub-agent composition, thread-safety, and Unity mapping.
+- Verification excerpt: `[INTENT] Public bridge managing the network implementation lifecycle and sub-agent composition.`
+- Unity-impact summary:
+  - Map to a persistent singleton service (e.g. `NetworkService`) that exposes `ICloudServiceAgent` and `IPrinterAgent` properties.
+  - Use async/await for all network-bound methods.
+  - Preserve the global `use_legacy_network` toggle as a ScriptableObject or persistent preference.
+- Hazards found: P3 x1 (coupling to global state for legacy mode)
+- Git: annotate: src/slic3r/Utils/NetworkAgent.hpp (T781)
+- Next recommended Phase 1 task: T779 annotate: src/slic3r/Utils/NetworkAgentFactory.cpp
+
+## Phase 1 - Task T779 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/NetworkAgentFactory.cpp
+- Deliverables: `src/slic3r/Utils/NetworkAgentFactory.cpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/scratchpad.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 1 class-level annotation block covering registry/cache intent, static map state, and Unity Service Locator mapping.
+- Verification excerpt: `[UNITY] Map to a persistent singleton NetworkService or AgentManager in Unity.`
+- Unity-impact summary:
+  - Replace static registry maps with a managed service lifecycle.
+  - Use Service Locator or Abstract Factory pattern for agent implementation swapping.
+  - Defer instance caching to the service layer rather than global statics.
+- Hazards found: P2 x1 (Dynamic DLL loading for BBL plugin)
+- Git: Annotate NetworkAgentFactory.cpp for Unity port
+- Next recommended Phase 1 task: T780 annotate: src/slic3r/Utils/NetworkAgentFactory.hpp
