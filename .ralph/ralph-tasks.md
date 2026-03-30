@@ -687,7 +687,7 @@ Last updated: 2026-03-30T01:50:00Z
 - [x] T766 annotate: src/slic3r/Utils/InstanceID.cpp
 - [x] T767 annotate: src/slic3r/Utils/InstanceID.hpp
 - [x] T768 annotate: src/slic3r/Utils/IPrinterAgent.hpp
-- [ ] T769 annotate: src/slic3r/Utils/json_diff.cpp
+- [x] T769 annotate: src/slic3r/Utils/json_diff.cpp
 - [ ] T770 annotate: src/slic3r/Utils/json_diff.hpp
 - [ ] T771 annotate: src/slic3r/Utils/MacDarkMode.hpp
 - [ ] T772 annotate: src/slic3r/Utils/minilzo_extension.cpp

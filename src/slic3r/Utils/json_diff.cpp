@@ -19,21 +19,24 @@
 using namespace std;
 using json = nlohmann::json;
 
-int json_diff::diff_objects(json const &in, json &out, json const &base)
+// [INTENT] Implementation of the recursive JSON diffing and patching logic.
+// This module provides the stateful transformation between full printer messages
+// and incremental deltas.
+
+int json_diff::diff_objects(json const& in, json& out, json const& base)
 {
     // [INTENT] This recursive walk emits only the fields that changed relative to the last full printer payload so the
     // networking layer can send incremental device updates instead of retransmitting the whole JSON document.
-    for (auto& el: in.items()) {
+    for (auto& el : in.items()) {
         if (el.value().empty()) {
-            //BBL_LOG_INFO("json_c diff empty key: " << el.key());
+            // BBL_LOG_INFO("json_c diff empty key: " << el.key());
             continue;
         }
 
-        if (!base.contains(el.key()) ) {
+        if (!base.contains(el.key())) {
             out[el.key()] = el.value();
-            BOOST_LOG_TRIVIAL(trace) << "json_c diff new key: " << el.key()
-                        << " type: "  << el.value().type_name()
-                        << " value: " << el.value();
+            BOOST_LOG_TRIVIAL(trace) << "json_c diff new key: " << el.key() << " type: " << el.value().type_name()
+                                     << " value: " << el.value();
 
             continue;
         }
@@ -41,16 +44,13 @@ int json_diff::diff_objects(json const &in, json &out, json const &base)
         if (el.value().type() != base[el.key()].type()) {
             out[el.key()] = el.value();
             BOOST_LOG_TRIVIAL(trace) << "json_c diff type changed"
-                 << " key: " << el.key() << " value: " << el.value().dump()
-                 << " last value: " << base[el.key()].dump();
+                                     << " key: " << el.key() << " value: " << el.value().dump() << " last value: " << base[el.key()].dump();
             continue;
         }
 
-
         if (el.value().is_object()) {
             json recur_out;
-            int recur_ret = diff_objects(
-                              el.value(), recur_out, base[el.key()]);
+            int  recur_ret = diff_objects(el.value(), recur_out, base[el.key()]);
             if (recur_ret == 0) {
                 out[el.key()] = recur_out;
             }
@@ -59,9 +59,8 @@ int json_diff::diff_objects(json const &in, json &out, json const &base)
 
         if (el.value() != base[el.key()]) {
             out[el.key()] = el.value();
-                BOOST_LOG_TRIVIAL(trace) << "json_c diff value changed"
-                 << " key: " << el.key() << " value: " << el.value().dump()
-                 << " last value: " << base[el.key()].dump();
+            BOOST_LOG_TRIVIAL(trace) << "json_c diff value changed"
+                                     << " key: " << el.key() << " value: " << el.value().dump() << " last value: " << base[el.key()].dump();
             continue;
         }
     }
@@ -72,16 +71,16 @@ int json_diff::diff_objects(json const &in, json &out, json const &base)
     return 0;
 }
 
-int json_diff::all2diff_base_reset(json const &base)
+int json_diff::all2diff_base_reset(json const& base)
 {
     BOOST_LOG_TRIVIAL(trace) << "all2diff_base_reset";
     all2diff_base = base;
     return 0;
 }
 
-bool json_diff::load_compatible_settings(std::string const &type, std::string const &version)
+bool json_diff::load_compatible_settings(std::string const& type, std::string const& version)
 {
-    // [COUPLING] Compatibility baselines are loaded from slicer-managed printer JSON files, so network message decode
+    // [PORTING_HAZARD:P3] Compatibility baselines are loaded from slicer-managed printer JSON files, so network message decode
     // behavior is indirectly tied to the preset/resource bundle shipped with the desktop application.
     // Reload on empty type and version
     if (!type.empty() || !version.empty()) {
@@ -93,7 +92,7 @@ bool json_diff::load_compatible_settings(std::string const &type, std::string co
         printer_version = version2;
     }
     settings_base.clear();
-    std::string config_file = Slic3r::data_dir() + "/printers/" + printer_type + ".json";
+    std::string             config_file = Slic3r::data_dir() + "/printers/" + printer_type + ".json";
     boost::nowide::ifstream json_file(config_file.c_str());
     try {
         json versions;
@@ -116,12 +115,12 @@ bool json_diff::load_compatible_settings(std::string const &type, std::string co
     return false;
 }
 
-int json_diff::all2diff(json const &in, json &out)
+int json_diff::all2diff(json const& in, json& out)
 {
     int ret = 0;
     if (all2diff_base.empty()) {
         all2diff_base = in;
-        out = in;
+        out           = in;
         BOOST_LOG_TRIVIAL(trace) << "json_c diff base reinit";
         return 0;
     }
@@ -136,14 +135,15 @@ int json_diff::all2diff(json const &in, json &out)
     return 0;
 }
 
-int json_diff::restore_objects(json const &in, json &out, json const &base)
+int json_diff::restore_objects(json const& in, json& out, json const& base)
 {
+    // [INTENT] Recursive restoration of original full JSON state from a diff and its corresponding base state.
     json jout;
 
-    for (auto& el: base.items()) {
+    for (auto& el : base.items()) {
         /*element not in input json,
           use base element to restore*/
-        if (!in.contains(el.key()) ) {
+        if (!in.contains(el.key())) {
             out[el.key()] = el.value();
             /*
             BBL_LOG_INFO("json_c restore compressed key " << el.key()
@@ -155,12 +155,10 @@ int json_diff::restore_objects(json const &in, json &out, json const &base)
 
         /*element in both base and input, but json type changed
            use input to restore*/
-        if (el.value().type() != in[el.key()].type() ){
+        if (el.value().type() != in[el.key()].type()) {
             out[el.key()] = in[el.key()];
             BOOST_LOG_TRIVIAL(trace) << "json_c restore type changed"
-                  << " key: " << el.key() << " value: "
-                  << in[el.key()].dump()
-                  << " last value: " << el.value().dump();
+                                     << " key: " << el.key() << " value: " << in[el.key()].dump() << " last value: " << el.value().dump();
             continue;
         }
 
@@ -168,8 +166,7 @@ int json_diff::restore_objects(json const &in, json &out, json const &base)
           recursive until basic type*/
         if (el.value().is_object()) {
             json recur_out;
-            int recur_ret = restore_objects(
-                              in[el.key()], recur_out, el.value());
+            int  recur_ret = restore_objects(in[el.key()], recur_out, el.value());
             if (recur_ret == 0) {
                 out[el.key()] = recur_out;
             }
@@ -188,32 +185,27 @@ int json_diff::restore_objects(json const &in, json &out, json const &base)
     }
 
     if (out.empty())
-        return  -1;
+        return -1;
 
     return 0;
 }
 
-int json_diff::restore_append_objects(json const &in, json &out)
+int json_diff::restore_append_objects(json const& in, json& out)
 {
     /*a new element comming, but be recoreded in base
       need be added to output*/
-    for (auto& el: in.items()) {
-
-        if (!out.contains(el.key()) ) {
-            BOOST_LOG_TRIVIAL(trace) << "json_c append new " << el.key()
-                        << " type: "  << el.value().type_name()
-                        << " value: " << el.value();
+    for (auto& el : in.items()) {
+        if (!out.contains(el.key())) {
+            BOOST_LOG_TRIVIAL(trace) << "json_c append new " << el.key() << " type: " << el.value().type_name() << " value: " << el.value();
             out[el.key()] = el.value();
             continue;
         }
 
         if (el.value().is_object()) {
-            int recur_ret =
-                     restore_append_objects(el.value(), out[el.key()]);
+            int recur_ret = restore_append_objects(el.value(), out[el.key()]);
             if (recur_ret != 0) {
                 BOOST_LOG_TRIVIAL(trace) << "json_c append obj failed"
-                                 << " key: " << el.key()
-                                 << " value: " << el.value();
+                                         << " key: " << el.key() << " value: " << el.value();
                 return recur_ret;
             }
         }
@@ -221,9 +213,9 @@ int json_diff::restore_append_objects(json const &in, json &out)
     return 0;
 }
 
-void json_diff::merge_objects(json const &in, json &out)
+void json_diff::merge_objects(json const& in, json& out)
 {
-    for (auto &el : in.items()) {
+    for (auto& el : in.items()) {
         if (!out.contains(el.key())) {
             out[el.key()] = el.value();
             continue;
@@ -236,7 +228,7 @@ void json_diff::merge_objects(json const &in, json &out)
     }
 }
 
-int json_diff::diff2all(json const &in, json &out)
+int json_diff::diff2all(json const& in, json& out)
 {
     // [INTENT] Decode applies the incremental patch back onto the last known full payload, then re-appends any new
     // branches so later diffs continue from a normalized full-message snapshot.
@@ -253,23 +245,21 @@ int json_diff::diff2all(json const &in, json &out)
         return -1;
     }
     restore_append_objects(in, out);
-    diff2all_base = out;
+    diff2all_base      = out;
     decode_error_count = 0;
     return 0;
 }
 
-void json_diff::compare_print(json &a, json &b)
+void json_diff::compare_print(json& a, json& b)
 {
-    for (auto& e: a.items()) {
-        if (!b.contains(e.key()) ) { BOOST_LOG_TRIVIAL(trace) << "json_c compare loss " << e.key()
-                        << " type: "  << e.value().type_name();
+    for (auto& e : a.items()) {
+        if (!b.contains(e.key())) {
+            BOOST_LOG_TRIVIAL(trace) << "json_c compare loss " << e.key() << " type: " << e.value().type_name();
         }
         if (e.value() != b[e.key()]) {
-            BOOST_LOG_TRIVIAL(trace) << "json_c compare not equal: key: " << e.key()
-                                 << " value: " << e.value();
+            BOOST_LOG_TRIVIAL(trace) << "json_c compare not equal: key: " << e.key() << " value: " << e.value();
             BOOST_LOG_TRIVIAL(trace) << "json_c compare vs value "
-                                 << " vs value: " << b[e.key()];
-
+                                     << " vs value: " << b[e.key()];
         }
     }
     return;
@@ -277,7 +267,7 @@ void json_diff::compare_print(json &a, json &b)
 
 bool json_diff::is_need_request()
 {
-    // [HAZARD] After repeated decode failures the codec forces a full-state re-request, which is a recovery heuristic
+    // [PORTING_HAZARD:P2] After repeated decode failures the codec forces a full-state re-request, which is a recovery heuristic
     // rather than protocol proof; ports need the same threshold or a more explicit resync signal.
     if (decode_error_count > 5) {
         return true;
@@ -285,7 +275,7 @@ bool json_diff::is_need_request()
     return false;
 }
 
-int json_diff::diff2all_base_reset(json &base)
+int json_diff::diff2all_base_reset(json& base)
 {
     BOOST_LOG_TRIVIAL(trace) << "diff2all_base_reset";
     full_message = base;
