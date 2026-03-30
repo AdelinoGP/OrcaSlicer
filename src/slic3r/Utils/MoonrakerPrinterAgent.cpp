@@ -1,3 +1,4 @@
+// [ANNOTATED]
 #include "MoonrakerPrinterAgent.hpp"
 #include "Http.hpp"
 #include "libslic3r/Preset.hpp"

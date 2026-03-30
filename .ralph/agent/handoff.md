@@ -962,3 +962,31 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 2 (P1: perform_sync() blocks UI thread; P2: 1500ms blocking sleep for device readiness)
 - Git: annotate: src/slic3r/Utils/MKS.cpp
 - Next recommended Phase 1 task: T777 src/slic3r/Utils/MoonrakerPrinterAgent.hpp
+
+## Phase 1 - Task T777 complete
+- Task type: annotate
+- File: src/slic3r/Utils/MoonrakerPrinterAgent.hpp
+- Deliverables: src/slic3r/Utils/MoonrakerPrinterAgent.hpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Protocol adapter for Klipper machines (REST + WebSocket).
+  - Managed concurrency with ws_thread and connect_thread.
+  - Map to a C# class with Task-based async and System.Net.WebSockets.
+- Hazards found: 1 (P1: Manual thread management with detach() causes difficult lifetime reasoning)
+- Git: annotate: src/slic3r/Utils/MoonrakerPrinterAgent.hpp
+- Next recommended Phase 1 task: T776 src/slic3r/Utils/MoonrakerPrinterAgent.cpp
+
+## Phase 1 - Task T776 complete
+- Task type: annotate
+- File: src/slic3r/Utils/MoonrakerPrinterAgent.cpp
+- Deliverables: src/slic3r/Utils/MoonrakerPrinterAgent.cpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Translates Moonraker telemetry into Bambu-flavored internal JSON schemas.
+  - Heavy reliance on recursive mutexes for cross-thread synchronization.
+  - Synthetic status updates required to keep pull-mode agents compatible with existing UI.
+- Hazards found: 2 (P1: Detached connect threads; P2: Bitfield mapping drops Bambu-only capability bits)
+- Git: annotate: src/slic3r/Utils/MoonrakerPrinterAgent.cpp
+- Next recommended Phase 1 task: T787 src/slic3r/Utils/OrcaCloudServiceAgent.hpp
