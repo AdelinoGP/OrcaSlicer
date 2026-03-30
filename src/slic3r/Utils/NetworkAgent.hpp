@@ -14,6 +14,22 @@ namespace Slic3r {
 class BBLNetworkPlugin;
 
 //the NetworkAgent class
+// [INTENT] Public bridge managing the network implementation lifecycle and sub-agent composition.
+// It serves as the primary entry point for the GUI to interact with cloud services and
+// printer hardware, abstracting whether the backend is a native implementation or a plugin.
+//
+// [STATE] Managed interface state:
+// - `use_legacy_network`: Global toggle for protocol version compatibility.
+// - `m_cloud_agent` / `m_printer_agent`: Shared pointers to active backend implementations.
+// - `m_printer_callbacks`: Retained set of UI handlers re-applied after backend swaps.
+//
+// [THREAD] The bridge is thread-safe, protecting agent swaps with `m_agent_mutex`. It relies on
+// the caller-provided `QueueOnMainFn` to marshal async network results back to the UI thread.
+//
+// [UNITY] Map to a persistent singleton service (e.g. `NetworkService`) that exposes `ICloudServiceAgent` 
+// and `IPrinterAgent` properties. Use async/await for all network-bound methods instead of 
+// synchronous return values.
+//
 class NetworkAgent
 {
 
