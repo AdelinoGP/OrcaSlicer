@@ -11,6 +11,36 @@ wxDEFINE_EVENT(EVT_CALI_ACTION, wxCommandEvent);
 wxDEFINE_EVENT(EVT_CALI_TRAY_CHANGED, wxCommandEvent);
 
 
+/*
+[INTENT]
+CalibrationWizardPage defines the building blocks for the calibration UI, including
+the base page class, specialized buttons, headers, footers, and progress panels.
+It also includes utility functions for determining calibration styles and modes.
+
+[STATE]
+- CalibrationWizardPage: Base state for all wizard sub-pages.
+- CaliPageActionPanel: Manages the visibility and state of navigation buttons.
+- CaliPageStepGuide: Maintains the visual 'breadcrumb' state.
+- FilamentComboBox: Tracks filament selection and printer compatibility.
+
+[EVENT]
+- EVT_CALI_ACTION: Sent when a wizard action (Next, Prev, Start) is triggered.
+- EVT_CALI_TRAY_CHANGED: Sent when a different filament tray is selected.
+- EVT_SHOW_ERROR_INFO_SEND: Triggered when a calibration job upload fails.
+
+[UNITY]
+- CalibrationWizardPage -> Base class for Page View MonoBehaviours.
+- CaliPageButton -> UI Toolkit Button with specific USS classes for 'green' vs 'white' styles.
+- CaliPageActionPanel -> Reusable Footer prefab.
+- CaliPageStepGuide -> Reusable Stepper/Breadcrumb UI component.
+- CaliPageSendingPanel -> Progress overlay prefab.
+
+[PORTING_HAZARD:P2]
+- Deeply nested sizer logic and manual Layout() calls.
+- Heavy reliance on global wxGetApp() for config and device management.
+- Custom state-driven button coloring (StateColor) should map to Unity's USS pseudo-states (:hover, :active, :disabled).
+*/
+
 CalibrationStyle get_cali_style(MachineObject* obj)
 {
     if (!obj) return CalibrationStyle::CALI_STYLE_DEFAULT;

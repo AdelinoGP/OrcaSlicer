@@ -1468,3 +1468,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2 (Heavy coupling with wxWidgets UI constructs and internal calibration APIs)
 - Git: N/A (will commit next)
 - Next recommended Phase 1 task: T197 annotate: src/slic3r/GUI/CalibrationWizardPage.cpp
+
+## Phase 1 - Task T197 & T198 complete
+- Task type: annotate
+- File: src/slic3r/GUI/CalibrationWizardPage.cpp, src/slic3r/GUI/CalibrationWizardPage.hpp
+- Deliverables: src/slic3r/GUI/CalibrationWizardPage.cpp, src/slic3r/GUI/CalibrationWizardPage.hpp
+- Substantive additions: Class-level [INTENT], [STATE], [EVENT], [UNITY] annotations.
+- Verification excerpt: "CalibrationWizardPage defines the building blocks for the calibration UI, including the base page class, specialized buttons, headers, footers, and progress panels."
+- Unity-impact summary:
+  - Map each UI class to a reusable UI Toolkit component or MonoBehaviour.
+  - Custom state-driven button coloring (StateColor) should map to Unity's USS pseudo-states.
+- Hazards found: P2 (Heavy reliance on global wxGetApp(), Deeply nested sizer logic)
+- Git: N/A (will commit next)
+- Next recommended Phase 1 task: T199 annotate: src/slic3r/GUI/CalibrationWizardPresetPage.cpp

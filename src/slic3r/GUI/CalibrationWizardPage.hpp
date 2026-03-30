@@ -16,6 +16,23 @@
 
 namespace Slic3r { namespace GUI {
 
+/*
+[INTENT]
+Declaration boundary for the calibration wizard components.
+
+[STATE]
+- CalibrationWizardPage: Base class for individual wizard views.
+- FilamentComboBox: Complex selection component for filaments.
+- CaliPageCaption: Header UI component.
+- CaliPageStepGuide: Breadcrumb/Stepper UI component.
+- CaliPageActionPanel: Action button container.
+- CaliPageSendingPanel: Upload progress and error display.
+
+[UNITY]
+- Map each class to a reusable UI Toolkit component or MonoBehaviour.
+- Use a central Navigation controller to manage the 'chain' of pages.
+*/
+
 
 #define MIN_CALIBRATION_PAGE_WIDTH         FromDIP(1100)
 #define PRESET_GAP                         FromDIP(25)

@@ -115,8 +115,8 @@ Last updated: 2026-03-30T05:59:40Z
 - [ ] T194 annotate: src/slic3r/GUI/CalibrationWizardCaliPage.hpp
 - [x] T195 annotate: src/slic3r/GUI/CalibrationWizard.cpp
 - [x] T196 annotate: src/slic3r/GUI/CalibrationWizard.hpp
-- [ ] T197 annotate: src/slic3r/GUI/CalibrationWizardPage.cpp
-- [ ] T198 annotate: src/slic3r/GUI/CalibrationWizardPage.hpp
+- [x] T197 annotate: src/slic3r/GUI/CalibrationWizardPage.cpp
+- [x] T198 annotate: src/slic3r/GUI/CalibrationWizardPage.hpp
 - [ ] T199 annotate: src/slic3r/GUI/CalibrationWizardPresetPage.cpp
 - [ ] T200 annotate: src/slic3r/GUI/CalibrationWizardPresetPage.hpp
 - [ ] T201 annotate: src/slic3r/GUI/CalibrationWizardSavePage.cpp
