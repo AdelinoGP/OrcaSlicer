@@ -1990,3 +1990,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2 x1 (stateful codec synchronization)
 - Git: Annotate json_diff.hpp for Unity port prep
 - Next recommended Phase 1 task: T771 annotate: src/slic3r/Utils/MacDarkMode.hpp
+
+## Phase 1 - Task T771 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/MacDarkMode.hpp
+- Deliverables: src/slic3r/Utils/MacDarkMode.hpp
+- Substantive additions: Annotations for macOS platform-specific shims, covering Dark Mode, WebView, and gesture integration.
+- Verification excerpt: [UNITY] Unity's cross-platform abstraction layer (PlayerSettings, SystemInfo) and the UI Toolkit handle most of these behaviors natively.
+- Unity-impact summary:
+  - Replace custom Dark Mode queries with `SystemInfo` or native theme providers.
+  - Use Unity's native Input System for gestures.
+- Hazards found: P3 x1 (platform-specific styling workarounds)
+- Git: Annotate MacDarkMode.hpp for Unity port prep
+- Next recommended Phase 1 task: T772 annotate: src/slic3r/Utils/minilzo_extension.cpp
