@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-30T04:00:27Z
+Last updated: 2026-03-30T04:14:13Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -107,8 +107,8 @@ Last updated: 2026-03-30T04:00:27Z
 - [x] T186 annotate: src/slic3r/GUI/BonjourDialog.hpp
 - [x] T187 annotate: src/slic3r/GUI/calib_dlg.cpp
 - [x] T188 annotate: src/slic3r/GUI/calib_dlg.hpp
-- [ ] T189 annotate: src/slic3r/GUI/Calibration.cpp
-- [ ] T190 annotate: src/slic3r/GUI/Calibration.hpp
+- [x] T189 annotate: src/slic3r/GUI/Calibration.cpp
+- [x] T190 annotate: src/slic3r/GUI/Calibration.hpp
 - [ ] T191 annotate: src/slic3r/GUI/CalibrationPanel.cpp
 - [ ] T192 annotate: src/slic3r/GUI/CalibrationPanel.hpp
 - [ ] T193 annotate: src/slic3r/GUI/CalibrationWizardCaliPage.cpp

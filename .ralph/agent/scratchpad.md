@@ -1,21 +1,16 @@
-# Plan - 2026-03-30
+# OrcaSlicer GUI Analysis Agent — Scratchpad
+## 2026-03-30 04:30:00 - Phase 1: Annotation
+Current focus: `src/slic3r/GUI/Calibration.cpp` (T189)
 
-I am continuing Phase 1: GUI File-by-File Annotation for Unity Port Preparation.
-Current focus: `src/slic3r/Utils/` directory.
+### Understanding & Context
+I am Ralph. My goal is to annotate GUI source files to prepare for a Unity port. I have a long list of tasks in `ralph-tasks.md`.
 
-## Accomplishments
-- Verified and closed T766 (`InstanceID.cpp`) and T767 (`InstanceID.hpp`) which were already annotated.
-- Annotated and committed T778 (`NetworkAgent.cpp`).
-- Annotated and committed T781 (`NetworkAgent.hpp`).
-- Annotated and committed T779 (`NetworkAgentFactory.cpp`).
+### Reconciling Task State
+There is some disagreement between `ralph-tasks.md`, `handoff.md`, and the CLI tool's task state. I will use `ralph-tasks.md` as the primary source for progress and filenames. I will add missing tasks to the CLI tool using stable keys to ensure idempotent behavior across runs.
 
-## Next Task
-- T780 annotate: `src/slic3r/Utils/NetworkAgentFactory.hpp`
-
-## Update - 2026-03-30
-- Annotated T780 (NetworkAgentFactory.hpp).
-- Annotated T782 (Obico.cpp).
-- Annotated T783 (Obico.hpp).
-- Annotated T784 (OctoPrint.cpp).
-- Annotated T785 (OctoPrint.hpp).
-Next up: T786 (OrcaCloudServiceAgent.cpp).
+### Plan for T189
+1.  Read `src/slic3r/GUI/Calibration.cpp` and its header `src/slic3r/GUI/Calibration.hpp` (if available) to understand its purpose and context.
+2.  Analyze the file for `[INTENT]`, `[STATE]`, `[EVENT]`, `[THREAD]`, `[OPENGL]`, `[UNITY]`, `[PORTING_HAZARD]`.
+3.  Annotate the file according to the Phase 1 standard.
+4.  Verify the annotation and commit.
+5.  Update the handoff and tasks.
