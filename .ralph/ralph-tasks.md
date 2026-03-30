@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-03-30T01:40:00Z
+Last updated: 2026-03-30T01:50:00Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -675,14 +675,14 @@ Last updated: 2026-03-30T01:40:00Z
 - [x] T754 annotate: src/slic3r/Utils/FixModelByWin10.hpp
 - [x] T755 annotate: src/slic3r/Utils/FlashAir.cpp
 - [x] T756 annotate: src/slic3r/Utils/FlashAir.hpp
-- [ ] T757 annotate: src/slic3r/Utils/Flashforge.cpp
-- [ ] T758 annotate: src/slic3r/Utils/Flashforge.hpp
+- [x] T757 annotate: src/slic3r/Utils/Flashforge.cpp
+- [x] T758 annotate: src/slic3r/Utils/Flashforge.hpp
 - [ ] T759 annotate: src/slic3r/Utils/FontConfigHelp.cpp
 - [ ] T760 annotate: src/slic3r/Utils/FontConfigHelp.hpp
 - [ ] T761 annotate: src/slic3r/Utils/HexFile.cpp
 - [ ] T762 annotate: src/slic3r/Utils/HexFile.hpp
 - [ ] T763 annotate: src/slic3r/Utils/Http.cpp
-- [ ] T764 annotate: src/slic3r/Utils/Http.hpp
+- [x] T764 annotate: src/slic3r/Utils/Http.hpp
 - [ ] T765 annotate: src/slic3r/Utils/ICloudServiceAgent.hpp
 - [ ] T766 annotate: src/slic3r/Utils/InstanceID.cpp
 - [ ] T767 annotate: src/slic3r/Utils/InstanceID.hpp
@@ -718,8 +718,8 @@ Last updated: 2026-03-30T01:40:00Z
 - [ ] T797 annotate: src/slic3r/Utils/Profile.hpp
 - [ ] T798 annotate: src/slic3r/Utils/QidiPrinterAgent.cpp
 - [ ] T799 annotate: src/slic3r/Utils/QidiPrinterAgent.hpp
-- [ ] T800 annotate: src/slic3r/Utils/RaycastManager.cpp
-- [ ] T801 annotate: src/slic3r/Utils/RaycastManager.hpp
+- [x] T800 annotate: src/slic3r/Utils/RaycastManager.cpp
+- [x] T801 annotate: src/slic3r/Utils/RaycastManager.hpp
 - [ ] T802 annotate: src/slic3r/Utils/Repetier.cpp
 - [ ] T803 annotate: src/slic3r/Utils/Repetier.hpp
 - [ ] T804 annotate: src/slic3r/Utils/RetinaHelper.hpp
@@ -733,8 +733,8 @@ Last updated: 2026-03-30T01:40:00Z
 - [ ] T812 annotate: src/slic3r/Utils/SnapmakerPrinterAgent.hpp
 - [ ] T813 annotate: src/slic3r/Utils/TCPConsole.cpp
 - [ ] T814 annotate: src/slic3r/Utils/TCPConsole.hpp
-- [ ] T815 annotate: src/slic3r/Utils/UndoRedo.cpp
-- [ ] T816 annotate: src/slic3r/Utils/UndoRedo.hpp
+- [x] T815 annotate: src/slic3r/Utils/UndoRedo.cpp
+- [x] T816 annotate: src/slic3r/Utils/UndoRedo.hpp
 - [ ] T817 annotate: src/slic3r/Utils/WebSocketClient.hpp
 - [ ] T818 annotate: src/slic3r/Utils/WxFontUtils.cpp
 - [ ] T819 annotate: src/slic3r/Utils/WxFontUtils.hpp

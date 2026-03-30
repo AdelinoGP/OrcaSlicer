@@ -1858,3 +1858,33 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none new (preserved existing hazard notes)
 - Git: Annotate Http.hpp for Unity port prep
 - Next recommended Phase 1 task: T763 annotate: src/slic3r/Utils/Http.cpp
+
+## Phase 1 - Task T758 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/Flashforge.hpp
+- Deliverables: src/slic3r/Utils/Flashforge.hpp
+- Substantive additions: 5 comment blocks covering class intent, state management, thread context, and Unity mapping.
+- Verification excerpt: `[UNITY] Map to a C# class implementing a shared IPrintHost interface, using a dedicated FlashforgeProtocol class to handle the command-response sequence.`
+- Unity-impact summary:
+  - Port as a retained C# service implementing a shared `IPrintHost` interface.
+  - Keep vendor-specific command strings explicit as a protocol model.
+  - Preserve the GCodeFlavor-based connection preamble selection.
+- Hazards found: P3 x1 (hardcoded protocol strings)
+- Git: d1b31054e1 - annotate: src/slic3r/Utils/Flashforge.hpp (T758)
+- Next recommended Phase 1 task: T757 annotate: src/slic3r/Utils/Flashforge.cpp
+
+## Phase 1 - Task T757 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/Flashforge.cpp
+- Deliverables: src/slic3r/Utils/Flashforge.cpp
+- Substantive additions: 8 comment blocks covering protocol intent, connection preamble state, worker thread context, and Unity mapping.
+- Verification excerpt: `[UNITY] Use a C# FlashforgeProtocol service class that wraps a TcpClient. Commands should be modeled as an enum or a set of protocol-message objects rather than raw strings.`
+- Unity-impact summary:
+  - Migrate blocking TCP operations to async Task-based networking.
+  - Implement chunked G-code upload to avoid full-file RAM buffering (P2 hazard).
+  - Preserve protocol-specific delays and chunk framing constraints.
+- Hazards found: P2 x2 (RAM buffering, framing constraints), P3 x1 (protocol delays)
+- Git: 8708bc5619 - annotate: src/slic3r/Utils/Flashforge.cpp (T757)
+- Next recommended Phase 1 task: T763 annotate: src/slic3r/Utils/Http.cpp
