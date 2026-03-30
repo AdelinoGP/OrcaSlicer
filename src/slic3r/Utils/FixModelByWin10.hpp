@@ -7,6 +7,8 @@
 class ProgressDialog;
 
 namespace Slic3r {
+// [INTENT] Public interface for Windows 10 model repair service.
+// [UNITY] Use conditional compilation (#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN) to wrap WinRT calls in C#.
 
 class Model;
 class ModelObject;
