@@ -1976,3 +1976,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2 x1 (stateful codec synchronization), P3 x1 (compatibility settings coupling)
 - Git: Annotate json_diff.cpp for Unity port prep
 - Next recommended Phase 1 task: T770 annotate: src/slic3r/Utils/json_diff.hpp
+
+## Phase 1 - Task T770 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/json_diff.hpp
+- Deliverables: src/slic3r/Utils/json_diff.hpp
+- Substantive additions: Header-level annotations for the JSON codec, mapping member state and Unity replacement strategy.
+- Verification excerpt: [PORTING_HAZARD:P2] The codec is strictly stateful and sequential. Message loss or out-of-order delivery will corrupt the local diff2all_base.
+- Unity-impact summary:
+  - Replace `nlohmann::json` with a .NET equivalent.
+  - Expose as a stateful service that preserves the "last seen" snapshot.
+- Hazards found: P2 x1 (stateful codec synchronization)
+- Git: Annotate json_diff.hpp for Unity port prep
+- Next recommended Phase 1 task: T771 annotate: src/slic3r/Utils/MacDarkMode.hpp
