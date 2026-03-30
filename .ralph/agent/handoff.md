@@ -1918,3 +1918,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P1 x2, P2 x3
 - Git: Annotate ICloudServiceAgent.hpp for Unity port prep
 - Next recommended Phase 1 task: T766 annotate: src/slic3r/Utils/InstanceID.cpp
+
+## Phase 1 - Task T766 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/InstanceID.cpp
+- Deliverables: src/slic3r/Utils/InstanceID.cpp
+- Substantive additions: Full suite of annotations covering machine IID persistence, singleton state, and thread safety.
+- Verification excerpt: [UNITY] Replace with a ScriptableObject for runtime access and a JSON-backed file in Application.persistentDataPath.
+- Unity-impact summary:
+  - Use `System.Guid` for UUID generation/normalization.
+  - Map custom filesystem storage to `Application.persistentDataPath`.
+  - Replace manual mutex locking with C# `lock` or `ThreadSafe` singleton patterns.
+- Hazards found: P2 x1 (non-atomic persistence), P3 x3 (coupling and validation dependencies)
+- Git: Annotate InstanceID.cpp for Unity port prep
+- Next recommended Phase 1 task: T767 annotate: src/slic3r/Utils/InstanceID.hpp

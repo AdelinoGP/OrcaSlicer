@@ -22,8 +22,23 @@
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/Utils.hpp"
 
-namespace Slic3r {
-namespace instance_id {
+namespace Slic3r { namespace instance_id {
+
+// [INTENT] Implementation of the machine identifier persistence and resolution logic.
+// It manages the process-global singleton state and coordinates multi-tier storage lookups
+// (secure file -> app config -> generation) to ensure stability across version upgrades.
+//
+// [STATE] Process-global singleton state:
+// - `cached_iid`: The memoized string representation of the machine's UUID.
+// - `cache_ready`: A boolean latch to avoid redundant filesystem/config I/O after the first resolution.
+//
+// [THREAD] Thread-safe via a static mutex (`cache_mutex`). While most GUI code is main-thread,
+// background cloud services and the updater may query the IID concurrently.
+//
+// [UNITY] Replace with a ScriptableObject for runtime access and a JSON-backed file in
+// `Application.persistentDataPath` for cross-session persistence. Use `System.Guid` for
+// generation and normalization.
+//
 namespace {
 
 constexpr const char* CONFIG_KEY = "updater_iid";
@@ -31,7 +46,7 @@ constexpr const char* LEGACY_KEY = "iid";
 
 std::mutex& cache_mutex()
 {
-    // [CONCURRENCY] The module keeps one process-global machine id cache; all callers serialize access here because
+    // [THREAD] Guards the process-global machine id cache; all callers serialize access here because
     // updater, cloud, and telemetry code may request the id from different threads.
     static std::mutex mtx;
     return mtx;
@@ -65,7 +80,7 @@ std::optional<std::string> normalize_uuid(std::string value)
             return std::nullopt;
         return value;
     } catch (...) {
-        // [HAZARD] Validation depends on Boost UUID parsing throwing on bad input; a port must preserve the same
+        // [PORTING_HAZARD:P3] Validation depends on Boost UUID parsing throwing on bad input; a port must preserve the same
         // "ignore invalid persisted id and regenerate" fallback even if its parser reports errors differently.
         return std::nullopt;
     }
@@ -89,7 +104,7 @@ std::optional<std::string> read_config_value(AppConfig& config)
 
 void write_config_value(AppConfig& config, const std::string& value)
 {
-    // [COUPLING] Migration stays coupled to both `updater_iid` and the legacy `iid` key because older updater builds
+    // [PORTING_HAZARD:P3] Migration stays coupled to both `updater_iid` and the legacy `iid` key because older updater builds
     // still read the old name; ports need to keep both until every consumer is migrated.
     config.set(CONFIG_KEY, value);
     if (config.get(LEGACY_KEY) != value)
@@ -106,7 +121,7 @@ void prune_config_value(AppConfig& config)
 
 boost::filesystem::path storage_path()
 {
-    // [COUPLING] Machine-id persistence is rooted in OrcaSlicer's `data_dir()` policy, so this helper inherits the
+    // [PORTING_HAZARD:P3] Machine-id persistence is rooted in OrcaSlicer's `data_dir()` policy, so this helper inherits the
     // application's platform-specific roaming-data location instead of using a standalone secure store.
     const std::string& base_dir = Slic3r::data_dir();
     if (base_dir.empty())
@@ -140,7 +155,7 @@ bool write_storage_file(const std::string& value)
     if (path.empty())
         return false;
 
-    const auto parent = path.parent_path();
+    const auto                parent = path.parent_path();
     boost::system::error_code ec;
     if (!parent.empty() && !boost::filesystem::exists(parent))
         boost::filesystem::create_directories(parent, ec);
@@ -148,7 +163,7 @@ bool write_storage_file(const std::string& value)
     if (ec)
         return false;
 
-    // [HAZARD] Persistence is a truncate-and-rewrite file update with no atomic rename, so a crash can briefly drop the
+    // [PORTING_HAZARD:P2] Persistence is a truncate-and-rewrite file update with no atomic rename, so a crash can briefly drop the
     // machine id and force regeneration on the next startup.
     boost::nowide::ofstream file(path.string(), std::ios::trunc);
     if (!file)
@@ -160,15 +175,9 @@ bool write_storage_file(const std::string& value)
     return file.good();
 }
 
-std::optional<std::string> read_secure()
-{
-    return read_storage_file();
-}
+std::optional<std::string> read_secure() { return read_storage_file(); }
 
-bool write_secure(const std::string& value)
-{
-    return write_storage_file(value);
-}
+bool write_secure(const std::string& value) { return write_storage_file(value); }
 
 std::string generate_uuid()
 {
@@ -187,7 +196,7 @@ std::string ensure(AppConfig& config)
         return cached_iid();
 
     if (auto secure = read_secure()) {
-        cached_iid() = *secure;
+        cached_iid()  = *secure;
         cache_ready() = true;
         // [INTENT] The dedicated storage file wins over config values so every subsystem converges on one stable id even
         // when the config still contains an outdated copy from earlier releases.
@@ -196,7 +205,7 @@ std::string ensure(AppConfig& config)
     }
 
     if (auto from_config = read_config_value(config)) {
-        cached_iid() = *from_config;
+        cached_iid()  = *from_config;
         cache_ready() = true;
         if (!write_secure(cached_iid()))
             write_config_value(config, cached_iid());
@@ -205,7 +214,7 @@ std::string ensure(AppConfig& config)
         return cached_iid();
     }
 
-    cached_iid() = generate_uuid();
+    cached_iid()  = generate_uuid();
     cache_ready() = true;
 
     if (!write_secure(cached_iid()))
@@ -223,5 +232,4 @@ void reset_cache_for_tests()
     cache_ready() = false;
 }
 
-} // namespace instance_id
-} // namespace Slic3r
+}} // namespace Slic3r::instance_id
