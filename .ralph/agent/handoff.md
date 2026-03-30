@@ -1306,3 +1306,31 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P3: Partial upload failures can leave orphaned server-side chunks)
 - Git: annotate: src/slic3r/Utils/SimplyPrint.cpp
 - Next recommended Phase 1 task: T812 src/slic3r/Utils/SnapmakerPrinterAgent.hpp
+
+## Phase 1 - Task T812 complete
+- Task type: annotate
+- File: src/slic3r/Utils/SnapmakerPrinterAgent.hpp
+- Deliverables: src/slic3r/Utils/SnapmakerPrinterAgent.hpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Specialized agent for Snapmaker machines extending Moonraker agent.
+  - Adapts NFC-based material reporting and parallel status arrays.
+  - Map to a C# class with robust index-based bounds checking for parallel arrays.
+- Hazards found: 1 (P3: Reliance on parallel arrays in JSON response)
+- Git: annotate: src/slic3r/Utils/SnapmakerPrinterAgent.hpp
+- Next recommended Phase 1 task: T811 src/slic3r/Utils/SnapmakerPrinterAgent.cpp
+
+## Phase 1 - Task T811 complete
+- Task type: annotate
+- File: src/slic3r/Utils/SnapmakerPrinterAgent.cpp
+- Deliverables: src/slic3r/Utils/SnapmakerPrinterAgent.cpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Collapses Snapmaker parallel arrays into Orca's per-tray record format.
+  - Resolves material names against PresetBundle for UI compatibility.
+  - Layers optional NFC-derived temperatures onto tray snapshots.
+- Hazards found: 1 (P3: Parallel array synchronization across multiple JSON keys)
+- Git: annotate: src/slic3r/Utils/SnapmakerPrinterAgent.cpp
+- Next recommended Phase 1 task: T814 src/slic3r/Utils/TCPConsole.hpp

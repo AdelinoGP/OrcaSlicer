@@ -1,3 +1,4 @@
+// [ANNOTATED]
 #pragma once
 
 #include "MoonrakerPrinterAgent.hpp"
