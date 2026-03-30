@@ -1,3 +1,4 @@
+// SKIP_TRIVIAL
 #ifndef slic3r_RetinaHelper_hpp_
 #define slic3r_RetinaHelper_hpp_
 

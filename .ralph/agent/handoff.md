@@ -1211,3 +1211,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P3: Multi-printer routing via PrintHostUpload carrying backend-specific 'group')
 - Git: annotate: src/slic3r/Utils/Repetier.cpp
 - Next recommended Phase 1 task: T804 src/slic3r/Utils/RetinaHelper.hpp
+
+## Phase 1 - Task T804 complete
+- Task type: skip-trivial
+- File: src/slic3r/Utils/RetinaHelper.hpp
+- Deliverables: src/slic3r/Utils/RetinaHelper.hpp
+- Substantive additions: 0 (marked as skip-trivial)
+- Verification excerpt: // SKIP_TRIVIAL
+- Unity-impact summary:
+  - Small platform-specific helper for Retina display scaling.
+  - Unity handles high-DPI scaling automatically.
+- Hazards found: 0
+- Git: skip-trivial: src/slic3r/Utils/RetinaHelper.hpp
+- Next recommended Phase 1 task: T806 src/slic3r/Utils/Serial.hpp
