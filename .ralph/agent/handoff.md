@@ -2004,3 +2004,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P3 x1 (platform-specific styling workarounds)
 - Git: Annotate MacDarkMode.hpp for Unity port prep
 - Next recommended Phase 1 task: T772 annotate: src/slic3r/Utils/minilzo_extension.cpp
+
+## Phase 1 - Task T772 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/minilzo_extension.cpp
+- Deliverables: src/slic3r/Utils/minilzo_extension.cpp
+- Substantive additions: Annotations for the minilzo wrapper, documenting the thread-safety hazard and binary compatibility requirements.
+- Verification excerpt: [THREAD] This shared buffer makes lzo_compress thread-unsafe.
+- Unity-impact summary:
+  - Replace with a managed C# LZO implementation or a thread-safe native plugin.
+  - Maintain binary compatibility with the printer's LZO1X-1 implementation.
+- Hazards found: P3 x1 (thread-safety with shared buffer)
+- Git: Annotate minilzo_extension.cpp for Unity port prep
+- Next recommended Phase 1 task: T773 annotate: src/slic3r/Utils/minilzo_extension.hpp
