@@ -1101,3 +1101,31 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P3: Detached threads during shutdown depend on heap lifetime extension)
 - Git: annotate: src/slic3r/Utils/PrintHost.cpp
 - Next recommended Phase 1 task: T795 src/slic3r/Utils/Process.hpp
+
+## Phase 1 - Task T795 complete
+- Task type: annotate
+- File: src/slic3r/Utils/Process.hpp
+- Deliverables: src/slic3r/Utils/Process.hpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Utilities for spawning new slicer/G-code viewer instances.
+  - Supports single-instance mode and file-specific launches.
+  - Port to C# ProcessService using System.Diagnostics.Process.
+- Hazards found: 1 (P3: Significant platform-specific spawning behavior)
+- Git: annotate: src/slic3r/Utils/Process.hpp
+- Next recommended Phase 1 task: T794 src/slic3r/Utils/Process.cpp
+
+## Phase 1 - Task T794 complete
+- Task type: annotate
+- File: src/slic3r/Utils/Process.cpp
+- Deliverables: src/slic3r/Utils/Process.cpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Deployment-aware process relaunch behavior (AppImage, macOS bundles).
+  - Asynchronous execution using wxExecute or boost::process.
+  - Isolation of G-code viewer process for memory/resource management.
+- Hazards found: 1 (P3: Encodes deployment assumptions like sibling exe names)
+- Git: annotate: src/slic3r/Utils/Process.cpp
+- Next recommended Phase 1 task: T797 src/slic3r/Utils/Profile.hpp
