@@ -16,22 +16,30 @@
 static wxColour FG_COLOR = wxColour(0x32, 0x3A, 0x3D);
 static wxColour BG_COLOR = wxColour(0xF8, 0xF8, 0xF8);
 
-#define CALI_FLOW_CONTENT_WIDTH  FromDIP(200)
+#define CALI_FLOW_CONTENT_WIDTH FromDIP(200)
 
 namespace Slic3r { namespace GUI {
 
-CalibrationDialog::CalibrationDialog(Plater *plater)
-    : DPIDialog(static_cast<wxWindow *>(wxGetApp().mainframe), wxID_ANY, _L("Calibration"), wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX)
+// [INTENT] Initializes the calibration dialog with a two-pane layout:
+// Left: Calibration step selection.
+// Right: Real-time progress indicator and start button.
+CalibrationDialog::CalibrationDialog(Plater* plater)
+    : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe),
+                wxID_ANY,
+                _L("Calibration"),
+                wxDefaultPosition,
+                wxDefaultSize,
+                wxCAPTION | wxCLOSE_BOX)
 {
     this->SetDoubleBuffered(true);
 
     SetBackgroundColour(*wxWHITE);
-    wxBoxSizer *m_sizer_main = new wxBoxSizer(wxVERTICAL);
+    wxBoxSizer* m_sizer_main = new wxBoxSizer(wxVERTICAL);
     auto        m_line_top   = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(-1, 1), wxTAB_TRAVERSAL);
     m_line_top->SetBackgroundColour(wxColour(166, 169, 170));
     m_sizer_main->Add(m_line_top, 0, wxEXPAND, 0);
 
-    wxBoxSizer *sizer_body = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* sizer_body = new wxBoxSizer(wxHORIZONTAL);
     auto        body_panel = new wxPanel(this, wxID_ANY);
 
     body_panel->SetBackgroundColour(*wxWHITE);
@@ -39,11 +47,12 @@ CalibrationDialog::CalibrationDialog(Plater *plater)
     cali_left_panel->SetBackgroundColor(BG_COLOR);
     cali_left_panel->SetBorderColor(BG_COLOR);
 
-    wxBoxSizer *cali_left_sizer = new wxBoxSizer(wxVERTICAL);
+    wxBoxSizer* cali_left_sizer = new wxBoxSizer(wxVERTICAL);
     cali_left_sizer->Add(0, 0, 0, wxTOP, FromDIP(25));
 
     // calibration step selection
-    auto cali_step_select_title = new wxStaticText(cali_left_panel, wxID_ANY, _L("Calibration step selection"), wxDefaultPosition, wxDefaultSize, 0);
+    auto cali_step_select_title = new wxStaticText(cali_left_panel, wxID_ANY, _L("Calibration step selection"), wxDefaultPosition,
+                                                   wxDefaultSize, 0);
     cali_step_select_title->SetFont(::Label::Head_14);
     cali_step_select_title->Wrap(-1);
     cali_step_select_title->SetForegroundColour(FG_COLOR);
@@ -51,16 +60,18 @@ CalibrationDialog::CalibrationDialog(Plater *plater)
     cali_left_sizer->Add(cali_step_select_title, 0, wxLEFT, FromDIP(15));
 
     select_xcam_cali    = create_check_option(_L("Micro lidar calibration"), cali_left_panel, _L("Micro lidar calibration"), "xcam_cali");
-    select_bed_leveling = create_check_option(_L("Bed leveling"),            cali_left_panel, _L("Bed leveling"),                       "bed_leveling");
+    select_bed_leveling = create_check_option(_L("Bed leveling"), cali_left_panel, _L("Bed leveling"), "bed_leveling");
     select_vibration    = create_check_option(_L("Vibration compensation"), cali_left_panel, _L("Vibration compensation"), "vibration");
-    select_motor_noise  = create_check_option(_L("Motor noise cancellation"), cali_left_panel, _L("Motor noise cancellation"), "motor_noise");
-    select_nozzle_cali  = create_check_option(_L("Nozzle offset calibration"), cali_left_panel, _L("Nozzle offset calibration"), "nozzle_cali");
-    select_heatbed_cali  = create_check_option(_L("High-temperature Heatbed Calibration"), cali_left_panel, _L("High-temperature Heatbed Calibration"), "bed_cali");
-    select_clumppos_cali = create_check_option(_L("Nozzle clumping detection Calibration"), cali_left_panel, _L("Nozzle clumping detection Calibration"), "clump_pos_cali");
+    select_motor_noise = create_check_option(_L("Motor noise cancellation"), cali_left_panel, _L("Motor noise cancellation"), "motor_noise");
+    select_nozzle_cali   = create_check_option(_L("Nozzle offset calibration"), cali_left_panel, _L("Nozzle offset calibration"),
+                                               "nozzle_cali");
+    select_heatbed_cali  = create_check_option(_L("High-temperature Heatbed Calibration"), cali_left_panel,
+                                               _L("High-temperature Heatbed Calibration"), "bed_cali");
+    select_clumppos_cali = create_check_option(_L("Nozzle clumping detection Calibration"), cali_left_panel,
+                                               _L("Nozzle clumping detection Calibration"), "clump_pos_cali");
 
     // STUDIO-10091 the default not checked option
-    if(m_checkbox_list.count("bed_cali") != 0)
-    {
+    if (m_checkbox_list.count("bed_cali") != 0) {
         m_checkbox_list["bed_cali"]->SetValue(false);
     }
 
@@ -84,8 +95,8 @@ CalibrationDialog::CalibrationDialog(Plater *plater)
 
     cali_left_sizer->Add(0, 0, 0, wxTOP, FromDIP(5));
 
-    auto cali_left_text_body =
-        new Label(cali_left_panel, _L("The calibration program detects the status of your device automatically to minimize deviation.\nIt keeps the device performing optimally."));
+    auto cali_left_text_body = new Label(cali_left_panel, _L("The calibration program detects the status of your device automatically to "
+                                                             "minimize deviation.\nIt keeps the device performing optimally."));
     cali_left_text_body->Wrap(FromDIP(260));
     cali_left_text_body->SetForegroundColour(wxColour(0x6B, 0x6B, 0x6B));
     cali_left_text_body->SetBackgroundColour(BG_COLOR);
@@ -94,31 +105,14 @@ CalibrationDialog::CalibrationDialog(Plater *plater)
 
     cali_left_sizer->Add(0, 0, 0, wxTOP, FromDIP(20));
 
-   /* auto cali_left_text_top_prepar = new wxStaticText(cali_left_panel, wxID_ANY, _L("Preparation before calibration"), wxDefaultPosition, wxDefaultSize, 0);
-     cali_left_text_top_prepar->SetFont(::Label::Head_14);
-     cali_left_text_top_prepar->SetForegroundColour(wxColour(0x32, 0x3A, 0x3D));
-     cali_left_text_top_prepar->SetBackgroundColour(wxColour(0xF8, 0xF8, 0xF8));
-     cali_left_text_top_prepar->Wrap(-1);
-     cali_left_sizer->Add(cali_left_text_top_prepar, 0, wxLEFT, FromDIP(15));
-
-     cali_left_sizer->Add(0, 0, 0, wxTOP, FromDIP(5));
-
-     auto cali_left_text_body_prepar =
-         new wxStaticText(cali_left_panel, wxID_ANY,
-                          _L("Before calibration, please make sure a filament is loaded and its nozzle temperature and bed temperature is set in Feeding lab."),
-     wxDefaultPosition, wxSize(FromDIP(260), -1), 0); cali_left_text_body_prepar->Wrap(FromDIP(260)); cali_left_text_body_prepar->SetFont(::Label::Body_13);
-     cali_left_text_body_prepar->SetForegroundColour(wxColour(0x6B, 0x6B, 0x6B));
-     cali_left_text_body_prepar->SetBackgroundColour(wxColour(0xF8, 0xF8, 0xF8));
-     cali_left_sizer->Add(cali_left_text_body_prepar, 0, wxLEFT, FromDIP(15));*/
-
     cali_left_panel->SetSizer(cali_left_sizer);
     cali_left_panel->Layout();
     sizer_body->Add(cali_left_panel, 0, wxALIGN_CENTER, 0);
 
     sizer_body->Add(0, 0, 0, wxLEFT, FromDIP(8));
 
-    wxBoxSizer *cali_right_sizer_h = new wxBoxSizer(wxHORIZONTAL);
-    wxBoxSizer *cali_right_sizer_v = new wxBoxSizer(wxVERTICAL);
+    wxBoxSizer* cali_right_sizer_h = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* cali_right_sizer_v = new wxBoxSizer(wxVERTICAL);
 
     auto cali_right_panel = new StaticBox(body_panel, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(182), FromDIP(200)));
     cali_right_panel->SetBackgroundColor(BG_COLOR);
@@ -134,6 +128,7 @@ CalibrationDialog::CalibrationDialog(Plater *plater)
     staticline->SetLineColour(AMS_CONTROL_BRAND_COLOUR);
     auto calibration_sizer = new wxBoxSizer(wxVERTICAL);
 
+    // [UNITY] StepIndicator maps to a Vertical Progress List or custom VisualElement in Unity.
     m_calibration_flow = new StepIndicator(cali_right_panel, wxID_ANY);
     StateColor bg_color(std::pair<wxColour, int>(BG_COLOR, StateColor::Normal));
     m_calibration_flow->SetBackgroundColor(bg_color);
@@ -141,6 +136,7 @@ CalibrationDialog::CalibrationDialog(Plater *plater)
     m_calibration_flow->SetMinSize(wxSize(CALI_FLOW_CONTENT_WIDTH, FromDIP(160)));
     m_calibration_flow->SetSize(wxSize(CALI_FLOW_CONTENT_WIDTH, FromDIP(160)));
 
+    // [UNITY] Standard Button maps to Unity UI Button with a state-driven label.
     m_calibration_btn = new Button(cali_right_panel, _L("Start Calibration"));
     m_calibration_btn->SetStyle(ButtonStyle::Confirm, ButtonType::Choice);
 
@@ -166,12 +162,13 @@ CalibrationDialog::CalibrationDialog(Plater *plater)
     Layout();
     Fit();
 
+    // [EVENT] Bind the calibration start action.
     m_calibration_btn->Bind(wxEVT_LEFT_DOWN, &CalibrationDialog::on_start_calibration, this);
 }
 
 CalibrationDialog::~CalibrationDialog() {}
 
-void CalibrationDialog::on_dpi_changed(const wxRect &suggested_rect) {}
+void CalibrationDialog::on_dpi_changed(const wxRect& suggested_rect) {}
 
 wxWindow* CalibrationDialog::create_check_option(wxString title, wxWindow* parent, wxString tooltip, std::string param)
 {
@@ -179,7 +176,7 @@ wxWindow* CalibrationDialog::create_check_option(wxString title, wxWindow* paren
     checkbox->SetBackgroundColour(BG_COLOR);
 
     wxBoxSizer* sizer_checkbox = new wxBoxSizer(wxHORIZONTAL);
-    wxBoxSizer* sizer_check = new wxBoxSizer(wxVERTICAL);
+    wxBoxSizer* sizer_check    = new wxBoxSizer(wxVERTICAL);
 
     auto check = new ::CheckBox(checkbox);
 
@@ -201,26 +198,29 @@ wxWindow* CalibrationDialog::create_check_option(wxString title, wxWindow* paren
     checkbox->SetToolTip(tooltip);
     text->SetToolTip(tooltip);
 
+    // [EVENT] Toggle checkbox when the label text is clicked.
     text->Bind(wxEVT_LEFT_DOWN, [this, check](wxMouseEvent&) { check->SetValue(check->GetValue() ? false : true); });
     m_checkbox_list[param] = check;
     m_checkbox_list[param]->SetValue(true);
     return checkbox;
 }
 
-void CalibrationDialog::update_cali(MachineObject *obj)
+// [THREAD] Main-thread UI update triggered by machine state changes.
+// [STATE] Synchronizes the UI visibility and labels with the MachineObject config and status.
+void CalibrationDialog::update_cali(MachineObject* obj)
 {
-    if (!obj) return;
-    if (obj->GetConfig()->SupportAIMonitor() && obj->GetConfig()->SupportCalibrationLidar())
-    {
+    if (!obj)
+        return;
+    if (obj->GetConfig()->SupportAIMonitor() && obj->GetConfig()->SupportCalibrationLidar()) {
         select_xcam_cali->Show();
     } else {
         select_xcam_cali->Hide();
         m_checkbox_list["xcam_cali"]->SetValue(false);
     }
 
-    if(obj->is_support_bed_leveling != 0){
+    if (obj->is_support_bed_leveling != 0) {
         select_bed_leveling->Show();
-    }else{
+    } else {
         select_bed_leveling->Hide();
         m_checkbox_list["bed_leveling"]->SetValue(false);
     }
@@ -262,7 +262,6 @@ void CalibrationDialog::update_cali(MachineObject *obj)
             // RUNNING && IDLE
             m_calibration_btn->Disable();
             m_calibration_btn->SetLabel(_L("Calibrating"));
-
         }
         auto size = wxSize(CALI_FLOW_CONTENT_WIDTH, obj->stage_list_info.size() * FromDIP(35));
         if (m_calibration_flow->GetSize().y != size.y) {
@@ -272,7 +271,6 @@ void CalibrationDialog::update_cali(MachineObject *obj)
             m_calibration_flow->Refresh();
 
             Layout();
-
         }
         if (is_stage_list_info_changed(obj)) {
             // change items if stage_list_info changed
@@ -289,39 +287,41 @@ void CalibrationDialog::update_cali(MachineObject *obj)
         // IDLE
         if (obj->is_in_printing()) {
             m_calibration_btn->Disable();
-        }
-        else {
+        } else {
             m_calibration_btn->Enable();
         }
         m_calibration_flow->DeleteAllItems();
         m_calibration_btn->SetLabel(_L("Start Calibration"));
         if (!m_checkbox_list["vibration"]->GetValue() && !m_checkbox_list["bed_leveling"]->GetValue() &&
             !m_checkbox_list["xcam_cali"]->GetValue() && !m_checkbox_list["motor_noise"]->GetValue() &&
-            !m_checkbox_list["nozzle_cali"]->GetValue() && !m_checkbox_list["bed_cali"]->GetValue())
-        {
+            !m_checkbox_list["nozzle_cali"]->GetValue() && !m_checkbox_list["bed_cali"]->GetValue()) {
             m_calibration_btn->Disable();
             m_calibration_btn->SetLabel(_L("No step selected"));
-        }
-        else {
+        } else {
             m_calibration_btn->Enable();
         }
     }
 }
 
-bool CalibrationDialog::is_stage_list_info_changed(MachineObject *obj)
+bool CalibrationDialog::is_stage_list_info_changed(MachineObject* obj)
 {
-    if (!obj) return true;
+    if (!obj)
+        return true;
 
-    if (last_stage_list_info.size() != obj->stage_list_info.size()) return true;
+    if (last_stage_list_info.size() != obj->stage_list_info.size())
+        return true;
 
     for (int i = 0; i < last_stage_list_info.size(); i++) {
-        if (last_stage_list_info[i] != obj->stage_list_info[i]) return true;
+        if (last_stage_list_info[i] != obj->stage_list_info[i])
+            return true;
     }
     last_stage_list_info = obj->stage_list_info;
     return false;
 }
 
-void CalibrationDialog::on_start_calibration(wxMouseEvent &event)
+// [EVENT] Dispatches the calibration command with selected options to the MachineObject.
+// [THREAD] Commands are sent to the machine/network layer from the UI thread.
+void CalibrationDialog::on_start_calibration(wxMouseEvent& event)
 {
     if (m_obj) {
         if (m_obj->is_calibration_done()) {
@@ -330,21 +330,17 @@ void CalibrationDialog::on_start_calibration(wxMouseEvent &event)
             Close();
         } else {
             BOOST_LOG_TRIVIAL(info) << "on_start_calibration";
-            m_obj->command_start_calibration(
-                m_checkbox_list["vibration"]->GetValue(),
-                m_checkbox_list["bed_leveling"]->GetValue(),
-                m_checkbox_list["xcam_cali"]->GetValue(),
-                m_checkbox_list["motor_noise"]->GetValue(),
-                m_checkbox_list["nozzle_cali"]->GetValue(),
-                m_checkbox_list["bed_cali"]->GetValue(),
-                m_checkbox_list["clump_pos_cali"]->GetValue()
-                );
+            m_obj->command_start_calibration(m_checkbox_list["vibration"]->GetValue(), m_checkbox_list["bed_leveling"]->GetValue(),
+                                             m_checkbox_list["xcam_cali"]->GetValue(), m_checkbox_list["motor_noise"]->GetValue(),
+                                             m_checkbox_list["nozzle_cali"]->GetValue(), m_checkbox_list["bed_cali"]->GetValue(),
+                                             m_checkbox_list["clump_pos_cali"]->GetValue());
         }
     }
 }
 
-void CalibrationDialog::update_machine_obj(MachineObject *obj) { m_obj = obj; }
+void CalibrationDialog::update_machine_obj(MachineObject* obj) { m_obj = obj; }
 
+// [EVENT] Ensures dark mode is applied before showing the dialog.
 bool CalibrationDialog::Show(bool show)
 {
     if (show) {
