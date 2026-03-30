@@ -5,6 +5,20 @@
 
 namespace Slic3r { namespace GUI {
 
+/*
+[INTENT]
+Declaration boundary for the calibration preset selection components.
+
+[STATE]
+- CaliPresetStage: Enumeration for Coarse/Fine stages.
+- CaliPresetPageStatus: State machine for page lifecycle and error handling.
+- CalibrationPresetPage: Root class for the 'Preset' wizard step.
+
+[UNITY]
+- Map complex sub-panels (Tips, Warning, CustomRange) to reusable UI Toolkit templates.
+- Preserve the status-driven UI update pattern using a formal State pattern in C#.
+*/
+
 enum CaliPresetStage {
     CALI_MANULA_STAGE_NONE = 0,
     CALI_MANUAL_STAGE_1,

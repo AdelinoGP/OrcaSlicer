@@ -23,6 +23,37 @@ namespace Slic3r { namespace GUI {
 static int PA_LINE = 0;
 static int PA_PATTERN = 1;
 
+
+/*
+[INTENT]
+CalibrationWizardPresetPage manages the initial configuration step for all calibration 
+wizards. It allows the user to select the target nozzle, build plate, and filaments, 
+ensuring compatibility with the connected machine.
+
+[STATE]
+- CaliPresetCaliStagePanel: Manages the Coarse vs Fine calibration stage toggle.
+- CalibrationPresetPage: Main controller for the preset selection view.
+- m_filament_comboBox_list: Tracks individual filament slot controls.
+- m_page_status: Lifecycle status of the preset page (e.g., Init, Normal, InPrinting).
+- filament_ams_list: Local cache of filament data from the connected AMS.
+
+[EVENT]
+- EVT_CALI_TRAY_CHANGED: Dispatched when a filament selection changes.
+- Sync Button: Triggers manual synchronization with AMS/Nozzle data from the printer.
+- ComboBox Events: Handle changes to nozzle diameter or build plate type.
+
+[UNITY]
+- CalibrationPresetPage -> MonoBehaviour-driven view with a complex UI Toolkit layout.
+- FilamentComboBox -> UI Toolkit template for filament slot selection.
+- CaliPresetTipsPanel -> Info panel prefab displaying ScriptableObject-based printer params.
+- CaliPresetCustomRangePanel -> Grid-based UI component for dynamic numeric inputs.
+
+[PORTING_HAZARD:P2]
+- The file contains extensive logic for cross-referencing AMS trays, filament IDs, 
+  and printer nozzle types. This should be moved to a shared C# Service/Model layer.
+- m_page_status driven show/hide logic is deeply nested and complex.
+- Dependency on print_config_def for populating enums (Nozzle Flow, Plate Type).
+*/
 CaliPresetCaliStagePanel::CaliPresetCaliStagePanel(
     wxWindow* parent,
     wxWindowID id,

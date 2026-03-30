@@ -1481,3 +1481,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2 (Heavy reliance on global wxGetApp(), Deeply nested sizer logic)
 - Git: N/A (will commit next)
 - Next recommended Phase 1 task: T199 annotate: src/slic3r/GUI/CalibrationWizardPresetPage.cpp
+
+## Phase 1 - Task T199 & T200 complete
+- Task type: annotate
+- File: src/slic3r/GUI/CalibrationWizardPresetPage.cpp, src/slic3r/GUI/CalibrationWizardPresetPage.hpp
+- Deliverables: src/slic3r/GUI/CalibrationWizardPresetPage.cpp, src/slic3r/GUI/CalibrationWizardPresetPage.hpp
+- Substantive additions: Class-level [INTENT], [STATE], [EVENT], [UNITY] annotations.
+- Verification excerpt: "CalibrationWizardPresetPage manages the initial configuration step for all calibration wizards."
+- Unity-impact summary:
+  - CalibrationPresetPage -> MonoBehaviour-driven view with a complex UI Toolkit layout.
+  - Preserve the status-driven UI update pattern using a formal State pattern in C#.
+- Hazards found: P2 (Complex AMS/filament cross-referencing logic, Status-driven UI complexity)
+- Git: N/A (will commit next)
+- Next recommended Phase 1 task: T201 annotate: src/slic3r/GUI/CalibrationWizardSavePage.cpp
