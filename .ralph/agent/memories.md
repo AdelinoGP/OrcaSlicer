@@ -2,6 +2,22 @@
 
 ## Patterns
 
+### mem-1774820483-b796
+> CalibUtils is a massive static utility class coupling the GUI device state to the libslic3r configuration and slicing engine. It depends on a single global Worker, limiting concurrent job generations.
+<!-- tags: gui, unity, calibration, threading | created: 2026-03-29 -->
+
+### mem-1774819013-2201
+> wxExtensions.hpp wraps common UI constructs into scalable wxWidgets equivalents (ScalableBitmap, ScalableButton). Unity's native UI system handles responsive scaling, making most explicit rescale overrides unnecessary; these should map directly to standard VisualElements with USS or UI Toolkit Sprites.
+<!-- tags: gui, unity, widgets, annotation | created: 2026-03-29 -->
+
+### mem-1774818698-31f4
+> WipingDialog uses wxWebView to render its flushing volume matrix, exchanging JSON commands (init, updateMatrix, storeData) via wxEVT_WEBVIEW_SCRIPT_MESSAGE_RECEIVED; Unity will either need a complex native grid component or a third-party browser plugin, and should decouple the volume recalculation logic from the UI event layer.
+<!-- tags: gui, unity, webview, dialog | created: 2026-03-29 -->
+
+### mem-1774817870-0072
+> TextInput is a skinned wxTextCtrl composite: it overrides DoSetSize and render to mix icon, label, and text layout. Unity should use a retained UI Toolkit structural TextField with USS styles instead of manual paint and measurement.
+<!-- tags: gui, unity, widgets | created: 2026-03-29 -->
+
 ### mem-1774767272-344d
 > TempInput.hpp is the declaration boundary for a skinned temperature row: keep owned text/popup child pointers, edit-progress guard, range limits, and custom commit event explicit so Unity can port it as a retained row prefab with an anchored validation overlay.
 <!-- tags: gui, unity, widgets | created: 2026-03-29 -->
