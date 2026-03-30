@@ -1073,3 +1073,31 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P3: Atomic rename within same directory requirement)
 - Git: annotate: src/slic3r/Utils/PresetUpdater.cpp
 - Next recommended Phase 1 task: T793 src/slic3r/Utils/PrintHost.hpp
+
+## Phase 1 - Task T793 complete
+- Task type: annotate
+- File: src/slic3r/Utils/PrintHost.hpp
+- Deliverables: src/slic3r/Utils/PrintHost.hpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Base class for print host adapters (OctoPrint, Duet, etc.).
+  - PrintHostUpload payload carries configuration and intent to backends.
+  - Job queue manages background worker thread with shared PIMPL state.
+- Hazards found: 1 (P3: Concrete adapters inherit libcurl-specific error semantics)
+- Git: annotate: src/slic3r/Utils/PrintHost.hpp
+- Next recommended Phase 1 task: T792 src/slic3r/Utils/PrintHost.cpp
+
+## Phase 1 - Task T792 complete
+- Task type: annotate
+- File: src/slic3r/Utils/PrintHost.cpp
+- Deliverables: src/slic3r/Utils/PrintHost.cpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Factory pattern for print host adapters hard-wired to PrintConfig enums.
+  - Background worker thread for job execution with wxQueueEvent notifications.
+  - Linear apply step for jobs with cancellation support via shared queues.
+- Hazards found: 1 (P3: Detached threads during shutdown depend on heap lifetime extension)
+- Git: annotate: src/slic3r/Utils/PrintHost.cpp
+- Next recommended Phase 1 task: T795 src/slic3r/Utils/Process.hpp

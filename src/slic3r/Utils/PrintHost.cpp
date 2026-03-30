@@ -1,3 +1,4 @@
+// [ANNOTATED]
 #include "PrintHost.hpp"
 
 #include <vector>
