@@ -1045,3 +1045,31 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 0 (Stub implementation)
 - Git: annotate: src/slic3r/Utils/OrcaPrinterAgent.cpp
 - Next recommended Phase 1 task: T791 src/slic3r/Utils/PresetUpdater.hpp
+
+## Phase 1 - Task T791 complete
+- Task type: annotate
+- File: src/slic3r/Utils/PresetUpdater.hpp
+- Deliverables: src/slic3r/Utils/PresetUpdater.hpp
+- Substantive additions: 1 ([ANNOTATED] tag and class-level intent/state/event/thread/unity/hazard notes)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Background synchronization and update process for presets, app versions, and plugins.
+  - Managed via PIMPL with background thread for network/IO.
+  - Port to a C# PresetUpdateService using UnityWebRequest and persistentDataPath.
+- Hazards found: 1 (P2: Reliance on direct zip extraction into application data directory)
+- Git: annotate: src/slic3r/Utils/PresetUpdater.hpp
+- Next recommended Phase 1 task: T790 src/slic3r/Utils/PresetUpdater.cpp
+
+## Phase 1 - Task T790 complete
+- Task type: annotate
+- File: src/slic3r/Utils/PresetUpdater.cpp
+- Deliverables: src/slic3r/Utils/PresetUpdater.cpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Implementation of OTA delta sync for presets and printer configs.
+  - Background thread for HTTP downloads and MZ extraction.
+  - Linear apply step over immutable update records.
+- Hazards found: 1 (P3: Atomic rename within same directory requirement)
+- Git: annotate: src/slic3r/Utils/PresetUpdater.cpp
+- Next recommended Phase 1 task: T793 src/slic3r/Utils/PrintHost.hpp

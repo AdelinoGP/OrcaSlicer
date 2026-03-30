@@ -1,3 +1,4 @@
+// [ANNOTATED]
 #include "PresetUpdater.hpp"
 
 #include <algorithm>

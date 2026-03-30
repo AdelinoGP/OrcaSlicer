@@ -1,4 +1,31 @@
+// [ANNOTATED]
 #ifndef slic3r_PresetUpdate_hpp_
+// [ANNOTATED]
+// [INTENT] Manages the background synchronization and update process for printer presets,
+// application versions, and plugins. It handles version checking, downloading
+// new configuration bundles, and notifying the user about available updates.
+//
+// [STATE] The internal state is managed via a PIMPL `priv` structure which tracks:
+// - Downloaded update packages and their version metadata.
+// - Background thread lifecycle.
+// - Enabled/disabled status for version and config checks.
+//
+// [EVENT] Dispatches `EVT_SLIC3R_VERSION_ONLINE` and `EVT_SLIC3R_EXPERIMENTAL_VERSION_ONLINE`
+// when new versions are detected online.
+//
+// [THREAD] The `sync` method launches a background `std::thread` to perform network
+// operations and filesystem extraction without blocking the UI. Results are
+// marshaled back to the UI thread via `GUI_App::CallAfter`.
+//
+// [UNITY] Replace with a C# `PresetUpdateService`.
+// - Use `UnityWebRequest` for background version checks and downloads.
+// - Use `System.IO.Compression` for zip extraction.
+// - Implement update notifications using Unity's UI Toolkit or a custom HUD notification.
+// - Store downloaded presets in `Application.persistentDataPath`.
+//
+// [PORTING_HAZARD:P2] Heavy reliance on local filesystem state and direct zip extraction
+// into the application's data directory. This must be handled carefully in Unity
+// to ensure cross-platform path compatibility and atomic updates.
 #define slic3r_PresetUpdate_hpp_
 
 #include <memory>
