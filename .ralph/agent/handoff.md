@@ -934,3 +934,31 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P3: Thread-unsafe due to shared wrkmem buffer)
 - Git: annotate: src/slic3r/Utils/minilzo_extension.cpp
 - Next recommended Phase 1 task: T775 src/slic3r/Utils/MKS.hpp
+
+## Phase 1 - Task T775 complete
+- Task type: annotate
+- File: src/slic3r/Utils/MKS.hpp
+- Deliverables: src/slic3r/Utils/MKS.hpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Interface for the MKS print host backend.
+  - Coordination between HTTP (for files) and raw TCP (for commands).
+  - Map to a C# class with async state machine.
+- Hazards found: 1 (P3: Dual-transport strategy must be preserved)
+- Git: annotate: src/slic3r/Utils/MKS.hpp
+- Next recommended Phase 1 task: T774 src/slic3r/Utils/MKS.cpp
+
+## Phase 1 - Task T774 complete
+- Task type: annotate
+- File: src/slic3r/Utils/MKS.cpp
+- Deliverables: src/slic3r/Utils/MKS.cpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Dual-transport workflow: HTTP for upload, TCP for M23/M24 execution.
+  - Asynchronous UnityWebRequest and System.Net.Sockets.TcpClient required.
+  - Replace blocking thread sleep and sync calls with async Task.Delay and await.
+- Hazards found: 2 (P1: perform_sync() blocks UI thread; P2: 1500ms blocking sleep for device readiness)
+- Git: annotate: src/slic3r/Utils/MKS.cpp
+- Next recommended Phase 1 task: T777 src/slic3r/Utils/MoonrakerPrinterAgent.hpp
