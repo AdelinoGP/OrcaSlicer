@@ -906,3 +906,31 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P3: Platform-specific hacks for title bar coloring)
 - Git: annotate: src/slic3r/Utils/MacDarkMode.hpp
 - Next recommended Phase 1 task: T773 src/slic3r/Utils/minilzo_extension.hpp
+
+## Phase 1 - Task T773 complete
+- Task type: annotate
+- File: src/slic3r/Utils/minilzo_extension.hpp
+- Deliverables: src/slic3r/Utils/minilzo_extension.hpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Public interface for LZO1X-1 compression/decompression routines.
+  - Used for compacting network message payloads.
+  - Map to a managed C# LZO implementation (e.g., lzoutils).
+- Hazards found: 1 (P3: Underlying implementation uses shared static buffer; thread-unsafe)
+- Git: annotate: src/slic3r/Utils/minilzo_extension.hpp
+- Next recommended Phase 1 task: T772 src/slic3r/Utils/minilzo_extension.cpp
+
+## Phase 1 - Task T772 complete
+- Task type: annotate
+- File: src/slic3r/Utils/minilzo_extension.cpp
+- Deliverables: src/slic3r/Utils/minilzo_extension.cpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - C++ wrapper around minilzo for LZO1X compression.
+  - Thread-unsafe due to shared wrkmem buffer.
+  - Binary compatibility with printer-side LZO1X-1 is critical.
+- Hazards found: 1 (P3: Thread-unsafe due to shared wrkmem buffer)
+- Git: annotate: src/slic3r/Utils/minilzo_extension.cpp
+- Next recommended Phase 1 task: T775 src/slic3r/Utils/MKS.hpp
