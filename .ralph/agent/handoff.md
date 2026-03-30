@@ -990,3 +990,31 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 2 (P1: Detached connect threads; P2: Bitfield mapping drops Bambu-only capability bits)
 - Git: annotate: src/slic3r/Utils/MoonrakerPrinterAgent.cpp
 - Next recommended Phase 1 task: T787 src/slic3r/Utils/OrcaCloudServiceAgent.hpp
+
+## Phase 1 - Task T787 complete
+- Task type: annotate
+- File: src/slic3r/Utils/OrcaCloudServiceAgent.hpp
+- Deliverables: src/slic3r/Utils/OrcaCloudServiceAgent.hpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Native cloud service and auth implementation for Orca Cloud.
+  - OAuth 2.0 PKCE support and token storage (wxSecretStore).
+  - Split into specialized services (IAuthService, ISyncService) in Unity.
+- Hazards found: 1 (P1: "Mega-Facade" interface couples many unrelated domains)
+- Git: annotate: src/slic3r/Utils/OrcaCloudServiceAgent.hpp
+- Next recommended Phase 1 task: T786 src/slic3r/Utils/OrcaCloudServiceAgent.cpp
+
+## Phase 1 - Task T786 complete
+- Task type: annotate
+- File: src/slic3r/Utils/OrcaCloudServiceAgent.cpp
+- Deliverables: src/slic3r/Utils/OrcaCloudServiceAgent.cpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - OAuth 2.0 PKCE flow normalization funnel (change_user).
+  - AES-256-GCM encrypted file fallback for token storage.
+  - Optimistic conflict detection using updated_time tokens.
+- Hazards found: 2 (P3: Machine identifiers derived from local host identity; P3: Sync cursor persistence via temp-file rename)
+- Git: annotate: src/slic3r/Utils/OrcaCloudServiceAgent.cpp
+- Next recommended Phase 1 task: T789 src/slic3r/Utils/OrcaPrinterAgent.hpp

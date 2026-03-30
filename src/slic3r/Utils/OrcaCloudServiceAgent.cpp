@@ -1,3 +1,4 @@
+// [ANNOTATED]
 #include "OrcaCloudServiceAgent.hpp"
 #include "Http.hpp"
 #include "slic3r/Utils/InstanceID.hpp"
