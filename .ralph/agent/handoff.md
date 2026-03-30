@@ -2018,3 +2018,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P3 x1 (thread-safety with shared buffer)
 - Git: Annotate minilzo_extension.cpp for Unity port prep
 - Next recommended Phase 1 task: T773 annotate: src/slic3r/Utils/minilzo_extension.hpp
+
+## Phase 1 - Task T773 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/minilzo_extension.hpp
+- Deliverables: src/slic3r/Utils/minilzo_extension.hpp
+- Substantive additions: Header-level annotations for the minilzo wrapper interface.
+- Verification excerpt: [UNITY] Replace with a managed C# LZO implementation (e.g., lzoutils) or a native plugin wrapper.
+- Unity-impact summary:
+  - Map to a C# LZO utility class.
+  - Ensure thread-safe implementation to fix the existing P3 hazard.
+- Hazards found: P3 x1 (inherited thread-safety concern)
+- Git: Annotate minilzo_extension.hpp for Unity port prep
+- Next recommended Phase 1 task: T774 annotate: src/slic3r/Utils/MKS.cpp
