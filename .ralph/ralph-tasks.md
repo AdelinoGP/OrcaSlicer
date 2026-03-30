@@ -686,7 +686,7 @@ Last updated: 2026-03-30T01:50:00Z
 - [ ] T765 annotate: src/slic3r/Utils/ICloudServiceAgent.hpp
 - [x] T766 annotate: src/slic3r/Utils/InstanceID.cpp
 - [x] T767 annotate: src/slic3r/Utils/InstanceID.hpp
-- [ ] T768 annotate: src/slic3r/Utils/IPrinterAgent.hpp
+- [x] T768 annotate: src/slic3r/Utils/IPrinterAgent.hpp
 - [ ] T769 annotate: src/slic3r/Utils/json_diff.cpp
 - [ ] T770 annotate: src/slic3r/Utils/json_diff.hpp
 - [ ] T771 annotate: src/slic3r/Utils/MacDarkMode.hpp

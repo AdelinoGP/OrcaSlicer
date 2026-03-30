@@ -9,16 +9,41 @@ namespace Slic3r {
 
 class ICloudServiceAgent;
 
+// [INTENT] Abstract interface for all printer-specific operations (e.g., Bambu Lab, Orca, etc.).
+// It abstracts direct LAN communication, cloud-relay messaging, SSDP device discovery,
+// printer binding, and print job lifecycle management.
+//
+// [STATE] Implementations of this interface (BBLPrinterAgent, OrcaPrinterAgent) manage
+// complex state including active MQTT/SSL connections, local SSDP caches, and
+// certificate validation results.
+//
+// [EVENT] Heavy use of asynchronous callbacks for status updates, message arrivals,
+// and error handling. Note the `set_queue_on_main_fn` requirement for UI synchronization.
+//
+// [THREAD] Most network operations are initiated from the UI thread but performed on
+// internal worker threads. The `QueueOnMainFn` is used to safely marshal results back
+// to the wxWidgets main loop.
+//
+// [UNITY] Map to a C# `IPrinterAgent` interface.
+// - Replace `int` return codes with `async Task<int>` or `Task<Result>` where applicable.
+// - Replace raw function pointer callbacks with C# `event` handlers or `System.IProgress<T>`.
+// - Replace `set_queue_on_main_fn` with Unity's `SynchronizationContext` or `UnityThread` dispatchers.
+//
+// [PORTING_HAZARD:P1] Synchronous return values (int/bool) for networking methods like
+// `send_message`, `connect_printer`, and `fetch_filament_info` suggest either blocking
+// I/O or fire-and-forget logic that lacks proper async error propagation.
+//
 /**
  * AgentInfo - Metadata structure for printer agent information.
  *
  * Contains identification and descriptive information about a printer agent
  * implementation, used for discovery and selection purposes.
  */
-struct AgentInfo {
-    std::string id;         ///< Unique identifier for the agent, e.g. "orca", "bbl"
-    std::string name;       ///< Human-readable agent name, e.g. "Orca", "Bambu Lab"
-    std::string version;    ///< Agent version string, e.g. "1.0.0"
+struct AgentInfo
+{
+    std::string id;          ///< Unique identifier for the agent, e.g. "orca", "bbl"
+    std::string name;        ///< Human-readable agent name, e.g. "Orca", "Bambu Lab"
+    std::string version;     ///< Agent version string, e.g. "1.0.0"
     std::string description; ///< Brief description of the agent's capabilities, e.g. "Orca printer agent"
 };
 
@@ -55,7 +80,8 @@ enum class FilamentSyncMode {
  * access tokens for cloud-relay operations.
  */
 
-class IPrinterAgent {
+class IPrinterAgent
+{
 public:
     virtual ~IPrinterAgent() = default;
 
@@ -128,7 +154,8 @@ public:
     /**
      * Execute the multi-stage printer binding workflow.
      */
-    virtual int bind(std::string dev_ip, std::string dev_id, std::string sec_link, std::string timezone, bool improved, OnUpdateStatusFn update_fn) = 0;
+    virtual int bind(
+        std::string dev_ip, std::string dev_id, std::string sec_link, std::string timezone, bool improved, OnUpdateStatusFn update_fn) = 0;
 
     /**
      * Remove the association between account and printer.
@@ -169,7 +196,10 @@ public:
     /**
      * Start a local print with cloud record.
      */
-    virtual int start_local_print_with_record(PrintParams params, OnUpdateStatusFn update_fn, WasCancelledFn cancel_fn, OnWaitFn wait_fn) = 0;
+    virtual int start_local_print_with_record(PrintParams      params,
+                                              OnUpdateStatusFn update_fn,
+                                              WasCancelledFn   cancel_fn,
+                                              OnWaitFn         wait_fn) = 0;
 
     /**
      * Upload gcode to printer's SD card without starting.
@@ -239,11 +269,11 @@ public:
     // ========================================================================
     /**
      * Get the filament synchronization mode for this agent.
-     * 
+     *
      * @return FilamentSyncMode indicating how filament data is obtained:
      *         - subscription: Real-time push updates via MQTT (no fetch needed)
      *         - pull: On-demand fetch via REST API (call fetch_filament_info())
-     *         - none: Filament synchronization not supported
+     *         - none: Filament sync unavailable
      */
     virtual FilamentSyncMode get_filament_sync_mode() const { return FilamentSyncMode::none; }
 

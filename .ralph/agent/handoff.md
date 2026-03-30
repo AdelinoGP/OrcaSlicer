@@ -1947,3 +1947,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P3 x1 (coupling to AppConfig)
 - Git: Annotate InstanceID.hpp for Unity port prep
 - Next recommended Phase 1 task: T768 annotate: src/slic3r/Utils/IPrinterAgent.hpp
+
+## Phase 1 - Task T768 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/IPrinterAgent.hpp
+- Deliverables: src/slic3r/Utils/IPrinterAgent.hpp
+- Substantive additions: Comprehensive annotations for the printer agent mega-interface, covering network communication, SSDP discovery, binding workflows, and threading/marshaling requirements.
+- Verification excerpt: [PORTING_HAZARD:P1] Synchronous return values (int/bool) for networking methods like send_message, connect_printer, and fetch_filament_info suggest either blocking I/O or fire-and-forget logic.
+- Unity-impact summary:
+  - Map to C# `IPrinterAgent` with async Task-based methods.
+  - Replace raw function pointers with C# events or `IProgress<T>`.
+  - Use `SynchronizationContext` instead of manual `set_queue_on_main_fn`.
+- Hazards found: P1 x2 (blocking networking, manual marshaling)
+- Git: Annotate IPrinterAgent.hpp for Unity port prep
+- Next recommended Phase 1 task: T769 annotate: src/slic3r/Utils/json_diff.cpp
