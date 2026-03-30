@@ -8,6 +8,8 @@
 #include "TCPConsole.hpp"
 
 namespace Slic3r {
+// [INTENT] Interface for the ESP3D PrintHost adapter.
+// [UNITY] Port as a C# class inheriting from a base PrintHostService, using UnityWebRequest.
 class DynamicPrintConfig;
 class Http;
 
