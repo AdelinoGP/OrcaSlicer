@@ -1,3 +1,4 @@
+// [ANNOTATED]
 #include "WxFontUtils.hpp"
 #include <boost/assign.hpp>
 #include <boost/log/trivial.hpp>

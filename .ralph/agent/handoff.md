@@ -1362,3 +1362,45 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Blocking loop in run_queue() with manual polling)
 - Git: annotate: src/slic3r/Utils/TCPConsole.cpp
 - Next recommended Phase 1 task: T817 src/slic3r/Utils/WebSocketClient.hpp
+
+## Phase 1 - Task T817 complete
+- Task type: annotate
+- File: src/slic3r/Utils/WebSocketClient.hpp
+- Deliverables: src/slic3r/Utils/WebSocketClient.hpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Simple synchronous wrapper around Boost.Beast WebSocket.
+  - Used for basic connect/send/receive operations.
+  - Port to C# ClientWebSocket with Async methods.
+- Hazards found: 1 (P2: Strictly synchronous implementation blocks calling thread)
+- Git: annotate: src/slic3r/Utils/WebSocketClient.hpp
+- Next recommended Phase 1 task: T819 src/slic3r/Utils/WxFontUtils.hpp
+
+## Phase 1 - Task T819 complete
+- Task type: annotate
+- File: src/slic3r/Utils/WxFontUtils.hpp
+- Deliverables: src/slic3r/Utils/WxFontUtils.hpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Bridge between wxWidgets font abstractions and libslic3r Emboss::FontFile.
+  - Handles platform-specific font loading and serialization for persistence.
+  - Unity replacement should use its own font management system (TextMeshPro or UI Toolkit).
+- Hazards found: 1 (P3: Platform-specific code paths for font loading)
+- Git: annotate: src/slic3r/Utils/WxFontUtils.hpp
+- Next recommended Phase 1 task: T818 src/slic3r/Utils/WxFontUtils.cpp
+
+## Phase 1 - Task T818 complete
+- Task type: annotate
+- File: src/slic3r/Utils/WxFontUtils.cpp
+- Deliverables: src/slic3r/Utils/WxFontUtils.cpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Critical bridge converting platform font handles to raw TTF data.
+  - Platform-specific extractors for Windows (GetFontData), macOS (CoreText), and Linux (FontConfig).
+  - Porting to Unity requires implementing font data extraction for each target platform.
+- Hazards found: 1 (P3: No cross-platform abstraction for font file access)
+- Git: annotate: src/slic3r/Utils/WxFontUtils.cpp
+- Next recommended Phase 1 task: Audit Phase 1 progress

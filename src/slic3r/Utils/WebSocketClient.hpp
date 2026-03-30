@@ -1,3 +1,4 @@
+// [ANNOTATED]
 #ifndef _WEB_SOCKET_CLIENT_HPP_
 #define _WEB_SOCKET_CLIENT_HPP_
 #include <boost/beast/core.hpp>
