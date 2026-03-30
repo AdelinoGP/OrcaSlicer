@@ -1,3 +1,5 @@
+// [INTENT] High-level C++ wrapper for libcurl-based HTTP operations (GET, POST, PUT, DELETE, PATCH).
+// [UNITY] Use UnityWebRequest for all HTTP operations. Map asynchronous perform() to UnityWebRequestAsyncOperation.
 #include "Http.hpp"
 
 #include <cstdlib>
@@ -24,6 +26,8 @@ namespace Slic3r {
 
 // Private
 
+// [INTENT] Singleton for global libcurl initialization and SSL certificate path resolution.
+// [UNITY] Handled internally by Unity's network stack; explicit SSL bundle management is typically not needed unless using custom certificates via CertificateHandler.
 struct CurlGlobalInit
 {
     static std::unique_ptr<CurlGlobalInit> instance;
@@ -86,6 +90,8 @@ std::unique_ptr<CurlGlobalInit> CurlGlobalInit::instance;
 std::map<std::string, std::string> extra_headers;
 std::mutex g_mutex;
 
+// [INTENT] File stream wrapper for multipart/form-data upload parts.
+// [UNITY] Use MultipartFormDataSection or UnityWebRequest.GetSection for file uploads.
 struct form_file
 {
     fs::ifstream                          ifs;
@@ -97,6 +103,10 @@ struct form_file
     {}
 };
 
+// [INTENT] Private implementation of the Http class, encapsulating libcurl state and request/response parameters.
+// [STATE] curl (CURL handle), url, method, buffer (response body), form_files (multipart state), headers (response headers), cancel (cancellation flag).
+// [THREAD] io_thread (dedicated worker thread for async requests).
+// [UNITY] Use UnityWebRequest and UnityWebRequestAsyncOperation. Mapping to a MonoBehaviour or a static network service that manages request lifetimes.
 struct Http::priv
 {
 	enum {
@@ -136,6 +146,8 @@ struct Http::priv
 	~priv();
 
 	static bool ca_file_supported(::CURL *curl);
+// [EVENT] curl-based callbacks for writing data, progress, and headers.
+// [UNITY] Map to UnityWebRequest progress and result callbacks/pollers.
 	static size_t writecb(void *data, size_t size, size_t nmemb, void *userp);
 	static int xfercb(void *userp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow);
 	static int xfercb_legacy(void *userp, double dltotal, double dlnow, double ultotal, double ulnow);
@@ -425,6 +437,8 @@ std::string Http::priv::body_size_error()
 	return (boost::format("HTTP body data size exceeded limit (%1% bytes)") % limit).str();
 }
 
+// [INTENT] Main request execution loop.
+// [UNITY] Use UnityWebRequest.SendWebRequest() which handles redirection and write/read callbacks natively.
 void Http::priv::http_perform()
 {
 	::curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
@@ -510,6 +524,7 @@ void Http::priv::http_perform()
 	}
 }
 
+// [INTENT] Public interface for constructing and executing HTTP requests.
 Http::Http(const std::string &url) : p(new priv(url)) {
 
     std::lock_guard<std::mutex> l(g_mutex);
@@ -738,6 +753,9 @@ Http &Http::on_header_callback(HeaderCallbackFn fn)
 	return *this;
 }
 
+// [INTENT] Launch the HTTP request in a background thread.
+// [THREAD] Performs libcurl work on io_thread.
+// [UNITY] UnityWebRequest is asynchronous by design; callers should use async/await or coroutines.
 Http::Ptr Http::perform()
 {
 	auto self = std::make_shared<Http>(std::move(*this));
@@ -752,6 +770,8 @@ Http::Ptr Http::perform()
 	return self;
 }
 
+// [INTENT] Perform the request synchronously on the calling thread.
+// [PORTING_HAZARD:P1] Synchronous requests on the main thread will cause Unity to hang. Use async paths or dedicated worker threads.
 void Http::perform_sync()
 {
 	if (p) { p->http_perform(); }

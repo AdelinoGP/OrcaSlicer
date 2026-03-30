@@ -681,7 +681,7 @@ Last updated: 2026-03-30T01:50:00Z
 - [ ] T760 annotate: src/slic3r/Utils/FontConfigHelp.hpp
 - [ ] T761 annotate: src/slic3r/Utils/HexFile.cpp
 - [ ] T762 annotate: src/slic3r/Utils/HexFile.hpp
-- [ ] T763 annotate: src/slic3r/Utils/Http.cpp
+- [x] T763 annotate: src/slic3r/Utils/Http.cpp
 - [x] T764 annotate: src/slic3r/Utils/Http.hpp
 - [ ] T765 annotate: src/slic3r/Utils/ICloudServiceAgent.hpp
 - [ ] T766 annotate: src/slic3r/Utils/InstanceID.cpp

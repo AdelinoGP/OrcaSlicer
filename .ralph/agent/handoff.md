@@ -1888,3 +1888,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2 x2 (RAM buffering, framing constraints), P3 x1 (protocol delays)
 - Git: 8708bc5619 - annotate: src/slic3r/Utils/Flashforge.cpp (T757)
 - Next recommended Phase 1 task: T763 annotate: src/slic3r/Utils/Http.cpp
+
+## Phase 1 - Task T763 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/Http.cpp
+- Deliverables: `src/slic3r/Utils/Http.cpp`, `.ralph/agent/handoff.md`
+- Substantive additions: 9 comment blocks covering global libcurl init, multipart form-data parts, private state management (CURL handle, threads), async request execution, and synchronous request hazards.
+- Verification excerpt: `[PORTING_HAZARD:P1] Synchronous requests on the main thread will cause Unity to hang. Use async paths or dedicated worker threads.`
+- Unity-impact summary:
+  - Map `Http::perform()` to `UnityWebRequest.SendWebRequest()` which is async by default.
+  - Replace manual thread management (`io_thread.detach()`) with C# `async/await` or coroutines.
+  - Map multipart form construction to `MultipartFormDataSection`.
+- Hazards found: P1 x1
+- Git: Annotate Http.cpp for Unity port prep
+- Next recommended Phase 1 task: T765 annotate: src/slic3r/Utils/ICloudServiceAgent.hpp
