@@ -1,6 +1,9 @@
 #ifndef slic3r_FontConfigHelp_hpp_
 #define slic3r_FontConfigHelp_hpp_
 
+// [INTENT] Declaration for Linux-specific font resolution utility.
+// [UNITY] Unity handles font management via Font assets or TMP_FontAsset. 
+// System font discovery is handled internally by Unity on Linux.
 #ifdef __linux__
 #define EXIST_FONT_CONFIG_INCLUDE
 #endif

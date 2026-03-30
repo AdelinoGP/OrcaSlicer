@@ -4,9 +4,13 @@
 // Given a wxFont descriptor, it queries FontConfig to find the actual TTF file path.
 // This is necessary on Linux where fonts are often installed system-wide and
 // wxFont does not provide direct file path access.
-// [COUPLING] Depends on: FontConfig library, wxWidgets
-// [HAZARD] Static global state (FcConfig* fc) - not thread-safe.
-// The FcFini() call is commented out due to assertion failure in FontConfig.
+// [UNITY] Unity manages fonts via Font assets or TMP_FontAsset. On Linux, Unity handles
+// system font discovery internally. If a raw file path is required (e.g. for external 
+// mesh generation), use Unity's cross-platform font discovery or Font.GetOSInstalledFontNames().
+// [PORTING_HAZARD:P2] Manual FontConfig queries are platform-specific and should be 
+// replaced by Unity's abstraction or a dedicated C# font-loading library if paths are needed.
+// [STATE] static FcConfig* fc: cached font configuration handle.
+// [THREAD] Access to static 'fc' and 'finalize_guard' is NOT thread-safe; expects UI thread execution.
 
 #ifdef EXIST_FONT_CONFIG_INCLUDE
 
