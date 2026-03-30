@@ -2261,3 +2261,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 3 (P2: mDNS workaround, Host spoofing, Path escaping)
 - Git: annotate: src/slic3r/Utils/OctoPrint.cpp
 - Next recommended Phase 1 task: T785 annotate: src/slic3r/Utils/OctoPrint.hpp
+
+## Phase 1 - Task T785 complete
+- Task type: annotate
+- File: src/slic3r/Utils/OctoPrint.hpp
+- Deliverables: `src/slic3r/Utils/OctoPrint.hpp`
+- Substantive additions: 1 class-level annotation block covering intent, state, network event surface, Unity mapping, and a P1 WIN32-specific porting hazard
+- Verification excerpt: `[UNITY] Class hierarchy should map to C# classes inheriting from a shared IPrintHost or BasePrintHost.`
+- Unity-impact summary:
+  - Preserve the base-class structure for REST-based print hosts (OctoPrint/PrusaLink/etc).
+  - Use UnityWebRequest with async/await for test/upload network calls.
+  - Handle the WIN32 Host-header IP resolution workaround as a critical platform-specific hazard.
+- Hazards found: 1 (P1: WIN32 Host-header IP resolution)
+- Git: annotate: src/slic3r/Utils/OctoPrint.hpp
+- Next recommended Phase 1 task: T786 annotate: src/slic3r/Utils/OrcaCloudServiceAgent.cpp

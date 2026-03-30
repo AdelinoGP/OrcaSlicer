@@ -1,6 +1,34 @@
 #ifndef slic3r_OctoPrint_hpp_
 #define slic3r_OctoPrint_hpp_
 
+/*
+ [INTENT]
+ Declaration boundary for the OctoPrint-family print host clients.
+ OctoPrint serves as the base for several REST-based print host implementations
+ including PrusaLink, PrusaConnect, and SL1Host.
+
+ [STATE]
+ - m_host: Target address/hostname for the print host. [STATE:CONFIG]
+ - m_apikey: API key for authentication. [STATE:SECRET]
+ - m_cafile: Path to CA bundle for SSL verification. [STATE:PATH]
+ - m_authorization_type (PrusaLink): Enum for choosing between API key or Digest auth. [STATE:ENUM]
+ - m_username/m_password (PrusaLink): Credentials for HTTP Digest auth. [STATE:SECRET]
+
+ [EVENT]
+ - test(): Synchronous network probe that returns success/failure and a message. [EVENT:NETWORK]
+ - upload(): Main entry point for starting a print job transfer, using Progress/Error/Info callbacks. [EVENT:NETWORK]
+
+ [UNITY]
+ - Class hierarchy should map to C# classes inheriting from a shared IPrintHost or BasePrintHost.
+ - Network calls (test/upload) should use UnityWebRequest with async/await.
+ - Authentication (set_auth) should be handled via request headers in UnityWebRequest.
+
+ [PORTING_HAZARD:P1]
+ The WIN32-specific IP resolution workaround (upload_inner_with_resolved_ip) must
+ be preserved or handled by Unity's DNS layer. It addresses mDNS resolution
+ failures by manually swapping the IP while keeping the Host header.
+*/
+
 #include <string>
 #include <wx/string.h>
 #include <boost/optional.hpp>
@@ -8,7 +36,6 @@
 
 #include "PrintHost.hpp"
 #include "libslic3r/PrintConfig.hpp"
-
 
 namespace Slic3r {
 
@@ -18,29 +45,33 @@ class Http;
 class OctoPrint : public PrintHost
 {
 public:
-    OctoPrint(DynamicPrintConfig *config);
+    OctoPrint(DynamicPrintConfig* config);
     ~OctoPrint() override = default;
 
     const char* get_name() const override;
 
-    virtual bool test(wxString &curl_msg) const override;
-    wxString get_test_ok_msg () const override;
-    wxString get_test_failed_msg (wxString &msg) const override;
-    bool upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const override;
-    bool has_auto_discovery() const override { return true; }
-    bool can_test() const override { return true; }
+    virtual bool               test(wxString& curl_msg) const override;
+    wxString                   get_test_ok_msg() const override;
+    wxString                   get_test_failed_msg(wxString& msg) const override;
+    bool                       upload(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const override;
+    bool                       has_auto_discovery() const override { return true; }
+    bool                       can_test() const override { return true; }
     PrintHostPostUploadActions get_post_upload_actions() const override { return PrintHostPostUploadAction::StartPrint; }
-    std::string get_host() const override { return m_host; }
-    const std::string& get_apikey() const { return m_apikey; }
-    const std::string& get_cafile() const { return m_cafile; }
+    std::string                get_host() const override { return m_host; }
+    const std::string&         get_apikey() const { return m_apikey; }
+    const std::string&         get_cafile() const { return m_cafile; }
 
 protected:
 #ifdef WIN32
     // [HAZARD] The Windows path swaps in a resolved IP while manually preserving the original Host header to work
     // around mDNS resolution failures; dropping it regresses hostname-based uploads on affected systems.
-    virtual bool upload_inner_with_resolved_ip(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn, const boost::asio::ip::address& resolved_addr) const;
+    virtual bool upload_inner_with_resolved_ip(PrintHostUpload                 upload_data,
+                                               ProgressFn                      prorgess_fn,
+                                               ErrorFn                         error_fn,
+                                               InfoFn                          info_fn,
+                                               const boost::asio::ip::address& resolved_addr) const;
 #endif
-    virtual bool validate_version_text(const boost::optional<std::string> &version_text) const;
+    virtual bool validate_version_text(const boost::optional<std::string>& version_text) const;
     virtual bool upload_inner_with_host(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const;
 
     std::string m_host;
@@ -48,14 +79,13 @@ protected:
     std::string m_cafile;
     bool        m_ssl_revoke_best_effort;
 
-    virtual void set_auth(Http &http) const;
-    std::string make_url(const std::string &path) const;
+    virtual void set_auth(Http& http) const;
+    std::string  make_url(const std::string& path) const;
 
 #ifdef WIN32
     virtual bool test_with_resolved_ip(wxString& curl_msg) const;
 #endif
 };
-
 
 class PrusaLink : public OctoPrint
 {
@@ -66,21 +96,26 @@ public:
 
     const char* get_name() const override;
 
-    wxString get_test_ok_msg() const override;
-    wxString get_test_failed_msg(wxString& msg) const override;
+    wxString                           get_test_ok_msg() const override;
+    wxString                           get_test_failed_msg(wxString& msg) const override;
     virtual PrintHostPostUploadActions get_post_upload_actions() const override { return PrintHostPostUploadAction::StartPrint; }
 
     // gets possible storage to be uploaded to. This allows different printer to have different storage. F.e. local vs sdcard vs usb.
     bool get_storage(wxArrayString& storage_path, wxArrayString& storage_name) const override;
+
 protected:
     bool test(wxString& curl_msg) const override;
     bool validate_version_text(const boost::optional<std::string>& version_text) const override;
     bool upload_inner_with_host(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const override;
 
-    void set_auth(Http& http) const override;
+    void         set_auth(Http& http) const override;
     virtual void set_http_post_header_args(Http& http, PrintHostPostUploadAction post_action) const;
 #ifdef WIN32
-    bool upload_inner_with_resolved_ip(PrintHostUpload upload_data, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn, const boost::asio::ip::address& resolved_addr) const override;
+    bool upload_inner_with_resolved_ip(PrintHostUpload                 upload_data,
+                                       ProgressFn                      prorgess_fn,
+                                       ErrorFn                         error_fn,
+                                       InfoFn                          info_fn,
+                                       const boost::asio::ip::address& resolved_addr) const override;
 #endif
 
     // Host authorization type.
@@ -91,8 +126,18 @@ protected:
 
 private:
     bool test_with_method_check(wxString& curl_msg, bool& use_put) const;
-    bool put_inner(PrintHostUpload upload_data, std::string url, const std::string& name, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const;
-    bool post_inner(PrintHostUpload upload_data, std::string url, const std::string& name, ProgressFn prorgess_fn, ErrorFn error_fn, InfoFn info_fn) const;
+    bool put_inner(PrintHostUpload    upload_data,
+                   std::string        url,
+                   const std::string& name,
+                   ProgressFn         prorgess_fn,
+                   ErrorFn            error_fn,
+                   InfoFn             info_fn) const;
+    bool post_inner(PrintHostUpload    upload_data,
+                    std::string        url,
+                    const std::string& name,
+                    ProgressFn         prorgess_fn,
+                    ErrorFn            error_fn,
+                    InfoFn             info_fn) const;
 #ifdef WIN32
     bool test_with_resolved_ip_and_method_check(wxString& curl_msg, bool& use_put) const;
 #endif
@@ -109,11 +154,13 @@ class PrusaConnect : public PrusaLink
 public:
     PrusaConnect(DynamicPrintConfig* config);
     ~PrusaConnect() override = default;
-    wxString get_test_ok_msg() const override;
-    wxString get_test_failed_msg(wxString& msg) const override;
-    PrintHostPostUploadActions get_post_upload_actions() const override { return PrintHostPostUploadAction::StartPrint | PrintHostPostUploadAction::QueuePrint; }
+    wxString                   get_test_ok_msg() const override;
+    wxString                   get_test_failed_msg(wxString& msg) const override;
+    PrintHostPostUploadActions get_post_upload_actions() const override
+    { return PrintHostPostUploadAction::StartPrint | PrintHostPostUploadAction::QueuePrint; }
     const char* get_name() const override { return "PrusaConnect"; }
-    bool get_storage(wxArrayString& storage_path, wxArrayString& storage_name) const override { return false; }
+    bool        get_storage(wxArrayString& storage_path, wxArrayString& storage_name) const override { return false; }
+
 protected:
     void set_http_post_header_args(Http& http, PrintHostPostUploadAction post_action) const override;
 };
@@ -126,14 +173,14 @@ public:
 
     const char* get_name() const override;
 
-    wxString get_test_ok_msg() const override;
-    wxString get_test_failed_msg(wxString& msg) const override;
+    wxString                   get_test_ok_msg() const override;
+    wxString                   get_test_failed_msg(wxString& msg) const override;
     PrintHostPostUploadActions get_post_upload_actions() const override { return {}; }
 
 protected:
     bool validate_version_text(const boost::optional<std::string>& version_text) const override;
 };
 
-}
+} // namespace Slic3r
 
 #endif
