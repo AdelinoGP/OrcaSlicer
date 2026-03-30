@@ -1843,3 +1843,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P1 x1, P2 x1
 - Git: Annotate UndoRedo.cpp for Unity port prep
 - Next recommended Phase 1 task: T764 annotate: src/slic3r/Utils/Http.hpp
+
+## Phase 1 - Task T764 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/Http.hpp
+- Deliverables: `src/slic3r/Utils/Http.hpp`
+- Substantive additions: 3 Unity mapping blocks covering `UnityWebRequest` integration, async transfer tracking, and certificate management.
+- Verification excerpt: `[UNITY] Map to UnityEngine.Networking.UnityWebRequest. While C# has HttpClient, Unity's version is better integrated with the engine's async pipeline.`
+- Unity-impact summary:
+  - Replace the libcurl-based `Http` wrapper with Unity's native `UnityWebRequest`.
+  - Map `perform()` to `SendWebRequest()` with `async/await` or coroutines.
+  - Use `downloadProgress` and `uploadProgress` for UI feedback instead of manual byte counting.
+- Hazards found: none new (preserved existing hazard notes)
+- Git: Annotate Http.hpp for Unity port prep
+- Next recommended Phase 1 task: T763 annotate: src/slic3r/Utils/Http.cpp

@@ -4,6 +4,7 @@
 //          calling shared_from_this(), otherwise undefined behavior (std::bad_weak_ptr).
 // [STATE] Static extra_headers map provides global state affecting all HTTP requests.
 //         Thread-unsafe if modified during concurrent requests.
+// [UNITY] Map to `UnityEngine.Networking.UnityWebRequest`. While C# has `HttpClient`, Unity's version is better integrated with the engine's async pipeline and certificate handling.
 
 #ifndef __Http_hpp__
 #define __Http_hpp__
@@ -60,6 +61,7 @@ public:
         size_t             ultotal; // Total bytes to upload
         size_t             ulnow;   // Bytes uploaded so far
         const std::string& buffer;  // reference to buffer containing all data
+// [UNITY] Use `UnityWebRequest.downloadProgress` and `uploadProgress` properties for transfer tracking.
         double             upload_spd{0.0f};
 
         Progress(size_t dltotal, size_t dlnow, size_t ultotal, size_t ulnow, const std::string& buffer)
@@ -194,6 +196,7 @@ public:
     // [HAZARD] Calling perform() on stack-allocated Http will crash (uses shared_from_this()).
     // [CONCURRENCY] Background thread calls curl_multi_perform; callbacks execute in that thread.
     Ptr  perform();
+// [UNITY] Call `SendWebRequest()` and handle the completion via `async/await` or coroutines. Unity's `UnityWebRequest` handles thread management internally.
     void perform_sync();
     void cancel();
 
