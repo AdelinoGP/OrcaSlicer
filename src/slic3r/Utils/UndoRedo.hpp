@@ -25,6 +25,8 @@ namespace GUI {
 } // namespace GUI
 
 namespace UndoRedo {
+// [INTENT] The `UndoRedo` namespace provides a snapshot-based history system that decouples UI state 
+// (selection, gizmos) from core model state while allowing for multi-level stacks (e.g., inside gizmos).
 
 enum class SnapshotType : unsigned char {
 	// [INTENT] Snapshot kinds distinguish user-visible project mutations from transient UI navigation so undo/redo and
@@ -121,6 +123,9 @@ struct Selection : public Slic3r::ObjectBase {
 class StackImpl;
 
 class Stack
+// [INTENT] `Stack` is a facade over a binary snapshot journal of model, selection, gizmo, and plate state. 
+// [UNITY] Port as an UndoService using a custom Command pattern or Snapshot-based approach. 
+// [PORTING_HAZARD:P1] Slicer models are heavy; full-model serialization in C# can cause GC pressure and frame hitches. Use delta-compression or incremental commands instead of full snapshots.
 {
 public:
 	// [INTENT] `Stack` is a facade over a binary snapshot journal of model, selection, gizmo, and plate state while the
@@ -140,6 +145,8 @@ public:
 	// Estimate size of the RAM consumed by the Undo / Redo stack.
 	size_t memsize() const;
 
+// [STATE] Snapshots capture a point-in-time state of the entire project. 
+// [UNITY] Use a background thread or Job to serialize the model to bytes to avoid blocking the main UI thread during snapshots.
 	// Release least recently used snapshots up to the memory limit set above.
 	void release_least_recently_used();
 
@@ -158,9 +165,11 @@ public:
 	// To query whether one can undo to a snapshot. Useful for notifications, that want to Undo a specific operation.
 	bool has_undo_snapshot(size_t time_to_load) const;
 
+// [UNITY] Undo must restore the data model and then notify the UI layer (MainUIController) to refresh all data-bound views.
 	// Roll back the time. If time_to_load is SIZE_MAX, the previous snapshot is activated.
 	// Undoing an action may need to take a snapshot of the current application state, so that redo to the current state is possible.
 	// [STATE] Undo mutates the passed model, gizmo manager, and plate list in place; the stack owns historical bytes, but
+// [UNITY] Redo should re-apply the serialized state and trigger a Scene-wide "rebuild" event for all visual components.
 	// callers own the live objects and must refresh any derived GUI after restoration.
     bool undo(Slic3r::Model& model, const Slic3r::GUI::Selection& selection, Slic3r::GUI::GLGizmosManager& gizmos, Slic3r::GUI::PartPlateList& plate_list, const SnapshotData &snapshot_data, size_t time_to_load = SIZE_MAX);
 

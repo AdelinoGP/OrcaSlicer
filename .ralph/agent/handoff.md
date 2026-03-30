@@ -1813,3 +1813,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2 x1
 - Git: Annotate RaycastManager.cpp for Unity port prep
 - Next recommended Phase 1 task: T816 annotate: src/slic3r/Utils/UndoRedo.hpp
+
+## Phase 1 - Task T816 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/UndoRedo.hpp
+- Deliverables: `src/slic3r/Utils/UndoRedo.hpp`
+- Substantive additions: 8 comment blocks covering snapshot intent, multi-level stack semantics, state preservation (gizmos, sidebar), Unity mapping, and a P1 performance hazard regarding full-model serialization in C#.
+- Verification excerpt: `[PORTING_HAZARD:P1] Slicer models are heavy; full-model serialization in C# can cause GC pressure and frame hitches. Use delta-compression or incremental commands.`
+- Unity-impact summary:
+  - Port as an UndoService using a custom Command pattern or snapshot-based approach (avoiding Unity's Editor-only Undo).
+  - Use background Jobs for serialization to avoid UI thread hitches.
+  - Trigger scene-wide rebuild events after restoration.
+- Hazards found: P1 x1
+- Git: Annotate UndoRedo.hpp for Unity port
+- Next recommended Phase 1 task: T815 annotate: src/slic3r/Utils/UndoRedo.cpp
