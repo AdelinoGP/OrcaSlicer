@@ -1252,3 +1252,29 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 2 (P1: Kernel ABI dependency for termios2; P3: Fragile sysfs path traversal on Linux)
 - Git: annotate: src/slic3r/Utils/Serial.cpp
 - Next recommended Phase 1 task: T807 src/slic3r/Utils/SerialMessage.hpp
+
+## Phase 1 - Task T807 complete
+- Task type: skip-trivial
+- File: src/slic3r/Utils/SerialMessage.hpp
+- Deliverables: src/slic3r/Utils/SerialMessage.hpp
+- Substantive additions: 0 (marked as skip-trivial)
+- Verification excerpt: // SKIP_TRIVIAL
+- Unity-impact summary:
+  - Simple message/type container for serial commands.
+  - No domain logic or porting consequence.
+- Hazards found: 0
+- Git: skip-trivial: src/slic3r/Utils/SerialMessage.hpp
+- Next recommended Phase 1 task: T808 src/slic3r/Utils/SerialMessageType.hpp
+
+## Phase 1 - Task T808 complete
+- Task type: skip-trivial
+- File: src/slic3r/Utils/SerialMessageType.hpp
+- Deliverables: src/slic3r/Utils/SerialMessageType.hpp
+- Substantive additions: 0 (marked as skip-trivial)
+- Verification excerpt: // SKIP_TRIVIAL
+- Unity-impact summary:
+  - Enum definition for serial message types (Command, Data).
+  - No domain logic or porting consequence.
+- Hazards found: 0
+- Git: skip-trivial: src/slic3r/Utils/SerialMessageType.hpp
+- Next recommended Phase 1 task: T810 src/slic3r/Utils/SimplyPrint.hpp
