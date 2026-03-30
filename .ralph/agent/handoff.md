@@ -1334,3 +1334,31 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P3: Parallel array synchronization across multiple JSON keys)
 - Git: annotate: src/slic3r/Utils/SnapmakerPrinterAgent.cpp
 - Next recommended Phase 1 task: T814 src/slic3r/Utils/TCPConsole.hpp
+
+## Phase 1 - Task T814 complete
+- Task type: annotate
+- File: src/slic3r/Utils/TCPConsole.hpp
+- Deliverables: src/slic3r/Utils/TCPConsole.hpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Generic command/response TCP console for sequential G-code commands.
+  - Managed command queue and Boost.Asio I/O objects.
+  - Port to C# TcpConsoleService using System.Net.Sockets.TcpClient.
+- Hazards found: 1 (P2: Stateful sequential logic relies on "ok" string termination)
+- Git: annotate: src/slic3r/Utils/TCPConsole.hpp
+- Next recommended Phase 1 task: T813 src/slic3r/Utils/TCPConsole.cpp
+
+## Phase 1 - Task T813 complete
+- Task type: annotate
+- File: src/slic3r/Utils/TCPConsole.cpp
+- Deliverables: src/slic3r/Utils/TCPConsole.cpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Implementation of asynchronous TCP command transmission and line-based reading.
+  - Sequential state machine (transmit -> wait -> handle -> transmit).
+  - Explicit deadline/timeout management for all network stages.
+- Hazards found: 1 (P2: Blocking loop in run_queue() with manual polling)
+- Git: annotate: src/slic3r/Utils/TCPConsole.cpp
+- Next recommended Phase 1 task: T817 src/slic3r/Utils/WebSocketClient.hpp
