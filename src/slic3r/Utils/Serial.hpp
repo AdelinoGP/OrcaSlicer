@@ -1,3 +1,4 @@
+// [ANNOTATED]
 #ifndef slic3r_GUI_Utils_Serial_hpp_
 #define slic3r_GUI_Utils_Serial_hpp_
 

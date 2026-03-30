@@ -1,3 +1,4 @@
+// [ANNOTATED]
 // [INTENT] Serial port enumeration and communication for direct printer connections.
 // [COUPLING] Uses Slic3r::RuntimeError from libslic3r/Exception.hpp for error reporting.
 // [HAZARD] Heavy platform-specific code: Windows SetupAPI, macOS IOKit, Linux sysfs.

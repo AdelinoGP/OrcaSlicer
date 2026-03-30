@@ -1224,3 +1224,31 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 0
 - Git: skip-trivial: src/slic3r/Utils/RetinaHelper.hpp
 - Next recommended Phase 1 task: T806 src/slic3r/Utils/Serial.hpp
+
+## Phase 1 - Task T806 complete
+- Task type: annotate
+- File: src/slic3r/Utils/Serial.hpp
+- Deliverables: src/slic3r/Utils/Serial.hpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Serial port enumeration and communication wrapper for direct connections.
+  - Maintains VID/PID and friendly name metadata for device identification.
+  - Port to C# SerialService using System.IO.Ports.
+- Hazards found: 1 (P1: Heavy reliance on platform-specific APIs for port enumeration)
+- Git: annotate: src/slic3r/Utils/Serial.hpp
+- Next recommended Phase 1 task: T805 src/slic3r/Utils/Serial.cpp
+
+## Phase 1 - Task T805 complete
+- Task type: annotate
+- File: src/slic3r/Utils/Serial.cpp
+- Deliverables: src/slic3r/Utils/Serial.cpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Platform-specific implementation for Windows (SetupAPI), macOS (IOKit), and Linux (sysfs).
+  - Custom baud rate support (>115200) via kernel-level ioctls (termios2).
+  - Commented-out Marlin-style protocol logic (line numbering, checksums).
+- Hazards found: 2 (P1: Kernel ABI dependency for termios2; P3: Fragile sysfs path traversal on Linux)
+- Git: annotate: src/slic3r/Utils/Serial.cpp
+- Next recommended Phase 1 task: T807 src/slic3r/Utils/SerialMessage.hpp
