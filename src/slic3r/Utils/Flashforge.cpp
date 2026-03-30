@@ -31,6 +31,9 @@
 namespace fs = boost::filesystem;
 namespace pt = boost::property_tree;
 
+// [INTENT] Implementation of Flashforge PrintHost that uses TCPConsole to communicate with the printer.
+// [UNITY] Use a C# FlashforgeProtocol service class that wraps a TcpClient. Commands should be
+// modeled as an enum or a set of protocol-message objects rather than raw strings.
 namespace Slic3r {
 
 Flashforge::Flashforge(DynamicPrintConfig* config)
@@ -42,6 +45,7 @@ Flashforge::Flashforge(DynamicPrintConfig* config)
 
 const char* Flashforge::get_name() const { return "Flashforge"; }
 
+// [EVENT] Connection test event dispatch.
 bool Flashforge::test(wxString& msg) const
 {
     BOOST_LOG_TRIVIAL(debug) << boost::format("[Flashforge Serial] testing connection");
@@ -62,13 +66,14 @@ wxString Flashforge::get_test_ok_msg() const { return _(L("Serial connection to 
 
 wxString Flashforge::get_test_failed_msg(wxString& msg) const
 {
-    return GUI::from_u8((boost::format("%s: %s") % _utf8(L("Could not connect to Flashforge via serial")) % std::string(msg.ToUTF8())).str());
+    return GUI::from_u8(
+        (boost::format("%s: %s") % _utf8(L("Could not connect to Flashforge via serial")) % std::string(msg.ToUTF8())).str());
 }
 
-
+// [INTENT] Connection preamble sequence for Flashforge protocol.
 bool Flashforge::connect(wxString& msg) const
 {
-    // [INTENT] Flashforge requires a serial-style connection preamble before transfer; the exact handshake depends
+    // [STATE] Flashforge requires a serial-style connection preamble before transfer; the exact handshake depends
     // on G-code flavor, so protocol negotiation happens here instead of being implicit in upload().
     Utils::TCPConsole client(m_host, m_console_port);
 
@@ -79,11 +84,9 @@ bool Flashforge::connect(wxString& msg) const
         client.enqueue_cmd(connectKlipperCommand);
     else {
         client.enqueue_cmd(connectLegacyCommand);
-
     }
 
     client.enqueue_cmd(statusCommand);
-    
 
     bool res = client.run_queue();
 
@@ -96,6 +99,7 @@ bool Flashforge::connect(wxString& msg) const
     return res;
 }
 
+// [INTENT] Sends the Start Print command to the Flashforge printer.
 bool Flashforge::start_print(wxString& msg, const std::string& filename) const
 {
     Utils::TCPConsole            client(m_host, m_console_port);
@@ -112,23 +116,26 @@ bool Flashforge::start_print(wxString& msg, const std::string& filename) const
     return res;
 }
 
+// [THREAD] This method is typically called from a worker thread managed by PrintHostJob.
+// Blocking TCP operations are performed here.
+// [UNITY] Use async/await Task-based networking in C# to avoid blocking the main thread.
 bool Flashforge::upload(PrintHostUpload upload_data, ProgressFn progress_fn, ErrorFn error_fn, InfoFn info_fn) const
 {
-    bool res = true;
+    bool     res = true;
     wxString errormsg;
 
-    // [MEMORY] This implementation reads the full G-code file into RAM before chunking it into SerialMessage data
+    // [PORTING_HAZARD:P2] This implementation reads the full G-code file into RAM before chunking it into SerialMessage data
     // frames, so peak memory grows linearly with file size rather than streaming from disk.
+    // [UNITY] Use a FileStream and chunked upload to minimize memory footprint.
     Utils::TCPConsole client(m_host, m_console_port);
 
     try {
-
         res = connect(errormsg);
 
         std::ifstream newfile;
         newfile.open(upload_data.source_path.c_str(), std::ios::binary); // open a file to perform read operation using file object
         std::string gcodeFile;
-        if (newfile.is_open()) {                                         // checking whether the file is open
+        if (newfile.is_open()) { // checking whether the file is open
             BOOST_LOG_TRIVIAL(info) << boost::format("[Flashforge Serial] Reading file...");
             newfile.seekg(0, std::ios::end);
             std::ifstream::pos_type pos = newfile.tellg();
@@ -144,22 +151,23 @@ bool Flashforge::upload(PrintHostUpload upload_data, ProgressFn progress_fn, Err
 
             newfile.close(); // close the file object.
         }
+        // [EVENT] Begin upload by sending the file header command.
         Slic3r::Utils::SerialMessage fileuploadCommand =
             {(boost::format("~M28 %1% 0:/user/%2%") % gcodeFile.size() % upload_data.upload_path.generic_string()).str(),
              Slic3r::Utils::Command};
         client.enqueue_cmd(fileuploadCommand);
 
-        //client.set_tcp_queue_delay(std::chrono::nanoseconds(10000));
+        // client.set_tcp_queue_delay(std::chrono::nanoseconds(10000));
 
-        // [HAZARD] The printer consumes a fixed-size chunk stream following M28; changing chunk boundaries or the
+        // [PORTING_HAZARD:P2] The printer consumes a fixed-size chunk stream following M28; changing chunk boundaries or the
         // substring slicing behavior can corrupt the device-side framing even if the total bytes match.
         for (int bytePos = 0; bytePos < gcodeFile.size(); bytePos += m_bufferSize) { // TODO: Find more efficient way of breaking ifstream
 
-            int bytePosEnd  = (gcodeFile.size() - bytePos > m_bufferSize - 1) ? m_bufferSize : gcodeFile.size();
-            Slic3r::Utils::SerialMessage dataCommand = {gcodeFile.substr(bytePos, bytePosEnd), Slic3r::Utils::Data}; // Break into smaller byte chunks
+            int                          bytePosEnd  = (gcodeFile.size() - bytePos > m_bufferSize - 1) ? m_bufferSize : gcodeFile.size();
+            Slic3r::Utils::SerialMessage dataCommand = {gcodeFile.substr(bytePos, bytePosEnd),
+                                                        Slic3r::Utils::Data}; // Break into smaller byte chunks
 
             client.enqueue_cmd(dataCommand);
-
         }
 
         res = client.run_queue();
@@ -167,17 +175,16 @@ bool Flashforge::upload(PrintHostUpload upload_data, ProgressFn progress_fn, Err
         if (res)
             BOOST_LOG_TRIVIAL(info) << boost::format("[Flashforge Serial] Sent %1% ") % gcodeFile.size();
 
-
         if (!res) {
             BOOST_LOG_TRIVIAL(info) << boost::format("[Flashforge Serial] error %1%") % client.error_message().c_str();
             errormsg = wxString::FromUTF8(client.error_message().c_str());
             error_fn(std::move(errormsg));
         } else {
-
+            // [PORTING_HAZARD:P3] 3 second delay before final save command is protocol-specific and must be preserved.
             client.set_tcp_queue_delay(std::chrono::milliseconds(3000));
 
             BOOST_LOG_TRIVIAL(info) << boost::format("[Flashforge Serial] Sending file save command ");
-            
+
             client.enqueue_cmd(saveFileCommand);
 
             res = client.run_queue();
