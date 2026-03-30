@@ -2046,3 +2046,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P1 x1 (blocking synchronization), P2 x1 (artificial delay), P3 x1 (transport coupling)
 - Git: Annotate MKS.cpp for Unity port prep
 - Next recommended Phase 1 task: T775 annotate: src/slic3r/Utils/MKS.hpp
+
+## Phase 1 - Task T775 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/MKS.hpp
+- Deliverables: src/slic3r/Utils/MKS.hpp
+- Substantive additions: Header-level annotations for the MKS print host interface, documenting the dual-transport coordination requirement and Unity mapping strategy.
+- Verification excerpt: [UNITY] Coordination between UnityWebRequest and TcpClient should be managed by a single async state machine.
+- Unity-impact summary:
+  - Map to a C# `PrintHost` service.
+  - Preserve the HTTP/TCP coordination for firmware compatibility.
+- Hazards found: P3 x1 (dual-transport requirement)
+- Git: Annotate MKS.hpp for Unity port prep
+- Next recommended Phase 1 task: T776 annotate: src/slic3r/Utils/MoonrakerPrinterAgent.cpp

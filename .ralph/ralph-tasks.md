@@ -693,7 +693,7 @@ Last updated: 2026-03-30T01:50:00Z
 - [x] T772 annotate: src/slic3r/Utils/minilzo_extension.cpp
 - [x] T773 annotate: src/slic3r/Utils/minilzo_extension.hpp
 - [x] T774 annotate: src/slic3r/Utils/MKS.cpp
-- [ ] T775 annotate: src/slic3r/Utils/MKS.hpp
+- [x] T775 annotate: src/slic3r/Utils/MKS.hpp
 - [ ] T776 annotate: src/slic3r/Utils/MoonrakerPrinterAgent.cpp
 - [ ] T777 annotate: src/slic3r/Utils/MoonrakerPrinterAgent.hpp
 - [ ] T778 annotate: src/slic3r/Utils/NetworkAgent.cpp
