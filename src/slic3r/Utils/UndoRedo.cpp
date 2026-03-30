@@ -88,6 +88,8 @@ class ObjectHistoryBase
 {
 public:
 	// [INTENT] The stack keeps a separate timeline per logical object so snapshots can share unchanged payloads instead of
+// [INTENT] The stack keeps a separate timeline per logical object so snapshots can share unchanged payloads instead of 
+// serializing the full scene graph after every edit.
 	// serializing the full scene graph after every edit.
 	virtual ~ObjectHistoryBase() {}
 
@@ -257,6 +259,8 @@ public:
 
 	void save(size_t active_snapshot_time, size_t current_time) {
 		// [INTENT] Immutable objects are tracked as time intervals over one shared payload, which lets repeated snapshots of
+// [INTENT] Immutable objects are tracked as time intervals over one shared payload, which lets repeated snapshots of 
+// the same mesh extend coverage instead of duplicating serialized geometry bytes.
 		// the same mesh extend coverage instead of duplicating serialized geometry bytes.
 		assert(m_history.empty() || m_history.back().end() <= active_snapshot_time ||
 			// The snapshot of an immutable object may have already been taken from another mutable object.
@@ -363,6 +367,8 @@ private:
 public:
 	MutableHistoryInterval(const Interval &interval, const std::string &input_data) : m_interval(interval), m_data(nullptr) {
 		// [MEMORY] Snapshot bytes live in one manually sized heap block with an intrusive refcount so identical serialized
+// [MEMORY] Snapshot bytes live in one manually sized heap block with an intrusive refcount so identical serialized 
+// states can be shared between adjacent intervals without `shared_ptr`'s atomic bookkeeping cost.
 		// states can be shared between adjacent intervals without `shared_ptr`'s atomic bookkeeping cost.
 		m_data = (Data*)new char[offsetof(Data, data) + input_data.size()];
 		m_data->refcnt = 1;
@@ -382,6 +388,8 @@ public:
 
 	~MutableHistoryInterval() {
 		// [HAZARD] This lifetime scheme relies on raw `char[]` allocation, pointer casting, and non-atomic refcounts; a
+// [HAZARD] This lifetime scheme relies on raw `char[]` allocation, pointer casting, and non-atomic refcounts; a 
+// translation should replace it with a safer byte-buffer abstraction before adding concurrency.
 		// translation should replace it with a safer byte-buffer abstraction before adding concurrency.
 		if (m_data != nullptr && -- m_data->refcnt == 0)
 			delete[] (char*)m_data;
@@ -555,6 +563,8 @@ class StackImpl
 {
 public:
 	// [CONCURRENCY] `StackImpl` assumes single-threaded GUI ownership. None of its maps, vectors, or intrusive reference
+// [CONCURRENCY] `StackImpl` assumes single-threaded GUI ownership. None of its maps, vectors, or intrusive reference 
+// counts are synchronized, so background jobs must not call snapshot APIs concurrently.
 	// counts are synchronized, so background jobs must not call snapshot APIs concurrently.
 	// Stack needs to be initialized. An empty stack is not valid, there must be a "New Project" status stored at the beginning.
 	// Initially enable Undo / Redo stack to occupy maximum 10% of the total system physical memory.
@@ -695,6 +705,8 @@ private:
 	std::map<ObjectID, std::unique_ptr<ObjectHistoryBase>> 	m_objects;
 	std::map<const void*, ObjectID>							m_shared_ptr_to_object_id;
 	// [STATE] These maps are the hidden identity bridge between live objects and serialized history; changing ObjectIDs or
+// [STATE] These maps are the hidden identity bridge between live objects and serialized history; changing ObjectIDs or 
+// swapping shared mesh pointers changes what future snapshots can deduplicate or reload.
 	// swapping shared mesh pointers changes what future snapshots can deduplicate or reload.
 	// Snapshot history (names with timestamps).
 	std::vector<Snapshot>									m_snapshots;
@@ -741,6 +753,8 @@ namespace cereal
 	// store just the ObjectID to this stream.
 	template <class T> void save(BinaryOutputArchive& ar, T* const& ptr)
 	{
+// [COUPLING] Raw pointers inside the model graph are redirected through UndoRedo object histories, so serialized 
+// snapshots depend on `ObjectID` identity rather than address-stable pointer graphs.
 		// [COUPLING] Raw pointers inside the model graph are redirected through UndoRedo object histories, so serialized
 		// snapshots depend on `ObjectID` identity rather than address-stable pointer graphs.
 		ar(cereal::get_user_data<Slic3r::UndoRedo::StackImpl>(ar).save_mutable_object<T>(*ptr));
@@ -861,6 +875,8 @@ template<typename T> ObjectID StackImpl::save_mutable_object(const T &object)
 	}
 	if (needs_to_save) {
 		// [INTENT] Mutable objects are captured wholesale because OrcaSlicer does not track field-level edits on Model,
+// [INTENT] Mutable objects are captured wholesale because OrcaSlicer does not track field-level edits on Model, 
+// Config, or GUI state; deduplication happens afterwards via timestamps and serialized byte comparisons.
 		// Config, or GUI state; deduplication happens afterwards via timestamps and serialized byte comparisons.
 		// Serialize the object into a string.
 		std::ostringstream oss;
@@ -892,6 +908,8 @@ template<typename T> T* StackImpl::load_mutable_object(const Slic3r::ObjectID id
 {
 	// BBS: reuse objects for backup
 	// [MEMORY] Deserialization first tries to recycle detached objects from `m_reusable_objects` to avoid repeated heap
+// [MEMORY] Deserialization first tries to recycle detached objects from `m_reusable_objects` to avoid repeated heap 
+// churn when the user scrubs backward and forward through large model trees.
 	// churn when the user scrubs backward and forward through large model trees.
 	auto it = std::find_if(m_reusable_objects.begin(), m_reusable_objects.end(), [id](auto o) { return o && o->id() == id; });
 	T* target = nullptr;
@@ -945,6 +963,8 @@ void StackImpl::take_snapshot(const std::string& snapshot_name, const Slic3r::Mo
 void StackImpl::take_snapshot(const std::string& snapshot_name, const Slic3r::Model& model, const Slic3r::GUI::Selection& selection, const Slic3r::GUI::GLGizmosManager& gizmos, const Slic3r::GUI::PartPlateList& plate_list, const SnapshotData& snapshot_data)
 {
 	// [STATE] Taking a snapshot truncates all redo history after `m_active_snapshot_time` before appending the current
+// [STATE] Taking a snapshot truncates all redo history after `m_active_snapshot_time` before appending the current 
+// model, selection, gizmo, and plate state as the new timeline head.
 	// model, selection, gizmo, and plate state as the new timeline head.
 	// Release old snapshot data.
 	assert(m_active_snapshot_time <= m_current_time);
@@ -960,6 +980,8 @@ void StackImpl::take_snapshot(const std::string& snapshot_name, const Slic3r::Mo
 	// Take new snapshots.
 	this->save_mutable_object<Slic3r::Model>(model);
 	// [COUPLING] Selection persistence depends on live `GLVolume::geometry_id` values matching the ids that the model and
+// [COUPLING] Selection persistence depends on live `GLVolume::geometry_id` values matching the ids that the model and 
+// 3D scene will reconstruct later, so identity drift here breaks selection restoration.
 	// 3D scene will reconstruct later, so identity drift here breaks selection restoration.
 	m_selection.volumes_and_instances.clear();
 	m_selection.volumes_and_instances.reserve(selection.get_volume_idxs().size());
@@ -995,6 +1017,8 @@ void StackImpl::take_snapshot(const std::string& snapshot_name, const Slic3r::Mo
 void StackImpl::reduce_noisy_snapshots(const std::string& new_name)
 {
 	// [INTENT] Gizmo sessions generate many micro-edits; this pass collapses the interior `GizmoAction` run into one
+// [INTENT] Gizmo sessions generate many micro-edits; this pass collapses the interior `GizmoAction` run into one 
+// user-facing step while preserving the enter/leave markers that delimit the gizmo substack.
 	// user-facing step while preserving the enter/leave markers that delimit the gizmo substack.
 	// Preceding snapshot must be a "leave gizmo" snapshot.
 	assert(! m_snapshots.empty() && m_snapshots.back().is_topmost() && m_snapshots.back().timestamp == m_active_snapshot_time);
@@ -1023,6 +1047,8 @@ void StackImpl::reduce_noisy_snapshots(const std::string& new_name)
 void StackImpl::load_snapshot(size_t timestamp, Slic3r::Model& model, Slic3r::GUI::GLGizmosManager& gizmos, Slic3r::GUI::PartPlateList& plate_list)
 {
 	// [STATE] Loading rewrites the live project in place: model contents, selection ids, gizmo state, and plate metadata
+// [STATE] Loading rewrites the live project in place: model contents, selection ids, gizmo state, and plate metadata 
+// are all replaced to match the requested timestamp.
 	// are all replaced to match the requested timestamp.
 	// Find the snapshot by time. It must exist.
 	const auto it_snapshot = std::lower_bound(m_snapshots.begin(), m_snapshots.end(), Snapshot(timestamp));
@@ -1032,6 +1058,8 @@ void StackImpl::load_snapshot(size_t timestamp, Slic3r::Model& model, Slic3r::GU
 	m_active_snapshot_time = timestamp;
 	// BBS: reuse objects for backup, objects should clear children before load them
 	// [MEMORY] The model contributes reusable heap objects before deserialization, and anything not reused must be deleted
+// [MEMORY] The model contributes reusable heap objects before deserialization, and anything not reused must be deleted 
+// manually at the end of the restore path.
 	// manually at the end of the restore path.
 	model.collect_reusable_objects(m_reusable_objects);
 	// model.clear_objects();
@@ -1121,6 +1149,8 @@ bool StackImpl::undo(Slic3r::Model &model, const Slic3r::GUI::Selection &selecti
 	bool new_snapshot_taken = false;
 	if (m_active_snapshot_time == m_snapshots.back().timestamp && ! m_snapshots.back().is_topmost_captured()) {
 		// [INTENT] The uncaptured topmost state must be snapshotted before rewinding so redo has a concrete target to come
+// [INTENT] The uncaptured topmost state must be snapshotted before rewinding so redo has a concrete target to come 
+// back to after the first undo.
 		// back to after the first undo.
 		// The current state is temporary. The current state needs to be captured to be redoable.
         this->take_snapshot(topmost_snapshot_name, model, selection, gizmos, plate_list, snapshot_data);
@@ -1217,6 +1247,8 @@ void StackImpl::release_least_recently_used()
 	assert(this->valid());
 	size_t current_memsize = this->memsize();
 	// [INTENT] Memory pressure is relieved by discarding reconstructible optional data first and then pruning the oldest
+// [INTENT] Memory pressure is relieved by discarding reconstructible optional data first and then pruning the oldest 
+// snapshots while keeping enough structure for a coherent undo chain.
 	// snapshots while keeping enough structure for a coherent undo chain.
 #ifdef SLIC3R_UNDOREDO_DEBUG
 	bool released = false;
@@ -1324,6 +1356,8 @@ void StackImpl::release_least_recently_used()
 bool StackImpl::project_modified() const
 {
 	// [INTENT] Dirty-state checks consult snapshot metadata instead of diffing project bytes, keeping save prompts cheap
+// [INTENT] Dirty-state checks consult snapshot metadata instead of diffing project bytes, keeping save prompts cheap 
+// even when the stack contains very large serialized models.
 	// even when the stack contains very large serialized models.
 	assert(! m_snapshots.empty());
 

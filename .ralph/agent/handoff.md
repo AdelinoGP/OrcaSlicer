@@ -1828,3 +1828,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P1 x1
 - Git: Annotate UndoRedo.hpp for Unity port
 - Next recommended Phase 1 task: T815 annotate: src/slic3r/Utils/UndoRedo.cpp
+
+## Phase 1 - Task T815 complete
+
+- Task type: annotate
+- File: src/slic3r/Utils/UndoRedo.cpp
+- Deliverables: `src/slic3r/Utils/UndoRedo.cpp`
+- Substantive additions: 17 comment blocks covering object-level timeline management, intrusive refcounting hazards, serialization-to-ObjectID coupling, memory pressure GC logic, and concurrency constraints.
+- Verification excerpt: `[HAZARD] This lifetime scheme relies on raw char[] allocation, pointer casting, and non-atomic refcounts; a translation should replace it with a safer byte-buffer abstraction.`
+- Unity-impact summary:
+  - The custom memory management for serialized state (intrusive refcounts) is a P1 porting hazard for C# and should be replaced by a standard byte-buffer or blob storage.
+  - Multi-level undo stacks (gizmos) are supported through marker snapshots and noisy-snapshot reduction.
+  - Deserialization uses an object-recycing pool (`m_reusable_objects`) to minimize heap churn during timeline scrubbing.
+- Hazards found: P1 x1, P2 x1
+- Git: Annotate UndoRedo.cpp for Unity port prep
+- Next recommended Phase 1 task: T764 annotate: src/slic3r/Utils/Http.hpp
