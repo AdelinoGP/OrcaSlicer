@@ -2234,3 +2234,16 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P2: Semantic reuse of m_port)
 - Git: annotate: src/slic3r/Utils/Obico.cpp
 - Next recommended Phase 1 task: T783 annotate: src/slic3r/Utils/Obico.hpp
+
+## Phase 1 - Task T783 complete
+- Task type: annotate
+- File: src/slic3r/Utils/Obico.hpp
+- Deliverables: src/slic3r/Utils/Obico.hpp
+- Substantive additions: 2 blocks (INTENT/UNITY, PORTING_HAZARD)
+- Verification excerpt: [UNITY] Maps to a C# class implementing an IPrintHost interface.
+- Unity-impact summary:
+  - C# strings replace std::string and wxString.
+  - Split m_port into separate HostPort and PrinterId properties.
+- Hazards found: 1 (P2: Semantic reuse of m_port)
+- Git: annotate: src/slic3r/Utils/Obico.hpp
+- Next recommended Phase 1 task: T784 annotate: src/slic3r/Utils/OctoPrint.cpp

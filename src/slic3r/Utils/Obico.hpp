@@ -9,6 +9,18 @@
 #include "PrintHost.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
+
+/**
+ * [INTENT]
+ * Declaration of the Obico cloud print host adapter.
+ * Handles the communication contract for authentication, printer discovery, and G-code upload
+ * through the Obico API.
+ * 
+ * [UNITY]
+ * Maps to a C# class implementing an IPrintHost interface.
+ * - String members (m_host, m_apikey, etc.) will be C# strings.
+ * - wxString parameters/returns will be C# strings.
+ */
 namespace Slic3r {
 
 class DynamicPrintConfig;
@@ -40,6 +52,7 @@ protected:
 private:
     // [STATE] `m_port` is used as a selected remote printer identifier even though its config origin suggests a
     // network port, so callers must preserve that semantic overload when refactoring.
+    // [PORTING_HAZARD:P2] This should be split into distinct `HostPort` and `PrinterId` properties in C#.
     std::string m_host;
     std::string m_port;
     std::string m_apikey;
