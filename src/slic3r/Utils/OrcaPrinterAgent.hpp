@@ -1,3 +1,4 @@
+// [ANNOTATED]
 #ifndef __ORCA_PRINTER_AGENT_HPP__
 #define __ORCA_PRINTER_AGENT_HPP__
 
