@@ -1,97 +1,22 @@
-## T714 annotate: src/slic3r/GUI/Widgets/TextInput.hpp
-- Start task-1773880088-514c
-- Read `src/slic3r/GUI/Widgets/TextInput.hpp`
-- Add Unity port annotations.
-- Complete task.
+# Plan - Phase 1: GUI Annotation
 
-## T715, T716 annotate: src/slic3r/GUI/Widgets/WebView.cpp / hpp
-- Start tasks
-- Read files
-- Add Unity port annotations regarding WebView platform specific dependencies.
-- Complete tasks.
+Current objective: Annotate GUI source files for Unity port prep.
 
-## T717, T718 annotate: src/slic3r/GUI/WipeTowerDialog.cpp / hpp
-- Started task-1773880088-9f39 and task-1773880088-b8bf
-- Noticed `WipeTowerDialog.hpp` was mostly annotated but added comprehensive method annotations to `.cpp` via Python script to bypass `edit` tool file modified locks.
-- `WipingDialog` is a critical webview wrapper sending/receiving JSON commands for flush volume recalculation. `RammingDialog` displays `RammingChart` and parameter spinners.
-- Completed and committed.
+## Status Review
+- T801, T800, T816 completed.
+- T815 (UndoRedo.cpp) verified as completed.
+- T758 (Flashforge.hpp) completed.
+- T757 (Flashforge.cpp) completed.
+- Registry updated for T757, T758, T764, T800, T801, T815, T816.
 
-## T719, T720 annotate: src/slic3r/GUI/wxExtensions.cpp / hpp
-- Started tasks T719 and T720
-- Analyzed wxExtensions.hpp and wxExtensions.cpp
-- These files provide scaled bitmaps, custom menu extensions, CheckListBox popup for dropdowns, and button state wrappers.
-- Added annotations focusing on Unity's built-in scaling vs wxWidgets' explicit rescale overrides.
-- Completed and committed.
+## Next Task
+- **T763 annotate: src/slic3r/Utils/Http.cpp**
+- Priority: High
+- Rationale: Follows the recommended sequence in handoff.md.
 
-## T724, T725 annotate: src/slic3r/Utils/AstroBox.cpp / hpp
-- Start tasks task-1773880088-5983 and task-1773880088-747c
-- Read AstroBox.hpp and AstroBox.cpp
-- Files were partially annotated. Added class-level `[INTENT]` and `[UNITY]` annotations to the header.
-- Added `[THREAD]` annotation to the `upload` method in `.cpp` detailing thread boundary assumptions.
-- Completed and committed.
-
-## T726 annotate: src/slic3r/Utils/bambu_networking.hpp
-- Started task-1773880088-90ba
-- Read `bambu_networking.hpp`. The file defines the C++ ABI and DTOs for the Bambu network plugin.
-- Added `[INTENT]` and `[UNITY]` annotations describing the C# P/Invoke `DllImport` requirements if the native plugin is retained.
-- Completed and committed.
-
-## T727, T728 annotate: src/slic3r/Utils/BBLCloudServiceAgent.cpp / hpp
-- Started tasks task-1773880088-aa55 and task-1773880088-c51e
-- Read files. This class acts as a pass-through abstraction over `BBLNetworkPlugin` for cloud operations.
-- Added `[INTENT]` and `[UNITY]` annotations detailing its delegation role and the mapping to either a C# P/Invoke wrapper or a pure C# network service.
-- Added `[STATE]` annotation to `m_enable_track`.
-- Completed and committed.
-
-## T729, T730 annotate: src/slic3r/Utils/BBLNetworkPlugin.cpp / hpp
-- Started tasks task-1773880088-dd5f and task-1773880088-f89f
-- Read `BBLNetworkPlugin.cpp` and `BBLNetworkPlugin.hpp`.
-- The files were already extensively annotated with `[MEMORY]`, `[INTENT]`, `[COUPLING]`, and `[STATE]` tags from a previous or manual pass.
-- Added class-level `[INTENT]` and `[UNITY]` annotations detailing the P/Invoke model `[DllImport]` vs manual `LoadLibrary`/`dlopen`.
-- Added a `[PORTING_HAZARD:P1]` to `BBLNetworkPlugin::initialize()` explaining the friction of dynamic runtime loading in Unity vs static P/Invoke.
-- Completed and committed.
-
-## T731, T732 annotate: src/slic3r/Utils/BBLPrinterAgent.cpp / hpp
-- Started tasks task-1773880088-135d and task-1773880088-2fae
-- Read files. This class acts as a pass-through abstraction over `BBLNetworkPlugin` for printer control.
-- Added `[INTENT]` and `[UNITY]` annotations detailing its delegation role and the mapping to either a C# P/Invoke wrapper or a pure C# MQTT/Networking client.
-- Completed and committed.
-
-## T733, T734 annotate: src/slic3r/Utils/Bonjour.cpp / hpp
-- Started tasks task-1773880088-4a74 and task-1773880088-6565
-- Read `Bonjour.hpp` and `Bonjour.cpp`.
-- Added `[INTENT]` and `[UNITY]` to `Bonjour` class detailing the need for a C# mDNS/Zeroconf library as Unity lacks native mDNS.
-- Added `[THREAD]` annotations to `lookup()` and `resolve()` noting that boost::asio is run on a detached `std::thread` and callbacks fire on that background thread.
-- Completed and committed.
-## T735, T736 annotate: src/slic3r/Utils/CalibUtils.cpp / hpp
-- Started task-1773880088-7f98 and task-1773880088-9abf
-- The files were mostly annotated with [INTENT] and [HAZARD] tags, but lacked [UNITY] notes at the class and structural level.
-- Added [UNITY] to map `CalibInfo` to C# DTOs and `CalibUtils` to C# job-builder services.
-- Replaced [STATE] with [INTENT] on the `CalibInfo` struct summary to better fit the tag convention.
-- Completed and committed.
-## T737, T738 annotate: src/slic3r/Utils/ColorSpaceConvert.cpp / hpp
-- Started task-1773880088-b6f4 and task-1773880088-d316
-- The files contain purely mathematical color space conversions and string serializers for wxColour.
-- Added [INTENT] and [UNITY] notes explaining they map cleanly to static C# functions and `UnityEngine.Color`.
-- Completed and committed.
-
-
-## T739, T740 annotate: src/slic3r/Utils/CrealityPrint.cpp / hpp
-- Started task-1773880088-ed97 and task-1773880088-07e4
-- Read files. This class handles sending gcode to Creality printers via REST, then switching to a WebSockets channel to trigger the start command.
-- Added [INTENT] and [UNITY] notes outlining the need for C# async Tasks and `ClientWebSocket` for the command channel since it blocks `Http::perform_sync`.
-- Completed and committed.
-
-## T741, T742 annotate: src/slic3r/Utils/Duet.cpp / hpp
-- Started tasks task-1773880088-21cf and task-1773880088-3d6a
-- Read files. Duet is a PrintHost adapter that supports both RRF and DSF APIs.
-- Added class-level [INTENT] and [UNITY] notes to the header.
-- Added [THREAD] note to the `upload` method detailing the blocking `perform_sync()` and mapping to an async C# Task.
-- Completed and committed.
-
-## T743, T744 annotate: src/slic3r/Utils/ElegooLink.cpp / hpp
-- Started tasks task-1773880089-1524 and task-1773880089-2ec7
-- Read files. ElegooLink inherits OctoPrint adapter for uploads, but uses SDCP via WebSockets for print commands.
-- Added class-level [INTENT] and [UNITY] annotations noting the inheritance/composition change.
-- Added [THREAD] and [UNITY] to `loopUpload` and `print` methods, explicitly calling out the `sleep_for` and blocking HTTP calls.
-- Completed and committed.
+## Steps
+1. Read `src/slic3r/Utils/Http.cpp`.
+2. Annotate implementation with `[STATE]`, `[UNITY]`, `[THREAD]`, etc.
+3. Update handoff.md.
+4. Update ralph-tasks.md.
+5. Commit changes.
