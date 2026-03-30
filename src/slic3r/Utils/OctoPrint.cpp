@@ -28,6 +28,19 @@
 namespace fs = boost::filesystem;
 namespace pt = boost::property_tree;
 
+
+/**
+ * [INTENT]
+ * Network adapter hierarchy for OctoPrint and compatible hosts (PrusaLink, SL1Host).
+ * Handles authentication (API Key or User/Pass), printer discovery (mDNS), and dual-mode 
+ * file upload (Multipart POST or Raw PUT).
+ * 
+ * [UNITY]
+ * Maps to a C# class hierarchy (OctoPrintAdapter -> PrusaLinkAdapter).
+ * - Replace Http::get/post with UnityWebRequest.
+ * - Replace Bonjour with a C# mDNS library or native platform discovery service.
+ * - Replace boost::property_tree with Newtonsoft.Json or Unity's JsonUtility.
+ */
 namespace Slic3r {
 
 namespace {
@@ -68,7 +81,9 @@ std::string get_host_from_url(const std::string& url_in)
     return out;
 }
 
-// Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+// [STATE] Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+// [PORTING_HAZARD:P2] This IP-based substitution with Host-header spoofing is mandatory for reliability 
+// on many home networks (where .local DNS is flakey) and should be ported as a core C# network service.
 std::string substitute_host(const std::string& orig_addr, std::string sub_addr)
 {
     // put ipv6 into [] brackets
@@ -150,6 +165,8 @@ std::string escape_path_by_element(const boost::filesystem::path& path)
 {
     // [INTENT] PUT uploads encode each path segment independently so printer-side folder separators survive while
     // spaces and non-ASCII characters in individual names still round-trip through HTTP.
+    // [PORTING_HAZARD:P2] This manual path-escaping logic is critical for correct folder creation on 
+    // OctoPrint/PrusaLink and must be exactly replicated in the C# transport layer.
     std::string             ret_val = escape_string(path.filename().string());
     boost::filesystem::path parent(path.parent_path());
     while (!parent.empty() &&
@@ -186,7 +203,9 @@ bool OctoPrint::test_with_resolved_ip(wxString& msg) const
 
     std::string host = get_host_from_url(m_host);
     auto        http = Http::get(url); // std::move(url));
-    // "Host" header is necessary here. We have resolved IP address and subsituted it into "url" variable.
+    // [COUPLING] "Host" header is necessary here. We have resolved IP address and subsituted it into "url" variable.
+    // [PORTING_HAZARD:P2] Spoofing the "Host" header when using direct IP access is required for 
+    // reverse-proxy (e.g. Nginx, PrusaLink) and vhost routing to function correctly.
     // And when creating Http object above, libcurl automatically includes "Host" header from address it got.
     // Thus "Host" is set to the resolved IP instead of host filled by user. We need to change it back.
     // Not changing the host would work on the most cases (where there is 1 service on 1 hostname) but would break when f.e. reverse proxy
@@ -275,7 +294,9 @@ bool OctoPrint::test(wxString& msg) const
 #ifdef WIN32
         .ssl_revoke_best_effort(m_ssl_revoke_best_effort)
         .on_ip_resolve([&](std::string address) {
-            // Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+// [STATE] Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+// [PORTING_HAZARD:P2] This IP-based substitution with Host-header spoofing is mandatory for reliability 
+// on many home networks (where .local DNS is flakey) and should be ported as a core C# network service.
             // Remember resolved address to be reused at successive REST API call.
             msg = GUI::from_u8(address);
         })
@@ -393,7 +414,9 @@ bool OctoPrint::upload_inner_with_resolved_ip(PrintHostUpload                 up
 
     std::string host = get_host_from_url(m_host);
     auto        http = Http::post(url); // std::move(url));
-    // "Host" header is necessary here. We have resolved IP address and subsituted it into "url" variable.
+    // [COUPLING] "Host" header is necessary here. We have resolved IP address and subsituted it into "url" variable.
+    // [PORTING_HAZARD:P2] Spoofing the "Host" header when using direct IP access is required for 
+    // reverse-proxy (e.g. Nginx, PrusaLink) and vhost routing to function correctly.
     // And when creating Http object above, libcurl automatically includes "Host" header from address it got.
     // Thus "Host" is set to the resolved IP instead of host filled by user. We need to change it back.
     // Not changing the host would work on the most cases (where there is 1 service on 1 hostname) but would break when f.e. reverse proxy
@@ -447,7 +470,9 @@ bool OctoPrint::upload_inner_with_host(PrintHostUpload upload_data, ProgressFn p
     bool        res = true;
 
 #ifdef WIN32
-    // Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+// [STATE] Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+// [PORTING_HAZARD:P2] This IP-based substitution with Host-header spoofing is mandatory for reliability 
+// on many home networks (where .local DNS is flakey) and should be ported as a core C# network service.
     if (m_host.find("https://") == 0 || test_msg_or_host_ip.empty() || !GUI::get_app_config()->get_bool("allow_ip_resolve"))
 #endif // _WIN32
     {
@@ -459,7 +484,9 @@ bool OctoPrint::upload_inner_with_host(PrintHostUpload upload_data, ProgressFn p
     }
 #ifdef WIN32
     else {
-        // Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+// [STATE] Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+// [PORTING_HAZARD:P2] This IP-based substitution with Host-header spoofing is mandatory for reliability 
+// on many home networks (where .local DNS is flakey) and should be ported as a core C# network service.
         // Curl uses easy_getinfo to get ip address of last successful transaction.
         // If it got the address use it instead of the stored in "host" variable.
         // This new address returns in "test_msg_or_host_ip" variable.
@@ -666,7 +693,9 @@ bool PrusaLink::test(wxString& msg) const
 #ifdef WIN32
         .ssl_revoke_best_effort(m_ssl_revoke_best_effort)
         .on_ip_resolve([&](std::string address) {
-            // Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+// [STATE] Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+// [PORTING_HAZARD:P2] This IP-based substitution with Host-header spoofing is mandatory for reliability 
+// on many home networks (where .local DNS is flakey) and should be ported as a core C# network service.
             // Remember resolved address to be reused at successive REST API call.
             msg = GUI::from_u8(address);
         })
@@ -848,7 +877,9 @@ bool PrusaLink::test_with_method_check(wxString& msg, bool& use_put) const
 #ifdef WIN32
         .ssl_revoke_best_effort(m_ssl_revoke_best_effort)
         .on_ip_resolve([&](std::string address) {
-            // Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+// [STATE] Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+// [PORTING_HAZARD:P2] This IP-based substitution with Host-header spoofing is mandatory for reliability 
+// on many home networks (where .local DNS is flakey) and should be ported as a core C# network service.
             // Remember resolved address to be reused at successive REST API call.
             msg = GUI::from_u8(address);
         })
@@ -873,7 +904,9 @@ bool PrusaLink::test_with_resolved_ip_and_method_check(wxString& msg, bool& use_
 
     std::string host = get_host_from_url(m_host);
     auto        http = Http::get(url); // std::move(url));
-    // "Host" header is necessary here. We have resolved IP address and subsituted it into "url" variable.
+    // [COUPLING] "Host" header is necessary here. We have resolved IP address and subsituted it into "url" variable.
+    // [PORTING_HAZARD:P2] Spoofing the "Host" header when using direct IP access is required for 
+    // reverse-proxy (e.g. Nginx, PrusaLink) and vhost routing to function correctly.
     // And when creating Http object above, libcurl automatically includes "Host" header from address it got.
     // Thus "Host" is set to the resolved IP instead of host filled by user. We need to change it back.
     // Not changing the host would work on the most cases (where there is 1 service on 1 hostname) but would break when f.e. reverse proxy
@@ -988,7 +1021,9 @@ bool PrusaLink::upload_inner_with_host(PrintHostUpload upload_data, ProgressFn p
     std::string storage_path = (use_put ? "api/v1/files" : "api/files");
     storage_path += (upload_data.storage.empty() ? "/local" : upload_data.storage);
 #ifdef WIN32
-    // Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+// [STATE] Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+// [PORTING_HAZARD:P2] This IP-based substitution with Host-header spoofing is mandatory for reliability 
+// on many home networks (where .local DNS is flakey) and should be ported as a core C# network service.
     if (m_host.find("https://") == 0 || test_msg_or_host_ip.empty() || !GUI::get_app_config()->get_bool("allow_ip_resolve"))
 #endif // _WIN32
     {
@@ -998,7 +1033,9 @@ bool PrusaLink::upload_inner_with_host(PrintHostUpload upload_data, ProgressFn p
     }
 #ifdef WIN32
     else {
-        // Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+// [STATE] Workaround for Windows 10/11 mDNS resolve issue, where two mDNS resolves in succession fail.
+// [PORTING_HAZARD:P2] This IP-based substitution with Host-header spoofing is mandatory for reliability 
+// on many home networks (where .local DNS is flakey) and should be ported as a core C# network service.
         // Curl uses easy_getinfo to get ip address of last successful transaction.
         // If it got the address use it instead of the stored in "host" variable.
         // This new address returns in "test_msg_or_host_ip" variable.
@@ -1032,7 +1069,9 @@ bool PrusaLink::put_inner(
     url += "/" + escape_path_by_element(upload_data.upload_path);
     Http http = Http::put(std::move(url));
 #ifdef WIN32
-    // "Host" header is necessary here. We have resolved IP address and subsituted it into "url" variable.
+    // [COUPLING] "Host" header is necessary here. We have resolved IP address and subsituted it into "url" variable.
+    // [PORTING_HAZARD:P2] Spoofing the "Host" header when using direct IP access is required for 
+    // reverse-proxy (e.g. Nginx, PrusaLink) and vhost routing to function correctly.
     // And when creating Http object above, libcurl automatically includes "Host" header from address it got.
     // Thus "Host" is set to the resolved IP instead of host filled by user. We need to change it back.
     // Not changing the host would work on the most cases (where there is 1 service on 1 hostname) but would break when f.e. reverse proxy
@@ -1085,7 +1124,9 @@ bool PrusaLink::post_inner(
 
     Http http = Http::post(std::move(url));
 #ifdef WIN32
-    // "Host" header is necessary here. We have resolved IP address and subsituted it into "url" variable.
+    // [COUPLING] "Host" header is necessary here. We have resolved IP address and subsituted it into "url" variable.
+    // [PORTING_HAZARD:P2] Spoofing the "Host" header when using direct IP access is required for 
+    // reverse-proxy (e.g. Nginx, PrusaLink) and vhost routing to function correctly.
     // And when creating Http object above, libcurl automatically includes "Host" header from address it got.
     // Thus "Host" is set to the resolved IP instead of host filled by user. We need to change it back.
     // Not changing the host would work on the most cases (where there is 1 service on 1 hostname) but would break when f.e. reverse proxy

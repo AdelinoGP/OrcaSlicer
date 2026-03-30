@@ -2247,3 +2247,17 @@ This prompt governs **Phase 1 only**.
 - Hazards found: 1 (P2: Semantic reuse of m_port)
 - Git: annotate: src/slic3r/Utils/Obico.hpp
 - Next recommended Phase 1 task: T784 annotate: src/slic3r/Utils/OctoPrint.cpp
+
+## Phase 1 - Task T784 complete
+- Task type: annotate
+- File: src/slic3r/Utils/OctoPrint.cpp
+- Deliverables: src/slic3r/Utils/OctoPrint.cpp
+- Substantive additions: 4 blocks (INTENT/UNITY, 3 PORTING_HAZARDs)
+- Verification excerpt: [PORTING_HAZARD:P2] This IP-based substitution with Host-header spoofing is mandatory for reliability on many home networks.
+- Unity-impact summary:
+  - Implement OctoPrint/PrusaLink/SL1Host hierarchy in C#.
+  - Port the mDNS workaround and Host header spoofing for reliability.
+  - Replicate exact path-escaping logic for PUT uploads.
+- Hazards found: 3 (P2: mDNS workaround, Host spoofing, Path escaping)
+- Git: annotate: src/slic3r/Utils/OctoPrint.cpp
+- Next recommended Phase 1 task: T785 annotate: src/slic3r/Utils/OctoPrint.hpp
