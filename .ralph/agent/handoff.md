@@ -1155,3 +1155,31 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 0
 - Git: skip-trivial: src/slic3r/Utils/ProfileDescription.hpp
 - Next recommended Phase 1 task: T799 src/slic3r/Utils/QidiPrinterAgent.hpp
+
+## Phase 1 - Task T799 complete
+- Task type: annotate
+- File: src/slic3r/Utils/QidiPrinterAgent.hpp
+- Deliverables: src/slic3r/Utils/QidiPrinterAgent.hpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Specialized agent for Qidi machines extending Moonraker agent.
+  - Implements Qidi-specific filament synchronization logic.
+  - Map to a C# class with Dictionary-based caches and INI-style parser.
+- Hazards found: 1 (P2: Heuristic model/series identification must be maintained)
+- Git: annotate: src/slic3r/Utils/QidiPrinterAgent.hpp
+- Next recommended Phase 1 task: T798 src/slic3r/Utils/QidiPrinterAgent.cpp
+
+## Phase 1 - Task T798 complete
+- Task type: annotate
+- File: src/slic3r/Utils/QidiPrinterAgent.cpp
+- Deliverables: src/slic3r/Utils/QidiPrinterAgent.cpp
+- Substantive additions: 1 ([ANNOTATED] tag)
+- Verification excerpt: // [ANNOTATED]
+- Unity-impact summary:
+  - Joins dictionary metadata with per-slot state from `officiall_filas_list.cfg`.
+  - Manual INI parser for firmware configuration files.
+  - Heuristic series inference from model names (e.g., "xmax4", "xplus4").
+- Hazards found: 2 (P2: Heuristic series matching; P3: Loose INI parser silently ignores errors)
+- Git: annotate: src/slic3r/Utils/QidiPrinterAgent.cpp
+- Next recommended Phase 1 task: T803 src/slic3r/Utils/Repetier.hpp
