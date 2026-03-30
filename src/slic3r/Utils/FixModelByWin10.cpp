@@ -52,6 +52,10 @@ extern "C"{
 }
 
 namespace Slic3r {
+// [INTENT] Bridges the slicer to the Windows 10 native 3D Printing (Netfabb) repair service.
+// It uses WinRT APIs to perform cloud or local mesh repair on 3MF packages.
+// [UNITY] Map to native C# WinRT calls (Windows.Graphics.Printing3D) or a dedicated 
+// mesh repair plugin. This is Windows-only logic and needs a fallback for other platforms.
 
 static std::string saving_failed_str = L("Saving objects into the 3MF failed.");
 
@@ -340,10 +344,13 @@ bool fix_model_by_win10_sdk_gui(ModelObject &model_object, int volume_idx, GUI::
 		volumes.emplace_back(model_object.volumes[volume_idx]);
 
 	// Executing the calculation in a background thread, so that the COM context could be created with its own threading model.
+// [THREAD] Background worker thread is used to host the COM multi-threaded apartment (MTA) 
+// which is required for WinRT 3D Printing APIs and avoids blocking the wxWidgets UI thread.
 	// (It seems like wxWidgets initialize the COM contex as single threaded and we need a multi-threaded context).
 	bool   success = false;
 	size_t ivolume = 0;
 	auto on_progress = [&mtx, &condition, &ivolume, &volumes, &progress](const char *msg, unsigned prcnt) {
+    // [EVENT] Progress callback that uses a condition variable to signal the UI thread.
 	    std::unique_lock<std::mutex> lock(mtx);
 		progress.message = msg;
 		progress.percent = (int)floor((float(prcnt) + float(ivolume) * 100.f) / float(volumes.size()));
@@ -422,6 +429,8 @@ bool fix_model_by_win10_sdk_gui(ModelObject &model_object, int volume_idx, GUI::
 	});
     while (! finished) {
 		std::unique_lock<std::mutex> lock(mtx);
+// [THREAD] UI thread loop that waits for progress updates from the worker thread 
+// and updates the wxProgressDialog.
 		condition.wait_for(lock, std::chrono::milliseconds(250), [&progress]{ return progress.updated; });
 		// decrease progress.percent value to avoid closing of the progress dialog
 		if (!progress_dialog.Update(progress.percent-1, msg_header + _(progress.message)))
