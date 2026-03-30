@@ -1494,3 +1494,27 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2 (Complex AMS/filament cross-referencing logic, Status-driven UI complexity)
 - Git: N/A (will commit next)
 - Next recommended Phase 1 task: T201 annotate: src/slic3r/GUI/CalibrationWizardSavePage.cpp
+
+## Phase 1 checkpoint
+- Files newly accounted for in this batch: 10
+- Cumulative annotated: 130
+- Cumulative skip-trivial: 10
+- Cumulative skip-vendored: 5
+- Total accounted for: 145
+- Manifest total: 800
+- Remaining: 655
+- Status: CONTINUING
+
+## Phase 1 - Task T201 & T202 complete
+- Task type: annotate
+- File: src/slic3r/GUI/CalibrationWizardSavePage.cpp, src/slic3r/GUI/CalibrationWizardSavePage.hpp
+- Deliverables: src/slic3r/GUI/CalibrationWizardSavePage.cpp, src/slic3r/GUI/CalibrationWizardSavePage.hpp
+- Substantive additions: Class-level [INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] annotations.
+- Verification excerpt: "CalibrationWizardSavePage.cpp implements the various 'Save' and 'Record' pages for the printer calibration wizards."
+- Unity-impact summary:
+  - Each Page class -> MonoBehaviour-driven UI Screen or VisualElement Document.
+  - Reusable Panels -> UI Toolkit Templates/Prefabs.
+  - Recursion in widget lookup should be replaced with explicit data-binding or controller references.
+- Hazards found: P2 (Manual destruction/rebuilding of sizers, Deep widget recursion)
+- Git: annotate: src/slic3r/GUI/CalibrationWizardSavePage.cpp and .hpp
+- Next recommended Phase 1 task: T203 annotate: src/slic3r/GUI/CalibrationWizardStartPage.cpp

@@ -1,8 +1,27 @@
+// [ANNOTATED]
 #ifndef slic3r_GUI_CalibrationWizardSavePage_hpp_
 #define slic3r_GUI_CalibrationWizardSavePage_hpp_
 
 #include "CalibrationWizardPage.hpp"
 #include "Widgets/TextInput.hpp"
+/*
+[INTENT]
+Declaration boundary for the various calibration wizard "Save" pages.
+Each class represents a final step in a specific calibration workflow (PA, Flow Rate, Volumetric Speed).
+
+[STATE]
+- CalibrationCommonSavePage: Base scroller/container.
+- CaliPASaveAutoPanel: Grid-based result summary for Auto PA.
+- CalibrationPASavePage: Host for manual/auto PA save variants.
+- CalibrationFlowX1SavePage: Host for automatic flow rate results.
+- CalibrationFlowCoarseSavePage / CalibrationFlowFineSavePage: Host for manual flow rate data entry.
+
+[UNITY]
+- CalibrationPASavePage -> MonoBehaviour or UI Toolkit Panel Document.
+- CaliPASaveAutoPanel -> UI Toolkit ListView or Repeater with ItemTemplates.
+- CalibrationWizardPage -> Base class for wizard-step controllers.
+*/
+
 
 namespace Slic3r { namespace GUI {
 

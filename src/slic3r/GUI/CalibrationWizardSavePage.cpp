@@ -1,7 +1,37 @@
+// [ANNOTATED]
 #include "CalibrationWizardSavePage.hpp"
 #include "I18N.hpp"
 #include "Widgets/Label.hpp"
 #include "MsgDialog.hpp"
+/*
+[INTENT]
+CalibrationWizardSavePage.cpp implements the various 'Save' and 'Record' pages for the printer calibration wizards.
+These pages are the final step in the calibration workflow, where the user reviews the results (either
+automatically detected or manually identified) and saves them to the printer or filament presets.
+
+[STATE]
+- Each page maintains local UI state for the results (K-factor, Flow Ratio, etc.) and the target preset names.
+- Coupling: Direct dependency on MachineObject for current device state and pa_calib_results.
+- Preset Integration: Uses PresetBundle to derive default names and manage filament associations.
+
+[EVENT]
+- GridTextInput / GridComboBox: Capture user edits for calibration factors and preset names.
+- CaliPageActionPanel: Coordinates the 'Save' or 'Finish' actions, triggering validation and persistence.
+- Dynamic UI: show_panels() toggles between manual, auto, and P1P-specific UI variants.
+
+[UNITY]
+- Each Page class -> A specific VisualElement Document or a MonoBehaviour-driven UI Screen.
+- Reusable Panels (CaliPASaveAutoPanel, etc.) -> UI Toolkit Prefabs or Templates.
+- Validation: Move to a C# CalibrationValidator utility class.
+- Images: Replace ScalableBitmap with Unity Sprite/Image references in the UI Document.
+
+[PORTING_HAZARD:P2]
+- Dynamic Grid Generation: sync_cali_result_for_multi_extruder manually destroys and rebuilds sizers and widgets.
+  Unity should use a ListView with ItemTemplates or a Flex-based Container with pooled elements.
+- Deep Widget Nesting: Recursion in save_to_result_from_widgets() to find and extract values from child widgets.
+  Unity should use data-binding or explicit reference fields in the controller.
+*/
+
 
 
 namespace Slic3r { namespace GUI {
