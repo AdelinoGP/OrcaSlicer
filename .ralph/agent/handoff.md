@@ -1602,3 +1602,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: PopupWindow dismissal logic)
 - Git: annotate: src/slic3r/GUI/CameraPopup.hpp
 - Next recommended Phase 1 task: T211 src/slic3r/GUI/CameraUtils.cpp
+
+## Phase 1 - Task T211 complete
+- Task type: annotate
+- File: src/slic3r/GUI/CameraUtils.cpp
+- Deliverables: src/slic3r/GUI/CameraUtils.cpp
+- Substantive additions: 4 annotation blocks
+- Verification excerpt: [UNITY] Equivalent to Camera.ScreenPointToRay(new Vector3(position.x, position.y, 0)).
+- Unity-impact summary:
+  - Direct mapping to Unity Camera and Plane APIs.
+  - Watch for right-to-left handed coordinate conversion.
+  - Coordinate transformations must be carefully audited.
+- Hazards found: 1 (P2 - Coordinate system mismatch)
+- Git: annotate: src/slic3r/GUI/CameraUtils.cpp
+- Next recommended Phase 1 task: T212 annotate: src/slic3r/GUI/CameraUtils.hpp
