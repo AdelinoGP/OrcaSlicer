@@ -2331,3 +2331,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/DeviceTab/uiAmsHumidityPopup.cpp
 - Next recommended Phase 1 task: T266 src/slic3r/GUI/DeviceTab/uiDeviceUpdateVersion.cpp
+
+## Phase 1 - Task T266 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceTab/uiDeviceUpdateVersion.cpp
+- Deliverables: src/slic3r/GUI/DeviceTab/uiDeviceUpdateVersion.cpp
+- Substantive additions: 4 ([INTENT], [STATE], [UNITY] tags)
+- Verification excerpt: // [INTENT] Sub-panel implementation for displaying specific firmware version metadata (model, serial, version diff).
+- Unity-impact summary:
+  - Reusable version info component maps to a Unity UI Toolkit VisualElement or Canvas prefab.
+  - Alignment of labels and values handled by Flexbox (USS) or Layout Groups.
+  - Dynamic upgrade indicator maps to a simple Image component in Unity.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/DeviceTab/uiDeviceUpdateVersion.cpp
+- Next recommended Phase 1 task: T267 src/slic3r/GUI/Downloader.cpp

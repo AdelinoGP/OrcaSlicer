@@ -1,3 +1,9 @@
+// [ANNOTATED]
+// [INTENT] Sub-panel implementation for displaying specific firmware version metadata (model, serial, version diff).
+// [STATE] Manages read-only text labels and an upgrade notification indicator.
+// [UNITY] Map to a reusable Unity UI Toolkit VisualElement or Canvas-based prefab.
+// [UNITY] Use Flexbox (USS) or Layout Groups to maintain the grid-like alignment of labels and values.
+
 //**********************************************************/
 /* File: uiDeviceUpdateVersion.cpp
 *  Description: The panel with firmware info
@@ -13,22 +19,19 @@
 
 #include <wx/stattext.h>
 
-#define MODEL_STR   L("Model:")
-#define SERIAL_STR  L("Serial:")
+#define MODEL_STR L("Model:")
+#define SERIAL_STR L("Serial:")
 #define VERSION_STR L("Version:")
 
 using namespace Slic3r::GUI;
 
-
-uiDeviceUpdateVersion::uiDeviceUpdateVersion(wxWindow* parent,
-                                             wxWindowID id /*= wxID_ANY*/,
+uiDeviceUpdateVersion::uiDeviceUpdateVersion(wxWindow*      parent,
+                                             wxWindowID     id /*= wxID_ANY*/,
                                              const wxPoint& pos /*= wxDefaultPosition*/,
-                                             const wxSize& size /*= wxDefaultSize*/,
-                                             long style /*= wxTAB_TRAVERSAL*/)
-     : wxPanel(parent, id, pos, size, style)
-{
-    CreateWidgets();
-}
+                                             const wxSize&  size /*= wxDefaultSize*/,
+                                             long           style /*= wxTAB_TRAVERSAL*/)
+    : wxPanel(parent, id, pos, size, style)
+{ CreateWidgets(); }
 
 void uiDeviceUpdateVersion::UpdateInfo(const DevFirmwareVersionInfo& info)
 {
@@ -39,26 +42,20 @@ void uiDeviceUpdateVersion::UpdateInfo(const DevFirmwareVersionInfo& info)
 
 void uiDeviceUpdateVersion::SetVersion(const wxString& cur_version, const wxString& latest_version)
 {
-    if (cur_version.empty())
-    {
+    if (cur_version.empty()) {
         return;
     }
 
-    if (!latest_version.empty() && (cur_version != latest_version))
-    {
+    if (!latest_version.empty() && (cur_version != latest_version)) {
         const wxString& shown_ver = wxString::Format("%s->%s", cur_version, latest_version);
         m_dev_version->SetLabel(shown_ver);
-        if (!m_dev_upgrade_indicator->IsShown())
-        {
+        if (!m_dev_upgrade_indicator->IsShown()) {
             m_dev_upgrade_indicator->Show(true);
         }
-    }
-    else
-    {
+    } else {
         const wxString& shown_ver = wxString::Format("%s(%s)", cur_version, _L("Latest version"));
         m_dev_version->SetLabel(shown_ver);
-        if (m_dev_upgrade_indicator->IsShown())
-        {
+        if (m_dev_upgrade_indicator->IsShown()) {
             m_dev_upgrade_indicator->Hide();
         }
     }
@@ -66,13 +63,13 @@ void uiDeviceUpdateVersion::SetVersion(const wxString& cur_version, const wxStri
 
 void uiDeviceUpdateVersion::CreateWidgets()
 {
-    m_dev_name = new wxStaticText(this, wxID_ANY, "-");
-    m_dev_snl = new wxStaticText(this, wxID_ANY, "-");
+    m_dev_name    = new wxStaticText(this, wxID_ANY, "-");
+    m_dev_snl     = new wxStaticText(this, wxID_ANY, "-");
     m_dev_version = new wxStaticText(this, wxID_ANY, "-");
 
-    wxStaticText* serial_text = new wxStaticText(this, wxID_ANY, _L(SERIAL_STR));
+    wxStaticText* serial_text  = new wxStaticText(this, wxID_ANY, _L(SERIAL_STR));
     wxStaticText* version_text = new wxStaticText(this, wxID_ANY, _L(VERSION_STR));
-    wxStaticText *model_text   = new wxStaticText(this, wxID_ANY, _L(MODEL_STR));
+    wxStaticText* model_text   = new wxStaticText(this, wxID_ANY, _L(MODEL_STR));
 
     // Use bold font
     wxFont font = Label::Head_14;
@@ -84,7 +81,7 @@ void uiDeviceUpdateVersion::CreateWidgets()
 
     // The grid sizer
     wxFlexGridSizer* grid_sizer = new wxFlexGridSizer(0, 2, 0, 0);
-    //grid_sizer->AddGrowableCol(1);
+    // grid_sizer->AddGrowableCol(1);
     grid_sizer->SetFlexibleDirection(wxHORIZONTAL);
     grid_sizer->SetNonFlexibleGrowMode(wxFLEX_GROWMODE_SPECIFIED);
 
@@ -103,7 +100,7 @@ void uiDeviceUpdateVersion::CreateWidgets()
 
     grid_sizer->Add(version_hsizer, 0, wxEXPAND, 0);
     grid_sizer->Add(m_dev_version, 0, wxEXPAND | wxALL, FromDIP(5));
-   
+
     // Updating
     wxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
     main_sizer->AddSpacer(FromDIP(40));
