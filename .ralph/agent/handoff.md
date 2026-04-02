@@ -2102,3 +2102,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Massive nested bit-packed telemetry parsing logic)
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevFilaSystem.cpp
 - Next recommended Phase 1 task: T248 src/slic3r/GUI/DeviceCore/DevFilaSystemCtrl.cpp
+
+## Phase 1 - Task T248 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevFilaSystemCtrl.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevFilaSystemCtrl.cpp
+- Substantive additions: 4 ([INTENT], [EVENT], [UNITY] tags)
+- Verification excerpt: // [INTENT] Control commands for the AMS (Automatic Material System) unit.
+- Unity-impact summary:
+  - AMS control commands map to C# async methods.
+  - Integration with sequence ID management handled by the Command Service.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevFilaSystemCtrl.cpp
+- Next recommended Phase 1 task: T249 src/slic3r/GUI/DeviceCore/DevFirmware.cpp

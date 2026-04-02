@@ -29,5 +29,6 @@
 - Completed T245: src/slic3r/GUI/DeviceCore/DevFilaAmsSettingCtrl.cpp.
 - Completed T246: src/slic3r/GUI/DeviceCore/DevFilaBlackList.cpp.
 - Completed T247: src/slic3r/GUI/DeviceCore/DevFilaSystem.cpp.
-- Next task: T248 src/slic3r/GUI/DeviceCore/DevFilaSystemCtrl.cpp.
+- Completed T248: src/slic3r/GUI/DeviceCore/DevFilaSystemCtrl.cpp.
+- Next task: T249 src/slic3r/GUI/DeviceCore/DevFirmware.cpp.
 
