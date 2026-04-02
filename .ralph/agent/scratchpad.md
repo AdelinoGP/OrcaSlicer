@@ -26,5 +26,6 @@
 - Completed T242: src/slic3r/GUI/DeviceCore/DevExtruderSystemCtrl.cpp.
 - Completed T243: src/slic3r/GUI/DeviceCore/DevFan.cpp.
 - Completed T244: src/slic3r/GUI/DeviceCore/DevFilaAmsSetting.cpp.
-- Next task: T245 src/slic3r/GUI/DeviceCore/DevFilaAmsSettingCtrl.cpp.
+- Completed T245: src/slic3r/GUI/DeviceCore/DevFilaAmsSettingCtrl.cpp.
+- Next task: T246 src/slic3r/GUI/DeviceCore/DevFilaBlackList.cpp.
 

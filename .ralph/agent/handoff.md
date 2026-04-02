@@ -2061,3 +2061,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Complex nested JSON parsing)
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevFilaAmsSetting.cpp
 - Next recommended Phase 1 task: T245 src/slic3r/GUI/DeviceCore/DevFilaAmsSettingCtrl.cpp
+
+## Phase 1 - Task T245 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevFilaAmsSettingCtrl.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevFilaAmsSettingCtrl.cpp
+- Substantive additions: 4 ([INTENT], [EVENT], [UNITY] tags)
+- Verification excerpt: // [INTENT] Control logic for initiating AMS unit firmware switches/upgrades.
+- Unity-impact summary:
+  - AMS firmware switch command maps to a C# async method.
+  - Tracking of the switching session handled by the centralized Command Service.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevFilaAmsSettingCtrl.cpp
+- Next recommended Phase 1 task: T246 src/slic3r/GUI/DeviceCore/DevFilaBlackList.cpp
