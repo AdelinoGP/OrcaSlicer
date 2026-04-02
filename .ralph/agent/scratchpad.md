@@ -17,5 +17,6 @@
 - Completed T233: src/slic3r/GUI/dark_mode/UAHMenuBar.hpp.
 - Completed T234: src/slic3r/GUI/DesktopIntegrationDialog.cpp.
 - Completed T235: src/slic3r/GUI/DesktopIntegrationDialog.hpp.
-- Next task: T236 src/slic3r/GUI/DeviceCore/DevBed.cpp.
+- Completed T236: src/slic3r/GUI/DeviceCore/DevBed.cpp.
+- Next task: T237 src/slic3r/GUI/DeviceCore/DevConfig.cpp.
 

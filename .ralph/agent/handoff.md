@@ -1939,3 +1939,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Linux-only platform restriction)
 - Git: annotate: src/slic3r/GUI/DesktopIntegrationDialog.hpp
 - Next recommended Phase 1 task: T236 src/slic3r/GUI/DeviceCore/DevBed.cpp
+
+## Phase 1 - Task T236 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevBed.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevBed.cpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Parsers for heated bed telemetry data from printer JSON status updates.
+- Unity-impact summary:
+  - Telemetry parsing should map to a C# service using Newtonsoft.Json or System.Text.Json.
+  - Bit-packed temperature extraction (V2.0) must be mirrored exactly in C#.
+- Hazards found: 1 (P3: Bit-packed status protocol)
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevBed.cpp
+- Next recommended Phase 1 task: T237 src/slic3r/GUI/DeviceCore/DevConfig.cpp
