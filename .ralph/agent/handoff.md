@@ -2457,3 +2457,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/DragCanvas.hpp
 - Next recommended Phase 1 task: T275 src/slic3r/GUI/DragDropPanel.cpp
+
+## Phase 1 - Task T275 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DragDropPanel.cpp
+- Deliverables: src/slic3r/GUI/DragDropPanel.cpp
+- Substantive additions: 5 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Interactive panel for managing and reordering filament color blocks via drag-and-drop.
+- Unity-impact summary:
+  - Color block reordering maps to Unity UI Toolkit's reorderable ListView or custom drag handlers.
+  - Custom drag data (filament ID, color, type) maps to a C# payload object.
+  - Hex color conversion maps to Unity's ColorUtility.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/DragDropPanel.cpp
+- Next recommended Phase 1 task: T276 src/slic3r/GUI/DragDropPanel.hpp

@@ -86,8 +86,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T272 annotate: src/slic3r/GUI/DownloadProgressDialog.hpp
 - [x] T273 annotate: src/slic3r/GUI/DragCanvas.cpp
 - [x] T274 annotate: src/slic3r/GUI/DragCanvas.hpp
-- [~] T275 annotate: src/slic3r/GUI/DragDropPanel.cpp
-- [ ] T276 annotate: src/slic3r/GUI/DragDropPanel.hpp
+- [x] T275 annotate: src/slic3r/GUI/DragDropPanel.cpp
+- [~] T276 annotate: src/slic3r/GUI/DragDropPanel.hpp
 - [ ] T277 annotate: src/slic3r/GUI/EditGCodeDialog.cpp
 - [ ] T278 annotate: src/slic3r/GUI/EditGCodeDialog.hpp
 - [ ] T279 annotate: src/slic3r/GUI/EncodedFilament.cpp
