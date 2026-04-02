@@ -49,8 +49,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T235 annotate: src/slic3r/GUI/DesktopIntegrationDialog.hpp
 - [x] T236 annotate: src/slic3r/GUI/DeviceCore/DevBed.cpp
 - [x] T237 annotate: src/slic3r/GUI/DeviceCore/DevConfig.cpp
-- [~] T238 annotate: src/slic3r/GUI/DeviceCore/DevConfigUtil.cpp
-- [ ] T239 annotate: src/slic3r/GUI/DeviceCore/DevCtrl.cpp
+- [x] T238 annotate: src/slic3r/GUI/DeviceCore/DevConfigUtil.cpp
+- [~] T239 annotate: src/slic3r/GUI/DeviceCore/DevCtrl.cpp
 - [ ] T240 annotate: src/slic3r/GUI/DeviceCore/DevExtensionTool.cpp
 - [ ] T241 annotate: src/slic3r/GUI/DeviceCore/DevExtruderSystem.cpp
 - [ ] T242 annotate: src/slic3r/GUI/DeviceCore/DevExtruderSystemCtrl.cpp

@@ -19,5 +19,6 @@
 - Completed T235: src/slic3r/GUI/DesktopIntegrationDialog.hpp.
 - Completed T236: src/slic3r/GUI/DeviceCore/DevBed.cpp.
 - Completed T237: src/slic3r/GUI/DeviceCore/DevConfig.cpp.
-- Next task: T238 src/slic3r/GUI/DeviceCore/DevConfigUtil.cpp.
+- Completed T238: src/slic3r/GUI/DeviceCore/DevConfigUtil.cpp.
+- Next task: T239 src/slic3r/GUI/DeviceCore/DevCtrl.cpp.
 

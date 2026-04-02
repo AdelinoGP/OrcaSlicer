@@ -1965,3 +1965,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevConfig.cpp
 - Next recommended Phase 1 task: T238 src/slic3r/GUI/DeviceCore/DevConfigUtil.cpp
+
+## Phase 1 - Task T238 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevConfigUtil.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevConfigUtil.cpp
+- Substantive additions: 4 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Utilities for discovering and loading printer-specific JSON configuration files from resources.
+- Unity-impact summary:
+  - Resource discovery logic should be moved to a C# PrinterModelService.
+  - wxDir and boost::filesystem replaced by System.IO.Directory and File classes.
+  - JSON parsing remains central to capability and model metadata loading.
+- Hazards found: 1 (P2: wxWidgets/Boost-specific resource discovery)
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevConfigUtil.cpp
+- Next recommended Phase 1 task: T239 src/slic3r/GUI/DeviceCore/DevCtrl.cpp
