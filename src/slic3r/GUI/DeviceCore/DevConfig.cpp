@@ -1,3 +1,8 @@
+// [ANNOTATED]
+// [INTENT] Parsers for printer capability configuration data (chamber, AI monitoring, calibration features).
+// [STATE] Populates capability flags used to dynamically show/hide or enable/disable GUI components.
+// [UNITY] Map to a C# capability model used by the UI layer to bind feature visibility.
+
 #include <nlohmann/json.hpp>
 
 #include "DevConfig.h"
@@ -5,26 +10,22 @@
 
 using namespace nlohmann;
 
-namespace Slic3r
-{
+namespace Slic3r {
 
 void DevConfig::ParseConfig(const json& print_json)
 {
     ParseChamberConfig(print_json);
     ParsePrintOptionsConfig(print_json);
     ParseCalibrationConfig(print_json);
-
 }
 
 void DevConfig::ParseChamberConfig(const json& print_json)
 {
     DevJsonValParser::ParseVal(print_json, "support_chamber", m_has_chamber);
     DevJsonValParser::ParseVal(print_json, "support_chamber_temp_edit", m_support_chamber_edit);
-    if (m_support_chamber_edit)
-    {
-        if (print_json.contains("support_chamber_temp_edit_range"))
-        {
-            const auto &support_champer_range = print_json["support_chamber_temp_edit_range"];
+    if (m_support_chamber_edit) {
+        if (print_json.contains("support_chamber_temp_edit_range")) {
+            const auto& support_champer_range = print_json["support_chamber_temp_edit_range"];
             if (support_champer_range.is_array() && support_champer_range.size() > 1) {
                 m_chamber_temp_edit_min = support_champer_range[0];
                 m_chamber_temp_edit_max = support_champer_range[1];
@@ -53,4 +54,4 @@ void DevConfig::ParseCalibrationConfig(const json& print_json)
     DevJsonValParser::ParseVal(print_json, "support_clump_position_calibration", m_support_calibration_clump_pos);
 }
 
-}
+} // namespace Slic3r

@@ -1952,3 +1952,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P3: Bit-packed status protocol)
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevBed.cpp
 - Next recommended Phase 1 task: T237 src/slic3r/GUI/DeviceCore/DevConfig.cpp
+
+## Phase 1 - Task T237 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevConfig.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevConfig.cpp
+- Substantive additions: 4 ([INTENT], [STATE], [UNITY] tags)
+- Verification excerpt: // [INTENT] Parsers for printer capability configuration data (chamber, AI monitoring, calibration features).
+- Unity-impact summary:
+  - Capability model should map to a C# class used for feature-flagging in the UI.
+  - Parsing logic should be moved to a Telemetry or Configuration service.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevConfig.cpp
+- Next recommended Phase 1 task: T238 src/slic3r/GUI/DeviceCore/DevConfigUtil.cpp
