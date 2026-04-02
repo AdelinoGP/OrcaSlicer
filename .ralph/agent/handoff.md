@@ -1816,3 +1816,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 2 (P2: High coupling with Preset implementation; P2: Mixed pointer ownership)
 - Git: annotate: src/slic3r/GUI/CreatePresetsDialog.hpp
 - Next recommended Phase 1 task: T227 src/slic3r/GUI/DailyTips.cpp
+
+## Phase 1 - Task T227 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DailyTips.cpp
+- Deliverables: src/slic3r/GUI/DailyTips.cpp
+- Substantive additions: 5 ([INTENT], [STATE], [OPENGL], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Implements the Daily Tips overlay and modal window using Dear ImGui.
+- Unity-impact summary:
+  - HUD overlay and modal window map to Unity UI (Canvas) or UI Toolkit.
+  - Immediate-mode ImGui rendering replaced with retained UI components.
+  - Tip metadata and images managed via ScriptableObjects and Addressables.
+  - Multi-language text wrapping handled natively by TextMeshPro.
+- Hazards found: 1 (P2: Manual CJK text wrapping via transient wxWidgets Label)
+- Git: annotate: src/slic3r/GUI/DailyTips.cpp
+- Next recommended Phase 1 task: T228 src/slic3r/GUI/DailyTips.hpp

@@ -38,8 +38,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T224 annotate: src/slic3r/GUI/ConnectPrinter.hpp
 - [x] T225 annotate: src/slic3r/GUI/CreatePresetsDialog.cpp
 - [x] T226 annotate: src/slic3r/GUI/CreatePresetsDialog.hpp
-- [~] T227 annotate: src/slic3r/GUI/DailyTips.cpp
-- [ ] T228 annotate: src/slic3r/GUI/DailyTips.hpp
+- [x] T227 annotate: src/slic3r/GUI/DailyTips.cpp
+- [~] T228 annotate: src/slic3r/GUI/DailyTips.hpp
 - [ ] T229 annotate: src/slic3r/GUI/dark_mode.cpp
 - [ ] T230 annotate: src/slic3r/GUI/dark_mode/dark_mode.hpp
 - [ ] T231 annotate: src/slic3r/GUI/dark_mode.hpp
