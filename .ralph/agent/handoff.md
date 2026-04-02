@@ -2373,3 +2373,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Manual range-based resume and temp file logic)
 - Git: annotate: src/slic3r/GUI/DownloaderFileGet.cpp
 - Next recommended Phase 1 task: T269 src/slic3r/GUI/DownloaderFileGet.hpp
+
+## Phase 1 - Task T269 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DownloaderFileGet.hpp
+- Deliverables: src/slic3r/GUI/DownloaderFileGet.hpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Public interface for the low-level file retrieval service and its associated lifecycle events.
+- Unity-impact summary:
+  - Public interface maps to a C# IFileDownloader or DownloadTask interface.
+  - wxWidgets events replaced by C# event delegates or IObservable progress notifications.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/DownloaderFileGet.hpp
+- Next recommended Phase 1 task: T270 src/slic3r/GUI/Downloader.hpp

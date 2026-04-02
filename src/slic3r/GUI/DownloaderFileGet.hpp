@@ -1,3 +1,9 @@
+// [ANNOTATED]
+// [INTENT] Public interface for the low-level file retrieval service and its associated lifecycle events.
+// [STATE] Uses a PIMPL pattern to manage thread-safe download state and curl handles.
+// [UNITY] Map to a C# IFileDownloader interface. Replace wxDECLARE_EVENT with C# delegates or IObservable.
+// [PORTING_HAZARD:P3] URL utility methods (escape_url, is_subdomain) must be ported to C# static helpers.
+
 #ifndef slic3r_DownloaderFileGet_hpp_
 #define slic3r_DownloaderFileGet_hpp_
 
@@ -9,24 +15,26 @@
 #include <wx/frame.h>
 #include <boost/filesystem.hpp>
 
-namespace Slic3r {
-namespace GUI {
-class FileGet : public std::enable_shared_from_this<FileGet> {
+namespace Slic3r { namespace GUI {
+class FileGet : public std::enable_shared_from_this<FileGet>
+{
 private:
-	struct priv;
-public:
-	FileGet(int ID, std::string url, const std::string& filename, wxEvtHandler* evt_handler,const boost::filesystem::path& dest_folder);
-	FileGet(FileGet&& other);
-	~FileGet();
+    struct priv;
 
-	void get();
-	void cancel();
-	void pause();
-	void resume();
-	static std::string	escape_url(const std::string& url);
-	static bool			is_subdomain(const std::string& url, const std::string& domain);
+public:
+    FileGet(int ID, std::string url, const std::string& filename, wxEvtHandler* evt_handler, const boost::filesystem::path& dest_folder);
+    FileGet(FileGet&& other);
+    ~FileGet();
+
+    void               get();
+    void               cancel();
+    void               pause();
+    void               resume();
+    static std::string escape_url(const std::string& url);
+    static bool        is_subdomain(const std::string& url, const std::string& domain);
+
 private:
-	std::unique_ptr<priv> p;
+    std::unique_ptr<priv> p;
 };
 // int = DOWNLOAD ID; string = file path
 wxDECLARE_EVENT(EVT_DWNLDR_FILE_COMPLETE, wxCommandEvent);
@@ -40,6 +48,5 @@ wxDECLARE_EVENT(EVT_DWNLDR_FILE_NAME_CHANGE, wxCommandEvent);
 wxDECLARE_EVENT(EVT_DWNLDR_FILE_PAUSED, wxCommandEvent);
 // int = DOWNLOAD ID;
 wxDECLARE_EVENT(EVT_DWNLDR_FILE_CANCELED, wxCommandEvent);
-}
-}
+}} // namespace Slic3r::GUI
 #endif

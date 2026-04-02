@@ -49,5 +49,6 @@
 - Completed T266: src/slic3r/GUI/DeviceTab/uiDeviceUpdateVersion.cpp.
 - Completed T267: src/slic3r/GUI/Downloader.cpp.
 - Completed T268: src/slic3r/GUI/DownloaderFileGet.cpp.
-- Next task: T269 src/slic3r/GUI/DownloaderFileGet.hpp.
+- Completed T269: src/slic3r/GUI/DownloaderFileGet.hpp.
+- Next task: T270 src/slic3r/GUI/Downloader.hpp.
 
