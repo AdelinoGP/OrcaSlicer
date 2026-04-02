@@ -33,7 +33,7 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T219 annotate: src/slic3r/GUI/ConfigManipulation.hpp
 - [x] T220 annotate: src/slic3r/GUI/ConfigWizard.cpp
 - [x] T221 annotate: src/slic3r/GUI/ConfigWizard.hpp
-- [ ] T222 annotate: src/slic3r/GUI/ConfigWizard_private.hpp
+- [x] T222 annotate: src/slic3r/GUI/ConfigWizard_private.hpp
 - [ ] T223 annotate: src/slic3r/GUI/ConnectPrinter.cpp
 - [ ] T224 annotate: src/slic3r/GUI/ConnectPrinter.hpp
 - [ ] T225 annotate: src/slic3r/GUI/CreatePresetsDialog.cpp

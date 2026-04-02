@@ -1746,3 +1746,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Tight coupling to Pimpl-managed wxWidgets pages)
 - Git: annotate: src/slic3r/GUI/ConfigWizard.hpp
 - Next recommended Phase 1 task: T222 annotate: src/slic3r/GUI/ConfigWizard_private.hpp
+
+## Phase 1 - Task T222 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ConfigWizard_private.hpp
+- Deliverables: src/slic3r/GUI/ConfigWizard_private.hpp
+- Substantive additions: 8 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Main implementation class for ConfigWizard, managing state and page transitions.
+- Unity-impact summary:
+  - Wizard state management should map to a central WizardController MonoBehaviour.
+  - GUI pages (Welcome, Printers, Materials, etc.) map to UI Toolkit VisualElement prefabs.
+  - Page navigation and index map to a ListView or custom vertical navigation control.
+- Hazards found: 1 (P2: Wizard finalization involves applying complex config changes to global app state)
+- Git: annotate: src/slic3r/GUI/ConfigWizard_private.hpp
+- Next recommended Phase 1 task: T223 src/slic3r/GUI/ConnectPrinter.cpp
