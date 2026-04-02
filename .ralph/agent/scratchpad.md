@@ -30,5 +30,6 @@
 - Completed T246: src/slic3r/GUI/DeviceCore/DevFilaBlackList.cpp.
 - Completed T247: src/slic3r/GUI/DeviceCore/DevFilaSystem.cpp.
 - Completed T248: src/slic3r/GUI/DeviceCore/DevFilaSystemCtrl.cpp.
-- Next task: T249 src/slic3r/GUI/DeviceCore/DevFirmware.cpp.
+- Completed T249: src/slic3r/GUI/DeviceCore/DevFirmware.cpp (skip-trivial).
+- Next task: T250 src/slic3r/GUI/DeviceCore/DevHMS.cpp.
 

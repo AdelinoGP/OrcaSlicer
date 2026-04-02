@@ -2115,3 +2115,14 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevFilaSystemCtrl.cpp
 - Next recommended Phase 1 task: T249 src/slic3r/GUI/DeviceCore/DevFirmware.cpp
+
+## Phase 1 - Task T249 complete
+- Task type: skip-trivial
+- File: src/slic3r/GUI/DeviceCore/DevFirmware.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevFirmware.cpp
+- Substantive additions: none ([SKIP_TRIVIAL] tag only)
+- Verification excerpt: // [SKIP_TRIVIAL] 2-line file with no implementation logic or state.
+- Unity-impact summary: none
+- Hazards found: none
+- Git: skip-trivial: src/slic3r/GUI/DeviceCore/DevFirmware.cpp
+- Next recommended Phase 1 task: T250 src/slic3r/GUI/DeviceCore/DevHMS.cpp
