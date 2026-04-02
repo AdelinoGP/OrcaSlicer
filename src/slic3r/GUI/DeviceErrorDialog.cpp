@@ -1,3 +1,11 @@
+// [ANNOTATED]
+// [INTENT] Implementation of the dynamic printer error/HMS dialog with context-sensitive action buttons.
+// [STATE] Manages dynamic button visibility, error code display, and asynchronous loading of troubleshooting images.
+// [EVENT] Dispatches a wide array of printer recovery commands (resume, stop, ams_control) based on button selection.
+// [UNITY] Map to a Unity UI Toolkit ModalWindow. Use a dynamic button factory to populate actions from the error metadata.
+// [UNITY] Use UnityWebRequestTexture for async troubleshooting image retrieval.
+// [PORTING_HAZARD:P2] Monolithic command dispatcher (on_button_click) couples UI state to network commands; refactor to a Command pattern in C#.
+
 #include "DeviceErrorDialog.hpp"
 #include "HMS.hpp"
 
@@ -6,24 +14,15 @@
 #include "MainFrame.hpp"
 #include "ReleaseNote.hpp"
 
-namespace Slic3r {
-namespace GUI
-{
+namespace Slic3r { namespace GUI {
 
 static std::unordered_set<std::string> message_containing_retry{
-    "0701-8004",
-    "0701-8005",
-    "0701-8007",
-    "0701-8012",
-    "0702-8012",
-    "0703-8012",
-    "07FF-8012",
-    "07FF-8013",
+    "0701-8004", "0701-8005", "0701-8007", "0701-8012", "0702-8012", "0703-8012", "07FF-8012", "07FF-8013",
 };
 
-
-DeviceErrorDialog::DeviceErrorDialog(MachineObject* obj, wxWindow* parent, wxWindowID id, const wxString& title, const wxPoint& pos, const wxSize& size, long style)
-    :DPIDialog(parent, id, title, pos, size, style), m_obj(obj)
+DeviceErrorDialog::DeviceErrorDialog(
+    MachineObject* obj, wxWindow* parent, wxWindowID id, const wxString& title, const wxPoint& pos, const wxSize& size, long style)
+    : DPIDialog(parent, id, title, pos, size, style), m_obj(obj)
 {
     std::string icon_path = (boost::format("%1%/images/OrcaSlicerTitle.ico") % resources_dir()).str();
     SetIcon(wxIcon(encode_path(icon_path.c_str()), wxBITMAP_TYPE_ICO));
@@ -31,7 +30,7 @@ DeviceErrorDialog::DeviceErrorDialog(MachineObject* obj, wxWindow* parent, wxWin
 
     SetTitle(_L("Error"));
 
-    auto        m_line_top = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(350), 1));
+    auto m_line_top = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(350), 1));
     m_line_top->SetBackgroundColour(wxColour(166, 169, 170));
 
     m_scroll_area = new wxScrolledWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxVSCROLL);
@@ -42,14 +41,14 @@ DeviceErrorDialog::DeviceErrorDialog(MachineObject* obj, wxWindow* parent, wxWin
     wxBoxSizer* text_sizer = new wxBoxSizer(wxVERTICAL);
 
     m_error_msg_label = new Label(m_scroll_area, wxEmptyString, LB_AUTO_WRAP);
-    m_error_picture = new wxStaticBitmap(m_scroll_area, wxID_ANY, wxBitmap(), wxDefaultPosition, wxSize(FromDIP(300), FromDIP(180)));
+    m_error_picture   = new wxStaticBitmap(m_scroll_area, wxID_ANY, wxBitmap(), wxDefaultPosition, wxSize(FromDIP(300), FromDIP(180)));
 
-    //Label* dev_name = new Label(m_scroll_area, wxString::FromUTF8(obj->dev_name) + ":", LB_AUTO_WRAP);
-    //dev_name->SetMaxSize(wxSize(FromDIP(300), -1));
-    //dev_name->SetMinSize(wxSize(FromDIP(300), -1));
-    //dev_name->Wrap(FromDIP(300));
-    //text_sizer->Add(dev_name, 0, wxALIGN_CENTER, FromDIP(5));
-    //text_sizer->AddSpacer(5);
+    // Label* dev_name = new Label(m_scroll_area, wxString::FromUTF8(obj->dev_name) + ":", LB_AUTO_WRAP);
+    // dev_name->SetMaxSize(wxSize(FromDIP(300), -1));
+    // dev_name->SetMinSize(wxSize(FromDIP(300), -1));
+    // dev_name->Wrap(FromDIP(300));
+    // text_sizer->Add(dev_name, 0, wxALIGN_CENTER, FromDIP(5));
+    // text_sizer->AddSpacer(5);
     text_sizer->Add(m_error_picture, 0, wxALIGN_CENTER, FromDIP(5));
     text_sizer->AddSpacer(10);
     text_sizer->Add(m_error_msg_label, 0, wxALIGN_CENTER, FromDIP(5));
@@ -60,7 +59,7 @@ DeviceErrorDialog::DeviceErrorDialog(MachineObject* obj, wxWindow* parent, wxWin
     m_scroll_area->SetSizer(text_sizer);
 
     auto bottom_sizer = new wxBoxSizer(wxVERTICAL);
-    m_sizer_button = new wxBoxSizer(wxVERTICAL);
+    m_sizer_button    = new wxBoxSizer(wxVERTICAL);
     bottom_sizer->Add(m_sizer_button, 0, wxEXPAND | wxRIGHT | wxLEFT, 0);
 
     wxBoxSizer* m_center_sizer = new wxBoxSizer(wxVERTICAL);
@@ -84,16 +83,17 @@ DeviceErrorDialog::DeviceErrorDialog(MachineObject* obj, wxWindow* parent, wxWin
     wxGetApp().UpdateDlgDarkUI(this);
 
     Bind(wxEVT_WEBREQUEST_STATE, &DeviceErrorDialog::on_webrequest_state, this);
-    Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent &e){
-        if (m_obj) { m_obj->command_clean_print_error_uiop(m_obj->print_error); }
+    Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& e) {
+        if (m_obj) {
+            m_obj->command_clean_print_error_uiop(m_obj->print_error);
+        }
         e.Skip();
     });
 }
 
 DeviceErrorDialog::~DeviceErrorDialog()
 {
-    if (web_request.IsOk() && web_request.GetState() == wxWebRequest::State_Active)
-    {
+    if (web_request.IsOk() && web_request.GetState() == wxWebRequest::State_Active) {
         BOOST_LOG_TRIVIAL(info) << "web_request: cancelled";
         web_request.Cancel();
     }
@@ -103,12 +103,10 @@ DeviceErrorDialog::~DeviceErrorDialog()
 void DeviceErrorDialog::on_webrequest_state(wxWebRequestEvent& evt)
 {
     BOOST_LOG_TRIVIAL(trace) << "monitor: monitor_panel web request state = " << evt.GetState();
-    switch (evt.GetState())
-    {
-    case wxWebRequest::State_Completed:
-    {
-        wxImage img(*evt.GetResponse().GetStream());
-        wxImage resize_img = img.Scale(FromDIP(320), FromDIP(180), wxIMAGE_QUALITY_HIGH);
+    switch (evt.GetState()) {
+    case wxWebRequest::State_Completed: {
+        wxImage  img(*evt.GetResponse().GetStream());
+        wxImage  resize_img       = img.Scale(FromDIP(320), FromDIP(180), wxIMAGE_QUALITY_HIGH);
         wxBitmap error_prompt_pic = resize_img;
         m_error_picture->SetBitmap(error_prompt_pic);
         Layout();
@@ -118,8 +116,7 @@ void DeviceErrorDialog::on_webrequest_state(wxWebRequestEvent& evt)
     }
     case wxWebRequest::State_Failed:
     case wxWebRequest::State_Cancelled:
-    case wxWebRequest::State_Unauthorized:
-    {
+    case wxWebRequest::State_Unauthorized: {
         m_error_picture->SetBitmap(wxBitmap());
         break;
     }
@@ -131,8 +128,7 @@ void DeviceErrorDialog::on_webrequest_state(wxWebRequestEvent& evt)
 
 void DeviceErrorDialog::init_button(ActionButton style, wxString buton_text)
 {
-    if (btn_bg_white.count() == 0)
-    {
+    if (btn_bg_white.count() == 0) {
         btn_bg_white = StateColor(std::pair<wxColour, int>(wxColour(206, 206, 206), StateColor::Pressed),
                                   std::pair<wxColour, int>(wxColour(238, 238, 238), StateColor::Hovered),
                                   std::pair<wxColour, int>(*wxWHITE, StateColor::Normal));
@@ -148,11 +144,10 @@ void DeviceErrorDialog::init_button(ActionButton style, wxString buton_text)
     print_error_button->SetCornerRadius(FromDIP(5));
     print_error_button->Hide();
     m_button_list[style] = print_error_button;
-    m_button_list[style]->Bind(wxEVT_LEFT_DOWN, [this, style](wxMouseEvent& e)
-        {
-            this->on_button_click(style);
-            e.Skip();
-        });
+    m_button_list[style]->Bind(wxEVT_LEFT_DOWN, [this, style](wxMouseEvent& e) {
+        this->on_button_click(style);
+        e.Skip();
+    });
 }
 
 void DeviceErrorDialog::init_button_list()
@@ -160,7 +155,7 @@ void DeviceErrorDialog::init_button_list()
     init_button(RESUME_PRINTING, _L("Resume Printing"));
     init_button(RESUME_PRINTING_DEFECTS, _L("Resume (defects acceptable)"));
     init_button(RESUME_PRINTING_PROBELM_SOLVED, _L("Resume (problem solved)"));
-    init_button(STOP_PRINTING, _L("Stop Printing"));// pop up recheck dialog?
+    init_button(STOP_PRINTING, _L("Stop Printing")); // pop up recheck dialog?
     init_button(CHECK_ASSISTANT, _L("Check Assistant"));
     init_button(FILAMENT_EXTRUDED, _L("Filament Extruded, Continue"));
     init_button(RETRY_FILAMENT_EXTRUDED, _L("Not Extruded Yet, Retry"));
@@ -187,7 +182,9 @@ void DeviceErrorDialog::init_button_list()
 
 void DeviceErrorDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
-    for (auto used_button : m_used_button) { used_button->Rescale();}
+    for (auto used_button : m_used_button) {
+        used_button->Rescale();
+    }
     wxGetApp().UpdateDlgDarkUI(this);
     Refresh();
 }
@@ -203,18 +200,24 @@ wxString DeviceErrorDialog::parse_error_level(int error_code)
     }
 }
 
-static const std::unordered_set<string> s_jump_liveview_error_codes = { "0300-8003", "0300-8002", "0300-800A"};
-wxString DeviceErrorDialog::show_error_code(int error_code)
+static const std::unordered_set<string> s_jump_liveview_error_codes = {"0300-8003", "0300-8002", "0300-800A"};
+wxString                                DeviceErrorDialog::show_error_code(int error_code)
 {
-    if (m_error_code == error_code) { return wxEmptyString;}
-    if (wxGetApp().get_hms_query()->is_internal_error(m_obj, error_code)) { return wxEmptyString;}
+    if (m_error_code == error_code) {
+        return wxEmptyString;
+    }
+    if (wxGetApp().get_hms_query()->is_internal_error(m_obj, error_code)) {
+        return wxEmptyString;
+    }
 
     /* error code str*/
     std::string error_str = m_obj->get_error_code_str(error_code);
 
     /* error code message*/
     wxString error_msg = wxGetApp().get_hms_query()->query_print_error_msg(m_obj, error_code);
-    if (error_msg.IsEmpty()) { error_msg = _L("Unknown error.");}
+    if (error_msg.IsEmpty()) {
+        error_msg = _L("Unknown error.");
+    }
 
     /* parse error level */
     wxString error_level = parse_error_level(error_code);
@@ -230,7 +233,9 @@ wxString DeviceErrorDialog::show_error_code(int error_code)
         /* action buttons*/
         std::vector<int> used_button;
         wxString         error_image_url = wxGetApp().get_hms_query()->query_print_image_action(m_obj, error_code, used_button);
-        if (s_jump_liveview_error_codes.count(error_str)) { used_button.emplace_back(DeviceErrorDialog::JUMP_TO_LIVEVIEW); } // special case
+        if (s_jump_liveview_error_codes.count(error_str)) {
+            used_button.emplace_back(DeviceErrorDialog::JUMP_TO_LIVEVIEW);
+        } // special case
 
         /* do update*/
         update_contents(error_level, error_msg, error_str, error_image_url, used_button);
@@ -255,9 +260,12 @@ std::vector<int> DeviceErrorDialog::convert_to_pseudo_buttons(std::string error_
     return pseudo_button;
 }
 
-void DeviceErrorDialog::update_contents(const wxString& title, const wxString& text, const wxString& error_code, const wxString& image_url, const std::vector<int>& btns)
+void DeviceErrorDialog::update_contents(
+    const wxString& title, const wxString& text, const wxString& error_code, const wxString& image_url, const std::vector<int>& btns)
 {
-    if (error_code.empty()) { return; }
+    if (error_code.empty()) {
+        return;
+    }
 
     /* buttons*/
     {
@@ -265,15 +273,13 @@ void DeviceErrorDialog::update_contents(const wxString& title, const wxString& t
         m_used_button.clear();
 
         // Show the used buttons
-        bool need_remove_close_btn = false;
+        bool                    need_remove_close_btn = false;
         std::unordered_set<int> shown_btns;
-        for (int button_id : btns)
-        {
+        for (int button_id : btns) {
             need_remove_close_btn |= (button_id == REMOVE_CLOSE_BTN); // special case, do not show close button
 
             auto iter = m_button_list.find(button_id);
-            if (iter != m_button_list.end())
-            {
+            if (iter != m_button_list.end()) {
                 m_sizer_button->Add(iter->second, 0, wxALL, FromDIP(5));
                 iter->second->Show();
                 m_used_button.insert(iter->second);
@@ -281,48 +287,41 @@ void DeviceErrorDialog::update_contents(const wxString& title, const wxString& t
         }
 
         // Special case, do not show close button
-        if (need_remove_close_btn)
-        {
+        if (need_remove_close_btn) {
             SetWindowStyle(GetWindowStyle() & ~wxCLOSE_BOX);
-        }
-        else
-        {
+        } else {
             SetWindowStyle(GetWindowStyle() | wxCLOSE_BOX);
         }
 
         // Hide unused buttons
-        for (const auto& pair : m_button_list)
-        {
-            if (m_used_button.count(pair.second) == 0) { pair.second->Hide(); }
+        for (const auto& pair : m_button_list) {
+            if (m_used_button.count(pair.second) == 0) {
+                pair.second->Hide();
+            }
         }
     }
 
     /* image */
-    if (!image_url.empty())
-    {
+    if (!image_url.empty()) {
         const wxImage& img = wxGetApp().get_hms_query()->query_image_from_local(image_url);
-        if (!img.IsOk() && image_url.Contains("http"))
-        {
+        if (!img.IsOk() && image_url.Contains("http")) {
             web_request = wxWebSession::GetDefault().CreateRequest(this, image_url);
             BOOST_LOG_TRIVIAL(trace) << "monitor: create new webrequest, state = " << web_request.GetState();
-            if (web_request.GetState() == wxWebRequest::State_Idle) web_request.Start();
+            if (web_request.GetState() == wxWebRequest::State_Idle)
+                web_request.Start();
             BOOST_LOG_TRIVIAL(trace) << "monitor: start new webrequest, state = " << web_request.GetState();
-        }
-        else
-        {
+        } else {
             const wxImage& resize_img = img.Scale(FromDIP(320), FromDIP(180), wxIMAGE_QUALITY_HIGH);
             m_error_picture->SetBitmap(wxBitmap(resize_img));
         }
 
         m_error_picture->Show();
-    }
-    else
-    {
+    } else {
         m_error_picture->Hide();
     }
 
     /* error code*/
-    const wxString& show_time = wxDateTime::Now().Format("%H%M%d");
+    const wxString& show_time      = wxDateTime::Now().Format("%H%M%d");
     const wxString& error_code_msg = wxString::Format("[%S %S]", error_code, show_time);
     m_error_code_label->SetMaxSize(wxSize(FromDIP(300), -1));
     m_error_code_label->SetMinSize(wxSize(FromDIP(300), -1));
@@ -340,19 +339,13 @@ void DeviceErrorDialog::update_contents(const wxString& title, const wxString& t
     {
         m_scroll_area->Layout();
         auto text_size = m_error_msg_label->GetBestSize();
-        if (text_size.y < FromDIP(360))
-        {
-            if (!image_url.empty())
-            {
+        if (text_size.y < FromDIP(360)) {
+            if (!image_url.empty()) {
                 m_scroll_area->SetMinSize(wxSize(FromDIP(320), text_size.y + FromDIP(220)));
-            }
-            else
-            {
+            } else {
                 m_scroll_area->SetMinSize(wxSize(FromDIP(320), text_size.y + FromDIP(50)));
             }
-        }
-        else
-        {
+        } else {
             m_scroll_area->SetMinSize(wxSize(FromDIP(320), FromDIP(340)));
         }
 
@@ -390,20 +383,20 @@ void DeviceErrorDialog::on_button_click(ActionButton btn_id)
     }
     case DeviceErrorDialog::RETRY_FILAMENT_EXTRUDED: {
         m_obj->command_ams_control("resume");
-        return;// do not hide the dialogs
+        return; // do not hide the dialogs
     }
     case DeviceErrorDialog::CONTINUE: {
         m_obj->command_ams_control("resume");
         break;
     }
     case DeviceErrorDialog::LOAD_VIRTUAL_TRAY: {
-        //m_ams_control->SwitchAms(std::to_string(VIRTUAL_TRAY_MAIN_ID));
-        //on_ams_load_curr();
-        break;/*AP, unknown what it is*/
+        // m_ams_control->SwitchAms(std::to_string(VIRTUAL_TRAY_MAIN_ID));
+        // on_ams_load_curr();
+        break; /*AP, unknown what it is*/
     }
     case DeviceErrorDialog::OK_BUTTON: {
         m_obj->command_clean_print_error(m_obj->subtask_id_, m_error_code);
-        break;/*do nothing*/
+        break; /*do nothing*/
     }
     case DeviceErrorDialog::FILAMENT_LOAD_RESUME: {
         m_obj->command_hms_resume(std::to_string(m_error_code), m_obj->job_id_);
@@ -446,10 +439,10 @@ void DeviceErrorDialog::on_button_click(ActionButton btn_id)
         break;
     }
     case DeviceErrorDialog::PROCEED: {
-        if(!m_action_json.is_null()){
-            try{
+        if (!m_action_json.is_null()) {
+            try {
                 m_obj->command_ack_proceed(m_action_json);
-            } catch(...){
+            } catch (...) {
                 BOOST_LOG_TRIVIAL(error) << "DeviceErrorDialog: Action Proceed missing params.";
             }
         }
@@ -492,5 +485,4 @@ void DeviceErrorDialog::on_button_click(ActionButton btn_id)
     Hide();
 }
 
-}
-} // namespace Slic3r::GUI
+}} // namespace Slic3r::GUI

@@ -2260,3 +2260,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Telemetry bit-masking logic sensitivity)
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevUtil.cpp
 - Next recommended Phase 1 task: T261 src/slic3r/GUI/DeviceErrorDialog.cpp
+
+## Phase 1 - Task T261 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceErrorDialog.cpp
+- Deliverables: src/slic3r/GUI/DeviceErrorDialog.cpp
+- Substantive additions: 6 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Implementation of the dynamic printer error/HMS dialog with context-sensitive action buttons.
+- Unity-impact summary:
+  - Complex modal dialog maps to a Unity UI Toolkit ModalWindow.
+  - Action buttons are dynamically generated from error metadata (prefabs + factory).
+  - Troubleshooting images loaded asynchronously via UnityWebRequestTexture.
+  - Monolithic button-click dispatcher should be refactored into a Command pattern in C#.
+- Hazards found: 1 (P2: Monolithic command dispatcher coupling)
+- Git: annotate: src/slic3r/GUI/DeviceErrorDialog.cpp
+- Next recommended Phase 1 task: T262 src/slic3r/GUI/DeviceErrorDialog.hpp

@@ -41,5 +41,6 @@
 - Completed T257: src/slic3r/GUI/DeviceCore/DevPrintOptions.cpp.
 - Completed T259: src/slic3r/GUI/DeviceCore/DevStorage.cpp.
 - Completed T260: src/slic3r/GUI/DeviceCore/DevUtil.cpp.
-- Next task: T261 src/slic3r/GUI/DeviceErrorDialog.cpp.
+- Completed T261: src/slic3r/GUI/DeviceErrorDialog.cpp.
+- Next task: T262 src/slic3r/GUI/DeviceErrorDialog.hpp.
 
