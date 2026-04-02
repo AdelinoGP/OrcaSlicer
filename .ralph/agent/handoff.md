@@ -2205,3 +2205,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Heuristic-based slot matching must be mirrored for identical behavior)
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevMapping.cpp
 - Next recommended Phase 1 task: T256 src/slic3r/GUI/DeviceCore/DevNozzleSystem.cpp
+
+## Phase 1 - Task T256 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevNozzleSystem.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevNozzleSystem.cpp
+- Substantive additions: 4 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Management and telemetry parsing for the printer's nozzle system.
+- Unity-impact summary:
+  - Nozzle state model maps to a C# NozzleService.
+  - Nozzle type/flow enums mirrored in C# for consistent type safety.
+  - Diameter rounding and bit-packed toolhead flags must be accurately ported.
+- Hazards found: 1 (P2: String-to-enum parsing and bit-field extraction logic)
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevNozzleSystem.cpp
+- Next recommended Phase 1 task: T257 src/slic3r/GUI/DeviceCore/DevPrintOptions.cpp
