@@ -12,5 +12,6 @@
 - Completed T228: src/slic3r/GUI/DailyTips.hpp.
 - Completed T229: src/slic3r/GUI/dark_mode.cpp.
 - Completed T230: src/slic3r/GUI/dark_mode/dark_mode.hpp.
-- Next task: T231 src/slic3r/GUI/dark_mode.hpp.
+- Completed T231: src/slic3r/GUI/dark_mode.hpp.
+- Next task: T232 src/slic3r/GUI/dark_mode/IatHook.hpp.
 
