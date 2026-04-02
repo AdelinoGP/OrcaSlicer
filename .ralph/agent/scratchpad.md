@@ -44,5 +44,6 @@
 - Completed T261: src/slic3r/GUI/DeviceErrorDialog.cpp.
 - Completed T262: src/slic3r/GUI/DeviceErrorDialog.hpp.
 - Completed T263: src/slic3r/GUI/DeviceManager.cpp.
-- Next task: T264 src/slic3r/GUI/DeviceManager.hpp.
+- Completed T264: src/slic3r/GUI/DeviceManager.hpp.
+- Next task: T265 src/slic3r/GUI/DeviceTab/uiAmsHumidityPopup.cpp.
 
