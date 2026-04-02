@@ -1885,3 +1885,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P1: Deep coupling to Win32 types)
 - Git: annotate: src/slic3r/GUI/dark_mode.hpp
 - Next recommended Phase 1 task: T232 src/slic3r/GUI/dark_mode/IatHook.hpp
+
+## Phase 1 - Task T232 complete
+- Task type: annotate
+- File: src/slic3r/GUI/dark_mode/IatHook.hpp
+- Deliverables: src/slic3r/GUI/dark_mode/IatHook.hpp
+- Substantive additions: 4 ([INTENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Low-level Windows runtime binary patching utility for hooking the Import Address Table (IAT).
+- Unity-impact summary:
+  - Completely redundant in Unity.
+  - Low-level PE binary traversal and patching is not applicable to managed C#.
+- Hazards found: 1 (P1: Deep reliance on Windows binary internals)
+- Git: annotate: src/slic3r/GUI/dark_mode/IatHook.hpp
+- Next recommended Phase 1 task: T233 src/slic3r/GUI/dark_mode/UAHMenuBar.hpp
