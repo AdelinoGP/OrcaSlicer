@@ -7,5 +7,6 @@
 - Completed T223: src/slic3r/GUI/ConnectPrinter.cpp.
 - Completed T224: src/slic3r/GUI/ConnectPrinter.hpp.
 - Completed T225: src/slic3r/GUI/CreatePresetsDialog.cpp.
-- Next task: T226 src/slic3r/GUI/CreatePresetsDialog.hpp.
+- Completed T226: src/slic3r/GUI/CreatePresetsDialog.hpp.
+- Next task: T227 src/slic3r/GUI/DailyTips.cpp.
 

@@ -1802,3 +1802,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 3 (P2: Direct mutation of global PresetBundle; P2: Static vendor/model data coupling; P2: OpenSSL/MD5 dependencies for ID generation)
 - Git: annotate: src/slic3r/GUI/CreatePresetsDialog.cpp
 - Next recommended Phase 1 task: T226 src/slic3r/GUI/CreatePresetsDialog.hpp
+
+## Phase 1 - Task T226 complete
+- Task type: annotate
+- File: src/slic3r/GUI/CreatePresetsDialog.hpp
+- Deliverables: src/slic3r/GUI/CreatePresetsDialog.hpp
+- Substantive additions: 6 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Declarations for a suite of dialogs managing printer and filament presets.
+- Unity-impact summary:
+  - Header maps to multiple C# class declarations for preset-management modals.
+  - Internal structs and enums should be ported to C# to maintain type safety.
+  - Raw pointers to Presets should be replaced with references to a centralized PresetService.
+- Hazards found: 2 (P2: High coupling with Preset implementation; P2: Mixed pointer ownership)
+- Git: annotate: src/slic3r/GUI/CreatePresetsDialog.hpp
+- Next recommended Phase 1 task: T227 src/slic3r/GUI/DailyTips.cpp
