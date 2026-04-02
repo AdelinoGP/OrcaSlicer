@@ -1694,3 +1694,29 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 0
 - Git: skip-trivial: src/slic3r/GUI/ConfigExceptions.hpp
 - Next recommended Phase 1 task: T218 annotate: src/slic3r/GUI/ConfigManipulation.cpp
+
+## Phase 1 - Task T218 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ConfigManipulation.cpp
+- Deliverables: src/slic3r/GUI/ConfigManipulation.cpp
+- Substantive additions: 2 annotation blocks
+- Verification excerpt: [UNITY] This is a prime candidate for a Data-Driven visibility system.
+- Unity-impact summary:
+  - Massive visibility and validation logic should move to a C# service.
+  - Replace manual toggle calls with a data-binding system.
+- Hazards found: 1 (P2: Massive tight coupling between logic and UI state)
+- Git: annotate: src/slic3r/GUI/ConfigManipulation.cpp
+- Next recommended Phase 1 task: T219 annotate: src/slic3r/GUI/ConfigManipulation.hpp
+
+## Phase 1 - Task T219 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ConfigManipulation.hpp
+- Deliverables: src/slic3r/GUI/ConfigManipulation.hpp
+- Substantive additions: 1 class-level annotation block
+- Verification excerpt: [INTENT] ConfigManipulation is a controller for managing configuration inter-dependencies and UI state.
+- Unity-impact summary:
+  - Refactor to a ScriptableObject or persistent Service.
+  - Decouple from wxWidgets modal dialogs.
+- Hazards found: 1 (P2: Tight coupling to wxWidgets MessageDialog)
+- Git: annotate: src/slic3r/GUI/ConfigManipulation.hpp
+- Next recommended Phase 1 task: T220 annotate: src/slic3r/GUI/ConfigWizard.cpp
