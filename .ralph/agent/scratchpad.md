@@ -56,5 +56,6 @@
 - Completed T273: src/slic3r/GUI/DragCanvas.cpp.
 - Completed T274: src/slic3r/GUI/DragCanvas.hpp.
 - Completed T275: src/slic3r/GUI/DragDropPanel.cpp.
-- Next task: T276 src/slic3r/GUI/DragDropPanel.hpp.
+- Completed T276: src/slic3r/GUI/DragDropPanel.hpp.
+- Next task: T277 src/slic3r/GUI/EditGCodeDialog.cpp.
 

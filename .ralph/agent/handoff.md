@@ -2471,3 +2471,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/DragDropPanel.cpp
 - Next recommended Phase 1 task: T276 src/slic3r/GUI/DragDropPanel.hpp
+
+## Phase 1 - Task T276 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DragDropPanel.hpp
+- Deliverables: src/slic3r/GUI/DragDropPanel.hpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Declarations for the interactive filament reordering panel and its individual color chips.
+- Unity-impact summary:
+  - Header declares the management interface for reorderable color blocks.
+  - DragDropPanel maps to a C# Grid Controller.
+  - ColorPanel maps to a MonoBehaviour component on a UI prefab.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/DragDropPanel.hpp
+- Next recommended Phase 1 task: T277 src/slic3r/GUI/EditGCodeDialog.cpp
