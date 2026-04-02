@@ -47,5 +47,6 @@
 - Completed T264: src/slic3r/GUI/DeviceManager.hpp.
 - Completed T265: src/slic3r/GUI/DeviceTab/uiAmsHumidityPopup.cpp.
 - Completed T266: src/slic3r/GUI/DeviceTab/uiDeviceUpdateVersion.cpp.
-- Next task: T267 src/slic3r/GUI/Downloader.cpp.
+- Completed T267: src/slic3r/GUI/Downloader.cpp.
+- Next task: T268 src/slic3r/GUI/DownloaderFileGet.cpp.
 

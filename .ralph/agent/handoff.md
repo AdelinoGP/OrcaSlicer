@@ -2345,3 +2345,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/DeviceTab/uiDeviceUpdateVersion.cpp
 - Next recommended Phase 1 task: T267 src/slic3r/GUI/Downloader.cpp
+
+## Phase 1 - Task T267 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Downloader.cpp
+- Deliverables: src/slic3r/GUI/Downloader.cpp
+- Substantive additions: 5 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Management of remote file downloads and deep-link URL scheme handling (orcaslicer://).
+- Unity-impact summary:
+  - Downloader logic maps to a C# DownloadService using UnityWebRequest.
+  - orcaslicer:// deep-linking handled by Unity's native platform support.
+  - Regex-based protocol parsing mirrored in C# for compatibility.
+- Hazards found: 1 (P2: Multi-slicer protocol regex parsing)
+- Git: annotate: src/slic3r/GUI/Downloader.cpp
+- Next recommended Phase 1 task: T268 src/slic3r/GUI/DownloaderFileGet.cpp
