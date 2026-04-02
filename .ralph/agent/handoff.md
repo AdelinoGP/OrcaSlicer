@@ -1787,3 +1787,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/ConnectPrinter.hpp
 - Next recommended Phase 1 task: T225 src/slic3r/GUI/CreatePresetsDialog.cpp
+
+## Phase 1 - Task T225 complete
+- Task type: annotate
+- File: src/slic3r/GUI/CreatePresetsDialog.cpp
+- Deliverables: src/slic3r/GUI/CreatePresetsDialog.cpp
+- Substantive additions: 15+ ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] This file implements a suite of dialogs for managing (creating, editing, and exporting) printer and filament presets.
+- Unity-impact summary:
+  - Suite of complex modal dialogs should map to Unity UI Toolkit ModalWindows.
+  - Multi-page wizards (CreatePrinter) should use step-based VisualElement navigation.
+  - Static metadata (vendors/models) should be externalized to JSON/ScriptableObjects.
+  - Preset cloning and file system logic (zipping) must be decoupled into a Service layer.
+- Hazards found: 3 (P2: Direct mutation of global PresetBundle; P2: Static vendor/model data coupling; P2: OpenSSL/MD5 dependencies for ID generation)
+- Git: annotate: src/slic3r/GUI/CreatePresetsDialog.cpp
+- Next recommended Phase 1 task: T226 src/slic3r/GUI/CreatePresetsDialog.hpp

@@ -1,32 +1,11 @@
-# Phase 1: GUI File-by-File Annotation for Unity Port Preparation
+# GUI Phase 1 Annotation Scratchpad
 
-## Current Status
-- Session started.
-- Resuming Phase 1 annotation work.
-- Multiple tasks found in `in_progress` state; likely orphans from previous runs.
-- Selecting `task-1773880089-bb01` (T768 annotate: src/slic3r/Utils/IPrinterAgent.hpp) as the next task.
+## 2026-04-02 Orientation
+- Started work on Phase 1 annotation.
+- Reconciled manifest and task list. Found many missing files in markdown (about 356 remaining).
+- Completed T222: src/slic3r/GUI/ConfigWizard_private.hpp.
+- Completed T223: src/slic3r/GUI/ConnectPrinter.cpp.
+- Completed T224: src/slic3r/GUI/ConnectPrinter.hpp.
+- Completed T225: src/slic3r/GUI/CreatePresetsDialog.cpp.
+- Next task: T226 src/slic3r/GUI/CreatePresetsDialog.hpp.
 
-## Plan
-1. Start `task-1773880089-bb01`.
-2. Read `src/slic3r/Utils/IPrinterAgent.hpp`.
-3. Annotate the file according to the Phase 1 standard.
-4. Verify and commit.
-5. Update handoff.
-
-# Phase 1: GUI File-by-File Annotation - src/slic3r/Utils/IPrinterAgent.hpp
-
-## Plan
-1. Start task for `src/slic3r/Utils/IPrinterAgent.hpp`.
-2. Read the file.
-3. Annotate with [INTENT], [STATE], [EVENT], [UNITY], etc.
-4. Update handoff and mark task complete.
-5. Commit and exit.
-
-# Phase 1: GUI File-by-File Annotation - src/slic3r/GUI/CalibrationPanel.cpp
-
-## Plan
-1. Start task for `src/slic3r/GUI/CalibrationPanel.cpp` (T191).
-2. Read the file.
-3. Annotate with [INTENT], [STATE], [EVENT], [UNITY], etc.
-4. Update handoff and mark task complete.
-5. Commit and exit.
