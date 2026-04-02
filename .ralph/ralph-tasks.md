@@ -73,8 +73,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T259 annotate: src/slic3r/GUI/DeviceCore/DevStorage.cpp
 - [x] T260 annotate: src/slic3r/GUI/DeviceCore/DevUtil.cpp
 - [x] T261 annotate: src/slic3r/GUI/DeviceErrorDialog.cpp
-- [~] T262 annotate: src/slic3r/GUI/DeviceErrorDialog.hpp
-- [ ] T263 annotate: src/slic3r/GUI/DeviceManager.cpp
+- [x] T262 annotate: src/slic3r/GUI/DeviceErrorDialog.hpp
+- [~] T263 annotate: src/slic3r/GUI/DeviceManager.cpp
 - [ ] T264 annotate: src/slic3r/GUI/DeviceManager.hpp
 - [ ] T265 annotate: src/slic3r/GUI/DeviceTab/uiAmsHumidityPopup.cpp
 - [ ] T266 annotate: src/slic3r/GUI/DeviceTab/uiDeviceUpdateVersion.cpp

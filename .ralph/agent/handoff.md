@@ -2275,3 +2275,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Monolithic command dispatcher coupling)
 - Git: annotate: src/slic3r/GUI/DeviceErrorDialog.cpp
 - Next recommended Phase 1 task: T262 src/slic3r/GUI/DeviceErrorDialog.hpp
+
+## Phase 1 - Task T262 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceErrorDialog.hpp
+- Deliverables: src/slic3r/GUI/DeviceErrorDialog.hpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Declaration of the dynamic printer error/HMS dialog and recovery action enums.
+- Unity-impact summary:
+  - Header declares the core recovery action enum (ActionButton).
+  - Dialog class maps to a C# ModalDialog controller.
+  - Member variables map to UI Toolkit VisualElement references.
+- Hazards found: 1 (P3: Async image loading via wxWebRequest)
+- Git: annotate: src/slic3r/GUI/DeviceErrorDialog.hpp
+- Next recommended Phase 1 task: T263 src/slic3r/GUI/DeviceManager.cpp
