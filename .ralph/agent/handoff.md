@@ -2088,3 +2088,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Complex multi-factor matching for hardware safety)
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevFilaBlackList.cpp
 - Next recommended Phase 1 task: T247 src/slic3r/GUI/DeviceCore/DevFilaSystem.cpp
+
+## Phase 1 - Task T247 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevFilaSystem.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevFilaSystem.cpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Management and telemetry parsing for the multi-material filament system (AMS).
+- Unity-impact summary:
+  - AMS state hierarchy maps to a tree of C# unit and tray models.
+  - Telemetry parsing involves complex bit-packed state and nested JSON structures.
+  - Color decoding maps to Unity's ColorUtility.
+- Hazards found: 1 (P2: Massive nested bit-packed telemetry parsing logic)
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevFilaSystem.cpp
+- Next recommended Phase 1 task: T248 src/slic3r/GUI/DeviceCore/DevFilaSystemCtrl.cpp

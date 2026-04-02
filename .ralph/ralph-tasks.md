@@ -58,8 +58,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T244 annotate: src/slic3r/GUI/DeviceCore/DevFilaAmsSetting.cpp
 - [x] T245 annotate: src/slic3r/GUI/DeviceCore/DevFilaAmsSettingCtrl.cpp
 - [x] T246 annotate: src/slic3r/GUI/DeviceCore/DevFilaBlackList.cpp
-- [~] T247 annotate: src/slic3r/GUI/DeviceCore/DevFilaSystem.cpp
-- [ ] T248 annotate: src/slic3r/GUI/DeviceCore/DevFilaSystemCtrl.cpp
+- [x] T247 annotate: src/slic3r/GUI/DeviceCore/DevFilaSystem.cpp
+- [~] T248 annotate: src/slic3r/GUI/DeviceCore/DevFilaSystemCtrl.cpp
 - [ ] T249 annotate: src/slic3r/GUI/DeviceCore/DevFirmware.cpp
 - [ ] T250 annotate: src/slic3r/GUI/DeviceCore/DevHMS.cpp
 - [ ] T251 annotate: src/slic3r/GUI/DeviceCore/DevInfo.cpp
