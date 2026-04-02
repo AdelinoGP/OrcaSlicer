@@ -2126,3 +2126,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: skip-trivial: src/slic3r/GUI/DeviceCore/DevFirmware.cpp
 - Next recommended Phase 1 task: T250 src/slic3r/GUI/DeviceCore/DevHMS.cpp
+
+## Phase 1 - Task T250 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevHMS.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevHMS.cpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Decoding and telemetry parsing for HMS (Health Management System) error codes.
+- Unity-impact summary:
+  - HMS error decoding maps to a C# health/diagnostic service.
+  - Bitwise parsing for error codes and Wiki-link generation mirrored in C#.
+  - Observable collection of health messages used to update UI diagnostic panels.
+- Hazards found: 1 (P2: Precise bitwise error code decoding requirement)
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevHMS.cpp
+- Next recommended Phase 1 task: T251 src/slic3r/GUI/DeviceCore/DevInfo.cpp
