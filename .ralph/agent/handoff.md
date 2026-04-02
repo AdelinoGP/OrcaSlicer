@@ -2191,3 +2191,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Intricate local/cloud device state synchronization)
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevManager.cpp
 - Next recommended Phase 1 task: T255 src/slic3r/GUI/DeviceCore/DevMapping.cpp
+
+## Phase 1 - Task T255 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevMapping.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevMapping.cpp
+- Substantive additions: 5 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Implementation of the filament-to-AMS-slot mapping algorithm (automatic slot selection).
+- Unity-impact summary:
+  - Core business logic maps to a C# FilamentMappingService.
+  - The three-step optimization algorithm (Collect, Distance Map, Optimize) can be ported 1:1 using standard C# collections.
+  - Perceptual color distance logic must be consistent with the C++ implementation.
+- Hazards found: 1 (P2: Heuristic-based slot matching must be mirrored for identical behavior)
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevMapping.cpp
+- Next recommended Phase 1 task: T256 src/slic3r/GUI/DeviceCore/DevNozzleSystem.cpp
