@@ -23,7 +23,7 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T209 annotate: src/slic3r/GUI/CameraPopup.cpp
 - [x] T210 annotate: src/slic3r/GUI/CameraPopup.hpp
 - [x] T211 annotate: src/slic3r/GUI/CameraUtils.cpp
-- [ ] T212 annotate: src/slic3r/GUI/CameraUtils.hpp
+- [x] T212 annotate: src/slic3r/GUI/CameraUtils.hpp
 - [ ] T213 annotate: src/slic3r/GUI/CapsuleButton.cpp
 - [ ] T214 annotate: src/slic3r/GUI/CapsuleButton.hpp
 - [ ] T215 annotate: src/slic3r/GUI/CloneDialog.cpp

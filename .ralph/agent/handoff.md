@@ -1616,3 +1616,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2 - Coordinate system mismatch)
 - Git: annotate: src/slic3r/GUI/CameraUtils.cpp
 - Next recommended Phase 1 task: T212 annotate: src/slic3r/GUI/CameraUtils.hpp
+
+## Phase 1 - Task T212 complete
+- Task type: annotate
+- File: src/slic3r/GUI/CameraUtils.hpp
+- Deliverables: src/slic3r/GUI/CameraUtils.hpp
+- Substantive additions: 5 (class intent, state variables, event declarations, Unity mapping, porting hazards)
+- Verification excerpt: [UNITY] Most of these functions map directly to Unity's Camera API.
+- Unity-impact summary:
+  - Direct mapping to Unity Camera and Plane APIs.
+  - Watch for right-to-left handed coordinate conversion.
+  - Coordinate transformations must be carefully audited.
+- Hazards found: 1 (P2 - Coordinate system mismatch)
+- Git: annotate: src/slic3r/GUI/CameraUtils.hpp
+- Next recommended Phase 1 task: T213 annotate: src/slic3r/GUI/CapsuleButton.cpp
