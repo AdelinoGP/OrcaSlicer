@@ -1546,3 +1546,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2 for filament lookup dependencies)
 - Git: annotate: src/slic3r/GUI/CaliHistoryDialog.hpp (T206)
 - Next recommended Phase 1 task: T207 src/slic3r/GUI/Camera.cpp
+
+## Phase 1 - Task T207 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Camera.cpp
+- Deliverables: src/slic3r/GUI/Camera.cpp
+- Substantive additions: Class-level and method-level annotations for 3D camera logic.
+- Verification excerpt: // [INTENT] Camera implements the logic for the 3D viewport camera, supporting Perspective and Orthographic projection.
+- Unity-impact summary:
+  - Direct mapping to Unity Camera component.
+  - Orbital rotation and look-at logic map to standard Transform operations.
+  - Manual projection matrix construction in C++ can be replaced by standard Unity camera properties.
+- Hazards found: 0
+- Git: annotate: src/slic3r/GUI/Camera.cpp (T207)
+- Next recommended Phase 1 task: T208 src/slic3r/GUI/Camera.hpp
