@@ -1,3 +1,9 @@
+// [ANNOTATED]
+// [INTENT] Declarations for the reorderable extruder canvas and its draggable shape elements.
+// [STATE] Tracks shape positions, indices, and drag state (NONE, DRAGGING).
+// [UNITY] Map DragCanvas to a C# Controller managing a grid of draggable UI prefabs.
+// [UNITY] Use Unity's native Drag and Drop interfaces (IBeginDragHandler, etc.) instead of wxDragImage.
+
 #ifndef slic3r_GUI_DragCanvas_hpp_
 #define slic3r_GUI_DragCanvas_hpp_
 
@@ -13,10 +19,10 @@ public:
     ~DragShape() {}
 
     wxPoint GetPosition() const { return m_pos; }
-    void SetPosition(const wxPoint& pos) { m_pos = pos; }
+    void    SetPosition(const wxPoint& pos) { m_pos = pos; }
 
     const wxBitmap& GetBitmap() const { return m_bitmap; }
-    void SetBitmap(const wxBitmap& bitmap) { m_bitmap = bitmap; }
+    void            SetBitmap(const wxBitmap& bitmap) { m_bitmap = bitmap; }
 
     int get_index() { return m_index; }
 
@@ -24,11 +30,10 @@ public:
     void paint(wxDC& dc, bool highlight = false);
 
 protected:
-    wxPoint     m_pos;
-    wxBitmap    m_bitmap;
-    int         m_index;
+    wxPoint  m_pos;
+    wxBitmap m_bitmap;
+    int      m_index;
 };
-
 
 enum class DragMode {
     NONE,
@@ -39,29 +44,28 @@ class DragCanvas : public wxPanel
 public:
     DragCanvas(wxWindow* parent, const std::vector<std::string>& colors, const std::vector<int>& order);
     ~DragCanvas();
-    void set_shape_list(const std::vector<std::string>& colors, const std::vector<int>& order);
-    std::vector<int> get_shape_list_order();
+    void                    set_shape_list(const std::vector<std::string>& colors, const std::vector<int>& order);
+    std::vector<int>        get_shape_list_order();
     std::vector<DragShape*> get_ordered_shape_list();
 
 protected:
-    void on_paint(wxPaintEvent& event);
-    void on_erase(wxEraseEvent& event);
-    void on_mouse(wxMouseEvent& event);
+    void       on_paint(wxPaintEvent& event);
+    void       on_erase(wxEraseEvent& event);
+    void       on_mouse(wxMouseEvent& event);
     DragShape* find_shape(const wxPoint& pt) const;
 
 private:
-    std::vector<DragShape*>    m_dragshape_list;
-    DragMode                   m_drag_mode;
-    DragShape*                 m_dragging_shape{ nullptr };
-    DragShape*                 m_slot_shape{ nullptr }; // The shape that's being highlighted
-    wxDragImage*               m_drag_image{ nullptr };
-    wxPoint                    m_drag_start_pos;
-    wxBitmap                   m_arrow_bmp;
-    wxPoint                    m_max_shape_pos;
-    wxColour                   m_background_color; // ORCA
-    wxColour                   m_border_color; // ORCA
+    std::vector<DragShape*> m_dragshape_list;
+    DragMode                m_drag_mode;
+    DragShape*              m_dragging_shape{nullptr};
+    DragShape*              m_slot_shape{nullptr}; // The shape that's being highlighted
+    wxDragImage*            m_drag_image{nullptr};
+    wxPoint                 m_drag_start_pos;
+    wxBitmap                m_arrow_bmp;
+    wxPoint                 m_max_shape_pos;
+    wxColour                m_background_color; // ORCA
+    wxColour                m_border_color;     // ORCA
 };
 
-
-}}
+}} // namespace Slic3r::GUI
 #endif

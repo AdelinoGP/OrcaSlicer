@@ -2443,3 +2443,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/DragCanvas.cpp
 - Next recommended Phase 1 task: T274 src/slic3r/GUI/DragCanvas.hpp
+
+## Phase 1 - Task T274 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DragCanvas.hpp
+- Deliverables: src/slic3r/GUI/DragCanvas.hpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY] tags)
+- Verification excerpt: // [INTENT] Declarations for the reorderable extruder canvas and its draggable shape elements.
+- Unity-impact summary:
+  - Header declares the public interface for the reorderable icon grid.
+  - wxDragImage and low-level mouse events replaced by Unity's Drag and Drop interfaces.
+  - Shape positions map to Unity RectTransform coordinates.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/DragCanvas.hpp
+- Next recommended Phase 1 task: T275 src/slic3r/GUI/DragDropPanel.cpp

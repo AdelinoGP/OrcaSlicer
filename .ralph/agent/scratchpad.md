@@ -54,5 +54,6 @@
 - Completed T271: src/slic3r/GUI/DownloadProgressDialog.cpp.
 - Completed T272: src/slic3r/GUI/DownloadProgressDialog.hpp.
 - Completed T273: src/slic3r/GUI/DragCanvas.cpp.
-- Next task: T274 src/slic3r/GUI/DragCanvas.hpp.
+- Completed T274: src/slic3r/GUI/DragCanvas.hpp.
+- Next task: T275 src/slic3r/GUI/DragDropPanel.cpp.
 
