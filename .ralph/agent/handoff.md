@@ -1532,3 +1532,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 4 (P1 for dynamic widget creation, P2 for device API coupling and circular references)
 - Git: Fix corruption and verify annotations in src/slic3r/GUI/CaliHistoryDialog.cpp
 - Next recommended Phase 1 task: T206 src/slic3r/GUI/CaliHistoryDialog.hpp
+
+## Phase 1 - Task T206 complete
+- Task type: annotate
+- File: src/slic3r/GUI/CaliHistoryDialog.hpp
+- Deliverables: src/slic3r/GUI/CaliHistoryDialog.hpp
+- Substantive additions: Class-level and member-level annotations for HistoryWindow and child dialogs.
+- Verification excerpt: // [INTENT] HistoryWindow manages the main calibration history interface, including nozzle/extruder selection and data display.
+- Unity-impact summary:
+  - Confirmed mapping to MonoBehaviour-driven modal windows.
+  - Recommended UI Toolkit ListView for results display.
+  - Highlighted state dependencies on PACalibResult and MachineObject.
+- Hazards found: 1 (P2 for filament lookup dependencies)
+- Git: annotate: src/slic3r/GUI/CaliHistoryDialog.hpp (T206)
+- Next recommended Phase 1 task: T207 src/slic3r/GUI/Camera.cpp
