@@ -2429,3 +2429,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/DownloadProgressDialog.hpp
 - Next recommended Phase 1 task: T273 src/slic3r/GUI/DragCanvas.cpp
+
+## Phase 1 - Task T273 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DragCanvas.cpp
+- Deliverables: src/slic3r/GUI/DragCanvas.cpp
+- Substantive additions: 5 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Custom interactive canvas for reordering extruder/filament slots via drag-and-drop.
+- Unity-impact summary:
+  - Drag-and-drop reordering maps to Unity UI's IBeginDragHandler and related interfaces.
+  - Reorderable grid layout handled natively by Unity's GridLayoutGroup.
+  - Manual icon wrapping logic replaced by CSS-like Flexbox (USS).
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/DragCanvas.cpp
+- Next recommended Phase 1 task: T274 src/slic3r/GUI/DragCanvas.hpp
