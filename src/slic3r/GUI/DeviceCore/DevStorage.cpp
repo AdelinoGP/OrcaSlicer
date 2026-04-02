@@ -1,6 +1,10 @@
+// [ANNOTATED]
+// [INTENT] Status parsing for printer storage media (SD cards).
+// [STATE] Tracks SD card presence and operational state (NORMAL, NO_SDCARD).
+// [UNITY] Map to a C# storage status model within the PrinterService.
+
 #include "DevStorage.h"
 #include "slic3r/GUI/DeviceManager.hpp"
-
 
 namespace Slic3r {
 
@@ -15,10 +19,9 @@ DevStorage::SdcardState Slic3r::DevStorage::set_sdcard_state(int state)
     return m_sdcard_state;
 }
 
- void DevStorage::ParseV1_0(const json &print_json, DevStorage *system)
+void DevStorage::ParseV1_0(const json& print_json, DevStorage* system)
 {
-     if (system)
-     {
+    if (system) {
         if (print_json.contains("sdcard")) {
             if (print_json["sdcard"].get<bool>())
                 system->m_sdcard_state = DevStorage::SdcardState::HAS_SDCARD_NORMAL;
@@ -29,6 +32,5 @@ DevStorage::SdcardState Slic3r::DevStorage::set_sdcard_state(int state)
         }
     }
 }
-
 
 } // namespace Slic3r

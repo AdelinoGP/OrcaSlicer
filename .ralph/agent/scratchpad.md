@@ -39,5 +39,6 @@
 - Completed T255: src/slic3r/GUI/DeviceCore/DevMapping.cpp.
 - Completed T256: src/slic3r/GUI/DeviceCore/DevNozzleSystem.cpp.
 - Completed T257: src/slic3r/GUI/DeviceCore/DevPrintOptions.cpp.
-- Next task: T259 src/slic3r/GUI/DeviceCore/DevStorage.cpp.
+- Completed T259: src/slic3r/GUI/DeviceCore/DevStorage.cpp.
+- Next task: T260 src/slic3r/GUI/DeviceCore/DevUtil.cpp.
 

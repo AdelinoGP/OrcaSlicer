@@ -70,8 +70,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T256 annotate: src/slic3r/GUI/DeviceCore/DevNozzleSystem.cpp
 - [x] T257 annotate: src/slic3r/GUI/DeviceCore/DevPrintOptions.cpp
 - [x] T258 skip-trivial: src/slic3r/GUI/DeviceCore/DevPrintTaskInfo.cpp
-- [~] T259 annotate: src/slic3r/GUI/DeviceCore/DevStorage.cpp
-- [ ] T260 annotate: src/slic3r/GUI/DeviceCore/DevUtil.cpp
+- [x] T259 annotate: src/slic3r/GUI/DeviceCore/DevStorage.cpp
+- [~] T260 annotate: src/slic3r/GUI/DeviceCore/DevUtil.cpp
 - [ ] T261 annotate: src/slic3r/GUI/DeviceErrorDialog.cpp
 - [ ] T262 annotate: src/slic3r/GUI/DeviceErrorDialog.hpp
 - [ ] T263 annotate: src/slic3r/GUI/DeviceManager.cpp

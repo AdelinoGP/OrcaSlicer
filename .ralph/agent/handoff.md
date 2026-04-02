@@ -2233,3 +2233,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Implicit time-based state guarding logic)
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevPrintOptions.cpp
 - Next recommended Phase 1 task: T259 src/slic3r/GUI/DeviceCore/DevStorage.cpp
+
+## Phase 1 - Task T259 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevStorage.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevStorage.cpp
+- Substantive additions: 4 ([INTENT], [STATE], [UNITY] tags)
+- Verification excerpt: // [INTENT] Status parsing for printer storage media (SD cards).
+- Unity-impact summary:
+  - Storage status maps to a C# enum and data model.
+  - Telemetry parsing should be part of the standard status update flow.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevStorage.cpp
+- Next recommended Phase 1 task: T260 src/slic3r/GUI/DeviceCore/DevUtil.cpp
