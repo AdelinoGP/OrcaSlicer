@@ -1845,3 +1845,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P3: Coupling with ImGui immediate-mode types)
 - Git: annotate: src/slic3r/GUI/DailyTips.hpp
 - Next recommended Phase 1 task: T229 src/slic3r/GUI/dark_mode.cpp
+
+## Phase 1 - Task T229 complete
+- Task type: annotate
+- File: src/slic3r/GUI/dark_mode.cpp
+- Deliverables: src/slic3r/GUI/dark_mode.cpp
+- Substantive additions: 6 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Low-level Windows Win32 API hooks for enabling Dark Mode on legacy controls and window chrome.
+- Unity-impact summary:
+  - Completely redundant in Unity.
+  - Legacy Win32 pixel-pushing and theme hooking is replaced by native USS/styles.
+  - Native platform UI handles (HWND, HDC) are not used in Unity's managed UI system.
+- Hazards found: 1 (P1: Deep coupling to Windows internal theme engine)
+- Git: annotate: src/slic3r/GUI/dark_mode.cpp
+- Next recommended Phase 1 task: T230 src/slic3r/GUI/dark_mode/dark_mode.hpp
