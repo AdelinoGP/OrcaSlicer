@@ -1518,3 +1518,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: P2 (Manual destruction/rebuilding of sizers, Deep widget recursion)
 - Git: annotate: src/slic3r/GUI/CalibrationWizardSavePage.cpp and .hpp
 - Next recommended Phase 1 task: T203 annotate: src/slic3r/GUI/CalibrationWizardStartPage.cpp
+
+## Phase 1 - Task T205 complete
+- Task type: annotate
+- File: src/slic3r/GUI/CaliHistoryDialog.cpp
+- Deliverables: src/slic3r/GUI/CaliHistoryDialog.cpp
+- Substantive additions: 15+ tags including [INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD]
+- Verification excerpt: // [INTENT] CaliHistoryDialog.cpp implements three dialog classes for managing flow dynamics calibration history:
+- Unity-impact summary:
+  - Maps to MonoBehaviour-driven modal windows with UI Toolkit VisualElements.
+  - Recommends moving data filtering logic to a view-model.
+  - Identified manual wxGridBagSizer layout as a porting hazard.
+- Hazards found: 4 (P1 for dynamic widget creation, P2 for device API coupling and circular references)
+- Git: Fix corruption and verify annotations in src/slic3r/GUI/CaliHistoryDialog.cpp
+- Next recommended Phase 1 task: T206 src/slic3r/GUI/CaliHistoryDialog.hpp

@@ -121,9 +121,9 @@ Last updated: 2026-03-30T05:59:40Z
 - [x] T200 annotate: src/slic3r/GUI/CalibrationWizardPresetPage.hpp
 - [x] T201 annotate: src/slic3r/GUI/CalibrationWizardSavePage.cpp
 - [x] T202 annotate: src/slic3r/GUI/CalibrationWizardSavePage.hpp
-- [ ] T203 annotate: src/slic3r/GUI/CalibrationWizardStartPage.cpp
-- [ ] T204 annotate: src/slic3r/GUI/CalibrationWizardStartPage.hpp
-- [ ] T205 annotate: src/slic3r/GUI/CaliHistoryDialog.cpp
+- [x] T203 annotate: src/slic3r/GUI/CalibrationWizardStartPage.cpp
+- [x] T204 annotate: src/slic3r/GUI/CalibrationWizardStartPage.hpp
+- [x] T205 annotate: src/slic3r/GUI/CaliHistoryDialog.cpp
 - [ ] T206 annotate: src/slic3r/GUI/CaliHistoryDialog.hpp
 - [ ] T207 annotate: src/slic3r/GUI/Camera.cpp
 - [ ] T208 annotate: src/slic3r/GUI/Camera.hpp
@@ -478,7 +478,7 @@ Last updated: 2026-03-30T05:59:40Z
 - [x] T557 annotate: src/slic3r/GUI/PublishDialog.cpp
 - [x] T558 annotate: src/slic3r/GUI/PublishDialog.hpp
 - [x] T559 annotate: src/slic3r/GUI/RammingChart.cpp
-- [~] T560 annotate: src/slic3r/GUI/RammingChart.hpp
+- [x] T560 annotate: src/slic3r/GUI/RammingChart.hpp
 - [x] T561 annotate: src/slic3r/GUI/RecenterDialog.cpp
 - [x] T562 annotate: src/slic3r/GUI/RecenterDialog.hpp
 - [x] T563 annotate: src/slic3r/GUI/ReleaseNote.cpp
@@ -499,7 +499,7 @@ Last updated: 2026-03-30T05:59:40Z
 - [x] T578 annotate: src/slic3r/GUI/SelectMachine.hpp
 - [x] T579 annotate: src/slic3r/GUI/SelectMachinePop.cpp
 - [x] T580 annotate: src/slic3r/GUI/SelectMachinePop.hpp
-- [~] T581 annotate: src/slic3r/GUI/SendMultiMachinePage.cpp
+- [x] T581 annotate: src/slic3r/GUI/SendMultiMachinePage.cpp
 - [x] T582 annotate: src/slic3r/GUI/SendMultiMachinePage.hpp
 - [x] T583 annotate: src/slic3r/GUI/SendSystemInfoDialog.cpp
 - [x] T584 annotate: src/slic3r/GUI/SendSystemInfoDialog.hpp
@@ -529,7 +529,7 @@ Last updated: 2026-03-30T05:59:40Z
 - [x] T608 annotate: src/slic3r/GUI/TabButton.hpp
 - [x] T609 annotate: src/slic3r/GUI/Tab.cpp
 - [x] T610 annotate: src/slic3r/GUI/Tab.hpp
-- [~] T611 annotate: src/slic3r/GUI/TaskManager.cpp
+- [x] T611 annotate: src/slic3r/GUI/TaskManager.cpp
 - [x] T612 annotate: src/slic3r/GUI/TaskManager.hpp
 - [x] T613 annotate: src/slic3r/GUI/TextLines.cpp
 - [x] T614 annotate: src/slic3r/GUI/TextLines.hpp
@@ -557,7 +557,7 @@ Last updated: 2026-03-30T05:59:40Z
 - [x] T636 annotate: src/slic3r/GUI/WebUserLoginDialog.hpp
 - [x] T637 annotate: src/slic3r/GUI/WebViewDialog.cpp
 - [x] T638 annotate: src/slic3r/GUI/WebViewDialog.hpp
-- [~] T639 annotate: src/slic3r/GUI/Widgets/AMSControl.cpp
+- [x] T639 annotate: src/slic3r/GUI/Widgets/AMSControl.cpp
 - [x] T640 annotate: src/slic3r/GUI/Widgets/AMSControl.hpp
 - [x] T641 annotate: src/slic3r/GUI/Widgets/AMSItem.cpp
 - [x] T642 annotate: src/slic3r/GUI/Widgets/AMSItem.hpp
@@ -626,7 +626,7 @@ Last updated: 2026-03-30T05:59:40Z
 - [x] T705 annotate: src/slic3r/GUI/Widgets/StepCtrl.cpp
 - [ ] T706 annotate: src/slic3r/GUI/Widgets/StepCtrl.hpp
 - [x] T707 annotate: src/slic3r/GUI/Widgets/SwitchButton.cpp
-- [~] T708 annotate: src/slic3r/GUI/Widgets/SwitchButton.hpp
+- [x] T708 annotate: src/slic3r/GUI/Widgets/SwitchButton.hpp
 - [x] T709 annotate: src/slic3r/GUI/Widgets/TabCtrl.cpp
 - [x] T710 annotate: src/slic3r/GUI/Widgets/TabCtrl.hpp
 - [x] T711 annotate: src/slic3r/GUI/Widgets/TempInput.cpp
