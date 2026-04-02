@@ -2177,3 +2177,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevLampCtrl.cpp
 - Next recommended Phase 1 task: T254 src/slic3r/GUI/DeviceCore/DevManager.cpp
+
+## Phase 1 - Task T254 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevManager.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevManager.cpp
+- Substantive additions: 6 ([INTENT], [STATE], [EVENT], [THREAD], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Central manager for printer discovery, lifecycle, and state synchronization across local (LAN) and cloud units.
+- Unity-impact summary:
+  - Device manager maps to a persistent C# DeviceService or PrinterManager singleton.
+  - Machine lists should be observable to support reactive UI updates.
+  - keep-alive and polling loops map to C# Timer or async/await cycles.
+- Hazards found: 1 (P2: Intricate local/cloud device state synchronization)
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevManager.cpp
+- Next recommended Phase 1 task: T255 src/slic3r/GUI/DeviceCore/DevMapping.cpp

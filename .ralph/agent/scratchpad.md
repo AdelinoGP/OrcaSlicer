@@ -35,5 +35,6 @@
 - Completed T251: src/slic3r/GUI/DeviceCore/DevInfo.cpp (skip-trivial).
 - Completed T252: src/slic3r/GUI/DeviceCore/DevLamp.cpp.
 - Completed T253: src/slic3r/GUI/DeviceCore/DevLampCtrl.cpp.
-- Next task: T254 src/slic3r/GUI/DeviceCore/DevManager.cpp.
+- Completed T254: src/slic3r/GUI/DeviceCore/DevManager.cpp.
+- Next task: T255 src/slic3r/GUI/DeviceCore/DevMapping.cpp.
 
