@@ -1588,3 +1588,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 0
 - Git: annotate: src/slic3r/GUI/CameraPopup.cpp (T209)
 - Next recommended Phase 1 task: T210 src/slic3r/GUI/CameraPopup.hpp
+
+## Phase 1 - Task T210 complete
+- Task type: annotate
+- File: src/slic3r/GUI/CameraPopup.hpp
+- Deliverables: src/slic3r/GUI/CameraPopup.hpp
+- Substantive additions: 5 (class intent, state variables, event declarations, Unity mapping, porting hazards)
+- Verification excerpt: // [INTENT] CameraPopup is a transient settings overlay for camera-related machine controls (recording, resolution, virtual camera).
+- Unity-impact summary:
+  - Map to a retained UI Toolkit or uGUI panel/popup anchored to the camera preview.
+  - Replicate click-outside-to-close behavior from PopupWindow.
+  - Access MachineObject state via a service layer or MonoBehaviour.
+- Hazards found: 1 (P2: PopupWindow dismissal logic)
+- Git: annotate: src/slic3r/GUI/CameraPopup.hpp
+- Next recommended Phase 1 task: T211 src/slic3r/GUI/CameraUtils.cpp
