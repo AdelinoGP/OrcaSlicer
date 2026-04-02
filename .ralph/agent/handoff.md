@@ -2246,3 +2246,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevStorage.cpp
 - Next recommended Phase 1 task: T260 src/slic3r/GUI/DeviceCore/DevUtil.cpp
+
+## Phase 1 - Task T260 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevUtil.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevUtil.cpp
+- Substantive additions: 4 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Shared low-level utilities for telemetry bitfield extraction and data conversion.
+- Unity-impact summary:
+  - Low-level parsing utilities map to a static DeviceUtils class in C#.
+  - Bit-masking and shifting logic must be identical to C++ implementation to maintain telemetry integrity.
+  - Standard .NET classes (IPAddress, Single.TryParse) replace custom conversion logic.
+- Hazards found: 1 (P2: Telemetry bit-masking logic sensitivity)
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevUtil.cpp
+- Next recommended Phase 1 task: T261 src/slic3r/GUI/DeviceErrorDialog.cpp
