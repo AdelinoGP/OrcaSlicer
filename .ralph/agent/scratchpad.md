@@ -50,5 +50,6 @@
 - Completed T267: src/slic3r/GUI/Downloader.cpp.
 - Completed T268: src/slic3r/GUI/DownloaderFileGet.cpp.
 - Completed T269: src/slic3r/GUI/DownloaderFileGet.hpp.
-- Next task: T270 src/slic3r/GUI/Downloader.hpp.
+- Completed T270: src/slic3r/GUI/Downloader.hpp.
+- Next task: T271 src/slic3r/GUI/DownloadProgressDialog.cpp.
 

@@ -2386,3 +2386,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/DownloaderFileGet.hpp
 - Next recommended Phase 1 task: T270 src/slic3r/GUI/Downloader.hpp
+
+## Phase 1 - Task T270 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Downloader.hpp
+- Deliverables: src/slic3r/GUI/Downloader.hpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Declaration of the high-level download management service and task models.
+- Unity-impact summary:
+  - Downloader maps to a C# DownloadService singleton.
+  - Download class maps to a DownloadTask model.
+  - wxWidgets event handling replaced by C# events or observable collections.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/Downloader.hpp
+- Next recommended Phase 1 task: T271 src/slic3r/GUI/DownloadProgressDialog.cpp
