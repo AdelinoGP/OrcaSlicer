@@ -2219,3 +2219,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: String-to-enum parsing and bit-field extraction logic)
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevNozzleSystem.cpp
 - Next recommended Phase 1 task: T257 src/slic3r/GUI/DeviceCore/DevPrintOptions.cpp
+
+## Phase 1 - Task T257 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevPrintOptions.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevPrintOptions.cpp
+- Substantive additions: 5 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Management and telemetry parsing for runtime printer behavioral options (speed, AI monitoring, safety features).
+- Unity-impact summary:
+  - Runtime options maps to a C# PrinterOptionService.
+  - Multi-version xcam telemetry parsing must be mirrored.
+  - Implicit 3-second lockout for user settings must be implemented in the C# data model to avoid UI flickering or overwrites.
+- Hazards found: 1 (P2: Implicit time-based state guarding logic)
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevPrintOptions.cpp
+- Next recommended Phase 1 task: T259 src/slic3r/GUI/DeviceCore/DevStorage.cpp
