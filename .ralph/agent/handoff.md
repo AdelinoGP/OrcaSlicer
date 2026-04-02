@@ -2317,3 +2317,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Monolithic state object complexity)
 - Git: annotate: src/slic3r/GUI/DeviceManager.hpp
 - Next recommended Phase 1 task: T265 src/slic3r/GUI/DeviceTab/uiAmsHumidityPopup.cpp
+
+## Phase 1 - Task T265 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceTab/uiAmsHumidityPopup.cpp
+- Deliverables: src/slic3r/GUI/DeviceTab/uiAmsHumidityPopup.cpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Implementation of the AMS humidity and drying status popup dialog.
+- Unity-impact summary:
+  - Humidity popup maps to a Unity UI Toolkit VisualElement or Canvas prefab.
+  - Image assets (drying icons, levels) map to Unity Sprites.
+  - Manual DPI scaling (msw_rescale) replaced by native Unity UI scaling.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/DeviceTab/uiAmsHumidityPopup.cpp
+- Next recommended Phase 1 task: T266 src/slic3r/GUI/DeviceTab/uiDeviceUpdateVersion.cpp

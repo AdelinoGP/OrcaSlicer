@@ -76,8 +76,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T262 annotate: src/slic3r/GUI/DeviceErrorDialog.hpp
 - [x] T263 annotate: src/slic3r/GUI/DeviceManager.cpp
 - [x] T264 annotate: src/slic3r/GUI/DeviceManager.hpp
-- [~] T265 annotate: src/slic3r/GUI/DeviceTab/uiAmsHumidityPopup.cpp
-- [ ] T266 annotate: src/slic3r/GUI/DeviceTab/uiDeviceUpdateVersion.cpp
+- [x] T265 annotate: src/slic3r/GUI/DeviceTab/uiAmsHumidityPopup.cpp
+- [~] T266 annotate: src/slic3r/GUI/DeviceTab/uiDeviceUpdateVersion.cpp
 - [ ] T267 annotate: src/slic3r/GUI/Downloader.cpp
 - [ ] T268 annotate: src/slic3r/GUI/DownloaderFileGet.cpp
 - [ ] T269 annotate: src/slic3r/GUI/DownloaderFileGet.hpp
