@@ -82,8 +82,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T268 annotate: src/slic3r/GUI/DownloaderFileGet.cpp
 - [x] T269 annotate: src/slic3r/GUI/DownloaderFileGet.hpp
 - [x] T270 annotate: src/slic3r/GUI/Downloader.hpp
-- [~] T271 annotate: src/slic3r/GUI/DownloadProgressDialog.cpp
-- [ ] T272 annotate: src/slic3r/GUI/DownloadProgressDialog.hpp
+- [x] T271 annotate: src/slic3r/GUI/DownloadProgressDialog.cpp
+- [~] T272 annotate: src/slic3r/GUI/DownloadProgressDialog.hpp
 - [ ] T273 annotate: src/slic3r/GUI/DragCanvas.cpp
 - [ ] T274 annotate: src/slic3r/GUI/DragCanvas.hpp
 - [ ] T275 annotate: src/slic3r/GUI/DragDropPanel.cpp

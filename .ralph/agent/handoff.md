@@ -2400,3 +2400,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/Downloader.hpp
 - Next recommended Phase 1 task: T271 src/slic3r/GUI/DownloadProgressDialog.cpp
+
+## Phase 1 - Task T271 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DownloadProgressDialog.cpp
+- Deliverables: src/slic3r/GUI/DownloadProgressDialog.cpp
+- Substantive additions: 6 ([INTENT], [STATE], [EVENT], [THREAD], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Modal dialog for displaying network plug-in download and installation progress.
+- Unity-impact summary:
+  - Network plug-in progress dialog maps to a Unity UI Toolkit ModalWindow.
+  - Page-based UI state managed via step-based VisualElements.
+  - Manual CJK text wrapping logic replaced by TextMeshPro.
+  - Background jobs ported to Task-based async/await or UniTask.
+- Hazards found: 1 (P2: Manual text formatting/wrapping for CJK)
+- Git: annotate: src/slic3r/GUI/DownloadProgressDialog.cpp
+- Next recommended Phase 1 task: T272 src/slic3r/GUI/DownloadProgressDialog.hpp

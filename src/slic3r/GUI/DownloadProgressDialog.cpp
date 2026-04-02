@@ -1,3 +1,11 @@
+// [ANNOTATED]
+// [INTENT] Modal dialog for displaying network plug-in download and installation progress.
+// [STATE] Multi-page state managed via wxSimplebook: Progress, Download Error, and Install Error views.
+// [EVENT] Listens for background job completion/failure events to update the UI and handle retry/close actions.
+// [THREAD] Utilizes a PlaterWorker to execute the asynchronous upgrade/download job off the main thread.
+// [UNITY] Map to a C# ModalDialog with a page-based VisualElement tree. Replace background jobs with UniTask or Coroutines.
+// [PORTING_HAZARD:P2] Manual CJK text wrapping and custom formatting logic should be discarded in favor of native Unity text layout.
+
 #include "DownloadProgressDialog.hpp"
 
 #include <wx/settings.h>
@@ -16,7 +24,7 @@
 #include "libslic3r/Utils.hpp"
 #include "GUI.hpp"
 #include "I18N.hpp"
-//#include "ConfigWizard.hpp"
+// #include "ConfigWizard.hpp"
 #include "wxExtensions.hpp"
 #include "slic3r/GUI/MainFrame.hpp"
 #include "slic3r/GUI/MsgDialog.hpp"
@@ -28,32 +36,31 @@
 
 #define DESIGN_INPUT_SIZE wxSize(FromDIP(100), -1)
 
-namespace Slic3r {
-namespace GUI {
+namespace Slic3r { namespace GUI {
 
 DownloadProgressDialog::DownloadProgressDialog(wxString title)
-    : DPIDialog(static_cast<wxWindow *>(wxGetApp().mainframe), wxID_ANY, title, wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX)
+    : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe), wxID_ANY, title, wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX)
 {
     wxString download_failed_url = wxT("https://wiki.bambulab.com/en/software/bambu-studio/failed-to-get-network-plugin");
-    wxString install_failed_url = wxT("https://wiki.bambulab.com/en/software/bambu-studio/failed-to-get-network-plugin");
+    wxString install_failed_url  = wxT("https://wiki.bambulab.com/en/software/bambu-studio/failed-to-get-network-plugin");
 
     wxString download_failed_msg = _L("Failed to download the plug-in. Please check your firewall settings and VPN software and retry.");
-    wxString install_failed_msg = _L("Failed to install the plug-in. The plug-in file may be in use. Please restart OrcaSlicer and try again. Also check whether it is blocked or deleted by anti-virus software.");
+    wxString install_failed_msg  = _L("Failed to install the plug-in. The plug-in file may be in use. Please restart OrcaSlicer and try "
+                                     "again. Also check whether it is blocked or deleted by anti-virus software.");
 
     SetBackgroundColour(*wxWHITE);
-    wxBoxSizer *m_sizer_main = new wxBoxSizer(wxVERTICAL);
+    wxBoxSizer* m_sizer_main = new wxBoxSizer(wxVERTICAL);
     auto        m_line_top   = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(-1, 1));
     m_line_top->SetBackgroundColour(wxColour(166, 169, 170));
     m_sizer_main->Add(m_line_top, 0, wxEXPAND, 0);
-
 
     m_simplebook_status = new wxSimplebook(this);
     m_simplebook_status->SetSize(wxSize(FromDIP(400), FromDIP(70)));
     m_simplebook_status->SetMinSize(wxSize(FromDIP(400), FromDIP(70)));
     m_simplebook_status->SetMaxSize(wxSize(FromDIP(400), FromDIP(70)));
 
-    //mode normal
-    m_status_bar    = std::make_shared<BBLStatusBarSend>(m_simplebook_status);
+    // mode normal
+    m_status_bar     = std::make_shared<BBLStatusBarSend>(m_simplebook_status);
     m_panel_download = m_status_bar->get_panel();
     m_panel_download->SetSize(wxSize(FromDIP(400), FromDIP(70)));
     m_panel_download->SetMinSize(wxSize(FromDIP(400), FromDIP(70)));
@@ -61,12 +68,13 @@ DownloadProgressDialog::DownloadProgressDialog(wxString title)
 
     m_worker = std::make_unique<PlaterWorker<BoostThreadWorker>>(this, m_status_bar, "download_worker");
 
-    //mode Download Failed 
+    // mode Download Failed
     auto m_panel_download_failed = new wxPanel(m_simplebook_status, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
 
     wxBoxSizer* sizer_download_failed = new wxBoxSizer(wxVERTICAL);
 
-    auto m_statictext_download_failed = new wxStaticText(m_panel_download_failed, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0);
+    auto m_statictext_download_failed = new wxStaticText(m_panel_download_failed, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize,
+                                                         0);
     m_statictext_download_failed->SetForegroundColour(*wxBLACK);
     m_statictext_download_failed->SetLabel(format_text(m_statictext_download_failed, download_failed_msg, FromDIP(360)));
     m_statictext_download_failed->Wrap(FromDIP(360));
@@ -77,20 +85,19 @@ DownloadProgressDialog::DownloadProgressDialog(wxString title)
     auto m_download_hyperlink = new HyperLink(m_panel_download_failed, _L("Click here to see more info"), download_failed_url);
     sizer_download_failed->Add(m_download_hyperlink, 0, wxALIGN_CENTER | wxALL, 5);
 
-
     m_panel_download_failed->SetSizer(sizer_download_failed);
     m_panel_download_failed->Layout();
     sizer_download_failed->Fit(m_panel_download_failed);
 
-
-    //mode Installed failed
+    // mode Installed failed
     auto m_panel_install_failed = new wxPanel(m_simplebook_status, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
 
     wxBoxSizer* sizer_install_failed = new wxBoxSizer(wxVERTICAL);
 
-    auto m_statictext_install_failed = new wxStaticText(m_panel_install_failed, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0);
+    auto m_statictext_install_failed = new wxStaticText(m_panel_install_failed, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize,
+                                                        0);
     m_statictext_install_failed->SetForegroundColour(*wxBLACK);
-    m_statictext_install_failed->SetLabel(format_text(m_statictext_install_failed, install_failed_msg,FromDIP(360)));
+    m_statictext_install_failed->SetLabel(format_text(m_statictext_install_failed, install_failed_msg, FromDIP(360)));
     m_statictext_install_failed->Wrap(FromDIP(360));
 
     sizer_install_failed->Add(m_statictext_install_failed, 0, wxALIGN_CENTER | wxALL, 5);
@@ -99,14 +106,12 @@ DownloadProgressDialog::DownloadProgressDialog(wxString title)
     auto m_install_hyperlink = new HyperLink(m_panel_install_failed, _L("Click here to see more info"), install_failed_url);
     sizer_install_failed->Add(m_install_hyperlink, 0, wxALIGN_CENTER | wxALL, 5);
 
-
     m_panel_install_failed->SetSizer(sizer_install_failed);
     m_panel_install_failed->Layout();
     sizer_install_failed->Fit(m_panel_install_failed);
 
     m_sizer_main->Add(m_simplebook_status, 0, wxALL, FromDIP(20));
     m_sizer_main->Add(0, 0, 1, wxBOTTOM, 10);
-
 
     m_simplebook_status->AddPage(m_status_bar->get_panel(), wxEmptyString, true);
     m_simplebook_status->AddPage(m_panel_download_failed, wxEmptyString, false);
@@ -123,18 +128,19 @@ DownloadProgressDialog::DownloadProgressDialog(wxString title)
 
 wxString DownloadProgressDialog::format_text(wxStaticText* st, wxString str, int warp)
 {
-    if (wxGetApp().app_config->get("language") != "zh_CN") { return str; }
+    if (wxGetApp().app_config->get("language") != "zh_CN") {
+        return str;
+    }
 
-    wxString out_txt = str;
-    wxString count_txt = "";
+    wxString out_txt      = str;
+    wxString count_txt    = "";
     int      new_line_pos = 0;
 
     for (int i = 0; i < str.length(); i++) {
         auto text_size = st->GetTextExtent(count_txt);
         if (text_size.x < warp) {
             count_txt += str[i];
-        }
-        else {
+        } else {
             out_txt.insert(i - 1, '\n');
             count_txt = "";
         }
@@ -152,40 +158,26 @@ bool DownloadProgressDialog::Show(bool show)
         Bind(EVT_UPGRADE_NETWORK_SUCCESS, [this](wxCommandEvent& evt) {
             m_status_bar->change_button_label(_L("Close"));
             on_finish();
-            m_status_bar->set_cancel_callback_fina(
-                [this]() {
-                    this->Close();
-                }
-            );
+            m_status_bar->set_cancel_callback_fina([this]() { this->Close(); });
         });
 
-        //download failed
+        // download failed
         Bind(EVT_DOWNLOAD_NETWORK_FAILED, [this](wxCommandEvent& evt) {
             m_status_bar->change_button_label(_L("Close"));
             m_status_bar->set_progress(0);
             this->m_simplebook_status->SetSelection(1);
-            m_status_bar->set_cancel_callback_fina(
-                [this]() {
-                    this->Close();
-                }
-            );
+            m_status_bar->set_cancel_callback_fina([this]() { this->Close(); });
         });
 
-        //install failed
+        // install failed
         Bind(EVT_INSTALL_NETWORK_FAILED, [this](wxCommandEvent& evt) {
             m_status_bar->change_button_label(_L("Close"));
             m_status_bar->set_progress(0);
             this->m_simplebook_status->SetSelection(2);
-            m_status_bar->set_cancel_callback_fina(
-                [this]() {
-                    this->Close();
-                }
-            );
+            m_status_bar->set_cancel_callback_fina([this]() { this->Close(); });
         });
 
-        m_status_bar->set_cancel_callback_fina([this]() {
-            m_worker->cancel_all();
-        });
+        m_status_bar->set_cancel_callback_fina([this]() { m_worker->cancel_all(); });
 
         replace_job(*m_worker, std::move(m_upgrade_job));
     }
@@ -198,9 +190,9 @@ void DownloadProgressDialog::on_close(wxCloseEvent& event)
     event.Skip();
 }
 
- DownloadProgressDialog::~DownloadProgressDialog() {}
+DownloadProgressDialog::~DownloadProgressDialog() {}
 
-void DownloadProgressDialog::on_dpi_changed(const wxRect &suggested_rect) {}
+void DownloadProgressDialog::on_dpi_changed(const wxRect& suggested_rect) {}
 
 void DownloadProgressDialog::update_release_note(std::string release_note, std::string version) {}
 
@@ -212,9 +204,8 @@ void DownloadProgressDialog::on_finish()
         return;
     }
 
-    MessageDialog dlg(nullptr,
-        _L("The network plug-in was installed but could not be loaded. Please restart the application."),
-        _L("Restart Required"), wxOK | wxICON_INFORMATION);
+    MessageDialog dlg(nullptr, _L("The network plug-in was installed but could not be loaded. Please restart the application."),
+                      _L("Restart Required"), wxOK | wxICON_INFORMATION);
     dlg.ShowModal();
 }
 
