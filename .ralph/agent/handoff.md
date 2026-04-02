@@ -2034,3 +2034,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevExtruderSystemCtrl.cpp
 - Next recommended Phase 1 task: T243 src/slic3r/GUI/DeviceCore/DevFan.cpp
+
+## Phase 1 - Task T243 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevFan.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevFan.cpp
+- Substantive additions: 5 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Management and telemetry parsing for printer fan and air duct (cooling) systems.
+- Unity-impact summary:
+  - Fan and air-duct state maps to a C# CoolingService.
+  - Telemetry parsing must support V1.0-V3.0 schemas and bit-packed ranges.
+  - Async command-response handling via sequence IDs mirrored in C#.
+- Hazards found: 1 (P2: Multi-version bit-packed telemetry parsing)
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevFan.cpp
+- Next recommended Phase 1 task: T244 src/slic3r/GUI/DeviceCore/DevFilaAmsSetting.cpp

@@ -54,8 +54,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T240 annotate: src/slic3r/GUI/DeviceCore/DevExtensionTool.cpp
 - [x] T241 annotate: src/slic3r/GUI/DeviceCore/DevExtruderSystem.cpp
 - [x] T242 annotate: src/slic3r/GUI/DeviceCore/DevExtruderSystemCtrl.cpp
-- [~] T243 annotate: src/slic3r/GUI/DeviceCore/DevFan.cpp
-- [ ] T244 annotate: src/slic3r/GUI/DeviceCore/DevFilaAmsSetting.cpp
+- [x] T243 annotate: src/slic3r/GUI/DeviceCore/DevFan.cpp
+- [~] T244 annotate: src/slic3r/GUI/DeviceCore/DevFilaAmsSetting.cpp
 - [ ] T245 annotate: src/slic3r/GUI/DeviceCore/DevFilaAmsSettingCtrl.cpp
 - [ ] T246 annotate: src/slic3r/GUI/DeviceCore/DevFilaBlackList.cpp
 - [ ] T247 annotate: src/slic3r/GUI/DeviceCore/DevFilaSystem.cpp

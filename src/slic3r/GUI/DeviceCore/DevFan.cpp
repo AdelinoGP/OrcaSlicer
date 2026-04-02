@@ -1,3 +1,10 @@
+// [ANNOTATED]
+// [INTENT] Management and telemetry parsing for printer fan and air duct (cooling) systems.
+// [STATE] Tracks fan speeds, air duct modes, and part-specific cooling capabilities.
+// [EVENT] Dispatches fan control commands (G-code or JSON) and manages response callbacks by sequence ID.
+// [UNITY] Map to a C# CoolingService managing fan and air-duct state models.
+// [PORTING_HAZARD:P2] Multi-version telemetry parsing (V1.0-V3.0) with complex bit-packed fields for fan speeds and air duct configurations.
+
 #include <nlohmann/json.hpp>
 #include "DevFan.h"
 #include <wx/app.h>
@@ -8,42 +15,42 @@ using namespace nlohmann;
 
 void Slic3r::DevFan::converse_to_duct(bool is_suppt_part_fun, bool is_suppt_aux_fun, bool is_suppt_cham_fun)
 {
-     m_air_duct_data.modes.clear();
-     m_air_duct_data.parts.clear();
-     m_air_duct_data.curren_mode = -1; // def mode
+    m_air_duct_data.modes.clear();
+    m_air_duct_data.parts.clear();
+    m_air_duct_data.curren_mode = -1; // def mode
 
-     if (is_suppt_part_fun) {
-         AirParts part_fan;
-         part_fan.type        = int(AirDuctType::AIR_FAN_TYPE);
-         part_fan.id          = int(AIR_FUN::FAN_COOLING_0_AIRDOOR);
-         part_fan.func        = int(AIR_FUN::FAN_COOLING_0_AIRDOOR);
-         part_fan.state       = 0;
-         part_fan.range_start = 0;
-         part_fan.range_end   = 100;
-         m_air_duct_data.parts.push_back(part_fan);
-     }
+    if (is_suppt_part_fun) {
+        AirParts part_fan;
+        part_fan.type        = int(AirDuctType::AIR_FAN_TYPE);
+        part_fan.id          = int(AIR_FUN::FAN_COOLING_0_AIRDOOR);
+        part_fan.func        = int(AIR_FUN::FAN_COOLING_0_AIRDOOR);
+        part_fan.state       = 0;
+        part_fan.range_start = 0;
+        part_fan.range_end   = 100;
+        m_air_duct_data.parts.push_back(part_fan);
+    }
 
-     if (is_suppt_aux_fun) {
-         AirParts aux_fan;
-         aux_fan.type        = int(AirDuctType::AIR_FAN_TYPE);
-         aux_fan.id          = int(AIR_FUN::FAN_REMOTE_COOLING_0_IDX);
-         aux_fan.func        = int(AIR_FUN::FAN_REMOTE_COOLING_0_IDX);
-         aux_fan.state       = 0;
-         aux_fan.range_start = 0;
-         aux_fan.range_end   = 100;
-         m_air_duct_data.parts.push_back(aux_fan);
-     }
+    if (is_suppt_aux_fun) {
+        AirParts aux_fan;
+        aux_fan.type        = int(AirDuctType::AIR_FAN_TYPE);
+        aux_fan.id          = int(AIR_FUN::FAN_REMOTE_COOLING_0_IDX);
+        aux_fan.func        = int(AIR_FUN::FAN_REMOTE_COOLING_0_IDX);
+        aux_fan.state       = 0;
+        aux_fan.range_start = 0;
+        aux_fan.range_end   = 100;
+        m_air_duct_data.parts.push_back(aux_fan);
+    }
 
-     if (is_suppt_aux_fun) {
-         AirParts chamber_fan;
-         chamber_fan.type        = int(AirDuctType::AIR_FAN_TYPE);
-         chamber_fan.id          = int(AIR_FUN::FAN_CHAMBER_0_IDX);
-         chamber_fan.func        = int(AIR_FUN::FAN_CHAMBER_0_IDX);
-         chamber_fan.state       = 0;
-         chamber_fan.range_start = 0;
-         chamber_fan.range_end   = 100;
-         m_air_duct_data.parts.push_back(chamber_fan);
-     }
+    if (is_suppt_aux_fun) {
+        AirParts chamber_fan;
+        chamber_fan.type        = int(AirDuctType::AIR_FAN_TYPE);
+        chamber_fan.id          = int(AIR_FUN::FAN_CHAMBER_0_IDX);
+        chamber_fan.func        = int(AIR_FUN::FAN_CHAMBER_0_IDX);
+        chamber_fan.state       = 0;
+        chamber_fan.range_start = 0;
+        chamber_fan.range_end   = 100;
+        m_air_duct_data.parts.push_back(chamber_fan);
+    }
 }
 
 static std::string _get_string_from_fantype(int type)
@@ -78,8 +85,7 @@ int Slic3r::DevFan::command_control_fan_new(int fan_id, int val)
     return m_owner->publish_json(j);
 }
 
-
-int Slic3r::DevFan::command_handle_response(const json &response)
+int Slic3r::DevFan::command_handle_response(const json& response)
 {
     if (!response.contains("sequence_id")) {
         BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ", error reponse.";
@@ -89,7 +95,8 @@ int Slic3r::DevFan::command_handle_response(const json &response)
     std::string reply = response["sequence_id"].get<std::string>();
     auto        it    = m_callback_list.find(reply);
     if (it != m_callback_list.end()) {
-        if (it->second) it->second(response);
+        if (it->second)
+            it->second(response);
         m_callback_list.erase(it);
     }
     return 0;
@@ -108,7 +115,7 @@ int Slic3r::DevFan::command_control_air_duct(int mode_id, int submode, const Com
     return m_owner->publish_json(j);
 }
 
-void Slic3r::DevFan::ParseV1_0(const json &print_json)
+void Slic3r::DevFan::ParseV1_0(const json& print_json)
 {
     if (print_json.contains("fan_gear")) {
         fan_gear          = print_json["fan_gear"].get<std::uint32_t>();
@@ -136,18 +143,17 @@ void Slic3r::DevFan::ParseV1_0(const json &print_json)
         }
     }
 
-    if (print_json.contains("heatbreak_fan_speed")) { heatbreak_fan_speed = stoi(print_json["heatbreak_fan_speed"].get<std::string>()); }
-
-
-
+    if (print_json.contains("heatbreak_fan_speed")) {
+        heatbreak_fan_speed = stoi(print_json["heatbreak_fan_speed"].get<std::string>());
+    }
 }
 
-void Slic3r::DevFan::ParseV2_0(const json &print_json) {
-
-     if (print_json.contains("support_aux_fan")) {
+void Slic3r::DevFan::ParseV2_0(const json& print_json)
+{
+    if (print_json.contains("support_aux_fan")) {
         if (print_json["support_aux_fan"].is_boolean())
             is_support_aux_fan = print_json["support_aux_fan"].get<bool>();
-     }
+    }
 
     if (print_json.contains("support_chamber_fan")) {
         if (print_json["support_chamber_fan"].is_boolean())
@@ -155,32 +161,36 @@ void Slic3r::DevFan::ParseV2_0(const json &print_json) {
     }
 }
 
-
-
-
-void Slic3r::DevFan::ParseV3_0(const json &device)
+void Slic3r::DevFan::ParseV3_0(const json& device)
 {
     if (device.contains("airduct")) {
-        is_support_airduct = true;
+        is_support_airduct          = true;
         m_air_duct_data.curren_mode = -1;
         m_air_duct_data.modes.clear();
         m_air_duct_data.parts.clear();
 
         m_air_duct_data.curren_mode = device["airduct"]["modeCur"].get<int>();
 
-        const json &airduct = device["airduct"];
-        if (airduct.contains("modeCur")) { m_air_duct_data.curren_mode = airduct["modeCur"].get<int>(); }
-        if (airduct.contains("subMode")) { m_air_duct_data.m_sub_mode = airduct["subMode"].get<int>(); }
+        const json& airduct = device["airduct"];
+        if (airduct.contains("modeCur")) {
+            m_air_duct_data.curren_mode = airduct["modeCur"].get<int>();
+        }
+        if (airduct.contains("subMode")) {
+            m_air_duct_data.m_sub_mode = airduct["subMode"].get<int>();
+        }
         if (airduct.contains("modeList") && airduct["modeList"].is_array()) {
             auto list = airduct["modeList"].get<std::vector<json>>();
 
             for (int i = 0; i < list.size(); ++i) {
                 // only show 2 mode for o
-                if (m_owner->is_series_o() && i >= 2) { break; }
+                if (m_owner->is_series_o() && i >= 2) {
+                    break;
+                }
 
                 json    mode_json = list[i];
                 AirMode mode;
-                if (mode_json.contains("modeId")) mode.id = mode_json["modeId"].get<int>();
+                if (mode_json.contains("modeId"))
+                    mode.id = mode_json["modeId"].get<int>();
                 if (mode_json.contains("ctrl")) {
                     for (auto it_mode_ctrl = mode_json["ctrl"].begin(); it_mode_ctrl != mode_json["ctrl"].end(); it_mode_ctrl++) {
                         mode.ctrl.push_back((*it_mode_ctrl).get<int>() >> 4);
@@ -193,7 +203,9 @@ void Slic3r::DevFan::ParseV3_0(const json &device)
                     }
                 }
 
-                if (AIR_DUCT(mode.id) == AIR_DUCT::AIR_DUCT_EXHAUST) { continue; } /*STUDIO-12796*/
+                if (AIR_DUCT(mode.id) == AIR_DUCT::AIR_DUCT_EXHAUST) {
+                    continue;
+                } /*STUDIO-12796*/
                 m_air_duct_data.modes[mode.id] = mode;
             }
         }
@@ -215,5 +227,4 @@ void Slic3r::DevFan::ParseV3_0(const json &device)
             }
         }
     }
-
 }
