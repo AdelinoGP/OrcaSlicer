@@ -127,7 +127,7 @@ Last updated: 2026-03-30T05:59:40Z
 - [x] T206 annotate: src/slic3r/GUI/CaliHistoryDialog.hpp
 - [x] T207 annotate: src/slic3r/GUI/Camera.cpp
 - [x] T208 annotate: src/slic3r/GUI/Camera.hpp
-- [ ] T209 annotate: src/slic3r/GUI/CameraPopup.cpp
+- [x] T209 annotate: src/slic3r/GUI/CameraPopup.cpp
 - [ ] T210 annotate: src/slic3r/GUI/CameraPopup.hpp
 - [ ] T211 annotate: src/slic3r/GUI/CameraUtils.cpp
 - [ ] T212 annotate: src/slic3r/GUI/CameraUtils.hpp

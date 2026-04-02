@@ -1574,3 +1574,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 0
 - Git: annotate: src/slic3r/GUI/Camera.hpp (T208)
 - Next recommended Phase 1 task: T209 src/slic3r/GUI/CameraPopup.cpp
+
+## Phase 1 - Task T209 complete
+- Task type: annotate
+- File: src/slic3r/GUI/CameraPopup.cpp
+- Deliverables: src/slic3r/GUI/CameraPopup.cpp
+- Substantive additions: Class-level annotations for CameraPopup and CameraItem.
+- Verification excerpt: // [INTENT] CameraPopup provides a transient UI for printer camera settings (recording, live view, resolution, custom source).
+- Unity-impact summary:
+  - Maps to anchored VisualElement popup in UI Toolkit.
+  - Custom CameraItem can be replaced by standard USS background-image states.
+  - Event flow (resolution change, switch) maps to standard UI events.
+- Hazards found: 0
+- Git: annotate: src/slic3r/GUI/CameraPopup.cpp (T209)
+- Next recommended Phase 1 task: T210 src/slic3r/GUI/CameraPopup.hpp
