@@ -9,5 +9,6 @@
 - Completed T225: src/slic3r/GUI/CreatePresetsDialog.cpp.
 - Completed T226: src/slic3r/GUI/CreatePresetsDialog.hpp.
 - Completed T227: src/slic3r/GUI/DailyTips.cpp.
-- Next task: T228 src/slic3r/GUI/DailyTips.hpp.
+- Completed T228: src/slic3r/GUI/DailyTips.hpp.
+- Next task: T229 src/slic3r/GUI/dark_mode.cpp.
 

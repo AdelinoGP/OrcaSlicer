@@ -1831,3 +1831,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Manual CJK text wrapping via transient wxWidgets Label)
 - Git: annotate: src/slic3r/GUI/DailyTips.cpp
 - Next recommended Phase 1 task: T228 src/slic3r/GUI/DailyTips.hpp
+
+## Phase 1 - Task T228 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DailyTips.hpp
+- Deliverables: src/slic3r/GUI/DailyTips.hpp
+- Substantive additions: 4 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Declarations for Daily Tips UI components (Panel and Modal Window).
+- Unity-impact summary:
+  - Header declares the public surface for the Daily Tips HUD.
+  - ImGui-specific types (ImVec2) should map to Unity's Vector2.
+  - Panel and Window classes should map to MonoBehaviour controllers in C#.
+- Hazards found: 1 (P3: Coupling with ImGui immediate-mode types)
+- Git: annotate: src/slic3r/GUI/DailyTips.hpp
+- Next recommended Phase 1 task: T229 src/slic3r/GUI/dark_mode.cpp
