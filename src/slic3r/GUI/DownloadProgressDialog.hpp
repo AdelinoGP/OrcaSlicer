@@ -1,3 +1,9 @@
+// [ANNOTATED]
+// [INTENT] Declaration of the modal dialog for network plug-in download/install tracking.
+// [STATE] Managed UI pages via wxSimplebook and background execution state via Worker/UpgradeNetworkJob.
+// [UNITY] Map to a C# ModalDialog with a page-based VisualElement tree. Replace background workers with Tasks.
+// [PORTING_HAZARD:P3] Shared use of BBLStatusBarSend for progress display requires a unified C# Progress component.
+
 #ifndef slic3r_DownloadProgressDialog_hpp_
 #define slic3r_DownloadProgressDialog_hpp_
 
@@ -27,9 +33,7 @@ class wxStaticBitmap;
 #define MSG_DIALOG_MIDDLE_BUTTON_SIZE wxSize(FromDIP(76), FromDIP(24))
 #define MSG_DIALOG_LONG_BUTTON_SIZE wxSize(FromDIP(90), FromDIP(24))
 
-
-namespace Slic3r {
-namespace GUI {
+namespace Slic3r { namespace GUI {
 
 class DownloadProgressDialog : public DPIDialog
 {
@@ -42,22 +46,20 @@ public:
     wxString format_text(wxStaticText* st, wxString str, int warp);
     ~DownloadProgressDialog();
 
-    void on_dpi_changed(const wxRect &suggested_rect) override;
+    void on_dpi_changed(const wxRect& suggested_rect) override;
     void update_release_note(std::string release_note, std::string version);
 
     wxSimplebook* m_simplebook_status{nullptr};
 
-	std::shared_ptr<BBLStatusBarSend> m_status_bar;
+    std::shared_ptr<BBLStatusBarSend> m_status_bar;
     std::unique_ptr<Worker>           m_worker;
-    wxPanel *                         m_panel_download;
+    wxPanel*                          m_panel_download;
 
 protected:
     virtual std::unique_ptr<UpgradeNetworkJob> make_job();
     virtual void                               on_finish();
 };
 
-
-}
-}
+}} // namespace Slic3r::GUI
 
 #endif
