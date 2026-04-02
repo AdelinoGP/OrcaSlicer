@@ -1925,3 +1925,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Deep reliance on Linux shell commands and environment variables)
 - Git: annotate: src/slic3r/GUI/DesktopIntegrationDialog.cpp
 - Next recommended Phase 1 task: T235 src/slic3r/GUI/DesktopIntegrationDialog.hpp
+
+## Phase 1 - Task T235 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DesktopIntegrationDialog.hpp
+- Deliverables: src/slic3r/GUI/DesktopIntegrationDialog.hpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Declaration of the Linux-specific desktop integration dialog and static management helpers.
+- Unity-impact summary:
+  - Linux-only module.
+  - Interface should map to a C# Service providing static integration helpers.
+  - Dialog class maps to a standard ModalWindow controller.
+- Hazards found: 1 (P2: Linux-only platform restriction)
+- Git: annotate: src/slic3r/GUI/DesktopIntegrationDialog.hpp
+- Next recommended Phase 1 task: T236 src/slic3r/GUI/DeviceCore/DevBed.cpp
