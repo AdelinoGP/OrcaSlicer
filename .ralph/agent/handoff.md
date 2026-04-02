@@ -2021,3 +2021,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Extensive bit-packed telemetry parsing logic)
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevExtruderSystem.cpp
 - Next recommended Phase 1 task: T242 src/slic3r/GUI/DeviceCore/DevExtruderSystemCtrl.cpp
+
+## Phase 1 - Task T242 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevExtruderSystemCtrl.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevExtruderSystemCtrl.cpp
+- Substantive additions: 4 ([INTENT], [EVENT], [UNITY] tags)
+- Verification excerpt: // [INTENT] Control commands for extruder toolhead switching (retry/quit).
+- Unity-impact summary:
+  - Toolhead control commands map to C# async methods.
+  - Interaction with AMS control logic stays in the networking layer.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevExtruderSystemCtrl.cpp
+- Next recommended Phase 1 task: T243 src/slic3r/GUI/DeviceCore/DevFan.cpp
