@@ -2359,3 +2359,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Multi-slicer protocol regex parsing)
 - Git: annotate: src/slic3r/GUI/Downloader.cpp
 - Next recommended Phase 1 task: T268 src/slic3r/GUI/DownloaderFileGet.cpp
+
+## Phase 1 - Task T268 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DownloaderFileGet.cpp
+- Deliverables: src/slic3r/GUI/DownloaderFileGet.cpp
+- Substantive additions: 6 ([INTENT], [STATE], [EVENT], [THREAD], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Low-level HTTP file retrieval using libcurl, with support for background threading, pausing, and resuming.
+- Unity-impact summary:
+  - Low-level curl logic replaced by UnityWebRequest or HttpClient.
+  - std::thread replaced by Task-based async/await.
+  - Manual file management (temp files, resuming) maps to managed C# System.IO patterns.
+- Hazards found: 1 (P2: Manual range-based resume and temp file logic)
+- Git: annotate: src/slic3r/GUI/DownloaderFileGet.cpp
+- Next recommended Phase 1 task: T269 src/slic3r/GUI/DownloaderFileGet.hpp

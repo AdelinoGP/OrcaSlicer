@@ -79,8 +79,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T265 annotate: src/slic3r/GUI/DeviceTab/uiAmsHumidityPopup.cpp
 - [x] T266 annotate: src/slic3r/GUI/DeviceTab/uiDeviceUpdateVersion.cpp
 - [x] T267 annotate: src/slic3r/GUI/Downloader.cpp
-- [~] T268 annotate: src/slic3r/GUI/DownloaderFileGet.cpp
-- [ ] T269 annotate: src/slic3r/GUI/DownloaderFileGet.hpp
+- [x] T268 annotate: src/slic3r/GUI/DownloaderFileGet.cpp
+- [~] T269 annotate: src/slic3r/GUI/DownloaderFileGet.hpp
 - [ ] T270 annotate: src/slic3r/GUI/Downloader.hpp
 - [ ] T271 annotate: src/slic3r/GUI/DownloadProgressDialog.cpp
 - [ ] T272 annotate: src/slic3r/GUI/DownloadProgressDialog.hpp
