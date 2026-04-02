@@ -21,26 +21,35 @@
 #include "DeviceManager.hpp"
 
 namespace Slic3r { namespace GUI {
+
+// [ANNOTATED]
+// [INTENT] Declaration of the ConnectPrinterDialog modal for LAN access code entry.
+// This dialog manages localized help images and the access code entry field.
+
 class ConnectPrinterDialog : public DPIDialog
 {
 private:
 protected:
-    wxStaticText *  m_staticText_connection_code;
-    TextInput *     m_textCtrl_code;
-    Button *        m_button_confirm;
+    // [UNITY] Replace with UI Toolkit equivalents: Label, TextField, Button, Image.
+    wxStaticText*   m_staticText_connection_code;
+    TextInput*      m_textCtrl_code;
+    Button*         m_button_confirm;
     wxStaticText*   m_staticText_hints;
     wxStaticBitmap* m_bitmap_diagram;
-    wxBitmap        m_diagram_bmp;
-    wxImage         m_diagram_img;
+    // [STATE] Cached bitmap and image for the help diagram.
+    wxBitmap m_diagram_bmp;
+    wxImage  m_diagram_img;
 
-    MachineObject*  m_obj{ nullptr };
-    wxString        m_input_access_code;
+    // [STATE] The target printer object and the entered access code.
+    MachineObject* m_obj{nullptr};
+    wxString       m_input_access_code;
+
 public:
-    ConnectPrinterDialog(wxWindow *      parent,
+    ConnectPrinterDialog(wxWindow*       parent,
                          wxWindowID      id    = wxID_ANY,
-                         const wxString &title = wxEmptyString,
-                         const wxPoint & pos   = wxDefaultPosition,
-                         const wxSize &  size  = wxDefaultSize,
+                         const wxString& title = wxEmptyString,
+                         const wxPoint&  pos   = wxDefaultPosition,
+                         const wxSize&   size  = wxDefaultSize,
                          long            style = wxCLOSE_BOX | wxCAPTION);
 
     ~ConnectPrinterDialog();
@@ -49,8 +58,8 @@ public:
     void init_bitmap();
     void set_machine_object(MachineObject* obj);
     void on_input_enter(wxCommandEvent& evt);
-    void on_button_confirm(wxCommandEvent &event);
-    void on_dpi_changed(const wxRect &suggested_rect) override;
+    void on_button_confirm(wxCommandEvent& event);
+    void on_dpi_changed(const wxRect& suggested_rect) override;
 };
 }} // namespace Slic3r::GUI
 

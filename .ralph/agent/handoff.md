@@ -1774,3 +1774,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P3: Manual aspect-ratio calculation and image rescaling during UI setup)
 - Git: annotate: src/slic3r/GUI/ConnectPrinter.cpp
 - Next recommended Phase 1 task: T224 src/slic3r/GUI/ConnectPrinter.hpp
+
+## Phase 1 - Task T224 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ConnectPrinter.hpp
+- Deliverables: src/slic3r/GUI/ConnectPrinter.hpp
+- Substantive additions: 4 ([INTENT], [STATE], [UNITY] tags)
+- Verification excerpt: // [INTENT] Declaration of the ConnectPrinterDialog modal for LAN access code entry.
+- Unity-impact summary:
+  - Header declaration maps to a C# class inheriting from a base ModalDialog controller.
+  - UI member variables map to references in a UI Toolkit VisualElement or a serialized MonoBehaviour.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/ConnectPrinter.hpp
+- Next recommended Phase 1 task: T225 src/slic3r/GUI/CreatePresetsDialog.cpp
