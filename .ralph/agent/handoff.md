@@ -1859,3 +1859,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P1: Deep coupling to Windows internal theme engine)
 - Git: annotate: src/slic3r/GUI/dark_mode.cpp
 - Next recommended Phase 1 task: T230 src/slic3r/GUI/dark_mode/dark_mode.hpp
+
+## Phase 1 - Task T230 complete
+- Task type: annotate
+- File: src/slic3r/GUI/dark_mode/dark_mode.hpp
+- Deliverables: src/slic3r/GUI/dark_mode/dark_mode.hpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Internal implementation of Windows-specific Dark Mode hooks using undocumented Win32 APIs and ordinals.
+- Unity-impact summary:
+  - Completely redundant in Unity.
+  - Undocumented Win32 API hooking and dynamic thunk patching are not applicable to Unity's managed environment.
+- Hazards found: 1 (P1: Deep reliance on undocumented Win32 ordinals and memory patching)
+- Git: annotate: src/slic3r/GUI/dark_mode/dark_mode.hpp
+- Next recommended Phase 1 task: T231 src/slic3r/GUI/dark_mode.hpp
