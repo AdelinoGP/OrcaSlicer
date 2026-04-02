@@ -1,3 +1,10 @@
+// [ANNOTATED]
+// [INTENT] Command lifecycle management, sequencing, and timeout handling for printer control messages.
+// [STATE] Tracks outstanding requests by sequence ID and timestamp to prevent state thrashing.
+// [EVENT] Monitors incoming telemetry to confirm successful command execution or trigger timeouts.
+// [UNITY] Map to a C# CommandService using Tasks and CancellationTokenSource for robust async control.
+// [PORTING_HAZARD:P2] Manual sequence ID management and state-polling for command confirmation should be centralized.
+
 #include <nlohmann/json.hpp>
 #include "DevCtrl.h"
 
@@ -7,16 +14,14 @@
 
 using namespace nlohmann;
 
-namespace Slic3r
-{
+namespace Slic3r {
 
-DevCtrlInfo::DevCtrlInfo(MachineObject* obj, int sequence_id, const json& req_json,
-                         int interval_max, int interval_min)
+DevCtrlInfo::DevCtrlInfo(MachineObject* obj, int sequence_id, const json& req_json, int interval_max, int interval_min)
 {
-    m_request_dev_id = obj->get_dev_id();
-    m_request_seq = sequence_id;
-    m_request_time = time(nullptr);
-    m_request_json = req_json;
+    m_request_dev_id       = obj->get_dev_id();
+    m_request_seq          = sequence_id;
+    m_request_time         = time(nullptr);
+    m_request_json         = req_json;
     m_request_interval_max = interval_max;
     m_request_interval_min = interval_min;
 }
@@ -56,18 +61,17 @@ bool DevCtrlInfo::CheckCanUpdateData(const nlohmann::json& jj)
     return false;
 }
 
-    int DevCtrl::command_select_extruder(int id)
-    {
-        json j;
-        j["print"]["sequence_id"] = std::to_string(MachineObject::m_sequence_id++);
-        j["print"]["command"] = "select_extruder";
-        j["print"]["extruder_index"] = id;
-        int rtn = m_obj->publish_json(j, 1);
-        if (rtn == 0)
-        {
-            m_obj->targ_nozzle_id_from_pc = id;
-        }
-
-        return rtn;
+int DevCtrl::command_select_extruder(int id)
+{
+    json j;
+    j["print"]["sequence_id"]    = std::to_string(MachineObject::m_sequence_id++);
+    j["print"]["command"]        = "select_extruder";
+    j["print"]["extruder_index"] = id;
+    int rtn                      = m_obj->publish_json(j, 1);
+    if (rtn == 0) {
+        m_obj->targ_nozzle_id_from_pc = id;
     }
+
+    return rtn;
 }
+} // namespace Slic3r

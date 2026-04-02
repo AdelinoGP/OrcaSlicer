@@ -1979,3 +1979,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: wxWidgets/Boost-specific resource discovery)
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevConfigUtil.cpp
 - Next recommended Phase 1 task: T239 src/slic3r/GUI/DeviceCore/DevCtrl.cpp
+
+## Phase 1 - Task T239 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevCtrl.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevCtrl.cpp
+- Substantive additions: 5 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Command lifecycle management, sequencing, and timeout handling for printer control messages.
+- Unity-impact summary:
+  - Command lifecycle should map to a C# Service using Task-based async/await.
+  - Manual sequence ID and timeout polling replaced by robust async patterns.
+  - Command execution (publishing JSON) stays in the network agent layer.
+- Hazards found: 1 (P2: Manual command-response correlation logic)
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevCtrl.cpp
+- Next recommended Phase 1 task: T240 src/slic3r/GUI/DeviceCore/DevExtensionTool.cpp
