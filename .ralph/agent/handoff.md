@@ -2074,3 +2074,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevFilaAmsSettingCtrl.cpp
 - Next recommended Phase 1 task: T246 src/slic3r/GUI/DeviceCore/DevFilaBlackList.cpp
+
+## Phase 1 - Task T246 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevFilaBlackList.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevFilaBlackList.cpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Validation logic for filament compatibility with AMS units and specific printer models.
+- Unity-impact summary:
+  - Filament validation logic maps to a C# FilamentValidationService.
+  - Blacklist data should be stored in a ScriptableObject for easy maintenance.
+  - Localization of warning/error messages handled via Unity's Localization package.
+- Hazards found: 1 (P2: Complex multi-factor matching for hardware safety)
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevFilaBlackList.cpp
+- Next recommended Phase 1 task: T247 src/slic3r/GUI/DeviceCore/DevFilaSystem.cpp
