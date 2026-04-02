@@ -15,5 +15,6 @@
 - Completed T231: src/slic3r/GUI/dark_mode.hpp.
 - Completed T232: src/slic3r/GUI/dark_mode/IatHook.hpp.
 - Completed T233: src/slic3r/GUI/dark_mode/UAHMenuBar.hpp.
-- Next task: T234 src/slic3r/GUI/DesktopIntegrationDialog.cpp.
+- Completed T234: src/slic3r/GUI/DesktopIntegrationDialog.cpp.
+- Next task: T235 src/slic3r/GUI/DesktopIntegrationDialog.hpp.
 

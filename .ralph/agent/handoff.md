@@ -1911,3 +1911,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P1: Deep reliance on Windows Win32 internal messages)
 - Git: annotate: src/slic3r/GUI/dark_mode/UAHMenuBar.hpp
 - Next recommended Phase 1 task: T234 src/slic3r/GUI/DesktopIntegrationDialog.cpp
+
+## Phase 1 - Task T234 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DesktopIntegrationDialog.cpp
+- Deliverables: src/slic3r/GUI/DesktopIntegrationDialog.cpp
+- Substantive additions: 5 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Linux-specific implementation for desktop integration (creating .desktop files, icons, and URL handlers).
+- Unity-impact summary:
+  - Linux-only functionality.
+  - Logic should be moved to a platform-specific Build Service or standalone installer utility.
+  - UI maps to a standard Unity Modal Window.
+- Hazards found: 1 (P2: Deep reliance on Linux shell commands and environment variables)
+- Git: annotate: src/slic3r/GUI/DesktopIntegrationDialog.cpp
+- Next recommended Phase 1 task: T235 src/slic3r/GUI/DesktopIntegrationDialog.hpp
