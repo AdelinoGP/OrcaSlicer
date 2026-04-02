@@ -1993,3 +1993,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Manual command-response correlation logic)
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevCtrl.cpp
 - Next recommended Phase 1 task: T240 src/slic3r/GUI/DeviceCore/DevExtensionTool.cpp
+
+## Phase 1 - Task T240 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevExtensionTool.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevExtensionTool.cpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Parsers for printer extension tools (cutters, lasers, auxiliary fans) telemetry.
+- Unity-impact summary:
+  - Accessory telemetry maps to a C# accessory data model.
+  - State used to dynamically show/hide specialized UI panels in Unity.
+  - JSON parsing should be moved to a Telemetry Service.
+- Hazards found: 1 (P3: safe concurrent access via weak_ptr)
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevExtensionTool.cpp
+- Next recommended Phase 1 task: T241 src/slic3r/GUI/DeviceCore/DevExtruderSystem.cpp
