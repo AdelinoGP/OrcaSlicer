@@ -14,9 +14,28 @@ class PresetUpdater;
 
 namespace GUI {
 
-// [INTENT] Main class responsible for orchestrating the initial configuration of the slicer, guiding the user through setting up printers,
-// filaments, etc. [UNITY] MonoBehaviour for handling UI dialog logic, likely using Unity UI Toolkit for cross-platform layout.
-class ConfigWizard : public DPIDialog // [UNITY] Base class for DPI-aware Dialogs, map to custom Unity BaseDialog or Panel
+/*
+ [INTENT]
+ Main class for the multi-page configuration wizard.
+ Manages the lifecycle of vendor profile discovery, printer selection,
+ and initial application settings.
+
+ [STATE]
+ - RunReason: Why the wizard was triggered (first run, update, user-requested).
+ - StartPage: Which page to show first.
+ - priv* p: Pimpl containing the actual wizard pages and the temporary PresetBundle.
+
+ [UNITY]
+ - MonoBehaviour (ConfigWizardController) for handling dialog flow.
+ - Map to a multi-step UI Toolkit or uGUI wizard.
+ - Use a ScriptableObject to store the temporary configuration being built.
+
+ [PORTING_HAZARD:P2]
+ The wizard logic is heavily dependent on the Pimpl (priv) structure which
+ manages complex wxWidgets page transitions. In Unity, this should be
+ refactored into a clear State Machine or navigation controller.
+*/
+class ConfigWizard : public DPIDialog
 {
 public:
     // [INTENT] Defines the reason for triggering the configuration wizard.

@@ -1720,3 +1720,29 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Tight coupling to wxWidgets MessageDialog)
 - Git: annotate: src/slic3r/GUI/ConfigManipulation.hpp
 - Next recommended Phase 1 task: T220 annotate: src/slic3r/GUI/ConfigWizard.cpp
+
+## Phase 1 - Task T220 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ConfigWizard.cpp
+- Deliverables: src/slic3r/GUI/ConfigWizard.cpp
+- Substantive additions: 3 major annotation blocks
+- Verification excerpt: [UNITY] Each Wizard Page (PageWelcome, PagePrinters, etc.) should be a separate VisualElement or Prefab.
+- Unity-impact summary:
+  - Complex multi-page flow should move to a navigation controller.
+  - Linked list selection logic (Printer -> Profile) should be reactive.
+- Hazards found: 1 (P2: Complex dynamic layout and custom widgets)
+- Git: annotate: src/slic3r/GUI/ConfigWizard.cpp
+- Next recommended Phase 1 task: T221 annotate: src/slic3r/GUI/ConfigWizard.hpp
+
+## Phase 1 - Task T221 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ConfigWizard.hpp
+- Deliverables: src/slic3r/GUI/ConfigWizard.hpp
+- Substantive additions: 1 class-level annotation block
+- Verification excerpt: [INTENT] Main class for the multi-page configuration wizard.
+- Unity-impact summary:
+  - Map to a MonoBehaviour-based wizard controller.
+  - Pimpl structure should be replaced with a proper State Machine.
+- Hazards found: 1 (P2: Tight coupling to Pimpl-managed wxWidgets pages)
+- Git: annotate: src/slic3r/GUI/ConfigWizard.hpp
+- Next recommended Phase 1 task: T222 annotate: src/slic3r/GUI/ConfigWizard_private.hpp

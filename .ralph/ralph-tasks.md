@@ -31,8 +31,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T217 skip-trivial: src/slic3r/GUI/ConfigExceptions.hpp
 - [x] T218 annotate: src/slic3r/GUI/ConfigManipulation.cpp
 - [x] T219 annotate: src/slic3r/GUI/ConfigManipulation.hpp
-- [ ] T220 annotate: src/slic3r/GUI/ConfigWizard.cpp
-- [ ] T221 annotate: src/slic3r/GUI/ConfigWizard.hpp
+- [x] T220 annotate: src/slic3r/GUI/ConfigWizard.cpp
+- [x] T221 annotate: src/slic3r/GUI/ConfigWizard.hpp
 - [ ] T222 annotate: src/slic3r/GUI/ConfigWizard_private.hpp
 - [ ] T223 annotate: src/slic3r/GUI/ConnectPrinter.cpp
 - [ ] T224 annotate: src/slic3r/GUI/ConnectPrinter.hpp

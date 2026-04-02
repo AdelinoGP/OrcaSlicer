@@ -58,6 +58,27 @@
 
 namespace Slic3r { namespace GUI {
 
+/*
+ [INTENT]
+ ConfigWizard implements the multi-page onboarding and configuration process.
+ It handles printer selection, filament/material discovery, and initial setup tasks.
+
+ [STATE]
+ - BundleMap: Cache of available vendor profile definitions (JSON-based).
+ - Current page index and navigation history.
+ - New configuration state being built during the wizard flow.
+
+ [UNITY]
+ - Use a Screen-level MonoBehaviour (ConfigWizardController) to manage page transitions.
+ - Each Wizard Page (PageWelcome, PagePrinters, etc.) should be a separate VisualElement or Prefab.
+ - Data-binding should be used to sync the wizard's temporary config state with the UI fields.
+
+ [PORTING_HAZARD:P2]
+ The wizard uses complex dynamic layout logic (wxFlexGridSizer, wxBoxSizer) and
+ custom-painted widgets (PrinterPicker). Replicating the exact responsive behavior
+ in Unity UI requires careful layout design (LayoutGroups, USS).
+*/
+
 using Config::Snapshot;
 using Config::SnapshotDB;
 
@@ -113,9 +134,7 @@ Bundle::Bundle(Bundle&& other)
     , vendor_profile(other.vendor_profile)
     , is_in_resources(other.is_in_resources)
     , is_bbl_bundle(other.is_bbl_bundle)
-{
-    other.vendor_profile = nullptr;
-}
+{ other.vendor_profile = nullptr; }
 
 BundleMap BundleMap::load()
 {
@@ -657,6 +676,19 @@ PageMaterials::PageMaterials(ConfigWizard* parent, Materials* materials, wxStrin
     , list_vendor(new StringList(this))
     , list_profile(new PresetList(this))
 {
+    /*
+     [INTENT]
+     A wizard page for selecting filaments or SLA materials.
+     Features a multi-column linked list (Printer -> Type -> Vendor -> Profile).
+
+     [STATE]
+     Maintains selection state for each list and filters presets dynamically based on dependencies.
+
+     [UNITY]
+     Map to a complex UI Toolkit view with multiple ListViews.
+     The filtering logic should be reactive, updating the data-source of dependent lists
+     when a parent list selection changes.
+    */
     SetBackgroundColour(*wxWHITE);
     append_spacer(VERTICAL_SPACING);
 
@@ -778,23 +810,23 @@ void PageMaterials::set_compatible_printers_html_window(const std::vector<std::s
     const auto bgr_clr_str  = encode_color(ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
     const auto text_clr_str = encode_color(ColorRGB(text_clr.Red(), text_clr.Green(), text_clr.Blue()));
     wxString   first_line   = format_wxstr(_L("%1% marked with <b>*</b> are <b>not</b> compatible with some installed printers."),
-                                       materials->technology == T_FFF ? _L("Filaments") : _L("SLA materials"));
+                                           materials->technology == T_FFF ? _L("Filaments") : _L("SLA materials"));
     wxString   text;
     if (all_printers) {
         wxString second_line = format_wxstr(_L("All installed printers are compatible with the selected %1%."),
                                             materials->technology == T_FFF ? _L("filament") : _L("SLA material"));
         text                 = wxString::Format("<html>"
-                                                                "<style>"
-                                                                "table{border-spacing: 1px;}"
-                                                                "</style>"
-                                                                "<body bgcolor= %s>"
-                                                                "<font color=%s>"
-                                                                "<font size=\"3\">"
-                                                                "%s<br /><br />%s"
-                                                                "</font>"
-                                                                "</font>"
-                                                                "</body>"
-                                                                "</html>",
+                                                "<style>"
+                                                "table{border-spacing: 1px;}"
+                                                "</style>"
+                                                "<body bgcolor= %s>"
+                                                "<font color=%s>"
+                                                "<font size=\"3\">"
+                                                "%s<br /><br />%s"
+                                                "</font>"
+                                                "</font>"
+                                                "</body>"
+                                                "</html>",
                                                 bgr_clr_str, text_clr_str, first_line, second_line);
     } else {
         wxString second_line;
@@ -1715,19 +1747,13 @@ void Materials::clear()
 }
 
 const std::string& Materials::appconfig_section() const
-{
-    return (technology & T_FFF) ? AppConfig::SECTION_FILAMENTS : AppConfig::SECTION_MATERIALS;
-}
+{ return (technology & T_FFF) ? AppConfig::SECTION_FILAMENTS : AppConfig::SECTION_MATERIALS; }
 
 const std::string& Materials::get_type(const Preset* preset) const
-{
-    return (technology & T_FFF) ? get_filament_type(preset) : get_material_type(preset);
-}
+{ return (technology & T_FFF) ? get_filament_type(preset) : get_material_type(preset); }
 
 const std::string& Materials::get_vendor(const Preset* preset) const
-{
-    return (technology & T_FFF) ? get_filament_vendor(preset) : get_material_vendor(preset);
-}
+{ return (technology & T_FFF) ? get_filament_vendor(preset) : get_material_vendor(preset); }
 
 const std::string& Materials::get_filament_type(const Preset* preset)
 {
@@ -2485,8 +2511,8 @@ bool ConfigWizard::priv::apply_config(AppConfig*           app_config,
 
     std::string preferred_model;
     std::string preferred_variant;
-    const auto  enabled_vendors_old         = app_config->vendors();
-    auto        get_preferred_printer_model = [enabled_vendors, enabled_vendors_old, preferred_pt](const std::string& bundle_name,
+    const auto  enabled_vendors_old  = app_config->vendors();
+    auto get_preferred_printer_model = [enabled_vendors, enabled_vendors_old, preferred_pt](const std::string& bundle_name,
                                                                                             const Bundle& bundle, std::string& variant) {
         const auto config = enabled_vendors.find(bundle_name);
         if (config == enabled_vendors.end())
@@ -2543,8 +2569,8 @@ bool ConfigWizard::priv::apply_config(AppConfig*           app_config,
         if (appconfig_new.has_section(section_name)) {
             // get first of new added preset names
             const std::map<std::string, std::string>& old_presets = app_config->has_section(section_name) ?
-                                                                               app_config->get_section(section_name) :
-                                                                               std::map<std::string, std::string>();
+                                                                        app_config->get_section(section_name) :
+                                                                        std::map<std::string, std::string>();
             first_added_preset = get_first_added_preset(old_presets, appconfig_new.get_section(section_name));
         }
     };
@@ -2659,6 +2685,20 @@ ConfigWizard::ConfigWizard(wxWindow* parent)
                 wxDEFAULT_DIALOG_STYLE /*| wxRESIZE_BORDER*/)
     , p(new priv(this))
 {
+    /*
+     [INTENT]
+     The root controller for the configuration wizard.
+     Responsible for creating all wizard pages and managing the navigation flow.
+
+     [STATE]
+     - m_pages: Collection of all wizard pages (managed by priv* p).
+     - m_current_page: Pointer to the currently active page.
+     - appconfig_new: Temporary configuration store that is committed only on Finish.
+
+     [UNITY]
+     This constructor logic should map to a MonoBehaviour's Start or Initialize method.
+     Pages should be lazily instantiated or loaded from Addressables/Resources.
+    */
     this->SetFont(wxGetApp().normal_font());
     SetBackgroundColour(*wxWHITE);
     p->load_vendors();
