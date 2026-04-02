@@ -5,28 +5,42 @@
 
 namespace Slic3r { namespace GUI {
 
-CloneDialog::CloneDialog(wxWindow *parent)
-    : DPIDialog(parent ? parent : static_cast<wxWindow *>(wxGetApp().mainframe), wxID_ANY, _L("Clone"), wxDefaultPosition, wxDefaultSize, wxCAPTION | wxCLOSE_BOX)
+CloneDialog::CloneDialog(wxWindow* parent)
+    : DPIDialog(parent ? parent : static_cast<wxWindow*>(wxGetApp().mainframe),
+                wxID_ANY,
+                _L("Clone"),
+                wxDefaultPosition,
+                wxDefaultSize,
+                wxCAPTION | wxCLOSE_BOX)
 {
+    /*
+     [INTENT]
+     Initialize the Clone dialog UI elements (count spinbox, auto-arrange checkbox, progress bar).
+
+     [EVENT]
+     - OK Button: Iteratively clones the current selection using the clipboard.
+     - Fill Button: Calls plater->fill_bed_with_instances() for immediate bed filling.
+     - Cancel Button: Interrupts the cloning loop and closes the dialog.
+    */
     SetBackgroundColour(*wxWHITE);
     SetFont(Label::Body_14);
 
-    m_plater = wxGetApp().plater();
-    m_config = wxGetApp().app_config;
+    m_plater         = wxGetApp().plater();
+    m_config         = wxGetApp().app_config;
     m_cancel_process = false;
 
     auto v_sizer = new wxBoxSizer(wxVERTICAL);
     auto f_sizer = new wxFlexGridSizer(2, 2, FromDIP(4), FromDIP(20));
 
     auto count_label = new wxStaticText(this, wxID_ANY, _L("Number of copies:"), wxDefaultPosition, wxDefaultSize, 0);
-    m_count_spin = new SpinInput(this, wxEmptyString, "", wxDefaultPosition, wxSize(FromDIP(120), -1), wxSP_ARROW_KEYS, 1, 1000, 1);
+    m_count_spin     = new SpinInput(this, wxEmptyString, "", wxDefaultPosition, wxSize(FromDIP(120), -1), wxSP_ARROW_KEYS, 1, 1000, 1);
     m_count_spin->GetTextCtrl()->SetFocus();
-    m_count_spin->Bind(wxEVT_KILL_FOCUS, [this](wxFocusEvent &e) {
+    m_count_spin->Bind(wxEVT_KILL_FOCUS, [this](wxFocusEvent& e) {
         e.SetId(GetId());
         ProcessEventLocally(e);
         e.Skip();
     });
-    f_sizer->Add(count_label  , 0, wxEXPAND | wxALIGN_CENTER_VERTICAL);
+    f_sizer->Add(count_label, 0, wxEXPAND | wxALIGN_CENTER_VERTICAL);
     f_sizer->Add(m_count_spin, 0, wxALIGN_CENTER_VERTICAL);
 
     auto arrange_label = new wxStaticText(this, wxID_ANY, _L("Auto arrange plate after cloning") + ":", wxDefaultPosition, wxDefaultSize, 0);
@@ -35,12 +49,12 @@ CloneDialog::CloneDialog(wxWindow *parent)
     m_arrange_cb->SetValue(m_config->get("auto_arrange") == "true");
 
     f_sizer->Add(arrange_label, 0, wxEXPAND | wxALIGN_CENTER_VERTICAL);
-    f_sizer->Add(m_arrange_cb , 0, wxALIGN_CENTER_VERTICAL | wxTOP | wxBOTTOM, FromDIP(5));
+    f_sizer->Add(m_arrange_cb, 0, wxALIGN_CENTER_VERTICAL | wxTOP | wxBOTTOM, FromDIP(5));
 
     v_sizer->Add(f_sizer, 1, wxEXPAND | wxALL, FromDIP(10));
 
     auto bottom_sizer = new wxBoxSizer(wxHORIZONTAL);
-    m_progress = new ProgressBar(this, wxID_ANY, 100);
+    m_progress        = new ProgressBar(this, wxID_ANY, 100);
     m_progress->SetHeight(FromDIP(8));
     m_progress->SetMaxSize(wxSize(-1, FromDIP(8)));
     m_progress->SetProgressForedColour(StateColor::darkModeColorFor(wxColour("#DFDFDF")));
@@ -51,16 +65,26 @@ CloneDialog::CloneDialog(wxWindow *parent)
     auto dlg_btns = new DialogButtons(this, {"Fill", "OK", "Cancel"}, "", 1 /*left_aligned*/);
 
     // Keep pointer to OK button so we can trigger it manually on Enter.
-    Button *ok_btn = dlg_btns->GetOK();
+    Button* ok_btn = dlg_btns->GetOK();
 
     dlg_btns->GetFIRST()->SetToolTip(_L("Fill bed with copies"));
-    dlg_btns->GetFIRST()->Bind(wxEVT_BUTTON, [this](wxCommandEvent &e) {
+    dlg_btns->GetFIRST()->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) {
         m_plater->fill_bed_with_instances();
         EndModal(wxID_OK);
     });
 
-    dlg_btns->GetOK()->Bind(wxEVT_BUTTON, [this, dlg_btns, v_sizer](wxCommandEvent &e) {
+    dlg_btns->GetOK()->Bind(wxEVT_BUTTON, [this, dlg_btns, v_sizer](wxCommandEvent& e) {
+        /*
+         [INTENT]
+         Iteratively clone the current selection based on the user-specified count.
 
+         [THREAD]
+         Executed on the UI thread. Uses wxYield() to prevent freezing and allow progress bar updates.
+
+         [PORTING_HAZARD:P2]
+         Blocking the UI thread with a tight loop and manual event yields is fragile in Unity.
+         This logic should be refactored into a Coroutine or async Task that yields back to the engine.
+        */
         m_count_spin->Disable(); // also ensures input box value applied with wxEVT_KILL_FOCUS
         m_arrange_cb->Disable();
 
@@ -79,7 +103,7 @@ CloneDialog::CloneDialog(wxWindow *parent)
         m_plater->take_snapshot(std::string("Selection-clone"));
         m_plater->Freeze(); // Better to stop rendering canvas while processing
         sel.copy_to_clipboard();
-        for (int i = 0; i < m_count; i++) { // same method with Selection::clone()
+        for (int i = 0; i < m_count; i++) {                                                 // same method with Selection::clone()
             m_progress->SetValue(static_cast<int>(static_cast<double>(i) / m_count * 100)); // pass 0 / 100
             sel.paste_from_clipboard();
 
@@ -87,7 +111,7 @@ CloneDialog::CloneDialog(wxWindow *parent)
                 m_plater->undo();
                 return;
             }
- 
+
             wxYield(); // Allow event loop to process updates
         }
 
@@ -101,7 +125,7 @@ CloneDialog::CloneDialog(wxWindow *parent)
         }
     });
 
-    dlg_btns->GetCANCEL()->Bind(wxEVT_BUTTON, [this](wxCommandEvent &) {
+    dlg_btns->GetCANCEL()->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
         m_cancel_process = true;
         if (m_plater->IsFrozen())
             m_plater->Thaw();
@@ -120,13 +144,10 @@ CloneDialog::CloneDialog(wxWindow *parent)
 
     // ------------------ ENTER KEY OVERRIDE ------------------
     // This makes Enter inside the spinbox behave EXACTLY like clicking OK.
-    Bind(wxEVT_CHAR_HOOK, [this, ok_btn](wxKeyEvent &e)
-    {
+    Bind(wxEVT_CHAR_HOOK, [this, ok_btn](wxKeyEvent& e) {
         const int key = e.GetKeyCode();
 
-        if ((key == WXK_RETURN || key == WXK_NUMPAD_ENTER) &&
-            m_count_spin->GetTextCtrl()->HasFocus())
-        {
+        if ((key == WXK_RETURN || key == WXK_NUMPAD_ENTER) && m_count_spin->GetTextCtrl()->HasFocus()) {
             // Trigger OK button's handler manually
             wxCommandEvent evt(wxEVT_BUTTON, ok_btn->GetId());
             ok_btn->GetEventHandler()->ProcessEvent(evt);

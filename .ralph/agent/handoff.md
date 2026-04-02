@@ -1656,3 +1656,29 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 0
 - Git: annotate: src/slic3r/GUI/CapsuleButton.hpp
 - Next recommended Phase 1 task: T215 annotate: src/slic3r/GUI/CloneDialog.cpp
+
+## Phase 1 - Task T215 complete
+- Task type: annotate
+- File: src/slic3r/GUI/CloneDialog.cpp
+- Deliverables: src/slic3r/GUI/CloneDialog.cpp
+- Substantive additions: 2 annotation blocks
+- Verification excerpt: [THREAD] Executed on the UI thread. Uses wxYield() to prevent freezing and allow progress bar updates.
+- Unity-impact summary:
+  - Iterative cloning should move to a Coroutine or async Task.
+  - Progress bar updates should be decoupled from the UI thread block.
+- Hazards found: 1 (P2: UI thread blocking with wxYield)
+- Git: annotate: src/slic3r/GUI/CloneDialog.cpp
+- Next recommended Phase 1 task: T216 annotate: src/slic3r/GUI/CloneDialog.hpp
+
+## Phase 1 - Task T216 complete
+- Task type: annotate
+- File: src/slic3r/GUI/CloneDialog.hpp
+- Deliverables: src/slic3r/GUI/CloneDialog.hpp
+- Substantive additions: 1 class-level annotation block
+- Verification excerpt: [INTENT] CloneDialog is a modal dialog for duplicating selected 3D objects/instances.
+- Unity-impact summary:
+  - Map to a modal UI Toolkit panel or prefab.
+  - Async task for cloning to preserve responsiveness.
+- Hazards found: 1 (P2: Iterative clipboard-based cloning)
+- Git: annotate: src/slic3r/GUI/CloneDialog.hpp
+- Next recommended Phase 1 task: T217 annotate: src/slic3r/GUI/ConfigExceptions.hpp

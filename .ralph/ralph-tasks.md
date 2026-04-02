@@ -26,8 +26,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T212 annotate: src/slic3r/GUI/CameraUtils.hpp
 - [x] T213 annotate: src/slic3r/GUI/CapsuleButton.cpp
 - [x] T214 annotate: src/slic3r/GUI/CapsuleButton.hpp
-- [ ] T215 annotate: src/slic3r/GUI/CloneDialog.cpp
-- [ ] T216 annotate: src/slic3r/GUI/CloneDialog.hpp
+- [x] T215 annotate: src/slic3r/GUI/CloneDialog.cpp
+- [x] T216 annotate: src/slic3r/GUI/CloneDialog.hpp
 - [ ] T217 annotate: src/slic3r/GUI/ConfigExceptions.hpp
 - [ ] T218 annotate: src/slic3r/GUI/ConfigManipulation.cpp
 - [ ] T219 annotate: src/slic3r/GUI/ConfigManipulation.hpp
