@@ -2140,3 +2140,14 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Precise bitwise error code decoding requirement)
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevHMS.cpp
 - Next recommended Phase 1 task: T251 src/slic3r/GUI/DeviceCore/DevInfo.cpp
+
+## Phase 1 - Task T251 complete
+- Task type: skip-trivial
+- File: src/slic3r/GUI/DeviceCore/DevInfo.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevInfo.cpp
+- Substantive additions: none ([SKIP_TRIVIAL] tag only)
+- Verification excerpt: // [SKIP_TRIVIAL] 7-line file with no implementation logic or state.
+- Unity-impact summary: none
+- Hazards found: none
+- Git: skip-trivial: src/slic3r/GUI/DeviceCore/DevInfo.cpp
+- Next recommended Phase 1 task: T252 src/slic3r/GUI/DeviceCore/DevLamp.cpp
