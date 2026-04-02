@@ -1898,3 +1898,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P1: Deep reliance on Windows binary internals)
 - Git: annotate: src/slic3r/GUI/dark_mode/IatHook.hpp
 - Next recommended Phase 1 task: T233 src/slic3r/GUI/dark_mode/UAHMenuBar.hpp
+
+## Phase 1 - Task T233 complete
+- Task type: annotate
+- File: src/slic3r/GUI/dark_mode/UAHMenuBar.hpp
+- Deliverables: src/slic3r/GUI/dark_mode/UAHMenuBar.hpp
+- Substantive additions: 4 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Internal Win32 declarations for owner-drawing the legacy system menu bar to support Dark Mode.
+- Unity-impact summary:
+  - Completely redundant in Unity.
+  - Native owner-drawing of system menus is not required in Unity's UI architecture.
+- Hazards found: 1 (P1: Deep reliance on Windows Win32 internal messages)
+- Git: annotate: src/slic3r/GUI/dark_mode/UAHMenuBar.hpp
+- Next recommended Phase 1 task: T234 src/slic3r/GUI/DesktopIntegrationDialog.cpp

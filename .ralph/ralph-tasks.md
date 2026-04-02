@@ -44,8 +44,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T230 annotate: src/slic3r/GUI/dark_mode/dark_mode.hpp
 - [x] T231 annotate: src/slic3r/GUI/dark_mode.hpp
 - [x] T232 annotate: src/slic3r/GUI/dark_mode/IatHook.hpp
-- [~] T233 annotate: src/slic3r/GUI/dark_mode/UAHMenuBar.hpp
-- [ ] T234 annotate: src/slic3r/GUI/DesktopIntegrationDialog.cpp
+- [x] T233 annotate: src/slic3r/GUI/dark_mode/UAHMenuBar.hpp
+- [~] T234 annotate: src/slic3r/GUI/DesktopIntegrationDialog.cpp
 - [ ] T235 annotate: src/slic3r/GUI/DesktopIntegrationDialog.hpp
 - [ ] T236 annotate: src/slic3r/GUI/DeviceCore/DevBed.cpp
 - [ ] T237 annotate: src/slic3r/GUI/DeviceCore/DevConfig.cpp
