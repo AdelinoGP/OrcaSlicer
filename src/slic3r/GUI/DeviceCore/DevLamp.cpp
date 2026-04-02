@@ -1,3 +1,8 @@
+// [ANNOTATED]
+// [INTENT] Status parsing for printer lighting (chamber light).
+// [STATE] Updates chamber light effect state (ON, OFF, FLASHING) from telemetry strings.
+// [UNITY] Map to a C# light status model within the PrinterService.
+
 #include "DevLamp.h"
 
 static Slic3r::DevLamp::LIGHT_EFFECT _light_effect_parse(std::string effect_str)
@@ -12,7 +17,4 @@ static Slic3r::DevLamp::LIGHT_EFFECT _light_effect_parse(std::string effect_str)
     return Slic3r::DevLamp::LIGHT_EFFECT_UNKOWN;
 }
 
-void Slic3r::DevLamp::SetChamberLight(const std::string& status)
-{
-    m_chamber_light = _light_effect_parse(status);
-}
+void Slic3r::DevLamp::SetChamberLight(const std::string& status) { m_chamber_light = _light_effect_parse(status); }

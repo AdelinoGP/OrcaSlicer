@@ -63,8 +63,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T249 skip-trivial: src/slic3r/GUI/DeviceCore/DevFirmware.cpp
 - [x] T250 annotate: src/slic3r/GUI/DeviceCore/DevHMS.cpp
 - [x] T251 skip-trivial: src/slic3r/GUI/DeviceCore/DevInfo.cpp
-- [~] T252 annotate: src/slic3r/GUI/DeviceCore/DevLamp.cpp
-- [ ] T253 annotate: src/slic3r/GUI/DeviceCore/DevLampCtrl.cpp
+- [x] T252 annotate: src/slic3r/GUI/DeviceCore/DevLamp.cpp
+- [~] T253 annotate: src/slic3r/GUI/DeviceCore/DevLampCtrl.cpp
 - [ ] T254 annotate: src/slic3r/GUI/DeviceCore/DevManager.cpp
 - [ ] T255 annotate: src/slic3r/GUI/DeviceCore/DevMapping.cpp
 - [ ] T256 annotate: src/slic3r/GUI/DeviceCore/DevNozzleSystem.cpp

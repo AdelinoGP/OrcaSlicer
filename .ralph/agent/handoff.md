@@ -2151,3 +2151,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: skip-trivial: src/slic3r/GUI/DeviceCore/DevInfo.cpp
 - Next recommended Phase 1 task: T252 src/slic3r/GUI/DeviceCore/DevLamp.cpp
+
+## Phase 1 - Task T252 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevLamp.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevLamp.cpp
+- Substantive additions: 4 ([INTENT], [STATE], [UNITY] tags)
+- Verification excerpt: // [INTENT] Status parsing for printer lighting (chamber light).
+- Unity-impact summary:
+  - Light status maps to a C# enum and data model.
+  - Telemetry parsing should be part of the standard status update flow.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevLamp.cpp
+- Next recommended Phase 1 task: T253 src/slic3r/GUI/DeviceCore/DevLampCtrl.cpp
