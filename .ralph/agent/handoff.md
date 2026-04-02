@@ -1630,3 +1630,29 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2 - Coordinate system mismatch)
 - Git: annotate: src/slic3r/GUI/CameraUtils.hpp
 - Next recommended Phase 1 task: T213 annotate: src/slic3r/GUI/CapsuleButton.cpp
+
+## Phase 1 - Task T213 complete
+- Task type: annotate
+- File: src/slic3r/GUI/CapsuleButton.cpp
+- Deliverables: src/slic3r/GUI/CapsuleButton.cpp
+- Substantive additions: 2 annotation blocks
+- Verification excerpt: [UNITY] Handled by UI Toolkit's USS styles (border-radius) and standard container visuals.
+- Unity-impact summary:
+  - Custom drawing translates to USS styling.
+  - Event forwarding translates to standard UI Toolkit event propagation.
+- Hazards found: 0
+- Git: annotate: src/slic3r/GUI/CapsuleButton.cpp
+- Next recommended Phase 1 task: T214 annotate: src/slic3r/GUI/CapsuleButton.hpp
+
+## Phase 1 - Task T214 complete
+- Task type: annotate
+- File: src/slic3r/GUI/CapsuleButton.hpp
+- Deliverables: src/slic3r/GUI/CapsuleButton.hpp
+- Substantive additions: 1 class-level annotation block
+- Verification excerpt: [INTENT] CapsuleButton is a custom-drawn, stateful toggle button widget.
+- Unity-impact summary:
+  - Map to a custom VisualElement (UI Toolkit) with USS for styling.
+  - State tracking (selection, hover) is maintained in the element's state.
+- Hazards found: 0
+- Git: annotate: src/slic3r/GUI/CapsuleButton.hpp
+- Next recommended Phase 1 task: T215 annotate: src/slic3r/GUI/CloneDialog.cpp

@@ -6,17 +6,25 @@
 
 namespace Slic3r { namespace GUI {
 
-static const wxColour BgNormalColor  = wxColour("#FFFFFF");
-static const wxColour BgSelectColor  = wxColour("#E5F0EE"); // ORCA
+static const wxColour BgNormalColor = wxColour("#FFFFFF");
+static const wxColour BgSelectColor = wxColour("#E5F0EE"); // ORCA
 
 static const wxColour TextNormalColor = wxColour("#262E30");
 static const wxColour TextSelectColor = wxColour("#262E30"); // ORCA use same color on selected to improve readability
 
-static const wxColour BorderNormalColor   = wxColour("#CECECE");
+static const wxColour BorderNormalColor = wxColour("#CECECE");
 static const wxColour BorderSelectColor = wxColour("#009688");
 
-CapsuleButton::CapsuleButton(wxWindow *parent, wxWindowID id, const wxString &label, bool selected) : wxPanel(parent, id)
+CapsuleButton::CapsuleButton(wxWindow* parent, wxWindowID id, const wxString& label, bool selected) : wxPanel(parent, id)
 {
+    /*
+     [INTENT]
+     Construct the CapsuleButton composite control.
+     Wires up internal components (icon, label) and their event forwarding.
+
+     [STATE]
+     Initializes selection/hover flags and loads bitmaps for the two states.
+    */
     SetBackgroundColour(*wxWHITE);
     SetBackgroundStyle(wxBG_STYLE_PAINT);
 
@@ -25,10 +33,10 @@ CapsuleButton::CapsuleButton(wxWindow *parent, wxWindowID id, const wxString &la
 
     auto sizer = new wxBoxSizer(wxHORIZONTAL);
 
-    tag_on_bmp = create_scaled_bitmap("capsule_tag_on", nullptr, FromDIP(16));
+    tag_on_bmp  = create_scaled_bitmap("capsule_tag_on", nullptr, FromDIP(16));
     tag_off_bmp = create_scaled_bitmap("capsule_tag_off", nullptr, FromDIP(16));
 
-    m_btn = new wxBitmapButton(this, wxID_ANY, selected?tag_on_bmp:tag_off_bmp, wxDefaultPosition, wxDefaultSize, wxNO_BORDER);
+    m_btn = new wxBitmapButton(this, wxID_ANY, selected ? tag_on_bmp : tag_off_bmp, wxDefaultPosition, wxDefaultSize, wxNO_BORDER);
     m_btn->SetBackgroundColour(*wxWHITE);
 
     m_label = new Label(this, label);
@@ -43,7 +51,7 @@ CapsuleButton::CapsuleButton(wxWindow *parent, wxWindowID id, const wxString &la
     Layout();
     Fit();
 
-    auto forward_click_to_parent = [this](auto &event) {
+    auto forward_click_to_parent = [this](auto& event) {
         wxCommandEvent click_event(wxEVT_BUTTON, GetId());
         click_event.SetEventObject(this);
         this->ProcessEvent(click_event);
@@ -59,10 +67,18 @@ CapsuleButton::CapsuleButton(wxWindow *parent, wxWindowID id, const wxString &la
 
     UpdateStatus();
 }
-void CapsuleButton::OnPaint(wxPaintEvent &event)
+void CapsuleButton::OnPaint(wxPaintEvent& event)
 {
+    /*
+     [INTENT]
+     Custom rendering of the rounded "capsule" background and border.
+
+     [UNITY]
+     Handled by UI Toolkit's USS styles (border-radius) and standard container visuals.
+     Manual GDI/DC painting should be replaced with retained UI elements.
+    */
     wxAutoBufferedPaintDC dc(this);
-    wxGraphicsContext    *gc = wxGraphicsContext::Create(dc);
+    wxGraphicsContext*    gc = wxGraphicsContext::Create(dc);
 
     if (gc) {
         dc.Clear();
@@ -71,8 +87,8 @@ void CapsuleButton::OnPaint(wxPaintEvent &event)
         gc->DrawRoundedRectangle(0, 0, rect.width, rect.height, 0);
         wxColour bg_color     = m_selected ? BgSelectColor : BgNormalColor;
         wxColour border_color = m_hovered || m_selected ? BorderSelectColor : BorderNormalColor;
-        bg_color = StateColor::darkModeColorFor(bg_color);
-        border_color = StateColor::darkModeColorFor(border_color);
+        bg_color              = StateColor::darkModeColorFor(bg_color);
+        border_color          = StateColor::darkModeColorFor(border_color);
         gc->SetBrush(wxBrush(bg_color));
         gc->SetPen(wxPen(border_color, 1));
         gc->DrawRoundedRectangle(1, 1, rect.width - 2, rect.height - 2, 5);
@@ -86,7 +102,7 @@ void CapsuleButton::Select(bool selected)
     Refresh();
 }
 
-void CapsuleButton::OnEnterWindow(wxMouseEvent &event)
+void CapsuleButton::OnEnterWindow(wxMouseEvent& event)
 {
     if (!m_hovered) {
         m_hovered = true;
@@ -96,11 +112,12 @@ void CapsuleButton::OnEnterWindow(wxMouseEvent &event)
     event.Skip();
 }
 
-void CapsuleButton::OnLeaveWindow(wxMouseEvent &event)
+void CapsuleButton::OnLeaveWindow(wxMouseEvent& event)
 {
     if (m_hovered) {
         wxPoint pos = this->ScreenToClient(wxGetMousePosition());
-        if (this->GetClientRect().Contains(pos)) return;
+        if (this->GetClientRect().Contains(pos))
+            return;
         m_hovered = false;
         UpdateStatus();
         Refresh();
