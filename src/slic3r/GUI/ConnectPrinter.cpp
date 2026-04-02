@@ -7,33 +7,43 @@
 #include "DeviceCore/DevManager.h"
 
 namespace Slic3r { namespace GUI {
-ConnectPrinterDialog::ConnectPrinterDialog(wxWindow *parent, wxWindowID id, const wxString &title, const wxPoint &pos, const wxSize &size, long style)
+
+// [ANNOTATED]
+// [INTENT] Modal dialog for connecting a printer via LAN using an access code.
+// This dialog provides a localized UI with a help diagram to guide the user in finding
+// the access code on their printer's hardware screen.
+
+ConnectPrinterDialog::ConnectPrinterDialog(
+    wxWindow* parent, wxWindowID id, const wxString& title, const wxPoint& pos, const wxSize& size, long style)
     : DPIDialog(parent, id, _L("Connect Printer (LAN)"), pos, size, style)
 {
     SetBackgroundColour(*wxWHITE);
     this->SetSizeHints(wxDefaultSize, wxDefaultSize);
 
-    wxBoxSizer *main_sizer;
+    // [UNITY] Use UI Toolkit VisualElement with BoxSizers mapped to Flexbox.
+    wxBoxSizer* main_sizer;
     main_sizer = new wxBoxSizer(wxHORIZONTAL);
 
     main_sizer->Add(FromDIP(40), 0);
 
-    wxBoxSizer *sizer_top;
+    wxBoxSizer* sizer_top;
     sizer_top = new wxBoxSizer(wxVERTICAL);
 
     sizer_top->Add(0, FromDIP(40));
 
-    m_staticText_connection_code = new wxStaticText(this, wxID_ANY, _L("Please input the printer access code:"), wxDefaultPosition, wxDefaultSize, 0);
+    m_staticText_connection_code = new wxStaticText(this, wxID_ANY, _L("Please input the printer access code:"), wxDefaultPosition,
+                                                    wxDefaultSize, 0);
     m_staticText_connection_code->SetFont(Label::Body_15);
     m_staticText_connection_code->SetForegroundColour(wxColour(50, 58, 61));
     m_staticText_connection_code->Wrap(-1);
     sizer_top->Add(m_staticText_connection_code, 0, wxALL, 0);
 
     sizer_top->Add(0, FromDIP(10));
-	
-    wxBoxSizer *sizer_connect;
+
+    wxBoxSizer* sizer_connect;
     sizer_connect = new wxBoxSizer(wxHORIZONTAL);
 
+    // [UNITY] Map TextInput to a structural TextField element with a specific USS class.
     m_textCtrl_code = new TextInput(this, wxEmptyString);
     m_textCtrl_code->GetTextCtrl()->SetMaxLength(10);
     m_textCtrl_code->SetFont(Label::Body_14);
@@ -52,14 +62,17 @@ ConnectPrinterDialog::ConnectPrinterDialog(wxWindow *parent, wxWindowID id, cons
     m_button_confirm->SetStyle(ButtonStyle::Confirm, ButtonType::Choice);
 
     sizer_connect->Add(m_button_confirm, 0, wxALL | wxALIGN_CENTER_VERTICAL, 0);
-    
+
     sizer_connect->Add(FromDIP(60), 0);
 
     sizer_top->Add(sizer_connect);
 
     sizer_top->Add(0, FromDIP(35));
 
-    m_staticText_hints = new wxStaticText(this, wxID_ANY, _L("You can find it in \"Settings > Network > Access code\"\non the printer, as shown in the figure:"), wxDefaultPosition, wxDefaultSize, 0);
+    m_staticText_hints =
+        new wxStaticText(this, wxID_ANY,
+                         _L("You can find it in \"Settings > Network > Access code\"\non the printer, as shown in the figure:"),
+                         wxDefaultPosition, wxDefaultSize, 0);
     m_staticText_hints->SetFont(Label::Body_15);
     m_staticText_hints->SetForegroundColour(wxColour(50, 58, 61));
     m_staticText_hints->Wrap(-1);
@@ -67,9 +80,10 @@ ConnectPrinterDialog::ConnectPrinterDialog(wxWindow *parent, wxWindowID id, cons
 
     sizer_top->Add(0, FromDIP(25));
 
-    wxBoxSizer *sizer_diagram;
+    wxBoxSizer* sizer_diagram;
     sizer_diagram = new wxBoxSizer(wxHORIZONTAL);
 
+    // [UNITY] Use a standard Image UI element or Sprite for the help diagram.
     m_bitmap_diagram = new wxStaticBitmap(this, wxID_ANY, wxNullBitmap, wxDefaultPosition, wxSize(FromDIP(340), -1), 0);
     m_bitmap_diagram->SetBitmap(m_diagram_img);
     sizer_diagram->Add(m_bitmap_diagram);
@@ -85,6 +99,7 @@ ConnectPrinterDialog::ConnectPrinterDialog(wxWindow *parent, wxWindowID id, cons
     this->Fit();
     CentreOnParent();
 
+    // [EVENT] Bindings for text entry and confirmation.
     m_textCtrl_code->Bind(wxEVT_TEXT, &ConnectPrinterDialog::on_input_enter, this);
     m_button_confirm->Bind(wxEVT_BUTTON, &ConnectPrinterDialog::on_button_confirm, this);
     wxGetApp().UpdateDlgDarkUI(this);
@@ -92,69 +107,66 @@ ConnectPrinterDialog::ConnectPrinterDialog(wxWindow *parent, wxWindowID id, cons
 
 ConnectPrinterDialog::~ConnectPrinterDialog() {}
 
-void ConnectPrinterDialog::end_modal(wxStandardID id)
-{
-    EndModal(id);
-}
+void ConnectPrinterDialog::end_modal(wxStandardID id) { EndModal(id); }
 
+// [INTENT] Load and rescale the help diagram based on current language and printer type.
+// [UNITY] Use Unity's localization system and Addressables/Resources for images.
 void ConnectPrinterDialog::init_bitmap()
 {
-    AppConfig *config = get_app_config();
+    AppConfig*  config   = get_app_config();
     std::string language = config->get("language");
 
     if (m_obj) {
         std::string img_str = DevPrinterConfigUtil::get_printer_connect_help_img(m_obj->printer_type);
-        if(img_str.empty()){img_str = "input_access_code_x1"; }
+        if (img_str.empty()) {
+            img_str = "input_access_code_x1";
+        }
 
         if (language == "zh_CN") {
-            m_diagram_bmp = create_scaled_bitmap(img_str+"_cn", nullptr, 190);
-        }
-        else {
-            m_diagram_bmp = create_scaled_bitmap(img_str+"_en", nullptr, 190);
+            m_diagram_bmp = create_scaled_bitmap(img_str + "_cn", nullptr, 190);
+        } else {
+            m_diagram_bmp = create_scaled_bitmap(img_str + "_en", nullptr, 190);
         }
 
         // traverse the guide text
         {
             // traverse the guide text
-            if (m_obj->printer_type == "O1D")
-            {
-                m_staticText_hints->SetLabel(_L("You can find it in \"Setting > Setting > LAN only > Access Code\"\non the printer, as shown in the figure:"));
-            }
-            else
-            {
-                m_staticText_hints->SetLabel(_L("You can find it in \"Settings > Network > Access code\"\non the printer, as shown in the figure:"));
+            if (m_obj->printer_type == "O1D") {
+                m_staticText_hints->SetLabel(
+                    _L("You can find it in \"Setting > Setting > LAN only > Access Code\"\non the printer, as shown in the figure:"));
+            } else {
+                m_staticText_hints->SetLabel(
+                    _L("You can find it in \"Settings > Network > Access code\"\non the printer, as shown in the figure:"));
             }
         }
-    }
-    else{
+    } else {
         if (language == "zh_CN") {
             m_diagram_bmp = create_scaled_bitmap("input_access_code_x1_cn", nullptr, 190);
-        }
-        else {
+        } else {
             m_diagram_bmp = create_scaled_bitmap("input_access_code_x1_en", nullptr, 190);
         }
     }
     m_diagram_img = m_diagram_bmp.ConvertToImage();
     auto bmp_size = m_diagram_bmp.GetSize();
-    float scale = (float)FromDIP(340) / (float)bmp_size.x;
+    // [PORTING_HAZARD:P3] Manual aspect-ratio calculation and image rescaling during UI setup.
+    // [UNITY] Use AspectRatioFitter or similar UI components to handle image scaling natively.
+    float scale = (float) FromDIP(340) / (float) bmp_size.x;
     m_diagram_img.Rescale(FromDIP(340), bmp_size.y * scale);
     m_bitmap_diagram->SetBitmap(m_diagram_img);
     Fit();
 }
 
+// [STATE] Store the MachineObject to which the access code will be applied.
 void ConnectPrinterDialog::set_machine_object(MachineObject* obj)
 {
     m_obj = obj;
     init_bitmap();
 }
 
-void ConnectPrinterDialog::on_input_enter(wxCommandEvent& evt)
-{
-    m_input_access_code = evt.GetString();
-}
+void ConnectPrinterDialog::on_input_enter(wxCommandEvent& evt) { m_input_access_code = evt.GetString(); }
 
-
-void ConnectPrinterDialog::on_button_confirm(wxCommandEvent &event)
+// [INTENT] Validate input and apply the access code to the target printer object.
+void ConnectPrinterDialog::on_button_confirm(wxCommandEvent& event)
 {
     wxString code = m_textCtrl_code->GetTextCtrl()->GetValue();
     for (char c : code) {
@@ -169,7 +181,9 @@ void ConnectPrinterDialog::on_button_confirm(wxCommandEvent &event)
     EndModal(wxID_OK);
 }
 
-void ConnectPrinterDialog::on_dpi_changed(const wxRect &suggested_rect)
+// [EVENT] Handle DPI changes to rescale bitmaps and UI layout.
+// [UNITY] Handled natively by Canvas Scaler or UI Toolkit's resolution-independent layout.
+void ConnectPrinterDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
     init_bitmap();
     m_bitmap_diagram->SetBitmap(m_diagram_img);
@@ -177,7 +191,7 @@ void ConnectPrinterDialog::on_dpi_changed(const wxRect &suggested_rect)
     m_textCtrl_code->GetTextCtrl()->SetMinSize(wxSize(-1, FromDIP(22)));
 
     m_button_confirm->Rescale(); // ORCA No need to set style again
-    
+
     Layout();
     this->Refresh();
 }

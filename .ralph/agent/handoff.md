@@ -1760,3 +1760,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Wizard finalization involves applying complex config changes to global app state)
 - Git: annotate: src/slic3r/GUI/ConfigWizard_private.hpp
 - Next recommended Phase 1 task: T223 src/slic3r/GUI/ConnectPrinter.cpp
+
+## Phase 1 - Task T223 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ConnectPrinter.cpp
+- Deliverables: src/slic3r/GUI/ConnectPrinter.cpp
+- Substantive additions: 7 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Modal dialog for connecting a printer via LAN using an access code.
+- Unity-impact summary:
+  - Dialog maps to a modal UI Toolkit VisualElement or anchored Canvas overlay.
+  - Image scaling and localized help diagrams map to Addressables and Unity's Localization package.
+  - Input validation and state application to MachineObject handled in C#.
+- Hazards found: 1 (P3: Manual aspect-ratio calculation and image rescaling during UI setup)
+- Git: annotate: src/slic3r/GUI/ConnectPrinter.cpp
+- Next recommended Phase 1 task: T224 src/slic3r/GUI/ConnectPrinter.hpp
