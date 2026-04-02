@@ -2164,3 +2164,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevLamp.cpp
 - Next recommended Phase 1 task: T253 src/slic3r/GUI/DeviceCore/DevLampCtrl.cpp
+
+## Phase 1 - Task T253 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevLampCtrl.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevLampCtrl.cpp
+- Substantive additions: 4 ([INTENT], [EVENT], [UNITY] tags)
+- Verification excerpt: // [INTENT] Control commands for printer lighting (chamber lights).
+- Unity-impact summary:
+  - Lighting control commands map to C# async methods.
+  - Multi-node LED control ("chamber_light", "chamber_light2") should be handled by a C# LightingService.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevLampCtrl.cpp
+- Next recommended Phase 1 task: T254 src/slic3r/GUI/DeviceCore/DevManager.cpp
