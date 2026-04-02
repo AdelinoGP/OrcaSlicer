@@ -2048,3 +2048,16 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Multi-version bit-packed telemetry parsing)
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevFan.cpp
 - Next recommended Phase 1 task: T244 src/slic3r/GUI/DeviceCore/DevFilaAmsSetting.cpp
+
+## Phase 1 - Task T244 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevFilaAmsSetting.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevFilaAmsSetting.cpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Management and telemetry parsing for AMS (Automatic Material System) unit settings and firmware status.
+- Unity-impact summary:
+  - AMS state model maps to a C# AMSService.
+  - Telemetry parsing for complex nested firmware upgrade states mirrored in C#.
+- Hazards found: 1 (P2: Complex nested JSON parsing)
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevFilaAmsSetting.cpp
+- Next recommended Phase 1 task: T245 src/slic3r/GUI/DeviceCore/DevFilaAmsSettingCtrl.cpp

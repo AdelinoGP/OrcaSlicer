@@ -1,3 +1,9 @@
+// [ANNOTATED]
+// [INTENT] Management and telemetry parsing for AMS (Automatic Material System) unit settings and firmware status.
+// [STATE] Tracks AMS feature flags (auto-refill, power-up detection) and firmware version metadata for connected AMS units.
+// [UNITY] Map to a C# AMSService within the core device data model.
+// [PORTING_HAZARD:P2] Complex nested JSON parsing for firmware upgrade states must be mirrored exactly.
+
 #include "DevFilaAmsSetting.h"
 #include "DevUtil.h"
 
@@ -21,7 +27,7 @@ void DevAmsSystemFirmwareSwitch::Reset()
 
 void DevAmsSystemFirmwareSwitch::ParseFirmwareSwitch(const nlohmann::json& j)
 {
-    if (!m_ctrl_switching.CheckCanUpdateData(j.contains("upgrade") ? j["upgrade"] :j)) {
+    if (!m_ctrl_switching.CheckCanUpdateData(j.contains("upgrade") ? j["upgrade"] : j)) {
         return;
     }
 
@@ -67,4 +73,4 @@ void DevAmsSystemFirmwareSwitch::ParseFirmwareSwitch(const nlohmann::json& j)
     }
 }
 
-}
+} // namespace Slic3r
