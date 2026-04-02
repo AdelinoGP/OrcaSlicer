@@ -1682,3 +1682,15 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Iterative clipboard-based cloning)
 - Git: annotate: src/slic3r/GUI/CloneDialog.hpp
 - Next recommended Phase 1 task: T217 annotate: src/slic3r/GUI/ConfigExceptions.hpp
+
+## Phase 1 - Task T217 complete
+- Task type: skip-trivial
+- File: src/slic3r/GUI/ConfigExceptions.hpp
+- Deliverables: none
+- Substantive additions: Classified as SKIP_TRIVIAL
+- Verification excerpt: Boilerplate exception definitions under 50 lines.
+- Unity-impact summary:
+  - Standard C# Exception types will replace these custom runtime errors.
+- Hazards found: 0
+- Git: skip-trivial: src/slic3r/GUI/ConfigExceptions.hpp
+- Next recommended Phase 1 task: T218 annotate: src/slic3r/GUI/ConfigManipulation.cpp

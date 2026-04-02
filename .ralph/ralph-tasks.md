@@ -28,7 +28,7 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T214 annotate: src/slic3r/GUI/CapsuleButton.hpp
 - [x] T215 annotate: src/slic3r/GUI/CloneDialog.cpp
 - [x] T216 annotate: src/slic3r/GUI/CloneDialog.hpp
-- [ ] T217 annotate: src/slic3r/GUI/ConfigExceptions.hpp
+- [x] T217 skip-trivial: src/slic3r/GUI/ConfigExceptions.hpp
 - [ ] T218 annotate: src/slic3r/GUI/ConfigManipulation.cpp
 - [ ] T219 annotate: src/slic3r/GUI/ConfigManipulation.hpp
 - [ ] T220 annotate: src/slic3r/GUI/ConfigWizard.cpp
