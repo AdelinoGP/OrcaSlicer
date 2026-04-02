@@ -2007,3 +2007,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P3: safe concurrent access via weak_ptr)
 - Git: annotate: src/slic3r/GUI/DeviceCore/DevExtensionTool.cpp
 - Next recommended Phase 1 task: T241 src/slic3r/GUI/DeviceCore/DevExtruderSystem.cpp
+
+## Phase 1 - Task T241 complete
+- Task type: annotate
+- File: src/slic3r/GUI/DeviceCore/DevExtruderSystem.cpp
+- Deliverables: src/slic3r/GUI/DeviceCore/DevExtruderSystem.cpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Management and telemetry parsing for the printer's extruder system (single/dual toolheads).
+- Unity-impact summary:
+  - Extruder data model maps to a C# service managing toolhead states.
+  - Telemetry parsing (bit-packed V2.0) must be mirrored in C#.
+  - Localized strings for toolhead names ("left", "right") map to Unity's Localization system.
+- Hazards found: 1 (P2: Extensive bit-packed telemetry parsing logic)
+- Git: annotate: src/slic3r/GUI/DeviceCore/DevExtruderSystem.cpp
+- Next recommended Phase 1 task: T242 src/slic3r/GUI/DeviceCore/DevExtruderSystemCtrl.cpp

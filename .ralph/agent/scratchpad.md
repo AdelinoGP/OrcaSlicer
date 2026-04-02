@@ -22,5 +22,6 @@
 - Completed T238: src/slic3r/GUI/DeviceCore/DevConfigUtil.cpp.
 - Completed T239: src/slic3r/GUI/DeviceCore/DevCtrl.cpp.
 - Completed T240: src/slic3r/GUI/DeviceCore/DevExtensionTool.cpp.
-- Next task: T241 src/slic3r/GUI/DeviceCore/DevExtruderSystem.cpp.
+- Completed T241: src/slic3r/GUI/DeviceCore/DevExtruderSystem.cpp.
+- Next task: T242 src/slic3r/GUI/DeviceCore/DevExtruderSystemCtrl.cpp.
 
