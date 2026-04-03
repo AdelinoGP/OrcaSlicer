@@ -1,3 +1,9 @@
+// [ANNOTATED]
+// [INTENT] Generic event wrappers for propagating typed data through the wxWidgets event loop.
+// [UNITY] COMPLETELY REDUNDANT. Replace with standard C# events, Action<T> delegates, or UnityEvents.
+// [UNITY] Use a centralized MessageBroker or Rx-style (UniRx) observables for decoupled communication.
+// [PORTING_HAZARD:P3] Legacy event propagation logic should map to managed C# publisher-subscriber patterns.
+
 #ifndef slic3r_Events_hpp_
 #define slic3r_Events_hpp_
 
@@ -5,11 +11,7 @@
 #include <wx/debug.h>
 #include <wx/event.h>
 
-
-namespace Slic3r {
-
-namespace GUI {
-
+namespace Slic3r { namespace GUI {
 
 struct SimpleEvent : public wxEvent
 {
@@ -19,10 +21,7 @@ struct SimpleEvent : public wxEvent
         SetEventObject(origin);
     }
 
-    virtual wxEvent* Clone() const
-    {
-        return new SimpleEvent(GetEventType(), GetEventObject());
-    }
+    virtual wxEvent* Clone() const { return new SimpleEvent(GetEventType(), GetEventObject()); }
 };
 
 struct IntEvent : public wxEvent
@@ -35,80 +34,60 @@ public:
         m_data = data;
     }
 
-    virtual wxEvent* Clone() const
-    {
-        return new IntEvent(GetEventType(), m_data, GetEventObject());
-    }
-    int get_data() { return m_data; }
+    virtual wxEvent* Clone() const { return new IntEvent(GetEventType(), m_data, GetEventObject()); }
+    int              get_data() { return m_data; }
 
 private:
     int m_data;
-    
 };
 
 template<class T, size_t N> struct ArrayEvent : public wxEvent
 {
     std::array<T, N> data;
 
-    ArrayEvent(wxEventType type, std::array<T, N> data, wxObject* origin = nullptr)
-        : wxEvent(0, type), data(std::move(data))
+    ArrayEvent(wxEventType type, std::array<T, N> data, wxObject* origin = nullptr) : wxEvent(0, type), data(std::move(data))
     {
         m_propagationLevel = wxEVENT_PROPAGATE_MAX;
         SetEventObject(origin);
     }
 
-    virtual wxEvent* Clone() const
-    {
-        return new ArrayEvent<T, N>(GetEventType(), data, GetEventObject());
-    }
+    virtual wxEvent* Clone() const { return new ArrayEvent<T, N>(GetEventType(), data, GetEventObject()); }
 };
 
 template<class T> struct Event : public wxEvent
 {
     T data;
 
-    Event(wxEventType type, const T &data, wxObject* origin = nullptr)
-        : wxEvent(0, type), data(std::move(data))
+    Event(wxEventType type, const T& data, wxObject* origin = nullptr) : wxEvent(0, type), data(std::move(data))
     {
         m_propagationLevel = wxEVENT_PROPAGATE_MAX;
         SetEventObject(origin);
     }
 
-    Event(wxEventType type, T&& data, wxObject* origin = nullptr)
-        : wxEvent(0, type), data(std::move(data))
+    Event(wxEventType type, T&& data, wxObject* origin = nullptr) : wxEvent(0, type), data(std::move(data))
     {
         m_propagationLevel = wxEVENT_PROPAGATE_MAX;
         SetEventObject(origin);
     }
 
-    virtual wxEvent* Clone() const
-    {
-        return new Event<T>(GetEventType(), data, GetEventObject());
-    }
+    virtual wxEvent* Clone() const { return new Event<T>(GetEventType(), data, GetEventObject()); }
 };
 
-
-class LoadPrinterViewEvent  : public wxCommandEvent
+class LoadPrinterViewEvent : public wxCommandEvent
 {
 public:
-    LoadPrinterViewEvent(wxEventType commandType = wxEVT_NULL, int winid = 0)
-        : wxCommandEvent(commandType, winid)
-        {  }
+    LoadPrinterViewEvent(wxEventType commandType = wxEVT_NULL, int winid = 0) : wxCommandEvent(commandType, winid) {}
 
-    LoadPrinterViewEvent(const LoadPrinterViewEvent& event)
-        : wxCommandEvent(event)
-        { m_APIkey = event.m_APIkey; }
+    LoadPrinterViewEvent(const LoadPrinterViewEvent& event) : wxCommandEvent(event) { m_APIkey = event.m_APIkey; }
 
     const wxString& GetAPIkey() const { return m_APIkey; }
-    void SetAPIkey(const wxString& apikey) { m_APIkey = apikey; }
+    void            SetAPIkey(const wxString& apikey) { m_APIkey = apikey; }
 
-    virtual wxEvent *Clone() const wxOVERRIDE { return new LoadPrinterViewEvent(*this); }
+    virtual wxEvent* Clone() const wxOVERRIDE { return new LoadPrinterViewEvent(*this); }
 
 private:
     wxString m_APIkey;
-
 };
-}
-}
+}} // namespace Slic3r::GUI
 
 #endif // slic3r_Events_hpp_

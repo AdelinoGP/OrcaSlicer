@@ -2542,3 +2542,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Custom color-set indexing logic)
 - Git: annotate: src/slic3r/GUI/EncodedFilament.hpp
 - Next recommended Phase 1 task: T281 src/slic3r/GUI/Event.hpp
+
+## Phase 1 - Task T281 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Event.hpp
+- Deliverables: src/slic3r/GUI/Event.hpp
+- Substantive additions: 4 ([INTENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Generic event wrappers for propagating typed data through the wxWidgets event loop.
+- Unity-impact summary:
+  - Completely redundant in Unity.
+  - Legacy event wrappers replaced by C# events, Action<T> delegates, or a MessageBroker.
+  - UniRx (IObservable) is a strong candidate for porting these reactive notifications.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/Event.hpp
+- Next recommended Phase 1 task: T282 src/slic3r/GUI/ExtraRenderers.cpp
