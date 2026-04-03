@@ -2797,6 +2797,20 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Git: annotate: src/slic3r/GUI/FileArchiveDialog.cpp
 - Next recommended Phase 1 task: T299 src/slic3r/GUI/FileArchiveDialog.hpp
 
+## Phase 1 - Task T299 complete
+- Task type: annotate
+- File: src/slic3r/GUI/FileArchiveDialog.hpp
+- Deliverables: src/slic3r/GUI/FileArchiveDialog.hpp
+- Substantive additions: 4 ([INTENT], [STATE], [UNITY] tags)
+- Verification excerpt: // [INTENT] Declaration of the ZIP archive selective import dialog and its hierarchical data model.
+- Unity-impact summary:
+  - Header declares the public interface for the ZIP browser.
+  - ArchiveViewModel maps to an observable C# hierarchical model for TreeView binding.
+  - ArchiveViewNode maps to a C# class with data-bound properties.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/FileArchiveDialog.hpp
+- Next recommended Phase 1 task: T300 src/slic3r/GUI/format.hpp
+
 ## Phase 1 checkpoint
 - Files newly accounted for in this batch: 70
 - Cumulative annotated: 129

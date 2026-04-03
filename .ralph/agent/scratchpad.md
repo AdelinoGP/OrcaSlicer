@@ -79,5 +79,6 @@
 - Completed T296: src/slic3r/GUI/FilamentPickerDialog.cpp.
 - Completed T297: src/slic3r/GUI/FilamentPickerDialog.hpp.
 - Completed T298: src/slic3r/GUI/FileArchiveDialog.cpp.
-- Next task: T299 src/slic3r/GUI/FileArchiveDialog.hpp.
+- Completed T299: src/slic3r/GUI/FileArchiveDialog.hpp.
+- Next task: T300 src/slic3r/GUI/format.hpp.
 
