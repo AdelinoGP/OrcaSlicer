@@ -2598,3 +2598,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Tight coupling with real-time hardware status)
 - Git: annotate: src/slic3r/GUI/ExtrusionCalibration.cpp
 - Next recommended Phase 1 task: T285 src/slic3r/GUI/ExtrusionCalibration.hpp
+
+## Phase 1 - Task T285 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ExtrusionCalibration.hpp
+- Deliverables: src/slic3r/GUI/ExtrusionCalibration.hpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Declaration of the manual Pressure Advance (Factor K) calibration wizard and setup models.
+- Unity-impact summary:
+  - Header declares the public interface for the pressure advance calibration wizard.
+  - Dialog class maps to a C# ModalDialog or specialized Wizard controller.
+  - UI members replaced by VisualElement references in Unity UI Toolkit.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/ExtrusionCalibration.hpp
+- Next recommended Phase 1 task: T286 src/slic3r/GUI/Field.cpp
