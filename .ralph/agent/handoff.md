@@ -2485,3 +2485,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/DragDropPanel.hpp
 - Next recommended Phase 1 task: T277 src/slic3r/GUI/EditGCodeDialog.cpp
+
+## Phase 1 - Task T277 complete
+- Task type: annotate
+- File: src/slic3r/GUI/EditGCodeDialog.cpp
+- Deliverables: src/slic3r/GUI/EditGCodeDialog.cpp
+- Substantive additions: 6 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Custom G-code editor dialog with real-time placeholder search and insertion.
+- Unity-impact summary:
+  - Custom G-code editor maps to a Unity UI Toolkit ModalWindow.
+  - Hierarchical placeholder list replaced by a TreeView bound to a C# model.
+  - Search filtering implemented via LINQ on the managed placeholder model.
+- Hazards found: 1 (P2: Complex dynamic placeholder discovery logic)
+- Git: annotate: src/slic3r/GUI/EditGCodeDialog.cpp
+- Next recommended Phase 1 task: T278 src/slic3r/GUI/EditGCodeDialog.hpp

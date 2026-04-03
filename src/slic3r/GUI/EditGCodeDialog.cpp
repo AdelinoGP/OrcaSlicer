@@ -1,3 +1,11 @@
+// [ANNOTATED]
+// [INTENT] Custom G-code editor dialog with real-time placeholder search and insertion.
+// [STATE] Hierarchical model (ParamsModel) tracks hundreds of built-in and preset-derived placeholders for G-code scripting.
+// [EVENT] Reactive search filtering and placeholder activation (double-click to insert) logic.
+// [UNITY] Map to a Unity UI Toolkit ModalWindow. Replace wxDataViewCtrl with a TreeView bound to a C# placeholder model.
+// [PORTING_HAZARD:P2] Complex logic for dynamic placeholder discovery from active presets and slicing state must be mirrored in the C#
+// service layer.
+
 #include "EditGCodeDialog.hpp"
 
 #include <vector>
@@ -23,18 +31,22 @@
 
 #include "libslic3r/Preset.hpp"
 
-#define BTN_GAP  FromDIP(20)
+#define BTN_GAP FromDIP(20)
 #define BTN_SIZE wxSize(FromDIP(58), FromDIP(24))
 
-namespace Slic3r {
-namespace GUI {
+namespace Slic3r { namespace GUI {
 
 //------------------------------------------
 //          EditGCodeDialog
 //------------------------------------------
 
-EditGCodeDialog::EditGCodeDialog(wxWindow* parent, const std::string& key, const std::string& value) :
-    DPIDialog(parent, wxID_ANY, format_wxstr(_L("Edit Custom G-code (%1%)"), key), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
+EditGCodeDialog::EditGCodeDialog(wxWindow* parent, const std::string& key, const std::string& value)
+    : DPIDialog(parent,
+                wxID_ANY,
+                format_wxstr(_L("Edit Custom G-code (%1%)"), key),
+                wxDefaultPosition,
+                wxDefaultSize,
+                wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 {
     SetFont(wxGetApp().normal_font());
     SetBackgroundColour(*wxWHITE);
@@ -42,7 +54,7 @@ EditGCodeDialog::EditGCodeDialog(wxWindow* parent, const std::string& key, const
     wxGetApp().UpdateDlgDarkUI(this);
 
     int border = 10;
-    int em = em_unit();
+    int em     = em_unit();
 
     wxStaticText* label_top = new wxStaticText(this, wxID_ANY, _L("Built-in placeholders (Double click item to add to G-code)") + ":");
 
@@ -59,11 +71,9 @@ EditGCodeDialog::EditGCodeDialog(wxWindow* parent, const std::string& key, const
     wxGetApp().UpdateDarkUI(m_search_bar);
 
     m_search_bar->Bind(wxEVT_SET_FOCUS, [](wxFocusEvent&) {
-//        this->on_search_update();
+        //        this->on_search_update();
     });
-    m_search_bar->Bind(wxEVT_COMMAND_TEXT_UPDATED, [this](wxCommandEvent&) {
-        this->on_search_update();
-    });
+    m_search_bar->Bind(wxEVT_COMMAND_TEXT_UPDATED, [this](wxCommandEvent&) { this->on_search_update(); });
 
     param_sizer->Add(m_search_bar, 0, wxEXPAND | wxALL, border);
 
@@ -75,18 +85,19 @@ EditGCodeDialog::EditGCodeDialog(wxWindow* parent, const std::string& key, const
     m_add_btn = new ScalableButton(this, wxID_ANY, "add_copies");
     m_add_btn->SetToolTip(_L("Add selected placeholder to G-code"));
 
-    m_gcode_editor = new wxTextCtrl(this, wxID_ANY, wxString::FromUTF8(value), wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE
-    #ifdef _WIN32
-        | wxBORDER_SIMPLE
-    #endif
+    m_gcode_editor = new wxTextCtrl(this, wxID_ANY, wxString::FromUTF8(value), wxDefaultPosition, wxDefaultSize,
+                                    wxTE_MULTILINE
+#ifdef _WIN32
+                                        | wxBORDER_SIMPLE
+#endif
     );
 
     m_gcode_editor->SetFont(wxGetApp().code_font());
     m_gcode_editor->SetInsertionPointEnd();
     wxGetApp().UpdateDarkUI(m_gcode_editor);
 
-    grid_sizer->Add(param_sizer,  1, wxEXPAND);
-    grid_sizer->Add(m_add_btn,      0, wxALIGN_CENTER_VERTICAL);
+    grid_sizer->Add(param_sizer, 1, wxEXPAND);
+    grid_sizer->Add(m_add_btn, 0, wxALIGN_CENTER_VERTICAL);
     grid_sizer->Add(m_gcode_editor, 2, wxEXPAND);
 
     grid_sizer->AddGrowableRow(0, 1);
@@ -102,11 +113,11 @@ EditGCodeDialog::EditGCodeDialog(wxWindow* parent, const std::string& key, const
 
     wxBoxSizer* topSizer = new wxBoxSizer(wxVERTICAL);
 
-    topSizer->Add(label_top           , 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
-    topSizer->Add(grid_sizer          , 1, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
-    topSizer->Add(m_param_label       , 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
-    topSizer->Add(m_param_description , 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
-    topSizer->Add(dlg_btns            , 0, wxEXPAND);
+    topSizer->Add(label_top, 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
+    topSizer->Add(grid_sizer, 1, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
+    topSizer->Add(m_param_label, 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
+    topSizer->Add(m_param_description, 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, border);
+    topSizer->Add(dlg_btns, 0, wxEXPAND);
 
     SetSizer(topSizer);
     topSizer->SetSizeHints(this);
@@ -138,7 +149,7 @@ std::string EditGCodeDialog::get_edited_gcode() const
 
 void EditGCodeDialog::on_search_update()
 {
-    wxString   search_text = m_search_bar->GetValue().Lower();
+    wxString search_text = m_search_bar->GetValue().Lower();
     if (search_text.empty())
         m_params_list->model->FinishSearch();
     else
@@ -146,22 +157,20 @@ void EditGCodeDialog::on_search_update()
 }
 
 static ParamType get_type(const std::string& opt_key, const ConfigOptionDef& opt_def)
-{
-    return opt_def.is_scalar() ? ParamType::Scalar : ParamType::Vector;
-}
+{ return opt_def.is_scalar() ? ParamType::Scalar : ParamType::Vector; }
 
 void EditGCodeDialog::init_params_list(const std::string& custom_gcode_name)
 {
     const auto& custom_gcode_placeholders = custom_gcode_specific_placeholders();
-    const auto& specific_params = custom_gcode_placeholders.count(custom_gcode_name) > 0 ?
-                                  custom_gcode_placeholders.at(custom_gcode_name) : t_config_option_keys({});
+    const auto& specific_params = custom_gcode_placeholders.count(custom_gcode_name) > 0 ? custom_gcode_placeholders.at(custom_gcode_name) :
+                                                                                           t_config_option_keys({});
 
     // Add slicing states placeholders
 
     wxDataViewItem slicing_state = m_params_list->AppendGroup(_L("[Global] Slicing State"), "custom-gcode_slicing-state_global");
     if (!cgp_ro_slicing_states_config_def.empty()) {
         wxDataViewItem read_only = m_params_list->AppendSubGroup(slicing_state, _L("Read Only"), "lock_closed");
-        for (const auto& [opt_key, def]: cgp_ro_slicing_states_config_def.options)
+        for (const auto& [opt_key, def] : cgp_ro_slicing_states_config_def.options)
             m_params_list->AppendParam(read_only, get_type(opt_key, def), opt_key);
     }
 
@@ -244,20 +253,18 @@ void EditGCodeDialog::init_params_list(const std::string& custom_gcode_name)
 
 wxDataViewItem EditGCodeDialog::add_presets_placeholders()
 {
-    auto get_set_from_vec = [](const std::vector<std::string>&vec) {
-        return std::set(vec.begin(), vec.end());
-    };
+    auto get_set_from_vec = [](const std::vector<std::string>& vec) { return std::set(vec.begin(), vec.end()); };
 
-    const bool  is_fff      = wxGetApp().plater()->printer_technology() == ptFFF;
-    const std::set<std::string> print_options    = get_set_from_vec(is_fff ? Preset::print_options()    : Preset::sla_print_options());
+    const bool                  is_fff           = wxGetApp().plater()->printer_technology() == ptFFF;
+    const std::set<std::string> print_options    = get_set_from_vec(is_fff ? Preset::print_options() : Preset::sla_print_options());
     const std::set<std::string> material_options = get_set_from_vec(is_fff ? Preset::filament_options() : Preset::sla_material_options());
-    const std::set<std::string> printer_options  = get_set_from_vec(is_fff ? Preset::printer_options()  : Preset::sla_printer_options());
-    const auto& full_config = wxGetApp().preset_bundle->full_config();
-    const auto& tab_list    = wxGetApp().tabs_list;
+    const std::set<std::string> printer_options  = get_set_from_vec(is_fff ? Preset::printer_options() : Preset::sla_printer_options());
+    const auto&                 full_config      = wxGetApp().preset_bundle->full_config();
+    const auto&                 tab_list         = wxGetApp().tabs_list;
 
-    Tab* tab_print = nullptr;
+    Tab* tab_print    = nullptr;
     Tab* tab_filament = nullptr;
-    Tab* tab_printer = nullptr;
+    Tab* tab_printer  = nullptr;
     for (const auto tab : tab_list) {
         if (tab->m_type == Preset::TYPE_PRINT)
             tab_print = tab;
@@ -267,9 +274,8 @@ wxDataViewItem EditGCodeDialog::add_presets_placeholders()
             tab_printer = tab;
     }
 
-
     // Orca: create subgroups from the pages of the tabs
-    auto init_from_tab = [this, full_config](wxDataViewItem parent, Tab* tab, const set<string>& preset_keys){
+    auto init_from_tab = [this, full_config](wxDataViewItem parent, Tab* tab, const set<string>& preset_keys) {
         set extra_keys(preset_keys);
         for (const auto& page : tab->m_pages) {
             // ORCA: Pull icons from tabs for subgroups, icons are hidden on tabs
@@ -303,7 +309,8 @@ wxDataViewItem EditGCodeDialog::add_presets_placeholders()
     wxDataViewItem print = m_params_list->AppendSubGroup(group, _L("Print settings"), "process");
     init_from_tab(print, tab_print, print_options);
 
-    wxDataViewItem material = m_params_list->AppendSubGroup(group, _(is_fff ? L("Filament settings") : L("SLA Materials settings")), is_fff ? "filament" : "resin");
+    wxDataViewItem material = m_params_list->AppendSubGroup(group, _(is_fff ? L("Filament settings") : L("SLA Materials settings")),
+                                                            is_fff ? "filament" : "resin");
     init_from_tab(material, tab_filament, material_options);
 
     wxDataViewItem printer = m_params_list->AppendSubGroup(group, _L("Printer settings"), is_fff ? "printer" : "sla_printer");
@@ -323,7 +330,7 @@ void EditGCodeDialog::add_selected_value_to_gcode()
     if (val.Last() == ']') {
         const long new_pos = m_gcode_editor->GetInsertionPoint();
         if (val[val.Len() - 2] == '[')
-            m_gcode_editor->SetInsertionPoint(new_pos - 1);          // set cursor into brackets
+            m_gcode_editor->SetInsertionPoint(new_pos - 1); // set cursor into brackets
         else
             m_gcode_editor->SetSelection(new_pos - 17, new_pos - 1); // select "current_extruder"
     }
@@ -338,20 +345,14 @@ void EditGCodeDialog::selection_changed(wxDataViewEvent& evt)
 
     const std::string opt_key = m_params_list->GetSelectedParamKey();
     if (!opt_key.empty()) {
-        const ConfigOptionDef*    def     { nullptr };
+        const ConfigOptionDef* def{nullptr};
 
-        for (const ConfigDef* config: std::initializer_list<const ConfigDef*> {
-                 &custom_gcode_specific_config_def,
-                 &cgp_ro_slicing_states_config_def,
-                 &cgp_rw_slicing_states_config_def,
-                 &cgp_other_slicing_states_config_def,
-                 &cgp_print_statistics_config_def,
-                 &cgp_objects_info_config_def,
-                 &cgp_dimensions_config_def,
-                 &cgp_temperatures_config_def,
-                 &cgp_timestamps_config_def,
-                 &cgp_other_presets_config_def
-             }) {
+        for (const ConfigDef* config :
+             std::initializer_list<const ConfigDef*>{&custom_gcode_specific_config_def, &cgp_ro_slicing_states_config_def,
+                                                     &cgp_rw_slicing_states_config_def, &cgp_other_slicing_states_config_def,
+                                                     &cgp_print_statistics_config_def, &cgp_objects_info_config_def,
+                                                     &cgp_dimensions_config_def, &cgp_temperatures_config_def, &cgp_timestamps_config_def,
+                                                     &cgp_other_presets_config_def}) {
             if (config->has(opt_key)) {
                 def = config->get(opt_key);
                 break;
@@ -367,30 +368,31 @@ void EditGCodeDialog::selection_changed(wxDataViewEvent& evt)
             }
         }
 
-            if (def) {
-                const ConfigOptionType scalar_type = def->is_scalar() ? def->type : static_cast<ConfigOptionType>(def->type - coVectorType);
-                wxString type_str = scalar_type == coNone           ? "none" :
-                                                     scalar_type == coFloat          ? "float" :
-                                                     scalar_type == coInt            ? "integer" :
-                                                     scalar_type == coString         ? "string" :
-                                                     scalar_type == coPercent        ? "percent" :
-                                                     scalar_type == coFloatOrPercent ? "float or percent" :
-                                                     scalar_type == coPoint          ? "point" :
-                                                     scalar_type == coBool           ? "bool" :
-                                                     scalar_type == coEnum           ? "enum" : "undef";
-                if (!def->is_scalar())
-                    type_str += "[]";
+        if (def) {
+            const ConfigOptionType scalar_type = def->is_scalar() ? def->type : static_cast<ConfigOptionType>(def->type - coVectorType);
+            wxString               type_str    = scalar_type == coNone           ? "none" :
+                                                 scalar_type == coFloat          ? "float" :
+                                                 scalar_type == coInt            ? "integer" :
+                                                 scalar_type == coString         ? "string" :
+                                                 scalar_type == coPercent        ? "percent" :
+                                                 scalar_type == coFloatOrPercent ? "float or percent" :
+                                                 scalar_type == coPoint          ? "point" :
+                                                 scalar_type == coBool           ? "bool" :
+                                                 scalar_type == coEnum           ? "enum" :
+                                                                                   "undef";
+            if (!def->is_scalar())
+                type_str += "[]";
 
-                label = (!def || (def->full_label.empty() && def->label.empty()) ) ? format_wxstr("%1%\n(%2%)", opt_key, type_str) :
-                        (!def->full_label.empty() && !def->label.empty() ) ?
-                                                                                    format_wxstr("%1% > %2%\n(%3%)", _(def->full_label), _(def->label), type_str) :
-                                                                                    format_wxstr("%1%\n(%2%)", def->label.empty() ? _(def->full_label) : _(def->label), type_str);
+            label = (!def || (def->full_label.empty() && def->label.empty())) ?
+                        format_wxstr("%1%\n(%2%)", opt_key, type_str) :
+                    (!def->full_label.empty() && !def->label.empty()) ?
+                        format_wxstr("%1% > %2%\n(%3%)", _(def->full_label), _(def->label), type_str) :
+                        format_wxstr("%1%\n(%2%)", def->label.empty() ? _(def->full_label) : _(def->label), type_str);
 
-                if (def)
-                    description = get_wraped_wxString(_(def->tooltip), 120);
-            }
-            else
-                label = "Undef optptr";
+            if (def)
+                description = get_wraped_wxString(_(def->tooltip), 120);
+        } else
+            label = "Undef optptr";
     }
 
     m_param_label->SetLabel(label);
@@ -403,18 +405,14 @@ void EditGCodeDialog::bind_list_and_button()
 {
     m_params_list->Bind(wxEVT_DATAVIEW_SELECTION_CHANGED, &EditGCodeDialog::selection_changed, this);
 
-    m_params_list->Bind(wxEVT_DATAVIEW_ITEM_ACTIVATED, [this](wxDataViewEvent& ) {
-        add_selected_value_to_gcode();
-    });
+    m_params_list->Bind(wxEVT_DATAVIEW_ITEM_ACTIVATED, [this](wxDataViewEvent&) { add_selected_value_to_gcode(); });
 
-    m_add_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-        add_selected_value_to_gcode();
-    });
+    m_add_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { add_selected_value_to_gcode(); });
 }
 
-void EditGCodeDialog::on_dpi_changed(const wxRect&suggested_rect)
+void EditGCodeDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
-    const int& em = em_unit();
+    const int&    em   = em_unit();
     const wxSize& size = wxSize(45 * em, 35 * em);
     SetMinSize(size);
 
@@ -422,16 +420,13 @@ void EditGCodeDialog::on_dpi_changed(const wxRect&suggested_rect)
     Refresh();
 }
 
-void EditGCodeDialog::on_sys_color_changed()
-{
-    m_add_btn->msw_rescale();
-}
+void EditGCodeDialog::on_sys_color_changed() { m_add_btn->msw_rescale(); }
 
-const std::map<ParamType, std::string> ParamsInfo {
-//    Type                      BitmapName
-    { ParamType::Scalar,        "custom-gcode_single"          },
-    { ParamType::Vector,        "custom-gcode_vector"          },
-    { ParamType::FilamentVector,"custom-gcode_vector-index" },
+const std::map<ParamType, std::string> ParamsInfo{
+    //    Type                      BitmapName
+    {ParamType::Scalar, "custom-gcode_single"},
+    {ParamType::Vector, "custom-gcode_vector"},
+    {ParamType::FilamentVector, "custom-gcode_vector-index"},
 };
 
 static void make_bold(wxString& str)
@@ -453,34 +448,15 @@ static void highlight(wxString& str)
 // ----------------------------------------------------------------------------
 
 ParamsNode::ParamsNode(const wxString& group_name, const std::string& icon_name, wxDataViewCtrl* ctrl)
-: icon_name(icon_name)
-, text(group_name)
-, m_ctrl(ctrl)
-, m_bold(true)
-{
-}
+    : icon_name(icon_name), text(group_name), m_ctrl(ctrl), m_bold(true)
+{}
 
-ParamsNode::ParamsNode( ParamsNode *        parent,
-                        const wxString&     sub_group_name,
-                        const std::string&  icon_name,
-                        wxDataViewCtrl* ctrl)
-    : m_parent(parent)
-    , icon_name(icon_name)
-    , text(sub_group_name)
-    , m_ctrl(ctrl)
-    , m_bold(true)
-{
-}
+ParamsNode::ParamsNode(ParamsNode* parent, const wxString& sub_group_name, const std::string& icon_name, wxDataViewCtrl* ctrl)
+    : m_parent(parent), icon_name(icon_name), text(sub_group_name), m_ctrl(ctrl), m_bold(true)
+{}
 
-ParamsNode::ParamsNode( ParamsNode*         parent,
-                        ParamType           param_type,
-                        const std::string&  param_key,
-                        wxDataViewCtrl* ctrl)
-    : m_parent(parent)
-    , m_param_type(param_type)
-    , m_container(false)
-    , param_key(param_key)
-    , m_ctrl(ctrl)
+ParamsNode::ParamsNode(ParamsNode* parent, ParamType param_type, const std::string& param_key, wxDataViewCtrl* ctrl)
+    : m_parent(parent), m_param_type(param_type), m_container(false), param_key(param_key), m_ctrl(ctrl)
 {
     text = from_u8(param_key);
     if (param_type == ParamType::Vector)
@@ -544,7 +520,8 @@ void ParamsNode::FinishSearch()
     m_expanded_before_search ? m_ctrl->Expand(item) : m_ctrl->Collapse(item);
 }
 
-wxDataViewItemArray ParamsNode::GetEnabledChildren() {
+wxDataViewItemArray ParamsNode::GetEnabledChildren()
+{
     wxDataViewItemArray array;
     for (const std::unique_ptr<ParamsNode>& child : m_children)
         if (child->IsEnabled())
@@ -552,46 +529,38 @@ wxDataViewItemArray ParamsNode::GetEnabledChildren() {
     return array;
 }
 
-
 // ----------------------------------------------------------------------------
 //                  ParamsModel
 // ----------------------------------------------------------------------------
 
-ParamsModel::ParamsModel()
-{
-}
+ParamsModel::ParamsModel() {}
 
-wxDataViewItem ParamsModel::AppendGroup(const wxString&    group_name,
-                                        const std::string& icon_name)
+wxDataViewItem ParamsModel::AppendGroup(const wxString& group_name, const std::string& icon_name)
 {
     m_group_nodes.emplace_back(std::make_unique<ParamsNode>(group_name, icon_name, m_ctrl));
 
     wxDataViewItem parent(nullptr);
-    wxDataViewItem child((void*)m_group_nodes.back().get());
+    wxDataViewItem child((void*) m_group_nodes.back().get());
 
     ItemAdded(parent, child);
     m_ctrl->Expand(parent);
     return child;
 }
 
-wxDataViewItem ParamsModel::AppendSubGroup(wxDataViewItem       parent,
-                                           const wxString&      sub_group_name,
-                                           const std::string&   icon_name)
+wxDataViewItem ParamsModel::AppendSubGroup(wxDataViewItem parent, const wxString& sub_group_name, const std::string& icon_name)
 {
     ParamsNode* parent_node = static_cast<ParamsNode*>(parent.GetID());
     if (!parent_node)
         return wxDataViewItem(0);
 
     parent_node->Append(std::make_unique<ParamsNode>(parent_node, sub_group_name, icon_name, m_ctrl));
-    const wxDataViewItem  sub_group_item((void*)parent_node->GetChildren().back().get());
+    const wxDataViewItem sub_group_item((void*) parent_node->GetChildren().back().get());
 
     ItemAdded(parent, sub_group_item);
     return sub_group_item;
 }
 
-wxDataViewItem ParamsModel::AppendParam(wxDataViewItem      parent,
-                                        ParamType           param_type,
-                                        const std::string&  param_key)
+wxDataViewItem ParamsModel::AppendParam(wxDataViewItem parent, ParamType param_type, const std::string& param_key)
 {
     ParamsNode* parent_node = static_cast<ParamsNode*>(parent.GetID());
     if (!parent_node)
@@ -599,7 +568,7 @@ wxDataViewItem ParamsModel::AppendParam(wxDataViewItem      parent,
 
     parent_node->Append(std::make_unique<ParamsNode>(parent_node, param_type, param_key, m_ctrl));
 
-    const wxDataViewItem  child_item((void*)parent_node->GetChildren().back().get());
+    const wxDataViewItem child_item((void*) parent_node->GetChildren().back().get());
 
     ItemAdded(parent, child_item);
     return child_item;
@@ -644,9 +613,9 @@ void ParamsModel::RefreshSearch(const wxString& search_text)
     }
 
     for (const auto& node : m_group_nodes)
-        node->RefreshSearch(search_text); //Enable/Disable node based on search
+        node->RefreshSearch(search_text); // Enable/Disable node based on search
 
-    Cleared(); //Reload the model into the control
+    Cleared(); // Reload the model into the control
 
     for (const auto& node : m_group_nodes) // (re)expand all
         m_ctrl->ExpandChildren(wxDataViewItem(node.get()));
@@ -665,9 +634,9 @@ void ParamsModel::FinishSearch()
 
 wxDataViewItem ParamsModel::Delete(const wxDataViewItem& item)
 {
-    auto ret_item = wxDataViewItem(nullptr);
-    ParamsNode* node = static_cast<ParamsNode*>(item.GetID());
-    if (!node)      // happens if item.IsOk()==false
+    auto        ret_item = wxDataViewItem(nullptr);
+    ParamsNode* node     = static_cast<ParamsNode*>(item.GetID());
+    if (!node) // happens if item.IsOk()==false
         return ret_item;
     const bool is_item_enabled = node->IsEnabled();
 
@@ -682,7 +651,7 @@ wxDataViewItem ParamsModel::Delete(const wxDataViewItem& item)
     auto node_parent = node->GetParent();
 
     ParamsNodePtrArray& parents_children = node_parent ? node_parent->GetChildren() : m_group_nodes;
-    auto it = find_if(parents_children.begin(), parents_children.end(),
+    auto                it               = find_if(parents_children.begin(), parents_children.end(),
                                                    [node](std::unique_ptr<ParamsNode>& child) { return child.get() == node; });
     assert(it != parents_children.end());
     it = parents_children.erase(it);
@@ -720,16 +689,18 @@ void ParamsModel::GetValue(wxVariant& variant, const wxDataViewItem& item, unsig
     assert(item.IsOk());
 
     ParamsNode* node = static_cast<ParamsNode*>(item.GetID());
-    if (col == (unsigned int)0)
+    if (col == (unsigned int) 0)
 #ifdef __linux__
-//        variant << wxDataViewIconText(node->GetFormattedText(), get_bmp_bundle(node->icon_name)->GetIconFor(m_ctrl->GetParent())); //TODO: update to bundle with wx update
+    //        variant << wxDataViewIconText(node->GetFormattedText(), get_bmp_bundle(node->icon_name)->GetIconFor(m_ctrl->GetParent()));
+    //        //TODO: update to bundle with wx update
     {
         wxIcon icon;
         icon.CopyFromBitmap(create_scaled_bitmap(node->icon_name, m_ctrl->GetParent()));
         variant << wxDataViewIconText(node->GetFormattedText(), icon);
     }
 #else
-//        variant << DataViewBitmapText(node->GetFormattedText(), get_bmp_bundle(node->icon_name)->GetBitmapFor(m_ctrl->GetParent())); //TODO: update to bundle with wx update
+        //        variant << DataViewBitmapText(node->GetFormattedText(),
+        //        get_bmp_bundle(node->icon_name)->GetBitmapFor(m_ctrl->GetParent())); //TODO: update to bundle with wx update
         variant << DataViewBitmapText(node->GetFormattedText(), create_scaled_bitmap(node->icon_name, m_ctrl->GetParent()));
 #endif //__linux__
     else
@@ -741,7 +712,7 @@ bool ParamsModel::SetValue(const wxVariant& variant, const wxDataViewItem& item,
     assert(item.IsOk());
 
     ParamsNode* node = static_cast<ParamsNode*>(item.GetID());
-    if (col == (unsigned int)0) {
+    if (col == (unsigned int) 0) {
 #ifdef __linux__
         wxDataViewIconText data;
         data << variant;
@@ -759,7 +730,7 @@ bool ParamsModel::SetValue(const wxVariant& variant, const wxDataViewItem& item,
     return false;
 }
 
-wxDataViewItem ParamsModel::GetParent(const wxDataViewItem&item) const
+wxDataViewItem ParamsModel::GetParent(const wxDataViewItem& item) const
 {
     // the invisible root node has no parent
     if (!item.IsOk())
@@ -770,7 +741,7 @@ wxDataViewItem ParamsModel::GetParent(const wxDataViewItem&item) const
     if (node->IsGroupNode())
         return wxDataViewItem(nullptr);
 
-    return wxDataViewItem((void*)node->GetParent());
+    return wxDataViewItem((void*) node->GetParent());
 }
 
 bool ParamsModel::IsContainer(const wxDataViewItem& item) const
@@ -784,24 +755,24 @@ bool ParamsModel::IsContainer(const wxDataViewItem& item) const
 }
 unsigned int ParamsModel::GetChildren(const wxDataViewItem& parent, wxDataViewItemArray& array) const
 {
-    ParamsNode* parent_node = (ParamsNode*)parent.GetID();
+    ParamsNode* parent_node = (ParamsNode*) parent.GetID();
 
     if (parent_node == nullptr) {
         for (const auto& group : m_group_nodes)
             if (group->IsEnabled())
-                array.Add(wxDataViewItem((void*)group.get()));
-    }
-    else  {
+                array.Add(wxDataViewItem((void*) group.get()));
+    } else {
         const ParamsNodePtrArray& children = parent_node->GetChildren();
         for (const std::unique_ptr<ParamsNode>& child : children)
             if (child->IsEnabled())
-                array.Add(wxDataViewItem((void*)child.get()));
+                array.Add(wxDataViewItem((void*) child.get()));
     }
 
     return array.Count();
 }
 unsigned int ParamsModel::GetColumnCount() const { return 1; }
-wxString     ParamsModel::GetColumnType(unsigned int col) const {
+wxString     ParamsModel::GetColumnType(unsigned int col) const
+{
 #ifdef __linux__
     return wxT("wxDataViewIconText");
 #else
@@ -813,13 +784,17 @@ wxString     ParamsModel::GetColumnType(unsigned int col) const {
 //                  ParamsViewCtrl
 // ----------------------------------------------------------------------------
 
-ParamsViewCtrl::ParamsViewCtrl(wxWindow *parent, wxSize size)
-    : wxDataViewCtrl(parent, wxID_ANY, wxDefaultPosition, size, wxDV_SINGLE | wxDV_NO_HEADER// | wxDV_ROW_LINES
+ParamsViewCtrl::ParamsViewCtrl(wxWindow* parent, wxSize size)
+    : wxDataViewCtrl(parent,
+                     wxID_ANY,
+                     wxDefaultPosition,
+                     size,
+                     wxDV_SINGLE | wxDV_NO_HEADER // | wxDV_ROW_LINES
 #ifdef _WIN32
-        | wxBORDER_SIMPLE
+                         | wxBORDER_SIMPLE
 #endif
-    ),
-    m_em_unit(em_unit(parent))
+                     )
+    , m_em_unit(em_unit(parent))
 {
     wxGetApp().UpdateDVCDarkUI(this);
 
@@ -832,52 +807,32 @@ ParamsViewCtrl::ParamsViewCtrl(wxWindow *parent, wxSize size)
 #ifdef SUPPORTS_MARKUP
     rd->EnableMarkup(true);
 #endif
-    wxDataViewColumn* column = new wxDataViewColumn("", rd, 0, 20 * m_em_unit, wxALIGN_TOP, wxDATAVIEW_COL_RESIZABLE | wxDATAVIEW_CELL_INERT);
+    wxDataViewColumn* column = new wxDataViewColumn("", rd, 0, 20 * m_em_unit, wxALIGN_TOP,
+                                                    wxDATAVIEW_COL_RESIZABLE | wxDATAVIEW_CELL_INERT);
 #else
-    wxDataViewColumn* column = new wxDataViewColumn("", new BitmapTextRenderer(true, wxDATAVIEW_CELL_INERT), 0, 20 * m_em_unit, wxALIGN_TOP, wxDATAVIEW_COL_RESIZABLE);
+    wxDataViewColumn* column = new wxDataViewColumn("", new BitmapTextRenderer(true, wxDATAVIEW_CELL_INERT), 0, 20 * m_em_unit, wxALIGN_TOP,
+                                                    wxDATAVIEW_COL_RESIZABLE);
 #endif //__linux__
     this->AppendColumn(column);
     this->SetExpanderColumn(column);
 }
 
 wxDataViewItem ParamsViewCtrl::AppendGroup(const wxString& group_name, const std::string& icon_name)
-{
-    return model->AppendGroup(group_name, icon_name);
-}
+{ return model->AppendGroup(group_name, icon_name); }
 
-wxDataViewItem ParamsViewCtrl::AppendSubGroup(  wxDataViewItem      parent,
-                                                const wxString&     sub_group_name,
-                                                const std::string&  icon_name)
-{
-    return model->AppendSubGroup(parent, sub_group_name, icon_name);
-}
+wxDataViewItem ParamsViewCtrl::AppendSubGroup(wxDataViewItem parent, const wxString& sub_group_name, const std::string& icon_name)
+{ return model->AppendSubGroup(parent, sub_group_name, icon_name); }
 
-wxDataViewItem ParamsViewCtrl::AppendParam( wxDataViewItem      parent,
-                                            ParamType           param_type,
-                                            const std::string&  param_key)
-{
-    return model->AppendParam(parent, param_type, param_key);
-}
+wxDataViewItem ParamsViewCtrl::AppendParam(wxDataViewItem parent, ParamType param_type, const std::string& param_key)
+{ return model->AppendParam(parent, param_type, param_key); }
 
-wxString ParamsViewCtrl::GetValue(wxDataViewItem item)
-{
-    return model->GetParamName(item);
-}
+wxString ParamsViewCtrl::GetValue(wxDataViewItem item) { return model->GetParamName(item); }
 
-wxString ParamsViewCtrl::GetSelectedValue()
-{
-    return model->GetParamName(this->GetSelection());
-}
+wxString ParamsViewCtrl::GetSelectedValue() { return model->GetParamName(this->GetSelection()); }
 
-std::string ParamsViewCtrl::GetSelectedParamKey()
-{
-    return model->GetParamKey(this->GetSelection());
-}
+std::string ParamsViewCtrl::GetSelectedParamKey() { return model->GetParamKey(this->GetSelection()); }
 
-std::string ParamsViewCtrl::GetSelectedTopLevelCategory()
-{
-    return model->GetTopLevelCategory(this->GetSelection());
-}
+std::string ParamsViewCtrl::GetSelectedTopLevelCategory() { return model->GetTopLevelCategory(this->GetSelection()); }
 
 void ParamsViewCtrl::CheckAndDeleteIfEmpty(wxDataViewItem item)
 {
@@ -887,14 +842,11 @@ void ParamsViewCtrl::CheckAndDeleteIfEmpty(wxDataViewItem item)
         model->Delete(item);
 }
 
-void ParamsViewCtrl::Clear()
-{
-    model->Clear();
-}
+void ParamsViewCtrl::Clear() { model->Clear(); }
 
-void ParamsViewCtrl::Rescale(int em/* = 0*/)
+void ParamsViewCtrl::Rescale(int em /* = 0*/)
 {
-//    model->Rescale();
+    //    model->Rescale();
     Refresh();
 }
-}}    // namespace Slic3r::GUI
+}} // namespace Slic3r::GUI
