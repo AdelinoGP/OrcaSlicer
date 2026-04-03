@@ -91,8 +91,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T277 annotate: src/slic3r/GUI/EditGCodeDialog.cpp
 - [x] T278 annotate: src/slic3r/GUI/EditGCodeDialog.hpp
 - [x] T279 annotate: src/slic3r/GUI/EncodedFilament.cpp
-- [~] T280 annotate: src/slic3r/GUI/EncodedFilament.hpp
-- [ ] T281 annotate: src/slic3r/GUI/Event.hpp
+- [x] T280 annotate: src/slic3r/GUI/EncodedFilament.hpp
+- [~] T281 annotate: src/slic3r/GUI/Event.hpp
 - [ ] T282 annotate: src/slic3r/GUI/ExtraRenderers.cpp
 - [ ] T283 annotate: src/slic3r/GUI/ExtraRenderers.hpp
 - [ ] T284 annotate: src/slic3r/GUI/ExtrusionCalibration.cpp

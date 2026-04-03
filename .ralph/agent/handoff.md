@@ -2528,3 +2528,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Custom color-to-code mapping logic)
 - Git: annotate: src/slic3r/GUI/EncodedFilament.cpp
 - Next recommended Phase 1 task: T280 src/slic3r/GUI/EncodedFilament.hpp
+
+## Phase 1 - Task T280 complete
+- Task type: annotate
+- File: src/slic3r/GUI/EncodedFilament.hpp
+- Deliverables: src/slic3r/GUI/EncodedFilament.hpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Declarations for the filament color metadata service and associated data models.
+- Unity-impact summary:
+  - Header declares the public interface for the filament database service.
+  - HSV color conversion and sorting logic maps to Unity's Color and IComparer interfaces.
+  - Custom color-set comparison logic is critical for consistent database lookups.
+- Hazards found: 1 (P2: Custom color-set indexing logic)
+- Git: annotate: src/slic3r/GUI/EncodedFilament.hpp
+- Next recommended Phase 1 task: T281 src/slic3r/GUI/Event.hpp
