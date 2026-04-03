@@ -2513,3 +2513,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/EditGCodeDialog.hpp
 - Next recommended Phase 1 task: T279 src/slic3r/GUI/EncodedFilament.cpp
+
+## Phase 1 - Task T279 complete
+- Task type: annotate
+- File: src/slic3r/GUI/EncodedFilament.cpp
+- Deliverables: src/slic3r/GUI/EncodedFilament.cpp
+- Substantive additions: 6 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Service for querying filament color codes and localized material names from a resource database.
+- Unity-impact summary:
+  - Material metadata querying maps to a C# FilamentDatabaseService.
+  - Resource database should be externalized to a ScriptableObject or JSON asset.
+  - Integration with Unity's Localization package for material name lookups.
+  - Custom hashing/comparison for color sets must be mirrored in C#.
+- Hazards found: 1 (P2: Custom color-to-code mapping logic)
+- Git: annotate: src/slic3r/GUI/EncodedFilament.cpp
+- Next recommended Phase 1 task: T280 src/slic3r/GUI/EncodedFilament.hpp

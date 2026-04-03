@@ -1,26 +1,31 @@
+// [ANNOTATED]
+// [INTENT] Service for querying filament color codes and localized material names from a resource database.
+// [STATE] Loads and maintains a hierarchical mapping of filament IDs, color types, and localized name tables.
+// [UNITY] Map to a C# FilamentDatabaseService using ScriptableObjects for the metadata storage.
+// [UNITY] Integrate with Unity's Localization package for language-specific material name lookups.
+// [PORTING_HAZARD:P2] Custom hashing and comparison logic for filament color sets must be mirrored in C# to ensure correct database hits.
+
 #include "EncodedFilament.hpp"
 
 #include "GUI_App.hpp"
 
-namespace Slic3r
-{
+namespace Slic3r {
 
 static wxString _ColourToString(const wxColour& color)
-{
-    return wxString::Format("#%02X%02X%02X%02X", color.Red(), color.Green(), color.Blue(), color.Alpha());
-}
+{ return wxString::Format("#%02X%02X%02X%02X", color.Red(), color.Green(), color.Blue(), color.Alpha()); }
 
 FilamentColorCodeQuery::FilamentColorCodeQuery()
 {
     m_fila_id2colors_map = new std::unordered_map<wxString, FilamentColorCodes*>;
-    m_fila_path = data_dir() + "/system/BBL/filament/filaments_color_codes.json";
+    m_fila_path          = data_dir() + "/system/BBL/filament/filaments_color_codes.json";
     LoadFromLocal();
 }
 
-
 FilamentColorCodeQuery::~FilamentColorCodeQuery()
 {
-    for (auto& pair : *m_fila_id2colors_map) { delete pair.second; }
+    for (auto& pair : *m_fila_id2colors_map) {
+        delete pair.second;
+    }
 
     delete m_fila_id2colors_map;
     m_fila_id2colors_map = nullptr;
@@ -63,54 +68,54 @@ wxString FilamentColorCodeQuery::GetFilaColorName(const wxString& fila_id, const
 void FilamentColorCodeQuery::LoadFromLocal()
 {
     std::ifstream json_file(encode_path(m_fila_path.c_str()));
-    try
-    {
-        if (json_file.is_open())
-        {
+    try {
+        if (json_file.is_open()) {
             const json& json_content = json::parse(json_file);
-            if (!json_content.contains("data")) { return; }
+            if (!json_content.contains("data")) {
+                return;
+            }
 
             const json& json_data = json_content["data"];
-            for (const auto& json_data_item : json_data)
-            {
-                const wxString& fila_id = json_data_item.contains("fila_id") ? json_data_item["fila_id"].get<wxString>() : wxString();
+            for (const auto& json_data_item : json_data) {
+                const wxString& fila_id   = json_data_item.contains("fila_id") ? json_data_item["fila_id"].get<wxString>() : wxString();
                 const wxString& fila_type = json_data_item.contains("fila_type") ? json_data_item["fila_type"].get<wxString>() : wxString();
-                const wxString& fila_color_code = json_data_item.contains("fila_color_code") ? json_data_item["fila_color_code"].get<wxString>() : wxString();
+                const wxString& fila_color_code = json_data_item.contains("fila_color_code") ?
+                                                      json_data_item["fila_color_code"].get<wxString>() :
+                                                      wxString();
 
                 FilamentColor fila_color;
-                if (json_data_item.contains("fila_color"))
-                {
+                if (json_data_item.contains("fila_color")) {
                     const auto& fila_color_strs = json_data_item["fila_color"].get<std::vector<wxString>>();
                     for (const auto& color_str : fila_color_strs) {
-                        if (color_str.size() > 3) /* Skip the value like "#0"*/{
+                        if (color_str.size() > 3) /* Skip the value like "#0"*/ {
                             fila_color.m_colors.emplace(wxColour(color_str));
                         }
                     }
                 }
 
                 if (fila_color.m_colors.empty()) {
-                    BOOST_LOG_TRIVIAL(warning) << "FilamentColorCodeQuery::LoadFromLocal: No colors found for fila_color_code: " << fila_color_code;
+                    BOOST_LOG_TRIVIAL(warning) << "FilamentColorCodeQuery::LoadFromLocal: No colors found for fila_color_code: "
+                                               << fila_color_code;
                     continue; // Skip if no colors are defined
                 };
 
-                const wxString& fila_color_type = json_data_item.contains("fila_color_type") ? wxString::FromUTF8(json_data_item["fila_color_type"].get<std::string>()) : wxString();
+                const wxString& fila_color_type = json_data_item.contains("fila_color_type") ?
+                                                      wxString::FromUTF8(json_data_item["fila_color_type"].get<std::string>()) :
+                                                      wxString();
                 if (fila_color_type == wxString::FromUTF8("单色")) {
                     fila_color.m_color_type = FilamentColor::ColorType::SINGLE_CLR;
                 } else if (fila_color_type == wxString::FromUTF8("多拼色")) {
                     fila_color.m_color_type = FilamentColor::ColorType::MULTI_CLR;
-                } else if (fila_color_type == wxString::FromUTF8("渐变色"))
-                {
+                } else if (fila_color_type == wxString::FromUTF8("渐变色")) {
                     fila_color.m_color_type = FilamentColor::ColorType::GRADIENT_CLR;
                 };
 
                 std::unordered_map<wxString, wxString> fila_color_names;
-                if (json_data_item.contains("fila_color_name"))
-                {
+                if (json_data_item.contains("fila_color_name")) {
                     const json& color_names_json = json_data_item["fila_color_name"];
-                    for (const auto& color_name_item : color_names_json.items())
-                    {
-                        const wxString& lang_code = wxString::FromUTF8(color_name_item.key());
-                        const wxString& color_name = wxString::FromUTF8(color_name_item.value().get<std::string>());
+                    for (const auto& color_name_item : color_names_json.items()) {
+                        const wxString& lang_code   = wxString::FromUTF8(color_name_item.key());
+                        const wxString& color_name  = wxString::FromUTF8(color_name_item.value().get<std::string>());
                         fila_color_names[lang_code] = color_name;
                     }
                 }
@@ -118,24 +123,21 @@ void FilamentColorCodeQuery::LoadFromLocal()
                 CreateFilaCode(fila_id, fila_type, fila_color_code, std::move(fila_color), std::move(fila_color_names));
             }
         }
-    }
-    catch (...)
-    {
+    } catch (...) {
         assert(0 && "FilamentColorCodeQuery::LoadFromLocal failed");
         BOOST_LOG_TRIVIAL(error) << "FilamentColorCodeQuery::LoadFromLocal failed";
     }
 }
 
-void FilamentColorCodeQuery::CreateFilaCode(const wxString& fila_id,
-                                            const wxString& fila_type,
-                                            const wxString& fila_color_code,
-                                            FilamentColor&& fila_color,
+void FilamentColorCodeQuery::CreateFilaCode(const wxString&                          fila_id,
+                                            const wxString&                          fila_type,
+                                            const wxString&                          fila_color_code,
+                                            FilamentColor&&                          fila_color,
                                             std::unordered_map<wxString, wxString>&& fila_color_names)
 {
     FilamentColorCodes* color_codes = GetFilaInfoMap(fila_id);
-    if (!color_codes)
-    {
-        color_codes = new FilamentColorCodes(fila_id, fila_type);
+    if (!color_codes) {
+        color_codes                      = new FilamentColorCodes(fila_id, fila_type);
         (*m_fila_id2colors_map)[fila_id] = color_codes;
     }
 
@@ -144,44 +146,45 @@ void FilamentColorCodeQuery::CreateFilaCode(const wxString& fila_id,
 }
 // End of class EncodedFilamentQuery
 
-
 wxString FilamentColorCode::GetFilaColorName() const
 {
     const wxString& strLanguage = Slic3r::GUI::wxGetApp().app_config->get("language");
-    const wxString& lang_code = strLanguage.BeforeFirst('_');
-    auto it = m_fila_color_names.find(lang_code);
-    if (it != m_fila_color_names.end() && !it->second.empty()) {  return it->second; }
+    const wxString& lang_code   = strLanguage.BeforeFirst('_');
+    auto            it          = m_fila_color_names.find(lang_code);
+    if (it != m_fila_color_names.end() && !it->second.empty()) {
+        return it->second;
+    }
 
-    it = m_fila_color_names.find("en");// retry with English as fallback
+    it = m_fila_color_names.find("en"); // retry with English as fallback
     return (it != m_fila_color_names.end()) ? it->second : "Unknown";
 }
 
-FilamentColorCode::FilamentColorCode(const wxString& color_code, FilamentColorCodes* owner, FilamentColor&& color, std::unordered_map<wxString, wxString>&& name_map)
-    : m_fila_color_code(color_code),
-      m_owner(owner),
-      m_fila_color(std::move(color)),
-      m_fila_color_names(std::move(name_map))
-{
-}
+FilamentColorCode::FilamentColorCode(const wxString&                          color_code,
+                                     FilamentColorCodes*                      owner,
+                                     FilamentColor&&                          color,
+                                     std::unordered_map<wxString, wxString>&& name_map)
+    : m_fila_color_code(color_code), m_owner(owner), m_fila_color(std::move(color)), m_fila_color_names(std::move(name_map))
+{}
 
 void FilamentColorCode::Debug(const char* prefix)
 {
-    BOOST_LOG_TRIVIAL(debug) << prefix << "Fila Color Code: " << m_fila_color_code
-                             << ", Colors: " << m_fila_color.ColorCount()
+    BOOST_LOG_TRIVIAL(debug) << prefix << "Fila Color Code: " << m_fila_color_code << ", Colors: " << m_fila_color.ColorCount()
                              << ", Type: " << static_cast<int>(m_fila_color.m_color_type);
-    for (const auto& color : m_fila_color.m_colors) { BOOST_LOG_TRIVIAL(debug) << prefix << "  Color: " << _ColourToString(color); }
-    //for (const auto& name_pair : m_fila_color_names) { BOOST_LOG_TRIVIAL(debug) << prefix << "  Color Name [" << name_pair.first << "]: " << name_pair.second;}
+    for (const auto& color : m_fila_color.m_colors) {
+        BOOST_LOG_TRIVIAL(debug) << prefix << "  Color: " << _ColourToString(color);
+    }
+    // for (const auto& name_pair : m_fila_color_names) { BOOST_LOG_TRIVIAL(debug) << prefix << "  Color Name [" << name_pair.first << "]: "
+    // << name_pair.second;}
 }
 
-FilamentColorCodes::FilamentColorCodes(const wxString& fila_id, const wxString& fila_type)
-    : m_fila_id(fila_id), m_fila_type(fila_type)
-{
-    m_fila_colors_map = new FilamentColor2CodeMap;
-}
+FilamentColorCodes::FilamentColorCodes(const wxString& fila_id, const wxString& fila_type) : m_fila_id(fila_id), m_fila_type(fila_type)
+{ m_fila_colors_map = new FilamentColor2CodeMap; }
 
 FilamentColorCodes::~FilamentColorCodes()
 {
-    for (auto iter : *m_fila_colors_map) { delete iter.second; }
+    for (auto iter : *m_fila_colors_map) {
+        delete iter.second;
+    }
 
     m_fila_colors_map->clear();
     delete m_fila_colors_map;
@@ -193,25 +196,19 @@ Slic3r::FilamentColorCode* FilamentColorCodes::GetColorCode(const FilamentColor&
     return (it != m_fila_colors_map->end()) ? it->second : nullptr;
 }
 
-void FilamentColorCodes::AddColorCode(FilamentColorCode* code)
-{
-    m_fila_colors_map->emplace(code->GetFilaColor(), code);
-}
+void FilamentColorCodes::AddColorCode(FilamentColorCode* code) { m_fila_colors_map->emplace(code->GetFilaColor(), code); }
 
 void FilamentColorCodes::Debug(const char* prefix)
 {
     BOOST_LOG_TRIVIAL(debug) << prefix << "Fila ID: " << m_fila_id << ", Type: " << m_fila_type;
 
     auto iter = m_fila_colors_map->begin();
-    while (iter != m_fila_colors_map->end())
-    {
+    while (iter != m_fila_colors_map->end()) {
         iter->second->Debug(prefix);
         iter++;
     }
 
     BOOST_LOG_TRIVIAL(debug) << prefix << "End";
 }
-
-
 
 } // namespace Slic3r
