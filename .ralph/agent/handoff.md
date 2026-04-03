@@ -2853,6 +2853,20 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Git: annotate: src/slic3r/GUI/GCodeViewer.hpp
 - Next recommended Phase 1 task: T303 src/slic3r/GUI/Gizmos/GizmoObjectManipulation.cpp
 
+## Phase 1 - Task T303 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GizmoObjectManipulation.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GizmoObjectManipulation.cpp
+- Substantive additions: 6 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Implementation of the 3D object manipulation HUD (Move, Rotate, Scale).
+- Unity-impact summary:
+  - Object manipulation HUD maps to a Unity UI Toolkit or Canvas overlay.
+  - Transformation logic leverages Unity's native Transform API.
+  - Unit conversion (mm/in) and coordinate space (World/Local) mapping are handled by managed C# services.
+- Hazards found: 1 (P2: Complex coordinate space math synchronization)
+- Git: annotate: src/slic3r/GUI/Gizmos/GizmoObjectManipulation.cpp
+- Next recommended Phase 1 task: T304 src/slic3r/GUI/Gizmos/GizmoObjectManipulation.hpp
+
 ## Phase 1 checkpoint
 - Files newly accounted for in this batch: 70
 - Cumulative annotated: 129

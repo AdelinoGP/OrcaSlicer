@@ -83,5 +83,6 @@
 - Completed T300: src/slic3r/GUI/format.hpp.
 - Completed T301: src/slic3r/GUI/GCodeViewer.cpp.
 - Completed T302: src/slic3r/GUI/GCodeViewer.hpp.
-- Next task: T303 src/slic3r/GUI/Gizmos/GizmoObjectManipulation.cpp.
+- Completed T303: src/slic3r/GUI/Gizmos/GizmoObjectManipulation.cpp.
+- Next task: T304 src/slic3r/GUI/Gizmos/GizmoObjectManipulation.hpp.
 
