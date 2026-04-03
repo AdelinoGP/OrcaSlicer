@@ -81,5 +81,6 @@
 - Completed T298: src/slic3r/GUI/FileArchiveDialog.cpp.
 - Completed T299: src/slic3r/GUI/FileArchiveDialog.hpp.
 - Completed T300: src/slic3r/GUI/format.hpp.
-- Next task: T301 src/slic3r/GUI/GCodeViewer.cpp.
+- Completed T301: src/slic3r/GUI/GCodeViewer.cpp.
+- Next task: T302 src/slic3r/GUI/GCodeViewer.hpp.
 

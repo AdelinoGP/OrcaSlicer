@@ -2824,6 +2824,21 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Git: annotate: src/slic3r/GUI/format.hpp
 - Next recommended Phase 1 task: T301 src/slic3r/GUI/GCodeViewer.cpp
 
+## Phase 1 - Task T301 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GCodeViewer.cpp
+- Deliverables: src/slic3r/GUI/GCodeViewer.cpp
+- Substantive additions: 10+ ([INTENT], [STATE], [EVENT], [OPENGL], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Primary controller for the 3D G-code preview, integrating libvgcode rendering with the slicer UI.
+- Unity-impact summary:
+  - Complex 3D toolpath visualization maps to a custom Unity rendering pipeline.
+  - ImGui-based overlays (Legend, Stats, G-code Window) replaced by Unity UI Toolkit VisualElements.
+  - High-performance G-code text rendering should use virtualized ListView components in Unity.
+  - Toolhead markers map to Unity GameObjects with custom meshes.
+- Hazards found: 2 (P1: High-performance graphics requirements; P2: Complex geometry generation logic)
+- Git: annotate: src/slic3r/GUI/GCodeViewer.cpp
+- Next recommended Phase 1 task: T302 src/slic3r/GUI/GCodeViewer.hpp
+
 ## Phase 1 checkpoint
 - Files newly accounted for in this batch: 70
 - Cumulative annotated: 129
