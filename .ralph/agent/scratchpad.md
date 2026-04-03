@@ -76,5 +76,6 @@
 - Completed T293: src/slic3r/GUI/FilamentMapDialog.hpp.
 - Completed T294: src/slic3r/GUI/FilamentMapPanel.cpp.
 - Completed T295: src/slic3r/GUI/FilamentMapPanel.hpp.
-- Next task: T296 src/slic3r/GUI/FilamentPickerDialog.cpp.
+- Completed T296: src/slic3r/GUI/FilamentPickerDialog.cpp.
+- Next task: T297 src/slic3r/GUI/FilamentPickerDialog.hpp.
 

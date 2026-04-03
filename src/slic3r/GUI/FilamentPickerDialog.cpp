@@ -1,3 +1,12 @@
+// [ANNOTATED]
+// [INTENT] Implementation of the filament material/color picker popup.
+// [STATE] Managed state for material variants, localized color names, and selected color preview.
+// [EVENT] Custom "flash" animation and click-outside detection using timed polling and platform hooks.
+// [UNITY] Map to a Unity UI Toolkit VisualElement. Replace manual window shaping with native SDF corners or sprite masks.
+// [UNITY] Use CanvasGroup and a Tweening library (or Animation) for the flash effect.
+// [PORTING_HAZARD:P2] Deep reliance on platform-specific window hierarchy checks (Win32 WindowFromPoint) for click-outside detection.
+// [PORTING_HAZARD:P2] Manual coordinate alignment with the sidebar UI must be replaced by Unity's anchoring system.
+
 #include "FilamentPickerDialog.hpp"
 #include "GUI.hpp"
 #include "I18N.hpp"
@@ -22,18 +31,19 @@
 #define COLOR_BTN_BITMAP_SIZE wxSize(FromDIP(24), FromDIP(24))
 #define COLOR_BTN_SIZE wxSize(FromDIP(30), FromDIP(30))
 #define GRID_GAP FromDIP(2)
-#define COLS 9  // fixed column count
-#define MAX_VISIBLE_ROWS 7  // max rows before scrollbar appears
+#define COLS 9             // fixed column count
+#define MAX_VISIBLE_ROWS 7 // max rows before scrollbar appears
 
 namespace Slic3r { namespace GUI {
 
 wxColour FilamentPickerDialog::GetSelectedColour() const
 {
-    if (!m_color_demo) return wxNullColour;
+    if (!m_color_demo)
+        return wxNullColour;
     return m_color_demo->GetBackgroundColour();
 }
 
-void FilamentPickerDialog::on_dpi_changed(const wxRect &suggested_rect)
+void FilamentPickerDialog::on_dpi_changed(const wxRect& suggested_rect)
 {
     // Handle DPI change
     CreateShapedBitmap();
@@ -57,32 +67,35 @@ void FilamentPickerDialog::StartFlashing()
     m_flash_timer->Start(50);
 }
 
-FilamentPickerDialog::FilamentPickerDialog(wxWindow *parent, const wxString& fila_id, const FilamentColor& fila_color, const std::string& fila_type)
+FilamentPickerDialog::FilamentPickerDialog(wxWindow*            parent,
+                                           const wxString&      fila_id,
+                                           const FilamentColor& fila_color,
+                                           const std::string&   fila_type)
     : DPIDialog(parent ? parent : wxGetApp().mainframe,
-        wxID_ANY,
-        _L("Select Filament"),
-        wxDefaultPosition,
-        wxDefaultSize,
-        wxBORDER_NONE | wxFRAME_NO_TASKBAR | wxFRAME_SHAPED)
+                wxID_ANY,
+                _L("Select Filament"),
+                wxDefaultPosition,
+                wxDefaultSize,
+                wxBORDER_NONE | wxFRAME_NO_TASKBAR | wxFRAME_SHAPED)
 {
     SetBackgroundColour(wxColour(255, 255, 255));
 
-    m_color_query = new FilamentColorCodeQuery();
-    m_is_data_loaded = LoadFilamentData(fila_id);
+    m_color_query        = new FilamentColorCodeQuery();
+    m_is_data_loaded     = LoadFilamentData(fila_id);
     m_cur_filament_color = fila_color;
-    wxString color_name = m_color_query->GetFilaColorName(fila_id, fila_color);
-    m_cur_color_name = new wxString(color_name);
+    wxString color_name  = m_color_query->GetFilaColorName(fila_id, fila_color);
+    m_cur_color_name     = new wxString(color_name);
 
-    wxBoxSizer *container_sizer = new wxBoxSizer(wxHORIZONTAL);
-    wxBoxSizer *main_sizer = new wxBoxSizer(wxVERTICAL);
+    wxBoxSizer* container_sizer = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* main_sizer      = new wxBoxSizer(wxVERTICAL);
 
     // Preview panel (always present)
-    wxBoxSizer *preview_sizer = CreatePreviewPanel(fila_color, fila_type);
+    wxBoxSizer* preview_sizer = CreatePreviewPanel(fila_color, fila_type);
     main_sizer->AddSpacer(FromDIP(4));
     main_sizer->Add(preview_sizer, 0, wxEXPAND, 0);
     main_sizer->AddSpacer(FromDIP(12));
 
-    wxBoxSizer *line_sizer = CreateSeparatorLine();
+    wxBoxSizer* line_sizer = CreateSeparatorLine();
     main_sizer->Add(line_sizer, 0, wxEXPAND, 0);
 
     // If caller passed an initial colour, reflect it in preview box.
@@ -99,8 +112,8 @@ FilamentPickerDialog::FilamentPickerDialog(wxWindow *parent, const wxString& fil
 
     // OK / Cancel buttons
     auto dlg_btns = new DialogButtons(this, {"OK", "Cancel"});
-    m_ok_btn = dlg_btns->GetOK();
-    m_cancel_btn = dlg_btns->GetCANCEL();
+    m_ok_btn      = dlg_btns->GetOK();
+    m_cancel_btn  = dlg_btns->GetCANCEL();
 
     main_sizer->Add(dlg_btns, 0, wxEXPAND);
     container_sizer->Add(main_sizer, 1, wxEXPAND | wxALL, FromDIP(16));
@@ -112,14 +125,11 @@ FilamentPickerDialog::FilamentPickerDialog(wxWindow *parent, const wxString& fil
     // Position the dialog relative to the parent window
     if (GetParent()) {
         // Align the dialog with the sidebar
-        auto& sidebar = wxGetApp().sidebar();
-        wxPoint sidebar_pos = sidebar.GetScreenPosition();
-        wxSize sidebar_size = sidebar.GetSize();
+        auto&   sidebar      = wxGetApp().sidebar();
+        wxPoint sidebar_pos  = sidebar.GetScreenPosition();
+        wxSize  sidebar_size = sidebar.GetSize();
 
-        wxPoint new_pos(
-            sidebar_pos.x + sidebar_size.GetWidth() + FromDIP(10),
-            sidebar_pos.y + FromDIP(80)
-        );
+        wxPoint new_pos(sidebar_pos.x + sidebar_size.GetWidth() + FromDIP(10), sidebar_pos.y + FromDIP(80));
         SetPosition(new_pos);
     } else {
         Centre(wxBOTH); // If no parent window, center the dialog
@@ -177,10 +187,7 @@ void FilamentPickerDialog::CreateShapedBitmap()
     // Draw main white shape on top, positioned to let shadow show through
     dc.SetBrush(wxBrush(wxColour(255, 255, 255, 255)));
     dc.SetPen(*wxTRANSPARENT_PEN);
-    dc.DrawRoundedRectangle(0, 0,
-                          size.GetWidth(),
-                          size.GetHeight(),
-                          FromDIP(m_corner_radius));
+    dc.DrawRoundedRectangle(0, 0, size.GetWidth(), size.GetHeight(), FromDIP(m_corner_radius));
 
     dc.SelectObject(wxNullBitmap);
 }
@@ -220,7 +227,7 @@ bool FilamentPickerDialog::LoadFilamentData(const wxString& fila_id)
 
 wxBoxSizer* FilamentPickerDialog::CreatePreviewPanel(const FilamentColor& fila_color, const std::string& fila_type)
 {
-    wxBoxSizer *preview_sizer = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer* preview_sizer = new wxBoxSizer(wxHORIZONTAL);
 
     // Create color preview bitmap
     CreateColorBitmap(fila_color);
@@ -228,25 +235,24 @@ wxBoxSizer* FilamentPickerDialog::CreatePreviewPanel(const FilamentColor& fila_c
     preview_sizer->AddSpacer(FromDIP(12));
 
     // Create info labels section
-    wxBoxSizer *label_sizer = CreateInfoSection();
+    wxBoxSizer* label_sizer = CreateInfoSection();
     SetupLabelsContent(fila_color, fila_type);
     preview_sizer->Add(label_sizer, 1, wxALIGN_CENTER_VERTICAL, 0);
 
     return preview_sizer;
 }
 
-void FilamentPickerDialog::CreateColorBitmap(const FilamentColor &fila_color)
+void FilamentPickerDialog::CreateColorBitmap(const FilamentColor& fila_color)
 {
     m_color_demo = new wxStaticBitmap(this, wxID_ANY, wxNullBitmap, wxDefaultPosition, COLOR_DEMO_SIZE, 0);
 
     // Generate bitmap content
     if (fila_color.ColorCount() > 0) {
         std::vector<wxColour> wx_colors(fila_color.m_colors.begin(), fila_color.m_colors.end());
-        wxBitmap init_bmp = create_filament_bitmap(wx_colors, COLOR_DEMO_SIZE,
-                                                fila_color.m_color_type == FilamentColor::ColorType::GRADIENT_CLR);
+        wxBitmap              init_bmp = create_filament_bitmap(wx_colors, COLOR_DEMO_SIZE,
+                                                                fila_color.m_color_type == FilamentColor::ColorType::GRADIENT_CLR);
         m_color_demo->SetBitmap(init_bmp);
-    }
-    else{
+    } else {
         std::vector<wxColour> wx_colors;
         wx_colors.push_back(wxNullColour);
         wxBitmap init_bmp = create_filament_bitmap(wx_colors, COLOR_DEMO_SIZE, false);
@@ -256,23 +262,18 @@ void FilamentPickerDialog::CreateColorBitmap(const FilamentColor &fila_color)
 
 wxBoxSizer* FilamentPickerDialog::CreateInfoSection()
 {
-    wxBoxSizer *main_sizer = new wxBoxSizer(wxVERTICAL);
+    wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
 
     // Create the container box
-    wxStaticBox *info_box = new wxStaticBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition);
+    wxStaticBox* info_box = new wxStaticBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition);
     info_box->SetSize(wxSize(FromDIP(240), FromDIP(24)));
     info_box->SetBackgroundColour(StateColor::darkModeColorFor(*wxWHITE));
-    wxStaticBoxSizer *box_sizer = new wxStaticBoxSizer(info_box, wxHORIZONTAL);
+    wxStaticBoxSizer* box_sizer = new wxStaticBoxSizer(info_box, wxHORIZONTAL);
 
     // Create labels with ellipsize style for text overflow
-    m_label_preview_color = new wxStaticText(this, wxID_ANY, _L("Custom Color"),
-                                           wxDefaultPosition, wxDefaultSize,
-                                           wxST_ELLIPSIZE_END);
-    m_label_preview_idx = new wxStaticText(this, wxID_ANY, "",
-                                         wxDefaultPosition, wxDefaultSize); // No size limit, no ellipsis
-    m_label_preview_type = new wxStaticText(this, wxID_ANY, "",
-                                          wxDefaultPosition, wxSize(FromDIP(220), FromDIP(16)),
-                                          wxST_ELLIPSIZE_END);
+    m_label_preview_color = new wxStaticText(this, wxID_ANY, _L("Custom Color"), wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
+    m_label_preview_idx   = new wxStaticText(this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize); // No size limit, no ellipsis
+    m_label_preview_type  = new wxStaticText(this, wxID_ANY, "", wxDefaultPosition, wxSize(FromDIP(220), FromDIP(16)), wxST_ELLIPSIZE_END);
 
     // Set maximum width for color label to enable proper ellipsis behavior
     m_label_preview_color->SetMaxSize(wxSize(FromDIP(160), -1));
@@ -308,7 +309,7 @@ wxBoxSizer* FilamentPickerDialog::CreateInfoSection()
     return main_sizer;
 }
 
-void FilamentPickerDialog::SetupLabelsContent(const FilamentColor &fila_color, const std::string &fila_type)
+void FilamentPickerDialog::SetupLabelsContent(const FilamentColor& fila_color, const std::string& fila_type)
 {
     m_label_preview_type->SetLabel(from_u8(fila_type));
     if (m_cur_color_name && !m_cur_color_name->IsEmpty()) {
@@ -316,20 +317,17 @@ void FilamentPickerDialog::SetupLabelsContent(const FilamentColor &fila_color, c
 
         // Try to get additional color code information
         if (m_cur_color_codes) {
-            FilamentColorCode *color_code = m_cur_color_codes->GetColorCode(fila_color);
+            FilamentColorCode* color_code = m_cur_color_codes->GetColorCode(fila_color);
             if (color_code) {
                 m_label_preview_idx->SetLabel(wxString::Format("(%s)", color_code->GetFilaColorCode()));
             }
         }
-    }
-    else{
-        if (fila_color.ColorCount() == 0){
+    } else {
+        if (fila_color.ColorCount() == 0) {
             m_label_preview_color->SetLabel(_L("Null Color"));
-        }
-        else if (fila_color.ColorCount() == 1) {
+        } else if (fila_color.ColorCount() == 1) {
             m_label_preview_color->SetLabel(fila_color.m_colors.begin()->GetAsString(wxC2S_HTML_SYNTAX));
-        }
-        else{
+        } else {
             m_label_preview_color->SetLabel(_L("Multiple Color"));
         }
     }
@@ -337,10 +335,11 @@ void FilamentPickerDialog::SetupLabelsContent(const FilamentColor &fila_color, c
 
 wxBoxSizer* FilamentPickerDialog::CreateSeparatorLine()
 {
-    wxBoxSizer *line_sizer = new wxBoxSizer(wxHORIZONTAL);
-    wxPanel* separator_line = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(-1, FromDIP(1)));
-    separator_line->SetBackgroundColour(wxColour(238,238,238));
-    wxStaticText* line_text = new wxStaticText(this, wxID_ANY, _L("Official Filament"), wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL);
+    wxBoxSizer* line_sizer     = new wxBoxSizer(wxHORIZONTAL);
+    wxPanel*    separator_line = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(-1, FromDIP(1)));
+    separator_line->SetBackgroundColour(wxColour(238, 238, 238));
+    wxStaticText* line_text = new wxStaticText(this, wxID_ANY, _L("Official Filament"), wxDefaultPosition, wxDefaultSize,
+                                               wxALIGN_CENTER_HORIZONTAL);
     line_text->SetForegroundColour(wxColour(128, 128, 128));
     line_sizer->Add(line_text, 0, wxEXPAND, 0);
     line_sizer->AddSpacer(FromDIP(8));
@@ -350,53 +349,41 @@ wxBoxSizer* FilamentPickerDialog::CreateSeparatorLine()
 
 wxScrolledWindow* FilamentPickerDialog::CreateColorGrid()
 {
-    if (!m_cur_color_codes) return nullptr;
+    if (!m_cur_color_codes)
+        return nullptr;
 
     FilamentColor2CodeMap* color_map = m_cur_color_codes->GetFilamentColor2CodeMap();
-    if (!color_map) return nullptr;
+    if (!color_map)
+        return nullptr;
 
     // Calculate required row count
-    int total_colors = color_map->size();
-    int needed_rows = (total_colors + COLS - 1) / COLS;  // round-up division
-    bool need_scroll = needed_rows > MAX_VISIBLE_ROWS;
+    int  total_colors = color_map->size();
+    int  needed_rows  = (total_colors + COLS - 1) / COLS; // round-up division
+    bool need_scroll  = needed_rows > MAX_VISIBLE_ROWS;
 
     // Create a vertical-only scrolled window
-    wxScrolledWindow* scroll_win = new wxScrolledWindow(
-        this,
-        wxID_ANY,
-        wxDefaultPosition,
-        wxDefaultSize,
-        wxVSCROLL | wxNO_BORDER
-    );
+    wxScrolledWindow* scroll_win = new wxScrolledWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxVSCROLL | wxNO_BORDER);
 
     wxGridSizer* grid_sizer = new wxGridSizer(needed_rows, COLS, GRID_GAP, GRID_GAP);
 
     if (!color_map->empty()) {
         for (const auto& color_pair : *color_map) {
-            const FilamentColor& fila_color = color_pair.first;        // color info
-            FilamentColorCode* color_code = color_pair.second;         // color code
+            const FilamentColor& fila_color = color_pair.first;  // color info
+            FilamentColorCode*   color_code = color_pair.second; // color code
 
-            if (!color_code) continue;
+            if (!color_code)
+                continue;
             std::vector<wxColour> wx_colors(fila_color.m_colors.begin(), fila_color.m_colors.end());
-            wxBitmap btn_bmp = create_filament_bitmap(
-                wx_colors,
-                COLOR_BTN_BITMAP_SIZE,
-                fila_color.m_color_type == FilamentColor::ColorType::GRADIENT_CLR
-            );
+            wxBitmap              btn_bmp = create_filament_bitmap(wx_colors, COLOR_BTN_BITMAP_SIZE,
+                                                                   fila_color.m_color_type == FilamentColor::ColorType::GRADIENT_CLR);
 
             if (!btn_bmp.IsOk()) {
                 BOOST_LOG_TRIVIAL(error) << "Failed to create bitmap for filament " << color_code->GetFilaColorCode().ToStdString();
                 continue;
             }
 
-            wxBitmapButton* btn = new wxBitmapButton(
-                scroll_win,
-                wxID_ANY,
-                btn_bmp,
-                wxDefaultPosition,
-                COLOR_BTN_SIZE,
-                wxBU_EXACTFIT | wxNO_BORDER
-            );
+            wxBitmapButton* btn = new wxBitmapButton(scroll_win, wxID_ANY, btn_bmp, wxDefaultPosition, COLOR_BTN_SIZE,
+                                                     wxBU_EXACTFIT | wxNO_BORDER);
 
             if (btn) {
                 // Remove any default background and borders
@@ -407,13 +394,12 @@ wxScrolledWindow* FilamentPickerDialog::CreateColorGrid()
                 btn->SetToolTip(tooltip);
 
                 // Check if this color matches the current color name and set as selected
-                bool is_matching_color = (m_cur_color_name &&
-                                        !m_cur_color_name->IsEmpty() &&
-                                        *m_cur_color_name == color_code->GetFilaColorName());
+                bool is_matching_color = (m_cur_color_name && !m_cur_color_name->IsEmpty() &&
+                                          *m_cur_color_name == color_code->GetFilaColorName());
 
                 if (is_matching_color) {
                     m_cur_filament_color = color_code->GetFilaColor();
-                    m_cur_selected_btn = btn;
+                    m_cur_selected_btn   = btn;
                     UpdatePreview(*color_code);
                     btn->Bind(wxEVT_PAINT, &FilamentPickerDialog::OnButtonPaint, this);
                 }
@@ -427,13 +413,9 @@ wxScrolledWindow* FilamentPickerDialog::CreateColorGrid()
                 });
 
                 // Hover highlight
-                btn->Bind(wxEVT_ENTER_WINDOW, [btn](wxMouseEvent& evt) {
-                    evt.Skip();
-                });
+                btn->Bind(wxEVT_ENTER_WINDOW, [btn](wxMouseEvent& evt) { evt.Skip(); });
 
-                btn->Bind(wxEVT_LEAVE_WINDOW, [btn](wxMouseEvent& evt) {
-                    evt.Skip();
-                });
+                btn->Bind(wxEVT_LEAVE_WINDOW, [btn](wxMouseEvent& evt) { evt.Skip(); });
 
                 grid_sizer->Add(btn, 0, wxALL | wxALIGN_CENTER, FromDIP(1));
             }
@@ -444,7 +426,7 @@ wxScrolledWindow* FilamentPickerDialog::CreateColorGrid()
 
     if (need_scroll) {
         int row_height = COLOR_BTN_SIZE.GetHeight() + FromDIP(2);
-        int col_width = COLOR_BTN_SIZE.GetWidth() + FromDIP(4);
+        int col_width  = COLOR_BTN_SIZE.GetWidth() + FromDIP(4);
 
         // Reserve space for vertical scrollbar so it doesn't overlay content
         int scrollbar_width = wxSystemSettings::GetMetric(wxSYS_VSCROLL_X);
@@ -470,8 +452,7 @@ void FilamentPickerDialog::UpdatePreview(const FilamentColorCode& color_code)
     std::vector<wxColour> wx_colors(fila_color.m_colors.begin(), fila_color.m_colors.end());
 
     // Update preview bitmap
-    wxBitmap bmp = create_filament_bitmap(wx_colors, COLOR_DEMO_SIZE,
-                                        fila_color.m_color_type == FilamentColor::ColorType::GRADIENT_CLR);
+    wxBitmap bmp = create_filament_bitmap(wx_colors, COLOR_DEMO_SIZE, fila_color.m_color_type == FilamentColor::ColorType::GRADIENT_CLR);
 
     if (bmp.IsOk()) {
         BOOST_LOG_TRIVIAL(debug) << "Bitmap created successfully: " << bmp.GetWidth() << "x" << bmp.GetHeight();
@@ -535,11 +516,8 @@ void FilamentPickerDialog::CreateMoreInfoButton()
     m_more_btn = new Button(this, "+ " + _L("More Colors"));
     m_more_btn->SetMinSize(wxSize(-1, FromDIP(36)));
 
-    StateColor btn_bg(
-        std::pair<wxColour, int>(wxColour(238, 238, 238), StateColor::Hovered),
-        std::pair<wxColour, int>(wxColour(248, 248, 248), StateColor::Normal)
-    );
-
+    StateColor btn_bg(std::pair<wxColour, int>(wxColour(238, 238, 238), StateColor::Hovered),
+                      std::pair<wxColour, int>(wxColour(248, 248, 248), StateColor::Normal));
 
     m_more_btn->SetBackgroundColor(btn_bg);
     m_more_btn->SetBorderStyle(wxPENSTYLE_SHORT_DASH);
@@ -578,7 +556,7 @@ void FilamentPickerDialog::BindEvents()
             StopClickDetection();
 
             wxColourData original_data = GetSingleColorData();
-            wxColourData result = show_sys_picker_dialog(this, original_data);
+            wxColourData result        = show_sys_picker_dialog(this, original_data);
 
             // Resume click detection after color picker closes
             StartClickDetection();
@@ -603,16 +581,12 @@ void FilamentPickerDialog::BindEvents()
 
     // Bind OK button event
     if (m_ok_btn) {
-        m_ok_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-            EndModal(wxID_OK);
-        });
+        m_ok_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { EndModal(wxID_OK); });
     }
 
     // Bind Cancel button event
     if (m_cancel_btn) {
-        m_cancel_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-            EndModal(wxID_CANCEL);
-        });
+        m_cancel_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { EndModal(wxID_CANCEL); });
     }
 }
 
@@ -640,11 +614,11 @@ void FilamentPickerDialog::OnMouseLeftDown(wxMouseEvent& event)
     }
 
     CaptureMouse();
-    wxPoint pt = ClientToScreen(event.GetPosition());
+    wxPoint pt     = ClientToScreen(event.GetPosition());
     wxPoint origin = GetPosition();
-    int dx = pt.x - origin.x;
-    int dy = pt.y - origin.y;
-    m_drag_delta = wxPoint(dx, dy);
+    int     dx     = pt.x - origin.x;
+    int     dy     = pt.y - origin.y;
+    m_drag_delta   = wxPoint(dx, dy);
 
     // Don't skip the event for dragging to work properly
 }
@@ -681,7 +655,7 @@ void FilamentPickerDialog::OnButtonPaint(wxPaintEvent& event)
     // Create paint DC and let default painting happen first
     wxPaintDC dc(button);
 
-    //Clear the button with white background
+    // Clear the button with white background
     dc.SetBrush(wxBrush(*wxTRANSPARENT_BRUSH));
     dc.SetPen(*wxTRANSPARENT_PEN);
     dc.DrawRectangle(0, 0, COLOR_BTN_SIZE.GetWidth(), COLOR_BTN_SIZE.GetHeight());
@@ -690,13 +664,13 @@ void FilamentPickerDialog::OnButtonPaint(wxPaintEvent& event)
     wxBitmapButton* bmpBtn = dynamic_cast<wxBitmapButton*>(button);
     if (bmpBtn && bmpBtn->GetBitmap().IsOk()) {
         wxBitmap bmp = bmpBtn->GetBitmap();
-        int x = (COLOR_BTN_SIZE.GetWidth() - COLOR_BTN_BITMAP_SIZE.GetWidth()) / 2;
-        int y = (COLOR_BTN_SIZE.GetHeight() - COLOR_BTN_BITMAP_SIZE.GetHeight()) / 2;
+        int      x   = (COLOR_BTN_SIZE.GetWidth() - COLOR_BTN_BITMAP_SIZE.GetWidth()) / 2;
+        int      y   = (COLOR_BTN_SIZE.GetHeight() - COLOR_BTN_BITMAP_SIZE.GetHeight()) / 2;
         dc.DrawBitmap(bmp, x, y, true);
     }
 
     // Draw the green border
-    dc.SetPen(wxPen(wxColour("#009688"), 2));  // Green pen, 2px thick
+    dc.SetPen(wxPen(wxColour("#009688"), 2)); // Green pen, 2px thick
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
     dc.DrawRectangle(1, 1, COLOR_BTN_SIZE.GetWidth() - 1, COLOR_BTN_SIZE.GetHeight() - 1);
 }
@@ -708,8 +682,8 @@ bool FilamentPickerDialog::IsClickOnTopMostWindow(const wxPoint& mouse_pos)
         return false;
     }
 
-    wxRect main_rect = main_window->GetScreenRect();
-    bool in_main_app = main_rect.Contains(mouse_pos);
+    wxRect main_rect   = main_window->GetScreenRect();
+    bool   in_main_app = main_rect.Contains(mouse_pos);
 
     if (!in_main_app) {
         return false;
@@ -717,9 +691,9 @@ bool FilamentPickerDialog::IsClickOnTopMostWindow(const wxPoint& mouse_pos)
 
 #ifdef _WIN32
     // Windows: Use WindowFromPoint to check actual topmost window
-    POINT pt = {mouse_pos.x, mouse_pos.y};
-    HWND hwnd_at_point = WindowFromPoint(pt);
-    HWND main_hwnd = (HWND)main_window->GetHandle();
+    POINT pt            = {mouse_pos.x, mouse_pos.y};
+    HWND  hwnd_at_point = WindowFromPoint(pt);
+    HWND  main_hwnd     = (HWND) main_window->GetHandle();
 
     // Check if clicked window belongs to our main window hierarchy
     HWND parent_hwnd = hwnd_at_point;
@@ -776,25 +750,24 @@ void FilamentPickerDialog::CleanupTimers()
 void FilamentPickerDialog::OnTimerCheck(wxTimerEvent& event)
 {
     static wxPoint last_mouse_pos(-1, -1);
-    wxPoint current_pos = wxGetMousePosition();
+    wxPoint        current_pos = wxGetMousePosition();
 
     // If the mouse position and button state haven't changed, skip the detection
-    if (current_pos == last_mouse_pos &&
-        wxGetMouseState().LeftIsDown() == m_last_mouse_down) {
+    if (current_pos == last_mouse_pos && wxGetMouseState().LeftIsDown() == m_last_mouse_down) {
         return;
     }
 
     last_mouse_pos = current_pos;
 
-    wxPoint mouse_pos = wxGetMousePosition();
-    wxRect window_rect = GetScreenRect();
+    wxPoint mouse_pos   = wxGetMousePosition();
+    wxRect  window_rect = GetScreenRect();
 
     // Check if mouse button state changed
     bool mouse_down = wxGetMouseState().LeftIsDown();
 
     if (mouse_down != m_last_mouse_down) {
         if (mouse_down) {
-            bool in_dialog = window_rect.Contains(mouse_pos);
+            bool in_dialog      = window_rect.Contains(mouse_pos);
             bool is_valid_click = IsClickOnTopMostWindow(mouse_pos);
 
             if (is_valid_click && !in_dialog) {
@@ -829,4 +802,3 @@ void FilamentPickerDialog::OnFlashTimer(wxTimerEvent& event)
 }
 
 }} // namespace Slic3r::GUI
-

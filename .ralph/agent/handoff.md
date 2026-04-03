@@ -2753,3 +2753,28 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/FilamentMapPanel.hpp
 - Next recommended Phase 1 task: T296 src/slic3r/GUI/FilamentPickerDialog.cpp
+
+## Phase 1 - Task T296 complete
+- Task type: annotate
+- File: src/slic3r/GUI/FilamentPickerDialog.cpp
+- Deliverables: src/slic3r/GUI/FilamentPickerDialog.cpp
+- Substantive additions: 6 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Implementation of the filament material/color picker popup.
+- Unity-impact summary:
+  - Filament picker maps to an anchored VisualElement in Unity UI Toolkit.
+  - "Flash" effect and click-outside detection map to CanvasGroup animations and full-screen pointer handlers.
+  - Platform-specific Win32 hooks for topmost window checks replaced by Unity's integrated UI event routing.
+  - Manual coordinate alignment with sidebar replaced by Unity anchors/pivots.
+- Hazards found: 2 (P2: Platform-specific click detection; P2: Manual UI alignment)
+- Git: annotate: src/slic3r/GUI/FilamentPickerDialog.cpp
+- Next recommended Phase 1 task: T297 src/slic3r/GUI/FilamentPickerDialog.hpp
+
+## Phase 1 checkpoint
+- Files newly accounted for in this batch: 70
+- Cumulative annotated: 129
+- Cumulative skip-trivial: 8
+- Cumulative skip-vendored: 0
+- Total accounted for: 137
+- Manifest total: 724
+- Remaining: 587
+- Status: CONTINUING
