@@ -1,3 +1,11 @@
+// [ANNOTATED]
+// [INTENT] Procedural generation of filament material icons (single, multi-color, and gradient).
+// [STATE] Stateless utilities for creating bitmap representations of physical material properties.
+// [UNITY] Map to a C# FilamentIconGenerator. Use Unity's Texture2D API to procedurally generate color chips.
+// [UNITY] Replace wxDC-based gradient fills with Unity's Gradient class or procedural pixel mapping.
+// [PORTING_HAZARD:P2] Procedural generation logic (checkerboards, quadrants, gradients) must be mirrored to maintain visual consistency for
+// material selection.
+
 #include <wx/dcmemory.h>
 #include <wx/graphics.h>
 #include <algorithm>
@@ -9,11 +17,13 @@
 namespace Slic3r { namespace GUI {
 
 // Helper struct to hold bitmap and DC
-struct BitmapDC {
-    wxBitmap bitmap;
+struct BitmapDC
+{
+    wxBitmap   bitmap;
     wxMemoryDC dc;
 
-    BitmapDC(const wxSize& size) : bitmap(size){
+    BitmapDC(const wxSize& size) : bitmap(size)
+    {
 #ifdef __WXOSX__
         bitmap.UseAlpha();
 #endif
@@ -23,30 +33,28 @@ struct BitmapDC {
     }
 };
 
-static BitmapDC init_bitmap_dc(const wxSize& size) {
-    return BitmapDC(size);
-}
+static BitmapDC init_bitmap_dc(const wxSize& size) { return BitmapDC(size); }
 
 // Check if a color is transparent (alpha == 0)
-static bool is_transparent_color(const wxColour& color) {
-    return color.Alpha() == 0;
-}
+static bool is_transparent_color(const wxColour& color) { return color.Alpha() == 0; }
 
 // Create transparent bitmap
-static wxBitmap create_transparent_bitmap(const wxSize& size) {
+static wxBitmap create_transparent_bitmap(const wxSize& size)
+{
     BitmapDC bdc = init_bitmap_dc(size);
-    if (!bdc.dc.IsOk()) return wxNullBitmap;
+    if (!bdc.dc.IsOk())
+        return wxNullBitmap;
 
     // Create checkerboard pattern
-    wxColour light_gray(217, 217, 217);  // #D9D9D9
+    wxColour light_gray(217, 217, 217); // #D9D9D9
     wxColour white(255, 255, 255);
 
     bool is_dark_mode = wxGetApp().dark_mode();
 
     // Calculate parameters based on mode
-    int start_pos = is_dark_mode ? 0 : 1;
-    int end_width = is_dark_mode ? size.GetWidth() : size.GetWidth() - 1;
-    int end_height = is_dark_mode ? size.GetHeight() : size.GetHeight() - 1;
+    int start_pos   = is_dark_mode ? 0 : 1;
+    int end_width   = is_dark_mode ? size.GetWidth() : size.GetWidth() - 1;
+    int end_height  = is_dark_mode ? size.GetHeight() : size.GetHeight() - 1;
     int square_size = std::max(6, std::min(end_width - start_pos, end_height - start_pos) / 8);
 
     // Draw checkerboard
@@ -55,7 +63,7 @@ static wxBitmap create_transparent_bitmap(const wxSize& size) {
             bool is_light = ((x / square_size) + (y / square_size)) % 2 == 0;
             bdc.dc.SetBrush(wxBrush(is_light ? white : light_gray));
 
-            int width = std::min(square_size, size.GetWidth() - x);
+            int width  = std::min(square_size, size.GetWidth() - x);
             int height = std::min(square_size, size.GetHeight() - y);
             bdc.dc.DrawRectangle(x, y, width, height);
         }
@@ -73,16 +81,19 @@ static wxBitmap create_transparent_bitmap(const wxSize& size) {
 }
 
 // Sort colors by HSV values (primarily by hue, then saturation, then value)
-static void sort_colors_by_hsv(std::vector<wxColour>& colors) {
-    if (colors.size() < 2) return;
-    std::sort(colors.begin(), colors.end(),
-        [](const wxColour& a, const wxColour& b) {
-            ColourHSV ha = wxColourToHSV(a);
-            ColourHSV hb = wxColourToHSV(b);
-            if (ha.h != hb.h) return ha.h < hb.h;
-            if (ha.s != hb.s) return ha.s < hb.s;
-            return ha.v < hb.v;
-        });
+static void sort_colors_by_hsv(std::vector<wxColour>& colors)
+{
+    if (colors.size() < 2)
+        return;
+    std::sort(colors.begin(), colors.end(), [](const wxColour& a, const wxColour& b) {
+        ColourHSV ha = wxColourToHSV(a);
+        ColourHSV hb = wxColourToHSV(b);
+        if (ha.h != hb.h)
+            return ha.h < hb.h;
+        if (ha.s != hb.s)
+            return ha.s < hb.s;
+        return ha.v < hb.v;
+    });
 }
 
 static wxBitmap create_single_filament_bitmap(const wxColour& color, const wxSize& size)
@@ -93,7 +104,8 @@ static wxBitmap create_single_filament_bitmap(const wxColour& color, const wxSiz
     }
 
     BitmapDC bdc = init_bitmap_dc(size);
-    if (!bdc.dc.IsOk()) return wxNullBitmap;
+    if (!bdc.dc.IsOk())
+        return wxNullBitmap;
 
     bdc.dc.SetBackground(wxBrush(color));
     bdc.dc.Clear();
@@ -108,7 +120,7 @@ static wxBitmap create_single_filament_bitmap(const wxColour& color, const wxSiz
     }
 
     // Add white border for dark colors - only in dark mode
-    if(wxGetApp().dark_mode() && color.Red() < 45 && color.Blue() < 45 && color.Green() < 45) {
+    if (wxGetApp().dark_mode() && color.Red() < 45 && color.Blue() < 45 && color.Green() < 45) {
         bdc.dc.SetPen(wxPen(wxColour(207, 207, 207), 1, wxPENSTYLE_SOLID));
         bdc.dc.SetBrush(*wxTRANSPARENT_BRUSH);
         bdc.dc.DrawRectangle(0, 0, size.GetWidth(), size.GetHeight());
@@ -138,7 +150,7 @@ static wxBitmap create_triple_filament_bitmap(const std::vector<wxColour>& color
 {
     BitmapDC bdc = init_bitmap_dc(size);
 
-    int third_width = size.GetWidth() / 3;
+    int third_width     = size.GetWidth() / 3;
     int remaining_width = size.GetWidth() - (third_width * 2);
 
     // Draw three vertical sections
@@ -159,14 +171,14 @@ static wxBitmap create_quadruple_filament_bitmap(const std::vector<wxColour>& co
 {
     BitmapDC bdc = init_bitmap_dc(size);
 
-    int half_width = (size.GetWidth() + 1) / 2;
+    int half_width  = (size.GetWidth() + 1) / 2;
     int half_height = (size.GetHeight() + 1) / 2;
 
     const int rects[4][4] = {
-        {0, 0, half_width, half_height},                    // Top left
-        {half_width, 0, size.GetWidth() - half_width, half_height},           // Top right
-        {0, half_height, half_width, size.GetHeight() - half_height},         // Bottom left
-        {half_width, half_height, size.GetWidth() - half_width, size.GetHeight() - half_height}  // Bottom right
+        {0, 0, half_width, half_height},                                                        // Top left
+        {half_width, 0, size.GetWidth() - half_width, half_height},                             // Top right
+        {0, half_height, half_width, size.GetHeight() - half_height},                           // Bottom left
+        {half_width, half_height, size.GetWidth() - half_width, size.GetHeight() - half_height} // Bottom right
     };
 
     for (int i = 0; i < 4; i++) {
@@ -187,17 +199,17 @@ static wxBitmap create_gradient_filament_bitmap(const std::vector<wxColour>& col
     }
 
     // use segment gradient, make transition more natural
-    wxDC& dc = bdc.dc;
-    int total_width = size.GetWidth();
-    int height = size.GetHeight();
+    wxDC& dc          = bdc.dc;
+    int   total_width = size.GetWidth();
+    int   height      = size.GetHeight();
 
     // calculate segment count
-    int segment_count = colors.size() - 1;
-    double segment_width = (double)total_width / segment_count;
+    int    segment_count = colors.size() - 1;
+    double segment_width = (double) total_width / segment_count;
 
     int left = 0;
     for (int i = 0; i < segment_count; i++) {
-        int current_width = (int)segment_width;
+        int current_width = (int) segment_width;
 
         // handle last segment, ensure fully filled
         if (i == segment_count - 1) {
@@ -222,7 +234,8 @@ static wxBitmap create_gradient_filament_bitmap(const std::vector<wxColour>& col
 
 wxBitmap create_filament_bitmap(const std::vector<wxColour>& colors, const wxSize& size, bool force_gradient)
 {
-    if (colors.empty()) return wxNullBitmap;
+    if (colors.empty())
+        return wxNullBitmap;
 
     // Make a copy to sort without modifying original
     std::vector<wxColour> sorted_colors = colors;
@@ -237,11 +250,11 @@ wxBitmap create_filament_bitmap(const std::vector<wxColour>& colors, const wxSiz
     }
 
     switch (sorted_colors.size()) {
-        case 1: return create_single_filament_bitmap(sorted_colors[0], size);
-        case 2: return create_dual_filament_bitmap(sorted_colors[0], sorted_colors[1], size);
-        case 3: return create_triple_filament_bitmap(sorted_colors, size);
-        case 4: return create_quadruple_filament_bitmap(sorted_colors, size);
-        default: return create_gradient_filament_bitmap(sorted_colors, size);
+    case 1: return create_single_filament_bitmap(sorted_colors[0], size);
+    case 2: return create_dual_filament_bitmap(sorted_colors[0], sorted_colors[1], size);
+    case 3: return create_triple_filament_bitmap(sorted_colors, size);
+    case 4: return create_quadruple_filament_bitmap(sorted_colors, size);
+    default: return create_gradient_filament_bitmap(sorted_colors, size);
     }
 }
 

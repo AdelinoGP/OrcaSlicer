@@ -99,8 +99,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T285 annotate: src/slic3r/GUI/ExtrusionCalibration.hpp
 - [x] T286 annotate: src/slic3r/GUI/Field.cpp
 - [x] T287 annotate: src/slic3r/GUI/Field.hpp
-- [~] T288 annotate: src/slic3r/GUI/FilamentBitmapUtils.cpp
-- [ ] T289 annotate: src/slic3r/GUI/FilamentBitmapUtils.hpp
+- [x] T288 annotate: src/slic3r/GUI/FilamentBitmapUtils.cpp
+- [~] T289 annotate: src/slic3r/GUI/FilamentBitmapUtils.hpp
 - [ ] T290 annotate: src/slic3r/GUI/FilamentGroupPopup.cpp
 - [ ] T291 annotate: src/slic3r/GUI/FilamentGroupPopup.hpp
 - [ ] T292 annotate: src/slic3r/GUI/FilamentMapDialog.cpp
