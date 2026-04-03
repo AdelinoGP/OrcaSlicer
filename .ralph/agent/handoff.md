@@ -2711,3 +2711,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Critical slicing engine integration for extruder mapping)
 - Git: annotate: src/slic3r/GUI/FilamentMapDialog.cpp
 - Next recommended Phase 1 task: T293 src/slic3r/GUI/FilamentMapDialog.hpp
+
+## Phase 1 - Task T293 complete
+- Task type: annotate
+- File: src/slic3r/GUI/FilamentMapDialog.hpp
+- Deliverables: src/slic3r/GUI/FilamentMapDialog.hpp
+- Substantive additions: 4 ([INTENT], [STATE], [UNITY] tags)
+- Verification excerpt: // [INTENT] Declaration of the multi-mode filament mapping dialog and pre-slicing validation helpers.
+- Unity-impact summary:
+  - Header declares the public interface for the extruder grouping dialog.
+  - Dialog class maps to a C# ModalDialog controller.
+  - Pre-slice logic should be moved to a managed SlicingWorkflowService.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/FilamentMapDialog.hpp
+- Next recommended Phase 1 task: T294 src/slic3r/GUI/FilamentMapPanel.cpp
