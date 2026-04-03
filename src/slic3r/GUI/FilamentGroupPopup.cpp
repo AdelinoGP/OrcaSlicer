@@ -1,3 +1,11 @@
+// [ANNOTATED]
+// [INTENT] Mode selector popup for automated filament grouping strategies (Savings vs Convenience).
+// [STATE] Managed state for active grouping mode, printer connectivity, and automatic dismissal timers.
+// [EVENT] Radio-style button selection and hover-based visibility management.
+// [UNITY] Replace with a floating UI Toolkit VisualElement anchored to the plater UI.
+// [UNITY] Replace Win32-specific window rounding logic with USS border-radius and native transparency.
+// [PORTING_HAZARD:P2] Manual Win32 HWND/Region manipulation for rounded corners is obsolete; map to standard Unity UI masking.
+
 #include "FilamentGroupPopup.hpp"
 #include "GUI_App.hpp"
 #include "MsgDialog.hpp"
@@ -7,18 +15,18 @@
 
 namespace Slic3r { namespace GUI {
 
-static const wxColour LabelEnableColor = wxColour("#262E30");
+static const wxColour LabelEnableColor  = wxColour("#262E30");
 static const wxColour LabelDisableColor = wxColour("#ACACAC");
-static const wxColour GreyColor = wxColour("#6B6B6B");
-static const wxColour GreenColor = wxColour("#009688");
-static const wxColour BackGroundColor = wxColour("#FFFFFF");
-
+static const wxColour GreyColor         = wxColour("#6B6B6B");
+static const wxColour GreenColor        = wxColour("#009688");
+static const wxColour BackGroundColor   = wxColour("#FFFFFF");
 
 static bool should_pop_up()
 {
-    const auto &preset_bundle    = wxGetApp().preset_bundle;
-    if (!preset_bundle->is_bbl_vendor()) return false;
-    const auto &full_config      = preset_bundle->full_config();
+    const auto& preset_bundle = wxGetApp().preset_bundle;
+    if (!preset_bundle->is_bbl_vendor())
+        return false;
+    const auto& full_config      = preset_bundle->full_config();
     const auto  nozzle_diameters = full_config.option<ConfigOptionFloats>("nozzle_diameter");
     return nozzle_diameters->size() > 1;
 }
@@ -26,11 +34,12 @@ static bool should_pop_up()
 static FilamentMapMode get_prefered_map_mode()
 {
     const static std::map<std::string, int> enum_keys_map = ConfigOptionEnum<FilamentMapMode>::get_enum_values();
-    auto                                   &app_config    = wxGetApp().app_config;
+    auto&                                   app_config    = wxGetApp().app_config;
     std::string                             mode_str      = app_config->get("prefered_filament_map_mode");
     auto                                    iter          = enum_keys_map.find(mode_str);
     if (iter == enum_keys_map.end()) {
-        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << boost::format("Could not get prefered_filament_map_mode from app config, use AutoForFlsuh mode");
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__
+                                   << boost::format("Could not get prefered_filament_map_mode from app config, use AutoForFlsuh mode");
         return FilamentMapMode::fmmAutoForFlush;
     }
     return FilamentMapMode(iter->second);
@@ -39,39 +48,43 @@ static FilamentMapMode get_prefered_map_mode()
 static void set_prefered_map_mode(FilamentMapMode mode)
 {
     const static std::vector<std::string> enum_values = ConfigOptionEnum<FilamentMapMode>::get_enum_names();
-    auto                                 &app_config  = wxGetApp().app_config;
+    auto&                                 app_config  = wxGetApp().app_config;
     std::string                           mode_str;
-    if (mode < enum_values.size()) mode_str = enum_values[mode];
+    if (mode < enum_values.size())
+        mode_str = enum_values[mode];
 
-    if (mode_str.empty()) BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << boost::format("Set empty prefered_filament_map_mode to app config");
+    if (mode_str.empty())
+        BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << boost::format("Set empty prefered_filament_map_mode to app config");
     app_config->set("prefered_filament_map_mode", mode_str);
 }
 
 void FilamentGroupPopup::CreateBmps()
 {
-    checked_bmp = create_scaled_bitmap("radio_on", nullptr, 16);; // ORCA match icons
-    unchecked_bmp = create_scaled_bitmap("radio_off", nullptr, 16);
-    disabled_bmp = create_scaled_bitmap("radio_disabled", nullptr, 16);
-    checked_hover_bmp = create_scaled_bitmap("radio_on_hover", nullptr, 16);
+    checked_bmp = create_scaled_bitmap("radio_on", nullptr, 16);
+    ; // ORCA match icons
+    unchecked_bmp       = create_scaled_bitmap("radio_off", nullptr, 16);
+    disabled_bmp        = create_scaled_bitmap("radio_disabled", nullptr, 16);
+    checked_hover_bmp   = create_scaled_bitmap("radio_on_hover", nullptr, 16);
     unchecked_hover_bmp = create_scaled_bitmap("radio_off_hover", nullptr, 16);
 }
 
-FilamentGroupPopup::FilamentGroupPopup(wxWindow *parent) : PopupWindow(parent, wxBORDER_NONE | wxPU_CONTAINS_CONTROLS)
+FilamentGroupPopup::FilamentGroupPopup(wxWindow* parent) : PopupWindow(parent, wxBORDER_NONE | wxPU_CONTAINS_CONTROLS)
 {
     const wxString AutoForFlushLabel = _L("Filament-Saving Mode");
     const wxString AutoForMatchLabel = _L("Convenience Mode");
     const wxString ManualLabel       = _L("Custom Mode");
 
-    const wxString AutoForFlushDetail = _L("Generates filament grouping for the left and right nozzles based on the most filament-saving principles to minimize waste.");
-    const wxString AutoForMatchDetail = _L("Generates filament grouping for the left and right nozzles based on the printer's actual filament status, reducing the need for manual filament adjustment.");
+    const wxString AutoForFlushDetail = _L(
+        "Generates filament grouping for the left and right nozzles based on the most filament-saving principles to minimize waste.");
+    const wxString AutoForMatchDetail = _L("Generates filament grouping for the left and right nozzles based on the printer's actual "
+                                           "filament status, reducing the need for manual filament adjustment.");
     const wxString ManualDetail       = _L("Manually assign filament to the left or right nozzle");
 
     const wxString AutoForFlushDesp = ""; //_L("(Post-slicing arrangement)");
     const wxString ManualDesp       = "";
-    const wxString AutoForMatchDesp = "";// _L("(Pre-slicing arrangement)");
+    const wxString AutoForMatchDesp = ""; // _L("(Pre-slicing arrangement)");
 
-
-    wxBoxSizer *top_sizer         = new wxBoxSizer(wxVERTICAL);
+    wxBoxSizer* top_sizer         = new wxBoxSizer(wxVERTICAL);
     const int   horizontal_margin = FromDIP(16);
     const int   vertical_margin   = FromDIP(15);
     const int   vertical_padding  = FromDIP(12);
@@ -83,7 +96,7 @@ FilamentGroupPopup::FilamentGroupPopup(wxWindow *parent) : PopupWindow(parent, w
     button_labels.resize(ButtonType::btCount);
     button_desps.resize(ButtonType::btCount);
     detail_infos.resize(ButtonType::btCount);
-    //global_mode_tags.resize(ButtonType::btCount);
+    // global_mode_tags.resize(ButtonType::btCount);
 
     std::vector<wxString> btn_texts    = {AutoForFlushLabel, AutoForMatchLabel, ManualLabel};
     std::vector<wxString> btn_desps    = {AutoForFlushDesp, AutoForMatchDesp, ManualDesp};
@@ -93,7 +106,7 @@ FilamentGroupPopup::FilamentGroupPopup(wxWindow *parent) : PopupWindow(parent, w
     CreateBmps();
 
     for (size_t idx = 0; idx < ButtonType::btCount; ++idx) {
-        wxBoxSizer *button_sizer = new wxBoxSizer(wxHORIZONTAL);
+        wxBoxSizer* button_sizer = new wxBoxSizer(wxHORIZONTAL);
         radio_btns[idx]          = new wxBitmapButton(this, wxID_ANY, unchecked_bmp, wxDefaultPosition, wxDefaultSize, wxNO_BORDER);
         radio_btns[idx]->SetBackgroundColour(BackGroundColor);
 
@@ -116,10 +129,10 @@ FilamentGroupPopup::FilamentGroupPopup(wxWindow *parent) : PopupWindow(parent, w
         button_sizer->AddSpacer(ratio_spacing);
         button_sizer->Add(button_labels[idx], 0, wxALIGN_CENTER);
         button_sizer->Add(button_desps[idx], 0, wxALIGN_CENTER);
-        //button_sizer->AddSpacer(ratio_spacing);
-        //button_sizer->Add(global_mode_tags[idx], 0, wxALIGN_CENTER);
+        // button_sizer->AddSpacer(ratio_spacing);
+        // button_sizer->Add(global_mode_tags[idx], 0, wxALIGN_CENTER);
 
-        wxBoxSizer *label_sizer = new wxBoxSizer(wxHORIZONTAL);
+        wxBoxSizer* label_sizer = new wxBoxSizer(wxHORIZONTAL);
 
         detail_infos[idx] = new Label(this, mode_details[idx]);
         detail_infos[idx]->SetBackgroundColour(BackGroundColor);
@@ -134,23 +147,23 @@ FilamentGroupPopup::FilamentGroupPopup(wxWindow *parent) : PopupWindow(parent, w
         top_sizer->Add(label_sizer, 0, wxLEFT | wxRIGHT, horizontal_margin);
         top_sizer->AddSpacer(vertical_padding);
 
-        radio_btns[idx]->Bind(wxEVT_LEFT_DOWN, [this, idx](auto &) { OnRadioBtn(idx);});
+        radio_btns[idx]->Bind(wxEVT_LEFT_DOWN, [this, idx](auto&) { OnRadioBtn(idx); });
 
-        radio_btns[idx]->Bind(wxEVT_ENTER_WINDOW, [this, idx](auto &) { UpdateButtonStatus(idx); });
-        radio_btns[idx]->Bind(wxEVT_LEAVE_WINDOW, [this](auto &) { UpdateButtonStatus(); });
+        radio_btns[idx]->Bind(wxEVT_ENTER_WINDOW, [this, idx](auto&) { UpdateButtonStatus(idx); });
+        radio_btns[idx]->Bind(wxEVT_LEAVE_WINDOW, [this](auto&) { UpdateButtonStatus(); });
 
-        button_labels[idx]->Bind(wxEVT_LEFT_DOWN, [this, idx](auto &) { OnRadioBtn(idx);});
-        button_labels[idx]->Bind(wxEVT_ENTER_WINDOW, [this, idx](auto &) { UpdateButtonStatus(idx); });
-        button_labels[idx]->Bind(wxEVT_LEAVE_WINDOW, [this](auto &) { UpdateButtonStatus(); });
+        button_labels[idx]->Bind(wxEVT_LEFT_DOWN, [this, idx](auto&) { OnRadioBtn(idx); });
+        button_labels[idx]->Bind(wxEVT_ENTER_WINDOW, [this, idx](auto&) { UpdateButtonStatus(idx); });
+        button_labels[idx]->Bind(wxEVT_LEAVE_WINDOW, [this](auto&) { UpdateButtonStatus(); });
     }
 
     {
-        wxBoxSizer *button_sizer = new wxBoxSizer(wxHORIZONTAL);
+        wxBoxSizer* button_sizer = new wxBoxSizer(wxHORIZONTAL);
 
         const std::string wiki_path = Slic3r::resources_dir() + "/wiki/filament_group_wiki_zh.html"; // NEEDFIX this link is broken
 
         auto* wiki_sizer = new wxBoxSizer(wxHORIZONTAL);
-        wiki_link = new HyperLink(this, _L("Wiki Guide"), wxString(wiki_path.c_str())); // ORCA
+        wiki_link        = new HyperLink(this, _L("Wiki Guide"), wxString(wiki_path.c_str())); // ORCA
         wiki_sizer->Add(wiki_link, 0, wxALIGN_CENTER | wxALL, FromDIP(3));
 
         button_sizer->Add(wiki_sizer, 0, wxLEFT, horizontal_margin);
@@ -195,7 +208,7 @@ void FilamentGroupPopup::Init()
         is_dark_mode = wxGetApp().dark_mode();
     }
 
-    const wxString AutoForMatchDesp = "";// _L("(Pre-slicing arrangement)");
+    const wxString AutoForMatchDesp = ""; // _L("(Pre-slicing arrangement)");
     const wxString MachineSyncTip   = _L("(Sync with printer)");
 
     if (m_connected) {
@@ -204,8 +217,7 @@ void FilamentGroupPopup::Init()
         detail_infos[ButtonType::btForMatch]->SetForegroundColour(GreyColor);
         radio_btns[ButtonType::btForMatch]->SetBitmap(unchecked_bmp);
         button_desps[ButtonType::btForMatch]->SetLabel(AutoForMatchDesp);
-    }
-    else {
+    } else {
         button_labels[ButtonType::btForMatch]->SetForegroundColour(LabelDisableColor);
         button_desps[ButtonType::btForMatch]->SetForegroundColour(LabelDisableColor);
         detail_infos[ButtonType::btForMatch]->SetForegroundColour(LabelDisableColor);
@@ -217,8 +229,7 @@ void FilamentGroupPopup::Init()
     if (m_mode == fmmAutoForMatch && !m_connected) {
         SetFilamentMapMode(fmmAutoForFlush);
         m_mode = fmmAutoForFlush;
-    }
-    else if (m_slice_all) {
+    } else if (m_slice_all) {
         // reset the filament map mode in slice all mode
         SetFilamentMapMode(m_mode);
     }
@@ -227,22 +238,23 @@ void FilamentGroupPopup::Init()
     GUI::wxGetApp().UpdateDarkUIWin(this);
 }
 
-void FilamentGroupPopup::tryPopup(Plater* plater,PartPlate* partplate,bool slice_all)
+void FilamentGroupPopup::tryPopup(Plater* plater, PartPlate* partplate, bool slice_all)
 {
     if (should_pop_up()) {
         bool connect_status = plater->get_machine_sync_status();
         this->partplate_ref = partplate;
-        this->plater_ref = plater;
-        this->m_sync_plate = true;
-        this->m_slice_all = slice_all;
+        this->plater_ref    = plater;
+        this->m_sync_plate  = true;
+        this->m_slice_all   = slice_all;
         if (m_active) {
-            if (m_connected != connect_status) { Init(); }
+            if (m_connected != connect_status) {
+                Init();
+            }
             m_connected = connect_status;
             ResetTimer();
-        }
-        else {
+        } else {
             m_connected = connect_status;
-            m_active = true;
+            m_active    = true;
             Init();
             ResetTimer();
             DrawRoundedCorner(16);
@@ -268,8 +280,7 @@ void FilamentGroupPopup::SetFilamentMapMode(const FilamentMapMode mode)
             for (int i = 0; i < plate_list.size(); ++i) {
                 plate_list[i]->set_filament_map_mode(mode);
             }
-        }
-        else {
+        } else {
             partplate_ref->set_filament_map_mode(mode);
         }
         return;
@@ -277,19 +288,17 @@ void FilamentGroupPopup::SetFilamentMapMode(const FilamentMapMode mode)
     plater_ref->set_global_filament_map_mode(mode);
 }
 
-
 void FilamentGroupPopup::tryClose() { StartTimer(); }
 
-void FilamentGroupPopup::OnPaint(wxPaintEvent&)
-{
-    DrawRoundedCorner(16);
-}
+void FilamentGroupPopup::OnPaint(wxPaintEvent&) { DrawRoundedCorner(16); }
 
 void FilamentGroupPopup::StartTimer() { m_timer->StartOnce(300); }
 
 void FilamentGroupPopup::ResetTimer()
 {
-    if (m_timer->IsRunning()) { m_timer->Stop(); }
+    if (m_timer->IsRunning()) {
+        m_timer->Stop();
+    }
 }
 
 void FilamentGroupPopup::OnRadioBtn(int idx)
@@ -304,27 +313,29 @@ void FilamentGroupPopup::OnRadioBtn(int idx)
     }
 }
 
-void FilamentGroupPopup::OnTimer(wxTimerEvent &event) { Dismiss(); }
+void FilamentGroupPopup::OnTimer(wxTimerEvent& event) { Dismiss(); }
 
-void FilamentGroupPopup::Dismiss() {
+void FilamentGroupPopup::Dismiss()
+{
     m_active = false;
     PopupWindow::Dismiss();
     m_timer->Stop();
 }
 
-void FilamentGroupPopup::OnLeaveWindow(wxMouseEvent &)
+void FilamentGroupPopup::OnLeaveWindow(wxMouseEvent&)
 {
     wxPoint pos = this->ScreenToClient(wxGetMousePosition());
-    if (this->GetClientRect().Contains(pos)) return;
+    if (this->GetClientRect().Contains(pos))
+        return;
     StartTimer();
 }
 
-void FilamentGroupPopup::OnEnterWindow(wxMouseEvent &) { ResetTimer(); }
+void FilamentGroupPopup::OnEnterWindow(wxMouseEvent&) { ResetTimer(); }
 
 void FilamentGroupPopup::UpdateButtonStatus(int hover_idx)
 {
     for (int i = 0; i < ButtonType::btCount; ++i) {
-#if 0  // do not display global mode tag
+#if 0 // do not display global mode tag
         if (mode_list.at(i) == global_mode)
             global_mode_tags[i]->Show();
         else

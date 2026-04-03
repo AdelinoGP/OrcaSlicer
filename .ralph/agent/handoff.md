@@ -2669,3 +2669,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/FilamentBitmapUtils.hpp
 - Next recommended Phase 1 task: T290 src/slic3r/GUI/FilamentGroupPopup.cpp
+
+## Phase 1 - Task T290 complete
+- Task type: annotate
+- File: src/slic3r/GUI/FilamentGroupPopup.cpp
+- Deliverables: src/slic3r/GUI/FilamentGroupPopup.cpp
+- Substantive additions: 6 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Mode selector popup for automated filament grouping strategies (Savings vs Convenience).
+- Unity-impact summary:
+  - Mode selector maps to a floating UI Toolkit VisualElement or anchored panel.
+  - Radio button logic replaced by standard C# events and RadioButtonGroup.
+  - Win32-specific window rounding logic replaced by native USS border-radius.
+- Hazards found: 1 (P2: Manual Win32 window region manipulation)
+- Git: annotate: src/slic3r/GUI/FilamentGroupPopup.cpp
+- Next recommended Phase 1 task: T291 src/slic3r/GUI/FilamentGroupPopup.hpp
