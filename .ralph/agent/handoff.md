@@ -2725,3 +2725,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/FilamentMapDialog.hpp
 - Next recommended Phase 1 task: T294 src/slic3r/GUI/FilamentMapPanel.cpp
+
+## Phase 1 - Task T294 complete
+- Task type: annotate
+- File: src/slic3r/GUI/FilamentMapPanel.cpp
+- Deliverables: src/slic3r/GUI/FilamentMapPanel.cpp
+- Substantive additions: 6 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Sub-panel implementations for manual and automatic filament-to-nozzle assignment.
+- Unity-impact summary:
+  - Sub-panels map to VisualElement views in Unity UI Toolkit.
+  - Manual state-driven background and border updates replaced by USS pseudo-classes.
+  - Bulk filament swapping logic ported to a simple C# controller.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/FilamentMapPanel.cpp
+- Next recommended Phase 1 task: T295 src/slic3r/GUI/FilamentMapPanel.hpp

@@ -1,3 +1,11 @@
+// [ANNOTATED]
+// [INTENT] Sub-panel implementations for manual and automatic filament-to-nozzle assignment.
+// [STATE] Managed UI state for left/right extruder panels and selection-mode button states.
+// [EVENT] Handles panel switching, bulk filament swapping, and hover-state visual updates.
+// [UNITY] Map to specialized VisualElement views. Replace owner-drawn buttons with styled Unity UI Button prefabs.
+// [UNITY] Use USS states (:hover, :checked) to replace manual state-driven background and border updates.
+// [PORTING_HAZARD:P3] GraphicsContext-based drawing for rounded rectangles and highlights should map to native USS properties.
+
 #include "FilamentMapPanel.hpp"
 #include "GUI_App.hpp"
 #include <wx/dcbuffer.h>
@@ -14,14 +22,14 @@ static const wxColour BorderSelectedColor = wxColour("#009688");
 static const wxColour BorderDisableColor  = wxColour("#EEEEEE");
 
 static const wxColour TextNormalBlackColor = wxColour("#262E30");
-static const wxColour TextNormalGreyColor = wxColour("#6B6B6B");
-static const wxColour TextDisableColor = wxColour("#CECECE");
+static const wxColour TextNormalGreyColor  = wxColour("#6B6B6B");
+static const wxColour TextDisableColor     = wxColour("#CECECE");
 
-FilamentMapManualPanel::FilamentMapManualPanel(wxWindow                       *parent,
-                                               const std::vector<std::string> &color,
-                                               const std::vector<std::string> &type,
-                                               const std::vector<int>         &filament_list,
-                                               const std::vector<int>         &filament_map)
+FilamentMapManualPanel::FilamentMapManualPanel(wxWindow*                       parent,
+                                               const std::vector<std::string>& color,
+                                               const std::vector<std::string>& type,
+                                               const std::vector<int>&         filament_list,
+                                               const std::vector<int>&         filament_map)
     : wxPanel(parent), m_filament_map(filament_map), m_filament_color(color), m_filament_type(type), m_filament_list(filament_list)
 {
     SetBackgroundColour(BgNormalColor);
@@ -40,9 +48,10 @@ FilamentMapManualPanel::FilamentMapManualPanel(wxWindow                       *p
 
     for (size_t idx = 0; idx < m_filament_map.size(); ++idx) {
         auto iter = std::find(m_filament_list.begin(), m_filament_list.end(), idx + 1);
-        if (iter == m_filament_list.end()) continue;
-        wxColor color = Hex2Color(m_filament_color[idx]);
-        std::string type = m_filament_type[idx];
+        if (iter == m_filament_list.end())
+            continue;
+        wxColor     color = Hex2Color(m_filament_color[idx]);
+        std::string type  = m_filament_type[idx];
         if (m_filament_map[idx] == 1) {
             m_left_panel->AddColorBlock(color, type, idx + 1);
         } else {
@@ -50,8 +59,8 @@ FilamentMapManualPanel::FilamentMapManualPanel(wxWindow                       *p
             m_right_panel->AddColorBlock(color, type, idx + 1);
         }
     }
-    m_left_panel->SetMinSize({ FromDIP(260),-1 });
-    m_right_panel->SetMinSize({ FromDIP(260),-1 });
+    m_left_panel->SetMinSize({FromDIP(260), -1});
+    m_right_panel->SetMinSize({FromDIP(260), -1});
 
     drag_sizer->AddStretchSpacer();
     drag_sizer->Add(m_left_panel, 1, wxALIGN_CENTER | wxEXPAND);
@@ -77,17 +86,17 @@ FilamentMapManualPanel::FilamentMapManualPanel(wxWindow                       *p
     GUI::wxGetApp().UpdateDarkUIWin(this);
 }
 
-void FilamentMapManualPanel::OnSwitchFilament(wxCommandEvent &)
+void FilamentMapManualPanel::OnSwitchFilament(wxCommandEvent&)
 {
     auto left_blocks  = m_left_panel->get_filament_blocks();
     auto right_blocks = m_right_panel->get_filament_blocks();
 
-    for (auto &block : left_blocks) {
+    for (auto& block : left_blocks) {
         m_right_panel->AddColorBlock(block->GetColor(), block->GetType(), block->GetFilamentId(), false);
         m_left_panel->RemoveColorBlock(block, false);
     }
 
-    for (auto &block : right_blocks) {
+    for (auto& block : right_blocks) {
         m_left_panel->AddColorBlock(block->GetColor(), block->GetType(), block->GetFilamentId(), false);
         m_right_panel->RemoveColorBlock(block, false);
     }
@@ -111,7 +120,8 @@ void FilamentMapManualPanel::Show()
     wxPanel::Show();
 }
 
-GUI::FilamentMapBtnPanel::FilamentMapBtnPanel(wxWindow *parent, const wxString &label, const wxString &detail, const std::string &icon) : wxPanel(parent)
+GUI::FilamentMapBtnPanel::FilamentMapBtnPanel(wxWindow* parent, const wxString& label, const wxString& detail, const std::string& icon)
+    : wxPanel(parent)
 {
     SetBackgroundColour(*wxWHITE);
     SetBackgroundStyle(wxBG_STYLE_PAINT);
@@ -121,10 +131,10 @@ GUI::FilamentMapBtnPanel::FilamentMapBtnPanel(wxWindow *parent, const wxString &
 
     auto sizer = new wxBoxSizer(wxVERTICAL);
 
-    icon_enabled = create_scaled_bitmap(icon, nullptr, 20);
+    icon_enabled  = create_scaled_bitmap(icon, nullptr, 20);
     icon_disabled = create_scaled_bitmap(icon + "_disabled", nullptr, 20);
 
-    m_btn    = new wxBitmapButton(this, wxID_ANY, icon_enabled, wxDefaultPosition, wxDefaultSize, wxNO_BORDER);
+    m_btn = new wxBitmapButton(this, wxID_ANY, icon_enabled, wxDefaultPosition, wxDefaultSize, wxNO_BORDER);
     m_btn->SetBackgroundStyle(wxBG_STYLE_PAINT);
 
     m_label = new wxStaticText(this, wxID_ANY, label);
@@ -134,7 +144,7 @@ GUI::FilamentMapBtnPanel::FilamentMapBtnPanel(wxWindow *parent, const wxString &
     auto label_sizer = new wxBoxSizer(wxHORIZONTAL);
     label_sizer->AddStretchSpacer();
     label_sizer->Add(m_btn, 0, wxALIGN_CENTER | wxEXPAND | wxLEFT, FromDIP(1));
-    label_sizer->Add(m_label, 0, wxALIGN_CENTER | wxEXPAND| wxALL, FromDIP(3));
+    label_sizer->Add(m_label, 0, wxALIGN_CENTER | wxEXPAND | wxALL, FromDIP(3));
     label_sizer->AddStretchSpacer();
 
     m_disable_tip = new Label(this, _L("(Sync with printer)"));
@@ -163,7 +173,7 @@ GUI::FilamentMapBtnPanel::FilamentMapBtnPanel(wxWindow *parent, const wxString &
 
     GUI::wxGetApp().UpdateDarkUIWin(this);
 
-    auto forward_click_to_parent = [this](wxMouseEvent &event) {
+    auto forward_click_to_parent = [this](wxMouseEvent& event) {
         wxCommandEvent click_event(wxEVT_LEFT_DOWN, GetId());
         click_event.SetEventObject(this);
         this->ProcessEvent(click_event);
@@ -178,10 +188,10 @@ GUI::FilamentMapBtnPanel::FilamentMapBtnPanel(wxWindow *parent, const wxString &
     Bind(wxEVT_LEAVE_WINDOW, &FilamentMapBtnPanel::OnLeaveWindow, this);
 }
 
-void FilamentMapBtnPanel::OnPaint(wxPaintEvent &event)
+void FilamentMapBtnPanel::OnPaint(wxPaintEvent& event)
 {
     wxAutoBufferedPaintDC dc(this);
-    wxGraphicsContext    *gc = wxGraphicsContext::Create(dc);
+    wxGraphicsContext*    gc = wxGraphicsContext::Create(dc);
 
     if (gc) {
         dc.Clear();
@@ -208,8 +218,7 @@ void FilamentMapBtnPanel::UpdateStatus()
         m_label->SetBackgroundColour(BgSelectColor);
         m_detail->SetBackgroundColour(BgSelectColor);
         m_disable_tip->SetBackgroundColour(BgSelectColor);
-    }
-    else {
+    } else {
         m_btn->SetBackgroundColour(BgNormalColor);
         m_label->SetBackgroundColour(BgNormalColor);
         m_detail->SetBackgroundColour(BgNormalColor);
@@ -222,8 +231,7 @@ void FilamentMapBtnPanel::UpdateStatus()
         m_btn->SetForegroundColour(BgDisableColor);
         m_label->SetForegroundColour(TextDisableColor);
         m_detail->SetForegroundColour(TextDisableColor);
-    }
-    else {
+    } else {
         m_disable_tip->SetLabel("");
         m_disable_tip->SetForegroundColour(TextNormalBlackColor);
         m_btn->SetBitmap(icon_enabled);
@@ -234,7 +242,7 @@ void FilamentMapBtnPanel::UpdateStatus()
     GUI::wxGetApp().UpdateDarkUIWin(this);
 }
 
-void FilamentMapBtnPanel::OnEnterWindow(wxMouseEvent &event)
+void FilamentMapBtnPanel::OnEnterWindow(wxMouseEvent& event)
 {
     if (!m_hover && m_enabled) {
         m_hover = true;
@@ -244,11 +252,12 @@ void FilamentMapBtnPanel::OnEnterWindow(wxMouseEvent &event)
     }
 }
 
-void FilamentMapBtnPanel::OnLeaveWindow(wxMouseEvent &event)
+void FilamentMapBtnPanel::OnLeaveWindow(wxMouseEvent& event)
 {
     if (m_hover) {
         wxPoint pos = this->ScreenToClient(wxGetMousePosition());
-        if (this->GetClientRect().Contains(pos)) return;
+        if (this->GetClientRect().Contains(pos))
+            return;
         m_hover = false;
         UpdateStatus();
         Refresh();
@@ -286,17 +295,20 @@ void GUI::FilamentMapBtnPanel::Show()
     wxPanel::Show();
 }
 
-FilamentMapAutoPanel::FilamentMapAutoPanel(wxWindow *parent, FilamentMapMode mode, bool machine_synced) : wxPanel(parent)
+FilamentMapAutoPanel::FilamentMapAutoPanel(wxWindow* parent, FilamentMapMode mode, bool machine_synced) : wxPanel(parent)
 {
-    const wxString AutoForFlushDetail = _L("Generates filament grouping for the left and right nozzles based on the most filament-saving principles to minimize waste.");
+    const wxString AutoForFlushDetail = _L(
+        "Generates filament grouping for the left and right nozzles based on the most filament-saving principles to minimize waste.");
 
-    const wxString AutoForMatchDetail = _L("Generates filament grouping for the left and right nozzles based on the printer's actual filament status, reducing the need for manual filament adjustment.");
+    const wxString AutoForMatchDetail = _L("Generates filament grouping for the left and right nozzles based on the printer's actual "
+                                           "filament status, reducing the need for manual filament adjustment.");
 
-    auto                  sizer              = new wxBoxSizer(wxHORIZONTAL);
-    m_flush_panel                            = new FilamentMapBtnPanel(this, _L("Filament-Saving Mode"), AutoForFlushDetail, "flush_mode_panel_icon");
-    m_match_panel                            = new FilamentMapBtnPanel(this, _L("Convenience Mode"), AutoForMatchDetail, "match_mode_panel_icon");
+    auto sizer    = new wxBoxSizer(wxHORIZONTAL);
+    m_flush_panel = new FilamentMapBtnPanel(this, _L("Filament-Saving Mode"), AutoForFlushDetail, "flush_mode_panel_icon");
+    m_match_panel = new FilamentMapBtnPanel(this, _L("Convenience Mode"), AutoForMatchDetail, "match_mode_panel_icon");
 
-    if (!machine_synced) m_match_panel->Enable(false);
+    if (!machine_synced)
+        m_match_panel->Enable(false);
 
     sizer->AddStretchSpacer();
     sizer->Add(m_flush_panel, 1, wxEXPAND);
@@ -310,7 +322,7 @@ FilamentMapAutoPanel::FilamentMapAutoPanel(wxWindow *parent, FilamentMapMode mod
         }
     });
 
-    m_match_panel->Bind(wxEVT_LEFT_DOWN, [this](auto &event) {
+    m_match_panel->Bind(wxEVT_LEFT_DOWN, [this](auto& event) {
         if (m_match_panel->IsEnabled()) {
             this->OnModeSwitch(FilamentMapMode::fmmAutoForMatch);
         }
@@ -354,11 +366,13 @@ void FilamentMapAutoPanel::OnModeSwitch(FilamentMapMode mode)
     UpdateStatus();
 }
 
-FilamentMapDefaultPanel::FilamentMapDefaultPanel(wxWindow *parent) : wxPanel(parent)
+FilamentMapDefaultPanel::FilamentMapDefaultPanel(wxWindow* parent) : wxPanel(parent)
 {
     auto sizer = new wxBoxSizer(wxHORIZONTAL);
 
-    m_label = new Label(this, _L("The filament grouping method for current plate is determined by the dropdown option at the slicing plate button."));
+    m_label =
+        new Label(this,
+                  _L("The filament grouping method for current plate is determined by the dropdown option at the slicing plate button."));
     m_label->SetFont(Label::Body_14);
     m_label->SetBackgroundColour(*wxWHITE);
     m_label->Wrap(FromDIP(500));

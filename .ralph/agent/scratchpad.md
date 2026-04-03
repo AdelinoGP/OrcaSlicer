@@ -74,5 +74,6 @@
 - Completed T291: src/slic3r/GUI/FilamentGroupPopup.hpp.
 - Completed T292: src/slic3r/GUI/FilamentMapDialog.cpp.
 - Completed T293: src/slic3r/GUI/FilamentMapDialog.hpp.
-- Next task: T294 src/slic3r/GUI/FilamentMapPanel.cpp.
+- Completed T294: src/slic3r/GUI/FilamentMapPanel.cpp.
+- Next task: T295 src/slic3r/GUI/FilamentMapPanel.hpp.
 
