@@ -102,8 +102,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T288 annotate: src/slic3r/GUI/FilamentBitmapUtils.cpp
 - [x] T289 annotate: src/slic3r/GUI/FilamentBitmapUtils.hpp
 - [x] T290 annotate: src/slic3r/GUI/FilamentGroupPopup.cpp
-- [~] T291 annotate: src/slic3r/GUI/FilamentGroupPopup.hpp
-- [ ] T292 annotate: src/slic3r/GUI/FilamentMapDialog.cpp
+- [x] T291 annotate: src/slic3r/GUI/FilamentGroupPopup.hpp
+- [~] T292 annotate: src/slic3r/GUI/FilamentMapDialog.cpp
 - [ ] T293 annotate: src/slic3r/GUI/FilamentMapDialog.hpp
 - [ ] T294 annotate: src/slic3r/GUI/FilamentMapPanel.cpp
 - [ ] T295 annotate: src/slic3r/GUI/FilamentMapPanel.hpp

@@ -71,5 +71,6 @@
 - Completed T288: src/slic3r/GUI/FilamentBitmapUtils.cpp.
 - Completed T289: src/slic3r/GUI/FilamentBitmapUtils.hpp.
 - Completed T290: src/slic3r/GUI/FilamentGroupPopup.cpp.
-- Next task: T291 src/slic3r/GUI/FilamentGroupPopup.hpp.
+- Completed T291: src/slic3r/GUI/FilamentGroupPopup.hpp.
+- Next task: T292 src/slic3r/GUI/FilamentMapDialog.cpp.
 

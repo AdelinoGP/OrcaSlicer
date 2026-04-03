@@ -2683,3 +2683,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Manual Win32 window region manipulation)
 - Git: annotate: src/slic3r/GUI/FilamentGroupPopup.cpp
 - Next recommended Phase 1 task: T291 src/slic3r/GUI/FilamentGroupPopup.hpp
+
+## Phase 1 - Task T291 complete
+- Task type: annotate
+- File: src/slic3r/GUI/FilamentGroupPopup.hpp
+- Deliverables: src/slic3r/GUI/FilamentGroupPopup.hpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Declaration of the mode selector popup for automated filament grouping strategies.
+- Unity-impact summary:
+  - Header declares the public interface for the mode selection popup.
+  - PopupWindow maps to a floating C# UI controller.
+  - wxTimer replaced by C# async/await or Timer class for dismissal logic.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/FilamentGroupPopup.hpp
+- Next recommended Phase 1 task: T292 src/slic3r/GUI/FilamentMapDialog.cpp
