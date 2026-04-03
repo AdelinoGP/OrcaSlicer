@@ -2839,6 +2839,20 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Git: annotate: src/slic3r/GUI/GCodeViewer.cpp
 - Next recommended Phase 1 task: T302 src/slic3r/GUI/GCodeViewer.hpp
 
+## Phase 1 - Task T302 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GCodeViewer.hpp
+- Deliverables: src/slic3r/GUI/GCodeViewer.hpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Public declaration of the G-code 3D preview system and its interactive components.
+- Unity-impact summary:
+  - Header declares the public interface for the 3D toolpath preview.
+  - GCodeViewer maps to a core Unity MonoBehaviour controller.
+  - Nested UI components (Marker, GCodeWindow) map to specialized C# classes managing Unity GameObjects and virtualized text UI.
+- Hazards found: 1 (P3: Coupling with libvgcode and immediate-mode ImGui state)
+- Git: annotate: src/slic3r/GUI/GCodeViewer.hpp
+- Next recommended Phase 1 task: T303 src/slic3r/GUI/Gizmos/GizmoObjectManipulation.cpp
+
 ## Phase 1 checkpoint
 - Files newly accounted for in this batch: 70
 - Cumulative annotated: 129

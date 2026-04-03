@@ -113,8 +113,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T299 annotate: src/slic3r/GUI/FileArchiveDialog.hpp
 - [x] T300 annotate: src/slic3r/GUI/format.hpp
 - [x] T301 annotate: src/slic3r/GUI/GCodeViewer.cpp
-- [~] T302 annotate: src/slic3r/GUI/GCodeViewer.hpp
-- [ ] T303 annotate: src/slic3r/GUI/Gizmos/GizmoObjectManipulation.cpp
+- [x] T302 annotate: src/slic3r/GUI/GCodeViewer.hpp
+- [~] T303 annotate: src/slic3r/GUI/Gizmos/GizmoObjectManipulation.cpp
 - [ ] T304 annotate: src/slic3r/GUI/Gizmos/GizmoObjectManipulation.hpp
 - [ ] T305 annotate: src/slic3r/GUI/Gizmos/GLGizmoAdvancedCut.cpp
 - [ ] T306 annotate: src/slic3r/GUI/Gizmos/GLGizmoAdvancedCut.hpp
