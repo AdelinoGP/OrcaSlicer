@@ -1,3 +1,10 @@
+// [ANNOTATED]
+// [INTENT] Declaration of the custom filament material/color picker popup.
+// [STATE] Managed state for material variants, selected color, and click-outside detection timers.
+// [UNITY] Map to a C# ModalDialog controller managing a retained VisualElement popup.
+// [UNITY] Replace shaped window and manual drag-delta logic with native Unity UI pivots and anchors.
+// [PORTING_HAZARD:P3] Reliance on wxWidgets-specific timer and region-based window shaping.
+
 #ifndef slic3r_GUI_FilamentPickerDialog_hpp_
 #define slic3r_GUI_FilamentPickerDialog_hpp_
 
@@ -21,16 +28,16 @@ namespace Slic3r { namespace GUI {
 class FilamentPickerDialog : public DPIDialog
 {
 public:
-    FilamentPickerDialog(wxWindow *parent, const wxString &fila_id, const FilamentColor &fila_color, const std::string &fila_type);
+    FilamentPickerDialog(wxWindow* parent, const wxString& fila_id, const FilamentColor& fila_color, const std::string& fila_type);
     virtual ~FilamentPickerDialog();
 
     // Public interface methods
-    bool IsDataLoaded() const { return m_is_data_loaded; }
-    wxColour GetSelectedColour() const;
+    bool                 IsDataLoaded() const { return m_is_data_loaded; }
+    wxColour             GetSelectedColour() const;
     const FilamentColor& GetSelectedFilamentColor() const { return m_cur_filament_color; }
 
 protected:
-    void on_dpi_changed(const wxRect &suggested_rect) override;
+    void on_dpi_changed(const wxRect& suggested_rect) override;
 
     // Event handlers
 #ifdef __WXGTK__
@@ -51,16 +58,16 @@ protected:
 
 private:
     // UI creation methods
-    wxBoxSizer* CreatePreviewPanel(const FilamentColor& fila_color, const std::string& fila_type);
+    wxBoxSizer*       CreatePreviewPanel(const FilamentColor& fila_color, const std::string& fila_type);
     wxScrolledWindow* CreateColorGrid();
-    wxBoxSizer* CreateSeparatorLine();
-    void CreateMoreInfoButton();
-    void BindEvents();
+    wxBoxSizer*       CreateSeparatorLine();
+    void              CreateMoreInfoButton();
+    void              BindEvents();
 
     // Preview panel helper methods
-    void CreateColorBitmap(const FilamentColor& fila_color);
+    void        CreateColorBitmap(const FilamentColor& fila_color);
     wxBoxSizer* CreateInfoSection();
-    void SetupLabelsContent(const FilamentColor& fila_color, const std::string& fila_type);
+    void        SetupLabelsContent(const FilamentColor& fila_color, const std::string& fila_type);
 
     // UI update methods
     void UpdatePreview(const FilamentColorCode& filament);
@@ -72,7 +79,7 @@ private:
     void CreateShapedBitmap();
 
     // Data loading
-    bool LoadFilamentData(const wxString& fila_id);
+    bool         LoadFilamentData(const wxString& fila_id);
     wxColourData GetSingleColorData();
 
     // Flash effect
@@ -80,35 +87,35 @@ private:
 
     // UI elements
     wxStaticBitmap* m_color_demo{nullptr};
-    wxStaticText* m_label_preview_color{nullptr};
-    wxStaticText* m_label_preview_idx{nullptr};
-    wxStaticText* m_label_preview_type{nullptr};
-    Button* m_more_btn{nullptr};
-    Button* m_ok_btn{nullptr};
-    Button* m_cancel_btn{nullptr};
+    wxStaticText*   m_label_preview_color{nullptr};
+    wxStaticText*   m_label_preview_idx{nullptr};
+    wxStaticText*   m_label_preview_type{nullptr};
+    Button*         m_more_btn{nullptr};
+    Button*         m_ok_btn{nullptr};
+    Button*         m_cancel_btn{nullptr};
 
     // Data members
-    bool m_is_data_loaded{false};
-    wxString *m_cur_color_name{nullptr};
+    bool                    m_is_data_loaded{false};
+    wxString*               m_cur_color_name{nullptr};
     FilamentColorCodeQuery* m_color_query{nullptr};
-    FilamentColorCodes* m_cur_color_codes{nullptr};
-    wxBitmapButton* m_cur_selected_btn{nullptr};
-    FilamentColor m_cur_filament_color;
+    FilamentColorCodes*     m_cur_color_codes{nullptr};
+    wxBitmapButton*         m_cur_selected_btn{nullptr};
+    FilamentColor           m_cur_filament_color;
 
     // Shaped window members
     wxBitmap m_shape_bmp;
-    int m_corner_radius{8};
+    int      m_corner_radius{8};
 
     // Mouse drag members
     wxPoint m_drag_delta;
 
     // Click detection timers
     wxTimer* m_click_timer{nullptr};
-    bool m_last_mouse_down{false};
+    bool     m_last_mouse_down{false};
 
     // Flash effect timer
     wxTimer* m_flash_timer{nullptr};
-    int m_flash_step{0};
+    int      m_flash_step{0};
 };
 
 }} // namespace Slic3r::GUI

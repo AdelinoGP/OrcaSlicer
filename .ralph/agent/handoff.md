@@ -2769,6 +2769,20 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Git: annotate: src/slic3r/GUI/FilamentPickerDialog.cpp
 - Next recommended Phase 1 task: T297 src/slic3r/GUI/FilamentPickerDialog.hpp
 
+## Phase 1 - Task T297 complete
+- Task type: annotate
+- File: src/slic3r/GUI/FilamentPickerDialog.hpp
+- Deliverables: src/slic3r/GUI/FilamentPickerDialog.hpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Declaration of the custom filament material/color picker popup.
+- Unity-impact summary:
+  - Header declares the public interface for the material selection popup.
+  - Dialog class maps to a C# ModalDialog controller.
+  - Manual window shaping and drag-delta tracking replaced by native Unity UI anchors and pivots.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/FilamentPickerDialog.hpp
+- Next recommended Phase 1 task: T298 src/slic3r/GUI/FileArchiveDialog.cpp
+
 ## Phase 1 checkpoint
 - Files newly accounted for in this batch: 70
 - Cumulative annotated: 129
