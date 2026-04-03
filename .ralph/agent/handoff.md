@@ -2627,3 +2627,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Deeply nested validation and formatting logic)
 - Git: annotate: src/slic3r/GUI/Field.cpp
 - Next recommended Phase 1 task: T287 src/slic3r/GUI/Field.hpp
+
+## Phase 1 - Task T287 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Field.hpp
+- Deliverables: src/slic3r/GUI/Field.hpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Declaration of the Field widget hierarchy for configuration option binding and editing.
+- Unity-impact summary:
+  - Header declares the public interface for the configuration form components.
+  - Field hierarchy maps to a C# component-based UI architecture.
+  - wxWidgets events replaced by C# delegates or UnityEvents for reactivity.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/Field.hpp
+- Next recommended Phase 1 task: T288 src/slic3r/GUI/FilamentBitmapUtils.cpp

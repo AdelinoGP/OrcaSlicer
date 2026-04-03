@@ -67,5 +67,6 @@
 - Completed T284: src/slic3r/GUI/ExtrusionCalibration.cpp.
 - Completed T285: src/slic3r/GUI/ExtrusionCalibration.hpp.
 - Completed T286: src/slic3r/GUI/Field.cpp.
-- Next task: T287 src/slic3r/GUI/Field.hpp.
+- Completed T287: src/slic3r/GUI/Field.hpp.
+- Next task: T288 src/slic3r/GUI/FilamentBitmapUtils.cpp.
 
