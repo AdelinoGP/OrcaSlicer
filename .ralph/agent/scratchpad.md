@@ -64,5 +64,6 @@
 - Completed T281: src/slic3r/GUI/Event.hpp.
 - Completed T282: src/slic3r/GUI/ExtraRenderers.cpp.
 - Completed T283: src/slic3r/GUI/ExtraRenderers.hpp.
-- Next task: T284 src/slic3r/GUI/ExtrusionCalibration.cpp.
+- Completed T284: src/slic3r/GUI/ExtrusionCalibration.cpp.
+- Next task: T285 src/slic3r/GUI/ExtrusionCalibration.hpp.
 

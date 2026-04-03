@@ -1,3 +1,12 @@
+// [ANNOTATED]
+// [INTENT] Implementation of the two-step manual Pressure Advance (Factor K) calibration wizard.
+// [STATE] Wizard navigation state (Step 1/2) and cached material/printer parameters (nozzle temp, bed type).
+// [EVENT] Dispatches hardware calibration jobs and handles result persistence to filament profiles.
+// [UNITY] Map to a Unity UI Toolkit ModalWindow using a step-based VisualElement state machine.
+// [UNITY] Use reactive bindings to show/hide wizard pages and update progress from the PrinterService.
+// [PORTING_HAZARD:P2] Wizard logic is tightly coupled to real-time printer telemetry (is_in_extrusion_cali); requires robust async state
+// synchronization.
+
 #include "ExtrusionCalibration.hpp"
 #include "GUI_App.hpp"
 #include "MsgDialog.hpp"
@@ -9,10 +18,13 @@
 
 namespace Slic3r { namespace GUI {
 
-
-ExtrusionCalibration::ExtrusionCalibration(wxWindow *parent, wxWindowID id)
-    : DPIDialog(parent, id, _L("Dynamic flow calibration"), wxDefaultPosition, wxDefaultSize, (wxSYSTEM_MENU |
-        wxMINIMIZE_BOX | wxMAXIMIZE_BOX | wxCLOSE_BOX | wxCAPTION |wxCLIP_CHILDREN))
+ExtrusionCalibration::ExtrusionCalibration(wxWindow* parent, wxWindowID id)
+    : DPIDialog(parent,
+                id,
+                _L("Dynamic flow calibration"),
+                wxDefaultPosition,
+                wxDefaultSize,
+                (wxSYSTEM_MENU | wxMINIMIZE_BOX | wxMAXIMIZE_BOX | wxCLOSE_BOX | wxCAPTION | wxCLIP_CHILDREN))
 {
     create();
     wxGetApp().UpdateDlgDarkUI(this);
@@ -22,11 +34,10 @@ void ExtrusionCalibration::init_bitmaps()
 {
     auto lan = wxGetApp().app_config->get_language_code();
     if (lan == "zh-cn") {
-        m_is_zh = true;
+        m_is_zh                   = true;
         m_calibration_tips_bmp_zh = create_scaled_bitmap("extrusion_calibration_tips_zh", nullptr, 256);
-    }
-    else{
-        m_is_zh = false;
+    } else {
+        m_is_zh                   = false;
         m_calibration_tips_bmp_en = create_scaled_bitmap("extrusion_calibration_tips_en", nullptr, 256);
     }
     m_calibration_tips_open_btn_bmp = create_scaled_bitmap("extrusion_calibrati_open_button", nullptr, 16);
@@ -37,7 +48,7 @@ void ExtrusionCalibration::create()
     init_bitmaps();
     SetBackgroundColour(*wxWHITE);
     wxBoxSizer* sizer_main = new wxBoxSizer(wxVERTICAL);
-    m_step_1_panel = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
+    m_step_1_panel         = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
     m_step_1_panel->SetBackgroundColour(*wxWHITE);
     wxBoxSizer* step_1_sizer = new wxBoxSizer(wxVERTICAL);
 
@@ -46,7 +57,8 @@ void ExtrusionCalibration::create()
     step_1_sizer->Add(0, EXTRUSION_CALIBRATION_WIDGET_GAP, 0, 0);
 
     // filament title
-    wxString intro_text = _L("The nozzle temp and max volumetric speed will affect the calibration results. Please fill in the same values as the actual printing. They can be auto-filled by selecting a filament preset.");
+    wxString intro_text = _L("The nozzle temp and max volumetric speed will affect the calibration results. Please fill in the same values "
+                             "as the actual printing. They can be auto-filled by selecting a filament preset.");
     m_filament_preset_title = new Label(m_step_1_panel, intro_text);
     m_filament_preset_title->SetFont(Label::Body_12);
     m_filament_preset_title->SetForegroundColour(EXTRUSION_CALIBRATION_GREY800);
@@ -61,11 +73,12 @@ void ExtrusionCalibration::create()
     select_sizer->Add(nozzle_dia_sel_text, 0, wxALIGN_LEFT);
     select_sizer->AddSpacer(FromDIP(4));
 
-
 #ifdef __APPLE__
-    m_comboBox_nozzle_dia = new wxComboBox(m_step_1_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, EXTRUSION_CALIBRATION_BED_COMBOX, 0, nullptr, wxCB_READONLY);
+    m_comboBox_nozzle_dia = new wxComboBox(m_step_1_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, EXTRUSION_CALIBRATION_BED_COMBOX, 0,
+                                           nullptr, wxCB_READONLY);
 #else
-    m_comboBox_nozzle_dia = new ComboBox(m_step_1_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, EXTRUSION_CALIBRATION_BED_COMBOX, 0, nullptr, wxCB_READONLY);
+    m_comboBox_nozzle_dia = new ComboBox(m_step_1_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, EXTRUSION_CALIBRATION_BED_COMBOX, 0,
+                                         nullptr, wxCB_READONLY);
 #endif
     m_comboBox_nozzle_dia->AppendString(wxString::Format("%1.1f", 0.2));
     m_comboBox_nozzle_dia->AppendString(wxString::Format("%1.1f", 0.4));
@@ -79,9 +92,11 @@ void ExtrusionCalibration::create()
     select_sizer->Add(filament_sel_text, 0, wxALIGN_LEFT);
     select_sizer->AddSpacer(FromDIP(4));
 #ifdef __APPLE__
-    m_comboBox_filament = new wxComboBox(m_step_1_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, EXTRUSION_CALIBRATION_BED_COMBOX, 0, nullptr, wxCB_READONLY);
+    m_comboBox_filament = new wxComboBox(m_step_1_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, EXTRUSION_CALIBRATION_BED_COMBOX, 0,
+                                         nullptr, wxCB_READONLY);
 #else
-    m_comboBox_filament = new ComboBox(m_step_1_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, EXTRUSION_CALIBRATION_BED_COMBOX, 0, nullptr, wxCB_READONLY);
+    m_comboBox_filament = new ComboBox(m_step_1_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, EXTRUSION_CALIBRATION_BED_COMBOX, 0,
+                                       nullptr, wxCB_READONLY);
 #endif
     select_sizer->Add(m_comboBox_filament, 0, wxEXPAND);
     select_sizer->Add(0, EXTRUSION_CALIBRATION_WIDGET_GAP, 0, 0);
@@ -91,9 +106,11 @@ void ExtrusionCalibration::create()
     select_sizer->AddSpacer(FromDIP(4));
 
 #ifdef __APPLE__
-    m_comboBox_bed_type = new wxComboBox(m_step_1_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, EXTRUSION_CALIBRATION_BED_COMBOX, 0, nullptr, wxCB_READONLY);
+    m_comboBox_bed_type = new wxComboBox(m_step_1_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, EXTRUSION_CALIBRATION_BED_COMBOX, 0,
+                                         nullptr, wxCB_READONLY);
 #else
-    m_comboBox_bed_type = new ComboBox(m_step_1_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, EXTRUSION_CALIBRATION_BED_COMBOX, 0, nullptr, wxCB_READONLY);
+    m_comboBox_bed_type = new ComboBox(m_step_1_panel, wxID_ANY, wxEmptyString, wxDefaultPosition, EXTRUSION_CALIBRATION_BED_COMBOX, 0,
+                                       nullptr, wxCB_READONLY);
 #endif
     select_sizer->Add(m_comboBox_bed_type, 0, wxEXPAND);
 
@@ -111,7 +128,7 @@ void ExtrusionCalibration::create()
 
     // static line
     step_1_sizer->Add(0, EXTRUSION_CALIBRATION_WIDGET_GAP, 0, 0);
-    wxPanel* static_line = new wxPanel(m_step_1_panel, wxID_ANY, wxDefaultPosition, { -1, FromDIP(1) });
+    wxPanel* static_line = new wxPanel(m_step_1_panel, wxID_ANY, wxDefaultPosition, {-1, FromDIP(1)});
     static_line->SetBackgroundColour(EXTRUSION_CALIBRATION_GREY300);
     step_1_sizer->Add(static_line, 0, wxEXPAND);
     step_1_sizer->Add(0, EXTRUSION_CALIBRATION_WIDGET_GAP, 0, 0);
@@ -122,26 +139,29 @@ void ExtrusionCalibration::create()
     info_sizer->SetNonFlexibleGrowMode(wxFLEX_GROWMODE_SPECIFIED);
 
     auto nozzle_temp_sizer = new wxBoxSizer(wxVERTICAL);
-    auto nozzle_temp_text = new wxStaticText(m_step_1_panel, wxID_ANY, _L("Nozzle temperature"));
-    auto max_input_width = std::max(std::max(std::max(wxWindow::GetTextExtent(_L("Nozzle temperature")).x,
-        wxWindow::GetTextExtent(_L("Bed Temperature")).x),
-        wxWindow::GetTextExtent(_L("Max volumetric speed")).x),
-        EXTRUSION_CALIBRATION_INPUT_SIZE.x);
-    m_nozzle_temp = new TextInput(m_step_1_panel, wxEmptyString, _L("\u2103" /* °C */), "", wxDefaultPosition, { max_input_width, EXTRUSION_CALIBRATION_INPUT_SIZE.y }, wxTE_READONLY);
+    auto nozzle_temp_text  = new wxStaticText(m_step_1_panel, wxID_ANY, _L("Nozzle temperature"));
+    auto max_input_width   = std::max(std::max(std::max(wxWindow::GetTextExtent(_L("Nozzle temperature")).x,
+                                                        wxWindow::GetTextExtent(_L("Bed Temperature")).x),
+                                               wxWindow::GetTextExtent(_L("Max volumetric speed")).x),
+                                      EXTRUSION_CALIBRATION_INPUT_SIZE.x);
+    m_nozzle_temp          = new TextInput(m_step_1_panel, wxEmptyString, _L("\u2103" /* °C */), "", wxDefaultPosition,
+                                           {max_input_width, EXTRUSION_CALIBRATION_INPUT_SIZE.y}, wxTE_READONLY);
     nozzle_temp_sizer->Add(nozzle_temp_text, 0, wxALIGN_LEFT);
     nozzle_temp_sizer->AddSpacer(FromDIP(4));
     nozzle_temp_sizer->Add(m_nozzle_temp, 0, wxEXPAND);
 
     auto bed_temp_sizer = new wxBoxSizer(wxVERTICAL);
-    auto bed_temp_text = new wxStaticText(m_step_1_panel, wxID_ANY, _L("Bed temperature"));
-    m_bed_temp = new TextInput(m_step_1_panel, wxEmptyString, _L("\u2103" /* °C */), "", wxDefaultPosition, { max_input_width, EXTRUSION_CALIBRATION_INPUT_SIZE.y }, wxTE_READONLY);
+    auto bed_temp_text  = new wxStaticText(m_step_1_panel, wxID_ANY, _L("Bed temperature"));
+    m_bed_temp          = new TextInput(m_step_1_panel, wxEmptyString, _L("\u2103" /* °C */), "", wxDefaultPosition,
+                                        {max_input_width, EXTRUSION_CALIBRATION_INPUT_SIZE.y}, wxTE_READONLY);
     bed_temp_sizer->Add(bed_temp_text, 0, wxALIGN_LEFT);
     bed_temp_sizer->AddSpacer(FromDIP(4));
     bed_temp_sizer->Add(m_bed_temp, 0, wxEXPAND);
 
     auto max_flow_sizer = new wxBoxSizer(wxVERTICAL);
-    auto max_flow_text = new wxStaticText(m_step_1_panel, wxID_ANY, _L("Max volumetric speed"));
-    m_max_flow_ratio = new TextInput(m_step_1_panel, wxEmptyString, _L("mm³"), "", wxDefaultPosition, { max_input_width, EXTRUSION_CALIBRATION_INPUT_SIZE.y }, wxTE_READONLY);
+    auto max_flow_text  = new wxStaticText(m_step_1_panel, wxID_ANY, _L("Max volumetric speed"));
+    m_max_flow_ratio    = new TextInput(m_step_1_panel, wxEmptyString, _L("mm³"), "", wxDefaultPosition,
+                                        {max_input_width, EXTRUSION_CALIBRATION_INPUT_SIZE.y}, wxTE_READONLY);
     max_flow_sizer->Add(max_flow_text, 0, wxALIGN_LEFT);
     max_flow_sizer->AddSpacer(FromDIP(4));
     max_flow_sizer->Add(m_max_flow_ratio, 0, wxEXPAND);
@@ -154,7 +174,7 @@ void ExtrusionCalibration::create()
 
     // static line
     step_1_sizer->Add(0, EXTRUSION_CALIBRATION_WIDGET_GAP, 0, 0);
-    wxPanel* static_line2 = new wxPanel(m_step_1_panel, wxID_ANY, wxDefaultPosition, { -1, FromDIP(1) });
+    wxPanel* static_line2 = new wxPanel(m_step_1_panel, wxID_ANY, wxDefaultPosition, {-1, FromDIP(1)});
     static_line2->SetBackgroundColour(EXTRUSION_CALIBRATION_GREY300);
     step_1_sizer->Add(static_line2, 0, wxEXPAND);
     step_1_sizer->Add(0, EXTRUSION_CALIBRATION_WIDGET_GAP, 0, 0);
@@ -194,7 +214,6 @@ void ExtrusionCalibration::create()
     step_1_sizer->Add(cali_sizer, 0, wxEXPAND);
     step_1_sizer->Add(0, EXTRUSION_CALIBRATION_WIDGET_GAP, 0, 0);
 
-
     m_step_2_panel = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
     m_step_2_panel->SetBackgroundColour(*wxWHITE);
     wxBoxSizer* step_2_sizer = new wxBoxSizer(wxVERTICAL);
@@ -204,8 +223,9 @@ void ExtrusionCalibration::create()
 
     // save result title and tips
     wxBoxSizer* save_result_sizer = new wxBoxSizer(wxHORIZONTAL);
-    wxString fill_intro_text = _L("Calibration completed. Please find the most uniform extrusion line on your hot bed like the picture below, and fill the value on its left side into the factor K input box.");
-    m_save_cali_result_title = new Label(m_step_2_panel, fill_intro_text);
+    wxString    fill_intro_text = _L("Calibration completed. Please find the most uniform extrusion line on your hot bed like the picture "
+                                  "below, and fill the value on its left side into the factor K input box.");
+    m_save_cali_result_title    = new Label(m_step_2_panel, fill_intro_text);
     m_save_cali_result_title->SetFont(::Label::Body_12);
     m_save_cali_result_title->SetForegroundColour(EXTRUSION_CALIBRATION_GREY800);
     m_save_cali_result_title->Wrap(this->GetSize().x);
@@ -213,17 +233,18 @@ void ExtrusionCalibration::create()
     step_2_sizer->Add(save_result_sizer, 0, wxEXPAND);
     step_2_sizer->Add(0, EXTRUSION_CALIBRATION_WIDGET_GAP, 0, 0);
 
-    auto content_sizer = new wxBoxSizer(wxHORIZONTAL);
-    m_calibration_tips_static_bmp = new wxStaticBitmap(m_step_2_panel, wxID_ANY, wxNullBitmap, wxDefaultPosition, EXTRUSION_CALIBRATION_BMP_SIZE, 0);
+    auto content_sizer            = new wxBoxSizer(wxHORIZONTAL);
+    m_calibration_tips_static_bmp = new wxStaticBitmap(m_step_2_panel, wxID_ANY, wxNullBitmap, wxDefaultPosition,
+                                                       EXTRUSION_CALIBRATION_BMP_SIZE, 0);
     m_calibration_tips_static_bmp->SetMinSize(EXTRUSION_CALIBRATION_BMP_SIZE);
     content_sizer->Add(m_calibration_tips_static_bmp, 1, wxEXPAND | wxSHAPED);
     content_sizer->Add(EXTRUSION_CALIBRATION_WIDGET_GAP, 0, 0, 0);
     // k/n input value
-    auto kn_sizer = new wxBoxSizer(wxVERTICAL);
+    auto kn_sizer   = new wxBoxSizer(wxVERTICAL);
     auto k_val_text = new wxStaticText(m_step_2_panel, wxID_ANY, _L("Factor K"), wxDefaultPosition, wxDefaultSize, 0);
-    m_k_val = new TextInput(m_step_2_panel, wxEmptyString, "", "", wxDefaultPosition, wxDefaultSize);
+    m_k_val         = new TextInput(m_step_2_panel, wxEmptyString, "", "", wxDefaultPosition, wxDefaultSize);
     auto n_val_text = new wxStaticText(m_step_2_panel, wxID_ANY, _L("Factor N"), wxDefaultPosition, wxDefaultSize, 0);
-    m_n_val = new TextInput(m_step_2_panel, wxEmptyString, "", "", wxDefaultPosition, wxDefaultSize);
+    m_n_val         = new TextInput(m_step_2_panel, wxEmptyString, "", "", wxDefaultPosition, wxDefaultSize);
 
     // hide n
     n_val_text->Hide();
@@ -242,7 +263,6 @@ void ExtrusionCalibration::create()
     m_button_last_step = new Button(m_step_2_panel, _L("Last Step")); // Back for english
     m_button_last_step->SetStyle(ButtonStyle::Regular, ButtonType::Choice);
     m_button_last_step->Bind(wxEVT_BUTTON, &ExtrusionCalibration::on_click_last, this);
-
 
     kn_sizer->AddStretchSpacer();
     kn_sizer->Add(m_button_last_step, 0);
@@ -276,34 +296,40 @@ void ExtrusionCalibration::create()
     m_k_val->GetTextCtrl()->Bind(wxEVT_TEXT_ENTER, [this](wxCommandEvent& e) {
         input_value_finish();
         e.Skip();
-        });
+    });
 
     m_n_val->GetTextCtrl()->Bind(wxEVT_TEXT_ENTER, [this](wxCommandEvent& e) {
         input_value_finish();
         e.Skip();
-        });
-
+    });
 
     m_calibration_tips_static_bmp->Bind(wxEVT_PAINT, &ExtrusionCalibration::paint, this);
 
     m_calibration_tips_static_bmp->Bind(wxEVT_LEFT_UP, &ExtrusionCalibration::open_bitmap, this);
 
-    m_comboBox_filament->Connect(wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler(ExtrusionCalibration::on_select_filament), NULL, this);
-    m_comboBox_bed_type->Connect(wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler(ExtrusionCalibration::on_select_bed_type), NULL, this);
-    m_comboBox_nozzle_dia->Connect(wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler(ExtrusionCalibration::on_select_nozzle_dia), NULL, this);
+    m_comboBox_filament->Connect(wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler(ExtrusionCalibration::on_select_filament), NULL,
+                                 this);
+    m_comboBox_bed_type->Connect(wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler(ExtrusionCalibration::on_select_bed_type), NULL,
+                                 this);
+    m_comboBox_nozzle_dia->Connect(wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler(ExtrusionCalibration::on_select_nozzle_dia), NULL,
+                                   this);
 }
 
 ExtrusionCalibration::~ExtrusionCalibration()
 {
-    m_comboBox_filament->Disconnect(wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler(ExtrusionCalibration::on_select_filament), NULL, this);
-    m_comboBox_bed_type->Disconnect(wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler(ExtrusionCalibration::on_select_bed_type), NULL, this);
-    m_comboBox_nozzle_dia->Disconnect(wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler(ExtrusionCalibration::on_select_nozzle_dia), NULL, this);
+    m_comboBox_filament->Disconnect(wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler(ExtrusionCalibration::on_select_filament), NULL,
+                                    this);
+    m_comboBox_bed_type->Disconnect(wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler(ExtrusionCalibration::on_select_bed_type), NULL,
+                                    this);
+    m_comboBox_nozzle_dia->Disconnect(wxEVT_COMMAND_COMBOBOX_SELECTED, wxCommandEventHandler(ExtrusionCalibration::on_select_nozzle_dia),
+                                      NULL, this);
 }
 
-void ExtrusionCalibration::paint(wxPaintEvent&) {
+void ExtrusionCalibration::paint(wxPaintEvent&)
+{
     auto      size = m_calibration_tips_static_bmp->GetSize();
     wxPaintDC dc(m_calibration_tips_static_bmp);
-    wxGCDC gcdc(dc);
+    wxGCDC    gcdc(dc);
 
     dc.DrawBitmap(m_is_zh ? m_calibration_tips_bmp_zh : m_calibration_tips_bmp_en, wxPoint(0, 0));
 
@@ -312,27 +338,29 @@ void ExtrusionCalibration::paint(wxPaintEvent&) {
     gcdc.DrawRectangle(wxPoint(0, 0), EXTRUSION_CALIBRATION_BMP_TIP_BAR);
 
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
-    int pos_offset = (EXTRUSION_CALIBRATION_BMP_TIP_BAR.y - EXTRUSION_CALIBRATION_BMP_BTN_SIZE.y) / 2;
+    int     pos_offset   = (EXTRUSION_CALIBRATION_BMP_TIP_BAR.y - EXTRUSION_CALIBRATION_BMP_BTN_SIZE.y) / 2;
     wxPoint open_btn_pos = wxPoint(size.x - pos_offset - EXTRUSION_CALIBRATION_BMP_BTN_SIZE.x, pos_offset);
     dc.DrawBitmap(m_calibration_tips_open_btn_bmp, open_btn_pos);
 
     gcdc.SetFont(Label::Head_14);
     gcdc.SetTextForeground(wxColour(255, 255, 255, 224));
     wxSize text_size = wxWindow::GetTextExtent(_L("Example"));
-    gcdc.DrawText(_L("Example"), { (EXTRUSION_CALIBRATION_BMP_TIP_BAR.x - text_size.x) / 2, (EXTRUSION_CALIBRATION_BMP_TIP_BAR.y - text_size.y) / 2});
+    gcdc.DrawText(_L("Example"),
+                  {(EXTRUSION_CALIBRATION_BMP_TIP_BAR.x - text_size.x) / 2, (EXTRUSION_CALIBRATION_BMP_TIP_BAR.y - text_size.y) / 2});
 
     return;
 }
 
-void ExtrusionCalibration::open_bitmap(wxMouseEvent& event) {
-    auto pos = event.GetPosition();
+void ExtrusionCalibration::open_bitmap(wxMouseEvent& event)
+{
+    auto pos  = event.GetPosition();
     auto size = m_calibration_tips_static_bmp->GetSize();
-    if (pos.x > size.x - EXTRUSION_CALIBRATION_BMP_TIP_BAR.y && pos.y > 0 &&
-        pos.x < size.x && pos.y < EXTRUSION_CALIBRATION_BMP_TIP_BAR.y) {
-        auto* popup = new wxDialog(this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize);
-        auto bmp_sizer = new wxBoxSizer(wxVERTICAL);
-        wxStaticBitmap* zoomed_bitmap =  new wxStaticBitmap(popup, wxID_ANY, wxNullBitmap, wxDefaultPosition, wxDefaultSize, 0);
-        zoomed_bitmap->SetBitmap(create_scaled_bitmap(m_is_zh ? "extrusion_calibration_tips_zh" : "extrusion_calibration_tips_en", nullptr, 720));
+    if (pos.x > size.x - EXTRUSION_CALIBRATION_BMP_TIP_BAR.y && pos.y > 0 && pos.x < size.x && pos.y < EXTRUSION_CALIBRATION_BMP_TIP_BAR.y) {
+        auto*           popup         = new wxDialog(this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize);
+        auto            bmp_sizer     = new wxBoxSizer(wxVERTICAL);
+        wxStaticBitmap* zoomed_bitmap = new wxStaticBitmap(popup, wxID_ANY, wxNullBitmap, wxDefaultPosition, wxDefaultSize, 0);
+        zoomed_bitmap->SetBitmap(
+            create_scaled_bitmap(m_is_zh ? "extrusion_calibration_tips_zh" : "extrusion_calibration_tips_en", nullptr, 720));
         bmp_sizer->Add(zoomed_bitmap, 1, wxEXPAND);
         popup->SetSizer(bmp_sizer);
         popup->Layout();
@@ -344,10 +372,7 @@ void ExtrusionCalibration::open_bitmap(wxMouseEvent& event) {
     return;
 }
 
-void ExtrusionCalibration::input_value_finish()
-{
-    ;
-}
+void ExtrusionCalibration::input_value_finish() { ; }
 
 void ExtrusionCalibration::show_info(bool show, bool is_error, wxString text)
 {
@@ -356,14 +381,12 @@ void ExtrusionCalibration::show_info(bool show, bool is_error, wxString text)
         if (m_error_text->GetLabelText().compare(text) != 0)
             m_error_text->SetLabelText(text);
         m_info_text->Hide();
-    }
-    else if (show && !is_error) {
+    } else if (show && !is_error) {
         m_info_text->Show();
         if (m_info_text->GetLabelText().compare(text) != 0)
             m_info_text->SetLabelText(text);
         m_error_text->Hide();
-    }
-    else {
+    } else {
         if (is_error) {
             m_info_text->Hide();
             m_error_text->Show();
@@ -391,8 +414,7 @@ void ExtrusionCalibration::update()
             if (m_bed_temp->GetTextCtrl()->GetValue().compare("0") == 0) {
                 wxString tips = get_bed_type_incompatible(false);
                 show_info(true, true, tips);
-            }
-            else {
+            } else {
                 get_bed_type_incompatible(true);
                 show_info(true, false, _L("Calibration completed"));
             }
@@ -418,8 +440,8 @@ void ExtrusionCalibration::update()
 void ExtrusionCalibration::on_click_cali(wxCommandEvent& event)
 {
     if (obj) {
-        int nozzle_temp = -1;
-        int bed_temp = -1;
+        int   nozzle_temp          = -1;
+        int   bed_temp             = -1;
         float max_volumetric_speed = -1;
 
         PresetBundle* preset_bundle = wxGetApp().preset_bundle;
@@ -428,11 +450,11 @@ void ExtrusionCalibration::on_click_cali(wxCommandEvent& event)
                 wxString filament_name = wxString::FromUTF8(it->name);
                 if (filament_name.compare(m_comboBox_filament->GetValue()) == 0) {
                     try {
-                        bed_temp = get_bed_temp(&it->config);
-                        const ConfigOptionInts* nozzle_temp_opt = it->config.option<ConfigOptionInts>("nozzle_temperature");
-                        const ConfigOptionFloats* speed_opt = it->config.option<ConfigOptionFloats>("filament_max_volumetric_speed");
+                        bed_temp                                  = get_bed_temp(&it->config);
+                        const ConfigOptionInts*   nozzle_temp_opt = it->config.option<ConfigOptionInts>("nozzle_temperature");
+                        const ConfigOptionFloats* speed_opt       = it->config.option<ConfigOptionFloats>("filament_max_volumetric_speed");
                         if (nozzle_temp_opt && speed_opt) {
-                            nozzle_temp = nozzle_temp_opt->get_at(0);
+                            nozzle_temp          = nozzle_temp_opt->get_at(0);
                             max_volumetric_speed = speed_opt->get_at(0);
                             if (bed_temp >= 0 && nozzle_temp >= 0 && max_volumetric_speed >= 0) {
                                 int curr_tray_id = ams_id * 4 + tray_id;
@@ -444,7 +466,7 @@ void ExtrusionCalibration::on_click_cali(wxCommandEvent& event)
                         } else {
                             BOOST_LOG_TRIVIAL(error) << "cali parameters is invalid";
                         }
-                    } catch(...) {
+                    } catch (...) {
                         ;
                     }
                 }
@@ -472,8 +494,7 @@ bool ExtrusionCalibration::check_k_validation(wxString k_text)
     double k = 0.0;
     try {
         k_text.ToDouble(&k);
-    }
-    catch (...) {
+    } catch (...) {
         ;
     }
 
@@ -489,16 +510,14 @@ bool ExtrusionCalibration::check_k_n_validation(wxString k_text, wxString n_text
     double k = 0.0;
     try {
         k_text.ToDouble(&k);
-    }
-    catch (...) {
+    } catch (...) {
         ;
     }
 
     double n = 0.0;
     try {
         n_text.ToDouble(&n);
-    }
-    catch (...) {
+    } catch (...) {
         ;
     }
     if (k <= MIN_PA_K_VALUE || k >= MAX_PA_K_VALUE)
@@ -508,13 +527,14 @@ bool ExtrusionCalibration::check_k_n_validation(wxString k_text, wxString n_text
     return true;
 }
 
-void ExtrusionCalibration::on_click_save(wxCommandEvent &event)
+void ExtrusionCalibration::on_click_save(wxCommandEvent& event)
 {
     wxString k_text = m_k_val->GetTextCtrl()->GetValue();
     wxString n_text = m_n_val->GetTextCtrl()->GetValue();
     if (!ExtrusionCalibration::check_k_validation(k_text)) {
-        wxString k_tips = wxString::Format(_L("Please input a valid value (K in %.1f~%.1f)"), MIN_PA_K_VALUE, MAX_PA_K_VALUE);
-        wxString kn_tips = wxString::Format(_L("Please input a valid value (K in %.1f~%.1f, N in %.1f~%.1f)"), MIN_PA_K_VALUE, MAX_PA_K_VALUE, 0.6, 2.0);
+        wxString      k_tips  = wxString::Format(_L("Please input a valid value (K in %.1f~%.1f)"), MIN_PA_K_VALUE, MAX_PA_K_VALUE);
+        wxString      kn_tips = wxString::Format(_L("Please input a valid value (K in %.1f~%.1f, N in %.1f~%.1f)"), MIN_PA_K_VALUE,
+                                                 MAX_PA_K_VALUE, 0.6, 2.0);
         MessageDialog msg_dlg(nullptr, k_tips, wxEmptyString, wxICON_WARNING | wxOK);
         msg_dlg.ShowModal();
         return;
@@ -523,40 +543,38 @@ void ExtrusionCalibration::on_click_save(wxCommandEvent &event)
     double k = 0.0;
     try {
         k_text.ToDouble(&k);
-    }
-    catch (...) {
+    } catch (...) {
         ;
     }
 
     double n = 0.0;
     try {
         n_text.ToDouble(&n);
-    }
-    catch (...) {
+    } catch (...) {
         ;
     }
 
     // set values
-    int nozzle_temp = -1;
-    int bed_temp = -1;
-    float max_volumetric_speed = -1;
-    std::string setting_id;
-    std::string name;
+    int           nozzle_temp          = -1;
+    int           bed_temp             = -1;
+    float         max_volumetric_speed = -1;
+    std::string   setting_id;
+    std::string   name;
     PresetBundle* preset_bundle = wxGetApp().preset_bundle;
     if (preset_bundle) {
         for (auto it = preset_bundle->filaments.begin(); it != preset_bundle->filaments.end(); it++) {
             wxString filament_name = wxString::FromUTF8(it->name);
             if (filament_name.compare(m_comboBox_filament->GetValue()) == 0) {
                 if (obj) {
-                    bed_temp    = get_bed_temp(&it->config);
-                    const ConfigOptionInts* nozzle_temp_opt = it->config.option<ConfigOptionInts>("nozzle_temperature");
-                    const ConfigOptionFloats* speed_opt = it->config.option<ConfigOptionFloats>("filament_max_volumetric_speed");
+                    bed_temp                                  = get_bed_temp(&it->config);
+                    const ConfigOptionInts*   nozzle_temp_opt = it->config.option<ConfigOptionInts>("nozzle_temperature");
+                    const ConfigOptionFloats* speed_opt       = it->config.option<ConfigOptionFloats>("filament_max_volumetric_speed");
                     if (nozzle_temp_opt && speed_opt) {
-                        nozzle_temp = nozzle_temp_opt->get_at(0);
+                        nozzle_temp          = nozzle_temp_opt->get_at(0);
                         max_volumetric_speed = speed_opt->get_at(0);
                     }
                     setting_id = it->setting_id;
-                    name = it->name;
+                    name       = it->name;
                 }
             }
         }
@@ -570,15 +588,9 @@ void ExtrusionCalibration::on_click_save(wxCommandEvent &event)
     Close();
 }
 
-void ExtrusionCalibration::on_click_last(wxCommandEvent &event)
-{
-    set_step(1);
-}
+void ExtrusionCalibration::on_click_last(wxCommandEvent& event) { set_step(1); }
 
-void ExtrusionCalibration::on_click_next(wxCommandEvent& event)
-{
-    set_step(2);
-}
+void ExtrusionCalibration::on_click_next(wxCommandEvent& event) { set_step(2); }
 
 bool ExtrusionCalibration::Show(bool show)
 {
@@ -593,43 +605,43 @@ void ExtrusionCalibration::update_combobox_filaments()
 {
     m_comboBox_filament->SetValue(wxEmptyString);
     user_filaments.clear();
-    int selection_idx = -1;
-    int filament_index = -1;
-    int curr_selection = -1;
+    int           selection_idx  = -1;
+    int           filament_index = -1;
+    int           curr_selection = -1;
     wxArrayString filament_items;
     PresetBundle* preset_bundle = wxGetApp().preset_bundle;
     if (preset_bundle && obj) {
         BOOST_LOG_TRIVIAL(trace) << "system_preset_bundle filament number=" << preset_bundle->filaments.size();
-        std::string printer_type = obj->printer_type;
+        std::string           printer_type = obj->printer_type;
         std::set<std::string> printer_preset_list;
         for (auto printer_it = preset_bundle->printers.begin(); printer_it != preset_bundle->printers.end(); printer_it++) {
             // only use system printer preset
-            if (!printer_it->is_system) continue;
+            if (!printer_it->is_system)
+                continue;
 
-            std::string model_id = printer_it->get_current_printer_type(preset_bundle);
-            ConfigOption* printer_nozzle_opt = printer_it->config.option("nozzle_diameter");
+            std::string         model_id            = printer_it->get_current_printer_type(preset_bundle);
+            ConfigOption*       printer_nozzle_opt  = printer_it->config.option("nozzle_diameter");
             ConfigOptionFloats* printer_nozzle_vals = nullptr;
             if (printer_nozzle_opt)
                 printer_nozzle_vals = dynamic_cast<ConfigOptionFloats*>(printer_nozzle_opt);
-            double nozzle_value = 0.4;
+            double   nozzle_value     = 0.4;
             wxString nozzle_value_str = m_comboBox_nozzle_dia->GetValue();
             try {
                 nozzle_value_str.ToDouble(&nozzle_value);
-            } catch(...) {
+            } catch (...) {
                 ;
             }
-            if (!model_id.empty() && model_id.compare(obj->printer_type) == 0
-                && printer_nozzle_vals
-                && abs(printer_nozzle_vals->get_at(0) - nozzle_value) < 1e-3) {
-                    printer_preset_list.insert(printer_it->name);
-                    BOOST_LOG_TRIVIAL(trace) << "extrusion_cali: printer_model = " << model_id;
+            if (!model_id.empty() && model_id.compare(obj->printer_type) == 0 && printer_nozzle_vals &&
+                abs(printer_nozzle_vals->get_at(0) - nozzle_value) < 1e-3) {
+                printer_preset_list.insert(printer_it->name);
+                BOOST_LOG_TRIVIAL(trace) << "extrusion_cali: printer_model = " << model_id;
             } else {
                 BOOST_LOG_TRIVIAL(error) << "extrusion_cali: printer_model = " << model_id;
             }
         }
 
         for (auto filament_it = preset_bundle->filaments.begin(); filament_it != preset_bundle->filaments.end(); filament_it++) {
-            ConfigOption* printer_opt = filament_it->config.option("compatible_printers");
+            ConfigOption*        printer_opt  = filament_it->config.option("compatible_printers");
             ConfigOptionStrings* printer_strs = dynamic_cast<ConfigOptionStrings*>(printer_opt);
             for (auto printer_str : printer_strs->values) {
                 if (printer_preset_list.find(printer_str) != printer_preset_list.end()) {
@@ -637,15 +649,11 @@ void ExtrusionCalibration::update_combobox_filaments()
 
                     // set default filament id
                     filament_index++;
-                    if (filament_it->is_system
-                        && !ams_filament_id.empty()
-                        && filament_it->filament_id == ams_filament_id
-                        ) {
+                    if (filament_it->is_system && !ams_filament_id.empty() && filament_it->filament_id == ams_filament_id) {
                         curr_selection = filament_index;
                     }
 
-                    if (filament_it->name == obj->extrusion_cali_filament_name && !obj->extrusion_cali_filament_name.empty())
-                    {
+                    if (filament_it->name == obj->extrusion_cali_filament_name && !obj->extrusion_cali_filament_name.empty()) {
                         curr_selection = filament_index;
                     }
 
@@ -671,11 +679,10 @@ wxString ExtrusionCalibration::get_bed_type_incompatible(bool incompatible)
     if (incompatible) {
         m_button_cali->Enable();
         return wxEmptyString;
-    }
-    else {
+    } else {
         m_button_cali->Disable();
-        std::string filament_alias = "";
-        PresetBundle* preset_bundle = wxGetApp().preset_bundle;
+        std::string   filament_alias = "";
+        PresetBundle* preset_bundle  = wxGetApp().preset_bundle;
         if (preset_bundle) {
             for (auto filament_it = preset_bundle->filaments.begin(); filament_it != preset_bundle->filaments.end(); filament_it++) {
                 wxString filament_name = wxString::FromUTF8(filament_it->name);
@@ -703,7 +710,8 @@ void ExtrusionCalibration::Popup()
     wxGetApp().UpdateDlgDarkUI(this);
     ShowModal();
 }
-void ExtrusionCalibration::post_select_event() {
+void ExtrusionCalibration::post_select_event()
+{
     wxCommandEvent event(wxEVT_COMBOBOX);
     event.SetEventObject(m_comboBox_filament);
     wxPostEvent(m_comboBox_filament, event);
@@ -727,7 +735,7 @@ void ExtrusionCalibration::set_step(int step_index)
     Fit();
 }
 
-void ExtrusionCalibration::on_select_filament(wxCommandEvent &evt)
+void ExtrusionCalibration::on_select_filament(wxCommandEvent& evt)
 {
     m_filament_type = "";
     update_filament_info();
@@ -751,7 +759,7 @@ void ExtrusionCalibration::update_filament_info()
     }
 
     PresetBundle* preset_bundle = wxGetApp().preset_bundle;
-    int bed_temp_int = -1;
+    int           bed_temp_int  = -1;
     if (preset_bundle) {
         for (auto filament_it = preset_bundle->filaments.begin(); filament_it != preset_bundle->filaments.end(); filament_it++) {
             wxString filament_name = wxString::FromUTF8(filament_it->name);
@@ -773,7 +781,7 @@ void ExtrusionCalibration::update_filament_info()
                     }
                 }
                 // update bed temperature
-                bed_temp_int = get_bed_temp(&filament_it->config);
+                bed_temp_int           = get_bed_temp(&filament_it->config);
                 wxString bed_temp_text = wxString::Format("%d", bed_temp_int);
                 m_bed_temp->GetTextCtrl()->SetValue(bed_temp_text);
 
@@ -793,7 +801,7 @@ void ExtrusionCalibration::update_filament_info()
 
 int ExtrusionCalibration::get_bed_temp(DynamicPrintConfig* config)
 {
-    BedType curr_bed_type = BedType(m_comboBox_bed_type->GetSelection() + btDefault + 1);
+    BedType                 curr_bed_type     = BedType(m_comboBox_bed_type->GetSelection() + btDefault + 1);
     const ConfigOptionInts* opt_bed_temp_ints = config->option<ConfigOptionInts>(get_bed_temp_key(curr_bed_type));
     if (opt_bed_temp_ints) {
         return opt_bed_temp_ints->get_at(0);
@@ -801,16 +809,10 @@ int ExtrusionCalibration::get_bed_temp(DynamicPrintConfig* config)
     return -1;
 }
 
-void ExtrusionCalibration::on_select_bed_type(wxCommandEvent &evt)
-{
-    update_filament_info();
-}
+void ExtrusionCalibration::on_select_bed_type(wxCommandEvent& evt) { update_filament_info(); }
 
-void ExtrusionCalibration::on_select_nozzle_dia(wxCommandEvent &evt)
-{
-    update_combobox_filaments();
-}
+void ExtrusionCalibration::on_select_nozzle_dia(wxCommandEvent& evt) { update_combobox_filaments(); }
 
-void ExtrusionCalibration::on_dpi_changed(const wxRect &suggested_rect) { this->Refresh(); }
+void ExtrusionCalibration::on_dpi_changed(const wxRect& suggested_rect) { this->Refresh(); }
 
 }} // namespace Slic3r::GUI

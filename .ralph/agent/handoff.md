@@ -2584,3 +2584,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/ExtraRenderers.hpp
 - Next recommended Phase 1 task: T284 src/slic3r/GUI/ExtrusionCalibration.cpp
+
+## Phase 1 - Task T284 complete
+- Task type: annotate
+- File: src/slic3r/GUI/ExtrusionCalibration.cpp
+- Deliverables: src/slic3r/GUI/ExtrusionCalibration.cpp
+- Substantive additions: 5 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Implementation of the two-step manual Pressure Advance (Factor K) calibration wizard.
+- Unity-impact summary:
+  - Pressure Advance wizard maps to a Unity UI Toolkit ModalWindow.
+  - Step-based navigation implemented via VisualElement states.
+  - Real-time progress updates depend on robust PrinterService telemetry sync.
+- Hazards found: 1 (P2: Tight coupling with real-time hardware status)
+- Git: annotate: src/slic3r/GUI/ExtrusionCalibration.cpp
+- Next recommended Phase 1 task: T285 src/slic3r/GUI/ExtrusionCalibration.hpp

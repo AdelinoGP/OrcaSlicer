@@ -95,8 +95,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T281 annotate: src/slic3r/GUI/Event.hpp
 - [x] T282 annotate: src/slic3r/GUI/ExtraRenderers.cpp
 - [x] T283 annotate: src/slic3r/GUI/ExtraRenderers.hpp
-- [~] T284 annotate: src/slic3r/GUI/ExtrusionCalibration.cpp
-- [ ] T285 annotate: src/slic3r/GUI/ExtrusionCalibration.hpp
+- [x] T284 annotate: src/slic3r/GUI/ExtrusionCalibration.cpp
+- [~] T285 annotate: src/slic3r/GUI/ExtrusionCalibration.hpp
 - [ ] T286 annotate: src/slic3r/GUI/Field.cpp
 - [ ] T287 annotate: src/slic3r/GUI/Field.hpp
 - [ ] T288 annotate: src/slic3r/GUI/FilamentBitmapUtils.cpp
