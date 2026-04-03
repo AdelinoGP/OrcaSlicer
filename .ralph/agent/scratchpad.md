@@ -63,5 +63,6 @@
 - Completed T280: src/slic3r/GUI/EncodedFilament.hpp.
 - Completed T281: src/slic3r/GUI/Event.hpp.
 - Completed T282: src/slic3r/GUI/ExtraRenderers.cpp.
-- Next task: T283 src/slic3r/GUI/ExtraRenderers.hpp.
+- Completed T283: src/slic3r/GUI/ExtraRenderers.hpp.
+- Next task: T284 src/slic3r/GUI/ExtrusionCalibration.cpp.
 
