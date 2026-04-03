@@ -2612,3 +2612,18 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/ExtrusionCalibration.hpp
 - Next recommended Phase 1 task: T286 src/slic3r/GUI/Field.cpp
+
+## Phase 1 - Task T286 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Field.cpp
+- Deliverables: src/slic3r/GUI/Field.cpp
+- Substantive additions: 7 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Implementation of the Field widget library for editing configuration options (ints, floats, strings, enums, colors).
+- Unity-impact summary:
+  - Config Field hierarchy maps to a C# component-based UI system.
+  - Subclasses map to Unity UI prefabs (TextField, Dropdown, Swatch).
+  - Validation and conversion logic should be ported to a managed C# service.
+  - Replace legacy control pooling with native Unity object pooling.
+- Hazards found: 1 (P2: Deeply nested validation and formatting logic)
+- Git: annotate: src/slic3r/GUI/Field.cpp
+- Next recommended Phase 1 task: T287 src/slic3r/GUI/Field.hpp

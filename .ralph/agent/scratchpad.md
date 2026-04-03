@@ -66,5 +66,6 @@
 - Completed T283: src/slic3r/GUI/ExtraRenderers.hpp.
 - Completed T284: src/slic3r/GUI/ExtrusionCalibration.cpp.
 - Completed T285: src/slic3r/GUI/ExtrusionCalibration.hpp.
-- Next task: T286 src/slic3r/GUI/Field.cpp.
+- Completed T286: src/slic3r/GUI/Field.cpp.
+- Next task: T287 src/slic3r/GUI/Field.hpp.
 
