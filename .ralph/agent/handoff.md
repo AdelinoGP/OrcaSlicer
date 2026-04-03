@@ -2697,3 +2697,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/FilamentGroupPopup.hpp
 - Next recommended Phase 1 task: T292 src/slic3r/GUI/FilamentMapDialog.cpp
+
+## Phase 1 - Task T292 complete
+- Task type: annotate
+- File: src/slic3r/GUI/FilamentMapDialog.cpp
+- Deliverables: src/slic3r/GUI/FilamentMapDialog.cpp
+- Substantive additions: 6 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Multi-mode dialog for assigning sliced filaments to physical toolheads (left/right).
+- Unity-impact summary:
+  - Filament mapping dialog maps to a Unity UI Toolkit ModalWindow.
+  - Pre-slice validation logic moved to a C# SlicingWorkflowService.
+  - Page-switching navigation implemented via VisualElement states.
+- Hazards found: 1 (P2: Critical slicing engine integration for extruder mapping)
+- Git: annotate: src/slic3r/GUI/FilamentMapDialog.cpp
+- Next recommended Phase 1 task: T293 src/slic3r/GUI/FilamentMapDialog.hpp
