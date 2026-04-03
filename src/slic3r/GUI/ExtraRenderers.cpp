@@ -1,3 +1,10 @@
+// [ANNOTATED]
+// [INTENT] Custom owner-drawn renderers for complex list items (mixed bitmap+text, color selectors).
+// [STATE] Custom data containers (DataViewBitmapText) bundle bitmaps and labels for tabular display.
+// [UNITY] COMPLETELY REDUNDANT. Use Unity UI Toolkit item templates (UXML) and styling (USS) for complex list items.
+// [UNITY] Inline editors map to standard TextField or DropdownField elements within a ListView template.
+// [PORTING_HAZARD:P3] Platform-specific owner-draw hacks (Windows Dark Mode, macOS icon scaling) should be discarded.
+
 #include "ExtraRenderers.hpp"
 #include "wxExtensions.hpp"
 #include "GUI.hpp"
@@ -24,23 +31,22 @@
 using Slic3r::GUI::from_u8;
 using Slic3r::GUI::into_u8;
 
-
 //-----------------------------------------------------------------------------
 // DataViewBitmapText
 //-----------------------------------------------------------------------------
 
 wxIMPLEMENT_DYNAMIC_CLASS(DataViewBitmapText, wxObject)
 
-IMPLEMENT_VARIANT_OBJECT(DataViewBitmapText)
+    IMPLEMENT_VARIANT_OBJECT(DataViewBitmapText)
 
 // ---------------------------------------------------------
 // BitmapTextRenderer
 // ---------------------------------------------------------
 
 #if ENABLE_NONCUSTOM_DATA_VIEW_RENDERING
-BitmapTextRenderer::BitmapTextRenderer(wxDataViewCellMode mode /*= wxDATAVIEW_CELL_EDITABLE*/, 
-                                                 int align /*= wxDVR_DEFAULT_ALIGNMENT*/): 
-wxDataViewRenderer(wxT("PrusaDataViewBitmapText"), mode, align)
+        BitmapTextRenderer::BitmapTextRenderer(wxDataViewCellMode mode /*= wxDATAVIEW_CELL_EDITABLE*/,
+                                               int                align /*= wxDVR_DEFAULT_ALIGNMENT*/)
+    : wxDataViewRenderer(wxT("PrusaDataViewBitmapText"), mode, align)
 {
     SetMode(mode);
     SetAlignment(align);
@@ -50,9 +56,9 @@ wxDataViewRenderer(wxT("PrusaDataViewBitmapText"), mode, align)
 BitmapTextRenderer::~BitmapTextRenderer()
 {
 #ifdef SUPPORTS_MARKUP
-    #ifdef wxHAS_GENERIC_DATAVIEWCTRL
+#ifdef wxHAS_GENERIC_DATAVIEWCTRL
     delete m_markupText;
-    #endif //wxHAS_GENERIC_DATAVIEWCTRL
+#endif // wxHAS_GENERIC_DATAVIEWCTRL
 #endif // SUPPORTS_MARKUP
 }
 
@@ -63,8 +69,7 @@ void BitmapTextRenderer::EnableMarkup(bool enable)
     if (enable) {
         if (!m_markupText)
             m_markupText = new wxItemMarkupText(wxString());
-    }
-    else {
+    } else {
         if (m_markupText) {
             delete m_markupText;
             m_markupText = nullptr;
@@ -72,11 +77,11 @@ void BitmapTextRenderer::EnableMarkup(bool enable)
     }
 #else
     is_markupText = enable;
-#endif //wxHAS_GENERIC_DATAVIEWCTRL
+#endif // wxHAS_GENERIC_DATAVIEWCTRL
 #endif // SUPPORTS_MARKUP
 }
 
-bool BitmapTextRenderer::SetValue(const wxVariant &value)
+bool BitmapTextRenderer::SetValue(const wxVariant& value)
 {
     m_value << value;
 
@@ -84,8 +89,8 @@ bool BitmapTextRenderer::SetValue(const wxVariant &value)
 #ifdef wxHAS_GENERIC_DATAVIEWCTRL
     if (m_markupText)
         m_markupText->SetMarkup(m_value.GetText());
-    /* 
-#else 
+    /*
+#else
 #if defined(__WXGTK__)
    GValue gvalue = G_VALUE_INIT;
     g_value_init(&gvalue, G_TYPE_STRING);
@@ -100,10 +105,7 @@ bool BitmapTextRenderer::SetValue(const wxVariant &value)
     return true;
 }
 
-bool BitmapTextRenderer::GetValue(wxVariant& WXUNUSED(value)) const
-{
-    return false;
-}
+bool BitmapTextRenderer::GetValue(wxVariant& WXUNUSED(value)) const { return false; }
 
 #if ENABLE_NONCUSTOM_DATA_VIEW_RENDERING && wxUSE_ACCESSIBILITY
 wxString BitmapTextRenderer::GetAccessibleDescription() const
@@ -117,13 +119,12 @@ wxString BitmapTextRenderer::GetAccessibleDescription() const
 }
 #endif // wxUSE_ACCESSIBILITY && ENABLE_NONCUSTOM_DATA_VIEW_RENDERING
 
-bool BitmapTextRenderer::Render(wxRect rect, wxDC *dc, int state)
+bool BitmapTextRenderer::Render(wxRect rect, wxDC* dc, int state)
 {
     int xoffset = 0;
 
     const wxBitmap& icon = m_value.GetBitmap();
-    if (icon.IsOk())
-    {
+    if (icon.IsOk()) {
 #ifdef __APPLE__
         wxSize icon_sz = icon.GetScaledSize();
 #else
@@ -134,18 +135,16 @@ bool BitmapTextRenderer::Render(wxRect rect, wxDC *dc, int state)
     }
 
 #if defined(SUPPORTS_MARKUP) && defined(wxHAS_GENERIC_DATAVIEWCTRL)
-    if (m_markupText)
-    {
+    if (m_markupText) {
         rect.x += xoffset;
         m_markupText->Render(GetView(), *dc, rect, 0, GetEllipsizeMode());
-    }
-    else
+    } else
 #endif // SUPPORTS_MARKUP && wxHAS_GENERIC_DATAVIEWCTRL
-#ifdef _WIN32 
+#ifdef _WIN32
         // workaround for Windows DarkMode : Don't respect to the state & wxDATAVIEW_CELL_SELECTED to avoid update of the text color
-        RenderText(m_value.GetText(), xoffset, rect, dc, state & wxDATAVIEW_CELL_SELECTED ? 0 :state);
+        RenderText(m_value.GetText(), xoffset, rect, dc, state & wxDATAVIEW_CELL_SELECTED ? 0 : state);
 #else
-        RenderText(m_value.GetText(), xoffset, rect, dc, state);
+    RenderText(m_value.GetText(), xoffset, rect, dc, state);
 #endif
 
     return true;
@@ -153,14 +152,12 @@ bool BitmapTextRenderer::Render(wxRect rect, wxDC *dc, int state)
 
 wxSize BitmapTextRenderer::GetSize() const
 {
-    if (!m_value.GetText().empty())
-    {
+    if (!m_value.GetText().empty()) {
         wxSize size;
 #if defined(SUPPORTS_MARKUP) && defined(wxHAS_GENERIC_DATAVIEWCTRL)
-        if (m_markupText)
-        {
+        if (m_markupText) {
             wxDataViewCtrl* const view = GetView();
-            wxClientDC dc(view);
+            wxClientDC            dc(view);
             if (GetAttr().HasFont())
                 dc.SetFont(GetAttr().GetEffectiveFont(view->GetFont()));
 
@@ -168,11 +165,10 @@ wxSize BitmapTextRenderer::GetSize() const
 
             int lines = m_value.GetText().Freq('\n') + 1;
             size.SetHeight(size.GetHeight() * lines);
-        }
-        else
+        } else
 #endif // SUPPORTS_MARKUP && wxHAS_GENERIC_DATAVIEWCTRL
         {
-            size = GetTextExtent(m_value.GetText());
+            size   = GetTextExtent(m_value.GetText());
             size.x = size.x * 9 / 8;
         }
 
@@ -182,7 +178,6 @@ wxSize BitmapTextRenderer::GetSize() const
     }
     return wxSize(80, 20);
 }
-
 
 wxWindow* BitmapTextRenderer::CreateEditorCtrl(wxWindow* parent, wxRect labelRect, const wxVariant& value)
 {
@@ -212,8 +207,7 @@ wxWindow* BitmapTextRenderer::CreateEditorCtrl(wxWindow* parent, wxRect labelRec
             }
 #endif // __WXMSW__
 
-    wxTextCtrl* text_editor = new wxTextCtrl(parent, wxID_ANY, data.GetText(),
-                                             position, labelRect.GetSize(), wxTE_PROCESS_ENTER);
+    wxTextCtrl* text_editor = new wxTextCtrl(parent, wxID_ANY, data.GetText(), position, labelRect.GetSize(), wxTE_PROCESS_ENTER);
     text_editor->SetInsertionPointEnd();
     text_editor->SelectAll();
     text_editor->SetBackgroundColour(parent->GetBackgroundColour());
@@ -225,7 +219,7 @@ wxWindow* BitmapTextRenderer::CreateEditorCtrl(wxWindow* parent, wxRect labelRec
 bool BitmapTextRenderer::GetValueFromEditorCtrl(wxWindow* ctrl, wxVariant& value)
 {
     wxTextCtrl* text_editor = wxDynamicCast(ctrl, wxTextCtrl);
-    auto item = GetView()->GetModel()->GetParent(m_item);
+    auto        item        = GetView()->GetModel()->GetParent(m_item);
     if (!text_editor || (item.IsOk() && text_editor->GetValue().IsEmpty()))
         return false;
 
@@ -235,8 +229,8 @@ bool BitmapTextRenderer::GetValueFromEditorCtrl(wxWindow* ctrl, wxVariant& value
 
     // The icon can't be edited so get its old value and reuse it.
     wxVariant valueOld;
-    GetView()->GetModel()->GetValue(valueOld, m_item, /*colName*/0); 
-    
+    GetView()->GetModel()->GetValue(valueOld, m_item, /*colName*/ 0);
+
     DataViewBitmapText bmpText;
     bmpText << valueOld;
 
@@ -257,7 +251,7 @@ bool BitmapChoiceRenderer::SetValue(const wxVariant& value)
     return true;
 }
 
-bool BitmapChoiceRenderer::GetValue(wxVariant& value) const 
+bool BitmapChoiceRenderer::GetValue(wxVariant& value) const
 {
     value << m_value;
     return true;
@@ -265,16 +259,15 @@ bool BitmapChoiceRenderer::GetValue(wxVariant& value) const
 
 bool BitmapChoiceRenderer::Render(wxRect rect, wxDC* dc, int state)
 {
-//    int xoffset = 0;
+    //    int xoffset = 0;
 
     const wxBitmap& icon = m_value.GetBitmap();
-    if (icon.IsOk())
-    {
+    if (icon.IsOk()) {
         dc->DrawBitmap(icon, rect.x, rect.y + (rect.height - icon.GetHeight()) / 2);
-//        xoffset = icon.GetWidth() + 4;
+        //        xoffset = icon.GetWidth() + 4;
 
         if (rect.height == 0)
-          rect.height = icon.GetHeight();
+            rect.height = icon.GetHeight();
     }
 
 #ifdef _WIN32
@@ -289,7 +282,7 @@ bool BitmapChoiceRenderer::Render(wxRect rect, wxDC* dc, int state)
 
 wxSize BitmapChoiceRenderer::GetSize() const
 {
-    wxSize sz;// = GetTextExtent(m_value.GetText());
+    wxSize sz; // = GetTextExtent(m_value.GetText());
 
     if (m_value.GetBitmap().IsOk()) {
         sz.x += m_value.GetBitmap().GetWidth() + 4;
@@ -298,7 +291,6 @@ wxSize BitmapChoiceRenderer::GetSize() const
 
     return sz;
 }
-
 
 wxWindow* BitmapChoiceRenderer::CreateEditorCtrl(wxWindow* parent, wxRect labelRect, const wxVariant& value)
 {
@@ -312,16 +304,15 @@ wxWindow* BitmapChoiceRenderer::CreateEditorCtrl(wxWindow* parent, wxRect labelR
     DataViewBitmapText data;
     data << value;
 
-    ::ComboBox *c_editor = new ::ComboBox(parent, wxID_ANY, wxEmptyString,
-        labelRect.GetTopLeft(), wxSize(labelRect.GetWidth(), -1),
-        0, nullptr, wxCB_READONLY | CB_NO_DROP_ICON | CB_NO_TEXT);
+    ::ComboBox* c_editor = new ::ComboBox(parent, wxID_ANY, wxEmptyString, labelRect.GetTopLeft(), wxSize(labelRect.GetWidth(), -1), 0,
+                                          nullptr, wxCB_READONLY | CB_NO_DROP_ICON | CB_NO_TEXT);
     c_editor->GetDropDown().SetUseContentWidth(true);
 
     if (has_default_extruder && has_default_extruder())
         c_editor->Append(_L("default"), *get_default_extruder_color_icon());
 
     for (size_t i = 0; i < icons.size(); i++)
-        c_editor->Append(wxString::Format("%d", i+1), *icons[i]);
+        c_editor->Append(wxString::Format("%d", i + 1), *icons[i]);
 
     if (has_default_extruder && has_default_extruder())
         c_editor->SetSelection(atoi(data.GetText().c_str()));
@@ -346,11 +337,11 @@ wxWindow* BitmapChoiceRenderer::CreateEditorCtrl(wxWindow* parent, wxRect labelR
 
 bool BitmapChoiceRenderer::GetValueFromEditorCtrl(wxWindow* ctrl, wxVariant& value)
 {
-    ::ComboBox*c         = static_cast<::ComboBox *>(ctrl);
-    int selection = c->GetSelection();
+    ::ComboBox* c         = static_cast<::ComboBox*>(ctrl);
+    int         selection = c->GetSelection();
     if (selection < 0)
         return false;
-   
+
     DataViewBitmapText bmpText;
 
     bmpText.SetText(c->GetString(selection));
@@ -370,10 +361,7 @@ bool TextRenderer::SetValue(const wxVariant& value)
     return true;
 }
 
-bool TextRenderer::GetValue(wxVariant& value) const
-{
-    return false;
-}
+bool TextRenderer::GetValue(wxVariant& value) const { return false; }
 
 bool TextRenderer::Render(wxRect rect, wxDC* dc, int state)
 {
@@ -387,9 +375,4 @@ bool TextRenderer::Render(wxRect rect, wxDC* dc, int state)
     return true;
 }
 
-wxSize TextRenderer::GetSize() const
-{
-    return GetTextExtent(m_value);
-}
-
-
+wxSize TextRenderer::GetSize() const { return GetTextExtent(m_value); }

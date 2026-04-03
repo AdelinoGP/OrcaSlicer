@@ -93,8 +93,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T279 annotate: src/slic3r/GUI/EncodedFilament.cpp
 - [x] T280 annotate: src/slic3r/GUI/EncodedFilament.hpp
 - [x] T281 annotate: src/slic3r/GUI/Event.hpp
-- [~] T282 annotate: src/slic3r/GUI/ExtraRenderers.cpp
-- [ ] T283 annotate: src/slic3r/GUI/ExtraRenderers.hpp
+- [x] T282 annotate: src/slic3r/GUI/ExtraRenderers.cpp
+- [~] T283 annotate: src/slic3r/GUI/ExtraRenderers.hpp
 - [ ] T284 annotate: src/slic3r/GUI/ExtrusionCalibration.cpp
 - [ ] T285 annotate: src/slic3r/GUI/ExtrusionCalibration.hpp
 - [ ] T286 annotate: src/slic3r/GUI/Field.cpp

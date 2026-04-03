@@ -62,5 +62,6 @@
 - Completed T279: src/slic3r/GUI/EncodedFilament.cpp.
 - Completed T280: src/slic3r/GUI/EncodedFilament.hpp.
 - Completed T281: src/slic3r/GUI/Event.hpp.
-- Next task: T282 src/slic3r/GUI/ExtraRenderers.cpp.
+- Completed T282: src/slic3r/GUI/ExtraRenderers.cpp.
+- Next task: T283 src/slic3r/GUI/ExtraRenderers.hpp.
 
