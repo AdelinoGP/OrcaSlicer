@@ -2655,3 +2655,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Visual consistency requirement for procedural icons)
 - Git: annotate: src/slic3r/GUI/FilamentBitmapUtils.cpp
 - Next recommended Phase 1 task: T289 src/slic3r/GUI/FilamentBitmapUtils.hpp
+
+## Phase 1 - Task T289 complete
+- Task type: annotate
+- File: src/slic3r/GUI/FilamentBitmapUtils.hpp
+- Deliverables: src/slic3r/GUI/FilamentBitmapUtils.hpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Public interface for the procedural filament icon generation service.
+- Unity-impact summary:
+  - Header declares the public interface for the procedural icon service.
+  - Returns Texture2D instead of wxBitmap.
+  - Rendering modes map to a C# enum for use in the icon generator.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/FilamentBitmapUtils.hpp
+- Next recommended Phase 1 task: T290 src/slic3r/GUI/FilamentGroupPopup.cpp
