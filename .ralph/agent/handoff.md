@@ -2499,3 +2499,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: Complex dynamic placeholder discovery logic)
 - Git: annotate: src/slic3r/GUI/EditGCodeDialog.cpp
 - Next recommended Phase 1 task: T278 src/slic3r/GUI/EditGCodeDialog.hpp
+
+## Phase 1 - Task T278 complete
+- Task type: annotate
+- File: src/slic3r/GUI/EditGCodeDialog.hpp
+- Deliverables: src/slic3r/GUI/EditGCodeDialog.hpp
+- Substantive additions: 5 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Declarations for the G-code editor dialog and its hierarchical placeholder data model.
+- Unity-impact summary:
+  - Header declares the public interface for the custom G-code editor.
+  - Hierarchical placeholder model replaced by a standard C# collection for a TreeView.
+  - Platform-specific rendering workarounds for icons are redundant in Unity.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/EditGCodeDialog.hpp
+- Next recommended Phase 1 task: T279 src/slic3r/GUI/EncodedFilament.cpp

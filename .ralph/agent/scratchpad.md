@@ -58,5 +58,6 @@
 - Completed T275: src/slic3r/GUI/DragDropPanel.cpp.
 - Completed T276: src/slic3r/GUI/DragDropPanel.hpp.
 - Completed T277: src/slic3r/GUI/EditGCodeDialog.cpp.
-- Next task: T278 src/slic3r/GUI/EditGCodeDialog.hpp.
+- Completed T278: src/slic3r/GUI/EditGCodeDialog.hpp.
+- Next task: T279 src/slic3r/GUI/EncodedFilament.cpp.
 

@@ -89,8 +89,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T275 annotate: src/slic3r/GUI/DragDropPanel.cpp
 - [x] T276 annotate: src/slic3r/GUI/DragDropPanel.hpp
 - [x] T277 annotate: src/slic3r/GUI/EditGCodeDialog.cpp
-- [~] T278 annotate: src/slic3r/GUI/EditGCodeDialog.hpp
-- [ ] T279 annotate: src/slic3r/GUI/EncodedFilament.cpp
+- [x] T278 annotate: src/slic3r/GUI/EditGCodeDialog.hpp
+- [~] T279 annotate: src/slic3r/GUI/EncodedFilament.cpp
 - [ ] T280 annotate: src/slic3r/GUI/EncodedFilament.hpp
 - [ ] T281 annotate: src/slic3r/GUI/Event.hpp
 - [ ] T282 annotate: src/slic3r/GUI/ExtraRenderers.cpp
