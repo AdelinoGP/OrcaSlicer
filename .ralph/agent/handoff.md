@@ -2783,6 +2783,20 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Git: annotate: src/slic3r/GUI/FilamentPickerDialog.hpp
 - Next recommended Phase 1 task: T298 src/slic3r/GUI/FileArchiveDialog.cpp
 
+## Phase 1 - Task T298 complete
+- Task type: annotate
+- File: src/slic3r/GUI/FileArchiveDialog.cpp
+- Deliverables: src/slic3r/GUI/FileArchiveDialog.cpp
+- Substantive additions: 6 ([INTENT], [STATE], [EVENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Modal dialog for selective file import from a compressed ZIP archive.
+- Unity-impact summary:
+  - Archive browser maps to a Unity UI Toolkit ModalWindow.
+  - Hierarchical file model replaced by a TreeView bound to a C# ZipArchive wrapper.
+  - miniz-based ZIP traversal replaced by standard .NET System.IO.Compression.
+- Hazards found: 1 (P2: Recursive folder reconciliation logic for ZIP structures)
+- Git: annotate: src/slic3r/GUI/FileArchiveDialog.cpp
+- Next recommended Phase 1 task: T299 src/slic3r/GUI/FileArchiveDialog.hpp
+
 ## Phase 1 checkpoint
 - Files newly accounted for in this batch: 70
 - Cumulative annotated: 129

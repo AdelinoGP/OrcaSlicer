@@ -1,3 +1,11 @@
+// [ANNOTATED]
+// [INTENT] Modal dialog for selective file import from a compressed ZIP archive.
+// [STATE] Hierarchical file-system model (ArchiveViewModel) mirrors the ZIP structure and tracks user selection toggles.
+// [EVENT] Bulk selection actions (All/None) and import confirmation logic.
+// [UNITY] Map to a Unity UI Toolkit ModalWindow with a TreeView bound to a C# ZipArchive model.
+// [UNITY] Replace miniz-based ZIP traversal with standard .NET System.IO.Compression.
+// [PORTING_HAZARD:P2] Recursive folder reconciliation logic (adjust_stack) must be mirrored to accurately reflect nested ZIP structures.
+
 #include "FileArchiveDialog.hpp"
 
 #include "I18N.hpp"
@@ -10,23 +18,19 @@
 #include <boost/log/trivial.hpp>
 #include <boost/nowide/convert.hpp>
 
-namespace Slic3r {
-namespace GUI {
+namespace Slic3r { namespace GUI {
 
-#define BTN_SIZE                wxSize(FromDIP(58), FromDIP(24))
-#define BTN_GAP                 FromDIP(20)
+#define BTN_SIZE wxSize(FromDIP(58), FromDIP(24))
+#define BTN_GAP FromDIP(20)
 
-ArchiveViewModel::ArchiveViewModel(wxWindow* parent)
-    :m_parent(parent)
-{}
-ArchiveViewModel::~ArchiveViewModel()
-{}
+ArchiveViewModel::ArchiveViewModel(wxWindow* parent) : m_parent(parent) {}
+ArchiveViewModel::~ArchiveViewModel() {}
 
-std::shared_ptr<ArchiveViewNode> ArchiveViewModel::AddFile(std::shared_ptr<ArchiveViewNode> parent, const wxString& name,  bool container)
+std::shared_ptr<ArchiveViewNode> ArchiveViewModel::AddFile(std::shared_ptr<ArchiveViewNode> parent, const wxString& name, bool container)
 {
     std::shared_ptr<ArchiveViewNode> node = std::make_shared<ArchiveViewNode>(ArchiveViewNode(name));
     node->set_container(container);
-    
+
     if (parent.get() != nullptr) {
         parent->get_children().push_back(node);
         node->set_parent(parent);
@@ -34,21 +38,21 @@ std::shared_ptr<ArchiveViewNode> ArchiveViewModel::AddFile(std::shared_ptr<Archi
     } else {
         m_top_children.emplace_back(node);
     }
-     
-    wxDataViewItem child = wxDataViewItem((void*)node.get());
-    wxDataViewItem parent_item= wxDataViewItem((void*)parent.get());
+
+    wxDataViewItem child       = wxDataViewItem((void*) node.get());
+    wxDataViewItem parent_item = wxDataViewItem((void*) parent.get());
     ItemAdded(parent_item, child);
-    
+
     if (parent)
         m_ctrl->Expand(parent_item);
     return node;
 }
 
-wxString ArchiveViewModel::GetColumnType(unsigned int col) const 
+wxString ArchiveViewModel::GetColumnType(unsigned int col) const
 {
     if (col == 0)
         return "bool";
-    return "string";//"DataViewBitmapText";
+    return "string"; //"DataViewBitmapText";
 }
 
 void ArchiveViewModel::Rescale()
@@ -56,44 +60,41 @@ void ArchiveViewModel::Rescale()
     // There should be no pictures rendered
 }
 
-void  ArchiveViewModel::Delete(const wxDataViewItem& item)
+void ArchiveViewModel::Delete(const wxDataViewItem& item)
 {
     assert(item.IsOk());
     ArchiveViewNode* node = static_cast<ArchiveViewNode*>(item.GetID());
     assert(node->get_parent() != nullptr);
-    for (std::shared_ptr<ArchiveViewNode> child : node->get_children())
-    {
-        Delete(wxDataViewItem((void*)child.get()));
+    for (std::shared_ptr<ArchiveViewNode> child : node->get_children()) {
+        Delete(wxDataViewItem((void*) child.get()));
     }
-    delete [] node;
+    delete[] node;
 }
-void  ArchiveViewModel::Clear()
-{
-}
+void ArchiveViewModel::Clear() {}
 
-wxDataViewItem ArchiveViewModel::GetParent(const wxDataViewItem& item) const 
+wxDataViewItem ArchiveViewModel::GetParent(const wxDataViewItem& item) const
 {
     assert(item.IsOk());
     ArchiveViewNode* node = static_cast<ArchiveViewNode*>(item.GetID());
-    return wxDataViewItem((void*)node->get_parent().get());
+    return wxDataViewItem((void*) node->get_parent().get());
 }
 unsigned int ArchiveViewModel::GetChildren(const wxDataViewItem& parent, wxDataViewItemArray& array) const
 {
     if (!parent.IsOk()) {
-        for (std::shared_ptr<ArchiveViewNode>child : m_top_children) {
-            array.push_back(wxDataViewItem((void*)child.get()));
+        for (std::shared_ptr<ArchiveViewNode> child : m_top_children) {
+            array.push_back(wxDataViewItem((void*) child.get()));
         }
         return m_top_children.size();
     }
-       
+
     ArchiveViewNode* node = static_cast<ArchiveViewNode*>(parent.GetID());
     for (std::shared_ptr<ArchiveViewNode> child : node->get_children()) {
-        array.push_back(wxDataViewItem((void*)child.get()));
+        array.push_back(wxDataViewItem((void*) child.get()));
     }
     return node->get_children().size();
 }
 
-void ArchiveViewModel::GetValue(wxVariant& variant, const wxDataViewItem& item, unsigned int col) const 
+void ArchiveViewModel::GetValue(wxVariant& variant, const wxDataViewItem& item, unsigned int col) const
 {
     assert(item.IsOk());
     ArchiveViewNode* node = static_cast<ArchiveViewNode*>(item.GetID());
@@ -110,10 +111,10 @@ void ArchiveViewModel::untoggle_folders(const wxDataViewItem& item)
     ArchiveViewNode* node = static_cast<ArchiveViewNode*>(item.GetID());
     node->set_toggle(false);
     if (node->get_parent().get() != nullptr)
-        untoggle_folders(wxDataViewItem((void*)node->get_parent().get()));
+        untoggle_folders(wxDataViewItem((void*) node->get_parent().get()));
 }
 
-bool ArchiveViewModel::SetValue(const wxVariant& variant, const wxDataViewItem& item, unsigned int col) 
+bool ArchiveViewModel::SetValue(const wxVariant& variant, const wxDataViewItem& item, unsigned int col)
 {
     assert(item.IsOk());
     ArchiveViewNode* node = static_cast<ArchiveViewNode*>(item.GetID());
@@ -121,38 +122,42 @@ bool ArchiveViewModel::SetValue(const wxVariant& variant, const wxDataViewItem& 
         node->set_toggle(variant.GetBool());
         // if folder recursivelly check all children
         for (std::shared_ptr<ArchiveViewNode> child : node->get_children()) {
-            SetValue(variant, wxDataViewItem((void*)child.get()), col);
+            SetValue(variant, wxDataViewItem((void*) child.get()), col);
         }
-        if(!variant.GetBool() && node->get_parent())
-            untoggle_folders(wxDataViewItem((void*)node->get_parent().get()));
+        if (!variant.GetBool() && node->get_parent())
+            untoggle_folders(wxDataViewItem((void*) node->get_parent().get()));
     } else {
         node->set_name(variant.GetString());
     }
     m_parent->Refresh();
     return true;
 }
-bool ArchiveViewModel::IsEnabled(const wxDataViewItem& item, unsigned int col) const 
+bool ArchiveViewModel::IsEnabled(const wxDataViewItem& item, unsigned int col) const
 {
     // As of now, all items are always enabled.
     // Returning false for col 1 would gray out text.
     return true;
 }
 
-bool ArchiveViewModel::IsContainer(const wxDataViewItem& item) const 
+bool ArchiveViewModel::IsContainer(const wxDataViewItem& item) const
 {
-    if(!item.IsOk())
+    if (!item.IsOk())
         return true;
     ArchiveViewNode* node = static_cast<ArchiveViewNode*>(item.GetID());
     return node->is_container();
 }
 
 ArchiveViewCtrl::ArchiveViewCtrl(wxWindow* parent, wxSize size)
-    : wxDataViewCtrl(parent, wxID_ANY, wxDefaultPosition, size, wxDV_VARIABLE_LINE_HEIGHT | wxDV_ROW_LINES
+    : wxDataViewCtrl(parent,
+                     wxID_ANY,
+                     wxDefaultPosition,
+                     size,
+                     wxDV_VARIABLE_LINE_HEIGHT | wxDV_ROW_LINES
 #ifdef _WIN32
-        | wxBORDER_SIMPLE
+                         | wxBORDER_SIMPLE
 #endif
-    )
-    //, m_em_unit(em_unit(parent))
+      )
+//, m_em_unit(em_unit(parent))
 {
     wxGetApp().UpdateDVCDarkUI(this);
 
@@ -169,11 +174,16 @@ ArchiveViewCtrl::~ArchiveViewCtrl()
     }
 }
 
-FileArchiveDialog::FileArchiveDialog(wxWindow* parent_window, mz_zip_archive* archive, std::vector<std::pair<boost::filesystem::path, size_t>>& selected_paths_w_size)
-    : DPIDialog(parent_window, wxID_ANY, _(L("Archive preview")), wxDefaultPosition,
-        wxSize(45 * wxGetApp().em_unit(), 40 * wxGetApp().em_unit()),
-        wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER | wxMAXIMIZE_BOX)
-    , m_selected_paths_w_size (selected_paths_w_size)
+FileArchiveDialog::FileArchiveDialog(wxWindow*                                                parent_window,
+                                     mz_zip_archive*                                          archive,
+                                     std::vector<std::pair<boost::filesystem::path, size_t>>& selected_paths_w_size)
+    : DPIDialog(parent_window,
+                wxID_ANY,
+                _(L("Archive preview")),
+                wxDefaultPosition,
+                wxSize(45 * wxGetApp().em_unit(), 40 * wxGetApp().em_unit()),
+                wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER | wxMAXIMIZE_BOX)
+    , m_selected_paths_w_size(selected_paths_w_size)
 {
 #ifdef _WIN32
     SetBackgroundColour(*wxWHITE);
@@ -187,49 +197,52 @@ FileArchiveDialog::FileArchiveDialog(wxWindow* parent_window, mz_zip_archive* ar
 
     wxBoxSizer* topSizer = new wxBoxSizer(wxVERTICAL);
 
-    m_avc = new ArchiveViewCtrl(this, wxSize(45 * em, 30 * em));
-    wxDataViewColumn*  toggle_column = m_avc->AppendToggleColumn(L"\u2714", 0, wxDATAVIEW_CELL_ACTIVATABLE, 6 * em);
+    m_avc                           = new ArchiveViewCtrl(this, wxSize(45 * em, 30 * em));
+    wxDataViewColumn* toggle_column = m_avc->AppendToggleColumn(L"\u2714", 0, wxDATAVIEW_CELL_ACTIVATABLE, 6 * em);
     m_avc->AppendTextColumn("filename", 1);
-    
+
     std::vector<std::shared_ptr<ArchiveViewNode>> stack;
 
-    std::function<void(std::vector<std::shared_ptr<ArchiveViewNode> >&, size_t)> reduce_stack = [] (std::vector<std::shared_ptr<ArchiveViewNode>>& stack, size_t size) {
-        if (size == 0) {
-            stack.clear();
-            return;
-        }
-        while (stack.size() > size)
-            stack.pop_back();
-    };
+    std::function<void(std::vector<std::shared_ptr<ArchiveViewNode>>&, size_t)> reduce_stack =
+        [](std::vector<std::shared_ptr<ArchiveViewNode>>& stack, size_t size) {
+            if (size == 0) {
+                stack.clear();
+                return;
+            }
+            while (stack.size() > size)
+                stack.pop_back();
+        };
     // recursively stores whole structure of file onto function stack and synchoronize with stack object.
-    std::function<size_t(const boost::filesystem::path&, std::vector<std::shared_ptr<ArchiveViewNode>>&)> adjust_stack = [&adjust_stack, &reduce_stack, &avc = m_avc](const boost::filesystem::path& const_file, std::vector<std::shared_ptr<ArchiveViewNode>>& stack)->size_t {
+    std::function<size_t(const boost::filesystem::path&, std::vector<std::shared_ptr<ArchiveViewNode>>&)> adjust_stack =
+        [&adjust_stack, &reduce_stack, &avc = m_avc](const boost::filesystem::path&                 const_file,
+                                                     std::vector<std::shared_ptr<ArchiveViewNode>>& stack) -> size_t {
         boost::filesystem::path file(const_file);
-        size_t struct_size = file.has_parent_path() ? adjust_stack(file.parent_path(), stack) : 0;
+        size_t                  struct_size = file.has_parent_path() ? adjust_stack(file.parent_path(), stack) : 0;
 
-        if (stack.size() > struct_size && (file.has_extension() || file.filename().string() != stack[struct_size]->get_name()))
-        {
+        if (stack.size() > struct_size && (file.has_extension() || file.filename().string() != stack[struct_size]->get_name())) {
             reduce_stack(stack, struct_size);
         }
         if (!file.has_extension() && stack.size() == struct_size)
-            stack.push_back(avc->get_model()->AddFile((stack.empty() ? std::shared_ptr<ArchiveViewNode>(nullptr) : stack.back()), boost::nowide::widen(file.filename().string()), true)); // filename string to wstring?
+            stack.push_back(avc->get_model()->AddFile((stack.empty() ? std::shared_ptr<ArchiveViewNode>(nullptr) : stack.back()),
+                                                      boost::nowide::widen(file.filename().string()), true)); // filename string to wstring?
         return struct_size + 1;
     };
 
-    const std::regex pattern_drop(".*[.](stl|obj|amf|3mf|step|stp)", std::regex::icase);
-    mz_uint num_entries = mz_zip_reader_get_num_files(archive);
-    mz_zip_archive_file_stat stat;
+    const std::regex                                        pattern_drop(".*[.](stl|obj|amf|3mf|step|stp)", std::regex::icase);
+    mz_uint                                                 num_entries = mz_zip_reader_get_num_files(archive);
+    mz_zip_archive_file_stat                                stat;
     std::vector<std::pair<boost::filesystem::path, size_t>> filtered_entries; // second is unzipped size
     for (mz_uint i = 0; i < num_entries; ++i) {
         if (mz_zip_reader_file_stat(archive, i, &stat)) {
-            std::string extra(1024, 0);
+            std::string             extra(1024, 0);
             boost::filesystem::path path;
-            size_t extra_size = mz_zip_reader_get_filename_from_extra(archive, i, extra.data(), extra.size());
+            size_t                  extra_size = mz_zip_reader_get_filename_from_extra(archive, i, extra.data(), extra.size());
             if (extra_size > 0) {
                 path = boost::filesystem::path(extra.substr(0, extra_size));
             } else {
-                wxString wname = boost::nowide::widen(stat.m_filename);
-                std::string name = into_u8(wname);
-                path = boost::filesystem::path(name);
+                wxString    wname = boost::nowide::widen(stat.m_filename);
+                std::string name  = into_u8(wname);
+                path              = boost::filesystem::path(name);
             }
             assert(!path.empty());
             if (!path.has_extension())
@@ -241,20 +254,23 @@ FileArchiveDialog::FileArchiveDialog(wxWindow* parent_window, mz_zip_archive* ar
         }
     }
     // sorting files will help adjust_stack function to not create multiple same folders
-    std::sort(filtered_entries.begin(), filtered_entries.end(), [](const std::pair<boost::filesystem::path, size_t>& p1, const std::pair<boost::filesystem::path, size_t>& p2){ return p1.first.string() < p2.first.string(); });
+    std::sort(filtered_entries.begin(), filtered_entries.end(),
+              [](const std::pair<boost::filesystem::path, size_t>& p1, const std::pair<boost::filesystem::path, size_t>& p2) {
+                  return p1.first.string() < p2.first.string();
+              });
     size_t entry_count = 0;
-    size_t depth = 1;
-    for (const auto& entry : filtered_entries)
-    {
-        const boost::filesystem::path& path = entry.first;
+    size_t depth       = 1;
+    for (const auto& entry : filtered_entries) {
+        const boost::filesystem::path&   path = entry.first;
         std::shared_ptr<ArchiveViewNode> parent(nullptr);
 
         depth = std::max(depth, adjust_stack(path, stack));
         if (!stack.empty())
             parent = stack.back();
-        if (std::regex_match(path.extension().string(), pattern_drop)) { // this leaves out non-compatible files 
-            std::shared_ptr<ArchiveViewNode> new_node = m_avc->get_model()->AddFile(parent, boost::nowide::widen(path.filename().string()), false);
-            new_node->set_fullpath(/*std::move(path)*/path); // filename string to wstring?
+        if (std::regex_match(path.extension().string(), pattern_drop)) { // this leaves out non-compatible files
+            std::shared_ptr<ArchiveViewNode> new_node = m_avc->get_model()->AddFile(parent, boost::nowide::widen(path.filename().string()),
+                                                                                    false);
+            new_node->set_fullpath(/*std::move(path)*/ path); // filename string to wstring?
             new_node->set_size(entry.second);
             entry_count++;
         }
@@ -287,7 +303,7 @@ void FileArchiveDialog::on_dpi_changed(const wxRect& suggested_rect)
 
     const wxSize& size = wxSize(45 * em, 40 * em);
     SetSize(size);
-    //m_tree->Rescale(em);
+    // m_tree->Rescale(em);
 
     Fit();
     Refresh();
@@ -297,21 +313,20 @@ void FileArchiveDialog::on_open_button()
 {
     wxDataViewItemArray top_items;
     m_avc->get_model()->GetChildren(wxDataViewItem(nullptr), top_items);
-    
-    std::function<void(ArchiveViewNode*)> deep_fill = [&paths = m_selected_paths_w_size, &deep_fill](ArchiveViewNode* node){
+
+    std::function<void(ArchiveViewNode*)> deep_fill = [&paths = m_selected_paths_w_size, &deep_fill](ArchiveViewNode* node) {
         if (node == nullptr)
             return;
         if (node->get_children().empty()) {
-            if (node->get_toggle()) 
+            if (node->get_toggle())
                 paths.emplace_back(node->get_fullpath(), node->get_size());
-        } else { 
+        } else {
             for (std::shared_ptr<ArchiveViewNode> child : node->get_children())
                 deep_fill(child.get());
         }
     };
 
-    for (const auto& item : top_items)
-    {
+    for (const auto& item : top_items) {
         ArchiveViewNode* node = static_cast<ArchiveViewNode*>(item.GetID());
         deep_fill(node);
     }
@@ -320,7 +335,6 @@ void FileArchiveDialog::on_open_button()
 
 void FileArchiveDialog::on_all_button()
 {
-    
     wxDataViewItemArray top_items;
     m_avc->get_model()->GetChildren(wxDataViewItem(nullptr), top_items);
 
@@ -334,12 +348,11 @@ void FileArchiveDialog::on_all_button()
         }
     };
 
-    for (const auto& item : top_items)
-    {
+    for (const auto& item : top_items) {
         ArchiveViewNode* node = static_cast<ArchiveViewNode*>(item.GetID());
         deep_fill(node);
         // Fix for linux, where Refresh or Update wont help to redraw toggle checkboxes.
-        // It should be enough to call ValueChanged for top items. 
+        // It should be enough to call ValueChanged for top items.
         m_avc->get_model()->ValueChanged(item, 0);
     }
 
@@ -361,19 +374,18 @@ void FileArchiveDialog::on_none_button()
         }
     };
 
-    for (const auto& item : top_items)
-    {
+    for (const auto& item : top_items) {
         ArchiveViewNode* node = static_cast<ArchiveViewNode*>(item.GetID());
         deep_fill(node);
         // Fix for linux, where Refresh or Update wont help to redraw toggle checkboxes.
-        // It should be enough to call ValueChanged for top items. 
+        // It should be enough to call ValueChanged for top items.
         m_avc->get_model()->ValueChanged(item, 0);
     }
 
     this->Refresh();
 }
 
-//Orca: Apply buttons style
+// Orca: Apply buttons style
 wxBoxSizer* FileArchiveDialog::create_btn_sizer()
 {
     auto btn_sizer = new wxBoxSizer(wxHORIZONTAL);
@@ -410,5 +422,4 @@ wxBoxSizer* FileArchiveDialog::create_btn_sizer()
     return btn_sizer;
 }
 
-} // namespace GUI
-} // namespace Slic3r
+}} // namespace Slic3r::GUI
