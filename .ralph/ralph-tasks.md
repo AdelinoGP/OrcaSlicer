@@ -106,8 +106,8 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T292 annotate: src/slic3r/GUI/FilamentMapDialog.cpp
 - [x] T293 annotate: src/slic3r/GUI/FilamentMapDialog.hpp
 - [x] T294 annotate: src/slic3r/GUI/FilamentMapPanel.cpp
-- [~] T295 annotate: src/slic3r/GUI/FilamentMapPanel.hpp
-- [ ] T296 annotate: src/slic3r/GUI/FilamentPickerDialog.cpp
+- [x] T295 annotate: src/slic3r/GUI/FilamentMapPanel.hpp
+- [~] T296 annotate: src/slic3r/GUI/FilamentPickerDialog.cpp
 - [ ] T297 annotate: src/slic3r/GUI/FilamentPickerDialog.hpp
 - [ ] T298 annotate: src/slic3r/GUI/FileArchiveDialog.cpp
 - [ ] T299 annotate: src/slic3r/GUI/FileArchiveDialog.hpp

@@ -2739,3 +2739,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: none
 - Git: annotate: src/slic3r/GUI/FilamentMapPanel.cpp
 - Next recommended Phase 1 task: T295 src/slic3r/GUI/FilamentMapPanel.hpp
+
+## Phase 1 - Task T295 complete
+- Task type: annotate
+- File: src/slic3r/GUI/FilamentMapPanel.hpp
+- Deliverables: src/slic3r/GUI/FilamentMapPanel.hpp
+- Substantive additions: 4 ([INTENT], [STATE], [UNITY] tags)
+- Verification excerpt: // [INTENT] Declarations for sub-panels used in the multi-mode filament mapping UI.
+- Unity-impact summary:
+  - Header declares the interfaces for specialized extruder mapping panels.
+  - Sub-panels map to VisualElement views in Unity UI Toolkit.
+  - Custom button panels map to styled Unity UI Button prefabs.
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/FilamentMapPanel.hpp
+- Next recommended Phase 1 task: T296 src/slic3r/GUI/FilamentPickerDialog.cpp
