@@ -2811,6 +2811,19 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Git: annotate: src/slic3r/GUI/FileArchiveDialog.hpp
 - Next recommended Phase 1 task: T300 src/slic3r/GUI/format.hpp
 
+## Phase 1 - Task T300 complete
+- Task type: annotate
+- File: src/slic3r/GUI/format.hpp
+- Deliverables: src/slic3r/GUI/format.hpp
+- Substantive additions: 4 ([INTENT], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Type-safe string formatting wrappers for mixing std::string and wxString with boost::format.
+- Unity-impact summary:
+  - Completely redundant in Unity.
+  - Custom formatters replaced by C# interpolated strings and string.Format().
+- Hazards found: none
+- Git: annotate: src/slic3r/GUI/format.hpp
+- Next recommended Phase 1 task: T301 src/slic3r/GUI/GCodeViewer.cpp
+
 ## Phase 1 checkpoint
 - Files newly accounted for in this batch: 70
 - Cumulative annotated: 129
