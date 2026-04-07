@@ -2930,5 +2930,5 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
   - Unity should map this to a panel overlay plus a mode-switch controller.
   - The assembly input window remains an immediate-mode UI flow that needs a retained rewrite.
 - Hazards found: 1 (P2: immediate-mode overlay logic coupled to mode switching and selection state)
-- Git: pending commit
+- Git: bd47ecaed4 (record T307 assembly gizmo)
 - Next recommended Phase 1 task: T308 src/slic3r/GUI/Gizmos/GLGizmoAssembly.hpp
