@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-04-02T15:15:00Z
+Last updated: 2026-04-07T00:00:00Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -115,7 +115,7 @@ Last updated: 2026-04-02T15:15:00Z
 - [x] T301 annotate: src/slic3r/GUI/GCodeViewer.cpp
 - [x] T302 annotate: src/slic3r/GUI/GCodeViewer.hpp
 - [x] T303 annotate: src/slic3r/GUI/Gizmos/GizmoObjectManipulation.cpp
-- [~] T304 annotate: src/slic3r/GUI/Gizmos/GizmoObjectManipulation.hpp
+- [x] T304 annotate: src/slic3r/GUI/Gizmos/GizmoObjectManipulation.hpp
 - [ ] T305 annotate: src/slic3r/GUI/Gizmos/GLGizmoAdvancedCut.cpp
 - [ ] T306 annotate: src/slic3r/GUI/Gizmos/GLGizmoAdvancedCut.hpp
 - [ ] T307 annotate: src/slic3r/GUI/Gizmos/GLGizmoAssembly.cpp

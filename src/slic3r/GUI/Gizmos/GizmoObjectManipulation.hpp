@@ -1,3 +1,10 @@
+// [ANNOTATED]
+// [INTENT] Declaration of the object manipulation HUD controller for move, rotate, and scale operations.
+// [STATE] Managed state for selection-driven transformation data, coordinate systems, and unit preferences.
+// [STATE] Cache structure preserves rounded values to minimize redundant UI refreshes.
+// [UNITY] Map to a Unity MonoBehaviour controller managing a persistent HUD (VisualElement or Canvas).
+// [PORTING_HAZARD:P2] Complex state synchronization between 3D selection and multiple numeric input fields.
+
 #ifndef slic3r_GizmoObjectManipulation_hpp_
 #define slic3r_GizmoObjectManipulation_hpp_
 

@@ -2876,3 +2876,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Manifest total: 724
 - Remaining: 587
 - Status: CONTINUING
+
+## Phase 1 - Task T304 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GizmoObjectManipulation.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GizmoObjectManipulation.hpp
+- Substantive additions: 6 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Declaration of the object manipulation HUD controller for move, rotate, and scale operations.
+- Unity-impact summary:
+  - Header defines the stateful HUD controller boundary for object transforms.
+  - Unity port maps to a persistent MonoBehaviour/UI overlay with cached selection state.
+  - Coordinate-system and buffered-transform state should be moved into a managed view-model.
+- Hazards found: 1 (P2: synchronization between 3D selection and multiple numeric inputs)
+- Git: pending commit
+- Next recommended Phase 1 task: T305 src/slic3r/GUI/Gizmos/GLGizmoAdvancedCut.cpp
