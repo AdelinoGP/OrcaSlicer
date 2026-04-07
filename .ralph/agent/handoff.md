@@ -2890,3 +2890,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: synchronization between 3D selection and multiple numeric inputs)
 - Git: f65c85fbdb (annotate gizmo object manipulation header)
 - Next recommended Phase 1 task: T305 src/slic3r/GUI/Gizmos/GLGizmoAdvancedCut.cpp
+
+## Phase 1 - Task T305 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoAdvancedCut.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoAdvancedCut.cpp
+- Substantive additions: 7 ([INTENT], [STATE], [EVENT], [OPENGL], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Advanced cut gizmo implementation: edits a cut plane, connector geometry, and cut execution from the 3D viewport.
+- Unity-impact summary:
+  - The cut gizmo combines viewport interaction, retained UI state, and mesh rendering.
+  - Unity should split gesture handling, cut-plane model state, and render output into separate components.
+  - Connector editing needs a managed model plus a retained inspector panel to preserve batch edits and validation.
+- Hazards found: 2 (P1: synchronous cut/model mutation on UI thread; P2: mixed tri-state connector editing)
+- Git: a07e2f8e27 (record T304 commit hash)
+- Next recommended Phase 1 task: T306 src/slic3r/GUI/Gizmos/GLGizmoAdvancedCut.hpp
