@@ -1,1 +1,313 @@
-# PROMPT - Phase 1: GUI File-by-File Annotation for Unity Port Preparation## Phase BoundaryThis prompt governs **Phase 1 only**.- Phase 0 is already complete.- Do **not** revisit Phase 0 work.- Do **not** begin Phase 2 documentation deliverables here.- Do **not** begin Phase 3 review or finalization work here.Your goal in this phase is to annotate every in-scope GUI source file so later agents can reimplement the GUI layer in Unity/C# with minimal ambiguity.## MissionYou are an expert Software Architect and UI/UX Engineer specializing in desktop GUI systems, rendering pipelines, and platform migration. You are analyzing the wxWidgets + OpenGL GUI layer of OrcaSlicer and preparing it for a later Unity Engine/C# reimplementation.Your output is not a rough summary. It is a durable engineering artifact for downstream agents and human developers.## Authoritative Working StateUse these as the source of truth for progress and resumption:1. `.ralph/ralph-tasks.md`2. `.ralph/agent/handoff.md`3. Ralph task tooling state (for example `ralph tools task list`)If these sources disagree, reconcile them first and record the reconciliation in `.ralph/agent/handoff.md` before continuing.## Runtime BehaviorYou must keep moving across tasks inside this same phase.- Completing one task is **not** a reason to stop.- After every completed task, immediately select the next eligible Phase 1 task and continue.- If one task is blocked, record the blocker and continue with the next unblocked task.- The only valid reasons to end the run are:  1. every Phase 1 completion gate in this prompt is satisfied, then emit the configured completion token **once** on its own line, or  2. every remaining Phase 1 task is blocked by a hard external dependency, and that blocker is clearly recorded in `.ralph/agent/handoff.md`.Never print the configured completion token in notes, examples, task updates, handoff text, commit messages, or checklists.## Non-Negotiable Rules1. No file is considered covered until it is explicitly classified as exactly one of:   - `ANNOTATED`   - `SKIP_TRIVIAL`   - `SKIP_VENDORED`2. Every in-scope file must end in one of those three states.3. Task completion is invalid without evidence recorded in `.ralph/agent/handoff.md`.4. Commit after every annotated file or atomic skip/audit step. Do not batch large groups.5. When uncertain, annotate the uncertainty with a hypothesis. Do not invent certainty.6. If context is getting tight, write a clean handoff entry, commit the in-progress atomic work if appropriate, and continue. Do not end the phase early.7. Do not claim Phase 1 complete until the coverage audit proves that every manifest file is accounted for.8. Do not create placeholder annotations. Every inserted comment must carry engineering value.## Required Phase 1 Task NamingPhase 1 tasks in `.ralph/ralph-tasks.md` must use one of these canonical patterns so the audit can parse them reliably:- `T1xx annotate: <repo-relative-path>`- `T1xx skip-trivial: <repo-relative-path>`- `T1xx skip-vendored: <repo-relative-path>`Examples:- `T101 annotate: src/slic3r/GUI/GLCanvas3D.cpp`- `T152 skip-trivial: src/slic3r/GUI/pchheader.hpp`- `T177 skip-vendored: src/slic3r/GUI/ExternalSomething.cpp`If an existing task title does not follow this pattern, normalize it when you touch it and note the change in `.ralph/agent/handoff.md`.## Scope### Fully annotate- `src/slic3r/GUI/`- `src/libvgcode/`- `src/slic3r/Utils/`- `src/slic3r/Config/` if present- GUI dispatch in `src/OrcaSlicer.cpp` for the `--gui` path### Interface-only context- Public headers from `src/libslic3r/` that are included by the GUI layerDescribe their interface impact when needed, but do not launch a separate implementation pass over `src/libslic3r/`.### Out of scope- `src/libslic3r/` implementation files- Vendored third-party trees such as `deps_src/`- Large non-GUI systems unless a GUI file directly depends on them for behavior that must be explained## Priority OrderProcess files in this order unless current task state already dictates another file:1. App lifecycle and startup2. Viewport / OpenGL rendering and input3. Main windows, tabs, and complex widgets4. Configuration and persistence UI5. Dialogs and wizards6. Background-process integration7. Utilities used directly by the GUI layer## Annotation StandardInsert comments at meaningful boundaries, not on every line.Use these tags consistently:- `[INTENT]` - what a class, subsystem, or non-trivial method is trying to accomplish- `[STATE]` - UI state, caches, mode flags, selection state, user preference state- `[EVENT]` - event binding, event handlers, callbacks, signal flow- `[THREAD]` - thread boundaries, synchronization, worker/UI thread crossings- `[OPENGL]` - rendering calls, GL resource lifetime, frame sequencing, GPU state changes- `[UNITY]` - concrete Unity replacement or nearest equivalent; name the component, package, or pattern- `[PORTING_HAZARD:P1]` - critical blocker or architectural mismatch- `[PORTING_HAZARD:P2]` - substantial redesign or behavior mismatch- `[PORTING_HAZARD:P3]` - moderate migration friction- `[UNCLEAR]` - ambiguity or unresolved intent, plus your best current hypothesis### Annotation Quality RequirementsFor each file, cover at least these dimensions where they exist:- class-level purpose- ownership and lifetime- important state variables- event flow- render/update flow- threading behavior- persistence/config dependencies- external service or process dependencies- specific Unity migration guidance### Unity Mapping Rules`[UNITY]` comments must be concrete.Good:- `Canvas + GraphicRaycaster + custom MonoBehaviour controller`- `UI Toolkit VisualElement tree with ListView`- `RenderTexture + dedicated camera + custom input bridge`- `async/await on main-thread marshaling layer`- `ScriptableObject-backed shared settings model`Bad:- `use Unity UI`- `replace with Unity equivalent`- `handled by C# somehow`If there is no clean equivalent, say so explicitly and explain the likely strategy.## Skip RulesUse `SKIP_TRIVIAL` only when the file is one of the following:- generated or boilerplate- precompiled-header support- extremely small wrapper with no real domain logic, state, event handling, or porting consequence- under roughly 50 lines and semantically inertUse `SKIP_VENDORED` only when the file is effectively third-party or vendored and does not require first-party GUI-porting analysis.If a file lives in an in-scope directory but contains meaningful GUI logic, state, event handling, rendering, or migration constraints, it must be annotated, not skipped.## Standard Work LoopFor each Phase 1 task:1. Read `.ralph/ralph-tasks.md`, `.ralph/agent/handoff.md`, and current task state.2. Select the next highest-priority incomplete Phase 1 task.3. Mark that task as `[~] ACTIVE` in `.ralph/ralph-tasks.md`.4. Read the full file before deciding how to annotate or classify it.5. If the file is huge, you may inspect it in chunks, but the file is not complete until the whole file has been covered.6. Annotate or classify the file.7. Self-check the file for missing annotation categories.8. Append a completion-evidence block to `.ralph/agent/handoff.md`.9. Mark the task `[x] DONE` in `.ralph/ralph-tasks.md`.10. Update any relevant timestamp or last-updated line in `.ralph/ralph-tasks.md`.11. Commit the atomic change.12. Immediately select the next eligible Phase 1 task and continue.## Required Completion Evidence BlockAfter every annotated or skipped file, append a block like this to `.ralph/agent/handoff.md`:```md## Phase 1 - Task T1xx complete- Task type: annotate | skip-trivial | skip-vendored- File: <repo-relative-path>- Deliverables: <files changed>- Substantive additions: <count and short description>- Verification excerpt: <one meaningful line from the annotation or skip rationale>- Unity-impact summary: <1-3 bullets>- Hazards found: <count by severity if applicable>- Git: <commit hash or commit subject>- Next recommended Phase 1 task: <task id and path>```A task is not complete until this evidence exists.## Suggested Self-Check Before Marking a File DoneBefore marking an annotation task done, verify that the file has:- `[INTENT]` for each important class and non-trivial method- `[STATE]` on meaningful UI state or cached state- `[EVENT]` on binds, handlers, callbacks, or dispatch points- `[THREAD]` on worker/UI boundary logic where present- `[OPENGL]` on rendering lifecycle and resource use where present- `[UNITY]` notes for important wxWidgets/OpenGL constructs- `[PORTING_HAZARD]` tags for anything likely to surprise a Unity port- `[UNCLEAR]` notes where the code intent cannot be established confidently## Every-10-File CheckpointAfter every 10 newly accounted-for files, append a checkpoint block to `.ralph/agent/handoff.md`:```md## Phase 1 checkpoint- Files newly accounted for in this batch: <N>- Cumulative annotated: <M>- Cumulative skip-trivial: <X>- Cumulative skip-vendored: <Y>- Total accounted for: <M+X+Y>- Manifest total: <T>- Remaining: <T-(M+X+Y)>- Status: CONTINUING | READY_FOR_AUDIT```If `Remaining > 0`, continue. Do not stop the phase.## Phase 1 Coverage AuditWhen you believe annotation work is finished, run the audit below.### 1) Regenerate the manifestUse one manifest path consistently:```bash{  find src/slic3r/GUI src/libvgcode src/slic3r/Utils src/slic3r/Config \    -type f \( -name "*.cpp" -o -name "*.hpp" \) 2>/dev/null  [ -f src/OrcaSlicer.cpp ] && printf '%s\n' src/OrcaSlicer.cpp} | sort -u > /tmp/gui_phase1_manifest.txt```### 2) Extract completed file coverage from `.ralph/ralph-tasks.md````bashsed -nE 's/^\[x\].*(annotate|skip-trivial|skip-vendored):[[:space:]]+(.+)/\1 \2/p' \  .ralph/ralph-tasks.md > /tmp/gui_phase1_done_raw.txtcut -d' ' -f2- /tmp/gui_phase1_done_raw.txt | sort -u > /tmp/gui_phase1_accounted.txt```### 3) Compute missing files```bashcomm -23 /tmp/gui_phase1_manifest.txt /tmp/gui_phase1_accounted.txt > /tmp/gui_phase1_missing.txt```### 4) Compute counts```bashannotated_count=$(grep -c '^annotate ' /tmp/gui_phase1_done_raw.txt || true)skip_trivial_count=$(grep -c '^skip-trivial ' /tmp/gui_phase1_done_raw.txt || true)skip_vendored_count=$(grep -c '^skip-vendored ' /tmp/gui_phase1_done_raw.txt || true)manifest_total=$(wc -l < /tmp/gui_phase1_manifest.txt)missing_total=$(wc -l < /tmp/gui_phase1_missing.txt)accounted_total=$((annotated_count + skip_trivial_count + skip_vendored_count))```### 5) Apply the completion equationThe only valid completion equation is:```textannotated_count + skip_trivial_count + skip_vendored_count == manifest_total```If this equation does not hold, Phase 1 is not complete.### 6) Resolve every missing fileFor each file in `/tmp/gui_phase1_missing.txt`, do exactly one of the following:- create or resume an `annotate:` task and process it- create a justified `skip-trivial:` task- create a justified `skip-vendored:` taskThen rerun the audit.### 7) Record the audit result in `.ralph/agent/handoff.md`Append a block like this:```md## Phase 1 coverage audit- Manifest total: <T>- Annotated: <M>- Skip-trivial: <X>- Skip-vendored: <Y>- Accounted total: <M+X+Y>- Missing after audit: <missing_total>- Completion equation: <M> + <X> + <Y> = <T>- Result: PASS | FAIL- Remaining files if any: <list or `none`>```If the result is `FAIL`, continue Phase 1 work immediately.### 8) Commit the auditCommit `.ralph/ralph-tasks.md`, `.ralph/agent/handoff.md`, and any final Phase 1 changes as one atomic audit commit.## Phase 1 Completion GatePhase 1 is complete only when **all** of the following are true:1. Every manifest file is accounted for exactly once through a done task titled `annotate:`, `skip-trivial:`, or `skip-vendored:`.2. The coverage equation passes exactly.3. There are zero missing files after the final audit.4. `.ralph/agent/handoff.md` contains the final coverage audit block with a `PASS` result.5. No Phase 1 task remains `[~] ACTIVE`.6. All Phase 1 work is committed.Only then emit the configured completion token once, on its own line, and nothing else after it.
+# PROMPT - Phase 2: GUI Documentation Package for Unity Reimplementation
+
+## Phase Boundary
+
+This prompt governs **Phase 2 only**.
+
+Assume Phase 1 has already finished successfully.
+
+- Do not redo Phase 1 annotation work except for a minimal corrective edit when a document would otherwise be false.
+- Do not begin Phase 3 review/finalization work here.
+- Do not emit the configured completion token until every Phase 2 completion gate is satisfied.
+
+## Mission
+
+You are producing the documentation package that future AI agents and human engineers will use to reimplement the OrcaSlicer GUI layer in Unity/C#.
+
+This phase turns source-level annotations into durable, structured engineering documentation.
+
+The output must be specific, source-grounded, and implementation-oriented.
+
+## Authoritative Working State
+
+Use these as the source of truth for progress and resumption:
+
+1. `.ralph/ralph-tasks.md`
+2. `.ralph/agent/handoff.md`
+3. Ralph task tooling state
+4. The annotated source tree from Phase 1
+
+If these disagree, reconcile the discrepancy first and record it in `.ralph/agent/handoff.md`.
+
+## Runtime Behavior
+
+- Completing one document task is **not** a reason to stop.
+- After every completed document task, immediately select the next eligible Phase 2 task and continue.
+- If one task is blocked, record the blocker and continue with the next unblocked Phase 2 task.
+- The only valid reasons to end the run are:
+  1. every Phase 2 completion gate is satisfied, then emit the configured completion token once on its own line, or
+  2. every remaining Phase 2 task is blocked by a hard external dependency and that blocker is explicitly recorded.
+
+Never print the configured completion token in examples, notes, handoff entries, or commit messages.
+
+## Output Location
+
+Write all Phase 2 deliverables under:
+
+`generated_documentation/gui/`
+
+## Required Phase 2 Task Naming
+
+Use task titles that make auditing easy:
+
+- `T201 docs: gui_01_architecture_overview.md`
+- `T202 docs: gui_02_screen_and_widget_inventory.md`
+- `T203 docs: gui_03_state_management.md`
+- `T204 docs: gui_04_opengl_viewport_pipeline.md`
+- `T205 docs: gui_05_event_and_callback_model.md`
+- `T206 docs: gui_06_background_process_and_threading.md`
+- `T207 docs: gui_07_unity_porting_hazards.md`
+- `T208 docs: gui_08_external_gui_dependencies.md`
+- `T209+ docs: flow_<name>.md` for pseudocode / flow documents
+
+If a title does not follow this format, normalize it when you touch it.
+
+## Documentation Quality Bar
+
+Every document must be useful to a Unity implementation effort.
+
+### Mandatory quality rules
+
+1. No stub files.
+2. No headers-only placeholders.
+3. No padding to satisfy length.
+4. Every major claim should be tied to source evidence.
+5. Every document must include Unity-specific recommendations, not just C++ descriptions.
+6. Every unresolved ambiguity must be called out explicitly.
+7. Prefer durable structure: tables, numbered flows, state diagrams, dependency lists, and subsystem breakdowns.
+
+### Required source-reference format
+
+Use repo-relative textual anchors in this exact style when citing source code:
+
+- `src/slic3r/GUI/Foo.cpp:L120-L184`
+- `src/libvgcode/Bar.hpp:L33-L79`
+
+Use one or more such anchors wherever they materially improve trustworthiness.
+
+Do **not** rely on host-specific web URLs.
+
+### Acceptable diagram forms
+
+At least one of these should appear where useful:
+
+- Mermaid
+- ASCII block diagram
+- numbered sequence flow
+- pseudocode listing
+- lifecycle table
+
+## Standard Work Loop
+
+For each Phase 2 task:
+
+1. Read `.ralph/ralph-tasks.md`, `.ralph/agent/handoff.md`, and the relevant Phase 1 annotations.
+2. Select the next highest-priority incomplete Phase 2 task.
+3. Mark it `[~] ACTIVE` in `.ralph/ralph-tasks.md`.
+4. Gather the primary source files and anchors you will rely on.
+5. Write or expand the document until it is materially complete.
+6. Self-verify that the document is not a stub and contains concrete Unity guidance.
+7. Append a completion-evidence block to `.ralph/agent/handoff.md`.
+8. Mark the task `[x] DONE` in `.ralph/ralph-tasks.md`.
+9. Commit the atomic change.
+10. Immediately continue to the next eligible Phase 2 task.
+
+## Required Completion Evidence Block
+
+After each document task, append this to `.ralph/agent/handoff.md`:
+
+```md
+## Phase 2 - Task T2xx complete
+- Deliverable: generated_documentation/gui/<filename>
+- Scope covered: <subsystems or flows>
+- Source anchors referenced: <count>
+- Key Unity decisions captured: <2-5 bullets>
+- Verification excerpt: <one meaningful line from the document>
+- Remaining follow-up if any: <none or short note>
+- Git: <commit hash or commit subject>
+- Next recommended Phase 2 task: <task id>
+```
+
+A document task is not complete until this evidence exists.
+
+## Required Deliverables
+
+### T201 - `gui_01_architecture_overview.md`
+
+Purpose: a top-down map of the GUI system.
+
+Required sections:
+
+- system boundary and module map
+- startup path and lifetime overview
+- major GUI subsystems and their responsibilities
+- cross-cutting concerns: undo/redo, i18n, theming, settings, background work
+- Unity migration summary by subsystem
+- recommended port order
+
+### T202 - `gui_02_screen_and_widget_inventory.md`
+
+Purpose: a screen-by-screen and widget-by-widget inventory.
+
+Required sections:
+
+- top-level windows, tabs, panes, and dialogs
+- ownership/lifecycle notes
+- Unity UI equivalent for each major screen or widget
+- complexity notes and migration hotspots
+- inventory table keyed by source anchors
+
+### T203 - `gui_03_state_management.md`
+
+Purpose: explain how UI state is modeled and moves through the system.
+
+Required sections:
+
+- state taxonomy: ephemeral, session, persistent, domain-backed
+- ownership and mutation patterns
+- synchronization points and invalidation patterns
+- persistence/settings interactions
+- Unity recommendations: MonoBehaviour state, ScriptableObject, serialized settings, async state, etc.
+
+### T204 - `gui_04_opengl_viewport_pipeline.md`
+
+Purpose: deep explanation of the rendering and interaction pipeline.
+
+This is one of the two highest-priority documents.
+
+Required sections:
+
+- render loop trace
+- viewport scene composition
+- GL resource lifetime and ownership
+- user interaction model
+- shader/material considerations
+- g-code visualization behavior
+- at least three Unity strategy options with trade-offs
+- preferred strategy and why
+
+### T205 - `gui_05_event_and_callback_model.md`
+
+Purpose: explain wxWidgets events, callbacks, and higher-level event flows.
+
+Required sections:
+
+- event model primer for this codebase
+- important bind sites and handlers
+- critical user flows as numbered sequences
+- custom events or app-specific dispatch patterns
+- Unity equivalents: EventSystem, UnityEvent, delegates, observables, custom bus, etc.
+
+### T206 - `gui_06_background_process_and_threading.md`
+
+Purpose: explain how background work interacts with the GUI.
+
+This is the other highest-priority document.
+
+Required sections:
+
+- thread/process inventory
+- background slicing and job orchestration
+- main-thread marshaling patterns
+- UI thread safety constraints
+- async cancellation/progress behavior
+- Unity equivalents using async/await, coroutines, Job System, or custom dispatching
+
+### T207 - `gui_07_unity_porting_hazards.md`
+
+Purpose: a concentrated list of migration risks.
+
+Required sections:
+
+- critical blockers
+- hazard catalog grouped by subsystem
+- severity, impact, evidence, and likely mitigation
+- dependencies between hazards
+- recommended order for burning down risk
+
+### T208 - `gui_08_external_gui_dependencies.md`
+
+Purpose: catalog external dependencies that affect the GUI port.
+
+Required sections:
+
+- dependency inventory
+- how each dependency is used by the GUI layer
+- whether Unity has a package or native replacement path
+- keep/adapt/replace recommendation for each
+- notable licensing or integration concerns if visible from source context
+
+## Pseudocode / Flow Documents (T209 and above)
+
+Create flow documents for complex flows that deserve implementation recipes.
+
+Use names like:
+
+- `flow_app_startup.md`
+- `flow_viewport_input_and_render.md`
+- `flow_background_slicing.md`
+- `flow_project_load_save.md`
+- `flow_printer_connection_or_upload.md`
+
+Create one when a flow has at least one of the following:
+
+- multiple event handlers
+- cross-thread behavior
+- GPU/render interaction
+- substantial state transitions
+- non-obvious Unity migration implications
+
+Each flow document must include:
+
+- flow purpose
+- participating source files and anchors
+- numbered steps
+- explicit state/thread/render markers where applicable
+- Unity implementation notes
+
+## Self-Check Before Marking a Document Done
+
+Before marking any Phase 2 task done, verify that the document:
+
+- has real content, not scaffolding
+- names the relevant source files and anchors
+- contains concrete Unity mappings
+- contains at least one table, flow, or diagram where useful
+- calls out unresolved ambiguity explicitly
+- would help a new engineer implement the subsystem in Unity without rereading all source files first
+
+## Phase 2 Completion Summary Block
+
+When you think Phase 2 is complete, append this block to `.ralph/agent/handoff.md`:
+
+```md
+## Phase 2 documentation coverage summary
+- Core docs present: <list T201-T208 files>
+- Flow docs present: <list or `none`>
+- Highest-priority docs completed: T204 yes/no, T206 yes/no
+- Source anchor convention used consistently: yes/no
+- Remaining documentation gaps: <list or `none`>
+- Result: PASS | FAIL
+```
+
+If the result is `FAIL`, continue Phase 2 work immediately.
+
+## Phase 2 Completion Gate
+
+Phase 2 is complete only when **all** of the following are true:
+
+1. `generated_documentation/gui/gui_01_architecture_overview.md` exists and is substantive.
+2. `generated_documentation/gui/gui_02_screen_and_widget_inventory.md` exists and is substantive.
+3. `generated_documentation/gui/gui_03_state_management.md` exists and is substantive.
+4. `generated_documentation/gui/gui_04_opengl_viewport_pipeline.md` exists and is substantive.
+5. `generated_documentation/gui/gui_05_event_and_callback_model.md` exists and is substantive.
+6. `generated_documentation/gui/gui_06_background_process_and_threading.md` exists and is substantive.
+7. `generated_documentation/gui/gui_07_unity_porting_hazards.md` exists and is substantive.
+8. `generated_documentation/gui/gui_08_external_gui_dependencies.md` exists and is substantive.
+9. T204 and T206 are among the deepest and most evidence-backed docs in the set.
+10. At least two flow documents exist if the codebase contains at least two qualifying complex flows; otherwise the reason is documented in `.ralph/agent/handoff.md`.
+11. `.ralph/agent/handoff.md` contains the final Phase 2 documentation coverage summary with `PASS`.
+12. No Phase 2 task remains `[~] ACTIVE`.
+13. All Phase 2 work is committed.
+
+Only then emit the configured completion token once, on its own line, and nothing else after it.
