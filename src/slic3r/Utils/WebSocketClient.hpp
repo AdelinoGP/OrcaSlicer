@@ -1,4 +1,3 @@
-// [ANNOTATED]
 #ifndef _WEB_SOCKET_CLIENT_HPP_
 #define _WEB_SOCKET_CLIENT_HPP_
 #include <boost/beast/core.hpp>
@@ -8,22 +7,21 @@
 #include <iostream>
 #include <string>
 #include <chrono>
-namespace beast = boost::beast;         // from <boost/beast.hpp>
-namespace http = beast::http;           // from <boost/beast/http.hpp>
+namespace beast     = boost::beast;     // from <boost/beast.hpp>
+namespace http      = beast::http;      // from <boost/beast/http.hpp>
 namespace websocket = beast::websocket; // from <boost/beast/websocket.hpp>
-namespace net = boost::asio;            // from <boost/asio.hpp>
-using tcp = net::ip::tcp;               // from <boost/asio/ip/tcp.hpp>
+namespace net       = boost::asio;      // from <boost/asio.hpp>
+using tcp           = net::ip::tcp;     // from <boost/asio/ip/tcp.hpp>
 
-class WebSocketClient {
+class WebSocketClient
+{
 public:
-//服务器是ws://echo.websocket.org:80/websocket
-    WebSocketClient():
-    resolver_(ioc_), ws_(ioc_),is_connect(false) {
+    // 服务器是ws://echo.websocket.org:80/websocket
+    WebSocketClient() : resolver_(ioc_), ws_(ioc_), is_connect(false) {}
 
-    }
-
-    ~WebSocketClient() {
-        if(!is_connect){
+    ~WebSocketClient()
+    {
+        if (!is_connect) {
             return;
         }
         try {
@@ -33,39 +31,40 @@ public:
             std::cerr << "Error: " << e.what() << std::endl;
         }
     }
-    void connect(const std::string& host, const std::string& port, const std::string& path="/"){
-        if(is_connect){
-           return;
+    void connect(const std::string& host, const std::string& port, const std::string& path = "/")
+    {
+        if (is_connect) {
+            return;
         }
+        // [STATE] This client keeps a single live websocket session and ignores repeated connect attempts.
         // Look up the domain name
         auto const results = resolver_.resolve(host, port);
 
         // Make the connection on the IP address we get from a lookup
-        auto ep = net::connect(ws_.next_layer(), results);
+        auto        ep    = net::connect(ws_.next_layer(), results);
         std::string _host = host;
-        //if _host last char is  '/', remove it
-        if(_host.size()>0&&_host[host.size()-1] == '/'){
-            _host[host.size()-1] = '\0';
+        // if _host last char is  '/', remove it
+        if (_host.size() > 0 && _host[host.size() - 1] == '/') {
+            _host[host.size() - 1] = '\0';
         }
 
         // _host += ':' + std::to_string(ep.port());
         // Set a decorator to change the User-Agent of the handshake
-        ws_.set_option(websocket::stream_base::decorator(
-            [](websocket::request_type& req)
-            {
-                req.set(http::field::user_agent,"ElegooSlicer");
-            }));
+        ws_.set_option(
+            websocket::stream_base::decorator([](websocket::request_type& req) { req.set(http::field::user_agent, "ElegooSlicer"); }));
         // Perform the WebSocket handshake
         ws_.handshake(_host, path);
         is_connect = true;
     }
 
-    void send(const std::string& message){
+    void send(const std::string& message)
+    {
         // Send a message
         ws_.write(net::buffer(message));
     }
 
-    std::string receive(int timeout = 0){
+    std::string receive(int timeout = 0)
+    {
         // This buffer will hold the incoming message
         beast::flat_buffer buffer;
 
@@ -76,11 +75,11 @@ public:
         return beast::buffers_to_string(buffer.data());
     }
 
-
 private:
-    net::io_context ioc_;
-    tcp::resolver resolver_;
+    net::io_context                ioc_;
+    tcp::resolver                  resolver_;
     websocket::stream<tcp::socket> ws_;
+    // [PORTING_HAZARD:P1] This synchronous wrapper has no internal locking or timeout handling around socket operations.
     bool is_connect;
 };
 

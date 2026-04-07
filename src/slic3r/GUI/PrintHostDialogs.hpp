@@ -1,3 +1,9 @@
+// [ANNOTATED]
+// [INTENT] Declares printer-host upload dialogs, queue event payloads, and the Elegoo-specific upload option extension.
+// [STATE] Captures upload form widgets, persisted options, queue row state, and auxiliary metadata returned with uploads.
+// [UNITY] Recast as view-model contracts plus typed async progress notifications instead of wx dialog subclasses.
+// [PORTING_HAZARD:P2] The API surface exposes wx-specific event inheritance and control ownership, so it is not directly portable.
+
 #ifndef slic3r_PrintHostSendDialog_hpp_
 #define slic3r_PrintHostSendDialog_hpp_
 
@@ -19,40 +25,42 @@ class wxChoice;
 class wxComboBox;
 class wxDataViewListCtrl;
 
-namespace Slic3r {
-
-namespace GUI {
+namespace Slic3r { namespace GUI {
 
 class PrintHostSendDialog : public GUI::MsgDialog
 {
 public:
-    PrintHostSendDialog(const boost::filesystem::path &path, PrintHostPostUploadActions post_actions, const wxArrayString& groups, const wxArrayString& storage_paths, const wxArrayString& storage_names, bool switch_to_device_tab);
+    PrintHostSendDialog(const boost::filesystem::path& path,
+                        PrintHostPostUploadActions     post_actions,
+                        const wxArrayString&           groups,
+                        const wxArrayString&           storage_paths,
+                        const wxArrayString&           storage_names,
+                        bool                           switch_to_device_tab);
     virtual ~PrintHostSendDialog() {}
-    boost::filesystem::path filename() const;
+    boost::filesystem::path   filename() const;
     PrintHostPostUploadAction post_action() const;
-    std::string group() const;
-    std::string storage() const;
-    bool switch_to_device_tab() const {return m_switch_to_device_tab;}
+    std::string               group() const;
+    std::string               storage() const;
+    bool                      switch_to_device_tab() const { return m_switch_to_device_tab; }
 
-    virtual void EndModal(int ret) override;
-    virtual void init();
+    virtual void                               EndModal(int ret) override;
+    virtual void                               init();
     virtual std::map<std::string, std::string> extendedInfo() const { return {}; }
 
 protected:
-    wxTextCtrl *txt_filename;
-    wxComboBox *combo_groups;
-    wxComboBox* combo_storage;
+    wxTextCtrl*               txt_filename;
+    wxComboBox*               combo_groups;
+    wxComboBox*               combo_storage;
     PrintHostPostUploadAction post_upload_action;
-    wxString    m_valid_suffix;
-    wxString    m_preselected_storage;
-    wxArrayString m_paths;
-    bool m_switch_to_device_tab;
+    wxString                  m_valid_suffix;
+    wxString                  m_preselected_storage;
+    wxArrayString             m_paths;
+    bool                      m_switch_to_device_tab;
 
-    boost::filesystem::path m_path;
+    boost::filesystem::path    m_path;
     PrintHostPostUploadActions m_post_actions;
-    wxArrayString m_storage_names;
+    wxArrayString              m_storage_names;
 };
-
 
 class PrintHostQueueDialog : public DPIDialog
 {
@@ -60,8 +68,8 @@ public:
     class Event : public wxEvent
     {
     public:
-        size_t job_id;
-        int progress = 0;    // in percent
+        size_t   job_id;
+        int      progress = 0; // in percent
         wxString tag;
         wxString status;
 
@@ -70,35 +78,27 @@ public:
         Event(wxEventType eventType, int winid, size_t job_id, wxString error);
         Event(wxEventType eventType, int winid, size_t job_id, wxString tag, wxString status);
 
-        virtual wxEvent *Clone() const;
+        virtual wxEvent* Clone() const;
     };
 
+    PrintHostQueueDialog(wxWindow* parent);
 
-    PrintHostQueueDialog(wxWindow *parent);
-
-    void append_job(const PrintHostJob &job);
+    void append_job(const PrintHostJob& job);
     void get_active_jobs(std::vector<std::pair<std::string, std::string>>& ret);
 
     virtual bool Show(bool show = true) override
     {
-        if(!show)
+        if (!show)
             save_user_data(UDT_SIZE | UDT_POSITION | UDT_COLS);
         return DPIDialog::Show(show);
     }
+
 protected:
-    void on_dpi_changed(const wxRect &suggested_rect) override;
+    void on_dpi_changed(const wxRect& suggested_rect) override;
     void on_sys_color_changed() override;
 
 private:
-    enum Column {
-        COL_ID,
-        COL_PROGRESS,
-        COL_STATUS,
-        COL_HOST,
-        COL_SIZE,
-        COL_FILENAME,
-        COL_ERRORMSG
-    };
+    enum Column { COL_ID, COL_PROGRESS, COL_STATUS, COL_HOST, COL_SIZE, COL_FILENAME, COL_ERRORMSG };
 
     enum JobState {
         ST_NEW,
@@ -111,15 +111,11 @@ private:
 
     enum { HEIGHT = 60, WIDTH = 30, SPACING = 5 };
 
-    enum UserDataType{
-        UDT_SIZE = 1,
-        UDT_POSITION = 2,
-        UDT_COLS = 4
-    };
+    enum UserDataType { UDT_SIZE = 1, UDT_POSITION = 2, UDT_COLS = 4 };
 
-    wxButton *btn_cancel;
-    wxButton *btn_error;
-    wxDataViewListCtrl *job_list;
+    wxButton*           btn_cancel;
+    wxButton*           btn_error;
+    wxDataViewListCtrl* job_list;
     // Note: EventGuard prevents delivery of progress evts to a freed PrintHostQueueDialog
     EventGuard on_progress_evt;
     EventGuard on_error_evt;
@@ -127,16 +123,16 @@ private:
     EventGuard on_info_evt;
 
     JobState get_state(int idx);
-    void set_state(int idx, JobState);
-    void on_list_select();
-    void on_progress(Event&);
-    void on_error(Event&);
-    void on_cancel(Event&);
-    void on_info(Event&);
+    void     set_state(int idx, JobState);
+    void     on_list_select();
+    void     on_progress(Event&);
+    void     on_error(Event&);
+    void     on_cancel(Event&);
+    void     on_info(Event&);
     // This vector keep adress and filename of uploads. It is used when checking for running uploads during exit.
     std::vector<std::pair<std::string, std::string>> upload_names;
-    void save_user_data(int);
-    bool load_user_data(int, std::vector<int>&);
+    void                                             save_user_data(int);
+    bool                                             load_user_data(int, std::vector<int>&);
 };
 
 class ElegooPrintHostSendDialog : public PrintHostSendDialog
@@ -184,6 +180,6 @@ wxDECLARE_EVENT(EVT_PRINTHOST_PROGRESS, PrintHostQueueDialog::Event);
 wxDECLARE_EVENT(EVT_PRINTHOST_ERROR, PrintHostQueueDialog::Event);
 wxDECLARE_EVENT(EVT_PRINTHOST_CANCEL, PrintHostQueueDialog::Event);
 wxDECLARE_EVENT(EVT_PRINTHOST_INFO, PrintHostQueueDialog::Event);
-}}
+}} // namespace Slic3r::GUI
 
 #endif

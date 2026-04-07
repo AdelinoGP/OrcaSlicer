@@ -10,27 +10,32 @@
 
 #include "wx/button.h"
 
-namespace Slic3r { 
-namespace GUI {
+namespace Slic3r { namespace GUI {
 
 #define PICK_LEFT_PADDING_LEFT 15
-#define PICK_LEFT_PRINTABLE    40
+#define PICK_LEFT_PRINTABLE 40
 #define PICK_LEFT_DEV_NAME 250
 #define PICK_LEFT_DEV_STATUS 250
 #define PICK_DEVICE_MAX 6
-    
+
 class MultiMachinePage : public wxPanel
 {
 private:
-    wxTimer*                    m_refresh_timer      = nullptr;
-    wxSizer*                    m_main_sizer{ nullptr };
-    LocalTaskManagerPage*       m_local_task_manager{ nullptr };
-    CloudTaskManagerPage*       m_cloud_task_manager{ nullptr };
-    MultiMachineManagerPage*    m_machine_manager{ nullptr };
-    Tabbook*                    m_tabpanel{ nullptr };
+    // [INTENT] Container page that coordinates machine management tabs plus periodic refresh of multi-machine state.
+    // [EVENT] The timer-driven refresh path means porting must preserve a single owner for polling and tab visibility changes.
+    wxTimer*                 m_refresh_timer = nullptr;
+    wxSizer*                 m_main_sizer{nullptr};
+    LocalTaskManagerPage*    m_local_task_manager{nullptr};
+    CloudTaskManagerPage*    m_cloud_task_manager{nullptr};
+    MultiMachineManagerPage* m_machine_manager{nullptr};
+    Tabbook*                 m_tabpanel{nullptr};
 
 public:
-    MultiMachinePage(wxWindow* parent, wxWindowID id = wxID_ANY, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize, long style = wxTAB_TRAVERSAL);
+    MultiMachinePage(wxWindow*      parent,
+                     wxWindowID     id    = wxID_ANY,
+                     const wxPoint& pos   = wxDefaultPosition,
+                     const wxSize&  size  = wxDefaultSize,
+                     long           style = wxTAB_TRAVERSAL);
     ~MultiMachinePage();
 
     void jump_to_send_page();
@@ -46,10 +51,8 @@ public:
     void clear_page();
 };
 
-
 class DevicePickItem : public DeviceItem
 {
-
 public:
     DevicePickItem(wxWindow* parent, MachineObject* obj);
     ~DevicePickItem() {};
@@ -68,28 +71,30 @@ public:
     virtual void DoSetSize(int x, int y, int width, int height, int sizeFlags = wxSIZE_AUTO);
 
 public:
-    bool m_hover{ false };
+    bool           m_hover{false};
     ScalableBitmap m_bitmap_check_disable;
     ScalableBitmap m_bitmap_check_off;
     ScalableBitmap m_bitmap_check_on;
 };
 
-
 class MultiMachinePickPage : public DPIDialog
 {
 private:
-    AppConfig*          app_config;
-    Label*              m_label{ nullptr };
-    wxScrolledWindow*     scroll_macine_list{ nullptr };
-    wxBoxSizer*         m_sizer_body{ nullptr };
-    wxBoxSizer*                         sizer_machine_list{ nullptr };
-    std::map<std::string, DevicePickItem*>  m_device_items;
-    int                 m_selected_count{0};
+    // [INTENT] Modal picker for selecting a bounded set of devices to participate in a multi-machine action.
+    // [PORTING_HAZARD:P1] This dialog mixes live device discovery with modal selection state, which should become an async overlay in Unity.
+    AppConfig*                             app_config;
+    Label*                                 m_label{nullptr};
+    wxScrolledWindow*                      scroll_macine_list{nullptr};
+    wxBoxSizer*                            m_sizer_body{nullptr};
+    wxBoxSizer*                            sizer_machine_list{nullptr};
+    std::map<std::string, DevicePickItem*> m_device_items;
+    int                                    m_selected_count{0};
+
 public:
     MultiMachinePickPage(Plater* plater = nullptr);
     ~MultiMachinePickPage();
 
-    int get_selected_count();
+    int  get_selected_count();
     void update_selected_count();
     void on_dpi_changed(const wxRect& suggested_rect);
     void on_sys_color_changed();
@@ -98,7 +103,6 @@ public:
     bool Show(bool show);
 };
 
-} // namespace GUI
-} // namespace Slic3r
+}} // namespace Slic3r::GUI
 
 #endif

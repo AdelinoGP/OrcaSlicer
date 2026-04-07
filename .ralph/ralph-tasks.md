@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-04-07T08:35:00Z
+Last updated: 2026-04-07T10:10:00Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -19,7 +19,159 @@ Last updated: 2026-04-07T08:35:00Z
 - [x] P0-T009 Commit orientation complete
 
 ## Phase 1 — Annotation
-...
+- [x] T101 annotate: src/libvgcode/include/ColorPrint.hpp
+- [x] T102 annotate: src/libvgcode/include/ColorRange.hpp
+- [x] T103 annotate: src/libvgcode/include/GCodeInputData.hpp
+- [x] T104 annotate: src/libvgcode/include/PathVertex.hpp
+- [x] T105 annotate: src/libvgcode/include/Types.hpp
+- [x] T106 annotate: src/libvgcode/include/Viewer.hpp
+- [x] T107 skip-trivial: src/libvgcode/src/Bitset.cpp
+- [x] T108 annotate: src/libvgcode/src/Bitset.hpp
+- [x] T109 annotate: src/libvgcode/src/CogMarker.cpp
+- [x] T110 annotate: src/libvgcode/src/CogMarker.hpp
+- [x] T111 skip-trivial: src/libvgcode/src/ColorPrint.cpp
+- [x] T112 annotate: src/libvgcode/src/ColorRange.cpp
+- [x] T113 annotate: src/libvgcode/src/ExtrusionRoles.cpp
+- [x] T114 annotate: src/libvgcode/src/ExtrusionRoles.hpp
+- [x] T115 skip-trivial: src/libvgcode/src/GCodeInputData.cpp
+- [x] T116 annotate: src/libvgcode/src/Layers.cpp
+- [x] T117 annotate: src/libvgcode/src/Layers.hpp
+- [x] T118 annotate: src/libvgcode/src/OpenGLUtils.cpp
+- [x] T119 annotate: src/libvgcode/src/OpenGLUtils.hpp
+- [x] T120 annotate: src/libvgcode/src/OptionTemplate.cpp
+- [x] T121 annotate: src/libvgcode/src/OptionTemplate.hpp
+- [x] T122 annotate: src/libvgcode/src/PathVertex.cpp
+- [x] T123 annotate: src/libvgcode/src/Range.cpp
+- [x] T124 annotate: src/libvgcode/src/Range.hpp
+- [x] T125 annotate: src/libvgcode/src/SegmentTemplate.cpp
+- [x] T126 annotate: src/libvgcode/src/SegmentTemplate.hpp
+- [x] T127 annotate: src/libvgcode/src/Settings.cpp
+- [x] T128 annotate: src/libvgcode/src/Settings.hpp
+- [x] T129 annotate: src/libvgcode/src/ShadersES.hpp
+- [x] T130 annotate: src/libvgcode/src/Shaders.hpp
+- [x] T131 annotate: src/libvgcode/src/ToolMarker.cpp
+- [x] T132 annotate: src/libvgcode/src/ToolMarker.hpp
+- [x] T133 annotate: src/libvgcode/src/Types.cpp
+- [x] T134 annotate: src/libvgcode/src/Utils.cpp
+- [x] T135 annotate: src/libvgcode/src/Utils.hpp
+- [x] T136 annotate: src/libvgcode/src/Viewer.cpp
+- [x] T137 annotate: src/libvgcode/src/ViewerImpl.cpp
+- [x] T138 annotate: src/libvgcode/src/ViewerImpl.hpp
+- [x] T139 annotate: src/libvgcode/src/ViewRange.cpp
+- [x] T140 annotate: src/libvgcode/src/ViewRange.hpp
+- [x] T141 annotate: src/slic3r/GUI/2DBed.cpp
+- [x] T142 annotate: src/slic3r/GUI/2DBed.hpp
+- [x] T143 annotate: src/slic3r/GUI/3DBed.cpp
+- [x] T144 annotate: src/slic3r/GUI/AboutDialog.hpp
+- [ ] T145 annotate: src/slic3r/GUI/ConfigWizard.cpp
+- [ ] T146 annotate: src/slic3r/GUI/ConfigWizard.hpp
+- [ ] T147 annotate: src/slic3r/GUI/InstanceCheck.cpp
+- [ ] T148 annotate: src/slic3r/GUI/InstanceCheck.hpp
+- [ ] T149 annotate: src/slic3r/GUI/KBShortcutsDialog.cpp
+- [ ] T150 annotate: src/slic3r/GUI/KBShortcutsDialog.hpp
+- [ ] T151 annotate: src/slic3r/GUI/MsgDialog.cpp
+- [ ] T152 annotate: src/slic3r/GUI/MsgDialog.hpp
+- [ ] T153 annotate: src/slic3r/GUI/PresetComboBoxes.cpp
+- [ ] T154 annotate: src/slic3r/GUI/PresetComboBoxes.hpp
+- [x] T155 annotate: src/slic3r/GUI/AmsWidgets.cpp
+- [ ] T156 annotate: src/slic3r/GUI/Tab.hpp
+- [ ] T157 annotate: src/slic3r/GUI/UpdateDialogs.cpp
+- [ ] T158 annotate: src/slic3r/GUI/UpdateDialogs.hpp
+- [ ] T159 annotate: src/slic3r/GUI/WipeTowerDialog.cpp
+- [ ] T160 annotate: src/slic3r/GUI/WipeTowerDialog.hpp
+- [ ] T161 annotate: src/slic3r/GUI/DPIFrame.cpp
+- [ ] T162 annotate: src/slic3r/GUI/DPIFrame.hpp
+- [ ] T163 annotate: src/slic3r/GUI/GUI.cpp
+- [ ] T164 annotate: src/slic3r/GUI/GUI.hpp
+- [ ] T165 annotate: src/slic3r/GUI/GUI_App.cpp
+- [ ] T166 annotate: src/slic3r/GUI/GUI_App.hpp
+- [ ] T167 annotate: src/slic3r/GUI/GUI_ObjectList.cpp
+- [x] T168 annotate: src/slic3r/GUI/BBLStatusBarBind.hpp
+- [ ] T169 annotate: src/slic3r/GUI/GUI_ObjectManipulation.cpp
+- [ ] T170 skip-trivial: src/slic3r/GUI/GUI_ObjectManipulation.hpp
+- [ ] T171 annotate: src/slic3r/GUI/PartPlate.cpp
+- [x] T172 annotate: src/slic3r/GUI/PartPlate.hpp
+- [ ] T173 annotate: src/slic3r/GUI/PalmTree.cpp
+- [ ] T174 annotate: src/slic3r/GUI/PalmTree.hpp
+- [ ] T175 annotate: src/slic3r/GUI/ImGuiWrapper.cpp
+- [x] T176 annotate: src/slic3r/GUI/BBLTopbar.hpp
+- [x] T177 annotate: src/slic3r/GUI/BedShapeDialog.cpp
+- [x] T178 annotate: src/slic3r/GUI/BedShapeDialog.hpp
+- [ ] T179 annotate: src/slic3r/GUI/Jobs/ArrangeJob.cpp
+- [x] T180 annotate: src/slic3r/GUI/BindDialog.hpp
+- [ ] T181 annotate: src/slic3r/GUI/Jobs/BackgroundSlicingProcessJob.cpp
+- [ ] T182 annotate: src/slic3r/GUI/Jobs/BackgroundSlicingProcessJob.hpp
+- [x] T183 annotate: src/slic3r/GUI/BitmapComboBox.cpp
+- [x] T184 annotate: src/slic3r/GUI/BitmapComboBox.hpp
+- [x] T185 annotate: src/slic3r/GUI/BonjourDialog.cpp
+- [ ] T186 annotate: src/slic3r/GUI/Jobs/EmbossUpdateJob.hpp
+- [x] T187 annotate: src/slic3r/GUI/calib_dlg.cpp
+- [x] T188 annotate: src/slic3r/GUI/calib_dlg.hpp
+- [x] T189 annotate: src/slic3r/GUI/Calibration.cpp
+- [ ] T190 annotate: src/slic3r/GUI/Jobs/JobList.hpp
+- [x] T191 annotate: src/slic3r/GUI/CalibrationPanel.cpp
+- [ ] T192 annotate: src/slic3r/GUI/Jobs/LightJob.hpp
+- [x] T193 annotate: src/slic3r/GUI/CalibrationWizardCaliPage.cpp
+- [ ] T194 annotate: src/slic3r/GUI/Jobs/MedialAxisJob.hpp
+- [x] T195 annotate: src/slic3r/GUI/CalibrationWizard.cpp
+- [ ] T196 annotate: src/slic3r/GUI/Jobs/RotoptJob.hpp
+- [x] T197 annotate: src/slic3r/GUI/CalibrationWizardPage.cpp
+- [ ] T198 annotate: src/slic3r/GUI/Jobs/SLAImportJob.hpp
+- [x] T199 annotate: src/slic3r/GUI/CalibrationWizardPresetPage.cpp
+- [ ] T200 annotate: src/slic3r/GUI/Jobs/SVGFileJob.hpp
+- [x] T201 annotate: src/slic3r/GUI/CalibrationWizardSavePage.cpp
+- [x] T202 annotate: src/slic3r/GUI/CalibrationWizardSavePage.hpp
+- [x] T203 annotate: src/slic3r/GUI/CalibrationWizardStartPage.cpp
+- [ ] T204 annotate: src/slic3r/GUI/Gizmos/3DScene.hpp
+- [x] T205 annotate: src/slic3r/GUI/CaliHistoryDialog.cpp
+- [x] T206 annotate: src/slic3r/GUI/CaliHistoryDialog.hpp
+- [x] T207 annotate: src/slic3r/GUI/Camera.cpp
+- [x] T208 annotate: src/slic3r/GUI/Camera.hpp
+- [x] T820 annotate: src/OrcaSlicer.cpp
+- [x] T821 annotate: src/slic3r/Config/Snapshot.cpp
+- [x] T822 annotate: src/slic3r/Config/Snapshot.hpp
+- [x] T823 annotate: src/slic3r/Config/Version.cpp
+- [x] T824 annotate: src/slic3r/Config/Version.hpp
+- [x] T825 annotate: src/slic3r/GUI/3DBed.hpp
+- [x] T826 annotate: src/slic3r/GUI/3DScene.cpp
+- [x] T827 annotate: src/slic3r/GUI/3DScene.hpp
+- [x] T828 annotate: src/slic3r/GUI/AboutDialog.cpp
+- [x] T829 annotate: src/slic3r/GUI/AmsMappingPopup.cpp
+- [x] T830 annotate: src/slic3r/GUI/AmsMappingPopup.hpp
+- [x] T831 annotate: src/slic3r/GUI/AMSMaterialsSetting.cpp
+- [x] T832 annotate: src/slic3r/GUI/AMSMaterialsSetting.hpp
+- [x] T833 annotate: src/slic3r/GUI/AMSSetting.cpp
+- [x] T834 annotate: src/slic3r/GUI/AMSSetting.hpp
+- [x] T835 annotate: src/slic3r/GUI/AmsWidgets.hpp
+- [x] T836 annotate: src/slic3r/GUI/Auxiliary.cpp
+- [x] T837 annotate: src/slic3r/GUI/AuxiliaryDataViewModel.cpp
+- [x] T838 annotate: src/slic3r/GUI/AuxiliaryDataViewModel.hpp
+- [x] T839 annotate: src/slic3r/GUI/AuxiliaryDialog.cpp
+- [x] T840 annotate: src/slic3r/GUI/AuxiliaryDialog.hpp
+- [x] T841 annotate: src/slic3r/GUI/Auxiliary.hpp
+- [x] T842 annotate: src/slic3r/GUI/BackgroundSlicingProcess.cpp
+- [x] T843 annotate: src/slic3r/GUI/BackgroundSlicingProcess.hpp
+- [x] T844 annotate: src/slic3r/GUI/BaseTransparentDPIFrame.cpp
+- [x] T845 annotate: src/slic3r/GUI/BaseTransparentDPIFrame.hpp
+- [x] T846 annotate: src/slic3r/GUI/BBLStatusBarBind.cpp
+- [x] T847 annotate: src/slic3r/GUI/BBLStatusBar.cpp
+- [x] T848 annotate: src/slic3r/GUI/BBLStatusBar.hpp
+- [x] T849 annotate: src/slic3r/GUI/BBLStatusBarPrint.cpp
+- [x] T850 annotate: src/slic3r/GUI/BBLStatusBarPrint.hpp
+- [x] T851 annotate: src/slic3r/GUI/BBLStatusBarSend.cpp
+- [x] T852 annotate: src/slic3r/GUI/BBLStatusBarSend.hpp
+- [x] T853 annotate: src/slic3r/GUI/BBLTopbar.cpp
+- [x] T854 annotate: src/slic3r/GUI/BindDialog.cpp
+- [x] T855 annotate: src/slic3r/GUI/BitmapCache.cpp
+- [x] T856 annotate: src/slic3r/GUI/BitmapCache.hpp
+- [x] T857 annotate: src/slic3r/GUI/BonjourDialog.hpp
+- [x] T858 annotate: src/slic3r/GUI/Calibration.hpp
+- [x] T859 annotate: src/slic3r/GUI/CalibrationPanel.hpp
+- [x] T860 annotate: src/slic3r/GUI/CalibrationWizardCaliPage.hpp
+- [x] T861 annotate: src/slic3r/GUI/CalibrationWizard.hpp
+- [x] T862 annotate: src/slic3r/GUI/CalibrationWizardPage.hpp
+- [x] T863 annotate: src/slic3r/GUI/CalibrationWizardPresetPage.hpp
+- [x] T864 annotate: src/slic3r/GUI/CalibrationWizardStartPage.hpp
 - [x] T209 annotate: src/slic3r/GUI/CameraPopup.cpp
 - [x] T210 annotate: src/slic3r/GUI/CameraPopup.hpp
 - [x] T211 annotate: src/slic3r/GUI/CameraUtils.cpp
@@ -257,50 +409,50 @@ Last updated: 2026-04-07T08:35:00Z
 - [x] T443 annotate: src/slic3r/GUI/Jobs/OrientJob.cpp
 - [x] T444 annotate: src/slic3r/GUI/Jobs/OrientJob.hpp
 - [x] T445 annotate: src/slic3r/GUI/Jobs/PlaterWorker.hpp
-- [ ] T446 annotate: src/slic3r/GUI/Jobs/PrintJob.cpp
+- [x] T446 annotate: src/slic3r/GUI/Jobs/PrintJob.cpp
 - [x] T447 annotate: src/slic3r/GUI/Jobs/PrintJob.hpp
 - [x] T448 annotate: src/slic3r/GUI/Jobs/ProgressIndicator.hpp
 - [x] T449 annotate: src/slic3r/GUI/Jobs/RotoptimizeJob.cpp
 - [x] T450 annotate: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp
-- [ ] T451 annotate: src/slic3r/GUI/Jobs/SendJob.cpp
+- [x] T451 annotate: src/slic3r/GUI/Jobs/SendJob.cpp
 - [x] T452 annotate: src/slic3r/GUI/Jobs/SendJob.hpp
-- [ ] T453 annotate: src/slic3r/GUI/Jobs/SLAImportDialog.hpp
+- [x] T453 annotate: src/slic3r/GUI/Jobs/SLAImportDialog.hpp
 - [x] T454 annotate: src/slic3r/GUI/Jobs/SLAImportJob.cpp
-- [ ] T455 annotate: src/slic3r/GUI/Jobs/SLAImportJob.hpp
+- [x] T455 annotate: src/slic3r/GUI/Jobs/SLAImportJob.hpp
 - [x] T456 annotate: src/slic3r/GUI/Jobs/ThreadSafeQueue.hpp
-- [ ] T457 annotate: src/slic3r/GUI/Jobs/UpgradeNetworkJob.cpp
-- [ ] T458 annotate: src/slic3r/GUI/Jobs/UpgradeNetworkJob.hpp
+- [x] T457 annotate: src/slic3r/GUI/Jobs/UpgradeNetworkJob.cpp
+- [x] T458 annotate: src/slic3r/GUI/Jobs/UpgradeNetworkJob.hpp
 - [x] T459 annotate: src/slic3r/GUI/Jobs/Worker.hpp
-- [ ] T460 annotate: src/slic3r/GUI/KBShortcutsDialog.cpp
+- [x] T460 annotate: src/slic3r/GUI/KBShortcutsDialog.cpp
 - [x] T461 annotate: src/slic3r/GUI/KBShortcutsDialog.hpp
-- [ ] T462 annotate: src/slic3r/GUI/LibVGCode/LibVGCodeWrapper.cpp
-- [ ] T463 annotate: src/slic3r/GUI/LibVGCode/LibVGCodeWrapper.hpp
+- [x] T462 annotate: src/slic3r/GUI/LibVGCode/LibVGCodeWrapper.cpp
+- [x] T463 annotate: src/slic3r/GUI/LibVGCode/LibVGCodeWrapper.hpp
 - [x] T464 annotate: src/slic3r/GUI/MainFrame.cpp
-- [ ] T465 annotate: src/slic3r/GUI/MainFrame.hpp
-- [ ] T466 annotate: src/slic3r/GUI/MarkdownTip.cpp
-- [ ] T467 annotate: src/slic3r/GUI/MarkdownTip.hpp
+- [x] T465 annotate: src/slic3r/GUI/MainFrame.hpp
+- [x] T466 annotate: src/slic3r/GUI/MarkdownTip.cpp
+- [x] T467 annotate: src/slic3r/GUI/MarkdownTip.hpp
 - [x] T468 annotate: src/slic3r/GUI/MediaFilePanel.cpp
-- [ ] T469 annotate: src/slic3r/GUI/MediaPlayCtrl.cpp
-- [ ] T470 annotate: src/slic3r/GUI/MeshUtils.cpp
-- [ ] T471 annotate: src/slic3r/GUI/MeshUtils.hpp
-- [ ] T472 annotate: src/slic3r/GUI/ModelMall.cpp
-- [ ] T473 annotate: src/slic3r/GUI/ModelMall.hpp
-- [ ] T474 annotate: src/slic3r/GUI/MonitorBasePanel.cpp
+- [x] T469 annotate: src/slic3r/GUI/MediaPlayCtrl.cpp
+- [x] T470 annotate: src/slic3r/GUI/MeshUtils.cpp
+- [x] T471 annotate: src/slic3r/GUI/MeshUtils.hpp
+- [x] T472 annotate: src/slic3r/GUI/ModelMall.cpp
+- [x] T473 annotate: src/slic3r/GUI/ModelMall.hpp
+- [x] T474 annotate: src/slic3r/GUI/MonitorBasePanel.cpp
 - [x] T475 annotate: src/slic3r/GUI/Monitor.cpp
 - [x] T476 annotate: src/slic3r/GUI/Monitor.hpp
 - [x] T477 skip-trivial: src/slic3r/GUI/MonitorPage.cpp
 - [x] T478 skip-trivial: src/slic3r/GUI/MonitorPage.hpp
-- [ ] T479 annotate: src/slic3r/GUI/Mouse3DController.cpp
-- [ ] T480 annotate: src/slic3r/GUI/Mouse3DController.hpp
+- [x] T479 annotate: src/slic3r/GUI/Mouse3DController.cpp
+- [x] T480 annotate: src/slic3r/GUI/Mouse3DController.hpp
 - [x] T481 annotate: src/slic3r/GUI/MsgDialog.cpp
-- [ ] T482 annotate: src/slic3r/GUI/MsgDialog.hpp
+- [x] T482 annotate: src/slic3r/GUI/MsgDialog.hpp
 - [x] T483 annotate: src/slic3r/GUI/MultiMachine.cpp
-- [ ] T484 annotate: src/slic3r/GUI/MultiMachine.hpp
-- [ ] T485 annotate: src/slic3r/GUI/MultiMachineManagerPage.cpp
+- [x] T484 annotate: src/slic3r/GUI/MultiMachine.hpp
+- [x] T485 annotate: src/slic3r/GUI/MultiMachineManagerPage.cpp
 - [x] T486 annotate: src/slic3r/GUI/MultiMachineManagerPage.hpp
 - [x] T487 annotate: src/slic3r/GUI/MultiMachinePage.cpp
-- [ ] T488 annotate: src/slic3r/GUI/MultiMachinePage.hpp
-- [ ] T489 annotate: src/slic3r/GUI/MultiPrintJob.cpp
+- [x] T488 annotate: src/slic3r/GUI/MultiMachinePage.hpp
+- [x] T489 skip-trivial: src/slic3r/GUI/MultiPrintJob.cpp
 - [x] T490 annotate: src/slic3r/GUI/MultiPrintJob.hpp
 - [x] T491 annotate: src/slic3r/GUI/MultiSendMachineModel.cpp
 - [x] T492 annotate: src/slic3r/GUI/MultiSendMachineModel.hpp
@@ -314,8 +466,8 @@ Last updated: 2026-04-07T08:35:00Z
 - [x] T500 annotate: src/slic3r/GUI/NetworkTestDialog.hpp
 - [x] T501 annotate: src/slic3r/GUI/Notebook.cpp
 - [x] T502 annotate: src/slic3r/GUI/Notebook.hpp
-- [ ] T503 annotate: src/slic3r/GUI/NotificationManager.cpp
-- [ ] T504 annotate: src/slic3r/GUI/NotificationManager.hpp
+- [x] T503 annotate: src/slic3r/GUI/NotificationManager.cpp
+- [x] T504 annotate: src/slic3r/GUI/NotificationManager.hpp
 - [x] T505 annotate: src/slic3r/GUI/OAuthDialog.cpp
 - [x] T506 annotate: src/slic3r/GUI/OAuthDialog.hpp
 - [x] T507 annotate: src/slic3r/GUI/ObjColorDialog.cpp
@@ -327,45 +479,45 @@ Last updated: 2026-04-07T08:35:00Z
 - [x] T513 annotate: src/slic3r/GUI/OpenGLManager.cpp
 - [x] T514 annotate: src/slic3r/GUI/OpenGLManager.hpp
 - [x] T515 annotate: src/slic3r/GUI/OptionsGroup.cpp
-- [ ] T516 annotate: src/slic3r/GUI/OptionsGroup.hpp
-- [ ] T517 annotate: src/slic3r/GUI/ParamsDialog.cpp
-- [ ] T518 annotate: src/slic3r/GUI/ParamsDialog.hpp
-- [ ] T519 annotate: src/slic3r/GUI/ParamsPanel.cpp
-- [ ] T520 annotate: src/slic3r/GUI/ParamsPanel.hpp
+- [x] T516 annotate: src/slic3r/GUI/OptionsGroup.hpp
+- [x] T517 annotate: src/slic3r/GUI/ParamsDialog.cpp
+- [x] T518 annotate: src/slic3r/GUI/ParamsDialog.hpp
+- [x] T519 annotate: src/slic3r/GUI/ParamsPanel.cpp
+- [x] T520 annotate: src/slic3r/GUI/ParamsPanel.hpp
 - [x] T521 annotate: src/slic3r/GUI/PartPlate.cpp
  - [x] T522 annotate: src/slic3r/GUI/PartPlate.hpp
-- [ ] T523 annotate: src/slic3r/GUI/PartSkipCommon.hpp
-- [ ] T524 annotate: src/slic3r/GUI/PartSkipDialog.cpp
-- [ ] T525 annotate: src/slic3r/GUI/PartSkipDialog.hpp
-- [ ] T526 annotate: src/slic3r/GUI/PhysicalPrinterDialog.cpp
-- [ ] T527 annotate: src/slic3r/GUI/PhysicalPrinterDialog.hpp
-- [ ] T528 annotate: src/slic3r/GUI/Plater.cpp
-- [ ] T529 annotate: src/slic3r/GUI/Plater.hpp
-- [ ] T530 annotate: src/slic3r/GUI/PlateSettingsDialog.cpp
-- [ ] T531 annotate: src/slic3r/GUI/PlateSettingsDialog.hpp
-- [ ] T532 annotate: src/slic3r/GUI/Preferences.cpp
-- [ ] T533 annotate: src/slic3r/GUI/Preferences.hpp
-- [ ] T534 annotate: src/slic3r/GUI/PrePrintChecker.cpp
-- [ ] T535 annotate: src/slic3r/GUI/PrePrintChecker.hpp
+- [x] T523 annotate: src/slic3r/GUI/PartSkipCommon.hpp
+- [x] T524 annotate: src/slic3r/GUI/PartSkipDialog.cpp
+- [x] T525 annotate: src/slic3r/GUI/PartSkipDialog.hpp
+- [x] T526 annotate: src/slic3r/GUI/PhysicalPrinterDialog.cpp
+- [x] T527 annotate: src/slic3r/GUI/PhysicalPrinterDialog.hpp
+- [x] T528 annotate: src/slic3r/GUI/Plater.cpp
+- [x] T529 annotate: src/slic3r/GUI/Plater.hpp
+- [x] T530 annotate: src/slic3r/GUI/PlateSettingsDialog.cpp
+- [x] T531 annotate: src/slic3r/GUI/PlateSettingsDialog.hpp
+- [x] T532 annotate: src/slic3r/GUI/Preferences.cpp
+- [x] T533 annotate: src/slic3r/GUI/Preferences.hpp
+- [x] T534 annotate: src/slic3r/GUI/PrePrintChecker.cpp
+- [x] T535 annotate: src/slic3r/GUI/PrePrintChecker.hpp
 - [x] T536 annotate: src/slic3r/GUI/PresetComboBoxes.cpp
-- [ ] T537 annotate: src/slic3r/GUI/PresetComboBoxes.hpp
-- [ ] T538 annotate: src/slic3r/GUI/PresetHints.cpp
-- [ ] T539 annotate: src/slic3r/GUI/PresetHints.hpp
-- [ ] T540 annotate: src/slic3r/GUI/PrinterCloudAuthDialog.cpp
-- [ ] T541 annotate: src/slic3r/GUI/PrinterCloudAuthDialog.hpp
-- [ ] T542 annotate: src/slic3r/GUI/Printer/PrinterFileSystem.cpp
-- [ ] T543 annotate: src/slic3r/GUI/PrinterWebView.cpp
-- [ ] T544 annotate: src/slic3r/GUI/PrinterWebView.hpp
-- [ ] T545 annotate: src/slic3r/GUI/PrintHostDialogs.cpp
-- [ ] T546 annotate: src/slic3r/GUI/PrintHostDialogs.hpp
-- [ ] T547 annotate: src/slic3r/GUI/PrintOptionsDialog.cpp
+- [x] T537 annotate: src/slic3r/GUI/PresetComboBoxes.hpp
+- [x] T538 annotate: src/slic3r/GUI/PresetHints.cpp
+- [x] T539 skip-trivial: src/slic3r/GUI/PresetHints.hpp
+- [x] T540 annotate: src/slic3r/GUI/PrinterCloudAuthDialog.cpp
+- [x] T541 annotate: src/slic3r/GUI/PrinterCloudAuthDialog.hpp
+- [x] T542 annotate: src/slic3r/GUI/Printer/PrinterFileSystem.cpp
+- [x] T543 annotate: src/slic3r/GUI/PrinterWebView.cpp
+- [x] T544 annotate: src/slic3r/GUI/PrinterWebView.hpp
+- [x] T545 annotate: src/slic3r/GUI/PrintHostDialogs.cpp
+- [x] T546 annotate: src/slic3r/GUI/PrintHostDialogs.hpp
+- [x] T547 annotate: src/slic3r/GUI/PrintOptionsDialog.cpp
 - [x] T548 annotate: src/slic3r/GUI/PrintOptionsDialog.hpp
 - [x] T549 annotate: src/slic3r/GUI/PrivacyUpdateDialog.cpp
-- [ ] T550 annotate: src/slic3r/GUI/PrivacyUpdateDialog.hpp
-- [ ] T551 annotate: src/slic3r/GUI/ProgressStatusBar.cpp
-- [ ] T552 annotate: src/slic3r/GUI/ProgressStatusBar.hpp
-- [ ] T553 annotate: src/slic3r/GUI/Project.cpp
-- [ ] T554 annotate: src/slic3r/GUI/ProjectDirtyStateManager.cpp
+- [x] T550 annotate: src/slic3r/GUI/PrivacyUpdateDialog.hpp
+- [x] T551 annotate: src/slic3r/GUI/ProgressStatusBar.cpp
+- [x] T552 annotate: src/slic3r/GUI/ProgressStatusBar.hpp
+- [x] T553 annotate: src/slic3r/GUI/Project.cpp
+- [x] T554 annotate: src/slic3r/GUI/ProjectDirtyStateManager.cpp
 - [x] T555 annotate: src/slic3r/GUI/ProjectDirtyStateManager.hpp
 - [x] T556 annotate: src/slic3r/GUI/Project.hpp
 - [x] T557 annotate: src/slic3r/GUI/PublishDialog.cpp
@@ -383,10 +535,10 @@ Last updated: 2026-04-07T08:35:00Z
 - [x] T569 annotate: src/slic3r/GUI/SavePresetDialog.cpp
 - [x] T570 annotate: src/slic3r/GUI/SavePresetDialog.hpp
 - [x] T571 annotate: src/slic3r/GUI/SceneRaycaster.cpp
-- [ ] T572 annotate: src/slic3r/GUI/SceneRaycaster.hpp
+- [x] T572 annotate: src/slic3r/GUI/SceneRaycaster.hpp
 - [x] T573 annotate: src/slic3r/GUI/Search.cpp
-- [ ] T574 annotate: src/slic3r/GUI/Search.hpp
-- [ ] T575 annotate: src/slic3r/GUI/Selection.cpp
+- [x] T574 annotate: src/slic3r/GUI/Search.hpp
+- [x] T575 annotate: src/slic3r/GUI/Selection.cpp
 - [x] T576 annotate: src/slic3r/GUI/Selection.hpp
 - [x] T577 annotate: src/slic3r/GUI/SelectMachine.cpp
 - [x] T578 annotate: src/slic3r/GUI/SelectMachine.hpp
@@ -429,15 +581,15 @@ Last updated: 2026-04-07T08:35:00Z
 - [x] T615 annotate: src/slic3r/GUI/ThermalPreconditioningDialog.cpp
 - [x] T616 annotate: src/slic3r/GUI/ThermalPreconditioningDialog.hpp
 - [x] T617 annotate: src/slic3r/GUI/TickCode.cpp
-- [ ] T618 annotate: src/slic3r/GUI/TickCode.hpp
+- [x] T618 annotate: src/slic3r/GUI/TickCode.hpp
 - [x] T619 annotate: src/slic3r/GUI/UnsavedChangesDialog.cpp
 - [x] T620 annotate: src/slic3r/GUI/UnsavedChangesDialog.hpp
-- [ ] T621 annotate: src/slic3r/GUI/UpdateDialogs.cpp
+- [x] T621 annotate: src/slic3r/GUI/UpdateDialogs.cpp
 - [x] T622 annotate: src/slic3r/GUI/UpdateDialogs.hpp
 - [x] T623 annotate: src/slic3r/GUI/UpgradePanel.cpp
 - [x] T624 annotate: src/slic3r/GUI/UpgradePanel.hpp
 - [x] T625 annotate: src/slic3r/GUI/UserManager.cpp
-- [ ] T626 annotate: src/slic3r/GUI/UserManager.hpp
+- [x] T626 annotate: src/slic3r/GUI/UserManager.hpp
 - [x] T627 skip-trivial: src/slic3r/GUI/UserNotification.cpp
 - [x] T628 skip-trivial: src/slic3r/GUI/UserNotification.hpp
 - [x] T629 annotate: src/slic3r/GUI/WebDownPluginDlg.cpp
@@ -461,7 +613,7 @@ Last updated: 2026-04-07T08:35:00Z
 - [x] T647 annotate: src/slic3r/GUI/Widgets/Button.cpp
 - [x] T648 annotate: src/slic3r/GUI/Widgets/Button.hpp
 - [x] T649 annotate: src/slic3r/GUI/Widgets/CheckBox.cpp
-- [ ] T650 annotate: src/slic3r/GUI/Widgets/CheckBox.hpp
+- [x] T650 annotate: src/slic3r/GUI/Widgets/CheckBox.hpp
 - [x] T651 annotate: src/slic3r/GUI/Widgets/ComboBox.cpp
 - [x] T652 annotate: src/slic3r/GUI/Widgets/ComboBox.hpp
 - [x] T653 annotate: src/slic3r/GUI/Widgets/DialogButtons.cpp
@@ -498,7 +650,7 @@ Last updated: 2026-04-07T08:35:00Z
 - [x] T684 annotate: src/slic3r/GUI/Widgets/Scrollbar.hpp
 - [x] T685 annotate: src/slic3r/GUI/Widgets/ScrolledWindow.cpp
 - [x] T686 annotate: src/slic3r/GUI/Widgets/ScrolledWindow.hpp
-- [ ] T687 annotate: src/slic3r/GUI/Widgets/SideButton.cpp
+- [x] T687 annotate: src/slic3r/GUI/Widgets/SideButton.cpp
 - [x] T688 annotate: src/slic3r/GUI/Widgets/SideButton.hpp
 - [x] T689 annotate: src/slic3r/GUI/Widgets/SideMenuPopup.cpp
 - [x] T690 annotate: src/slic3r/GUI/Widgets/SideMenuPopup.hpp
@@ -514,50 +666,50 @@ Last updated: 2026-04-07T08:35:00Z
 - [x] T700 annotate: src/slic3r/GUI/Widgets/StaticBox.hpp
 - [x] T701 annotate: src/slic3r/GUI/Widgets/StaticGroup.cpp
 - [x] T702 annotate: src/slic3r/GUI/Widgets/StaticGroup.hpp
-- [ ] T703 annotate: src/slic3r/GUI/Widgets/StaticLine.cpp
+- [x] T703 annotate: src/slic3r/GUI/Widgets/StaticLine.cpp
 - [x] T704 annotate: src/slic3r/GUI/Widgets/StaticLine.hpp
 - [x] T705 annotate: src/slic3r/GUI/Widgets/StepCtrl.cpp
-- [ ] T706 annotate: src/slic3r/GUI/Widgets/StepCtrl.hpp
+- [x] T706 annotate: src/slic3r/GUI/Widgets/StepCtrl.hpp
 - [x] T707 annotate: src/slic3r/GUI/Widgets/SwitchButton.cpp
 - [x] T708 annotate: src/slic3r/GUI/Widgets/SwitchButton.hpp
 - [x] T709 annotate: src/slic3r/GUI/Widgets/TabCtrl.cpp
 - [x] T710 annotate: src/slic3r/GUI/Widgets/TabCtrl.hpp
 - [x] T711 annotate: src/slic3r/GUI/Widgets/TempInput.cpp
 - [x] T712 annotate: src/slic3r/GUI/Widgets/TempInput.hpp
-- [ ] T713 annotate: src/slic3r/GUI/Widgets/TextInput.cpp
-- [ ] T714 annotate: src/slic3r/GUI/Widgets/TextInput.hpp
-- [ ] T715 annotate: src/slic3r/GUI/Widgets/WebView.cpp
-- [ ] T716 annotate: src/slic3r/GUI/Widgets/WebView.hpp
-- [ ] T717 annotate: src/slic3r/GUI/WipeTowerDialog.cpp
-- [ ] T718 annotate: src/slic3r/GUI/WipeTowerDialog.hpp
-- [ ] T719 annotate: src/slic3r/GUI/wxExtensions.cpp
-- [ ] T720 annotate: src/slic3r/GUI/wxExtensions.hpp
+- [x] T713 annotate: src/slic3r/GUI/Widgets/TextInput.cpp
+- [x] T714 annotate: src/slic3r/GUI/Widgets/TextInput.hpp
+- [x] T715 annotate: src/slic3r/GUI/Widgets/WebView.cpp
+- [x] T716 annotate: src/slic3r/GUI/Widgets/WebView.hpp
+- [x] T717 annotate: src/slic3r/GUI/WipeTowerDialog.cpp
+- [x] T718 annotate: src/slic3r/GUI/WipeTowerDialog.hpp
+- [x] T719 annotate: src/slic3r/GUI/wxExtensions.cpp
+- [x] T720 annotate: src/slic3r/GUI/wxExtensions.hpp
 - [x] T721 annotate: src/slic3r/GUI/wxMediaCtrl2.cpp
 - [x] T722 annotate: src/slic3r/Utils/ASCIIFolding.cpp
 - [x] T723 annotate: src/slic3r/Utils/ASCIIFolding.hpp
-- [ ] T724 annotate: src/slic3r/Utils/AstroBox.cpp
-- [ ] T725 annotate: src/slic3r/Utils/AstroBox.hpp
-- [ ] T726 annotate: src/slic3r/Utils/bambu_networking.hpp
-- [ ] T727 annotate: src/slic3r/Utils/BBLCloudServiceAgent.cpp
-- [ ] T728 annotate: src/slic3r/Utils/BBLCloudServiceAgent.hpp
-- [ ] T729 annotate: src/slic3r/Utils/BBLNetworkPlugin.cpp
-- [ ] T730 annotate: src/slic3r/Utils/BBLNetworkPlugin.hpp
-- [ ] T731 annotate: src/slic3r/Utils/BBLPrinterAgent.cpp
-- [ ] T732 annotate: src/slic3r/Utils/BBLPrinterAgent.hpp
-- [ ] T733 annotate: src/slic3r/Utils/Bonjour.cpp
-- [ ] T734 annotate: src/slic3r/Utils/Bonjour.hpp
-- [ ] T735 annotate: src/slic3r/Utils/CalibUtils.cpp
-- [ ] T736 annotate: src/slic3r/Utils/CalibUtils.hpp
-- [ ] T737 annotate: src/slic3r/Utils/ColorSpaceConvert.cpp
-- [ ] T738 annotate: src/slic3r/Utils/ColorSpaceConvert.hpp
-- [ ] T739 annotate: src/slic3r/Utils/CrealityPrint.cpp
-- [ ] T740 annotate: src/slic3r/Utils/CrealityPrint.hpp
-- [ ] T741 annotate: src/slic3r/Utils/Duet.cpp
-- [ ] T742 annotate: src/slic3r/Utils/Duet.hpp
-- [ ] T743 annotate: src/slic3r/Utils/ElegooLink.cpp
-- [ ] T744 annotate: src/slic3r/Utils/ElegooLink.hpp
-- [ ] T745 annotate: src/slic3r/Utils/EmbossStyleManager.cpp
-- [ ] T746 annotate: src/slic3r/Utils/EmbossStyleManager.hpp
+- [x] T724 annotate: src/slic3r/Utils/AstroBox.cpp
+- [x] T725 annotate: src/slic3r/Utils/AstroBox.hpp
+- [x] T726 annotate: src/slic3r/Utils/bambu_networking.hpp
+- [x] T727 annotate: src/slic3r/Utils/BBLCloudServiceAgent.cpp
+- [x] T728 annotate: src/slic3r/Utils/BBLCloudServiceAgent.hpp
+- [x] T729 annotate: src/slic3r/Utils/BBLNetworkPlugin.cpp
+- [x] T730 annotate: src/slic3r/Utils/BBLNetworkPlugin.hpp
+- [x] T731 annotate: src/slic3r/Utils/BBLPrinterAgent.cpp
+- [x] T732 annotate: src/slic3r/Utils/BBLPrinterAgent.hpp
+- [x] T733 annotate: src/slic3r/Utils/Bonjour.cpp
+- [x] T734 annotate: src/slic3r/Utils/Bonjour.hpp
+- [x] T735 annotate: src/slic3r/Utils/CalibUtils.cpp
+- [x] T736 annotate: src/slic3r/Utils/CalibUtils.hpp
+- [x] T737 annotate: src/slic3r/Utils/ColorSpaceConvert.cpp
+- [x] T738 annotate: src/slic3r/Utils/ColorSpaceConvert.hpp
+- [x] T739 annotate: src/slic3r/Utils/CrealityPrint.cpp
+- [x] T740 annotate: src/slic3r/Utils/CrealityPrint.hpp
+- [x] T741 annotate: src/slic3r/Utils/Duet.cpp
+- [x] T742 annotate: src/slic3r/Utils/Duet.hpp
+- [x] T743 annotate: src/slic3r/Utils/ElegooLink.cpp
+- [x] T744 annotate: src/slic3r/Utils/ElegooLink.hpp
+- [x] T745 annotate: src/slic3r/Utils/EmbossStyleManager.cpp
+- [x] T746 annotate: src/slic3r/Utils/EmbossStyleManager.hpp
 - [x] T747 annotate: src/slic3r/Utils/ESP3D.cpp
 - [x] T748 annotate: src/slic3r/Utils/ESP3D.hpp
 - [x] T749 skip-trivial: src/slic3r/Utils/FileHelp.cpp
@@ -570,13 +722,13 @@ Last updated: 2026-04-07T08:35:00Z
 - [x] T756 annotate: src/slic3r/Utils/FlashAir.hpp
 - [x] T757 annotate: src/slic3r/Utils/Flashforge.cpp
 - [x] T758 annotate: src/slic3r/Utils/Flashforge.hpp
-- [ ] T759 annotate: src/slic3r/Utils/FontConfigHelp.cpp
-- [ ] T760 annotate: src/slic3r/Utils/FontConfigHelp.hpp
-- [ ] T761 annotate: src/slic3r/Utils/HexFile.cpp
-- [ ] T762 annotate: src/slic3r/Utils/HexFile.hpp
+- [x] T759 annotate: src/slic3r/Utils/FontConfigHelp.cpp
+- [x] T760 annotate: src/slic3r/Utils/FontConfigHelp.hpp
+- [x] T761 annotate: src/slic3r/Utils/HexFile.cpp
+- [x] T762 annotate: src/slic3r/Utils/HexFile.hpp
 - [x] T763 annotate: src/slic3r/Utils/Http.cpp
 - [x] T764 annotate: src/slic3r/Utils/Http.hpp
-- [ ] T765 annotate: src/slic3r/Utils/ICloudServiceAgent.hpp
+- [x] T765 annotate: src/slic3r/Utils/ICloudServiceAgent.hpp
 - [x] T766 annotate: src/slic3r/Utils/InstanceID.cpp
 - [x] T767 annotate: src/slic3r/Utils/InstanceID.hpp
 - [x] T768 annotate: src/slic3r/Utils/IPrinterAgent.hpp
@@ -597,40 +749,40 @@ Last updated: 2026-04-07T08:35:00Z
 - [x] T783 annotate: src/slic3r/Utils/Obico.hpp
 - [x] T784 annotate: src/slic3r/Utils/OctoPrint.cpp
 - [x] T785 annotate: src/slic3r/Utils/OctoPrint.hpp
-- [ ] T786 annotate: src/slic3r/Utils/OrcaCloudServiceAgent.cpp
-- [ ] T787 annotate: src/slic3r/Utils/OrcaCloudServiceAgent.hpp
-- [ ] T788 annotate: src/slic3r/Utils/OrcaPrinterAgent.cpp
-- [ ] T789 annotate: src/slic3r/Utils/OrcaPrinterAgent.hpp
-- [ ] T790 annotate: src/slic3r/Utils/PresetUpdater.cpp
-- [ ] T791 annotate: src/slic3r/Utils/PresetUpdater.hpp
-- [ ] T792 annotate: src/slic3r/Utils/PrintHost.cpp
-- [ ] T793 annotate: src/slic3r/Utils/PrintHost.hpp
-- [ ] T794 annotate: src/slic3r/Utils/Process.cpp
-- [ ] T795 annotate: src/slic3r/Utils/Process.hpp
-- [ ] T796 annotate: src/slic3r/Utils/ProfileDescription.hpp
-- [ ] T797 annotate: src/slic3r/Utils/Profile.hpp
-- [ ] T798 annotate: src/slic3r/Utils/QidiPrinterAgent.cpp
-- [ ] T799 annotate: src/slic3r/Utils/QidiPrinterAgent.hpp
+- [x] T786 annotate: src/slic3r/Utils/OrcaCloudServiceAgent.cpp
+- [x] T787 annotate: src/slic3r/Utils/OrcaCloudServiceAgent.hpp
+- [x] T788 annotate: src/slic3r/Utils/OrcaPrinterAgent.cpp
+- [x] T789 annotate: src/slic3r/Utils/OrcaPrinterAgent.hpp
+- [x] T790 annotate: src/slic3r/Utils/PresetUpdater.cpp
+- [x] T791 annotate: src/slic3r/Utils/PresetUpdater.hpp
+- [x] T792 annotate: src/slic3r/Utils/PrintHost.cpp
+- [x] T793 annotate: src/slic3r/Utils/PrintHost.hpp
+- [x] T794 annotate: src/slic3r/Utils/Process.cpp
+- [x] T795 skip-trivial: src/slic3r/Utils/Process.hpp
+- [x] T796 skip-trivial: src/slic3r/Utils/ProfileDescription.hpp
+- [x] T797 skip-trivial: src/slic3r/Utils/Profile.hpp
+- [x] T798 annotate: src/slic3r/Utils/QidiPrinterAgent.cpp
+- [x] T799 annotate: src/slic3r/Utils/QidiPrinterAgent.hpp
 - [x] T800 annotate: src/slic3r/Utils/RaycastManager.cpp
 - [x] T801 annotate: src/slic3r/Utils/RaycastManager.hpp
-- [ ] T802 annotate: src/slic3r/Utils/Repetier.cpp
-- [ ] T803 annotate: src/slic3r/Utils/Repetier.hpp
-- [ ] T804 annotate: src/slic3r/Utils/RetinaHelper.hpp
-- [ ] T805 annotate: src/slic3r/Utils/Serial.cpp
-- [ ] T806 annotate: src/slic3r/Utils/Serial.hpp
-- [ ] T807 annotate: src/slic3r/Utils/SerialMessage.hpp
-- [ ] T808 annotate: src/slic3r/Utils/SerialMessageType.hpp
-- [ ] T809 annotate: src/slic3r/Utils/SimplyPrint.cpp
-- [ ] T810 annotate: src/slic3r/Utils/SimplyPrint.hpp
-- [ ] T811 annotate: src/slic3r/Utils/SnapmakerPrinterAgent.cpp
-- [ ] T812 annotate: src/slic3r/Utils/SnapmakerPrinterAgent.hpp
-- [ ] T813 annotate: src/slic3r/Utils/TCPConsole.cpp
-- [ ] T814 annotate: src/slic3r/Utils/TCPConsole.hpp
+- [x] T802 annotate: src/slic3r/Utils/Repetier.cpp
+- [x] T803 annotate: src/slic3r/Utils/Repetier.hpp
+- [x] T804 skip-trivial: src/slic3r/Utils/RetinaHelper.hpp
+- [x] T805 annotate: src/slic3r/Utils/Serial.cpp
+- [x] T806 annotate: src/slic3r/Utils/Serial.hpp
+- [x] T807 skip-trivial: src/slic3r/Utils/SerialMessage.hpp
+- [x] T808 skip-trivial: src/slic3r/Utils/SerialMessageType.hpp
+- [x] T809 annotate: src/slic3r/Utils/SimplyPrint.cpp
+- [x] T810 annotate: src/slic3r/Utils/SimplyPrint.hpp
+- [x] T811 annotate: src/slic3r/Utils/SnapmakerPrinterAgent.cpp
+- [x] T812 annotate: src/slic3r/Utils/SnapmakerPrinterAgent.hpp
+- [x] T813 annotate: src/slic3r/Utils/TCPConsole.cpp
+- [x] T814 annotate: src/slic3r/Utils/TCPConsole.hpp
 - [x] T815 annotate: src/slic3r/Utils/UndoRedo.cpp
 - [x] T816 annotate: src/slic3r/Utils/UndoRedo.hpp
-- [ ] T817 annotate: src/slic3r/Utils/WebSocketClient.hpp
-- [ ] T818 annotate: src/slic3r/Utils/WxFontUtils.cpp
-- [ ] T819 annotate: src/slic3r/Utils/WxFontUtils.hpp
+- [x] T817 annotate: src/slic3r/Utils/WebSocketClient.hpp
+- [x] T818 annotate: src/slic3r/Utils/WxFontUtils.cpp
+- [x] T819 annotate: src/slic3r/Utils/WxFontUtils.hpp
 
 ## Phase 2 — Documentation
 (Inline tasks for each doc file)

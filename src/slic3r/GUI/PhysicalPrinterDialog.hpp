@@ -15,9 +15,7 @@ class wxStaticText;
 class Button;
 class wxBoxSizer;
 
-namespace Slic3r {
-
-namespace GUI {
+namespace Slic3r { namespace GUI {
 
 //------------------------------------------
 //          PhysicalPrinterDialog
@@ -26,20 +24,24 @@ namespace GUI {
 class ConfigOptionsGroup;
 class PhysicalPrinterDialog : public DPIDialog
 {
-    DynamicPrintConfig* m_config            { nullptr };
-    ConfigOptionsGroup* m_optgroup          { nullptr };
+    // [INTENT] Dialog for editing the active physical printer preset and its host connection details.
+    // [STATE] Combines preset-backed config data with transient validation widgets, so UI state and config state diverge while the dialog
+    // is open. [PORTING_HAZARD:P1] The current flow assumes synchronous wx dialog events and immediate preset mutation hooks that need
+    // restructuring in Unity.
+    DynamicPrintConfig* m_config{nullptr};
+    ConfigOptionsGroup* m_optgroup{nullptr};
 
-    Button*     m_printhost_browse_btn              {nullptr};
-    Button*     m_printhost_test_btn                {nullptr};
-    Button*     m_printhost_logout_btn              {nullptr};
-    Button*     m_printhost_cafile_browse_btn       {nullptr};
-    Button*     m_printhost_client_cert_browse_btn  {nullptr};
-    Button*     m_printhost_port_browse_btn         {nullptr};
+    Button* m_printhost_browse_btn{nullptr};
+    Button* m_printhost_test_btn{nullptr};
+    Button* m_printhost_logout_btn{nullptr};
+    Button* m_printhost_cafile_browse_btn{nullptr};
+    Button* m_printhost_client_cert_browse_btn{nullptr};
+    Button* m_printhost_port_browse_btn{nullptr};
 
-    RoundedRectangle*   m_input_area                        {nullptr};
-    wxStaticText*       m_valid_label                       {nullptr};
-    wxTextCtrl*         m_input_ctrl                        {nullptr};
-    Button*             btnOK                               {nullptr};
+    RoundedRectangle* m_input_area{nullptr};
+    wxStaticText*     m_valid_label{nullptr};
+    wxTextCtrl*       m_input_ctrl{nullptr};
+    Button*           btnOK{nullptr};
 
     void build_printhost_settings(ConfigOptionsGroup* optgroup);
     void OnOK(wxEvent& event);
@@ -48,24 +50,19 @@ public:
     PhysicalPrinterDialog(wxWindow* parent);
     ~PhysicalPrinterDialog();
 
-    enum ValidationType
-    {
-        Valid,
-        NoValid,
-        Warning
-    };
-    PresetCollection* m_presets {nullptr};
-    ValidationType  m_valid_type;
-    std::string     m_preset_name;
+    enum ValidationType { Valid, NoValid, Warning };
+    PresetCollection* m_presets{nullptr};
+    ValidationType    m_valid_type;
+    std::string       m_preset_name;
 
-    void        update(bool printer_change = false);
-    void        update_host_type(bool printer_change);
-    void        update_printer_agent_type();
-    void        update_preset_input();
-    void        update_printhost_buttons();
-    void        update_printers();
-    void        update_ports();
-    void        update_webui();
+    void update(bool printer_change = false);
+    void update_host_type(bool printer_change);
+    void update_printer_agent_type();
+    void update_preset_input();
+    void update_printhost_buttons();
+    void update_printers();
+    void update_ports();
+    void update_webui();
 
 protected:
     void on_dpi_changed(const wxRect& suggested_rect) override;
@@ -73,8 +70,6 @@ protected:
     void check_host_key_valid();
 };
 
-
-} // namespace GUI
-} // namespace Slic3r
+}} // namespace Slic3r::GUI
 
 #endif

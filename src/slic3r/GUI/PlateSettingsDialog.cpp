@@ -1,3 +1,7 @@
+// [INTENT] Implements the plate settings dialogs plus the per-layer print-sequence editor used to validate, reorder, and apply
+// plate-specific overrides. [EVENT] Custom wx events (`EVT_NEED_RESORT_LAYERS`, `EVT_SET_BED_TYPE_CONFIRM`) keep the layer-range UI
+// synchronized as edits mutate dependent controls. [PORTING_HAZARD:P2] The dialog flow depends on wx widget ownership, posted events, and
+// layout/fit passes after nearly every edit; a Unity port will need an explicit state/controller split.
 #include "PlateSettingsDialog.hpp"
 #include "MsgDialog.hpp"
 #include "Widgets/DialogButtons.hpp"
@@ -26,7 +30,7 @@ bool LayerSeqInfo::operator<(const LayerSeqInfo& another) const
 }
 
 LayerNumberTextInput::LayerNumberTextInput(wxWindow* parent, int layer_number, wxSize size, Type type, ValueType value_type)
-    :ComboBox(parent, wxID_ANY, wxEmptyString, wxDefaultPosition, size, 0, NULL)
+    : ComboBox(parent, wxID_ANY, wxEmptyString, wxDefaultPosition, size, 0, NULL)
     , m_layer_number(layer_number)
     , m_type(type)
     , m_value_type(value_type)
@@ -43,29 +47,29 @@ LayerNumberTextInput::LayerNumberTextInput(wxWindow* parent, int layer_number, w
     }
 
     Bind(wxEVT_TEXT, [this](auto& evt) {
-            if (m_value_type == ValueType::End) {
-                // TextCtrl->SetValue() will generate a wxEVT_TEXT event
-                GetTextCtrl()->ChangeValue(_L("End"));
-                return;
-            }
-            evt.Skip();
-        });
+        if (m_value_type == ValueType::End) {
+            // TextCtrl->SetValue() will generate a wxEVT_TEXT event
+            GetTextCtrl()->ChangeValue(_L("End"));
+            return;
+        }
+        evt.Skip();
+    });
 
     auto validate_input_value = [this](int gui_value) {
         // value should not be less than MIN_LAYER_VALUE, and should not be greater than MAX_LAYER_VALUE
         gui_value = std::clamp(gui_value, MIN_LAYER_VALUE, MAX_LAYER_VALUE);
 
-        int begin_value = 0;
-        int end_value = 0;
+        int                   begin_value     = 0;
+        int                   end_value       = 0;
         LayerNumberTextInput* end_layer_input = nullptr;
         if (this->m_type == Type::Begin) {
-            begin_value = gui_value;
-            end_value = m_another_layer_input->get_layer_number();
+            begin_value     = gui_value;
+            end_value       = m_another_layer_input->get_layer_number();
             end_layer_input = m_another_layer_input;
         }
         if (this->m_type == Type::End) {
-            begin_value = m_another_layer_input->get_layer_number();
-            end_value = gui_value;
+            begin_value     = m_another_layer_input->get_layer_number();
+            end_value       = gui_value;
             end_layer_input = this;
         }
 
@@ -82,8 +86,7 @@ LayerNumberTextInput::LayerNumberTextInput(wxWindow* parent, int layer_number, w
                     this->set_layer_number(begin_value);
                     wxCommandEvent evt(EVT_NEED_RESORT_LAYERS);
                     wxPostEvent(m_parent, evt);
-                }
-                else {
+                } else {
                     // do nothing
                     // reset to the last value for end_layer_input
                 }
@@ -113,23 +116,22 @@ LayerNumberTextInput::LayerNumberTextInput(wxWindow* parent, int layer_number, w
     Bind(wxEVT_TEXT_ENTER, [commit_layer_number_from_gui](wxEvent& evt) {
         commit_layer_number_from_gui();
         evt.Skip();
-        });
+    });
     Bind(wxEVT_KILL_FOCUS, [commit_layer_number_from_gui](wxFocusEvent& evt) {
         commit_layer_number_from_gui();
         evt.Skip();
-        });
+    });
 
     Bind(wxEVT_COMBOBOX, [this](auto& e) {
         if (e.GetSelection() == 0) {
             m_value_type = ValueType::End;
-        }
-        else if (e.GetSelection() == 1) {
-            m_value_type = ValueType::Custom;
+        } else if (e.GetSelection() == 1) {
+            m_value_type   = ValueType::Custom;
             m_layer_number = -1;
             update_label();
         }
         e.Skip();
-        });
+    });
 }
 
 void LayerNumberTextInput::update_label()
@@ -139,8 +141,7 @@ void LayerNumberTextInput::update_label()
 
     if (!is_layer_number_valid()) {
         SetLabel("");
-    }
-    else
+    } else
         SetLabel(std::to_string(m_layer_number));
 }
 
@@ -160,10 +161,7 @@ void LayerNumberTextInput::set_layer_number(int layer_number)
     }
 }
 
-int LayerNumberTextInput::get_layer_number()
-{
-    return m_value_type == ValueType::End ? MAX_LAYER_VALUE : m_layer_number;
-}
+int LayerNumberTextInput::get_layer_number() { return m_value_type == ValueType::End ? MAX_LAYER_VALUE : m_layer_number; }
 
 bool LayerNumberTextInput::is_layer_number_valid()
 {
@@ -172,18 +170,18 @@ bool LayerNumberTextInput::is_layer_number_valid()
     return m_layer_number >= MIN_LAYER_VALUE;
 }
 
-OtherLayersSeqPanel::OtherLayersSeqPanel(wxWindow* parent)
-    :wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize)
+OtherLayersSeqPanel::OtherLayersSeqPanel(wxWindow* parent) : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize)
 {
     m_bmp_delete = ScalableBitmap(this, "delete_filament");
-    m_bmp_add = ScalableBitmap(this, "add_filament");
+    m_bmp_add    = ScalableBitmap(this, "add_filament");
 
     SetBackgroundColour(*wxWHITE);
 
     wxBoxSizer* top_sizer = new wxBoxSizer(wxVERTICAL);
 
-    wxBoxSizer* title_sizer = new wxBoxSizer(wxHORIZONTAL);
-    m_other_layer_print_seq_choice = new ComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(FromDIP(240), -1), 0, NULL, wxCB_READONLY);
+    wxBoxSizer* title_sizer        = new wxBoxSizer(wxHORIZONTAL);
+    m_other_layer_print_seq_choice = new ComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(FromDIP(240), -1), 0, NULL,
+                                                  wxCB_READONLY);
     m_other_layer_print_seq_choice->Append(_L("Auto"));
     m_other_layer_print_seq_choice->Append(_L("Customize"));
     m_other_layer_print_seq_choice->SetSelection(0);
@@ -193,7 +191,7 @@ OtherLayersSeqPanel::OtherLayersSeqPanel(wxWindow* parent)
     title_sizer->AddStretchSpacer();
     title_sizer->Add(m_other_layer_print_seq_choice, 0, wxALIGN_CENTER | wxALIGN_RIGHT, 0);
 
-    wxBoxSizer* buttons_sizer = new wxBoxSizer(wxHORIZONTAL);
+    wxBoxSizer*     buttons_sizer  = new wxBoxSizer(wxHORIZONTAL);
     ScalableButton* add_layers_btn = new ScalableButton(this, wxID_ANY, m_bmp_add);
     add_layers_btn->SetBackgroundColour(GetBackgroundColour());
     ScalableButton* delete_layers_btn = new ScalableButton(this, wxID_ANY, m_bmp_delete);
@@ -202,7 +200,7 @@ OtherLayersSeqPanel::OtherLayersSeqPanel(wxWindow* parent)
     buttons_sizer->Add(delete_layers_btn, 0, wxLEFT | wxRIGHT | wxALIGN_CENTER, FromDIP(5));
     buttons_sizer->Show(false);
 
-    m_layer_input_panel = new wxPanel(this);
+    m_layer_input_panel           = new wxPanel(this);
     wxBoxSizer* layer_panel_sizer = new wxBoxSizer(wxVERTICAL);
     m_layer_input_panel->SetSizer(layer_panel_sizer);
     m_layer_input_panel->Hide();
@@ -216,49 +214,47 @@ OtherLayersSeqPanel::OtherLayersSeqPanel(wxWindow* parent)
     Layout();
     top_sizer->Fit(this);
 
-
     m_other_layer_print_seq_choice->Bind(wxEVT_COMBOBOX, [this, buttons_sizer](auto& e) {
         if (e.GetSelection() == 0) {
             m_layer_input_panel->Show(false);
             buttons_sizer->Show(false);
-        }
-        else if (e.GetSelection() == 1) {
+        } else if (e.GetSelection() == 1) {
             m_layer_input_panel->Show(true);
             buttons_sizer->Show(true);
         }
         m_parent->Layout();
         m_parent->Fit();
-        });
+    });
     add_layers_btn->Bind(wxEVT_BUTTON, [this](wxEvent&) {
         Freeze();
         append_layer();
         m_parent->Layout();
         m_parent->Fit();
         Thaw();
-        });
+    });
     delete_layers_btn->Bind(wxEVT_BUTTON, [this](wxEvent&) {
         popup_layer();
         m_parent->Layout();
         m_parent->Fit();
-        });
+    });
     Bind(EVT_NEED_RESORT_LAYERS, [this](auto& evt) {
         std::vector<LayerSeqInfo> result;
         for (int i = 0; i < m_layer_input_sizer_list.size(); i++) {
             int begin_layer_number = m_begin_layer_input_list[i]->get_layer_number();
-            int end_layer_number = m_end_layer_input_list[i]->get_layer_number();
-            result.push_back({ begin_layer_number, end_layer_number, m_drag_canvas_list[i]->get_shape_list_order() });
+            int end_layer_number   = m_end_layer_input_list[i]->get_layer_number();
+            result.push_back({begin_layer_number, end_layer_number, m_drag_canvas_list[i]->get_shape_list_order()});
         }
         if (!std::is_sorted(result.begin(), result.end())) {
             std::sort(result.begin(), result.end());
             sync_layers_print_seq(1, result);
         }
         result.swap(m_layer_seq_infos);
-        });
+    });
     Bind(EVT_SET_BED_TYPE_CONFIRM, [this](auto& evt) {
         std::vector<LayerSeqInfo> result;
         for (int i = 0; i < m_layer_input_sizer_list.size(); i++) {
             int begin_layer_number = m_begin_layer_input_list[i]->get_layer_number();
-            int end_layer_number = m_end_layer_input_list[i]->get_layer_number();
+            int end_layer_number   = m_end_layer_input_list[i]->get_layer_number();
 
             if (!m_begin_layer_input_list[i]->is_layer_number_valid() || !m_end_layer_input_list[i]->is_layer_number_valid()) {
                 MessageDialog msg_dlg(nullptr, _L("Please input layer value (>= 2)."), wxEmptyString, wxICON_WARNING | wxOK);
@@ -267,10 +263,10 @@ OtherLayersSeqPanel::OtherLayersSeqPanel(wxWindow* parent)
                 return;
             }
 
-            result.push_back({ begin_layer_number, end_layer_number, m_drag_canvas_list[i]->get_shape_list_order() });
+            result.push_back({begin_layer_number, end_layer_number, m_drag_canvas_list[i]->get_shape_list_order()});
         }
         result.swap(m_layer_seq_infos);
-        });
+    });
 }
 
 void OtherLayersSeqPanel::append_layer(const LayerSeqInfo* layer_info)
@@ -280,12 +276,15 @@ void OtherLayersSeqPanel::append_layer(const LayerSeqInfo* layer_info)
     wxStaticText* choose_layer_head_txt = new wxStaticText(m_layer_input_panel, wxID_ANY, _L("Layer"));
     choose_layer_head_txt->SetFont(Label::Body_14);
 
-    LayerNumberTextInput* begin_layer_input = new LayerNumberTextInput(m_layer_input_panel, -1, wxSize(FromDIP(100), -1), LayerNumberTextInput::Type::Begin, LayerNumberTextInput::ValueType::Custom);
+    LayerNumberTextInput* begin_layer_input = new LayerNumberTextInput(m_layer_input_panel, -1, wxSize(FromDIP(100), -1),
+                                                                       LayerNumberTextInput::Type::Begin,
+                                                                       LayerNumberTextInput::ValueType::Custom);
 
     wxStaticText* choose_layer_to_txt = new wxStaticText(m_layer_input_panel, wxID_ANY, _L("to"));
     choose_layer_to_txt->SetFont(Label::Body_14);
 
-    LayerNumberTextInput* end_layer_input = new LayerNumberTextInput(m_layer_input_panel, -1, wxSize(FromDIP(100), -1), LayerNumberTextInput::Type::End, LayerNumberTextInput::ValueType::End);
+    LayerNumberTextInput* end_layer_input = new LayerNumberTextInput(m_layer_input_panel, -1, wxSize(FromDIP(100), -1),
+                                                                     LayerNumberTextInput::Type::End, LayerNumberTextInput::ValueType::End);
 
     begin_layer_input->link(end_layer_input);
     if (m_begin_layer_input_list.size() == 0) {
@@ -294,7 +293,7 @@ void OtherLayersSeqPanel::append_layer(const LayerSeqInfo* layer_info)
     }
 
     const std::vector<std::string> extruder_colours = wxGetApp().plater()->get_extruder_colors_from_plater_config();
-    std::vector<int> order(extruder_colours.size());
+    std::vector<int>               order(extruder_colours.size());
     for (int i = 0; i < order.size(); i++) {
         order[i] = i + 1;
     }
@@ -362,37 +361,39 @@ void OtherLayersSeqPanel::sync_layers_print_seq(int selection, const std::vector
     }
 }
 
-
-PlateSettingsDialog::PlateSettingsDialog(wxWindow* parent, const wxString& title, bool only_layer_seq, const wxPoint& pos, const wxSize& size, long style)
-:DPIDialog(parent, wxID_ANY, title, pos, size, style)
+PlateSettingsDialog::PlateSettingsDialog(
+    wxWindow* parent, const wxString& title, bool only_layer_seq, const wxPoint& pos, const wxSize& size, long style)
+    : DPIDialog(parent, wxID_ANY, title, pos, size, style)
 {
     SetBackgroundColour(*wxWHITE);
     wxBoxSizer* m_sizer_main = new wxBoxSizer(wxVERTICAL);
-    auto m_line_top = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(650), -1));
+    auto        m_line_top   = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(650), -1));
     m_line_top->SetBackgroundColour(wxColour(166, 169, 170));
     m_sizer_main->Add(m_line_top, 0, wxEXPAND, 0);
 
     wxFlexGridSizer* top_sizer = new wxFlexGridSizer(0, 2, FromDIP(5), 0);
-    top_sizer->AddGrowableCol(0,1);
+    top_sizer->AddGrowableCol(0, 1);
     top_sizer->SetFlexibleDirection(wxBOTH);
     top_sizer->SetNonFlexibleGrowMode(wxFLEX_GROWMODE_SPECIFIED);
 
     auto plate_name_txt = new wxStaticText(this, wxID_ANY, _L("Plate name"));
     plate_name_txt->SetFont(Label::Body_14);
-    m_ti_plate_name = new TextInput(this, wxString::FromDouble(0.0), "", "", wxDefaultPosition, wxSize(FromDIP(240),-1), wxTE_PROCESS_ENTER);
+    m_ti_plate_name = new TextInput(this, wxString::FromDouble(0.0), "", "", wxDefaultPosition, wxSize(FromDIP(240), -1),
+                                    wxTE_PROCESS_ENTER);
     top_sizer->Add(plate_name_txt, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_LEFT | wxTOP | wxBOTTOM, FromDIP(5));
     top_sizer->Add(m_ti_plate_name, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_RIGHT | wxTOP | wxBOTTOM, FromDIP(5));
 
-    m_bed_type_choice = new ComboBox( this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(FromDIP(240),-1), 0, NULL, wxCB_READONLY );
+    m_bed_type_choice = new ComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(FromDIP(240), -1), 0, NULL, wxCB_READONLY);
     auto pm           = wxGetApp().plater()->get_curr_printer_model();
     if (pm) {
         m_cur_combox_bed_types.clear();
         m_bed_type_choice->AppendString(_L("Same as Global Plate Type"));
-        const ConfigOptionDef *bed_type_def = print_config_def.get("curr_bed_type");
+        const ConfigOptionDef* bed_type_def = print_config_def.get("curr_bed_type");
         int                    index        = 0;
         for (auto item : bed_type_def->enum_labels) {
             index++;
-            bool find = std::find(pm->not_support_bed_types.begin(), pm->not_support_bed_types.end(), item) != pm->not_support_bed_types.end();
+            bool find = std::find(pm->not_support_bed_types.begin(), pm->not_support_bed_types.end(), item) !=
+                        pm->not_support_bed_types.end();
             if (!find) {
                 m_bed_type_choice->AppendString(_L(item));
                 m_cur_combox_bed_types.emplace_back(BedType(index));
@@ -406,7 +407,7 @@ PlateSettingsDialog::PlateSettingsDialog(wxWindow* parent, const wxString& title
     }
 
     if (!wxGetApp().preset_bundle->is_bbl_vendor())
-      m_bed_type_choice->Disable();
+        m_bed_type_choice->Disable();
 
     wxStaticText* m_bed_type_txt = new wxStaticText(this, wxID_ANY, _L("Bed type"));
     m_bed_type_txt->SetFont(Label::Body_14);
@@ -414,7 +415,7 @@ PlateSettingsDialog::PlateSettingsDialog(wxWindow* parent, const wxString& title
     top_sizer->Add(m_bed_type_choice, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_RIGHT | wxTOP | wxBOTTOM, FromDIP(5));
 
     // Print Sequence
-    m_print_seq_choice = new ComboBox( this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(FromDIP(240),-1), 0, NULL, wxCB_READONLY );
+    m_print_seq_choice = new ComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(FromDIP(240), -1), 0, NULL, wxCB_READONLY);
     m_print_seq_choice->Append(_L("Same as Global Print Sequence"));
     for (auto i = PrintSequence::ByLayer; i < PrintSequence::ByDefault; i = PrintSequence(int(i) + 1)) {
         m_print_seq_choice->Append(to_print_sequence_name(i));
@@ -436,27 +437,27 @@ PlateSettingsDialog::PlateSettingsDialog(wxWindow* parent, const wxString& title
     top_sizer->Add(m_spiral_mode_choice, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_RIGHT | wxTOP | wxBOTTOM, FromDIP(5));
 
     // First layer filament sequence
-    m_first_layer_print_seq_choice = new ComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(FromDIP(240), -1), 0, NULL, wxCB_READONLY);
+    m_first_layer_print_seq_choice = new ComboBox(this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxSize(FromDIP(240), -1), 0, NULL,
+                                                  wxCB_READONLY);
     m_first_layer_print_seq_choice->Append(_L("Auto"));
     m_first_layer_print_seq_choice->Append(_L("Customize"));
     m_first_layer_print_seq_choice->SetSelection(0);
     m_first_layer_print_seq_choice->Bind(wxEVT_COMBOBOX, [this](auto& e) {
         if (e.GetSelection() == 0) {
             m_drag_canvas->Hide();
-        }
-        else if (e.GetSelection() == 1) {
+        } else if (e.GetSelection() == 1) {
             m_drag_canvas->Show();
         }
         Layout();
         Fit();
-        });
+    });
     wxStaticText* first_layer_txt = new wxStaticText(this, wxID_ANY, _L("First layer filament sequence"));
     first_layer_txt->SetFont(Label::Body_14);
     top_sizer->Add(first_layer_txt, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_LEFT | wxTOP | wxBOTTOM, FromDIP(5));
     top_sizer->Add(m_first_layer_print_seq_choice, 0, wxALIGN_CENTER_VERTICAL | wxALIGN_RIGHT | wxTOP | wxBOTTOM, FromDIP(5));
 
     const std::vector<std::string> extruder_colours = wxGetApp().plater()->get_extruder_colors_from_plater_config();
-    std::vector<int> order(extruder_colours.size());
+    std::vector<int>               order(extruder_colours.size());
     for (int i = 0; i < order.size(); i++) {
         order[i] = i + 1;
     }
@@ -484,14 +485,14 @@ PlateSettingsDialog::PlateSettingsDialog(wxWindow* parent, const wxString& title
             EndModal(wxID_YES);
         else
             this->Close();
-        });
+    });
 
     dlg_btns->GetCANCEL()->Bind(wxEVT_BUTTON, [this](auto& e) {
         if (this->IsModal())
             EndModal(wxID_NO);
         else
             this->Close();
-        });
+    });
 
     m_sizer_main->AddSpacer(FromDIP(20));
     m_sizer_main->Add(dlg_btns, 0, wxEXPAND);
@@ -518,17 +519,14 @@ PlateSettingsDialog::PlateSettingsDialog(wxWindow* parent, const wxString& title
     }
 }
 
-PlateSettingsDialog::~PlateSettingsDialog()
-{
-
-}
+PlateSettingsDialog::~PlateSettingsDialog() {}
 
 void PlateSettingsDialog::sync_bed_type(BedType type)
 {
     if (m_bed_type_choice != nullptr) {
         for (int i = 0; i < m_cur_combox_bed_types.size(); i++) {
             if (m_cur_combox_bed_types[i] == type) {
-                m_bed_type_choice->SetSelection(i + 1);//+1 because same as global
+                m_bed_type_choice->SetSelection(i + 1); //+1 because same as global
                 return;
             }
         }
@@ -559,17 +557,17 @@ void PlateSettingsDialog::sync_first_layer_print_seq(int selection, const std::v
     }
 }
 
-void PlateSettingsDialog::sync_other_layers_print_seq(int selection, const std::vector<LayerPrintSequence>& seq) {
+void PlateSettingsDialog::sync_other_layers_print_seq(int selection, const std::vector<LayerPrintSequence>& seq)
+{
     if (selection == 1) {
         std::vector<LayerSeqInfo> sequences;
         sequences.reserve(seq.size());
         for (int i = 0; i < seq.size(); i++) {
-            LayerSeqInfo info{ seq[i].first.first, seq[i].first.second, seq[i].second };
+            LayerSeqInfo info{seq[i].first.first, seq[i].first.second, seq[i].second};
             sequences.push_back(info);
         }
         m_other_layers_seq_panel->sync_layers_print_seq(selection, sequences);
-    }
-    else {
+    } else {
         m_other_layers_seq_panel->sync_layers_print_seq(selection, {});
     }
 }
@@ -579,8 +577,7 @@ void PlateSettingsDialog::sync_spiral_mode(bool spiral_mode, bool as_global)
     if (m_spiral_mode_choice) {
         if (as_global) {
             m_spiral_mode_choice->SetSelection(0);
-        }
-        else {
+        } else {
             if (spiral_mode)
                 m_spiral_mode_choice->SetSelection(1);
             else
@@ -589,77 +586,69 @@ void PlateSettingsDialog::sync_spiral_mode(bool spiral_mode, bool as_global)
     }
 }
 
-wxString PlateSettingsDialog::to_bed_type_name(BedType bed_type) {
+wxString PlateSettingsDialog::to_bed_type_name(BedType bed_type)
+{
     switch (bed_type) {
-    case btDefault:
-        return _L("Same as Global Plate Type");
+    case btDefault: return _L("Same as Global Plate Type");
     default: {
-        const ConfigOptionDef *bed_type_def = print_config_def.get("curr_bed_type");
+        const ConfigOptionDef* bed_type_def = print_config_def.get("curr_bed_type");
         return _(bed_type_def->enum_labels[size_t(bed_type) - 1]);
-        }
+    }
     }
     return _L("Same as Global Bed Type");
 }
 
-wxString PlateSettingsDialog::to_print_sequence_name(PrintSequence print_seq) {
+wxString PlateSettingsDialog::to_print_sequence_name(PrintSequence print_seq)
+{
     switch (print_seq) {
-    case PrintSequence::ByLayer:
-        return _L("By Layer");
-    case PrintSequence::ByObject:
-        return _L("By Object");
-    default:
-        return _L("By Layer");
+    case PrintSequence::ByLayer: return _L("By Layer");
+    case PrintSequence::ByObject: return _L("By Object");
+    default: return _L("By Layer");
     }
     return _L("By Layer");
 }
 
-void PlateSettingsDialog::on_dpi_changed(const wxRect& suggested_rect)
-{
-}
+void PlateSettingsDialog::on_dpi_changed(const wxRect& suggested_rect) {}
 
-wxString PlateSettingsDialog::get_plate_name() const {
-    return m_ti_plate_name->GetTextCtrl()->GetValue(); 
-}
+wxString PlateSettingsDialog::get_plate_name() const { return m_ti_plate_name->GetTextCtrl()->GetValue(); }
 
-void PlateSettingsDialog::set_plate_name(const wxString &name) { m_ti_plate_name->GetTextCtrl()->SetValue(name); }
+void PlateSettingsDialog::set_plate_name(const wxString& name) { m_ti_plate_name->GetTextCtrl()->SetValue(name); }
 
 BedType PlateSettingsDialog::get_bed_type_choice()
 {
     if (m_bed_type_choice != nullptr) {
         int choice = m_bed_type_choice->GetSelection();
         if (choice > 0) {
-            return m_cur_combox_bed_types[choice - 1];//-1 because same as globlal
+            return m_cur_combox_bed_types[choice - 1]; //-1 because same as globlal
         }
     }
     return BedType::btDefault;
 };
 
-std::vector<int> PlateSettingsDialog::get_first_layer_print_seq()
-{
-    return m_drag_canvas->get_shape_list_order();
-}
+std::vector<int> PlateSettingsDialog::get_first_layer_print_seq() { return m_drag_canvas->get_shape_list_order(); }
 
-
-//PlateNameEditDialog
-PlateNameEditDialog::PlateNameEditDialog(wxWindow *parent, wxWindowID id, const wxString &title, const wxPoint &pos, const wxSize &size, long style)
+// PlateNameEditDialog
+PlateNameEditDialog::PlateNameEditDialog(
+    wxWindow* parent, wxWindowID id, const wxString& title, const wxPoint& pos, const wxSize& size, long style)
     : DPIDialog(parent, id, title, pos, size, style)
 {
     SetBackgroundColour(*wxWHITE);
-    wxBoxSizer *m_sizer_main = new wxBoxSizer(wxVERTICAL);
+    wxBoxSizer* m_sizer_main = new wxBoxSizer(wxVERTICAL);
     auto        m_line_top   = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(400), -1));
     m_line_top->SetBackgroundColour(wxColour(166, 169, 170));
     m_sizer_main->Add(m_line_top, 0, wxEXPAND, 0);
     m_sizer_main->Add(0, 0, 0, wxTOP, FromDIP(5));
 
-    wxFlexGridSizer *top_sizer = new wxFlexGridSizer(0, 2, FromDIP(5), 0);
+    wxFlexGridSizer* top_sizer = new wxFlexGridSizer(0, 2, FromDIP(5), 0);
     top_sizer->AddGrowableCol(0, 1);
     top_sizer->SetFlexibleDirection(wxBOTH);
     top_sizer->SetNonFlexibleGrowMode(wxFLEX_GROWMODE_SPECIFIED);
 
     auto plate_name_txt = new wxStaticText(this, wxID_ANY, _L("Plate name"));
     plate_name_txt->SetFont(Label::Body_14);
-    m_ti_plate_name = new TextInput(this, wxString::FromDouble(0.0), "", "", wxDefaultPosition, wxSize(FromDIP(240), -1), wxTE_PROCESS_ENTER);
-    m_ti_plate_name->Bind(wxEVT_TEXT_ENTER, [this](wxCommandEvent &e) {
+    m_ti_plate_name = new TextInput(this, wxString::FromDouble(0.0), "", "", wxDefaultPosition, wxSize(FromDIP(240), -1),
+                                    wxTE_PROCESS_ENTER);
+    m_ti_plate_name->Bind(wxEVT_TEXT_ENTER, [this](wxCommandEvent& e) {
         if (this->IsModal())
             EndModal(wxID_YES);
         else
@@ -673,14 +662,14 @@ PlateNameEditDialog::PlateNameEditDialog(wxWindow *parent, wxWindowID id, const 
 
     auto dlg_btns = new DialogButtons(this, {"OK", "Cancel"});
 
-    dlg_btns->GetOK()->Bind(wxEVT_BUTTON, [this](wxCommandEvent &e) {
+    dlg_btns->GetOK()->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) {
         if (this->IsModal())
             EndModal(wxID_YES);
         else
             this->Close();
     });
 
-    dlg_btns->GetCANCEL()->Bind(wxEVT_BUTTON, [this](wxCommandEvent &e) {
+    dlg_btns->GetCANCEL()->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) {
         if (this->IsModal())
             EndModal(wxID_NO);
         else
@@ -700,19 +689,15 @@ PlateNameEditDialog::PlateNameEditDialog(wxWindow *parent, wxWindowID id, const 
 
 PlateNameEditDialog::~PlateNameEditDialog() {}
 
-void PlateNameEditDialog::on_dpi_changed(const wxRect &suggested_rect)
-{
-}
-
+void PlateNameEditDialog::on_dpi_changed(const wxRect& suggested_rect) {}
 
 wxString PlateNameEditDialog::get_plate_name() const { return m_ti_plate_name->GetTextCtrl()->GetValue(); }
 
-void PlateNameEditDialog::set_plate_name(const wxString &name) {
+void PlateNameEditDialog::set_plate_name(const wxString& name)
+{
     m_ti_plate_name->GetTextCtrl()->SetValue(name);
     m_ti_plate_name->GetTextCtrl()->SetFocus();
     m_ti_plate_name->GetTextCtrl()->SetInsertionPointEnd();
 }
 
-
-}
-} // namespace Slic3r::GUI
+}} // namespace Slic3r::GUI

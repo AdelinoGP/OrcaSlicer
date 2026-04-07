@@ -1,3 +1,7 @@
+// [INTENT] Implements a lightweight labeled divider widget that measures optional text/icon content and draws the remaining line segment
+// manually. [EVENT] Paint events funnel through `render()` so the same drawing code can be reused with different device contexts after
+// label/icon changes. [PORTING_HAZARD:P3] Rendering depends on immediate-mode wx DC measurement and dark-mode color translation, so ports
+// should replace it with layout-driven retained UI primitives.
 #include "StaticLine.hpp"
 #include "Label.hpp"
 #include "StateColor.hpp"
@@ -12,9 +16,8 @@ EVT_PAINT(StaticLine::paintEvent)
 
 END_EVENT_TABLE()
 
-StaticLine::StaticLine(wxWindow *parent, bool vertical, const wxString &label, const wxString &icon)
-    : wxWindow(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE)
-    , vertical(vertical)
+StaticLine::StaticLine(wxWindow* parent, bool vertical, const wxString& label, const wxString& icon)
+    : wxWindow(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE), vertical(vertical)
 {
     wxWindow::SetBackgroundColour(parent->GetBackgroundColour());
     this->lineColor = wxColour("#EEEEEE");
@@ -31,18 +34,14 @@ void StaticLine::SetLabel(const wxString& label)
     Refresh();
 }
 
-void StaticLine::SetIcon(const wxString &icon)
+void StaticLine::SetIcon(const wxString& icon)
 {
-    this->icon = icon.IsEmpty() ? ScalableBitmap() 
-        : ScalableBitmap(this, icon.ToStdString(), 18);
+    this->icon = icon.IsEmpty() ? ScalableBitmap() : ScalableBitmap(this, icon.ToStdString(), 18);
     messureSize();
     Refresh();
 }
 
-void StaticLine::SetLineColour(wxColour color)
-{
-    this->lineColor = color;
-}
+void StaticLine::SetLineColour(wxColour color) { this->lineColor = color; }
 
 void StaticLine::Rescale()
 {
@@ -61,8 +60,8 @@ void StaticLine::paintEvent(wxPaintEvent& evt)
 void StaticLine::messureSize()
 {
     wxClientDC dc(this);
-    wxSize textSize = dc.GetTextExtent(GetLabel());
-    wxSize szContent = textSize;
+    wxSize     textSize  = dc.GetTextExtent(GetLabel());
+    wxSize     szContent = textSize;
     if (this->icon.bmp().IsOk()) {
         if (szContent.y > 0) {
             // BBS norrow size between text and icon
@@ -70,7 +69,8 @@ void StaticLine::messureSize()
         }
         wxSize szIcon = this->icon.GetBmpSize();
         szContent.x += szIcon.x;
-        if (szIcon.y > szContent.y) szContent.y = szIcon.y;
+        if (szIcon.y > szContent.y)
+            szContent.y = szIcon.y;
     }
     if (vertical)
         szContent.y += 10;
@@ -89,12 +89,13 @@ void StaticLine::render(wxDC& dc)
     wxSize size = GetSize();
     wxSize textSize;
     auto   label = GetLabel();
-    if (!label.IsEmpty()) textSize = dc.GetTextExtent(label);
+    if (!label.IsEmpty())
+        textSize = dc.GetTextExtent(label);
     wxRect titleRect{{0, 0}, size};
     titleRect.height = wxMax(icon.GetBmpHeight(), textSize.GetHeight());
-    int contentWidth = icon.GetBmpWidth() + ((icon.bmp().IsOk() && textSize.GetWidth() > 0) ? 5 : 0) +
-                textSize.GetWidth();
-    if (vertical) titleRect.Deflate((size.GetWidth() - contentWidth) / 2, 0);
+    int contentWidth = icon.GetBmpWidth() + ((icon.bmp().IsOk() && textSize.GetWidth() > 0) ? 5 : 0) + textSize.GetWidth();
+    if (vertical)
+        titleRect.Deflate((size.GetWidth() - contentWidth) / 2, 0);
     if (icon.bmp().IsOk()) {
         dc.DrawBitmap(icon.bmp(), {0, (size.y - icon.GetBmpHeight()) / 2});
         titleRect.x += icon.GetBmpWidth() + 5;
@@ -107,7 +108,8 @@ void StaticLine::render(wxDC& dc)
     dc.SetPen(wxPen(StateColor::darkModeColorFor(lineColor)));
     if (vertical) {
         size.x /= 2;
-        if (titleRect.y > 0) titleRect.y += 5;
+        if (titleRect.y > 0)
+            titleRect.y += 5;
         dc.DrawLine(size.x, titleRect.y, size.x, size.y);
     } else {
         size.y /= 2;

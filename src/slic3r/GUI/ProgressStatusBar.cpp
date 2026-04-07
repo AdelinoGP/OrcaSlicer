@@ -1,3 +1,7 @@
+// [INTENT] Wraps a wx status bar with progress, busy-pulse, cancel, and status-text helpers so long-running jobs can surface lightweight
+// feedback in the main frame. [EVENT] Timer, size, and button events keep the embedded controls laid out, animated, and cancelable without
+// exposing raw wx event plumbing to callers. [THREAD] This widget is UI-thread owned; callers are expected to marshal progress updates onto
+// the main thread before touching the bar.
 #include "ProgressStatusBar.hpp"
 
 #include <wx/timer.h>
@@ -14,18 +18,10 @@
 
 namespace Slic3r {
 
-ProgressStatusBar::ProgressStatusBar(wxWindow *parent, int id)
+ProgressStatusBar::ProgressStatusBar(wxWindow* parent, int id)
     : self{new wxStatusBar(parent, id == -1 ? wxID_ANY : id)}
-    , m_prog{new wxGauge(self,
-                         wxGA_HORIZONTAL,
-                         100,
-                         wxDefaultPosition,
-                         wxDefaultSize)}
-    , m_cancelbutton{new wxButton(self,
-                                  -1,
-                                  _(L("Cancel")),
-                                  wxDefaultPosition,
-                                  wxDefaultSize)}
+    , m_prog{new wxGauge(self, wxGA_HORIZONTAL, 100, wxDefaultPosition, wxDefaultSize)}
+    , m_cancelbutton{new wxButton(self, -1, _(L("Cancel")), wxDefaultPosition, wxDefaultSize)}
     , m_timer{new wxTimer(self)}
 {
     update_dark_ui();
@@ -40,11 +36,13 @@ ProgressStatusBar::ProgressStatusBar(wxWindow *parent, int id)
     self->SetMinHeight(int(2 * self->GetBorderY() + 1.2 * s.GetHeight()));
 
     self->Bind(wxEVT_TIMER, [this](const wxTimerEvent&) {
-        if (m_prog->IsShown()) m_timer->Stop();
-        if(is_busy()) m_prog->Pulse();
+        if (m_prog->IsShown())
+            m_timer->Stop();
+        if (is_busy())
+            m_prog->Pulse();
     });
 
-    self->Bind(wxEVT_SIZE, [this](wxSizeEvent& event){
+    self->Bind(wxEVT_SIZE, [this](wxSizeEvent& event) {
         wxRect rect;
         self->GetFieldRect(1, rect);
         auto offset = 0;
@@ -59,14 +57,16 @@ ProgressStatusBar::ProgressStatusBar(wxWindow *parent, int id)
     });
 
     m_cancelbutton->Bind(wxEVT_BUTTON, [this](const wxCommandEvent&) {
-        if (m_cancel_cb) 
+        if (m_cancel_cb)
             m_cancel_cb();
         m_cancelbutton->Hide();
     });
 }
 
-ProgressStatusBar::~ProgressStatusBar() {
-    if(m_timer && m_timer->IsRunning()) m_timer->Stop();
+ProgressStatusBar::~ProgressStatusBar()
+{
+    if (m_timer && m_timer->IsRunning())
+        m_timer->Stop();
 }
 
 void ProgressStatusBar::update_dark_ui()
@@ -76,42 +76,38 @@ void ProgressStatusBar::update_dark_ui()
     GUI::wxGetApp().UpdateDarkUI(m_cancelbutton);
 }
 
-int ProgressStatusBar::get_progress() const
-{
-    return m_prog ? m_prog->GetValue() : 0;
-}
+int ProgressStatusBar::get_progress() const { return m_prog ? m_prog->GetValue() : 0; }
 
 void ProgressStatusBar::set_progress(int val)
 {
-    if(!m_prog) return;
-    
-    if(!m_prog->IsShown()) show_progress(true);
-    if(val < 0) return;
+    if (!m_prog)
+        return;
 
-    if(val == m_prog->GetRange()) {
+    if (!m_prog->IsShown())
+        show_progress(true);
+    if (val < 0)
+        return;
+
+    if (val == m_prog->GetRange()) {
         m_prog->SetValue(0);
         show_progress(false);
-    }
-    else {
+    } else {
         m_prog->SetValue(val);
     }
 }
 
-int ProgressStatusBar::get_range() const
-{
-    return m_prog ? m_prog->GetRange() : 0;
-}
+int ProgressStatusBar::get_range() const { return m_prog ? m_prog->GetRange() : 0; }
 
 void ProgressStatusBar::set_range(int val)
 {
-    if(m_prog && val != m_prog->GetRange()) {
+    if (m_prog && val != m_prog->GetRange()) {
         m_prog->SetRange(val);
     }
 }
 
 void ProgressStatusBar::show_progress(bool show)
 {
-    if(m_prog) {
+    if (m_prog) {
         m_prog->Show(show);
         m_prog->Pulse();
     }
@@ -119,8 +115,9 @@ void ProgressStatusBar::show_progress(bool show)
 
 void ProgressStatusBar::start_busy(int rate)
 {
-    if(!m_prog) return;
-    
+    if (!m_prog)
+        return;
+
     m_busy = true;
     show_progress(true);
     if (!m_timer->IsRunning()) {
@@ -130,68 +127,63 @@ void ProgressStatusBar::start_busy(int rate)
 
 void ProgressStatusBar::stop_busy()
 {
-    if(!m_timer || !m_prog) return;
-    
+    if (!m_timer || !m_prog)
+        return;
+
     m_timer->Stop();
     show_progress(false);
     m_prog->SetValue(0);
     m_busy = false;
 }
 
-void ProgressStatusBar::set_cancel_callback(ProgressStatusBar::CancelFn ccb) {
+void ProgressStatusBar::set_cancel_callback(ProgressStatusBar::CancelFn ccb)
+{
     m_cancel_cb = ccb;
-    if(m_cancelbutton) {
-        if(ccb) m_cancelbutton->Show();
-        else m_cancelbutton->Hide();
+    if (m_cancelbutton) {
+        if (ccb)
+            m_cancelbutton->Show();
+        else
+            m_cancelbutton->Hide();
     }
 }
 
 void ProgressStatusBar::run(int rate)
 {
-    if(m_timer && !m_timer->IsRunning()) {
+    if (m_timer && !m_timer->IsRunning()) {
         m_timer->Start(rate);
     }
 }
 
-void ProgressStatusBar::embed(wxFrame *frame)
+void ProgressStatusBar::embed(wxFrame* frame)
 {
-    if(frame) frame->SetStatusBar(self);
+    if (frame)
+        frame->SetStatusBar(self);
 }
 
 void ProgressStatusBar::set_status_text(const wxString& txt)
 {
-	if(self) self->SetStatusText(txt);
+    if (self)
+        self->SetStatusText(txt);
 }
 
-void ProgressStatusBar::set_status_text(const std::string& txt)
-{ 
-    this->set_status_text(txt.c_str());
-}
+void ProgressStatusBar::set_status_text(const std::string& txt) { this->set_status_text(txt.c_str()); }
 
-void ProgressStatusBar::set_status_text(const char *txt)
-{ 
-    this->set_status_text(wxString::FromUTF8(txt));
-}
+void ProgressStatusBar::set_status_text(const char* txt) { this->set_status_text(wxString::FromUTF8(txt)); }
 
-wxString ProgressStatusBar::get_status_text() const
-{
-    return self->GetStatusText();
-}
+wxString ProgressStatusBar::get_status_text() const { return self->GetStatusText(); }
 
-void ProgressStatusBar::set_font(const wxFont &font)
-{
-    self->SetFont(font);
-}
+void ProgressStatusBar::set_font(const wxFont& font) { self->SetFont(font); }
 
 void ProgressStatusBar::show_cancel_button()
 {
-    if(m_cancelbutton) m_cancelbutton->Show();
+    if (m_cancelbutton)
+        m_cancelbutton->Show();
 }
 
 void ProgressStatusBar::hide_cancel_button()
 {
-    if(m_cancelbutton) m_cancelbutton->Hide();
+    if (m_cancelbutton)
+        m_cancelbutton->Hide();
 }
 
-}
-
+} // namespace Slic3r

@@ -1,4 +1,3 @@
-// [ANNOTATED]
 #ifndef __QIDI_PRINTER_AGENT_HPP__
 #define __QIDI_PRINTER_AGENT_HPP__
 
@@ -13,6 +12,7 @@ namespace Slic3r {
 class QidiPrinterAgent final : public MoonrakerPrinterAgent
 {
 public:
+    // [UNITY] Qidi support reuses the Moonraker transport and only swaps vendor-specific filament discovery.
     explicit QidiPrinterAgent(std::string log_dir);
     ~QidiPrinterAgent() override = default;
 
@@ -25,6 +25,7 @@ public:
 private:
     struct QidiFilamentDict
     {
+        // [STATE] Qidi filament metadata is split across parallel color and material lookup tables.
         std::map<int, std::string> colors;
         std::map<int, std::string> filaments;
     };
@@ -43,8 +44,8 @@ private:
     std::string normalize_model_key(std::string value);
 
     // Static helpers
-    static void parse_ini_section(const std::string& content, const std::string& section_name, std::map<int, std::string>& result);
-    static void parse_filament_sections(const std::string& content, std::map<int, std::string>& result);
+    static void        parse_ini_section(const std::string& content, const std::string& section_name, std::map<int, std::string>& result);
+    static void        parse_filament_sections(const std::string& content, std::map<int, std::string>& result);
     static std::string map_filament_type_to_setting_id(const std::string& filament_type);
 };
 

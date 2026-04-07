@@ -1,3 +1,7 @@
+// [INTENT] Declares the pre-print status taxonomy and the lightweight collector/view types used to present printer and filament readiness
+// issues. [STATE] Status severity and category are inferred from enum ranges rather than explicit metadata, keeping the checker simple but
+// coupling behavior to declaration order. [PORTING_HAZARD:P1] Any refactor of `PrintDialogStatus` must preserve the begin/end sentinels
+// because the inline helpers do range comparisons instead of switch-based classification.
 #ifndef slic3r_GUI_PRE_PRINT_CHECK_hpp_
 #define slic3r_GUI_PRE_PRINT_CHECK_hpp_
 
@@ -5,37 +9,30 @@
 #include "Widgets/Label.hpp"
 namespace Slic3r { namespace GUI {
 
-enum prePrintInfoLevel {
-    Normal,
-    Warning,
-    Error
-};
+enum prePrintInfoLevel { Normal, Warning, Error };
 
-enum prePrintInfoType {
-    Printer,
-    Filament
-};
+enum prePrintInfoType { Printer, Filament };
 
 struct prePrintInfo
 {
     prePrintInfoLevel level;
     prePrintInfoType  type;
-    wxString msg;
-    wxString tips;
-    wxString wiki_url;
-    int index;
+    wxString          msg;
+    wxString          tips;
+    wxString          wiki_url;
+    int               index;
 
 public:
-    bool operator==(const prePrintInfo& other) const {
-        return level == other.level && type == other.type &&
-               msg == other.msg && tips == other.tips &&
-               wiki_url == other.wiki_url && index == other.index;
+    bool operator==(const prePrintInfo& other) const
+    {
+        return level == other.level && type == other.type && msg == other.msg && tips == other.tips && wiki_url == other.wiki_url &&
+               index == other.index;
     }
 };
 
 enum PrintDialogStatus : unsigned int {
 
-    PrintStatusErrorBegin,//->start error<-
+    PrintStatusErrorBegin, //->start error<-
 
     // Errors for printer, Block Print
     PrintStatusPrinterErrorBegin,
@@ -78,10 +75,9 @@ enum PrintDialogStatus : unsigned int {
     PrintStatusColorQuantityExceed,
     PrintStatusFilamentErrorEnd,
 
-    PrintStatusErrorEnd,//->end error<-
+    PrintStatusErrorEnd, //->end error<-
 
-
-    PrintStatusWarningBegin,//->start warning<-
+    PrintStatusWarningBegin, //->start warning<-
 
     // Warnings for printer
     PrintStatusPrinterWarningBegin,
@@ -101,7 +97,7 @@ enum PrintDialogStatus : unsigned int {
     PrintStatusFilamentWarningUnknownHighChamberTempSoft,
     PrintStatusFilamentWarningEnd,
 
-    PrintStatusWarningEnd,//->end error<-
+    PrintStatusWarningEnd, //->end error<-
 
     /*success*/
     // printer
@@ -128,60 +124,60 @@ public:
 public:
     void clear();
     /*auto merge*/
-    void add(PrintDialogStatus state, wxString msg, wxString tip, const wxString& wiki_url);
+    void                 add(PrintDialogStatus state, wxString msg, wxString tip, const wxString& wiki_url);
     static ::std::string get_print_status_info(PrintDialogStatus status);
 
-	wxString get_pre_state_msg(PrintDialogStatus status);
+    wxString    get_pre_state_msg(PrintDialogStatus status);
     static bool is_error(PrintDialogStatus status) { return (PrintStatusErrorBegin < status) && (PrintStatusErrorEnd > status); };
-    static bool is_error_printer(PrintDialogStatus status) { return (PrintStatusPrinterErrorBegin < status) && (PrintStatusPrinterErrorEnd > status); };
-    static bool is_error_filament(PrintDialogStatus status) { return (PrintStatusFilamentErrorBegin < status) && (PrintStatusFilamentErrorEnd > status); };
+    static bool is_error_printer(PrintDialogStatus status)
+    { return (PrintStatusPrinterErrorBegin < status) && (PrintStatusPrinterErrorEnd > status); };
+    static bool is_error_filament(PrintDialogStatus status)
+    { return (PrintStatusFilamentErrorBegin < status) && (PrintStatusFilamentErrorEnd > status); };
     static bool is_warning(PrintDialogStatus status) { return (PrintStatusWarningBegin < status) && (PrintStatusWarningEnd > status); };
-    static bool is_warning_printer(PrintDialogStatus status) { return (PrintStatusPrinterWarningBegin < status) && (PrintStatusPrinterWarningEnd > status); };
-    static bool is_warning_filament(PrintDialogStatus status) { return (PrintStatusFilamentWarningBegin < status) && (PrintStatusFilamentWarningEnd > status); };
+    static bool is_warning_printer(PrintDialogStatus status)
+    { return (PrintStatusPrinterWarningBegin < status) && (PrintStatusPrinterWarningEnd > status); };
+    static bool is_warning_filament(PrintDialogStatus status)
+    { return (PrintStatusFilamentWarningBegin < status) && (PrintStatusFilamentWarningEnd > status); };
 };
-//class PrePrintMsgBoard : public wxWindow
+// class PrePrintMsgBoard : public wxWindow
 //{
-//public:
-//    PrePrintMsgBoard(wxWindow * parent,
-//        wxWindowID      winid = wxID_ANY,
-//        const wxPoint & pos   = wxDefaultPosition,
-//        const wxSize &  size  = wxDefaultSize,
-//        long            style = wxTAB_TRAVERSAL | wxNO_BORDER,
-//        const wxString &name  = wxASCII_STR(wxPanelNameStr)
-//    );
+// public:
+//     PrePrintMsgBoard(wxWindow * parent,
+//         wxWindowID      winid = wxID_ANY,
+//         const wxPoint & pos   = wxDefaultPosition,
+//         const wxSize &  size  = wxDefaultSize,
+//         long            style = wxTAB_TRAVERSAL | wxNO_BORDER,
+//         const wxString &name  = wxASCII_STR(wxPanelNameStr)
+//     );
 //
-//public:
-//    // Operations
-//    void addError(const wxString &msg, const wxString &tips = wxEmptyString) { Add(msg, tips, true); };
-//    void addWarning(const wxString &msg, const wxString &tips = wxEmptyString) { Add(msg, tips, false); };
-//    void clear() { m_sizer->Clear(); };
+// public:
+//     // Operations
+//     void addError(const wxString &msg, const wxString &tips = wxEmptyString) { Add(msg, tips, true); };
+//     void addWarning(const wxString &msg, const wxString &tips = wxEmptyString) { Add(msg, tips, false); };
+//     void clear() { m_sizer->Clear(); };
 //
-//    // Const Access
-//    bool isEmpty() const { return m_sizer->IsEmpty(); }
+//     // Const Access
+//     bool isEmpty() const { return m_sizer->IsEmpty(); }
 //
-//private:
-//    void add(const wxString &msg, const wxString &tips, bool is_error);
+// private:
+//     void add(const wxString &msg, const wxString &tips, bool is_error);
 //
-//private:
-//    wxBoxSizer *m_sizer{nullptr};
-//};
-
-
+// private:
+//     wxBoxSizer *m_sizer{nullptr};
+// };
 
 class PrinterMsgPanel : public wxPanel
 {
 public:
-    PrinterMsgPanel(wxWindow *parent);
+    PrinterMsgPanel(wxWindow* parent);
 
 public:
-    bool  UpdateInfos(const std::vector<prePrintInfo>& infos);
+    bool UpdateInfos(const std::vector<prePrintInfo>& infos);
 
- private:
-    wxBoxSizer*  m_sizer = nullptr;
+private:
+    wxBoxSizer*               m_sizer = nullptr;
     std::vector<prePrintInfo> m_infos;
-
 };
-
 
 }} // namespace Slic3r::GUI
 

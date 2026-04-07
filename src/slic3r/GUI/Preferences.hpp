@@ -1,3 +1,6 @@
+// [INTENT] Declares the preferences dialog helpers that assemble tabbed settings pages from reusable control-building functions.
+// [STATE] The dialog caches `AppConfig`, tab widgets, and change flags for options that must trigger broader GUI recreation after the
+// dialog closes.
 #ifndef slic3r_Preferences_hpp_
 #define slic3r_Preferences_hpp_
 
@@ -33,12 +36,12 @@ class TextInput;
 class PreferencesDialog : public DPIDialog
 {
 private:
-    AppConfig *app_config;
+    AppConfig* app_config;
 
 protected:
-    wxBoxSizer *  m_sizer_body;
+    wxBoxSizer*       m_sizer_body;
     wxScrolledWindow* m_parent;
-    TabCtrl* m_pref_tabs;
+    TabCtrl*          m_pref_tabs;
 
     // bool								m_settings_layout_changed {false};
     bool m_seq_top_layer_only_changed{false};
@@ -47,29 +50,29 @@ protected:
 public:
     bool seq_top_layer_only_changed() const { return m_seq_top_layer_only_changed; }
     bool recreate_GUI() const { return m_recreate_GUI; }
-    void on_dpi_changed(const wxRect &suggested_rect) override;
+    void on_dpi_changed(const wxRect& suggested_rect) override;
 
 public:
-    PreferencesDialog(wxWindow *      parent,
+    PreferencesDialog(wxWindow*       parent,
                       wxWindowID      id    = wxID_ANY,
-                      const wxString &title = wxT(""),
-                      const wxPoint & pos   = wxDefaultPosition,
-                      const wxSize &  size  = wxDefaultSize,
+                      const wxString& title = wxT(""),
+                      const wxPoint&  pos   = wxDefaultPosition,
+                      const wxSize&   size  = wxDefaultSize,
                       long            style = wxSYSTEM_MENU | wxCAPTION | wxCLOSE_BOX);
 
     ~PreferencesDialog();
 
     wxString m_backup_interval_time;
 
-    void      create();
+    void create();
 
     // debug mode
-    ::CheckBox * m_developer_mode_ckeckbox   = {nullptr};
-    ::CheckBox * m_internal_developer_mode_ckeckbox = {nullptr};
-    ::CheckBox * m_dark_mode_ckeckbox        = {nullptr};
-    ::TextInput *m_backup_interval_textinput = {nullptr};
-    ::ComboBox * m_network_version_combo     = {nullptr};
-    wxBoxSizer * m_network_version_sizer     = {nullptr};
+    ::CheckBox*                            m_developer_mode_ckeckbox          = {nullptr};
+    ::CheckBox*                            m_internal_developer_mode_ckeckbox = {nullptr};
+    ::CheckBox*                            m_dark_mode_ckeckbox               = {nullptr};
+    ::TextInput*                           m_backup_interval_textinput        = {nullptr};
+    ::ComboBox*                            m_network_version_combo            = {nullptr};
+    wxBoxSizer*                            m_network_version_sizer            = {nullptr};
     std::vector<NetworkLibraryVersionInfo> m_available_versions;
 
     wxString m_developer_mode_def;
@@ -79,41 +82,53 @@ public:
 
     std::vector<wxFlexGridSizer*> f_sizers;
 
-    wxBoxSizer *create_item_title(wxString title);
-    wxBoxSizer *create_item_combobox(wxString title, wxString tooltip, std::string param, std::vector<wxString> vlist, std::function<void(wxString)> onchange = {});
-    wxBoxSizer *create_item_combobox(wxString title, wxString tooltip, std::string param, std::vector<wxString> vlist, std::vector<std::string> config_name_index);
-    wxBoxSizer *create_item_region_combobox(wxString title, wxString tooltip);
-    wxBoxSizer *create_item_language_combobox(wxString title, wxString tooltip);
-    wxBoxSizer *create_item_loglevel_combobox(wxString title, wxString tooltip, std::vector<wxString> vlist);
-    wxBoxSizer *create_item_checkbox(wxString title, wxString tooltip, std::string param, const wxString secondary_title = "");
-    wxBoxSizer *create_item_darkmode(wxString title,wxString tooltip, std::string param);
-    void set_dark_mode();
-    wxBoxSizer *create_item_button(wxString title, wxString title2, wxString tooltip, wxString tooltip2, std::function<void()> onclick);
-    wxBoxSizer *create_item_downloads(wxString title, wxString tooltip);
-    wxBoxSizer *create_item_input(wxString title, wxString title2, wxString tooltip, std::string param, std::function<void(wxString)> onchange = {});
-    wxBoxSizer *create_item_spinctrl(wxString title, wxString title2, wxString side_label, wxString tooltip, std::string param, int min, int max, std::function<void(int)> onchange = nullptr);
-    wxBoxSizer *create_camera_orbit_mult_input(wxString title, wxString tooltip);
-    wxBoxSizer *create_item_backup(wxString title, wxString tooltip);
-    wxBoxSizer *create_item_auto_reslice(wxString title, wxString checkbox_tooltip, wxString delay_tooltip);
-    wxBoxSizer *create_item_draco(wxString title, wxString side_label, wxString tooltip);
-    wxBoxSizer *create_item_multiple_combobox(wxString title, wxString tooltip, std::string parama, std::vector<wxString> vlista, std::vector<wxString> vlistb);
+    wxBoxSizer* create_item_title(wxString title);
+    wxBoxSizer* create_item_combobox(
+        wxString title, wxString tooltip, std::string param, std::vector<wxString> vlist, std::function<void(wxString)> onchange = {});
+    wxBoxSizer* create_item_combobox(
+        wxString title, wxString tooltip, std::string param, std::vector<wxString> vlist, std::vector<std::string> config_name_index);
+    wxBoxSizer* create_item_region_combobox(wxString title, wxString tooltip);
+    wxBoxSizer* create_item_language_combobox(wxString title, wxString tooltip);
+    wxBoxSizer* create_item_loglevel_combobox(wxString title, wxString tooltip, std::vector<wxString> vlist);
+    wxBoxSizer* create_item_checkbox(wxString title, wxString tooltip, std::string param, const wxString secondary_title = "");
+    wxBoxSizer* create_item_darkmode(wxString title, wxString tooltip, std::string param);
+    void        set_dark_mode();
+    wxBoxSizer* create_item_button(wxString title, wxString title2, wxString tooltip, wxString tooltip2, std::function<void()> onclick);
+    wxBoxSizer* create_item_downloads(wxString title, wxString tooltip);
+    wxBoxSizer* create_item_input(
+        wxString title, wxString title2, wxString tooltip, std::string param, std::function<void(wxString)> onchange = {});
+    wxBoxSizer* create_item_spinctrl(wxString                 title,
+                                     wxString                 title2,
+                                     wxString                 side_label,
+                                     wxString                 tooltip,
+                                     std::string              param,
+                                     int                      min,
+                                     int                      max,
+                                     std::function<void(int)> onchange = nullptr);
+    wxBoxSizer* create_camera_orbit_mult_input(wxString title, wxString tooltip);
+    wxBoxSizer* create_item_backup(wxString title, wxString tooltip);
+    wxBoxSizer* create_item_auto_reslice(wxString title, wxString checkbox_tooltip, wxString delay_tooltip);
+    wxBoxSizer* create_item_draco(wxString title, wxString side_label, wxString tooltip);
+    wxBoxSizer* create_item_multiple_combobox(
+        wxString title, wxString tooltip, std::string parama, std::vector<wxString> vlista, std::vector<wxString> vlistb);
 #ifdef WIN32
-    wxBoxSizer *create_item_link_association(wxString url_prefix, wxString website_name);
+    wxBoxSizer* create_item_link_association(wxString url_prefix, wxString website_name);
 #endif // WIN32
 
-    void create_items();
-    void create_sync_page();
-    void create_shortcuts_page();
+    void        create_items();
+    void        create_sync_page();
+    void        create_shortcuts_page();
     wxBoxSizer* create_debug_page();
 
     // BBS
     void create_select_domain_widget();
 
-    void Split(const std::string &src, const std::string &separator, std::vector<wxString> &dest);
-    int m_current_language_selected = {0};
+    void Split(const std::string& src, const std::string& separator, std::vector<wxString>& dest);
+    int  m_current_language_selected = {0};
 
 private:
-    std::tuple<wxBoxSizer*, ComboBox*> create_item_combobox_base(wxString title, wxString tooltip, std::string param, std::vector<wxString> vlist, unsigned int current_index);
+    std::tuple<wxBoxSizer*, ComboBox*> create_item_combobox_base(
+        wxString title, wxString tooltip, std::string param, std::vector<wxString> vlist, unsigned int current_index);
 };
 
 }} // namespace Slic3r::GUI

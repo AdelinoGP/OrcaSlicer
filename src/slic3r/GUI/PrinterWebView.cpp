@@ -1,3 +1,10 @@
+// [ANNOTATED]
+// [INTENT] Lightweight wrapper around the embedded web view used to show a printer-host web UI inside the desktop app.
+// [STATE] Stores the deferred URL, API key injection state, and browser instance lifetime.
+// [EVENT] Reacts to wx webview load/error/close events and toggles developer tools from app config.
+// [UNITY] Replace with a dedicated browser bridge layer; raw desktop webview embedding does not map directly to Unity UI.
+// [PORTING_HAZARD:P1] Request authentication is injected by monkey-patching `window.fetch`, which is fragile and browser-backend specific.
+
 #include "PrinterWebView.hpp"
 
 #include "I18N.hpp"
@@ -17,16 +24,13 @@
 
 namespace pt = boost::property_tree;
 
-namespace Slic3r {
-namespace GUI {
+namespace Slic3r { namespace GUI {
 
-PrinterWebView::PrinterWebView(wxWindow *parent)
-        : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize)
- {
-
+PrinterWebView::PrinterWebView(wxWindow* parent) : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize)
+{
     wxBoxSizer* topsizer = new wxBoxSizer(wxVERTICAL);
 
-      // Create the webview
+    // Create the webview
     m_browser = WebView::CreateWebView(this, "");
     if (m_browser == nullptr) {
         wxLogError("Could not init m_browser");
@@ -52,13 +56,12 @@ PrinterWebView::PrinterWebView(wxWindow *parent)
     }
     */
 
-    //Zoom
+    // Zoom
     m_zoomFactor = 100;
 
-    //Connect the idle events
+    // Connect the idle events
     Bind(wxEVT_CLOSE_WINDOW, &PrinterWebView::OnClose, this);
-
- }
+}
 
 PrinterWebView::~PrinterWebView()
 {
@@ -68,14 +71,13 @@ PrinterWebView::~PrinterWebView()
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " End";
 }
 
-
 void PrinterWebView::load_url(wxString& url, wxString apikey)
 {
-//    this->Show();
-//    this->Raise();
+    //    this->Show();
+    //    this->Raise();
     if (m_browser == nullptr)
         return;
-    m_apikey = apikey;
+    m_apikey      = apikey;
     m_apikey_sent = false;
 
     if (this->IsShown()) {
@@ -84,7 +86,7 @@ void PrinterWebView::load_url(wxString& url, wxString apikey)
     } else {
         m_url_deferred = url;
     }
-    //m_browser->SetFocus();
+    // m_browser->SetFocus();
     UpdateState();
 }
 
@@ -97,35 +99,28 @@ bool PrinterWebView::Show(bool show)
     return wxPanel::Show(show);
 }
 
-void PrinterWebView::reload()
-{
-    m_browser->Reload();
-}
+void PrinterWebView::reload() { m_browser->Reload(); }
 
-void PrinterWebView::update_mode()
-{
-    m_browser->EnableAccessToDevTools(wxGetApp().app_config->get_bool("developer_mode"));
-}
+void PrinterWebView::update_mode() { m_browser->EnableAccessToDevTools(wxGetApp().app_config->get_bool("developer_mode")); }
 
 /**
  * Method that retrieves the current state from the web control and updates the
  * GUI the reflect this current state.
  */
-void PrinterWebView::UpdateState() {
-  // SetTitle(m_browser->GetCurrentTitle());
-
-}
-
-void PrinterWebView::OnClose(wxCloseEvent& evt)
+void PrinterWebView::UpdateState()
 {
-    this->Hide();
+    // SetTitle(m_browser->GetCurrentTitle());
 }
+
+void PrinterWebView::OnClose(wxCloseEvent& evt) { this->Hide(); }
 
 void PrinterWebView::SendAPIKey()
 {
     if (m_apikey_sent || m_apikey.IsEmpty())
         return;
-    m_apikey_sent   = true;
+    m_apikey_sent = true;
+    // [PORTING_HAZARD:P1] This assumes every relevant request flows through `window.fetch`; XHR, websocket, or iframe traffic would bypass
+    // the API key.
     wxString script = wxString::Format(R"(
     // Check if window.fetch exists before overriding
     if (window.fetch) {
@@ -144,44 +139,28 @@ void PrinterWebView::SendAPIKey()
     m_browser->Reload();
 }
 
-void PrinterWebView::OnError(wxWebViewEvent &evt)
+void PrinterWebView::OnError(wxWebViewEvent& evt)
 {
     auto e = "unknown error";
     switch (evt.GetInt()) {
-      case wxWEBVIEW_NAV_ERR_CONNECTION:
-        e = "wxWEBVIEW_NAV_ERR_CONNECTION";
-        break;
-      case wxWEBVIEW_NAV_ERR_CERTIFICATE:
-        e = "wxWEBVIEW_NAV_ERR_CERTIFICATE";
-        break;
-      case wxWEBVIEW_NAV_ERR_AUTH:
-        e = "wxWEBVIEW_NAV_ERR_AUTH";
-        break;
-      case wxWEBVIEW_NAV_ERR_SECURITY:
-        e = "wxWEBVIEW_NAV_ERR_SECURITY";
-        break;
-      case wxWEBVIEW_NAV_ERR_NOT_FOUND:
-        e = "wxWEBVIEW_NAV_ERR_NOT_FOUND";
-        break;
-      case wxWEBVIEW_NAV_ERR_REQUEST:
-        e = "wxWEBVIEW_NAV_ERR_REQUEST";
-        break;
-      case wxWEBVIEW_NAV_ERR_USER_CANCELLED:
-        e = "wxWEBVIEW_NAV_ERR_USER_CANCELLED";
-        break;
-      case wxWEBVIEW_NAV_ERR_OTHER:
-        e = "wxWEBVIEW_NAV_ERR_OTHER";
-        break;
-      }
-    BOOST_LOG_TRIVIAL(info) << __FUNCTION__<< boost::format(": error loading page %1% %2% %3% %4%") %evt.GetURL() %evt.GetTarget() %e %evt.GetString();
+    case wxWEBVIEW_NAV_ERR_CONNECTION: e = "wxWEBVIEW_NAV_ERR_CONNECTION"; break;
+    case wxWEBVIEW_NAV_ERR_CERTIFICATE: e = "wxWEBVIEW_NAV_ERR_CERTIFICATE"; break;
+    case wxWEBVIEW_NAV_ERR_AUTH: e = "wxWEBVIEW_NAV_ERR_AUTH"; break;
+    case wxWEBVIEW_NAV_ERR_SECURITY: e = "wxWEBVIEW_NAV_ERR_SECURITY"; break;
+    case wxWEBVIEW_NAV_ERR_NOT_FOUND: e = "wxWEBVIEW_NAV_ERR_NOT_FOUND"; break;
+    case wxWEBVIEW_NAV_ERR_REQUEST: e = "wxWEBVIEW_NAV_ERR_REQUEST"; break;
+    case wxWEBVIEW_NAV_ERR_USER_CANCELLED: e = "wxWEBVIEW_NAV_ERR_USER_CANCELLED"; break;
+    case wxWEBVIEW_NAV_ERR_OTHER: e = "wxWEBVIEW_NAV_ERR_OTHER"; break;
+    }
+    BOOST_LOG_TRIVIAL(info) << __FUNCTION__
+                            << boost::format(": error loading page %1% %2% %3% %4%") % evt.GetURL() % evt.GetTarget() % e % evt.GetString();
 }
 
-void PrinterWebView::OnLoaded(wxWebViewEvent &evt)
+void PrinterWebView::OnLoaded(wxWebViewEvent& evt)
 {
     if (evt.GetURL().IsEmpty())
         return;
     SendAPIKey();
 }
 
-} // GUI
-} // Slic3r
+}} // namespace Slic3r::GUI

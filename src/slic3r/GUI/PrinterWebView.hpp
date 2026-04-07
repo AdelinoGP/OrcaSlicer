@@ -1,6 +1,11 @@
+// [ANNOTATED]
+// [INTENT] Declares the embedded printer web panel and its minimal navigation/authentication control surface.
+// [STATE] Holds browser ownership plus deferred navigation and one-shot API key injection flags.
+// [UNITY] Treat this as an interface boundary around an eventual platform-specific browser solution.
+// [PORTING_HAZARD:P2] Public methods are tightly coupled to wx lifecycle and wxWebView event types.
+
 #ifndef slic3r_PrinterWebView_hpp_
 #define slic3r_PrinterWebView_hpp_
-
 
 #include "wx/artprov.h"
 #include "wx/cmdline.h"
@@ -26,14 +31,12 @@
 #include "wx/textctrl.h"
 #include <wx/timer.h>
 
+namespace Slic3r { namespace GUI {
 
-namespace Slic3r {
-namespace GUI {
-
-
-class PrinterWebView : public wxPanel {
+class PrinterWebView : public wxPanel
+{
 public:
-    PrinterWebView(wxWindow *parent);
+    PrinterWebView(wxWindow* parent);
     virtual ~PrinterWebView();
 
     void load_url(wxString& url, wxString apikey = "");
@@ -50,16 +53,15 @@ private:
     void SendAPIKey();
 
     wxWebView* m_browser;
-    long m_zoomFactor;
-    wxString m_apikey;
-    bool m_apikey_sent;
+    long       m_zoomFactor;
+    wxString   m_apikey;
+    bool       m_apikey_sent;
 
     wxString m_url_deferred;
 
     // DECLARE_EVENT_TABLE()
 };
 
-} // GUI
-} // Slic3r
+}} // namespace Slic3r::GUI
 
 #endif /* slic3r_Tab_hpp_ */

@@ -1,4 +1,3 @@
-// [ANNOTATED]
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/tcp.hpp>
@@ -21,8 +20,7 @@
 using boost::asio::steady_timer;
 using boost::asio::ip::tcp;
 
-namespace Slic3r {
-namespace Utils {
+namespace Slic3r { namespace Utils {
 
 void TCPConsole::transmit_next_command()
 {
@@ -31,15 +29,13 @@ void TCPConsole::transmit_next_command()
         return;
     }
 
+    // [STATE] The queue advances only after the peer confirms the previous command with the configured done token.
     std::this_thread::sleep_for(m_tcp_queue_delay);
 
     SerialMessage cmd = m_cmd_queue.front();
     m_cmd_queue.pop_front();
 
-    BOOST_LOG_TRIVIAL(debug) << boost::format("TCPConsole: transmitting '%3%' to %1%:%2%")
-        % m_host_name
-        % m_port_name
-        % cmd.message;
+    BOOST_LOG_TRIVIAL(debug) << boost::format("TCPConsole: transmitting '%3%' to %1%:%2%") % m_host_name % m_port_name % cmd.message;
 
     m_send_buffer = cmd.message;
 
@@ -48,55 +44,40 @@ void TCPConsole::transmit_next_command()
     }
 
     set_deadline_in(m_write_timeout);
-    boost::asio::async_write(
-        m_socket,
-        boost::asio::buffer(m_send_buffer),
-        boost::bind(&TCPConsole::handle_write, this, boost::placeholders::_1, boost::placeholders::_2, cmd.messageType)
-    );
+    boost::asio::async_write(m_socket, boost::asio::buffer(m_send_buffer),
+                             boost::bind(&TCPConsole::handle_write, this, boost::placeholders::_1, boost::placeholders::_2,
+                                         cmd.messageType));
 }
 
 void TCPConsole::wait_next_line()
 {
     set_deadline_in(m_read_timeout);
-    boost::asio::async_read_until(
-        m_socket,
-        m_recv_buffer,
-        m_newline,
-        boost::bind(&TCPConsole::handle_read, this, boost::placeholders::_1, boost::placeholders::_2)
-    );
+    boost::asio::async_read_until(m_socket, m_recv_buffer, m_newline,
+                                  boost::bind(&TCPConsole::handle_read, this, boost::placeholders::_1, boost::placeholders::_2));
 }
 
 // TODO: Use std::optional here
 std::string TCPConsole::extract_next_line()
 {
-    char linebuf[1024];
+    char         linebuf[1024];
     std::istream is(&m_recv_buffer);
     is.getline(linebuf, sizeof(linebuf));
     return is.good() ? linebuf : std::string{};
 }
 
-void TCPConsole::handle_read(
-    const boost::system::error_code& ec,
-    std::size_t bytes_transferred)
+void TCPConsole::handle_read(const boost::system::error_code& ec, std::size_t bytes_transferred)
 {
     m_error_code = ec;
 
     if (ec) {
-        BOOST_LOG_TRIVIAL(error) << boost::format("TCPConsole: Can't read from %1%:%2%: %3%")
-            % m_host_name
-            % m_port_name
-            % ec.message();
+        BOOST_LOG_TRIVIAL(error) << boost::format("TCPConsole: Can't read from %1%:%2%: %3%") % m_host_name % m_port_name % ec.message();
 
         m_io_context.stop();
-    }
-    else {
+    } else {
         std::string line = extract_next_line();
         boost::trim(line);
 
-        BOOST_LOG_TRIVIAL(debug) << boost::format("TCPConsole: received '%3%' from %1%:%2%")
-            % m_host_name
-            % m_port_name
-            % line;
+        BOOST_LOG_TRIVIAL(debug) << boost::format("TCPConsole: received '%3%' from %1%:%2%") % m_host_name % m_port_name % line;
 
         boost::to_lower(line);
 
@@ -107,24 +88,17 @@ void TCPConsole::handle_read(
     }
 }
 
-void TCPConsole::handle_write(
-    const boost::system::error_code& ec,
-    std::size_t, SerialMessageType messageType)
+void TCPConsole::handle_write(const boost::system::error_code& ec, std::size_t, SerialMessageType messageType)
 {
     m_error_code = ec;
     if (ec) {
-        BOOST_LOG_TRIVIAL(error) << boost::format("TCPConsole: Can't write to %1%:%2%: %3%")
-            % m_host_name
-            % m_port_name
-            % ec.message();
+        BOOST_LOG_TRIVIAL(error) << boost::format("TCPConsole: Can't write to %1%:%2%: %3%") % m_host_name % m_port_name % ec.message();
 
         m_io_context.stop();
-    }
-    else {
-        if(messageType == Command) {
+    } else {
+        if (messageType == Command) {
             wait_next_line();
-        }
-        else {
+        } else {
             transmit_next_command();
         }
     }
@@ -135,35 +109,24 @@ void TCPConsole::handle_connect(const boost::system::error_code& ec)
     m_error_code = ec;
 
     if (ec) {
-        BOOST_LOG_TRIVIAL(error) << boost::format("TCPConsole: Can't connect to %1%:%2%: %3%")
-            % m_host_name
-            % m_port_name
-            % ec.message();
+        BOOST_LOG_TRIVIAL(error) << boost::format("TCPConsole: Can't connect to %1%:%2%: %3%") % m_host_name % m_port_name % ec.message();
 
         m_io_context.stop();
-    }
-    else {
+    } else {
         m_is_connected = true;
-        BOOST_LOG_TRIVIAL(info) << boost::format("TCPConsole: connected to %1%:%2%")
-            % m_host_name
-            % m_port_name;
+        BOOST_LOG_TRIVIAL(info) << boost::format("TCPConsole: connected to %1%:%2%") % m_host_name % m_port_name;
 
         transmit_next_command();
     }
 }
 
-void TCPConsole::set_deadline_in(std::chrono::steady_clock::duration d)
-{
-    m_deadline = std::chrono::steady_clock::now() + d;
-}
-bool TCPConsole::is_deadline_over() const
-{
-    return m_deadline < std::chrono::steady_clock::now();
-}
+void TCPConsole::set_deadline_in(std::chrono::steady_clock::duration d) { m_deadline = std::chrono::steady_clock::now() + d; }
+bool TCPConsole::is_deadline_over() const { return m_deadline < std::chrono::steady_clock::now(); }
 
 bool TCPConsole::run_queue()
 {
     try {
+        // [EVENT] A run executes one connect-send-read exchange until completion, error, or deadline expiry.
         // TODO: Add more resets and initializations after previous run (reset() method?..)
         set_deadline_in(m_connect_timeout);
         m_is_connected = false;
@@ -171,9 +134,7 @@ bool TCPConsole::run_queue()
 
         auto endpoints = m_resolver.resolve(m_host_name, m_port_name);
 
-        m_socket.async_connect(endpoints->endpoint(),
-            boost::bind(&TCPConsole::handle_connect, this, boost::placeholders::_1)
-        );
+        m_socket.async_connect(endpoints->endpoint(), boost::bind(&TCPConsole::handle_connect, this, boost::placeholders::_1));
 
         // Loop until we get any reasonable result. Negative result is also result.
         // TODO: Rewrite to more graceful way using deadlime_timer
@@ -202,13 +163,9 @@ bool TCPConsole::run_queue()
             BOOST_LOG_TRIVIAL(error) << "TCPConsole: command queue is not empty after end of exchange";
             return false;
         }
-    }
-    catch (std::exception& e)
-    {
-        BOOST_LOG_TRIVIAL(error) << boost::format("TCPConsole: Exception while talking with %1%:%2%: %3%")
-            % m_host_name
-            % m_port_name
-            % e.what();
+    } catch (std::exception& e) {
+        BOOST_LOG_TRIVIAL(error) << boost::format("TCPConsole: Exception while talking with %1%:%2%: %3%") % m_host_name % m_port_name %
+                                        e.what();
 
         return false;
     }
@@ -216,5 +173,4 @@ bool TCPConsole::run_queue()
     return true;
 }
 
-} // namespace Utils
-} // namespace Slic3r
+}} // namespace Slic3r::Utils

@@ -1,4 +1,3 @@
-// [ANNOTATED]
 #ifndef slic3r_Utils_TCPConsole_hpp_
 #define slic3r_Utils_TCPConsole_hpp_
 
@@ -10,8 +9,7 @@
 #include <boost/asio/streambuf.hpp>
 #include "SerialMessage.hpp"
 
-namespace Slic3r {
-namespace Utils {
+namespace Slic3r { namespace Utils {
 
 using boost::asio::ip::tcp;
 
@@ -20,39 +18,33 @@ using boost::asio::ip::tcp;
 class TCPConsole
 {
 public:
+    // [INTENT] TCPConsole serializes short command/response exchanges against telnet-like printer sockets.
     TCPConsole() : m_resolver(m_io_context), m_socket(m_io_context) { set_defaults(); }
     TCPConsole(const std::string& host_name, const std::string& port_name) : m_resolver(m_io_context), m_socket(m_io_context)
-        { set_defaults(); set_remote(host_name, port_name); }
+    {
+        set_defaults();
+        set_remote(host_name, port_name);
+    }
     ~TCPConsole() = default;
 
     void set_defaults()
     {
-        m_newline = "\n";
-        m_done_string = "ok";
+        m_newline         = "\n";
+        m_done_string     = "ok";
         m_connect_timeout = std::chrono::milliseconds(5000);
-        m_write_timeout = std::chrono::milliseconds(10000);
-        m_read_timeout = std::chrono::milliseconds(10000);
+        m_write_timeout   = std::chrono::milliseconds(10000);
+        m_read_timeout    = std::chrono::milliseconds(10000);
         m_tcp_queue_delay = std::chrono::milliseconds(0);
     }
 
-    void set_write_timeout(std::chrono::steady_clock::duration timeout) {
-        m_write_timeout = timeout;
-    }
+    void set_write_timeout(std::chrono::steady_clock::duration timeout) { m_write_timeout = timeout; }
 
-    void set_read_timeout(std::chrono::steady_clock::duration timeout) {
-        m_read_timeout = timeout;
-    }
+    void set_read_timeout(std::chrono::steady_clock::duration timeout) { m_read_timeout = timeout; }
 
-    void set_tcp_queue_delay(std::chrono::steady_clock::duration delay) { 
-        m_tcp_queue_delay = delay;
-    }
+    void set_tcp_queue_delay(std::chrono::steady_clock::duration delay) { m_tcp_queue_delay = delay; }
 
-    void set_line_delimiter(const std::string& newline) {
-        m_newline = newline;
-    }
-    void set_command_done_string(const std::string& done_string) {
-        m_done_string = done_string;
-    }
+    void set_line_delimiter(const std::string& newline) { m_newline = newline; }
+    void set_command_done_string(const std::string& done_string) { m_done_string = done_string; }
 
     void set_remote(const std::string& host_name, const std::string& port_name)
     {
@@ -60,13 +52,14 @@ public:
         m_port_name = port_name;
     }
 
-    bool enqueue_cmd(const SerialMessage& cmd) {
-        // TODO: Add multithread protection to queue
+    bool enqueue_cmd(const SerialMessage& cmd)
+    {
+        // [THREAD] Queue mutation is currently single-threaded; callers must avoid concurrent producers.
         m_cmd_queue.push_back(cmd);
         return true;
     }
 
-    bool run_queue();
+    bool        run_queue();
     std::string error_message() const { return m_error_code.message(); }
 
 private:
@@ -74,36 +67,35 @@ private:
     void handle_read(const boost::system::error_code& ec, std::size_t bytes_transferred);
     void handle_write(const boost::system::error_code& ec, std::size_t bytes_transferred, SerialMessageType messageType);
 
-    void transmit_next_command();
-    void wait_next_line();
+    void        transmit_next_command();
+    void        wait_next_line();
     std::string extract_next_line();
 
     void set_deadline_in(std::chrono::steady_clock::duration);
     bool is_deadline_over() const;
 
-    std::string                             m_host_name;
-    std::string                             m_port_name;
-    std::string                             m_newline;
-    std::string                             m_done_string;
-    std::chrono::steady_clock::duration     m_connect_timeout;
-    std::chrono::steady_clock::duration     m_write_timeout;
-    std::chrono::steady_clock::duration     m_read_timeout;
-    std::chrono::steady_clock::duration     m_tcp_queue_delay;
+    std::string                         m_host_name;
+    std::string                         m_port_name;
+    std::string                         m_newline;
+    std::string                         m_done_string;
+    std::chrono::steady_clock::duration m_connect_timeout;
+    std::chrono::steady_clock::duration m_write_timeout;
+    std::chrono::steady_clock::duration m_read_timeout;
+    std::chrono::steady_clock::duration m_tcp_queue_delay;
 
-    std::deque<SerialMessage>                 m_cmd_queue;
+    std::deque<SerialMessage> m_cmd_queue;
 
-    boost::asio::io_context                 m_io_context;
-    tcp::resolver                           m_resolver;
-    tcp::socket                             m_socket;
-    boost::asio::streambuf                  m_recv_buffer;
-    std::string                             m_send_buffer;
+    boost::asio::io_context m_io_context;
+    tcp::resolver           m_resolver;
+    tcp::socket             m_socket;
+    boost::asio::streambuf  m_recv_buffer;
+    std::string             m_send_buffer;
 
-    bool                                    m_is_connected;
-    boost::system::error_code               m_error_code;
-    std::chrono::steady_clock::time_point   m_deadline;
+    bool                                  m_is_connected;
+    boost::system::error_code             m_error_code;
+    std::chrono::steady_clock::time_point m_deadline;
 };
 
-} // Utils
-} // Slic3r
+}} // namespace Slic3r::Utils
 
 #endif

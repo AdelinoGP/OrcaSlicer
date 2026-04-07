@@ -1,4 +1,3 @@
-// [ANNOTATED]
 #pragma once
 
 #include "MoonrakerPrinterAgent.hpp"
@@ -10,6 +9,7 @@ namespace Slic3r {
 class SnapmakerPrinterAgent final : public MoonrakerPrinterAgent
 {
 public:
+    // [UNITY] Snapmaker support stays on the Moonraker base agent and customizes filament normalization only.
     explicit SnapmakerPrinterAgent(std::string log_dir);
     ~SnapmakerPrinterAgent() override = default;
 
@@ -19,7 +19,7 @@ public:
     bool fetch_filament_info(std::string dev_id) override;
 
 private:
-    // Combine filament_type + filament_sub_type into a unified type string
+    // [INTENT] Combine firmware-reported type fragments into the single material key used by Orca profiles.
     static std::string combine_filament_type(const std::string& type, const std::string& sub_type);
 };
 

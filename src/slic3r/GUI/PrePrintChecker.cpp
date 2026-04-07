@@ -1,15 +1,17 @@
+// [INTENT] Maps pre-print status enums into user-facing messages and groups deduplicated warnings/errors by printer vs filament before the
+// dialog renders them. [STATE] `PrePrintChecker` stores transient categorized message lists, while `PrinterMsgPanel` rebuilds its label
+// widgets only when the incoming info set changes. [PORTING_HAZARD:P1] The categorization logic relies on enum ordering and range sentinels
+// in `PrintDialogStatus`; inserting new statuses in the wrong range silently changes behavior.
 #include "PrePrintChecker.hpp"
 #include "GUI_Utils.hpp"
 #include "I18N.hpp"
 #include <set>
 
-
 namespace Slic3r { namespace GUI {
 
 std::string PrePrintChecker::get_print_status_info(PrintDialogStatus status)
 {
-    switch (status)
-    {
+    switch (status) {
     case PrintStatusInit: return "PrintStatusInit";
     case PrintStatusNoUserLogin: return "PrintStatusNoUserLogin";
     case PrintStatusInvalidPrinter: return "PrintStatusInvalidPrinter";
@@ -77,21 +79,29 @@ wxString PrePrintChecker::get_pre_state_msg(PrintDialogStatus status)
     case PrintStatusInSystemPrinting: return _L("The printer is executing instructions. Please restart printing after it ends.");
     case PrintStatusInPrinting: return _L("The printer is busy with another print job.");
     case PrintStatusAmsOnSettingup: return _L("AMS is setting up. Please try again later.");
-    case PrintStatusAmsMappingInvalid: return _L("Not all filaments used in slicing are mapped to the printer. Please check the mapping of filaments.");
+    case PrintStatusAmsMappingInvalid:
+        return _L("Not all filaments used in slicing are mapped to the printer. Please check the mapping of filaments.");
     case PrintStatusAmsMappingMixInvalid: return _L("Please do not mix-use the Ext with AMS.");
     case PrintStatusNozzleDataInvalid: return _L("Invalid nozzle information, please refresh or manually set nozzle information.");
     case PrintStatusLanModeNoSdcard: return _L("Storage needs to be inserted before printing via LAN.");
     case PrintStatusLanModeSDcardNotAvailable: return _L("Storage is in abnormal state or is in read-only mode.");
     case PrintStatusNoSdcard: return _L("Storage needs to be inserted before printing.");
     case PrintStatusNeedForceUpgrading: return _L("Cannot send the print job to a printer whose firmware is required to get updated.");
-    case PrintStatusNeedConsistencyUpgrading: return _L("Cannot send the print job to a printer whose firmware is required to get updated.");
+    case PrintStatusNeedConsistencyUpgrading:
+        return _L("Cannot send the print job to a printer whose firmware is required to get updated.");
     case PrintStatusBlankPlate: return _L("Cannot send a print job for an empty plate.");
     case PrintStatusTimelapseNoSdcard: return _L("Storage needs to be inserted to record timelapse.");
-    case PrintStatusMixAmsAndVtSlotWarning: return _L("You have selected both external and AMS filaments for an extruder. You will need to manually switch the external filament during printing.");
-    case PrintStatusTPUUnsupportAutoCali: return _L("TPU 90A/TPU 85A is too soft and does not support automatic Flow Dynamics calibration.");
+    case PrintStatusMixAmsAndVtSlotWarning:
+        return _L("You have selected both external and AMS filaments for an extruder. You will need to manually switch the external "
+                  "filament during printing.");
+    case PrintStatusTPUUnsupportAutoCali:
+        return _L("TPU 90A/TPU 85A is too soft and does not support automatic Flow Dynamics calibration.");
     case PrintStatusWarningKvalueNotUsed: return _L("Set dynamic flow calibration to 'OFF' to enable custom dynamic flow value.");
     case PrintStatusNotSupportedPrintAll: return _L("This printer does not support printing all plates.");
-    case PrintStatusColorQuantityExceed: return _L("The current firmware supports a maximum of 16 materials. You can either reduce the number of materials to 16 or fewer on the Preparation Page, or try updating the firmware. If you are still restricted after the update, please wait for subsequent firmware support.");
+    case PrintStatusColorQuantityExceed:
+        return _L("The current firmware supports a maximum of 16 materials. You can either reduce the number of materials to 16 or fewer "
+                  "on the Preparation Page, or try updating the firmware. If you are still restricted after the update, please wait for "
+                  "subsequent firmware support.");
     }
     return wxEmptyString;
 }
@@ -149,37 +159,35 @@ void PrePrintChecker::add(PrintDialogStatus state, wxString msg, wxString tip, c
     }
 }
 
-
-//void PrePrintMsgBoard::add(const wxString &msg, const wxString &tips, bool is_error)
+// void PrePrintMsgBoard::add(const wxString &msg, const wxString &tips, bool is_error)
 //{
-//    if (msg.IsEmpty()) { return; }
+//     if (msg.IsEmpty()) { return; }
 //
-//    /*message*/
-//    // create label
-//    if (!m_sizer->IsEmpty()) { m_sizer->AddSpacer(FromDIP(10)); }
-//    Label *msg_label = new Label(this, wxEmptyString);
-//    m_sizer->Add(msg_label, 0, wxLEFT, 0);
+//     /*message*/
+//     // create label
+//     if (!m_sizer->IsEmpty()) { m_sizer->AddSpacer(FromDIP(10)); }
+//     Label *msg_label = new Label(this, wxEmptyString);
+//     m_sizer->Add(msg_label, 0, wxLEFT, 0);
 //
-//    // set message
-//    msg_label->SetLabel(msg);
-//    msg_label->SetMinSize(wxSize(FromDIP(420), -1));
-//    msg_label->SetMaxSize(wxSize(FromDIP(420), -1));
-//    msg_label->Wrap(FromDIP(420));
+//     // set message
+//     msg_label->SetLabel(msg);
+//     msg_label->SetMinSize(wxSize(FromDIP(420), -1));
+//     msg_label->SetMaxSize(wxSize(FromDIP(420), -1));
+//     msg_label->Wrap(FromDIP(420));
 //
-//    // font color
-//    auto colour = is_error ? wxColour("#D01B1B") : wxColour(0xFF, 0x6F, 0x00);
-//    msg_label->SetForegroundColour(colour);
+//     // font color
+//     auto colour = is_error ? wxColour("#D01B1B") : wxColour(0xFF, 0x6F, 0x00);
+//     msg_label->SetForegroundColour(colour);
 //
-//    /*tips*/
-//    if (!tips.IsEmpty()) { /*Not supported yet*/
-//    }
+//     /*tips*/
+//     if (!tips.IsEmpty()) { /*Not supported yet*/
+//     }
 //
-//    Layout();
-//    Fit();
-//}
+//     Layout();
+//     Fit();
+// }
 
-PrinterMsgPanel::PrinterMsgPanel(wxWindow *parent)
-    : wxPanel(parent)
+PrinterMsgPanel::PrinterMsgPanel(wxWindow* parent) : wxPanel(parent)
 {
     m_sizer = new wxBoxSizer(wxVERTICAL);
     this->SetSizer(m_sizer);
@@ -187,12 +195,9 @@ PrinterMsgPanel::PrinterMsgPanel(wxWindow *parent)
 
 static wxColour _GetLabelColour(const prePrintInfo& info)
 {
-    if (info.level == Error)
-    {
+    if (info.level == Error) {
         return wxColour("#D01B1B");
-    }
-    else if (info.level == Warning)
-    {
+    } else if (info.level == Warning) {
         return wxColour("#FF6F00");
     }
 
@@ -201,28 +206,21 @@ static wxColour _GetLabelColour(const prePrintInfo& info)
 
 bool PrinterMsgPanel::UpdateInfos(const std::vector<prePrintInfo>& infos)
 {
-    if (m_infos == infos)
-    {
+    if (m_infos == infos) {
         return false;
     }
     m_infos = infos;
 
     m_sizer->Clear(true);
-    for (const prePrintInfo& info : infos)
-    {
-        if (!info.msg.empty())
-        {
+    for (const prePrintInfo& info : infos) {
+        if (!info.msg.empty()) {
             Label* label = new Label(this);
             label->SetFont(::Label::Body_13);
             label->SetForegroundColour(_GetLabelColour(info));
 
-
-            if (info.wiki_url.empty())
-            {
+            if (info.wiki_url.empty()) {
                 label->SetLabel(info.msg);
-            }
-            else
-            {
+            } else {
                 label->SetLabel(info.msg + " " + _L("Please refer to Wiki before use->"));
                 label->Bind(wxEVT_ENTER_WINDOW, [this](auto& e) { SetCursor(wxCURSOR_HAND); });
                 label->Bind(wxEVT_LEAVE_WINDOW, [this](auto& e) { SetCursor(wxCURSOR_ARROW); });
@@ -243,8 +241,4 @@ bool PrinterMsgPanel::UpdateInfos(const std::vector<prePrintInfo>& infos)
     return true;
 }
 
-
-}
-};
-
-
+}}; // namespace Slic3r::GUI

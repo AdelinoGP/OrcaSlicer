@@ -1,4 +1,3 @@
-// [ANNOTATED]
 #ifndef __ORCA_CLOUD_SERVICE_AGENT_HPP__
 #define __ORCA_CLOUD_SERVICE_AGENT_HPP__
 
@@ -22,10 +21,10 @@ class AppConfig;
 
 // Constants for OAuth loopback server
 namespace auth_constants {
-    constexpr int LOOPBACK_PORT = 41172;
-    constexpr const char* LOOPBACK_PATH = "/callback";
-    constexpr const char* TOKEN_PATH = "/auth/v1/token";
-    constexpr const char* LOGOUT_PATH = "/auth/v1/logout";
+constexpr int         LOOPBACK_PORT = 41172;
+constexpr const char* LOOPBACK_PATH = "/callback";
+constexpr const char* TOKEN_PATH    = "/auth/v1/token";
+constexpr const char* LOGOUT_PATH   = "/auth/v1/logout";
 } // namespace auth_constants
 
 // ============================================================================
@@ -36,30 +35,34 @@ namespace auth_constants {
 #ifndef ORCA_SYNC_STRUCTS_DEFINED
 #define ORCA_SYNC_STRUCTS_DEFINED
 
-struct ProfileUpsert {
-    std::string id;
-    std::string name;
+struct ProfileUpsert
+{
+    std::string    id;
+    std::string    name;
     nlohmann::json content;
-    std::string updated_at;
-    std::string created_at;
+    std::string    updated_at;
+    std::string    created_at;
 };
 
-struct SyncPullResponse {
-    std::string next_cursor;
+struct SyncPullResponse
+{
+    std::string                next_cursor;
     std::vector<ProfileUpsert> upserts;
-    std::vector<std::string> deletes;
+    std::vector<std::string>   deletes;
 };
 
-struct SyncPushResult {
-    bool success;
-    int http_code;
-    std::string new_updated_at;
+struct SyncPushResult
+{
+    bool          success;
+    int           http_code;
+    std::string   new_updated_at;
     ProfileUpsert server_version;
-    bool server_deleted;
-    std::string error_message;
+    bool          server_deleted;
+    std::string   error_message;
 };
 
-struct SyncState {
+struct SyncState
+{
     std::string last_sync_timestamp;
 };
 
@@ -79,31 +82,35 @@ struct SyncState {
  *
  * This class combines the functionality of the former OrcaAuthAgent and OrcaCloudServiceAgent.
  */
-class OrcaCloudServiceAgent : public ICloudServiceAgent {
+class OrcaCloudServiceAgent : public ICloudServiceAgent
+{
 public:
     // ========================================================================
     // Auth Session Types
     // ========================================================================
-    struct SessionInfo {
-        std::string access_token;
-        std::string refresh_token;
-        std::string user_id;
-        std::string user_name;
-        std::string user_nickname;
-        std::string user_avatar;
+    struct SessionInfo
+    {
+        // [STATE] SessionInfo mirrors the persisted login state shared across auth, refresh, and sync calls.
+        std::string                           access_token;
+        std::string                           refresh_token;
+        std::string                           user_id;
+        std::string                           user_name;
+        std::string                           user_nickname;
+        std::string                           user_avatar;
         std::chrono::system_clock::time_point expires_at{};
-        bool logged_in = false;
+        bool                                  logged_in = false;
     };
 
-    struct PkceBundle {
+    struct PkceBundle
+    {
         std::string verifier;
         std::string challenge;
         std::string state;
         std::string redirect;
-        int loopback_port = auth_constants::LOOPBACK_PORT;
+        int         loopback_port = auth_constants::LOOPBACK_PORT;
     };
 
-    using SessionHandler = std::function<bool(const std::string&)>;
+    using SessionHandler         = std::function<bool(const std::string&)>;
     using OnLoginCompleteHandler = std::function<void(bool success, const std::string& user_id)>;
 
     explicit OrcaCloudServiceAgent(std::string log_dir);
@@ -128,9 +135,9 @@ public:
     // ========================================================================
     // ICloudServiceAgent Interface Implementation - User Session Management
     // ========================================================================
-    int change_user(std::string user_info) override;
-    bool is_user_login() override;
-    int user_logout(bool request = false) override;
+    int         change_user(std::string user_info) override;
+    bool        is_user_login() override;
+    int         user_logout(bool request = false) override;
     std::string get_user_id() override;
     std::string get_user_name() override;
     std::string get_user_avatar() override;
@@ -148,31 +155,37 @@ public:
     // ========================================================================
     std::string get_access_token() const override;
     std::string get_refresh_token() const override;
-    bool ensure_token_fresh(const std::string& reason) override;
+    bool        ensure_token_fresh(const std::string& reason) override;
 
     // ========================================================================
     // ICloudServiceAgent Interface Implementation - Server Connectivity
     // ========================================================================
     std::string get_cloud_service_host() override;
     std::string get_cloud_login_url(const std::string& language = "") override;
-    int connect_server() override;
-    bool is_server_connected() override;
-    int refresh_connection() override;
-    int start_subscribe(std::string module) override;
-    int stop_subscribe(std::string module) override;
-    int add_subscribe(std::vector<std::string> dev_list) override;
-    int del_subscribe(std::vector<std::string> dev_list) override;
-    void enable_multi_machine(bool enable) override;
+    int         connect_server() override;
+    bool        is_server_connected() override;
+    int         refresh_connection() override;
+    int         start_subscribe(std::string module) override;
+    int         stop_subscribe(std::string module) override;
+    int         add_subscribe(std::vector<std::string> dev_list) override;
+    int         del_subscribe(std::vector<std::string> dev_list) override;
+    void        enable_multi_machine(bool enable) override;
 
     // ========================================================================
     // ICloudServiceAgent Interface Implementation - Settings Synchronization
     // ========================================================================
-    int get_user_presets(std::map<std::string, std::map<std::string, std::string>>* user_presets) override;
+    int         get_user_presets(std::map<std::string, std::map<std::string, std::string>>* user_presets) override;
     std::string request_setting_id(std::string name, std::map<std::string, std::string>* values_map, unsigned int* http_code) override;
-    int put_setting(std::string setting_id, std::string name, std::map<std::string, std::string>* values_map, unsigned int* http_code) override;
-    int get_setting_list(std::string bundle_version, ProgressFn pro_fn = nullptr, WasCancelledFn cancel_fn = nullptr) override;
-    int get_setting_list2(std::string bundle_version, CheckFn chk_fn, ProgressFn pro_fn = nullptr, WasCancelledFn cancel_fn = nullptr) override;
-    int delete_setting(std::string setting_id) override;
+    int         put_setting(std::string                         setting_id,
+                            std::string                         name,
+                            std::map<std::string, std::string>* values_map,
+                            unsigned int*                       http_code) override;
+    int         get_setting_list(std::string bundle_version, ProgressFn pro_fn = nullptr, WasCancelledFn cancel_fn = nullptr) override;
+    int         get_setting_list2(std::string    bundle_version,
+                                  CheckFn        chk_fn,
+                                  ProgressFn     pro_fn    = nullptr,
+                                  WasCancelledFn cancel_fn = nullptr) override;
+    int         delete_setting(std::string setting_id) override;
 
     // ========================================================================
     // ICloudServiceAgent Interface Implementation - Cloud User Services
@@ -204,29 +217,39 @@ public:
     // ========================================================================
     // ICloudServiceAgent Interface Implementation - Analytics & Tracking
     // ========================================================================
-    int track_enable(bool enable) override;
-    int track_remove_files() override;
-    int track_event(std::string evt_key, std::string content) override;
-    int track_header(std::string header) override;
-    int track_update_property(std::string name, std::string value, std::string type = "string") override;
-    int track_get_property(std::string name, std::string& value, std::string type = "string") override;
+    int  track_enable(bool enable) override;
+    int  track_remove_files() override;
+    int  track_event(std::string evt_key, std::string content) override;
+    int  track_header(std::string header) override;
+    int  track_update_property(std::string name, std::string value, std::string type = "string") override;
+    int  track_get_property(std::string name, std::string& value, std::string type = "string") override;
     bool get_track_enable() override;
 
     // ========================================================================
     // ICloudServiceAgent Interface Implementation - Ratings & Reviews
     // ========================================================================
-    int put_model_mall_rating(int design_id, int score, std::string content, std::vector<std::string> images, unsigned int& http_code, std::string& http_error) override;
+    int put_model_mall_rating(int                      design_id,
+                              int                      score,
+                              std::string              content,
+                              std::vector<std::string> images,
+                              unsigned int&            http_code,
+                              std::string&             http_error) override;
     int get_oss_config(std::string& config, std::string country_code, unsigned int& http_code, std::string& http_error) override;
-    int put_rating_picture_oss(std::string& config, std::string& pic_oss_path, std::string model_id, int profile_id, unsigned int& http_code, std::string& http_error) override;
+    int put_rating_picture_oss(std::string&  config,
+                               std::string&  pic_oss_path,
+                               std::string   model_id,
+                               int           profile_id,
+                               unsigned int& http_code,
+                               std::string&  http_error) override;
     int get_model_mall_rating_result(int job_id, std::string& rating_result, unsigned int& http_code, std::string& http_error) override;
 
     // ========================================================================
     // ICloudServiceAgent Interface Implementation - Extra Features
     // ========================================================================
-    int set_extra_http_header(std::map<std::string, std::string> extra_headers) override;
+    int         set_extra_http_header(std::map<std::string, std::string> extra_headers) override;
     std::string get_studio_info_url() override;
-    int get_mw_user_preference(std::function<void(std::string)> callback) override;
-    int get_mw_user_4ulist(int seed, int limit, std::function<void(std::string)> callback) override;
+    int         get_mw_user_preference(std::function<void(std::string)> callback) override;
+    int         get_mw_user_4ulist(int seed, int limit, std::function<void(std::string)> callback) override;
     std::string get_version() override;
 
     // ========================================================================
@@ -239,9 +262,10 @@ public:
     int set_queue_on_main_fn(QueueOnMainFn fn) override;
 
     // Sync state management
-    void load_sync_state();
-    void save_sync_state();
-    void clear_sync_state();
+    // [INTENT] Sync state persists the server cursor boundary used to resume incremental profile sync.
+    void             load_sync_state();
+    void             save_sync_state();
+    void             clear_sync_state();
     const SyncState& get_sync_state() const { return sync_state; }
 
     // ========================================================================
@@ -251,7 +275,7 @@ public:
     void set_on_login_complete_handler(OnLoginCompleteHandler handler);
 
     const PkceBundle& pkce();
-    void regenerate_pkce();
+    void              regenerate_pkce();
 
     void persist_refresh_token(const std::string& token);
     bool load_refresh_token(std::string& out_token);
@@ -275,17 +299,13 @@ public:
 
 private:
     // Sync protocol helpers
-    int sync_pull(
-        std::function<void(const SyncPullResponse&)> on_success,
-        std::function<void(int http_code, const std::string& error)> on_error
-    );
+    int sync_pull(std::function<void(const SyncPullResponse&)>                 on_success,
+                  std::function<void(int http_code, const std::string& error)> on_error);
 
-    SyncPushResult sync_push(
-        const std::string& profile_id,
-        const std::string& name,
-        const nlohmann::json& content,
-        const std::string& original_updated_at = ""
-    );
+    SyncPushResult sync_push(const std::string&    profile_id,
+                             const std::string&    name,
+                             const nlohmann::json& content,
+                             const std::string&    original_updated_at = "");
 
     // HTTP request helpers
     int http_get(const std::string& path, std::string* response_body, unsigned int* http_code);
@@ -293,7 +313,7 @@ private:
     int http_put(const std::string& path, const std::string& body, std::string* response_body, unsigned int* http_code);
     int http_delete(const std::string& path, std::string* response_body, unsigned int* http_code);
     std::map<std::string, std::string> data_headers();
-    bool attempt_refresh_after_unauthorized(const std::string& reason);
+    bool                               attempt_refresh_after_unauthorized(const std::string& reason);
 
     // Auth HTTP helpers
     bool http_post_token(const std::string& body, std::string* response_body, unsigned int* http_code, const std::string& url = "");
@@ -311,26 +331,26 @@ private:
 
     // JSON helpers
     std::string map_to_json(const std::map<std::string, std::string>& map);
-    void json_to_map(const std::string& json, std::map<std::string, std::string>& map);
+    void        json_to_map(const std::string& json, std::map<std::string, std::string>& map);
 
     // Member variables - configuration
-    std::string log_dir;
-    std::string config_dir;
-    std::string api_base_url;
-    std::string auth_base_url;
-    std::string country_code;
+    std::string                        log_dir;
+    std::string                        config_dir;
+    std::string                        api_base_url;
+    std::string                        auth_base_url;
+    std::string                        country_code;
     std::map<std::string, std::string> extra_headers;
     std::map<std::string, std::string> auth_headers;
-    mutable std::mutex headers_mutex;
-    bool m_use_encrypted_token_file{false};
+    mutable std::mutex                 headers_mutex;
+    bool                               m_use_encrypted_token_file{false};
 
     // Member variables - auth state
-    PkceBundle pkce_bundle;
-    std::string refresh_fallback_path;
-    SessionHandler session_handler;
+    PkceBundle             pkce_bundle;
+    std::string            refresh_fallback_path;
+    SessionHandler         session_handler;
     OnLoginCompleteHandler on_login_complete_handler;
-    SessionInfo session;
-    mutable std::mutex session_mutex;
+    SessionInfo            session;
+    mutable std::mutex     session_mutex;
 
     // Member variables - connection state
     bool is_connected{false};
@@ -338,21 +358,21 @@ private:
     bool multi_machine_enabled{false};
 
     // Sync state
-    SyncState sync_state;
+    SyncState   sync_state;
     std::string sync_state_path;
 
     // Callbacks
-    OnUserLoginFn on_user_login_fn;
+    OnUserLoginFn       on_user_login_fn;
     OnServerConnectedFn on_server_connected_fn;
-    OnHttpErrorFn on_http_error_fn;
-    GetCountryCodeFn get_country_code_fn;
-    QueueOnMainFn queue_on_main_fn;
-    mutable std::mutex callback_mutex;
+    OnHttpErrorFn       on_http_error_fn;
+    GetCountryCodeFn    get_country_code_fn;
+    QueueOnMainFn       queue_on_main_fn;
+    mutable std::mutex  callback_mutex;
 
     // Thread safety
     mutable std::recursive_mutex state_mutex;
-    std::thread refresh_thread;
-    std::atomic_bool refresh_running{false};
+    std::thread                  refresh_thread;
+    std::atomic_bool             refresh_running{false};
 };
 
 } // namespace Slic3r
