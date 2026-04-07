@@ -2888,5 +2888,5 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
   - Unity port maps to a persistent MonoBehaviour/UI overlay with cached selection state.
   - Coordinate-system and buffered-transform state should be moved into a managed view-model.
 - Hazards found: 1 (P2: synchronization between 3D selection and multiple numeric inputs)
-- Git: pending commit
+- Git: f65c85fbdb (annotate gizmo object manipulation header)
 - Next recommended Phase 1 task: T305 src/slic3r/GUI/Gizmos/GLGizmoAdvancedCut.cpp
