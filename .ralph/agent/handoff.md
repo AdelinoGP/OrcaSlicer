@@ -82,6 +82,20 @@ _Generated: 2026-03-30 04:15:47 UTC_
 - Git: pending atomic commit for T443/T444 registry reconciliation
 - Next recommended Phase 1 task: `T445 annotate: src/slic3r/GUI/Jobs/PlaterWorker.hpp`
 
+## Phase 1 - Task T445 complete
+- Task type: annotate
+- File: `src/slic3r/GUI/Jobs/PlaterWorker.hpp`
+- Deliverables: `src/slic3r/GUI/Jobs/PlaterWorker.hpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/handoff.md`
+- Substantive additions: replaced the placeholder header banner with concrete `[INTENT]`, `[STATE]`, `[EVENT]`, `[THREAD]`, `[UNITY]`, and `[PORTING_HAZARD:P1]` notes describing the plater-specific worker wakeup bridge.
+- Verification excerpt: `// [EVENT] \`PlaterJob\` injects \`wxWakeUpIdle()\` into every status/progress callback, while the outer \`PlaterWorker\` listens to \`wxEVT_IDLE\``
+- Unity-impact summary:
+  - The file now explicitly documents that the current responsiveness contract depends on forcing the wx event loop to wake and drain worker completions.
+  - A Unity port will need an explicit main-thread completion pump instead of assuming idle/paint events will flush job updates.
+  - The header now clearly separates worker-thread processing from main-thread finalize/error presentation, which is the key porting boundary.
+- Hazards found: 1 (P1: job completion flow is coupled to wx idle/paint wakeups rather than an explicit scheduler)
+- Git: pending atomic commit for T445 annotation
+- Next recommended Phase 1 task: `T446 annotate: src/slic3r/GUI/Jobs/PrintJob.cpp`
+
 ## Phase 1 - Task T361 complete
 - Task type: annotate
 - File: src/slic3r/GUI/GLSelectionRectangle.hpp

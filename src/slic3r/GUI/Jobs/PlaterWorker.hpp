@@ -1,31 +1,15 @@
-// [INTENT]
-// ... (omitted) ...
-// [PORTING_HAZARD:P1] The direct reliance on wxWidgets event loop (wxEVT_IDLE, wxEVT_PAINT) for processing worker thread results is highly
-// coupled to the UI framework and must be replaced by a C# event/async-await mechanism in Unity.
-//
-// The key components are:
-
-// - `PlaterWorker`: A template class that wraps a `Worker` instance. It ensures
-//   that the UI thread continuously processes messages from the worker thread
-//   by hooking into the `wxEVT_IDLE` and `wxEVT_PAINT` events.
-// - `PlaterJob`: A nested wrapper class that decorates any `Job` submitted to
-//   the `PlaterWorker`. Its main purposes are:
-//   - To ensure the UI thread is woken up to process status updates from the
-//     job, providing a responsive UI.
-//   - To add detailed logging for job execution times (process and finalize stages).
-//   - To provide centralized exception handling and display error messages to
-//     the user.
-//   - To show a busy cursor while the job is running.
-//
-// [UNITY]
-// The concept of a dedicated `PlaterWorker` would not be necessary in Unity.
-// The core job management would be handled by the C# Job System or async/await.
-// - The UI responsiveness (waking up the UI thread) is handled automatically by
-//   Unity's main loop and `async/await`'s main thread synchronization context.
-// - Job logging and exception handling would be implemented in a C# wrapper
-//   class or using AOP (Aspect-Oriented Programming) techniques with attributes.
-// - A busy cursor would be managed by a global UI state controller that listens
-//   for "job started" and "job ended" events.
+// [INTENT] PlaterWorker.hpp wraps the generic job worker with plater-specific UI wakeups, status propagation, timing logs, and
+// exception presentation so long-running background jobs can keep the wxWidgets scene responsive.
+// [STATE] The template owns the concrete worker implementation, a non-owning plater window pointer, and RAII event guards that keep idle and
+// paint hooks attached for as long as the wrapper lives.
+// [EVENT] `PlaterJob` injects `wxWakeUpIdle()` into every status/progress callback, while the outer `PlaterWorker` listens to `wxEVT_IDLE`
+// and `wxEVT_PAINT` so worker-thread completions are drained back into the UI loop even when the plater is otherwise idle.
+// [THREAD] Wrapped jobs still do their heavy `process()` work on the worker thread, but finalize/error UI is funneled through the main thread
+// by the underlying Worker contract and this header's wake-up bridge.
+// [UNITY] Replace this with a Unity-side job runner service that exposes progress events, busy-state notifications, and main-thread
+// continuations through `async/await` or the C# Job System rather than piggybacking on paint/idle events.
+// [PORTING_HAZARD:P1] The direct reliance on `wxEVT_IDLE`, `wxEVT_PAINT`, and `wxWakeUpIdle()` is tightly coupled to the wx event loop; the
+// Unity port needs an explicit main-thread pump for worker completions instead of assuming rendering or idle callbacks will flush them.
 
 #ifndef PLATERWORKER_HPP
 #define PLATERWORKER_HPP
