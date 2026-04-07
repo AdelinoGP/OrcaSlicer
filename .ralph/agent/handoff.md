@@ -2902,5 +2902,5 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
   - Unity should split gesture handling, cut-plane model state, and render output into separate components.
   - Connector editing needs a managed model plus a retained inspector panel to preserve batch edits and validation.
 - Hazards found: 2 (P1: synchronous cut/model mutation on UI thread; P2: mixed tri-state connector editing)
-- Git: a07e2f8e27 (record T304 commit hash)
+- Git: 47b77648b1 (annotate advanced cut gizmo)
 - Next recommended Phase 1 task: T306 src/slic3r/GUI/Gizmos/GLGizmoAdvancedCut.hpp
