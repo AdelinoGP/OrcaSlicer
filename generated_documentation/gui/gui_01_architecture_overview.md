@@ -21,7 +21,9 @@ main()/CLI
           -> Device/Monitor
           -> Multi-device
           -> Project
-          -> Calibration
+        -> Calibration
+        -> Auxiliary
+        -> Debug tool
 
 Cross-cutting services owned from app shell:
 - OpenGL manager and shader catalog
@@ -62,7 +64,7 @@ Unity implication: this should become a much thinner bootstrapper. Keep service 
 
 ### Main Window And Navigation
 
-`MainFrame` defines the top-level tab enumeration and owns the major screen instances: plater, monitor, multi-machine, project, calibration, home webview, printer webview, settings dialogs, and print queue dialog (`src/slic3r/GUI/MainFrame.hpp:L209-L219`, `src/slic3r/GUI/MainFrame.hpp:L361-L405`).
+`MainFrame` defines the top-level tab enumeration and owns the major screen instances: home, prepare, preview, monitor, multi-device, project, calibration, auxiliary, and debug-tool surfaces, plus printer webviews, settings dialogs, and the print queue dialog (`src/slic3r/GUI/MainFrame.hpp:L209-L219`, `src/slic3r/GUI/MainFrame.hpp:L361-L405`).
 
 Unity implication: use an explicit router with stable page IDs instead of notebook indices and dynamic tab insertion.
 

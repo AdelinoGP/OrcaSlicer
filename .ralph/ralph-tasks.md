@@ -800,4 +800,8 @@ Last updated: 2026-04-07T20:15:00Z
 (Inline tasks for each doc file)
 
 ## Phase 3 — Review and Audit
-(Audit tasks)
+- [x] T301 audit: unclear_inventory
+- [x] T302 audit: source_reference_validation
+- [x] T303 audit: documentation_consistency
+- [x] T304 review: final_readiness_package
+- [x] T305 finalize: phase3_commit
