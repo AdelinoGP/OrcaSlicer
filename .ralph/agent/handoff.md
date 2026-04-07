@@ -2916,5 +2916,5 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
   - Unity should separate the controller interface from serialized gizmo state.
   - The declaration reveals a broad view-model boundary that should not be coupled to rendering code.
 - Hazards found: 1 (P1: declaration mixes mesh state, input buffering, and model mutation entry points)
-- Git: pending commit
+- Git: e641621d06 (annotate advanced cut header)
 - Next recommended Phase 1 task: T307 src/slic3r/GUI/Gizmos/GLGizmoAssembly.cpp
