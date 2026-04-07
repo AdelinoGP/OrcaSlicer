@@ -1,313 +1,204 @@
-# PROMPT - Phase 2: GUI Documentation Package for Unity Reimplementation
+# PROMPT - Phase 3: Final Review, Validation, and Readiness Package
 
 ## Phase Boundary
 
-This prompt governs **Phase 2 only**.
+This prompt governs **Phase 3 only**.
 
-Assume Phase 1 has already finished successfully.
+Assume Phases 1 and 2 have already completed.
 
-- Do not redo Phase 1 annotation work except for a minimal corrective edit when a document would otherwise be false.
-- Do not begin Phase 3 review/finalization work here.
-- Do not emit the configured completion token until every Phase 2 completion gate is satisfied.
+- Do not redo earlier phases wholesale.
+- Do not create new major Phase 2 documents beyond what is required to fix audit failures.
+- Do not emit the configured completion token until every Phase 3 completion gate is satisfied.
 
 ## Mission
 
-You are producing the documentation package that future AI agents and human engineers will use to reimplement the OrcaSlicer GUI layer in Unity/C#.
+You are performing the final validation pass over the GUI analysis package for the future Unity/C# port.
 
-This phase turns source-level annotations into durable, structured engineering documentation.
-
-The output must be specific, source-grounded, and implementation-oriented.
+This phase exists to catch drift, stale references, unresolved ambiguity, and missing readiness guidance before the package is handed off to implementation agents.
 
 ## Authoritative Working State
 
-Use these as the source of truth for progress and resumption:
+Use these as the source of truth:
 
 1. `.ralph/ralph-tasks.md`
 2. `.ralph/agent/handoff.md`
 3. Ralph task tooling state
-4. The annotated source tree from Phase 1
+4. Annotated source files from Phase 1
+5. Documentation under `generated_documentation/gui/` from Phase 2
 
-If these disagree, reconcile the discrepancy first and record it in `.ralph/agent/handoff.md`.
+If these disagree, reconcile the discrepancy first and record the resolution in `.ralph/agent/handoff.md`.
 
 ## Runtime Behavior
 
-- Completing one document task is **not** a reason to stop.
-- After every completed document task, immediately select the next eligible Phase 2 task and continue.
-- If one task is blocked, record the blocker and continue with the next unblocked Phase 2 task.
+- Completing one review task is **not** a reason to stop.
+- After every completed review task, immediately select the next eligible Phase 3 task and continue.
+- If you find a defect, fix it or create a precise follow-up task, then continue.
 - The only valid reasons to end the run are:
-  1. every Phase 2 completion gate is satisfied, then emit the configured completion token once on its own line, or
-  2. every remaining Phase 2 task is blocked by a hard external dependency and that blocker is explicitly recorded.
+  1. every Phase 3 completion gate is satisfied, then emit the configured completion token once on its own line, or
+  2. every remaining Phase 3 task is blocked by a hard external dependency and that blocker is explicitly recorded.
 
-Never print the configured completion token in examples, notes, handoff entries, or commit messages.
+Never print the configured completion token in notes, examples, handoff entries, or commit messages.
 
-## Output Location
+## Required Phase 3 Task Naming
 
-Write all Phase 2 deliverables under:
+Use these canonical tasks:
 
-`generated_documentation/gui/`
+- `T301 audit: unclear_inventory`
+- `T302 audit: source_reference_validation`
+- `T303 audit: documentation_consistency`
+- `T304 review: final_readiness_package`
+- `T305 finalize: phase3_commit`
 
-## Required Phase 2 Task Naming
-
-Use task titles that make auditing easy:
-
-- `T201 docs: gui_01_architecture_overview.md`
-- `T202 docs: gui_02_screen_and_widget_inventory.md`
-- `T203 docs: gui_03_state_management.md`
-- `T204 docs: gui_04_opengl_viewport_pipeline.md`
-- `T205 docs: gui_05_event_and_callback_model.md`
-- `T206 docs: gui_06_background_process_and_threading.md`
-- `T207 docs: gui_07_unity_porting_hazards.md`
-- `T208 docs: gui_08_external_gui_dependencies.md`
-- `T209+ docs: flow_<name>.md` for pseudocode / flow documents
-
-If a title does not follow this format, normalize it when you touch it.
-
-## Documentation Quality Bar
-
-Every document must be useful to a Unity implementation effort.
-
-### Mandatory quality rules
-
-1. No stub files.
-2. No headers-only placeholders.
-3. No padding to satisfy length.
-4. Every major claim should be tied to source evidence.
-5. Every document must include Unity-specific recommendations, not just C++ descriptions.
-6. Every unresolved ambiguity must be called out explicitly.
-7. Prefer durable structure: tables, numbered flows, state diagrams, dependency lists, and subsystem breakdowns.
-
-### Required source-reference format
-
-Use repo-relative textual anchors in this exact style when citing source code:
-
-- `src/slic3r/GUI/Foo.cpp:L120-L184`
-- `src/libvgcode/Bar.hpp:L33-L79`
-
-Use one or more such anchors wherever they materially improve trustworthiness.
-
-Do **not** rely on host-specific web URLs.
-
-### Acceptable diagram forms
-
-At least one of these should appear where useful:
-
-- Mermaid
-- ASCII block diagram
-- numbered sequence flow
-- pseudocode listing
-- lifecycle table
-
-## Standard Work Loop
-
-For each Phase 2 task:
-
-1. Read `.ralph/ralph-tasks.md`, `.ralph/agent/handoff.md`, and the relevant Phase 1 annotations.
-2. Select the next highest-priority incomplete Phase 2 task.
-3. Mark it `[~] ACTIVE` in `.ralph/ralph-tasks.md`.
-4. Gather the primary source files and anchors you will rely on.
-5. Write or expand the document until it is materially complete.
-6. Self-verify that the document is not a stub and contains concrete Unity guidance.
-7. Append a completion-evidence block to `.ralph/agent/handoff.md`.
-8. Mark the task `[x] DONE` in `.ralph/ralph-tasks.md`.
-9. Commit the atomic change.
-10. Immediately continue to the next eligible Phase 2 task.
-
-## Required Completion Evidence Block
-
-After each document task, append this to `.ralph/agent/handoff.md`:
-
-```md
-## Phase 2 - Task T2xx complete
-- Deliverable: generated_documentation/gui/<filename>
-- Scope covered: <subsystems or flows>
-- Source anchors referenced: <count>
-- Key Unity decisions captured: <2-5 bullets>
-- Verification excerpt: <one meaningful line from the document>
-- Remaining follow-up if any: <none or short note>
-- Git: <commit hash or commit subject>
-- Next recommended Phase 2 task: <task id>
-```
-
-A document task is not complete until this evidence exists.
+If your current task list differs, normalize it when you touch it.
 
 ## Required Deliverables
 
-### T201 - `gui_01_architecture_overview.md`
+Phase 3 must produce or update these artifacts:
 
-Purpose: a top-down map of the GUI system.
+- `generated_documentation/gui/gui_99_final_review.md`
+- updates to earlier docs if reference or consistency fixes are needed
+- `.ralph/agent/handoff.md` final review summary
+- `.ralph/ralph-tasks.md` closed Phase 3 state
 
-Required sections:
+## Standard Work Loop
 
-- system boundary and module map
-- startup path and lifetime overview
-- major GUI subsystems and their responsibilities
-- cross-cutting concerns: undo/redo, i18n, theming, settings, background work
-- Unity migration summary by subsystem
-- recommended port order
+1. Read `.ralph/ralph-tasks.md`, `.ralph/agent/handoff.md`, and the Phase 2 documents.
+2. Select the next incomplete Phase 3 task.
+3. Mark it `[~] ACTIVE`.
+4. Perform the audit or fix.
+5. Record evidence in `.ralph/agent/handoff.md`.
+6. Mark the task `[x] DONE`.
+7. Commit the atomic change.
+8. Immediately continue to the next eligible Phase 3 task.
 
-### T202 - `gui_02_screen_and_widget_inventory.md`
+## T301 - UNCLEAR Inventory
 
-Purpose: a screen-by-screen and widget-by-widget inventory.
+Search all in-scope source files for `[UNCLEAR]` tags and produce a structured inventory.
 
-Required sections:
+Recommended search scope:
 
-- top-level windows, tabs, panes, and dialogs
-- ownership/lifecycle notes
-- Unity UI equivalent for each major screen or widget
-- complexity notes and migration hotspots
-- inventory table keyed by source anchors
+- `src/slic3r/GUI/`
+- `src/libvgcode/`
+- `src/slic3r/Utils/`
+- `src/slic3r/Config/` if present
+- `src/OrcaSlicer.cpp` if it contains Phase 1 annotations
 
-### T203 - `gui_03_state_management.md`
+For each `[UNCLEAR]` item, classify it as one of:
 
-Purpose: explain how UI state is modeled and moves through the system.
+- resolved during later work
+- still unresolved but low-risk
+- still unresolved and porting-relevant
 
-Required sections:
+Record each item in `generated_documentation/gui/gui_99_final_review.md` with:
 
-- state taxonomy: ephemeral, session, persistent, domain-backed
-- ownership and mutation patterns
-- synchronization points and invalidation patterns
-- persistence/settings interactions
-- Unity recommendations: MonoBehaviour state, ScriptableObject, serialized settings, async state, etc.
+- source anchor
+- short description
+- current best hypothesis
+- expected Unity impact
+- recommendation for the implementation phase
 
-### T204 - `gui_04_opengl_viewport_pipeline.md`
+## T302 - Source Reference Validation
 
-Purpose: deep explanation of the rendering and interaction pipeline.
+Phase 2 documents should use textual anchors like:
 
-This is one of the two highest-priority documents.
+- `path/to/file.cpp:L120-L184`
 
-Required sections:
+Validate every such reference in `generated_documentation/gui/`.
 
-- render loop trace
-- viewport scene composition
-- GL resource lifetime and ownership
-- user interaction model
-- shader/material considerations
-- g-code visualization behavior
-- at least three Unity strategy options with trade-offs
-- preferred strategy and why
+The audit must check that:
 
-### T205 - `gui_05_event_and_callback_model.md`
+1. the referenced file exists
+2. the start line exists
+3. the end line exists if present
+4. the referenced passage still matches the claim closely enough to remain trustworthy
 
-Purpose: explain wxWidgets events, callbacks, and higher-level event flows.
+If a reference is broken or stale, fix the document immediately.
 
-Required sections:
+You may use a temporary script under `/tmp` to automate validation if helpful, but do not commit temporary tooling unless it adds durable value.
 
-- event model primer for this codebase
-- important bind sites and handlers
-- critical user flows as numbered sequences
-- custom events or app-specific dispatch patterns
-- Unity equivalents: EventSystem, UnityEvent, delegates, observables, custom bus, etc.
+## T303 - Documentation Consistency Audit
 
-### T206 - `gui_06_background_process_and_threading.md`
+Audit the documentation package for internal consistency.
 
-Purpose: explain how background work interacts with the GUI.
+Check at least the following:
 
-This is the other highest-priority document.
+- every required Phase 2 core document exists
+- the same subsystem is described consistently across docs
+- hazards in `gui_07_unity_porting_hazards.md` are reflected in the architecture and threading docs where relevant
+- major viewport claims align with the annotations in the source
+- screen inventory and state-management docs do not contradict each other
+- any corrective source edits made during Phase 2 are reflected in the docs
 
-Required sections:
+If you find a material inconsistency, fix it rather than merely reporting it.
 
-- thread/process inventory
-- background slicing and job orchestration
-- main-thread marshaling patterns
-- UI thread safety constraints
-- async cancellation/progress behavior
-- Unity equivalents using async/await, coroutines, Job System, or custom dispatching
+## T304 - Final Readiness Package
 
-### T207 - `gui_07_unity_porting_hazards.md`
-
-Purpose: a concentrated list of migration risks.
+Create or update `generated_documentation/gui/gui_99_final_review.md` so it becomes the executive handoff for the future Unity implementation effort.
 
 Required sections:
 
+- artifact inventory
+- unresolved ambiguities
+- source reference validation summary
+- documentation consistency summary
 - critical blockers
-- hazard catalog grouped by subsystem
-- severity, impact, evidence, and likely mitigation
-- dependencies between hazards
-- recommended order for burning down risk
+- recommended implementation order
+- estimated effort by subsystem
+- suggested first Unity milestones
+- known assumptions and what should be verified first during implementation
 
-### T208 - `gui_08_external_gui_dependencies.md`
+This document should be concise compared with the main docs, but specific and actionable.
 
-Purpose: catalog external dependencies that affect the GUI port.
+## T305 - Finalization Commit
 
-Required sections:
+After all review and fixes are complete:
 
-- dependency inventory
-- how each dependency is used by the GUI layer
-- whether Unity has a package or native replacement path
-- keep/adapt/replace recommendation for each
-- notable licensing or integration concerns if visible from source context
+- ensure no Phase 3 task remains `[~] ACTIVE`
+- commit the final Phase 3 changes atomically
+- record the final commit hash and summary in `.ralph/agent/handoff.md`
 
-## Pseudocode / Flow Documents (T209 and above)
+## Required Completion Evidence Block
 
-Create flow documents for complex flows that deserve implementation recipes.
-
-Use names like:
-
-- `flow_app_startup.md`
-- `flow_viewport_input_and_render.md`
-- `flow_background_slicing.md`
-- `flow_project_load_save.md`
-- `flow_printer_connection_or_upload.md`
-
-Create one when a flow has at least one of the following:
-
-- multiple event handlers
-- cross-thread behavior
-- GPU/render interaction
-- substantial state transitions
-- non-obvious Unity migration implications
-
-Each flow document must include:
-
-- flow purpose
-- participating source files and anchors
-- numbered steps
-- explicit state/thread/render markers where applicable
-- Unity implementation notes
-
-## Self-Check Before Marking a Document Done
-
-Before marking any Phase 2 task done, verify that the document:
-
-- has real content, not scaffolding
-- names the relevant source files and anchors
-- contains concrete Unity mappings
-- contains at least one table, flow, or diagram where useful
-- calls out unresolved ambiguity explicitly
-- would help a new engineer implement the subsystem in Unity without rereading all source files first
-
-## Phase 2 Completion Summary Block
-
-When you think Phase 2 is complete, append this block to `.ralph/agent/handoff.md`:
+After each Phase 3 task, append a block like this to `.ralph/agent/handoff.md`:
 
 ```md
-## Phase 2 documentation coverage summary
-- Core docs present: <list T201-T208 files>
-- Flow docs present: <list or `none`>
-- Highest-priority docs completed: T204 yes/no, T206 yes/no
-- Source anchor convention used consistently: yes/no
-- Remaining documentation gaps: <list or `none`>
-- Result: PASS | FAIL
+## Phase 3 - Task T3xx complete
+- Deliverables: <files changed>
+- Audit scope: <what was checked>
+- Problems found: <count and short summary>
+- Fixes applied: <short list or `none`>
+- Verification excerpt: <one meaningful line from a doc, audit summary, or fix>
+- Git: <commit hash or commit subject>
+- Next recommended Phase 3 task: <task id or `none`>
 ```
 
-If the result is `FAIL`, continue Phase 2 work immediately.
+A Phase 3 task is not complete until this evidence exists.
 
-## Phase 2 Completion Gate
+## Final Review Summary Block
 
-Phase 2 is complete only when **all** of the following are true:
+When you believe Phase 3 is complete, append this to `.ralph/agent/handoff.md`:
 
-1. `generated_documentation/gui/gui_01_architecture_overview.md` exists and is substantive.
-2. `generated_documentation/gui/gui_02_screen_and_widget_inventory.md` exists and is substantive.
-3. `generated_documentation/gui/gui_03_state_management.md` exists and is substantive.
-4. `generated_documentation/gui/gui_04_opengl_viewport_pipeline.md` exists and is substantive.
-5. `generated_documentation/gui/gui_05_event_and_callback_model.md` exists and is substantive.
-6. `generated_documentation/gui/gui_06_background_process_and_threading.md` exists and is substantive.
-7. `generated_documentation/gui/gui_07_unity_porting_hazards.md` exists and is substantive.
-8. `generated_documentation/gui/gui_08_external_gui_dependencies.md` exists and is substantive.
-9. T204 and T206 are among the deepest and most evidence-backed docs in the set.
-10. At least two flow documents exist if the codebase contains at least two qualifying complex flows; otherwise the reason is documented in `.ralph/agent/handoff.md`.
-11. `.ralph/agent/handoff.md` contains the final Phase 2 documentation coverage summary with `PASS`.
-12. No Phase 2 task remains `[~] ACTIVE`.
-13. All Phase 2 work is committed.
+```md
+## Phase 3 final review summary
+- UNCLEAR inventory complete: yes/no
+- Source references validated: yes/no
+- Consistency audit passed: yes/no
+- Final review document present: yes/no
+- Remaining blockers: <list or `none`>
+- Implementation readiness: READY | NOT_READY
+```
+
+If the result is `NOT_READY`, continue Phase 3 work immediately.
+
+## Phase 3 Completion Gate
+
+Phase 3 is complete only when **all** of the following are true:
+
+1. `generated_documentation/gui/gui_99_final_review.md` exists and contains all required sections.
+2. Every Phase 2 core document still exists and any broken/stale references have been fixed.
+3. Every discovered `[UNCLEAR]` item has been inventoried and classified.
+4. `.ralph/agent/handoff.md` contains the final review summary with `Implementation readiness: READY`.
+5. No Phase 3 task remains `[~] ACTIVE`.
+6. All Phase 3 work is committed.
 
 Only then emit the configured completion token once, on its own line, and nothing else after it.

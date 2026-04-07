@@ -56,9 +56,12 @@ bool instance_check(int argc, char** argv, bool app_config_single_instance);
 #if __APPLE__
 // apple implementation of inner functions of instance_check
 // in InstanceCheckMac.mm
+// [EVENT] Sends a serialized launch payload to the already-running macOS instance.
 void send_message_mac(const std::string& msg, const std::string& version);
+// [EVENT] Notifies sibling macOS instances that the current lock holder is shutting down.
 void send_message_mac_closing(const std::string& msg, const std::string& version);
 
+// [STATE] Releases the advisory lockfile used by the macOS single-instance fallback path.
 bool unlock_lockfile(const std::string& name, const std::string& path);
 #endif //__APPLE__
 
@@ -69,6 +72,40 @@ class MainFrame;
 #if __linux__
 #define BACKGROUND_MESSAGE_LISTENER
 #endif // __linux__
+
+/*
+ [INTENT]
+ Declaration boundary for OrcaSlicer's single-instance gate and cross-instance
+ message ingress. The free function handles the early startup decision, while
+ `OtherInstanceMessageHandler` owns the live listener that turns incoming IPC
+ payloads into wx events for the main frame.
+
+ [STATE]
+ - `instance_check(...)`: derives whether this process should become the active
+   GUI instance or forward its command line payload to an already-running one.
+ - `OtherInstanceMessageHandler`: owns the callback target, listener lifetime,
+   and platform-specific background state needed to receive messages.
+ - The declared event types are the public payload contract between low-level
+   IPC code and higher-level GUI controllers.
+
+ [EVENT]
+ - Secondary launches emit load/download/focus requests into the primary GUI
+   instance through the declared wx events.
+ - `init()` and `shutdown()` bracket subscription to the underlying platform
+   transport so the main frame does not outlive the listener.
+
+ [UNITY]
+ - Replace the wx event contract with a retained application service that owns
+   the single-instance lock plus a typed message dispatcher.
+ - Keep startup arbitration separate from scene/view logic so secondary-launch
+   payloads can be replayed safely on Unity's main thread.
+
+ [PORTING_HAZARD:P2]
+ This header looks small, but it exposes the full app-level contract for
+ platform IPC, startup arbitration, and focus restoration. Unity should keep
+ those concerns in a dedicated bootstrap/service layer instead of scattering
+ them across view scripts.
+*/
 
 // [EVENT] Events for inter-instance communication
 using LoadFromOtherInstanceEvent      = Event<std::vector<boost::filesystem::path>>;
@@ -109,9 +146,11 @@ public:
     void handle_message(const std::string& message);
 #ifdef __APPLE__
     // [INTENT] Handle message about lockfile closure.
+    // [EVENT] Lets the surviving instance recreate ownership when the previous primary exits.
     void handle_message_other_closed();
 #endif //__APPLE__
 #ifdef _WIN32
+    // [STATE] Tags the native frame with this build's instance hash so sibling launches can find the matching window.
     static void init_windows_properties(MainFrame* main_frame, size_t instance_hash);
 #endif // WIN32
 private:

@@ -211,6 +211,8 @@ Button* MsgDialog::get_button(wxWindowID btn_id) { return static_cast<Button*>(F
 
 void MsgDialog::apply_style(long style)
 {
+    // [STATE] The footer is synthesized from wx style bits instead of a typed dialog-action model, so ports should normalize this into an
+    // explicit button descriptor list before recreating the UI.
     if (style & wxFORWARD)
         add_button(wxFORWARD, true, _L("Go to") + " " + m_forward_str);
     if (style & wxOK) {
@@ -250,6 +252,9 @@ static void add_msg_content(wxWindow*                            parent,
                             const wxString&                      link_text       = "",
                             std::function<void(const wxString&)> link_callback   = nullptr)
 {
+    // [PORTING_HAZARD:P2] This helper dynamically chooses between `wxHtmlWindow` and a scrollable wrapped-label path based on message
+    // content, link state, and estimated size; Unity should replace that branchy widget selection with one retained text panel that can
+    // switch rich-text/link behavior without changing the hosting control type.
     wxHtmlWindow* html = new wxHtmlWindow(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHW_SCROLLBAR_AUTO);
     html->SetBackgroundColour(StateColor::darkModeColorFor(*wxWHITE));
 
@@ -453,6 +458,8 @@ RichMessageDialog::RichMessageDialog(wxWindow*       parent,
 
 int RichMessageDialog::ShowModal()
 {
+    // [EVENT] The optional checkbox row is injected right before modal display, so any port must preserve this late-binding step if the
+    // same dialog instance can be configured after construction.
     if (!m_checkBoxText.IsEmpty()) {
         show_dsa_button(m_checkBoxText);
         m_checkbox_dsa->SetValue(m_checkBoxValue);

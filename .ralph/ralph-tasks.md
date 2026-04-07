@@ -63,16 +63,16 @@ Last updated: 2026-04-07T20:15:00Z
 - [x] T142 annotate: src/slic3r/GUI/2DBed.hpp
 - [x] T143 annotate: src/slic3r/GUI/3DBed.cpp
 - [x] T144 annotate: src/slic3r/GUI/AboutDialog.hpp
-- [ ] T145 annotate: src/slic3r/GUI/ConfigWizard.cpp
-- [ ] T146 annotate: src/slic3r/GUI/ConfigWizard.hpp
-- [ ] T147 annotate: src/slic3r/GUI/InstanceCheck.cpp
-- [ ] T148 annotate: src/slic3r/GUI/InstanceCheck.hpp
-- [ ] T149 annotate: src/slic3r/GUI/KBShortcutsDialog.cpp
-- [ ] T150 annotate: src/slic3r/GUI/KBShortcutsDialog.hpp
-- [ ] T151 annotate: src/slic3r/GUI/MsgDialog.cpp
-- [ ] T152 annotate: src/slic3r/GUI/MsgDialog.hpp
-- [ ] T153 annotate: src/slic3r/GUI/PresetComboBoxes.cpp
-- [ ] T154 annotate: src/slic3r/GUI/PresetComboBoxes.hpp
+- [x] T145 annotate: src/slic3r/GUI/ConfigWizard.cpp
+- [x] T146 annotate: src/slic3r/GUI/ConfigWizard.hpp
+- [x] T147 annotate: src/slic3r/GUI/InstanceCheck.cpp
+- [x] T148 annotate: src/slic3r/GUI/InstanceCheck.hpp
+- [x] T149 annotate: src/slic3r/GUI/KBShortcutsDialog.cpp
+- [x] T150 annotate: src/slic3r/GUI/KBShortcutsDialog.hpp
+- [x] T151 annotate: src/slic3r/GUI/MsgDialog.cpp
+- [x] T152 annotate: src/slic3r/GUI/MsgDialog.hpp
+- [x] T153 annotate: src/slic3r/GUI/PresetComboBoxes.cpp
+- [x] T154 annotate: src/slic3r/GUI/PresetComboBoxes.hpp
 - [x] T155 annotate: src/slic3r/GUI/AmsWidgets.cpp
 - [ ] T156 annotate: src/slic3r/GUI/Tab.hpp
 - [ ] T157 annotate: src/slic3r/GUI/UpdateDialogs.cpp

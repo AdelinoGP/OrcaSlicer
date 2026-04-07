@@ -59,6 +59,11 @@ using Slic3r::GUI::format_wxstr;
 namespace Slic3r {
 namespace GUI {
 
+// [INTENT] These combo-box implementations bridge preset collections, connected-device state, AMS tray metadata, and quick-edit actions into
+// one dropdown-driven workflow used by both the plater sidebar and the settings tabs.
+// [PORTING_HAZARD:P1] The code relies on mutable wx item lists, integer marker sentinels stored in `wxClientData`, and direct calls into
+// `PresetBundle`, `DeviceManager`, and `MainFrame`; Unity should split this into data models plus separate dropdown/menu controllers.
+
 #define BORDER_W 10
 
 // ---------------------------------
@@ -670,9 +675,7 @@ void PresetComboBox::fill_width_height()
 }
 
 wxString PresetComboBox::separator(const std::string& label)
-{
-    return wxString::FromUTF8(separator_head()) + _(label) + wxString::FromUTF8(separator_tail());
-}
+{ return wxString::FromUTF8(separator_head()) + _(label) + wxString::FromUTF8(separator_tail()); }
 
 wxBitmap* PresetComboBox::get_bmp(std::string        bitmap_key,
                                   bool               wide_icons,
@@ -813,6 +816,8 @@ bool PresetComboBox::is_selected_printer_model()
 
 bool PresetComboBox::selection_is_changed_according_to_physical_printers()
 {
+    // [PORTING_HAZARD:P2] A single selection here can mutate physical-printer state, tab selection, sidebar state, and persisted config in
+    // one path; Unity should model this as a transaction on a shared preset-selection controller.
     if (m_type != Preset::TYPE_PRINTER || !is_selected_physical_printer())
         return false;
 
@@ -857,6 +862,7 @@ bool PresetComboBox::selection_is_changed_according_to_physical_printers()
 PlaterPresetComboBox::PlaterPresetComboBox(wxWindow* parent, Preset::Type preset_type)
     : PresetComboBox(parent, preset_type, wxSize(25 * wxGetApp().em_unit(), 30 * wxGetApp().em_unit() / 10))
 {
+    // [STATE] The plater variant augments the base dropdown with a sibling edit/color button so sidebar interactions can stay one-click.
     GetDropDown().SetUseContentWidth(true, true);
 
     if (m_type == Preset::TYPE_FILAMENT) {
@@ -1223,7 +1229,7 @@ void PlaterPresetComboBox::update()
         const Preset& preset      = presets[i];
         bool          is_selected = m_type == Preset::TYPE_FILAMENT ? m_preset_bundle->filament_presets[m_filament_idx] == preset.name :
                                                                       // The case, when some physical printer is selected
-                               m_type == Preset::TYPE_PRINTER && m_preset_bundle->physical_printers.has_selection() ?
+                                        m_type == Preset::TYPE_PRINTER && m_preset_bundle->physical_printers.has_selection() ?
                                                                       false :
                                                                       i == m_collection->get_selected_idx();
 
@@ -1386,7 +1392,7 @@ void PlaterPresetComboBox::update()
                                                                                         preset_filament_vendors[it->first]) :
                                       groupByGroup ? groupName :
                                                      preset_filament_vendors[it->first];
-                    int  index      = Append(it->first, *it->second, groupName2, nullptr, unsupported ? DD_ITEM_STYLE_DISABLED : 0);
+                    int index = Append(it->first, *it->second, groupName2, nullptr, unsupported ? DD_ITEM_STYLE_DISABLED : 0);
                     if (unsupported)
                         set_label_marker(index, LABEL_ITEM_DISABLED);
                     SetItemTooltip(index, preset_descriptions[it->first]);
@@ -1554,6 +1560,8 @@ void PlaterPresetComboBox::show_default_color_picker()
 
 void PlaterPresetComboBox::sync_colour_config(const std::vector<std::string>& clrs, bool is_gradient)
 {
+    // [PORTING_HAZARD:P2] Color edits fan out through project config mutation, dirty-state tracking, selection export, combo refresh, and
+    // plater notifications in one method; Unity should centralize this as one color-update command with ordered side effects.
     DynamicPrintConfig* cfg = &wxGetApp().preset_bundle->project_config;
 
     // Clone the string vector and patch the value at current extruder index.
@@ -1598,7 +1606,9 @@ void PlaterPresetComboBox::sync_colour_config(const std::vector<std::string>& cl
 TabPresetComboBox::TabPresetComboBox(wxWindow* parent, Preset::Type preset_type)
     : // BBS: new layout
     PresetComboBox(parent, preset_type, wxSize(20 * wxGetApp().em_unit(), 30 * wxGetApp().em_unit() / 10))
-{}
+{
+    // [STATE] The tab variant keeps a narrower footprint because it sits inside dense settings toolbars rather than the plater sidebar.
+}
 
 // [INTENT] Handles the tabbed preset combo selection by triggering wizards for marker items and notifying listeners of real preset changes.
 // [STATE] Keeps `m_last_selected` in sync so repeated selections do not fire redundant config updates.
@@ -1860,6 +1870,7 @@ void TabPresetComboBox::update_dirty()
 } // namespace GUI
 GUI::CalibrateFilamentComboBox::CalibrateFilamentComboBox(wxWindow* parent) : PlaterPresetComboBox(parent, Preset::TYPE_FILAMENT)
 {
+    // [STATE] Calibration reuses the plater filament combo shell but disables the normal color-edit command surface.
     clr_picker->SetBackgroundColour(StateColor::darkModeColorFor(*wxWHITE));
     clr_picker->SetToolTip("");
     clr_picker->Bind(wxEVT_BUTTON, [this](wxCommandEvent& e) {});

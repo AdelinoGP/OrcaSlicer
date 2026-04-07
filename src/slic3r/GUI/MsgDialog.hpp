@@ -23,6 +23,11 @@ class wxBoxSizer;
 class wxCheckBox;
 class wxStaticBitmap;
 
+// [INTENT] `MsgDialog` and its derived types define the reusable modal-message shell used across the GUI, including footer buttons,
+// optional opt-out state, and rich/html message content.
+// [PORTING_HAZARD:P2] The declarations are tightly coupled to wx dialog inheritance, raw child-widget ownership, and style-bit-driven
+// button creation; Unity should replace this with a retained modal controller plus typed dialog models.
+
 enum ButtonSizeType {
     ButtonSizeNormal = 0,
     ButtonSizeMiddle = 1,
@@ -91,14 +96,22 @@ protected:
     void    apply_style(long style);
     void    finalize();
 
-    wxFont          boldfont;
-    wxBoxSizer*     content_sizer;
-    wxBoxSizer*     btn_sizer;
-    wxBoxSizer*     m_dsa_sizer;
+    // [STATE] Cached headline font reused during dialog construction and DPI refresh.
+    wxFont boldfont;
+    // [STATE] Main content column where derived dialogs insert their message widgets.
+    wxBoxSizer* content_sizer;
+    // [STATE] Footer row containing buttons and optional checkbox content.
+    wxBoxSizer* btn_sizer;
+    // [STATE] Sub-sizer reserved for the "don't show again" checkbox/text pair.
+    wxBoxSizer* m_dsa_sizer;
+    // [STATE] Left-side icon reflecting the active dialog style.
     wxStaticBitmap* logo;
-    MsgButtonsHash  m_buttons;
-    CheckBox*       m_checkbox_dsa{nullptr};
-    wxString        m_forward_str;
+    // [STATE] Tracks runtime-created buttons for cleanup and DPI refresh.
+    MsgButtonsHash m_buttons;
+    // [STATE] Optional checkbox allocated only for dialogs that enable the DSA flow.
+    CheckBox* m_checkbox_dsa{nullptr};
+    // [STATE] Optional target text appended to the forward/go-to button label.
+    wxString m_forward_str;
 };
 
 // [INTENT] Generic error dialog. [UNITY] Map to specialized modal ErrorPanel.
@@ -173,6 +186,7 @@ public:
 // Generic rich message dialog, used intead of wxRichMessageDialog
 class RichMessageDialog : public MsgDialog
 {
+    // [STATE] Optional checkbox shown lazily in `ShowModal()` rather than at construction time.
     wxCheckBox* m_checkBox{nullptr};
     wxString    m_checkBoxText;
     bool        m_checkBoxValue{false};
@@ -307,9 +321,7 @@ class RichMessageDialog : public wxRichMessageDialog
 public:
     RichMessageDialog(wxWindow* parent, const wxString& message, const wxString& caption = wxEmptyString, long style = wxOK)
         : wxRichMessageDialog(parent, message, caption, style)
-    {
-        this->SetEscapeId(wxID_CANCEL);
-    }
+    { this->SetEscapeId(wxID_CANCEL); }
     ~RichMessageDialog() {}
 };
 #endif

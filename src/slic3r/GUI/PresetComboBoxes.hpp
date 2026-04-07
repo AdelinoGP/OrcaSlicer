@@ -25,6 +25,11 @@ namespace Slic3r { namespace GUI {
 
 class BitmapCache;
 
+// [INTENT] The preset combo-box family is the main GUI surface for selecting printer, filament, process, and calibration presets while
+// mixing preset metadata, device/AMS state, and quick actions such as wizard launch or tab navigation.
+// [PORTING_HAZARD:P1] These declarations expose a large wx-centric control hierarchy with raw child pointers, `wxClientData` marker values,
+// and direct `PresetBundle`/device coupling; Unity should split this into retained dropdown views plus a presenter/service layer.
+
 // ---------------------------------
 // ***  PresetComboBox  ***
 // ---------------------------------
@@ -110,10 +115,14 @@ protected:
     typedef std::size_t      Marker;
     std::function<void(int)> on_selection_changed{nullptr};
 
+    // [STATE] Which preset collection this combo currently represents.
     Preset::Type m_type;
-    std::string  m_main_bitmap_name;
+    // [STATE] Icon family used when building combo-box item art.
+    std::string m_main_bitmap_name;
 
-    PresetBundle*     m_preset_bundle{nullptr};
+    // [STATE] Shared preset/device bundle used to rebuild entries and resolve selections.
+    PresetBundle* m_preset_bundle{nullptr};
+    // [STATE] Active preset collection inside the bundle for `m_type`.
     PresetCollection* m_collection{nullptr};
 
     // Caching bitmaps for the all bitmaps, used in preset comboboxes
@@ -124,11 +133,15 @@ protected:
     // Indicator, that the preset is NOT compatible with the selected printer.
     ScalableBitmap m_bitmapIncompatible;
 
+    // [STATE] Last accepted selection index, used to reject marker rows and avoid duplicate callbacks.
     int m_last_selected;
+    // [STATE] Cached DPI-scaled measurement unit used for control/icon sizing.
     int m_em_unit;
 
     // BBS: ams
-    int m_filament_idx       = -1;
+    // [STATE] Active extruder/filament slot index for sidebar and AMS-driven color syncing.
+    int m_filament_idx = -1;
+    // [STATE] Half-open range of AMS-inserted entries within the dropdown.
     int m_first_ams_filament = 0;
     int m_last_ams_filament  = 0;
 
@@ -142,11 +155,14 @@ protected:
     int wide_space_icon_width;
 
     // BBS: printer
+    // [STATE] Half-open range of connected-printer entries injected into the list.
     int m_first_printer_idx = 0;
     int m_last_printer_idx  = 0;
 
+    // [STATE] Device identifier latched from a connected-printer selection.
     std::string m_selected_dev_id;
 
+    // [STATE] Optional compatibility filter for printer presets.
     PrinterTechnology printer_technology{ptAny};
 
     void invalidate_selection();
@@ -198,9 +214,11 @@ public:
     PlaterPresetComboBox(wxWindow* parent, Preset::Type preset_type);
     ~PlaterPresetComboBox();
 
+    // [STATE] Optional quick-edit button shown next to non-filament plater combos.
     ScalableButton* edit_btn{nullptr};
 
     // BBS
+    // [STATE] Filament color button and cached dialog state used by plater-side filament combos.
     wxButton*    clr_picker{nullptr};
     wxColourData m_clrData;
 
@@ -224,6 +242,7 @@ public:
 
 private:
     // BBS
+    // [STATE] Cached last-picked color for the plater filament color button.
     wxColor m_color;
 };
 
@@ -233,7 +252,9 @@ private:
 
 class TabPresetComboBox : public PresetComboBox
 {
+    // [STATE] Controls whether incompatible presets remain visible in the settings-tab version of the dropdown.
     bool show_incompatible{false};
+    // [STATE] Allows the tab combo to bypass some compatibility gating when required by the settings workflow.
     bool m_enable_all{false};
 
 public:
@@ -275,6 +296,7 @@ public:
     bool          is_compatible_with_printer() { return m_is_compatible; }
 
 private:
+    // [STATE] Tray metadata and filtered preset maps used by the calibration-only filament selector.
     std::string                                           m_tray_name;
     std::string                                           m_filament_id;
     std::string                                           m_tag_uid;

@@ -1,3 +1,11 @@
+// [ANNOTATED]
+// [INTENT] Modal keyboard-shortcuts browser that groups application shortcuts into left-rail tabs and renders each group as a scrollable
+// two-column list. [STATE] Builds a static per-tab shortcut dataset (`m_full_shortcuts`), keeps custom left-rail tab widgets in
+// `m_hash_selector`, and swaps pages through `wxSimplebook`. [EVENT] Custom `EVT_PREFERENCES_SELECT_TAB` events decouple tab clicks from
+// page switching and selected-tab restyling. [UNITY] Port as a retained modal/panel with a data-driven tab list and scrollable
+// shortcut-group views instead of constructing each wx control manually. [PORTING_HAZARD:P2] Selection visuals, page switching, and
+// DPI/dark-mode refreshes are coupled directly to wx widget instances, so Unity should move this into a view-model/controller layer.
+
 #include "libslic3r/libslic3r.h"
 #include "KBShortcutsDialog.hpp"
 #include "I18N.hpp"
@@ -15,9 +23,6 @@ namespace Slic3r { namespace GUI {
 
 wxDEFINE_EVENT(EVT_PREFERENCES_SELECT_TAB, wxCommandEvent);
 
-// [INTENT] Dialog displaying keyboard shortcuts in tabs.
-// [UNITY] Reimplement as a UI Toolkit Window or Panel with a custom Tab controller.
-// [PORTING_HAZARD:P3] wxSimplebook is specific to wxWidgets; needs equivalent in UI Toolkit or custom panel switcher.
 KBShortcutsDialog::KBShortcutsDialog()
     : DPIDialog(static_cast<wxWindow*>(wxGetApp().mainframe),
                 wxID_ANY,
@@ -34,7 +39,6 @@ KBShortcutsDialog::KBShortcutsDialog()
     this->SetSizeHints(wxDefaultSize, wxDefaultSize);
     this->SetBackgroundColour(wxColour(255, 255, 255));
 
-    // [UNITY] Use UI Toolkit VisualElement for top line styling.
     wxBoxSizer* m_sizer_top = new wxBoxSizer(wxVERTICAL);
 
     auto m_top_line = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(-1, 1), wxTAB_TRAVERSAL);
@@ -66,8 +70,8 @@ KBShortcutsDialog::KBShortcutsDialog()
 
     m_sizer_right->Add(0, 0, 0, wxEXPAND | wxLEFT, FromDIP(12));
 
-    // [STATE] Simplebook for tabbed content.
-    // [UNITY] Use UI Toolkit `Simplebook` or `TabView` component.
+    // [STATE] `wxSimplebook` owns one generated page per shortcut category and switches the visible page by selected tab index.
+    // [UNITY] Replace with a retained tab/page container driven by the same shortcut dataset.
     m_simplebook = new wxSimplebook(this, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(870), FromDIP(500)), 0);
 
     m_sizer_right->Add(m_simplebook, 1, wxEXPAND, 0);
@@ -81,8 +85,7 @@ KBShortcutsDialog::KBShortcutsDialog()
         m_simplebook->AddPage(page, m_full_shortcuts[i].first.first, i == 0);
     }
 
-    // [EVENT] Bind event listener for tab selection.
-    // [UNITY] Handle via C# delegate or event listener in custom Controller class.
+    // [EVENT] All tab clicks funnel through one custom event so selection styling and page switching stay centralized.
     Bind(EVT_PREFERENCES_SELECT_TAB, &KBShortcutsDialog::OnSelectTabel, this);
 
     SetSizer(m_sizer_top);
@@ -91,8 +94,7 @@ KBShortcutsDialog::KBShortcutsDialog()
     CenterOnParent();
 
     // select first
-    // [EVENT] Post event for async UI update.
-    // [UNITY] Use Unity's EventSystem or a messaging system.
+    // [EVENT] Post the initial selection through the same event path used by user clicks.
     auto event = wxCommandEvent(EVT_PREFERENCES_SELECT_TAB);
     event.SetInt(0);
     event.SetEventObject(this);
@@ -100,8 +102,7 @@ KBShortcutsDialog::KBShortcutsDialog()
     wxGetApp().UpdateDlgDarkUI(this);
 }
 
-// [INTENT] Event handler for tab selection.
-// [UNITY] Handle UI update logic in controller, update styles in UI Toolkit.
+// [INTENT] Updates left-rail button styling and the active `wxSimplebook` page from the selected tab index.
 void KBShortcutsDialog::OnSelectTabel(wxCommandEvent& event)
 {
     auto                 id = event.GetInt();
@@ -130,8 +131,7 @@ void KBShortcutsDialog::OnSelectTabel(wxCommandEvent& event)
     wxGetApp().UpdateDlgDarkUI(this);
 }
 
-// [INTENT] Helper for creating custom tab buttons.
-// [UNITY] Convert to a custom UI Toolkit Component/Control.
+// [INTENT] Creates one custom left-rail tab row and registers it for later selection-state updates.
 wxWindow* KBShortcutsDialog::create_button(int id, wxString text)
 {
     auto tab_button = new wxWindow(m_panel_selects, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(150), FromDIP(28)), wxTAB_TRAVERSAL);
@@ -146,7 +146,7 @@ wxWindow* KBShortcutsDialog::create_button(int id, wxString text)
     stext->Wrap(-1);
     sizer->Add(stext, 1, wxALIGN_CENTER, 0);
 
-    // [EVENT] Bind event listener for tab selection.
+    // [EVENT] Both the row shell and its label post the same selection event back to the dialog.
     tab_button->Bind(wxEVT_LEFT_DOWN, [this, id](auto& e) {
         auto event = wxCommandEvent(EVT_PREFERENCES_SELECT_TAB);
         event.SetInt(id);
@@ -161,7 +161,7 @@ wxWindow* KBShortcutsDialog::create_button(int id, wxString text)
         wxPostEvent(this, event);
     });
 
-    // [STATE] Mapping index to select object.
+    // [STATE] Cache the row widgets by logical tab index so `OnSelectTabel` can restyle them without walking the sizer tree.
     Select* sel                   = new Select;
     sel->m_index                  = id;
     sel->m_tab_button             = tab_button;
@@ -186,6 +186,7 @@ void KBShortcutsDialog::on_dpi_changed(const wxRect& suggested_rect)
 
 void KBShortcutsDialog::fill_shortcuts()
 {
+    // [STATE] Shortcut definitions are materialized eagerly and vary slightly by editor mode, platform, and app config.
     const std::string ctrl  = GUI::shortkey_ctrl_prefix();
     const std::string alt   = GUI::shortkey_alt_prefix();
     const std::string shift = L("Shift+");
@@ -331,6 +332,9 @@ void KBShortcutsDialog::fill_shortcuts()
 
 wxPanel* KBShortcutsDialog::create_page(wxWindow* parent, const ShortcutsItem& shortcuts, const wxFont& font, const wxFont& bold_font)
 {
+    // [INTENT] Builds one scrollable two-column shortcut page from a precomputed shortcut group.
+    // [PORTING_HAZARD:P3] The current layout relies on wx text wrapping and grid sizing; Unity should let retained layout handle row height
+    // naturally.
     wxPanel*    main_page  = new wxPanel(parent);
     wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
 

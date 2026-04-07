@@ -1,3 +1,4 @@
+// [ANNOTATED]
 // FIXME: extract absolute units -> em
 
 #include "ConfigWizard_private.hpp"
@@ -64,9 +65,19 @@ namespace Slic3r { namespace GUI {
  It handles printer selection, filament/material discovery, and initial setup tasks.
 
  [STATE]
- - BundleMap: Cache of available vendor profile definitions (JSON-based).
- - Current page index and navigation history.
- - New configuration state being built during the wizard flow.
+  - BundleMap: Cache of available vendor profile definitions (JSON-based).
+  - Current page index and navigation history.
+  - New configuration state being built during the wizard flow.
+
+  [EVENT]
+  - PrinterPicker checkboxes update `appconfig_new`, page visibility, and the material lists in one cascade.
+  - The left index emits `EVT_INDEX_PAGE`, which is the central page-switch signal for the dialog shell.
+  - Finish runs a final material-consistency pass before committing changes back into `AppConfig` and `PresetBundle`.
+
+  [THREAD]
+  - This file assumes main-thread ownership of wx controls and most preset mutations.
+  - Expensive preset/bundle work is still triggered synchronously from button handlers, so the wizard depends on modal UI flow rather than
+ background tasks.
 
  [UNITY]
  - Use a Screen-level MonoBehaviour (ConfigWizardController) to manage page transitions.
@@ -222,6 +233,8 @@ wxDEFINE_EVENT(EVT_PRINTER_PICK, PrinterPickerEvent);
 const std::string PrinterPicker::PRINTER_PLACEHOLDER = "printer_placeholder.png";
 
 // [INTENT] GUI control for selecting printer models and variants.
+// [STATE] Owns one checkbox per printer variant and uses `vendor_id` + checkbox metadata as the canonical selection key.
+// [EVENT] Checkbox toggles are translated into `EVT_PRINTER_PICK`, so the parent page can update app config and material compatibility.
 // [UNITY] Use a GridLayoutGroup with prefab buttons or UI Toolkit ListView for printer selection.
 // [PORTING_HAZARD:P2] Complex layout grid manipulation with wxFlexGridSizer requires manual rebuild in Unity UI.
 PrinterPicker::PrinterPicker(
@@ -775,6 +788,8 @@ void PageMaterials::on_mouse_enter_profiles(wxMouseEvent& evt) {}
 void PageMaterials::on_mouse_leave_profiles(wxMouseEvent& evt) { on_material_hovered(-1); }
 void PageMaterials::reload_presets()
 {
+    // [STATE] Rebuild all four linked lists from the current `Materials` snapshot and reset the remembered selections so the next
+    // `update_lists()` call recomputes each dependent column from scratch.
     clear();
 
     list_printer->append(_L("(All)"), &EMPTY);
@@ -796,6 +811,10 @@ void PageMaterials::reload_presets()
 
 void PageMaterials::set_compatible_printers_html_window(const std::vector<std::string>& printer_names, bool all_printers)
 {
+    // [INTENT] Render the compatibility summary for the highlighted material as a small HTML fragment so the user can immediately see
+    // whether the current selection works with all installed printers or only a subset.
+    // [PORTING_HAZARD:P2] The message is assembled as raw HTML and pushed into `wxHtmlWindow`; Unity should replace this with a retained
+    // rich-text/list view instead of preserving the markup generation path.
     const auto bgr_clr = html_window->GetParent()->GetBackgroundColour();
     // #if defined(__APPLE__)
     //         html_window->GetParent()->GetBackgroundColour();
@@ -874,6 +893,8 @@ void PageMaterials::on_material_hovered(int sel_material) {}
 
 void PageMaterials::on_material_highlighted(int sel_material)
 {
+    // [EVENT] Highlighting a profile is read-only: it does not change install state, but it recomputes the compatible-printer explanation
+    // from the alias-backed material set and refreshes the HTML preview below the lists.
     if (sel_material == last_hovered_item)
         return;
     if (sel_material == -1) {
@@ -911,6 +932,12 @@ void PageMaterials::update_lists(int sel_type, int sel_vendor, int last_selected
 {
     wxWindowUpdateLocker freeze_guard(this);
     (void) freeze_guard;
+
+    // [EVENT] This is the fan-out point for the linked material selectors: printer selection rebuilds type choices, type selection
+    // rebuilds vendors, and vendor selection rebuilds the checklist of installable aliases.
+    // [STATE] `*_prev` caches prevent unnecessary full-list rebuilds while preserving the special "(All)" semantics for printers.
+    // [PORTING_HAZARD:P2] The wx implementation mutates list contents and checked state in-place during event handling; Unity should move
+    // this to a derived view-model so filters are recomputed first and the UI is rebound in one pass.
 
     wxArrayInt sel_printers;
     int        sel_printers_count = list_printer->GetSelections(sel_printers);
@@ -1497,6 +1524,12 @@ void PageTemperatures::apply_custom_config(DynamicPrintConfig& config)
     */
 }
 
+// [INTENT] Custom-painted left navigation rail for the wizard that mixes static labels and clickable pages.
+// [STATE] `items`, `item_active`, and `item_hover` define the current navigation graph and the visual hover/selection state.
+// [EVENT] Mouse movement, leave, click, and paint events stay inside the widget; page switches are surfaced outward only through
+// `EVT_INDEX_PAGE` after `go_to()` swaps the visible page.
+// [UNITY] Port as a retained step-navigation view with explicit item view-models and selection state instead of repaint-driven hit testing.
+// [PORTING_HAZARD:P2] Width and hover behavior depend on runtime text measurement, bitmap bullets, and manual paint/layout refreshes.
 ConfigWizardIndex::ConfigWizardIndex(wxWindow* parent)
     : wxPanel(parent)
     , bg(ScalableBitmap(parent, "OrcaSlicer_192px_transparent.png", 192))
@@ -1600,6 +1633,8 @@ void ConfigWizardIndex::go_next()
 void ConfigWizardIndex::go_to(size_t i)
 {
     if (i != item_active && i < items.size() && items[i].page != nullptr) {
+        // [EVENT] Page changes are hide/show based. The explicit `EVT_INDEX_PAGE` event keeps the outer dialog chrome
+        // (Next/Finish visibility, layout refresh, focus) synchronized with the newly active page.
         auto* new_active    = items[i].page;
         auto* former_active = active_page();
         if (former_active != nullptr) {
@@ -1726,6 +1761,9 @@ void ConfigWizardIndex::msw_rescale()
     Refresh();
 }
 
+// [INTENT] Lightweight compatibility model that groups available material presets by technology, type, vendor, and compatible printers.
+// [STATE] `presets`, `types`, `printers`, and `compatibility_counter` are rebuilt caches used by the linked material-selection pages.
+// [UNITY] Keep this as a pure data/service layer that feeds retained list views; avoid mixing these derived collections back into UI code.
 // Materials
 
 const std::string Materials::UNKNOWN = "(Unknown)";
@@ -1800,6 +1838,10 @@ void ConfigWizard::priv::load_pages()
 {
     wxWindowUpdateLocker freeze_guard(q);
     (void) freeze_guard;
+
+    // [STATE] Regenerate the visible navigation graph from the current printer/custom selections instead of keeping a fixed page list.
+    // This lets printer picks immediately add or remove downstream pages, but it also means callers must preserve the former active page
+    // explicitly across every rebuild.
 
     const ConfigWizardPage* former_active = index->active_page();
 
@@ -2006,6 +2048,10 @@ void ConfigWizard::priv::set_run_reason(RunReason run_reason)
 
 void ConfigWizard::priv::update_materials(Technology technology)
 {
+    // [INTENT] Derive the installable material universe from the currently visible printer presets.
+    // [STATE] `filaments` / `sla_materials` are rebuilt caches, while `aliases_*` tracks alias-to-preset fan-out for checklist toggles.
+    // [PORTING_HAZARD:P2] Compatibility is recomputed with nested bundle/printer/material scans every time selections change; Unity should
+    // move this into a service layer and expose only filtered view models to the UI.
     if (any_fff_selected && (technology & T_FFF)) {
         filaments.clear();
         aliases_fff.clear();
@@ -2137,6 +2183,8 @@ void ConfigWizard::priv::on_custom_setup(const bool custom_wanted)
 
 void ConfigWizard::priv::on_printer_pick(PagePrinters* page, const PrinterPickerEvent& evt)
 {
+    // [EVENT] A single printer toggle can change page availability, visible preset flags, and the default-material fallback logic.
+    // Keep the ordering here intact: recompute selection mode, update preset visibility, then repair missing materials.
     if (check_sla_selected() != any_sla_selected || check_fff_selected() != any_fff_selected) {
         any_fff_selected = check_fff_selected();
         any_sla_selected = check_sla_selected();
@@ -2177,6 +2225,10 @@ void ConfigWizard::priv::select_default_materials_for_printer_model(const Vendor
 void ConfigWizard::priv::select_default_materials_for_printer_models(Technology                                          technology,
                                                                      const std::set<const VendorProfile::PrinterModel*>& printer_models)
 {
+    // [INTENT] Bulk-apply each selected model's vendor-defined default materials so the wizard can repair invalid printer selections in one
+    // pass instead of forcing the user to toggle materials manually.
+    // [EVENT] Models without defaults are reported immediately through a modal notice, then the material caches and visible lists are
+    // rebuilt so the page reflects any newly enabled aliases.
     PageMaterials*     page_materials    = technology & T_FFF ? page_filaments : page_sla_materials;
     const std::string& appconfig_section = page_materials->materials->appconfig_section();
 
@@ -2263,6 +2315,9 @@ bool ConfigWizard::priv::on_bnt_finish()
 // respective Printer Models or not.
 bool ConfigWizard::priv::check_and_install_missing_materials(Technology technology, const std::string& only_for_model_id)
 {
+    // [INTENT] Enforce the wizard invariant that every enabled printer model must end the flow with at least one compatible material.
+    // [EVENT] Depending on `only_for_model_id`, this either silently installs defaults for a just-selected model or blocks navigation with
+    // a confirmation dialog for broader fixes.
     // Walk over all installed Printer presets and verify whether there is a filament or SLA material profile installed at the same
     // PresetBundle, which is compatible with it.
     const auto printer_models_missing_materials = [this, only_for_model_id](PrinterTechnology technology, const std::string& section) {
@@ -2359,6 +2414,8 @@ bool ConfigWizard::priv::check_and_install_missing_materials(Technology technolo
 static std::set<std::string> get_new_added_presets(const std::map<std::string, std::string>& old_data,
                                                    const std::map<std::string, std::string>& new_data)
 {
+    // [INTENT] Collapse two app-config sections down to alias sets and return the aliases that were introduced by the wizard edit.
+    // This lets the commit path distinguish new installs from previously enabled presets without depending on per-vendor ordering.
     auto get_aliases = [](const std::map<std::string, std::string>& data) {
         std::set<std::string> old_aliases;
         for (auto item : data) {
@@ -2380,6 +2437,8 @@ static std::set<std::string> get_new_added_presets(const std::map<std::string, s
 static std::string get_first_added_preset(const std::map<std::string, std::string>& old_data,
                                           const std::map<std::string, std::string>& new_data)
 {
+    // [STATE] The first added alias is used as a stable hint when choosing which freshly enabled preset should become active after the
+    // wizard commits its staged config.
     std::set<std::string> diff = get_new_added_presets(old_data, new_data);
     if (diff.empty())
         return std::string();
@@ -2391,6 +2450,12 @@ bool ConfigWizard::priv::apply_config(AppConfig*           app_config,
                                       const PresetUpdater* updater,
                                       bool&                apply_keeped_changes)
 {
+    // [INTENT] Commit the temporary wizard state into the real application config and preset bundle, while preserving the existing
+    // unsaved-preset safeguards used elsewhere in the app.
+    // [STATE] `appconfig_new` is the staging area; this method decides whether changes imply new vendors, printers, or materials and then
+    // picks the preferred preset activation tuple passed into `load_presets()`.
+    // [PORTING_HAZARD:P1] The commit path interleaves bundle installation, preset-change prompts, preset activation, and custom-profile
+    // creation in one modal method. Unity should split this into explicit transaction steps with recoverable failure states.
     wxString   header, caption = _L("Configuration is edited in ConfigWizard");
     const auto enabled_vendors = appconfig_new.vendors();
 
@@ -2782,6 +2847,8 @@ ConfigWizard::ConfigWizard(wxWindow* parent)
     on_window_geometry(this, [this]() { p->init_dialog_size(); });
 
     p->btn_prev->Bind(wxEVT_BUTTON, [this](const wxCommandEvent&) {
+        // [EVENT] Navigation is guarded by the material invariant: leaving a materials page may trigger default-material installation
+        // before the index is allowed to move.
         ConfigWizardPage* active_page = this->p->index->active_page();
         if ((active_page == p->page_filaments || active_page == p->page_sla_materials) &&
             !p->check_and_install_missing_materials(dynamic_cast<PageMaterials*>(active_page)->materials->technology))
@@ -2791,6 +2858,7 @@ ConfigWizard::ConfigWizard(wxWindow* parent)
     });
 
     p->btn_next->Bind(wxEVT_BUTTON, [this](const wxCommandEvent&) {
+        // [EVENT] Forward navigation uses the same guard as Back so the wizard never advances past an invalid material selection state.
         ConfigWizardPage* active_page = this->p->index->active_page();
         if ((active_page == p->page_filaments || active_page == p->page_sla_materials) &&
             !p->check_and_install_missing_materials(dynamic_cast<PageMaterials*>(active_page)->materials->technology))
@@ -2800,6 +2868,8 @@ ConfigWizard::ConfigWizard(wxWindow* parent)
     });
 
     p->btn_finish->Bind(wxEVT_BUTTON, [this](const wxCommandEvent&) {
+        // [EVENT] Finish runs the same repair/validation flow one last time, but only closes the modal when the staged config is internally
+        // consistent.
         if (p->on_bnt_finish())
             this->EndModal(wxID_OK);
     });
@@ -2823,6 +2893,7 @@ ConfigWizard::~ConfigWizard() {}
 
 bool ConfigWizard::run(RunReason reason, StartPage start_page)
 {
+    // [EVENT] Modal entry point: seed run state, show the wizard, and only persist changes after the dialog returns `wxID_OK`.
     BOOST_LOG_TRIVIAL(info) << boost::format("Running ConfigWizard, reason: %1%, start_page: %2%") % reason % start_page;
 
     GUI_App& app = wxGetApp();
@@ -2868,6 +2939,8 @@ const wxString& ConfigWizard::name(const bool from_menu /* = false*/)
 
 void ConfigWizard::on_dpi_changed(const wxRect& suggested_rect)
 {
+    // [EVENT] DPI changes rescale the shared dialog chrome first, then recompute the wizard's scrollable layout so page widths and the left
+    // index stay aligned with the new font metrics.
     const int em = em_unit();
 
     msw_buttons_rescale(this, em, {wxID_APPLY, wxID_CANCEL, p->btn_next->GetId(), p->btn_prev->GetId()});

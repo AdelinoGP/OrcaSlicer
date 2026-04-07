@@ -1,3 +1,4 @@
+// [ANNOTATED]
 #ifndef slic3r_ConfigWizard_hpp_
 #define slic3r_ConfigWizard_hpp_
 
@@ -16,29 +17,37 @@ namespace GUI {
 
 /*
  [INTENT]
- Main class for the multi-page configuration wizard.
- Manages the lifecycle of vendor profile discovery, printer selection,
- and initial application settings.
+ Declaration boundary for the onboarding/configuration wizard dialog.
+ This shell exposes the run entry point, the startup reason, and the initial
+ page selection while hiding the actual page graph and temporary preset state
+ behind a private implementation.
 
  [STATE]
- - RunReason: Why the wizard was triggered (first run, update, user-requested).
- - StartPage: Which page to show first.
- - priv* p: Pimpl containing the actual wizard pages and the temporary PresetBundle.
+ - RunReason: Launch context for first-run, upgrade, downgrade, or manual entry.
+ - StartPage: Optional deep-link into a specific stage of the flow.
+ - priv p: Dialog-owned implementation containing the page controllers, staged
+   PresetBundle mutations, and navigation state declared in ConfigWizard_private.hpp.
+
+ [EVENT]
+ - run() drives the modal wizard lifecycle and returns whether the user finished
+   the flow successfully.
+ - on_dpi_changed() and on_sys_color_changed() forward shell-level environment
+   changes to the private page tree.
 
  [UNITY]
- - MonoBehaviour (ConfigWizardController) for handling dialog flow.
- - Map to a multi-step UI Toolkit or uGUI wizard.
- - Use a ScriptableObject to store the temporary configuration being built.
+ - Port this as a retained wizard controller plus explicit page/state model.
+ - Keep the temporary configuration bundle separate from the rendered views.
 
  [PORTING_HAZARD:P2]
- The wizard logic is heavily dependent on the Pimpl (priv) structure which
- manages complex wxWidgets page transitions. In Unity, this should be
- refactored into a clear State Machine or navigation controller.
+ The header looks simple, but almost all behavior is funneled through the pimpl
+ and friend page types. Unity should replace that hidden wx-centric navigation
+ contract with an explicit state machine and owned data model rather than
+ mirroring the private page coupling.
 */
 class ConfigWizard : public DPIDialog
 {
 public:
-    // [INTENT] Defines the reason for triggering the configuration wizard.
+    // [INTENT] Reason the app opened the wizard; controls copy, gating, and follow-up actions.
     enum RunReason {
         RR_DATA_EMPTY,    // No or empty datadir
         RR_DATA_LEGACY,   // Pre-updating datadir
@@ -46,7 +55,7 @@ public:
         RR_USER,          // User requested the Wizard from the menus
     };
 
-    // [INTENT] Defines the initial page for the wizard to display.
+    // [INTENT] Optional entry page override used when callers jump directly into a subsection of the flow.
     enum StartPage {
         SP_WELCOME,
         SP_PRINTERS,
@@ -62,9 +71,10 @@ public:
     ConfigWizard& operator=(const ConfigWizard&) = delete;
     ~ConfigWizard();
 
-    // [INTENT] Starts the wizard and returns true if finished successfully.
+    // [EVENT] Starts the modal flow and reports whether the wizard committed its staged configuration.
     bool run(RunReason reason, StartPage start_page = SP_WELCOME);
 
+    // [INTENT] Shared localized wizard title; `from_menu` selects the user-invoked wording.
     static const wxString& name(const bool from_menu = false);
 
 protected:
@@ -75,9 +85,10 @@ protected:
 
 private:
     struct priv;
-    // [STATE] Pointer to private implementation (pimpl) for encapsulating state and UI components.
+    // [STATE] Dialog-owned private implementation containing the page stack, staged preset bundle, and navigation logic.
     std::unique_ptr<priv> p;
 
+    // [STATE] Page classes reach into the private implementation instead of using a public controller API.
     friend struct ConfigWizardPage;
 };
 

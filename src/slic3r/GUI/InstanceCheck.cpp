@@ -1,3 +1,4 @@
+// [ANNOTATED]
 // [INTENT] Defines the instance checking and inter-process communication (IPC) for the application.
 // [PORTING_HAZARD:P1] IPC mechanism is heavily OS-dependent (Windows/Linux/macOS) and requires complete replacement in Unity (e.g., Named
 // Pipes or native plugins).
@@ -455,9 +456,7 @@ void OtherInstanceMessageHandler::handle_message(const std::string& message)
 
 #ifdef __APPLE__
 void OtherInstanceMessageHandler::handle_message_other_closed()
-{
-    instance_check_internal::get_lock(wxGetApp().get_instance_hash_string() + ".lock", data_dir() + "/cache/");
-}
+{ instance_check_internal::get_lock(wxGetApp().get_instance_hash_string() + ".lock", data_dir() + "/cache/"); }
 #endif //__APPLE__
 
 #ifdef BACKGROUND_MESSAGE_LISTENER
