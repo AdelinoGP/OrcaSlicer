@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-04-07T00:00:00Z
+Last updated: 2026-04-07T08:27:00Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -162,7 +162,7 @@ Last updated: 2026-04-07T00:00:00Z
 - [x] T348 annotate: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp
 - [x] T349 annotate: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.hpp
 - [x] T350 annotate: src/slic3r/GUI/Gizmos/GLGizmosManager.cpp
-- [ ] T351 annotate: src/slic3r/GUI/Gizmos/GLGizmosManager.hpp
+- [x] T351 annotate: src/slic3r/GUI/Gizmos/GLGizmosManager.hpp
 - [x] T352 annotate: src/slic3r/GUI/Gizmos/GLGizmoSVG.cpp
 - [x] T353 annotate: src/slic3r/GUI/Gizmos/GLGizmoSVG.hpp
 - [x] T354 annotate: src/slic3r/GUI/Gizmos/GLGizmoText.cpp
@@ -172,17 +172,17 @@ Last updated: 2026-04-07T00:00:00Z
 - [x] T358 annotate: src/slic3r/GUI/GLModel.cpp
 - [x] T359 annotate: src/slic3r/GUI/GLModel.hpp
 - [x] T360 annotate: src/slic3r/GUI/GLSelectionRectangle.cpp
-- [ ] T361 annotate: src/slic3r/GUI/GLSelectionRectangle.hpp
-- [ ] T362 annotate: src/slic3r/GUI/GLShader.cpp
+- [x] T361 annotate: src/slic3r/GUI/GLSelectionRectangle.hpp
+- [x] T362 annotate: src/slic3r/GUI/GLShader.cpp
 - [x] T363 annotate: src/slic3r/GUI/GLShader.hpp
 - [x] T364 annotate: src/slic3r/GUI/GLShadersManager.cpp
-- [ ] T365 annotate: src/slic3r/GUI/GLShadersManager.hpp
-- [ ] T366 annotate: src/slic3r/GUI/GLTexture.cpp
+- [x] T365 annotate: src/slic3r/GUI/GLShadersManager.hpp
+- [x] T366 annotate: src/slic3r/GUI/GLTexture.cpp
 - [x] T367 annotate: src/slic3r/GUI/GLTexture.hpp
 - [x] T368 annotate: src/slic3r/GUI/GLToolbar.cpp
 - [x] T369 annotate: src/slic3r/GUI/GLToolbar.hpp
 - [x] T370 annotate: src/slic3r/GUI/GUI_App.cpp
-- [ ] T371 annotate: src/slic3r/GUI/GUI_App.hpp
+- [x] T371 annotate: src/slic3r/GUI/GUI_App.hpp
 - [x] T372 annotate: src/slic3r/GUI/GUI_AuxiliaryList.cpp
 - [x] T373 annotate: src/slic3r/GUI/GUI_AuxiliaryList.hpp
 - [x] T374 annotate: src/slic3r/GUI/GuiColor.cpp
@@ -190,7 +190,7 @@ Last updated: 2026-04-07T00:00:00Z
 - [x] T376 annotate: src/slic3r/GUI/GUI_Colors.cpp
 - [x] T377 annotate: src/slic3r/GUI/GUI_Colors.hpp
 - [x] T378 annotate: src/slic3r/GUI/GUI.cpp
-- [ ] T379 annotate: src/slic3r/GUI/GUI_Factories.cpp
+- [x] T379 annotate: src/slic3r/GUI/GUI_Factories.cpp
 - [x] T380 annotate: src/slic3r/GUI/GUI_Factories.hpp
 - [x] T381 annotate: src/slic3r/GUI/GUI_Geometry.cpp
 - [x] T382 annotate: src/slic3r/GUI/GUI_Geometry.hpp
@@ -244,22 +244,22 @@ Last updated: 2026-04-07T00:00:00Z
 - [x] T430 annotate: src/slic3r/GUI/Jobs/CreateFontNameImageJob.cpp
 - [x] T431 annotate: src/slic3r/GUI/Jobs/CreateFontNameImageJob.hpp
 - [x] T432 annotate: src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.cpp
-- [ ] T433 annotate: src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.hpp
+- [x] T433 annotate: src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.hpp
 - [x] T434 annotate: src/slic3r/GUI/Jobs/EmbossJob.cpp
 - [x] T435 annotate: src/slic3r/GUI/Jobs/EmbossJob.hpp
 - [x] T436 annotate: src/slic3r/GUI/Jobs/FillBedJob.cpp
-- [ ] T437 annotate: src/slic3r/GUI/Jobs/FillBedJob.hpp
+- [x] T437 annotate: src/slic3r/GUI/Jobs/FillBedJob.hpp
 - [x] T438 annotate: src/slic3r/GUI/Jobs/Job.hpp
 - [x] T439 annotate: src/slic3r/GUI/Jobs/NotificationProgressIndicator.cpp
 - [x] T440 annotate: src/slic3r/GUI/Jobs/NotificationProgressIndicator.hpp
-- [ ] T441 annotate: src/slic3r/GUI/Jobs/OAuthJob.cpp
+- [x] T441 annotate: src/slic3r/GUI/Jobs/OAuthJob.cpp
 - [x] T442 annotate: src/slic3r/GUI/Jobs/OAuthJob.hpp
-- [ ] T443 annotate: src/slic3r/GUI/Jobs/OrientJob.cpp
-- [ ] T444 annotate: src/slic3r/GUI/Jobs/OrientJob.hpp
+- [x] T443 annotate: src/slic3r/GUI/Jobs/OrientJob.cpp
+- [x] T444 annotate: src/slic3r/GUI/Jobs/OrientJob.hpp
 - [ ] T445 annotate: src/slic3r/GUI/Jobs/PlaterWorker.hpp
 - [ ] T446 annotate: src/slic3r/GUI/Jobs/PrintJob.cpp
 - [x] T447 annotate: src/slic3r/GUI/Jobs/PrintJob.hpp
-- [ ] T448 annotate: src/slic3r/GUI/Jobs/ProgressIndicator.hpp
+- [x] T448 annotate: src/slic3r/GUI/Jobs/ProgressIndicator.hpp
 - [x] T449 annotate: src/slic3r/GUI/Jobs/RotoptimizeJob.cpp
 - [x] T450 annotate: src/slic3r/GUI/Jobs/RotoptimizeJob.hpp
 - [ ] T451 annotate: src/slic3r/GUI/Jobs/SendJob.cpp
@@ -267,10 +267,10 @@ Last updated: 2026-04-07T00:00:00Z
 - [ ] T453 annotate: src/slic3r/GUI/Jobs/SLAImportDialog.hpp
 - [x] T454 annotate: src/slic3r/GUI/Jobs/SLAImportJob.cpp
 - [ ] T455 annotate: src/slic3r/GUI/Jobs/SLAImportJob.hpp
-- [ ] T456 annotate: src/slic3r/GUI/Jobs/ThreadSafeQueue.hpp
+- [x] T456 annotate: src/slic3r/GUI/Jobs/ThreadSafeQueue.hpp
 - [ ] T457 annotate: src/slic3r/GUI/Jobs/UpgradeNetworkJob.cpp
 - [ ] T458 annotate: src/slic3r/GUI/Jobs/UpgradeNetworkJob.hpp
-- [ ] T459 annotate: src/slic3r/GUI/Jobs/Worker.hpp
+- [x] T459 annotate: src/slic3r/GUI/Jobs/Worker.hpp
 - [ ] T460 annotate: src/slic3r/GUI/KBShortcutsDialog.cpp
 - [x] T461 annotate: src/slic3r/GUI/KBShortcutsDialog.hpp
 - [ ] T462 annotate: src/slic3r/GUI/LibVGCode/LibVGCodeWrapper.cpp

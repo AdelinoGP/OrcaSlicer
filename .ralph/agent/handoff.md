@@ -10,6 +10,87 @@ _Generated: 2026-03-30 04:15:47 UTC_
 ## Tasks
 
 - Reconciled stale Phase 1 registry entries: T326 and T327 were already annotated in source and are now marked complete in `.ralph/ralph-tasks.md`.
+- Reconciled another stale Phase 1 registry/tooling mismatch: `.ralph/ralph-tasks.md` still showed T362/T365/T366/T371/T379 pending even though the source files already contain the required Unity-port annotations. Runtime task tooling still has unrelated stale `in_progress` rows from earlier runs, so markdown + source comments remain the authoritative state for this pass.
+
+## Phase 1 - Reconciliation step complete
+- Task type: audit/reconcile
+- Deliverables: `.ralph/ralph-tasks.md`, `.ralph/agent/handoff.md`
+- Registry updates: T362, T365, T366, T371, T379 -> DONE
+- Verification excerpts:
+  - `src/slic3r/GUI/GLShader.cpp`: `// [INTENT] GLShaderProgram encapsulates GL program creation/caching so view passes can reuse compiled shaders without leaking GPU handles.`
+  - `src/slic3r/GUI/GLShadersManager.hpp`: `// [INTENT] Warm every known shader so viewport rendering can bind programs without per-frame compilation.`
+  - `src/slic3r/GUI/GLTexture.cpp`: `// [INTENT] GLTexture centralizes texture loading/rendering for GUI icons, bed sprites, and label caches.`
+  - `src/slic3r/GUI/GUI_App.hpp`: `// [INTENT] Main application class managing wxWidgets lifecycle and UI orchestration`
+  - `src/slic3r/GUI/GUI_Factories.cpp`: `// [INTENT][STATE][UNITY][PORTING_HAZARD:P3] Maps object-setting categories to prioritized option keys so the parameter table knows how to group controls; Unity should mirror this with ScriptableObject metadata so the same sections and order are preserved at runtime.`
+- Notes:
+  - No source annotation edits were needed; this step only aligned the canonical task registry with already-present annotations.
+  - Next unresolved Phase 1 registry item after this reconciliation was `T441 annotate: src/slic3r/GUI/Jobs/OAuthJob.cpp`.
+
+## Phase 1 - Task T441 complete
+- Task type: annotate
+- File: `src/slic3r/GUI/Jobs/OAuthJob.cpp`
+- Deliverables: `src/slic3r/GUI/Jobs/OAuthJob.cpp`, `.ralph/ralph-tasks.md`, `.ralph/agent/handoff.md`
+- Substantive additions:
+  - Strengthened the worker-thread annotation block around the localhost OAuth callback flow, queue handoff, and main-thread finalize event.
+  - Added Unity-port guidance for replacing the wx job + localhost callback + posted-event flow with an async service and explicit main-thread completion.
+  - Removed a duplicated trailing implementation block that had been left after the real `finalize()` definition.
+- Verification excerpt: `// [INTENT] The main worker method runs the desktop OAuth authorization-code flow without blocking the UI thread.`
+- Verification excerpt: `// [EVENT] The callback handler is the cross-thread handoff point where the browser redirect becomes an OAuthResult pushed back to the worker.`
+- Verification excerpt: `// [INTENT] Finalize shuts down the callback server on the UI thread and emits the completion event that lets dialogs resume their login flow.`
+- Unity-impact summary:
+  - The job is a desktop-specific localhost redirect flow that must become an async auth service in Unity rather than a wx background job.
+  - The callback listener, token exchange, and UI completion event are distinct lifecycle stages that need explicit ownership in the Unity port.
+  - The wx posted event is the only completion bridge today; Unity should replace it with a main-thread callback or event channel.
+- Hazards found: 2 (P2: blocking token exchange in the callback path; P2: desktop localhost callback + wx finalization assumptions)
+- Notes:
+  - File cleanup removed an accidental duplicate tail so the file now contains exactly one `process()` and one `finalize()` definition.
+  - Next unresolved Phase 1 registry item after T441 is `T443 annotate: src/slic3r/GUI/Jobs/OrientJob.cpp`.
+
+## Phase 1 - Runtime reconciliation before T443
+- Task type: audit/reconcile
+- Deliverables: `.ralph/ralph-tasks.md`, `.ralph/agent/handoff.md`
+- Runtime mismatch: `ralph tools task ready` returned no ready tasks because the runtime registry still has many stale `in_progress` rows, while `.ralph/ralph-tasks.md` had no active Phase 1 task and the next unresolved markdown item was `T443 annotate: src/slic3r/GUI/Jobs/OrientJob.cpp`.
+- Resolution: treated `.ralph/ralph-tasks.md` plus source comments as authoritative for file coverage, reused runtime task `task-1773880087-c029` for `T443`, and started it explicitly.
+- Verification excerpt: `task-1773880087-c029 in_progress 2 T443 annotate: src/slic3r/GUI/Jobs/OrientJob.cpp gui:T443`
+- Next unresolved markdown task: `T443 annotate: src/slic3r/GUI/Jobs/OrientJob.cpp`
+
+## Phase 1 - Task T443 complete
+- Task type: annotate
+- File: `src/slic3r/GUI/Jobs/OrientJob.cpp`
+- Deliverables: `.ralph/ralph-tasks.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 0 source edits; verified the existing annotation coverage already documents selection bucketing, locked-plate warnings, worker-thread preparation, progress callbacks, orientation execution, and finalize/apply behavior.
+- Verification excerpt: `// [INTENT] process() runs on the job thread, orchestrating preparation, orientation calculation, and UI progress updates.`
+- Unity-impact summary:
+  - The file already documents the split between UI-thread preparation, background orientation search, and main-thread transform application.
+  - The existing comments call out the critical Unity replacement: a background job that computes rotation deltas and a main-thread pass that applies them to scene objects.
+  - Locked-plate behavior and progress reporting are already identified as user-visible contracts the Unity port must preserve.
+- Hazards found: 1 (P2: `orientation::orient` mutates orient-mesh state and assumes synchronous callback-driven application semantics)
+- Git: pending atomic commit for T443 registry reconciliation
+- Next recommended Phase 1 task: `T444 annotate: src/slic3r/GUI/Jobs/OrientJob.hpp`
+
+## Phase 1 - Task T444 complete
+- Task type: annotate
+- File: `src/slic3r/GUI/Jobs/OrientJob.hpp`
+- Deliverables: `.ralph/ralph-tasks.md`, `.ralph/agent/handoff.md`
+- Substantive additions: 0 source edits; verified that the header already documents job purpose, worker/main-thread split, owned mesh buckets, and Unity migration constraints for the orientation pipeline.
+- Verification excerpt: `// [PORTING_HAZARD:P2] - The C++ orientation algorithms (\`libslic3r/Orient.hpp\`) must be completely replaced or re-implemented in C# to run within Unity, as they depend on libslic3r data structures that aren't natively supported in Unity.`
+- Unity-impact summary:
+  - The header already defines the intended Unity replacement shape: async or job-based orientation processing with a main-thread callback that updates transforms.
+  - The retained mesh buckets and `Plater*` dependency are already exposed as the state ownership boundary the Unity port must replace.
+  - The file clearly records that `libslic3r` orientation code is not a drop-in dependency for C#, which is the main architectural hazard for this job.
+- Hazards found: 1 (P2: orientation logic depends on `libslic3r` structures and must be reimplemented or bridged for Unity)
+- Git: pending atomic commit for T443/T444 registry reconciliation
+- Next recommended Phase 1 task: `T445 annotate: src/slic3r/GUI/Jobs/PlaterWorker.hpp`
+
+## Phase 1 - Task T361 complete
+- Task type: annotate
+- File: src/slic3r/GUI/GLSelectionRectangle.hpp
+- Deliverables: .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Verification excerpt: `// [UNITY] Mirror this as a dedicated overlay control (Canvas + GraphicRaycaster) that drives a LineRenderer or UI Toolkit VisualElement`
+- Unity-impact summary:
+  - The selection rectangle is already documented as a drag-selection overlay with explicit select/deselect state.
+  - Screen-space bounds and cached rectangle geometry are called out for a retained overlay implementation.
+  - No source edit was needed because the annotation comments were already present; this run only reconciled the stale task registry entry.
 
 ## Phase 1 - Task T348 complete
 - Task type: annotate
@@ -635,7 +716,7 @@ _Generated: 2026-03-30 04:15:47 UTC_
 - [ ] T335 annotate: src/slic3r/GUI/Gizmos/GLGizmoPainterBase.cpp
 - [ ] T342 annotate: src/slic3r/GUI/Gizmos/GLGizmosCommon.hpp
 - [ ] T343 annotate: src/slic3r/GUI/Gizmos/GLGizmoSeam.cpp
-- [ ] T348 annotate: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp
+- [x] T348 annotate: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp
 - [ ] T351 annotate: src/slic3r/GUI/Gizmos/GLGizmosManager.hpp
 - [ ] T352 annotate: src/slic3r/GUI/Gizmos/GLGizmoSVG.cpp
 - [~] T358 annotate: src/slic3r/GUI/GLModel.cpp
@@ -777,7 +858,6 @@ Continue the previous work. Remaining tasks (120):
 - T335 annotate: src/slic3r/GUI/Gizmos/GLGizmoPainterBase.cpp
 - T342 annotate: src/slic3r/GUI/Gizmos/GLGizmosCommon.hpp
 - T343 annotate: src/slic3r/GUI/Gizmos/GLGizmoSeam.cpp
-- T348 annotate: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp
 - T351 annotate: src/slic3r/GUI/Gizmos/GLGizmosManager.hpp
 - T352 annotate: src/slic3r/GUI/Gizmos/GLGizmoSVG.cpp
 - T358 annotate: src/slic3r/GUI/GLModel.cpp
@@ -2962,3 +3042,40 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Completion equation: 450 + 0 + 0 = 724
 - Result: FAIL
 - Remaining files if any: 274 files, see `/tmp/gui_phase1_missing.txt`
+
+## Phase 1 - Tasks T433/T437/T448/T456/T459 complete
+- Task type: annotate
+- Files:
+  - src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.hpp
+  - src/slic3r/GUI/Jobs/FillBedJob.hpp
+  - src/slic3r/GUI/Jobs/ProgressIndicator.hpp
+  - src/slic3r/GUI/Jobs/ThreadSafeQueue.hpp
+  - src/slic3r/GUI/Jobs/Worker.hpp
+- Deliverables: src/slic3r/GUI/Jobs/CreateFontStyleImagesJob.hpp, .ralph/ralph-tasks.md, .ralph/agent/handoff.md
+- Substantive additions:
+  - Added header-level [INTENT]/[STATE]/[THREAD]/[UNITY]/[PORTING_HAZARD] coverage to `CreateFontStyleImagesJob.hpp` and method-level lifecycle notes for constructor/process/finalize.
+  - Verified that `FillBedJob.hpp`, `ProgressIndicator.hpp`, `ThreadSafeQueue.hpp`, and `Worker.hpp` already contained Phase 1 annotation coverage and reconciled their stale pending entries.
+- Verification excerpts:
+  - `CreateFontStyleImagesJob.hpp`: `// [THREAD] process() runs on the worker thread to build geometry/raster data, while finalize() returns to the UI/GL thread`
+  - `FillBedJob.hpp`: `// [THREAD] This job is designed to run in a background worker thread to prevent UI blocking`
+  - `ProgressIndicator.hpp`: `// [INTENT] This header defines the ProgressIndicator class, which is a pure virtual interface`
+  - `ThreadSafeQueue.hpp`: `// [INTENT][THREAD] Single-producer/single-consumer queue for GUI jobs`
+  - `Worker.hpp`: `// [PORTING_HAZARD:P1] Synchronous wait on UI thread blocks the UI in both C++ and Unity.`
+- Unity-impact summary:
+  - The emboss font-style preview path is a split worker-plus-main-thread atlas pipeline rather than a simple widget refresh.
+  - The job utility headers in `Jobs/` already describe the worker/main-thread contract needed for a Unity task runner and progress bridge.
+  - The markdown registry had drifted behind the source for four headers; this batch re-synced task completion with verified annotations.
+- Hazards found: 2 (P1: synchronous worker waits in `Worker.hpp`; P2: GL-thread texture upload dependency in `CreateFontStyleImagesJob.hpp`)
+- Next recommended Phase 1 task: T441 annotate: src/slic3r/GUI/Jobs/OAuthJob.cpp
+
+## Phase 1 coverage audit
+
+- Manifest total: 724
+- Annotated: 452
+- Skip-trivial: 12
+- Skip-vendored: 0
+- Accounted total: 464
+- Missing after audit: 260
+- Completion equation: 452 + 12 + 0 = 724
+- Result: FAIL
+- Remaining files if any: 260 files, see `/tmp/gui_phase1_missing.txt`
