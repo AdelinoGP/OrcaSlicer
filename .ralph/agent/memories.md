@@ -2,6 +2,10 @@
 
 ## Patterns
 
+### mem-1775148319-880a
+> Found discrepancy between .ralph/ralph-tasks.md and Ralph task tooling IDs/Titles. The markdown file uses sequential T1xx/T2xx IDs for Phase 1 files, while the tool might have stale or conflicting titles from previous runs. Always use 'ralph tools task ensure' with titles from the markdown file to keep them in sync.
+<!-- tags: tasking, tooling | created: 2026-04-02 -->
+
 ### mem-1774820483-b796
 > CalibUtils is a massive static utility class coupling the GUI device state to the libslic3r configuration and slicing engine. It depends on a single global Worker, limiting concurrent job generations.
 <!-- tags: gui, unity, calibration, threading | created: 2026-03-29 -->

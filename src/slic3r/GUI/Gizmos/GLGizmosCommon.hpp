@@ -69,9 +69,6 @@ class ModelObjectsClipper;
 // are just switched, but on the other hand, they should be released when
 // they are not in use by any gizmo anymore.
 
-// Enumeration of various data types that the data pool can contain.
-// Each gizmo can tell which of the data it wants to use through
-// on_get_requirements() method.
 // [STATE] Bitmask describing which shared data objects a gizmo currently needs; used to update/release just the required subsets without
 // rebuilding everything. [UNITY] Corresponds to a `[Flags]` enum or `EnumMaskField` in Unity so the C# controller can request cached
 // resources per-gizmo mode.
@@ -166,18 +163,23 @@ private:
     CommonGizmosDataPool* m_common   = nullptr;
 };
 
-// The specializations of the CommonGizmosDataBase class live in this
-// namespace to avoid clashes in GUI namespace.
+// [STATE] Specializations for the main gizmo pool's cached helpers live here to avoid GUI namespace clashes.
+// [UNITY] Treat these as frame-snapshot services owned by the gizmo cache rather than standalone scene objects.
 namespace CommonGizmosDataObjects {
 
+// [STATE] Caches the active model object, instance index, and SLA shift for selection-sensitive gizmo helpers.
+// [UNITY] This becomes a selection snapshot service that other gizmos read from a shared frame cache.
 class SelectionInfo : public CommonGizmosDataBase
 {
 public:
     explicit SelectionInfo(CommonGizmosDataPool* cgdp) : CommonGizmosDataBase(cgdp) {}
 
+    // [STATE] Returns the currently selected model object, or null when nothing is active.
     ModelObject* model_object() const { return m_model_object; }
-    int          get_active_instance() const;
-    float        get_sla_shift() const { return m_z_shift; }
+    // [STATE] Returns the active instance index for selection-aware clipping and raycasting.
+    int get_active_instance() const;
+    // [STATE] Returns the cached SLA Z shift used when drawing object cuts.
+    float get_sla_shift() const { return m_z_shift; }
 
 protected:
     void on_update() override;
@@ -189,6 +191,9 @@ private:
     float m_z_shift = 0.f;
 };
 
+// [INTENT] Hide all non-active instances while rendering object-specific cut geometry in the gizmo views.
+// [STATE] Rebuilds per-mesh clipper objects when the active model mesh set changes.
+// [UNITY] Mirror this with renderer visibility masks plus per-mesh clipping materials.
 class InstancesHider : public CommonGizmosDataBase
 {
 public:
@@ -197,6 +202,7 @@ public:
     CommonGizmosDataID get_dependencies() const override { return CommonGizmosDataID::SelectionInfo; }
 #endif // NDEBUG
 
+    // [OPENGL] Draws the active instance cut mesh after the visibility mask has been applied.
     void render_cut() const;
 
 protected:
@@ -208,6 +214,9 @@ private:
     std::vector<std::unique_ptr<MeshClipper>> m_clippers;
 };
 
+// [INTENT] Rebuild raycasters for the meshes in the current selection so gizmos can perform hit tests and picking.
+// [STATE] Owns a mesh-raycaster list plus the current mesh snapshot used to detect rebuilds.
+// [UNITY] Port to a raycast service or collider cache that updates when the selection mesh set changes.
 class Raycaster : public CommonGizmosDataBase
 {
 public:
@@ -216,13 +225,16 @@ public:
     CommonGizmosDataID get_dependencies() const override { return CommonGizmosDataID::SelectionInfo; }
 #endif // NDEBUG
 
+    // [STATE] Returns the primary mesh raycaster for the current selection snapshot.
     const MeshRaycaster* raycaster() const
     {
         assert(m_raycasters.size() == 1);
         return m_raycasters.front().get();
     }
+    // [STATE] Returns all active raycasters, including one per mesh when the selection is split.
     std::vector<const MeshRaycaster*> raycasters() const;
-    void                              set_only_support_model_part_flag(bool);
+    // [STATE] Controls whether the raycaster should only consider support-model parts.
+    void set_only_support_model_part_flag(bool);
 
 protected:
     void on_update() override;
@@ -234,6 +246,9 @@ private:
     bool                                        m_only_support_model_part{true};
 };
 
+// [INTENT] Own and update the active clipping plane used by object cut views and auxiliary gizmo previews.
+// [STATE] Stores the current clip ratio, bounding radius, and cached cut geometry helpers.
+// [UNITY] Port as a clipping-plane controller plus a shader-driven cut renderer.
 class ObjectClipper : public CommonGizmosDataBase
 {
 public:
@@ -241,18 +256,29 @@ public:
 #ifndef NDEBUG
     CommonGizmosDataID get_dependencies() const override { return CommonGizmosDataID::SelectionInfo; }
 #endif // NDEBUG
-    double               get_position() const { return m_clp_ratio; }
-    void                 set_position_to_init_layer();
+    // [STATE] Exposes the normalized clip position used by UI controls and downstream renderers.
+    double get_position() const { return m_clp_ratio; }
+    // [EVENT] Resets the clipping plane to the first visible layer and marks the canvas dirty.
+    void set_position_to_init_layer();
+    // [STATE] Returns the active clipping plane so other helpers can mirror or invert it.
     const ClippingPlane* get_clipping_plane(bool ignore_hide_clipped = false) const;
-    void                 render_cut(const std::vector<size_t>* ignore_idxs = nullptr) const;
-    void                 set_position_by_ratio(double pos, bool keep_normal, bool vertical_normal = false);
-    void                 set_range_and_pos(const Vec3d& cpl_normal, double cpl_offset, double pos);
-    void                 set_behavior(bool hide_clipped, bool fill_cut, double contour_width);
+    // [OPENGL] Draws the clipped mesh surfaces for the current object selection.
+    void render_cut(const std::vector<size_t>* ignore_idxs = nullptr) const;
+    // [EVENT] Updates the cut ratio from a UI drag or slider while preserving the plane orientation.
+    void set_position_by_ratio(double pos, bool keep_normal, bool vertical_normal = false);
+    // [EVENT] Recomputes the clipping range and position from a normalized direction vector and offset.
+    void set_range_and_pos(const Vec3d& cpl_normal, double cpl_offset, double pos);
+    // [STATE] Toggles whether clipped geometry is hidden, filled, or outlined.
+    void set_behavior(bool hide_clipped, bool fill_cut, double contour_width);
 
-    int                get_number_of_contours() const;
+    // [STATE] Returns the number of generated contours in the current clipping plane.
+    int get_number_of_contours() const;
+    // [STATE] Returns sampled contour points for UI overlays or downstream export.
     std::vector<Vec3d> point_per_contour() const;
 
-    int  is_projection_inside_cut(const Vec3d& point_in) const;
+    // [STATE] Tests whether a point projects inside the active cut region.
+    int is_projection_inside_cut(const Vec3d& point_in) const;
+    // [STATE] Reports whether the clip geometry has been initialized and contains valid contour data.
     bool has_valid_contour() const;
 
 protected:
@@ -270,6 +296,8 @@ private:
 
 } // namespace CommonGizmosDataObjects
 
+// [STATE] Enumeration of the assemble-view resource kinds that are cached separately from the main selection pool.
+// [UNITY] Use a second cache mask or view-mode enum so assembly-only helpers can be refreshed independently.
 enum class AssembleViewDataID {
     None                = 0,
     ModelObjectsInfo    = 1 << 0,
@@ -281,11 +309,10 @@ class AssembleViewDataPool
 public:
     AssembleViewDataPool(GLCanvas3D* canvas);
 
-    // Update all resources and release what is not used.
-    // Accepts a bitmask of currently required resources.
+    // [EVENT] Refreshes the assemble-view helpers requested by the active controller and releases the rest.
     void update(AssembleViewDataID required);
 
-    // Getters for the data that need to be accessed from the gizmos directly.
+    // [STATE] Accessors for the assemble-view snapshot and clipping helpers.
     AssembleViewDataObjects::ModelObjectsInfo*    model_objects_info() const;
     AssembleViewDataObjects::ModelObjectsClipper* model_objects_clipper() const;
 
@@ -300,8 +327,8 @@ private:
 #endif
 };
 
-// Base class for a wrapper object managing a single resource.
-// Each of the enum values above (safe None) will have an object of this kind.
+// [INTENT] Wrap one assemble-view resource with the same lazy update/release lifecycle as the main gizmo pool.
+// [STATE] Holds the owning pool back-pointer and validity bit for the cached helper.
 class AssembleViewDataBase
 {
 public:
@@ -345,13 +372,18 @@ private:
 };
 
 namespace AssembleViewDataObjects {
+
+// [STATE] Caches the current model objects and SLA shift used by assembly-view clipping and selection helpers.
+// [UNITY] Model this as a list snapshot service driven by the active assembly view controller.
 class ModelObjectsInfo : public AssembleViewDataBase
 {
 public:
     explicit ModelObjectsInfo(AssembleViewDataPool* cgdp) : AssembleViewDataBase(cgdp) {}
 
+    // [STATE] Returns the cached model-object list for the current assembly snapshot.
     ModelObjectPtrs model_objects() const { return m_model_objects; }
     // int get_active_instance() const;
+    // [STATE] Returns the per-object SLA shift used by clipping/render offsets.
     float get_sla_shift() const { return m_z_shift; }
 
 protected:
@@ -363,6 +395,9 @@ private:
     float           m_z_shift = 0.f;
 };
 
+// [INTENT] Maintain assemble-view clipping geometry for the current object set.
+// [STATE] Owns the cut plane, generated clippers, and the current clipping ratio/radius used by the assembly UI.
+// [UNITY] Port as a cut-plane controller that rebuilds per-object preview meshes when the view changes.
 class ModelObjectsClipper : public AssembleViewDataBase
 {
 public:
@@ -371,10 +406,14 @@ public:
     AssembleViewDataID get_dependencies() const override { return AssembleViewDataID::ModelObjectsInfo; }
 #endif // NDEBUG
 
-    void           set_position(double pos, bool keep_normal);
-    double         get_position() const { return m_clp_ratio; }
+    // [EVENT] Moves the clipping plane from the UI while optionally preserving the previous normal.
+    void set_position(double pos, bool keep_normal);
+    // [STATE] Returns the normalized clipping ratio used by the assembly controls.
+    double get_position() const { return m_clp_ratio; }
+    // [STATE] Returns the current clipping plane, or null when no cut plane is active.
     ClippingPlane* get_clipping_plane() const { return m_clp.get(); }
-    void           render_cut() const;
+    // [OPENGL] Renders the clipped object outlines for the assembly view.
+    void render_cut() const;
 
 protected:
     void on_update() override;
