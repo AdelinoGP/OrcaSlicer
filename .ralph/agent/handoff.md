@@ -2918,3 +2918,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P1: declaration mixes mesh state, input buffering, and model mutation entry points)
 - Git: e641621d06 (annotate advanced cut header)
 - Next recommended Phase 1 task: T307 src/slic3r/GUI/Gizmos/GLGizmoAssembly.cpp
+
+## Phase 1 - Task T307 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoAssembly.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoAssembly.cpp
+- Substantive additions: 6 ([INTENT], [STATE], [EVENT], [OPENGL], [UNITY] tags)
+- Verification excerpt: // [INTENT] Provides the assembly gizmo entry point that reuses the measurement base and toggles the assembly-only mode when activated.
+- Unity-impact summary:
+  - Assembly gizmo is a thin controller over measurement UI state and mode selection.
+  - Unity should map this to a panel overlay plus a mode-switch controller.
+  - The assembly input window remains an immediate-mode UI flow that needs a retained rewrite.
+- Hazards found: 1 (P2: immediate-mode overlay logic coupled to mode switching and selection state)
+- Git: pending commit
+- Next recommended Phase 1 task: T308 src/slic3r/GUI/Gizmos/GLGizmoAssembly.hpp

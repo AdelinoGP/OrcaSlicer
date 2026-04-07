@@ -118,7 +118,7 @@ Last updated: 2026-04-07T00:00:00Z
 - [x] T304 annotate: src/slic3r/GUI/Gizmos/GizmoObjectManipulation.hpp
 - [x] T305 annotate: src/slic3r/GUI/Gizmos/GLGizmoAdvancedCut.cpp
 - [x] T306 annotate: src/slic3r/GUI/Gizmos/GLGizmoAdvancedCut.hpp
-- [ ] T307 annotate: src/slic3r/GUI/Gizmos/GLGizmoAssembly.cpp
+- [x] T307 annotate: src/slic3r/GUI/Gizmos/GLGizmoAssembly.cpp
 - [x] T308 annotate: src/slic3r/GUI/Gizmos/GLGizmoAssembly.hpp
 - [x] T309 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.cpp
 - [x] T310 annotate: src/slic3r/GUI/Gizmos/GLGizmoBase.hpp
