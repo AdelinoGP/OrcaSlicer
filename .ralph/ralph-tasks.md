@@ -1,5 +1,5 @@
 # Ralph Task Registry — OrcaSlicer GUI Analysis Agent
-Last updated: 2026-04-07T10:10:00Z
+Last updated: 2026-04-07T20:15:00Z
 
 ## Legend
 - [ ] PENDING — not started
@@ -172,6 +172,18 @@ Last updated: 2026-04-07T10:10:00Z
 - [x] T862 annotate: src/slic3r/GUI/CalibrationWizardPage.hpp
 - [x] T863 annotate: src/slic3r/GUI/CalibrationWizardPresetPage.hpp
 - [x] T864 annotate: src/slic3r/GUI/CalibrationWizardStartPage.hpp
+
+## Phase 2 — GUI Documentation
+- [x] T201 docs: gui_01_architecture_overview.md
+- [x] T202 docs: gui_02_screen_and_widget_inventory.md
+- [x] T203 docs: gui_03_state_management.md
+- [x] T204 docs: gui_04_opengl_viewport_pipeline.md
+- [x] T205 docs: gui_05_event_and_callback_model.md
+- [x] T206 docs: gui_06_background_process_and_threading.md
+- [x] T207 docs: gui_07_unity_porting_hazards.md
+- [x] T208 docs: gui_08_external_gui_dependencies.md
+- [x] T209 docs: flow_background_slicing.md
+- [x] T210 docs: flow_viewport_input_and_render.md
 - [x] T209 annotate: src/slic3r/GUI/CameraPopup.cpp
 - [x] T210 annotate: src/slic3r/GUI/CameraPopup.hpp
 - [x] T211 annotate: src/slic3r/GUI/CameraUtils.cpp

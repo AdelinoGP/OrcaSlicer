@@ -120,6 +120,119 @@ _Generated: 2026-03-30 04:15:47 UTC_
 - Git: Annotate SLA support gizmo for Unity port
 - Next recommended Phase 1 task: T351 src/slic3r/GUI/Gizmos/GLGizmosManager.hpp
 
+## Phase 2 - Runtime reconciliation
+- Phase 2 prompt existed in `PROMPT.md`, but `.ralph/ralph-tasks.md` had no Phase 2 registry section and `generated_documentation/gui/` still contained only Phase 0 artifacts.
+- Resolution: treated `PROMPT.md`, `.ralph/ralph-tasks.md`, and the annotated source tree as authoritative, added an explicit Phase 2 task section to `.ralph/ralph-tasks.md`, and generated the required Phase 2 deliverables under `generated_documentation/gui/`.
+- Runtime-task note: Phase 1/Phase 2 title space is overloaded (`T201` etc.), so Phase 2 runtime tasks were created with stable `phase2:*` keys and the required markdown titles to avoid colliding with stale Phase 1 tooling rows.
+
+## Phase 2 - Task T201 complete
+- Deliverable: generated_documentation/gui/gui_01_architecture_overview.md
+- Scope covered: app shell, startup path, subsystem map, cross-cutting concerns, recommended port order
+- Source anchors referenced: 11
+- Key Unity decisions captured: bootstrap should be thinner than `GUI_App`; main shell should become explicit routing; `Plater` should be split into services/controllers; viewport remains a dedicated subsystem
+- Verification excerpt: `This order reduces the chance that the viewport port has to solve service lifetime, persistence, and async architecture at the same time.`
+- Remaining follow-up if any: none
+- Git: Document Phase 2 GUI package
+- Next recommended Phase 2 task: T202
+
+## Phase 2 - Task T202 complete
+- Deliverable: generated_documentation/gui/gui_02_screen_and_widget_inventory.md
+- Scope covered: top-level windows, tabs, panes, dialog categories, ownership/lifecycle inventory
+- Source anchors referenced: 10
+- Key Unity decisions captured: preserve page identities instead of notebook indices; treat Prepare/Preview as one workspace family; port monitor/project/calibration as explicit screen controllers; capture reusable widget patterns
+- Verification excerpt: `Migration hotspot: the workspace is currently a fused screen made of viewport, sidebar, object/plate data, notifications, gizmos, and slicing lifecycle.`
+- Remaining follow-up if any: auxiliary/debug inventory could be expanded later
+- Git: Document Phase 2 GUI package
+- Next recommended Phase 2 task: T203
+
+## Phase 2 - Task T203 complete
+- Deliverable: generated_documentation/gui/gui_03_state_management.md
+- Scope covered: state taxonomy, ownership patterns, invalidation, persistence interactions, Unity state model
+- Source anchors referenced: 9
+- Key Unity decisions captured: split app/session/domain/UI state; replace `wxGetApp()` reachability with stores/services; turn preset editing into explicit edit sessions; centralize async workflow state
+- Verification excerpt: `Unity recommendation: split into: domain state: project/model/plates/prints; session state: selected plate/object/view mode; UI state: overlays, notifications, modal intents.`
+- Remaining follow-up if any: device/cloud state could use a deeper dedicated map
+- Git: Document Phase 2 GUI package
+- Next recommended Phase 2 task: T204
+
+## Phase 2 - Task T204 complete
+- Deliverable: generated_documentation/gui/gui_04_opengl_viewport_pipeline.md
+- Scope covered: render loop, pass ordering, GL ownership, input model, shader/material concerns, G-code preview, Unity strategy options
+- Source anchors referenced: 18
+- Key Unity decisions captured: viewport is a custom rendering runtime; G-code preview should remain a dedicated subsystem; prefer URP/SRP-style explicit passes plus a dedicated preview path; keep input as a tool state machine
+- Verification excerpt: `This best matches the current code structure, where the viewport already behaves like a custom render pipeline and the G-code preview is architecturally distinct.`
+- Remaining follow-up if any: exact libvgcode replacement choice remains open
+- Git: Document Phase 2 GUI package
+- Next recommended Phase 2 task: T205
+
+## Phase 2 - Task T205 complete
+- Deliverable: generated_documentation/gui/gui_05_event_and_callback_model.md
+- Scope covered: wx event model primer, bind sites, custom events, critical flows, Unity event equivalents
+- Source anchors referenced: 14
+- Key Unity decisions captured: keep local UI events local; use typed cross-screen events; centralize worker completion dispatch; give browser bridges typed command channels
+- Verification excerpt: `This means there is no single event bus. Instead, each subsystem uses the mechanism that was easiest to attach to its owner.`
+- Remaining follow-up if any: a full event catalog would require a dedicated pass
+- Git: Document Phase 2 GUI package
+- Next recommended Phase 2 task: T206
+
+## Phase 2 - Task T206 complete
+- Deliverable: generated_documentation/gui/gui_06_background_process_and_threading.md
+- Scope covered: thread inventory, slicing orchestration, UI marshaling, thread-safety rules, cancellation/progress behavior, Unity async model
+- Source anchors referenced: 14
+- Key Unity decisions captured: no UI work from background threads; replace wx idle/paint completion pump with explicit dispatcher; preserve distinction between user cancel and internal invalidation; split slicing/export/upload stages
+- Verification excerpt: `This is a major Unity porting hazard because it means some background work depends on the main thread not just for completion, but for mid-flight participation.`
+- Remaining follow-up if any: broader async inventory may still need expansion during implementation
+- Git: Document Phase 2 GUI package
+- Next recommended Phase 2 task: T207
+
+## Phase 2 - Task T207 complete
+- Deliverable: generated_documentation/gui/gui_07_unity_porting_hazards.md
+- Scope covered: blocker list, subsystem hazard catalog, severity/impact/mitigation, dependency ordering
+- Source anchors referenced: 11
+- Key Unity decisions captured: solve singleton/app-shell boundaries first; define async runtime before porting workflows; choose viewport architecture early; treat browser/device bridges as separate risk area
+- Verification excerpt: `The viewport architecture decision affects input, overlays, G-code preview, and notification placement.`
+- Remaining follow-up if any: none
+- Git: Document Phase 2 GUI package
+- Next recommended Phase 2 task: T208
+
+## Phase 2 - Task T208 complete
+- Deliverable: generated_documentation/gui/gui_08_external_gui_dependencies.md
+- Scope covered: dependency inventory, usage, replacement paths, keep/adapt/replace recommendations
+- Source anchors referenced: 12
+- Key Unity decisions captured: replace wx/OpenGL/Boost-thread GUI infrastructure; decide browser-backed flows per screen; resolve libvgcode strategy early; move JSON/browser payloads to typed contracts
+- Verification excerpt: `Recommendation: this is a strategic dependency decision, not an implementation detail.`
+- Remaining follow-up if any: license audit remains separate work
+- Git: Document Phase 2 GUI package
+- Next recommended Phase 2 task: T209
+
+## Phase 2 - Task T209 complete
+- Deliverable: generated_documentation/gui/flow_background_slicing.md
+- Scope covered: debounced reslice, worker-state progression, UI synchronization, completion/cancellation behavior
+- Source anchors referenced: 8
+- Key Unity decisions captured: preserve debounce/restart semantics; replace blocking UI tasks with awaited continuations; centralize completion handling; keep cancellation states explicit
+- Verification excerpt: `Replace `UITask` blocking with awaited main-thread continuations.`
+- Remaining follow-up if any: none
+- Git: Document Phase 2 GUI package
+- Next recommended Phase 2 task: T210
+
+## Phase 2 - Task T210 complete
+- Deliverable: generated_documentation/gui/flow_viewport_input_and_render.md
+- Scope covered: viewport input arbitration, picking, render scheduling, pass-ordered draw pipeline
+- Source anchors referenced: 6
+- Key Unity decisions captured: dedicated input arbiter; separate scene picking from overlay UI; preserve pass ordering; keep viewport specialized
+- Verification excerpt: `Treat input arbitration as a dedicated controller, not as incidental per-object callbacks.`
+- Remaining follow-up if any: none
+- Git: Document Phase 2 GUI package
+- Next recommended Phase 2 task: completion summary
+
+## Phase 2 documentation coverage summary
+- Core docs present: T201 gui_01_architecture_overview.md, T202 gui_02_screen_and_widget_inventory.md, T203 gui_03_state_management.md, T204 gui_04_opengl_viewport_pipeline.md, T205 gui_05_event_and_callback_model.md, T206 gui_06_background_process_and_threading.md, T207 gui_07_unity_porting_hazards.md, T208 gui_08_external_gui_dependencies.md
+- Flow docs present: flow_background_slicing.md, flow_viewport_input_and_render.md
+- Highest-priority docs completed: T204 yes, T206 yes
+- Source anchor convention used consistently: yes
+- Remaining documentation gaps: none
+- Result: PASS
+
 ### Completed
 
 - [x] document: tests/libslic3r/test_mutable_polygon.cpp (T105)
