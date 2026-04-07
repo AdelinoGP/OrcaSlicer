@@ -9,6 +9,22 @@ _Generated: 2026-03-30 04:15:47 UTC_
 
 ## Tasks
 
+- Reconciled stale Phase 1 registry entries: T326 and T327 were already annotated in source and are now marked complete in `.ralph/ralph-tasks.md`.
+
+## Phase 1 - Task T348 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp, .ralph/ralph-tasks.md, .ralph/agent/scratchpad.md
+- Substantive additions: 10 annotation blocks covering selection state, edit/apply/discard flow, backend cache refresh, auto-generation, edit-mode transitions, dirty-state comparison, and the shortcut help dialog
+- Verification excerpt: `// [STATE][THREAD] Commit the whole editing cache back into the model before kicking reslicing, because downstream support generation`
+- Unity-impact summary:
+  - The gizmo is a retained edit session with explicit clone/commit/discard phases.
+  - Backend-generated points stay in a UI cache while the model remains the source of truth for reslicing.
+  - The help dialog is best represented as a modal overlay with a static shortcut table.
+- Hazards found: 2 (P2: destructive discard path; P2: UI-thread marshalling for regenerate/reslice)
+- Git: Annotate SLA support gizmo for Unity port
+- Next recommended Phase 1 task: T351 src/slic3r/GUI/Gizmos/GLGizmosManager.hpp
+
 ### Completed
 
 - [x] document: tests/libslic3r/test_mutable_polygon.cpp (T105)
@@ -337,6 +353,8 @@ _Generated: 2026-03-30 04:15:47 UTC_
 - [x] T509 annotate: src/slic3r/GUI/ObjectDataViewModel.cpp
 - [x] T510 annotate: src/slic3r/GUI/ObjectDataViewModel.hpp
 - [x] T511 annotate: src/slic3r/GUI/OG_CustomCtrl.cpp
+- [x] T325 annotate: src/slic3r/GUI/Gizmos/GLGizmoHollow.cpp
+  - Evidence: `src/slic3r/GUI/Gizmos/GLGizmoHollow.cpp` already contains the required [INTENT]/[STATE]/[EVENT]/[THREAD]/[OPENGL]/[UNITY]/[PORTING_HAZARD] annotations; runtime task `task-1773880086-2719` is closed, so this run reconciled the stale registry entry.
 - [x] T512 annotate: src/slic3r/GUI/OG_CustomCtrl.hpp
 - [x] T513 annotate: src/slic3r/GUI/OpenGLManager.cpp
 - [x] T515 annotate: src/slic3r/GUI/OptionsGroup.cpp
@@ -586,7 +604,7 @@ _Generated: 2026-03-30 04:15:47 UTC_
 ### Remaining
 
 - [ ] P0-T006: Main Window Class Identification
-- [ ] T106 annotate: src/libvgcode/include/Viewer.hpp
+- [x] T106 annotate: src/libvgcode/include/Viewer.hpp
 - [ ] T132 annotate: src/libvgcode/src/ToolMarker.hpp
 - [ ] T153 annotate: src/slic3r/GUI/PresetComboBoxes.cpp
 - [~] T161 annotate: src/slic3r/GUI/DPIFrame.cpp
@@ -2932,3 +2950,15 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 1 (P2: immediate-mode overlay logic coupled to mode switching and selection state)
 - Git: bd47ecaed4 (record T307 assembly gizmo)
 - Next recommended Phase 1 task: T308 src/slic3r/GUI/Gizmos/GLGizmoAssembly.hpp
+
+## Phase 1 coverage audit
+
+- Manifest total: 724
+- Annotated: 450
+- Skip-trivial: 0
+- Skip-vendored: 0
+- Accounted total: 450
+- Missing after audit: 274
+- Completion equation: 450 + 0 + 0 = 724
+- Result: FAIL
+- Remaining files if any: 274 files, see `/tmp/gui_phase1_missing.txt`

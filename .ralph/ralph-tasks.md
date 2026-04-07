@@ -135,10 +135,10 @@ Last updated: 2026-04-07T00:00:00Z
 - [x] T321 annotate: src/slic3r/GUI/Gizmos/GLGizmoFlatten.cpp
 - [x] T322 annotate: src/slic3r/GUI/Gizmos/GLGizmoFlatten.hpp
 - [x] T323 annotate: src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.cpp
-- [ ] T324 annotate: src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.hpp
-- [ ] T325 annotate: src/slic3r/GUI/Gizmos/GLGizmoHollow.cpp
-- [ ] T326 annotate: src/slic3r/GUI/Gizmos/GLGizmoHollow.hpp
-- [ ] T327 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp
+- [x] T324 annotate: src/slic3r/GUI/Gizmos/GLGizmoFuzzySkin.hpp
+- [x] T325 annotate: src/slic3r/GUI/Gizmos/GLGizmoHollow.cpp
+- [x] T326 annotate: src/slic3r/GUI/Gizmos/GLGizmoHollow.hpp
+- [x] T327 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeasure.cpp
 - [x] T328 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeasure.hpp
 - [x] T329 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.cpp
 - [x] T330 annotate: src/slic3r/GUI/Gizmos/GLGizmoMeshBoolean.hpp
@@ -150,16 +150,16 @@ Last updated: 2026-04-07T00:00:00Z
 - [x] T336 annotate: src/slic3r/GUI/Gizmos/GLGizmoPainterBase.hpp
 - [x] T337 annotate: src/slic3r/GUI/Gizmos/GLGizmoRotate.cpp
 - [x] T338 annotate: src/slic3r/GUI/Gizmos/GLGizmoRotate.hpp
-- [ ] T339 annotate: src/slic3r/GUI/Gizmos/GLGizmoScale.cpp
+- [x] T339 annotate: src/slic3r/GUI/Gizmos/GLGizmoScale.cpp
 - [x] T340 annotate: src/slic3r/GUI/Gizmos/GLGizmoScale.hpp
 - [x] T341 annotate: src/slic3r/GUI/Gizmos/GLGizmosCommon.cpp
-- [ ] T342 annotate: src/slic3r/GUI/Gizmos/GLGizmosCommon.hpp
+- [x] T342 annotate: src/slic3r/GUI/Gizmos/GLGizmosCommon.hpp
 - [x] T343 annotate: src/slic3r/GUI/Gizmos/GLGizmoSeam.cpp
 - [x] T344 annotate: src/slic3r/GUI/Gizmos/GLGizmoSeam.hpp
 - [x] T345 annotate: src/slic3r/GUI/Gizmos/GLGizmos.hpp
 - [x] T346 annotate: src/slic3r/GUI/Gizmos/GLGizmoSimplify.cpp
 - [x] T347 annotate: src/slic3r/GUI/Gizmos/GLGizmoSimplify.hpp
-- [ ] T348 annotate: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp
+- [x] T348 annotate: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.cpp
 - [x] T349 annotate: src/slic3r/GUI/Gizmos/GLGizmoSlaSupports.hpp
 - [x] T350 annotate: src/slic3r/GUI/Gizmos/GLGizmosManager.cpp
 - [ ] T351 annotate: src/slic3r/GUI/Gizmos/GLGizmosManager.hpp
@@ -427,7 +427,7 @@ Last updated: 2026-04-07T00:00:00Z
 - [x] T613 annotate: src/slic3r/GUI/TextLines.cpp
 - [x] T614 annotate: src/slic3r/GUI/TextLines.hpp
 - [x] T615 annotate: src/slic3r/GUI/ThermalPreconditioningDialog.cpp
-- [ ] T616 annotate: src/slic3r/GUI/ThermalPreconditioningDialog.hpp
+- [x] T616 annotate: src/slic3r/GUI/ThermalPreconditioningDialog.hpp
 - [x] T617 annotate: src/slic3r/GUI/TickCode.cpp
 - [ ] T618 annotate: src/slic3r/GUI/TickCode.hpp
 - [x] T619 annotate: src/slic3r/GUI/UnsavedChangesDialog.cpp
