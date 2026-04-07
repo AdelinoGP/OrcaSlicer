@@ -2904,3 +2904,17 @@ Original objective: # PROMPT - Phase 1: GUI File-by-File Annotation for Unity Po
 - Hazards found: 2 (P1: synchronous cut/model mutation on UI thread; P2: mixed tri-state connector editing)
 - Git: 47b77648b1 (annotate advanced cut gizmo)
 - Next recommended Phase 1 task: T306 src/slic3r/GUI/Gizmos/GLGizmoAdvancedCut.hpp
+
+## Phase 1 - Task T306 complete
+- Task type: annotate
+- File: src/slic3r/GUI/Gizmos/GLGizmoAdvancedCut.hpp
+- Deliverables: src/slic3r/GUI/Gizmos/GLGizmoAdvancedCut.hpp
+- Substantive additions: 4 ([INTENT], [STATE], [UNITY], [PORTING_HAZARD] tags)
+- Verification excerpt: // [INTENT] Declaration boundary for the advanced cut gizmo: exposes cut-plane editing, connector editing, and cut execution hooks.
+- Unity-impact summary:
+  - Header makes the cut gizmo's mutable state and model mutation surface explicit.
+  - Unity should separate the controller interface from serialized gizmo state.
+  - The declaration reveals a broad view-model boundary that should not be coupled to rendering code.
+- Hazards found: 1 (P1: declaration mixes mesh state, input buffering, and model mutation entry points)
+- Git: pending commit
+- Next recommended Phase 1 task: T307 src/slic3r/GUI/Gizmos/GLGizmoAssembly.cpp
