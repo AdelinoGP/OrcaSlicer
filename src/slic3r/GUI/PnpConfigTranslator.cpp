@@ -298,8 +298,14 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     // overhang_1_4_speed percent resolves over outer_wall_speed (its Orca
     // ratio_over); pnp types it float.
     if (auto* v = cfg.option<ConfigOptionFloatsOrPercents>("overhang_1_4_speed");
-        v != nullptr && !v->values.empty() && v->values.front().percent)
-        out["overhang_1_4_speed"] = v->values.front().value / 100. * cfg.opt_float("outer_wall_speed");
+        v != nullptr && !v->values.empty() && v->values.front().percent) {
+        // The base key can be absent (partial configs); never deref a missing
+        // option — drop the key instead so pnp's default applies.
+        if (const ConfigOption* base = cfg.option("outer_wall_speed"); base != nullptr)
+            out["overhang_1_4_speed"] = v->values.front().value / 100. * base->getFloat();
+        else
+            out.erase("overhang_1_4_speed");
+    }
     // Orca bead widths are percent-of-nozzle-diameter; pnp expects absolute
     // values in its internal units (1 unit = 100 nm, i.e. mm * 10000).
     for (const char* key : {"min_bead_width", "initial_layer_min_bead_width"}) {
