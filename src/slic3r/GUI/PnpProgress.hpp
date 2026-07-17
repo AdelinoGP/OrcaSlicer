@@ -74,7 +74,8 @@ public:
     // fatal=true, validation_error, or slice_complete with fatal errors).
     bool has_fatal_error() const { return m_fatal; }
 
-    // Message of the first fatal error seen (empty when has_fatal_error() is false).
+    // First fatal error seen, formatted "message — suggestion (stage: X)" with
+    // empty parts omitted (F08); empty when has_fatal_error() is false.
     const std::string& fatal_error_message() const { return m_fatal_message; }
 
     // Raw JSON text of the slice_stats event when pnp ships it (handoff item

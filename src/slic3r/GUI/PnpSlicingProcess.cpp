@@ -12,6 +12,7 @@
 #include "PnpProgress.hpp"
 #include "PnpConfigTranslator.hpp"
 #include "PnpConfigWarningsLog.hpp"
+#include "NotificationManager.hpp"
 
 #include <wx/app.h>
 #include <wx/stdpaths.h>
@@ -37,6 +38,7 @@
 #include <boost/process.hpp>
 #ifdef _WIN32
 #include <boost/process/windows.hpp>
+#include <windows.h>
 #endif
 
 namespace Slic3r {
@@ -77,6 +79,35 @@ void ingest_pnp_gcode(GCodeProcessorResult &dst, const std::string &gcode_path, 
 	});
 	dst = std::move(processor.extract_result());
 }
+
+#ifdef _WIN32
+// F08 orphan guard: every pnp_cli child is assigned to one process-lifetime
+// Job Object with kill-on-close, so the OS terminates any in-flight slice the
+// moment this GUI process dies — including on a crash, where no cleanup code
+// runs (the kernel closes the last job handle for us). The handle is created
+// once and intentionally never closed.
+HANDLE pnp_job_object()
+{
+	static HANDLE s_job = []() -> HANDLE {
+		HANDLE job = ::CreateJobObjectW(nullptr, nullptr);
+		if (job == nullptr) {
+			BOOST_LOG_TRIVIAL(warning) << "pnp: CreateJobObjectW failed, error " << ::GetLastError()
+			                           << "; pnp_cli orphan guard disabled";
+			return nullptr;
+		}
+		JOBOBJECT_EXTENDED_LIMIT_INFORMATION info {};
+		info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+		if (!::SetInformationJobObject(job, JobObjectExtendedLimitInformation, &info, sizeof(info))) {
+			BOOST_LOG_TRIVIAL(warning) << "pnp: SetInformationJobObject failed, error " << ::GetLastError()
+			                           << "; pnp_cli orphan guard disabled";
+			::CloseHandle(job);
+			return nullptr;
+		}
+		return job;
+	}();
+	return s_job;
+}
+#endif // _WIN32
 
 } // anonymous namespace
 
@@ -402,6 +433,15 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 		                   bp::windows::create_no_window,
 #endif
 		                   bp::limit_handles);
+#ifdef _WIN32
+		// F08: bind the child to the kill-on-close Job Object so it cannot
+		// outlive the GUI process. Failure is logged, never fatal — the slice
+		// itself still works, only the crash-orphan guard is lost.
+		if (HANDLE job = pnp_job_object(); job != nullptr)
+			if (!::AssignProcessToJobObject(job, child.native_handle()))
+				BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": AssignProcessToJobObject failed, error "
+				                           << ::GetLastError();
+#endif
 		// Clear m_child before `child` is destroyed on every exit path (incl.
 		// exceptions), so stop() can never terminate a dangling pointer.
 		struct ChildGuard {
@@ -442,26 +482,50 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 		// Terminated by stop()/stop_internal(); the caller handles cleanup.
 		return;
 
-	auto with_tail = [&stderr_tail](std::string msg) {
-		if (!stderr_tail.empty())
-			msg += "\n\n" + _u8L("PNP slicer output (tail):") + "\n" + stderr_tail;
-		return msg;
-	};
+	// F08: the raw stderr tail goes to Orca's log only, never into the dialog.
+	const bool failed = exit_code != 0 || parser.has_fatal_error() || !fs::exists(fs::path(job.output_path));
+	if (failed && !stderr_tail.empty())
+		BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": pnp_cli stderr tail:\n" << stderr_tail;
+	// Exit code decides success (never parser fidelity); the parsed fatal
+	// error, when present, only improves the message shown.
 	if (exit_code != 0) {
 		std::string msg = parser.has_fatal_error()
 			? parser.fatal_error_message()
-			: Slic3r::format(_u8L("The PNP slicer exited with code %1%."), exit_code);
-		throw Slic3r::SlicingError(with_tail(std::move(msg)));
+			: Slic3r::format(_u8L("The PNP slicer exited with code %1%. See the log for details."), exit_code);
+		throw Slic3r::SlicingError(std::move(msg));
 	}
 	if (parser.has_fatal_error())
-		throw Slic3r::SlicingError(with_tail(parser.fatal_error_message()));
+		throw Slic3r::SlicingError(parser.fatal_error_message());
 	if (!fs::exists(fs::path(job.output_path)))
-		throw Slic3r::SlicingError(with_tail(
-			Slic3r::format(_u8L("The PNP slicer reported success but produced no G-code at %1%."), job.output_path)));
+		throw Slic3r::SlicingError(
+			Slic3r::format(_u8L("The PNP slicer reported success but produced no G-code at %1%."), job.output_path));
 
-	if (!parser.warnings().empty())
-		BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": pnp_cli reported " << parser.warnings().size()
-		                           << " degraded-slice warning(s); aggregation UX is ticket F08";
+	// F08: degraded slice — one aggregated warning notification on completion,
+	// no per-event toasts. Full per-warning detail goes to the log.
+	if (!parser.warnings().empty()) {
+		const auto &warnings = parser.warnings();
+		for (const PnpProgressParser::Warning &w : warnings)
+			BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": pnp degraded-slice warning"
+			                           << (w.module_id.empty() ? std::string() : " [" + w.module_id + "]")
+			                           << (w.layer_index >= 0 ? " (layer " + std::to_string(w.layer_index) + ")" : "")
+			                           << ": " << w.message;
+		std::string text = Slic3r::format(_u8L("Slicing completed with %1% warning(s):"), warnings.size());
+		const size_t shown = std::min<size_t>(warnings.size(), 3);
+		for (size_t i = 0; i < shown; ++i) {
+			const PnpProgressParser::Warning &w = warnings[i];
+			text += "\n- " + (w.module_id.empty() ? w.message : w.module_id + ": " + w.message);
+		}
+		if (warnings.size() > shown)
+			text += "\n" + Slic3r::format(_u8L("...and %1% more (see the log)."), warnings.size() - shown);
+		// The notification manager is UI-thread only; hop over via CallAfter.
+		wxGetApp().CallAfter([text = std::move(text)]() {
+			Plater *plater = wxGetApp().plater();
+			if (plater != nullptr)
+				plater->get_notification_manager()->push_notification(
+					NotificationType::CustomNotification,
+					NotificationManager::NotificationLevel::WarningNotificationLevel, text);
+		});
+	}
 }
 
 // Copy the temporary G-code to the user-selected export location.

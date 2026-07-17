@@ -51,6 +51,18 @@ bool get_bool(const nlohmann::json& j, const char* key, bool def = false)
     return (it != j.end() && it->is_boolean()) ? it->get<bool>() : def;
 }
 
+// F08: "message — suggestion (stage: X)", omitting empty parts.
+std::string format_fatal(std::string message, const std::string& suggestion, const std::string& stage)
+{
+    if (message.empty())
+        message = "Slicing failed";
+    if (!suggestion.empty())
+        message += " \xE2\x80\x94 " + suggestion; // " — "
+    if (!stage.empty())
+        message += " (stage: " + stage + ")";
+    return message;
+}
+
 } // anonymous namespace
 
 PnpProgressParser::PnpProgressParser(int estimated_layer_count, std::string plate_label)
@@ -163,7 +175,9 @@ void PnpProgressParser::feed_line(const std::string& line)
         if (fatal) {
             m_fatal = true;
             if (m_fatal_message.empty())
-                m_fatal_message = message.empty() ? std::string("Module error") : message;
+                m_fatal_message = format_fatal(message.empty() ? std::string("Module error") : message,
+                                               has_error ? get_string(*err_it, "suggestion") : std::string(),
+                                               get_string(j, "stage"));
         } else {
             Warning w;
             w.module_id   = get_string(j, "module_id");
@@ -175,9 +189,11 @@ void PnpProgressParser::feed_line(const std::string& line)
         m_fatal = true;
         if (m_fatal_message.empty()) {
             const auto err_it = j.find("error");
-            std::string message = (err_it != j.end() && err_it->is_object()) ? get_string(*err_it, "message")
-                                                                             : std::string();
-            m_fatal_message = message.empty() ? std::string("Validation error") : message;
+            const bool  has_error = err_it != j.end() && err_it->is_object();
+            std::string message   = has_error ? get_string(*err_it, "message") : std::string();
+            m_fatal_message = format_fatal(message.empty() ? std::string("Validation error") : message,
+                                           has_error ? get_string(*err_it, "suggestion") : std::string(),
+                                           get_string(j, "stage"));
         }
     } else if (event == "slice_complete") {
         if (get_int(j, "fatal_error_count", 0) > 0) {
