@@ -301,8 +301,9 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
         v != nullptr && !v->values.empty() && v->values.front().percent) {
         // The base key can be absent (partial configs); never deref a missing
         // option — drop the key instead so pnp's default applies.
-        if (const ConfigOption* base = cfg.option("outer_wall_speed"); base != nullptr)
-            out["overhang_1_4_speed"] = v->values.front().value / 100. * base->getFloat();
+        // outer_wall_speed is coFloats (vector) — getFloat() on it throws.
+        if (cfg.option("outer_wall_speed") != nullptr)
+            out["overhang_1_4_speed"] = v->values.front().value / 100. * cfg.opt_float("outer_wall_speed", 0);
         else
             out.erase("overhang_1_4_speed");
     }
