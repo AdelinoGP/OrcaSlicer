@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <map>
 #include <set>
 #include <string>
 
@@ -445,6 +446,95 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
             warn(key, tier_d_class(key), cfg.opt_serialize(key));
 
     return result;
+}
+
+namespace {
+
+// True when `v` is acceptable for a schema field of type tag `type`.
+// Unknown/empty type tags validate everything (fail open — the guard's job is
+// to stop known-bad values, not to second-guess new schema features).
+bool value_matches_type(const json& v, const std::string& type)
+{
+    if (type == "float" || type == "int" || type == "units")
+        return v.is_number();
+    if (type == "bool")
+        return v.is_boolean();
+    if (type == "string" || type == "enum")
+        return v.is_string();
+    if (type == "percent" || type == "float_or_percent")
+        return v.is_number() || (v.is_string() && !v.get<std::string>().empty() && v.get<std::string>().back() == '%');
+    if (type == "float-list" || type == "int-list") {
+        if (!v.is_array())
+            return false;
+        for (const json& e : v)
+            if (!e.is_number())
+                return false;
+        return true;
+    }
+    if (type == "string-list") {
+        if (!v.is_array())
+            return false;
+        for (const json& e : v)
+            if (!e.is_string())
+                return false;
+        return true;
+    }
+    return true;
+}
+
+} // anonymous namespace
+
+void apply_schema_guard(json& config, const json& schema_doc, std::vector<PnpConfigWarning>& warnings)
+{
+    // Index the schema: key -> field descriptor (first definition wins, like
+    // pnp's own module dedup).
+    std::map<std::string, const json*> fields;
+    if (const auto it = schema_doc.find("schema"); it != schema_doc.end() && it->is_array())
+        for (const json& mod : *it)
+            if (const auto fit = mod.find("fields"); fit != mod.end() && fit->is_array())
+                for (const json& field : *fit)
+                    if (field.is_object() && field.contains("key") && field["key"].is_string())
+                        fields.emplace(field["key"].get<std::string>(), &field);
+
+    for (auto it = config.begin(); it != config.end(); /* increment in body */) {
+        const auto found = fields.find(it.key());
+        if (found == fields.end()) {
+            ++it; // unknown to the schema: pnp ignores it, leave it alone
+            continue;
+        }
+        const json&       field  = *found->second;
+        const json&       value  = it.value();
+        const std::string type   = field.contains("type") && field["type"].is_string() ? field["type"].get<std::string>() : std::string();
+        std::string       reason;
+
+        if (!value_matches_type(value, type)) {
+            reason = "schema type '" + type + "' rejects this value";
+        } else if (value.is_number()) {
+            const double v = value.get<double>();
+            if (field.contains("min") && field["min"].is_number() && v < field["min"].get<double>())
+                reason = "below schema min " + field["min"].dump();
+            else if (field.contains("max") && field["max"].is_number() && v > field["max"].get<double>())
+                reason = "above schema max " + field["max"].dump();
+        }
+        if (reason.empty() && type == "enum" && value.is_string()
+            && field.contains("values") && field["values"].is_array() && !field["values"].empty()) {
+            bool all_strings = true, member = false;
+            for (const json& allowed : field["values"]) {
+                if (!allowed.is_string()) { all_strings = false; break; }
+                if (allowed.get<std::string>() == value.get<std::string>()) member = true;
+            }
+            if (all_strings && !member)
+                reason = "not one of the schema enum values";
+        }
+
+        if (reason.empty()) {
+            ++it;
+        } else {
+            warnings.push_back({it.key(), PnpWarningClass::LossyFallback, value.dump(),
+                                "(dropped by schema guard: " + reason + "; pnp default applies)"});
+            it = config.erase(it);
+        }
+    }
 }
 
 }}} // namespace Slic3r::GUI::PnpConfigTranslator

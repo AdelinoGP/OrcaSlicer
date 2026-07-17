@@ -57,6 +57,10 @@ public:
     // or its output could not be parsed).
     const std::string& schema_version() const { return m_schema_version; }
 
+    // Raw `module config-schema` JSON document from the last successful probe
+    // (empty when unavailable). Consumed by PnpConfigTranslator's schema guard.
+    const std::string& schema_json() const { return m_schema_json; }
+
     // Human-readable reason available() is false (empty when available() is true).
     const std::string& failure_reason() const { return m_failure_reason; }
 
@@ -82,6 +86,7 @@ private:
     boost::filesystem::path m_module_dir;
     std::string             m_schema_version;
     std::string             m_failure_reason;
+    std::string             m_schema_json;
     bool                    m_notification_shown { false };
 };
 

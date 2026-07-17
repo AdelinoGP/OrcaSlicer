@@ -29,6 +29,16 @@ struct PnpTranslationResult
 
 namespace PnpConfigTranslator {
 
+// Schema guard (F01 follow-up): validate a translated config against the
+// parsed `pnp_cli module config-schema` document and drop every key whose
+// value pnp's config resolution would reject — wrong JSON type, out of
+// [min, max] range, or unknown enum value — appending one lossy-fallback
+// warning per dropped key. pnp then falls back to its own default, so a
+// config mismatch degrades to a logged warning instead of a failed slice.
+// Keys the schema does not mention are left untouched (pnp ignores them).
+void apply_schema_guard(nlohmann::json& config, const nlohmann::json& schema_doc,
+                        std::vector<PnpConfigWarning>& warnings);
+
 PnpTranslationResult translate(const DynamicPrintConfig& full_config);
 
 } // namespace PnpConfigTranslator

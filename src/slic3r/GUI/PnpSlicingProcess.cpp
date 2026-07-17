@@ -231,6 +231,16 @@ bool PnpSlicingProcess::start()
 
 		const DynamicPrintConfig &full_config = m_print->full_print_config();
 		PnpTranslationResult      translated  = PnpConfigTranslator::translate(full_config);
+		// Schema guard: drop any key the pnp config-schema would reject so a
+		// translation gap degrades to a logged warning + pnp default instead
+		// of a fatal `config resolution failed` slice error.
+		if (const std::string &schema = PnpBackend::get().schema_json(); !schema.empty()) {
+			try {
+				PnpConfigTranslator::apply_schema_guard(translated.json, nlohmann::json::parse(schema), translated.warnings);
+			} catch (const std::exception &ex) {
+				BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": schema guard skipped: " << ex.what();
+			}
+		}
 		// F03: dev-instrument sink for unmapped/lossy keys.
 		log_pnp_config_warnings(full_config, std::move(translated.warnings), job.plate_idx);
 		try {

@@ -49,6 +49,7 @@ bool PnpBackend::probe()
     m_available      = false;
     m_schema_version.clear();
     m_failure_reason.clear();
+    m_schema_json.clear();
 
     if (resolve_paths() && run_probe())
         m_available = true;
@@ -139,6 +140,8 @@ bool PnpBackend::run_probe()
     try {
         nlohmann::json j = nlohmann::json::parse(output);
         m_schema_version = j.at("schema_version").get<std::string>();
+        // Retain the full document for the translator's schema guard.
+        m_schema_json = std::move(output);
     } catch (const std::exception &) {
         m_failure_reason = Slic3r::format(_u8L("Could not parse the config schema reported by %1%."), m_cli_path.string());
         return false;
