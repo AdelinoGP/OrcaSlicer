@@ -119,7 +119,7 @@ A driving session may still split F12/F13's internal steps across sequential sub
 Tick when a ticket's commit lands; batch line when smoke-verified.
 
 - [x] B1: F01 · F02 · F03 — batch verified (ALL_BUILD RelWithDebInfo clean, app launch OK, 2026-07-17)
-- [ ] B2: F04 · F05 · F06 — batch verified
+- [x] B2: F04 · F05 · F06 — batch verified (ALL_BUILD RelWithDebInfo clean, app launch OK, pnp_cli slice of regression_wedge.stl -> gcode + instrumented JSONL stream replayed through PnpProgressParser monotonic 0->99; GUI progress-bar/warnings-jsonl smoke steps need the F09 Plater swap and roll into B3's smoke, 2026-07-17. NOTE: pnp_cli emits JSONL events only with --instrument-stderr — F04 passes it)
 - [ ] B3: F07 · F08 · F09 — batch verified
 - [ ] B4: F10 — **M1 smoke + gating (items 10, 2)**
 - [ ] B5: F11 — batch verified
