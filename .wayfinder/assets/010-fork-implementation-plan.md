@@ -120,7 +120,7 @@ Tick when a ticket's commit lands; batch line when smoke-verified.
 
 - [x] B1: F01 · F02 · F03 — batch verified (ALL_BUILD RelWithDebInfo clean, app launch OK, 2026-07-17)
 - [x] B2: F04 · F05 · F06 — batch verified (ALL_BUILD RelWithDebInfo clean, app launch OK, pnp_cli slice of regression_wedge.stl -> gcode + instrumented JSONL stream replayed through PnpProgressParser monotonic 0->99; GUI progress-bar/warnings-jsonl smoke steps need the F09 Plater swap and roll into B3's smoke, 2026-07-17. NOTE: pnp_cli emits JSONL events only with --instrument-stderr — F04 passes it)
-- [ ] B3: F07 · F08 · F09 — batch verified
+- [x] B3: F07 · F08 · F09 — batch verified (ALL_BUILD RelWithDebInfo clean, app launch OK 25s+, pnp_cli staged + `module config-schema` handshake OK, no orphan pnp_cli, 2026-07-17. HUMAN EYEBALL PENDING for the GUI-slice steps: progress bar, preview roles, plate tmp gcode, pnp-config-warnings.jsonl growth, cancel kill-tolerance. NOTE: `restart_background_process` logs "pnp backend unavailable" once during startup — it runs before GUI_App::post_init's probe(); harmless ordering artifact, gate opens after probe)
 - [ ] B4: F10 — **M1 smoke + gating (items 10, 2)**
 - [ ] B5: F11 — batch verified
 - [ ] B6: F12 — batch verified

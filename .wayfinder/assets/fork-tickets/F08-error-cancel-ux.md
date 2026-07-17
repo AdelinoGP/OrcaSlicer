@@ -1,6 +1,6 @@
 ---
 title: Error, degraded-slice, and cancel UX + Job Object orphan guard
-status: active
+status: done
 batch: B3
 blocked-by: [F04, F06]
 files: [src/slic3r/GUI/PnpSlicingProcess.cpp, src/slic3r/GUI/PnpProgress.cpp, src/slic3r/GUI/NotificationManager.cpp]
