@@ -1,6 +1,6 @@
 ---
 title: Preview ingestion of PNP G-code
-status: open
+status: active
 batch: B3
 blocked-by: [F04]
 files: [src/slic3r/GUI/PnpSlicingProcess.cpp, src/libslic3r/GCode/GCodeProcessor.cpp]

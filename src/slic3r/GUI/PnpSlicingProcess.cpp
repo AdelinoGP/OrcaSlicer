@@ -52,6 +52,32 @@ void append_capped_tail(std::string &tail, const std::string &line, size_t cap =
 		tail.erase(0, tail.size() - cap);
 }
 
+// F07: parse the pnp-emitted G-code into a GCodeProcessorResult on the worker
+// thread. This mirrors Plater::load_gcode's ingestion (the proven path for
+// externally produced G-code): everything — config, roles, layers, time and
+// filament estimates — arrives via the file's CONFIG_BLOCK, parsed by
+// GCodeProcessor's EProducer::OrcaSlicer pre-pass. Do NOT hand the processor
+// the in-memory preset: the pre-pass discards pre-applied config anyway.
+// process_file() ends with finalize(false), so Orca post-processing / M73
+// injection never runs here (pnp emits M73 itself).
+void ingest_pnp_gcode(GCodeProcessorResult &dst, const std::string &gcode_path, const std::atomic<bool> &canceled)
+{
+	GCodeProcessor processor;
+	// Benign defaults for filament maps / nozzle types when there is no live
+	// Print context, exactly as the standalone G-code viewer path does.
+	processor.init_filament_maps_and_nozzle_type_when_import_only_gcode();
+	// MUST be off for pnp output (defaults to true): pnp emits no
+	// `printer_model`, so the pre-pass never overwrites the flag, and with the
+	// BBL tag table active the (non-BBL) feature tags would not parse and the
+	// preview legend would collapse.
+	GCodeProcessor::s_IsBBLPrinter = false;
+	processor.process_file(gcode_path, [&canceled]() {
+		if (canceled)
+			throw CanceledException();
+	});
+	dst = std::move(processor.extract_result());
+}
+
 } // anonymous namespace
 
 PnpSlicingProcess::~PnpSlicingProcess()
@@ -273,11 +299,15 @@ void PnpSlicingProcess::worker_main(SliceJob job)
 		}
 
 		if (!m_canceled) {
-			// SEAM (ticket F07 / B3): fill the plate's GCodeProcessorResult here
-			// by parsing job.output_path (Plater::load_gcode ->
-			// GCodeProcessor::process_file is the proven ingredient). Until F07
-			// lands, completion is posted with the gcode at
-			// PartPlate::get_tmp_gcode_path() only.
+			// F07: fill the plate's GCodeProcessorResult from the pnp-emitted
+			// G-code before posting any completion events, so GUI_Preview /
+			// GLCanvas3D find toolpaths when they reload. On the reuse path the
+			// result is re-ingested only if it is empty (e.g. after apply()
+			// reset it or an app restart); otherwise the existing result stands.
+			const bool need_ingest = m_gcode_result != nullptr
+			                      && (!job.reuse || m_gcode_result->moves.empty());
+			if (need_ingest)
+				ingest_pnp_gcode(*m_gcode_result, job.output_path, m_canceled);
 
 			// Let the G-code viewer know slicing proper is done (same event BSP
 			// posts before its G-code export phase; the int payload is unused by
