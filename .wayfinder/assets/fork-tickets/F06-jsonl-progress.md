@@ -1,6 +1,6 @@
 ---
 title: JSONL progress parser + phase-weighted percent
-status: open
+status: done
 batch: B2
 blocked-by: []
 files: [src/slic3r/GUI/PnpProgress.hpp, src/slic3r/GUI/PnpProgress.cpp, src/slic3r/GUI/CMakeLists.txt]

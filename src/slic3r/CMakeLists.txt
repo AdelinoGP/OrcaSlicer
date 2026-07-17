@@ -390,6 +390,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/PnpConfigWarningsLog.hpp
     GUI/PnpModelExport.cpp
     GUI/PnpModelExport.hpp
+    GUI/PnpProgress.cpp
+    GUI/PnpProgress.hpp
     GUI/Preferences.cpp
     GUI/Preferences.hpp
     GUI/PresetBundleDialog.cpp
