@@ -1,6 +1,6 @@
 ---
 title: Config-warnings sink — Tier-D default filter + jsonl writer
-status: open
+status: done
 batch: B1
 blocked-by: []
 files: [src/slic3r/GUI/PnpConfigWarningsLog.hpp, src/slic3r/GUI/PnpConfigWarningsLog.cpp, src/slic3r/GUI/CMakeLists.txt]

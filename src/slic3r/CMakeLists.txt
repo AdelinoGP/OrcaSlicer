@@ -386,6 +386,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/PnpConfigTranslator.cpp
     GUI/PnpConfigTranslator.hpp
     GUI/PnpConfigWarning.hpp
+    GUI/PnpConfigWarningsLog.cpp
+    GUI/PnpConfigWarningsLog.hpp
     GUI/Preferences.cpp
     GUI/Preferences.hpp
     GUI/PresetBundleDialog.cpp
