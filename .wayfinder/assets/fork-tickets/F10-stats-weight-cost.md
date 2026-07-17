@@ -1,6 +1,6 @@
 ---
 title: Stats — weight from slice_stats, fork-side cost, legend zero-guards
-status: open
+status: done
 batch: B4
 blocked-by: [F06, F07, F09]
 files: [src/slic3r/GUI/PnpSlicingProcess.cpp, src/slic3r/GUI/GCodeViewer.cpp, src/libslic3r/Print.hpp]

@@ -161,6 +161,11 @@ private:
 	// Launch pnp_cli and pump its stderr; throws SlicingError on any failure,
 	// returns silently when the child was terminated by a cancel.
 	void run_pnp_cli(const SliceJob &job);
+	// F10: parse the pnp `slice_stats` JSONL event (captured verbatim by the
+	// progress parser) into m_fff_print->print_statistics() and compute cost
+	// fork-side from the Orca preset. When the event is absent all fields stay
+	// 0 and the legend's zero-guards hide the weight/cost rows.
+	void apply_slice_stats();
 	// Copy the temp G-code to m_export_path (throws ExportError on failure).
 	void finalize_export();
 	// Enqueue the scheduled print-host upload job.
@@ -180,6 +185,9 @@ private:
 
 	// Temporary G-code produced by pnp_cli (= plate's tmp gcode path).
 	std::string                 m_temp_output_path;
+	// F10: raw JSON of the pnp `slice_stats` event from the last run_pnp_cli()
+	// (empty when pnp did not emit one). Written and read on the worker thread.
+	std::string                 m_slice_stats_json;
 	// Output path provided by the user; once set it cannot be re-set.
 	std::string                 m_export_path;
 	bool                        m_export_path_on_removable_media = false;

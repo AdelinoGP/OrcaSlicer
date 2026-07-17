@@ -2807,13 +2807,17 @@ void GCodeViewer::render_all_plates_stats(const std::vector<const GCodeProcessor
         ImGui::SameLine();
         imgui.text(short_time(get_time_dhms(total_time_all_plates)));
 
-        ImGui::Dummy({ window_padding, window_padding });
-        ImGui::SameLine();
-        imgui.text(_u8L("Total cost") + ":");
-        ImGui::SameLine();
-        char buf[64];
-        ::sprintf(buf, "%.2f", total_cost_all_plates);
-        imgui.text(buf);
+        // PNP fork (F10): per-plate Print::PrintStatistics carries cost only
+        // once pnp's slice_stats lands; hide the row at 0, never "0.00".
+        if (total_cost_all_plates > 0.0f) {
+            ImGui::Dummy({ window_padding, window_padding });
+            ImGui::SameLine();
+            imgui.text(_u8L("Total cost") + ":");
+            ImGui::SameLine();
+            char buf[64];
+            ::sprintf(buf, "%.2f", total_cost_all_plates);
+            imgui.text(buf);
+        }
     }
     ImGui::End();
     ImGui::PopStyleColor(6);
@@ -3748,9 +3752,15 @@ void GCodeViewer::render_legend(float &legend_height, int canvas_width, int canv
     {
         std::vector<std::string> total_filaments;
         char buffer[64];
-        const std::string total_weight_text = format_compact_weight(ps.total_weight, imperial_units);
-        ::sprintf(buffer, imperial_units ? "%.2f in\n%s" : "%.2f m\n%s", ps.total_used_filament / /*1000*/koef, total_weight_text.c_str());
-        total_filaments.push_back(buffer);
+        // PNP fork (F10): ps.* is filled from pnp's slice_stats event; hide the
+        // totals instead of rendering "0.00 m / 0.00 g" when it is absent.
+        if (ps.total_weight != 0.0) {
+            const std::string total_weight_text = format_compact_weight(ps.total_weight, imperial_units);
+            ::sprintf(buffer, imperial_units ? "%.2f in\n%s" : "%.2f m\n%s", ps.total_used_filament / /*1000*/koef, total_weight_text.c_str());
+            total_filaments.push_back(buffer);
+        }
+        else
+            total_filaments.push_back("");
 
 
         std::vector<std::pair<std::string, std::vector<::string>>> title_columns;
@@ -4010,19 +4020,23 @@ void GCodeViewer::render_legend(float &legend_height, int canvas_width, int canv
     case libvgcode::EViewType::Summary:
     {
         char buf[64];
-        imgui.text(_u8L("Total") + ":");
-        ImGui::SameLine();
-        const std::string total_weight_text = format_compact_weight(ps.total_weight, imperial_units);
-        ::sprintf(buf, imperial_units ? "%.2f in / %s" : "%.2f m / %s", ps.total_used_filament / koef, total_weight_text.c_str());
-        imgui.text(buf);
-
-        ImGui::Dummy({window_padding, window_padding});
-        ImGui::SameLine();
-        imgui.text(_u8L("Cost") + ":");
-        ImGui::SameLine();
-        ::sprintf(buf, "%.2f", ps.total_cost);
-        imgui.text(buf);
-
+        // PNP fork (F10): hide the weight/cost rows when unfilled (no
+        // slice_stats event yet / foreign G-code), same pattern as the time rows.
+        if (ps.total_weight != 0.0) {
+            imgui.text(_u8L("Total") + ":");
+            ImGui::SameLine();
+            const std::string total_weight_text = format_compact_weight(ps.total_weight, imperial_units);
+            ::sprintf(buf, imperial_units ? "%.2f in / %s" : "%.2f m / %s", ps.total_used_filament / koef, total_weight_text.c_str());
+            imgui.text(buf);
+        }
+        if (ps.total_cost > 0.0) {
+            ImGui::Dummy({window_padding, window_padding});
+            ImGui::SameLine();
+            imgui.text(_u8L("Cost") + ":");
+            ImGui::SameLine();
+            ::sprintf(buf, "%.2f", ps.total_cost);
+            imgui.text(buf);
+        }
         ImGui::Dummy({window_padding, window_padding});
         ImGui::SameLine();
         imgui.text(_u8L("Total time") + ":");
@@ -4163,12 +4177,15 @@ void GCodeViewer::render_legend(float &legend_height, int canvas_width, int canv
         imgui.text(format_compact_count(m_print_statistics.total_extruder_changes));
 
         //BBS display cost
-        ImGui::Dummy({ window_padding, window_padding });
-        ImGui::SameLine();
-        imgui.text(_u8L("Cost")+":");
-        ImGui::SameLine();
-        ::sprintf(buf, "%.2f", ps.total_cost);
-        imgui.text(buf);
+        // PNP fork (F10): hidden until pnp's slice_stats fills the statistics.
+        if (ps.total_cost > 0.0) {
+            ImGui::Dummy({ window_padding, window_padding });
+            ImGui::SameLine();
+            imgui.text(_u8L("Cost")+":");
+            ImGui::SameLine();
+            ::sprintf(buf, "%.2f", ps.total_cost);
+            imgui.text(buf);
+        }
 
         break;
     }
@@ -4601,35 +4618,42 @@ void GCodeViewer::render_legend(float &legend_height, int canvas_width, int canv
                 (std::max(ImGui::CalcTextSize(prepare_str.c_str()).x, ImGui::CalcTextSize(total_str.c_str()).x)));
     }
     if (m_viewer.get_view_type() == libvgcode::EViewType::FeatureType) {
-        //BBS display filament cost
-        ImGui::Dummy({ window_padding, window_padding });
-        ImGui::SameLine();
-        imgui.text(total_filament_str + ":");
-        ImGui::SameLine(max_len);
         //BBS: use current plater's print statistics
         bool imperial_units = wxGetApp().app_config->get("use_inches") == "1";
         char buf[64];
-        ::sprintf(buf, imperial_units ? "%.2f in" : "%.2f m", ps.total_used_filament / koef);
-        imgui.text(buf);
-        ImGui::SameLine();
-        imgui.text("  " + format_compact_weight(ps.total_weight, imperial_units));
-        ImGui::Dummy({ window_padding, window_padding });
-        ImGui::SameLine();
-        imgui.text(model_filament_str + ":");
-        ImGui::SameLine(max_len);
-        auto exlude_m = total_support_used_filament_m + total_flushed_filament_m + total_wipe_tower_used_filament_m;
-        auto exlude_g = total_support_used_filament_g + total_flushed_filament_g + total_wipe_tower_used_filament_g;
-        ::sprintf(buf, imperial_units ? "%.2f in" : "%.2f m", ps.total_used_filament / koef - exlude_m);
-        imgui.text(buf);
-        ImGui::SameLine();
-        imgui.text("  " + format_compact_weight(ps.total_weight - exlude_g, imperial_units));
-        //BBS: display cost of filaments
-        ImGui::Dummy({ window_padding, window_padding });
-        ImGui::SameLine();
-        imgui.text(cost_str + ":");
-        ImGui::SameLine(max_len);
-        ::sprintf(buf, "%.2f", ps.total_cost);
-        imgui.text(buf);
+        // PNP fork (F10): the filament/cost rows read Print::PrintStatistics,
+        // filled only when pnp emits a slice_stats event; hide them (like the
+        // zero-time rows) instead of rendering "0.00 m / 0.00 g".
+        if (ps.total_weight != 0.0) {
+            //BBS display filament cost
+            ImGui::Dummy({ window_padding, window_padding });
+            ImGui::SameLine();
+            imgui.text(total_filament_str + ":");
+            ImGui::SameLine(max_len);
+            ::sprintf(buf, imperial_units ? "%.2f in" : "%.2f m", ps.total_used_filament / koef);
+            imgui.text(buf);
+            ImGui::SameLine();
+            imgui.text("  " + format_compact_weight(ps.total_weight, imperial_units));
+            ImGui::Dummy({ window_padding, window_padding });
+            ImGui::SameLine();
+            imgui.text(model_filament_str + ":");
+            ImGui::SameLine(max_len);
+            auto exlude_m = total_support_used_filament_m + total_flushed_filament_m + total_wipe_tower_used_filament_m;
+            auto exlude_g = total_support_used_filament_g + total_flushed_filament_g + total_wipe_tower_used_filament_g;
+            ::sprintf(buf, imperial_units ? "%.2f in" : "%.2f m", ps.total_used_filament / koef - exlude_m);
+            imgui.text(buf);
+            ImGui::SameLine();
+            imgui.text("  " + format_compact_weight(ps.total_weight - exlude_g, imperial_units));
+        }
+        if (ps.total_cost > 0.0) {
+            //BBS: display cost of filaments
+            ImGui::Dummy({ window_padding, window_padding });
+            ImGui::SameLine();
+            imgui.text(cost_str + ":");
+            ImGui::SameLine(max_len);
+            ::sprintf(buf, "%.2f", ps.total_cost);
+            imgui.text(buf);
+        }
     }
     //BBS: start gcode is mostly same with prepeare time
     if (time_mode.prepare_time != 0.0f) {

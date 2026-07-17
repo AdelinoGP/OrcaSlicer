@@ -28,11 +28,13 @@
 #include <algorithm>
 #include <cassert>
 #include <exception>
+#include <map>
 #include <string>
 #include <vector>
 
 #include <boost/filesystem.hpp>
 #include <boost/format.hpp>
+#include <nlohmann/json.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/nowide/fstream.hpp>
 #include <boost/process.hpp>
@@ -350,6 +352,13 @@ void PnpSlicingProcess::worker_main(SliceJob job)
 			if (need_ingest)
 				ingest_pnp_gcode(*m_gcode_result, job.output_path, m_canceled);
 
+			// F10: route the pnp slice_stats event (when emitted) into
+			// Print::PrintStatistics and compute cost fork-side, so the preview
+			// legend and the send/upload placeholders see real weight/cost. On
+			// the reuse path the previous slice's statistics stand.
+			if (!job.reuse)
+				this->apply_slice_stats();
+
 			// Preview gate: GUI_Preview::load_print_as_fff renders toolpaths
 			// only when psGCodeExport is done (the "directly preview" path used
 			// for loaded .gcode.3mf files) — otherwise it bails before reading
@@ -433,6 +442,7 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 	                        << " --output " << job.output_path
 	                        << " --instrument-stderr";
 
+	m_slice_stats_json.clear();
 	PnpProgressParser parser(job.estimated_layer_count);
 	parser.set_update_callback([this](int percent, const std::string &text) {
 		if (m_canceled)
@@ -519,6 +529,10 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 		throw Slic3r::SlicingError(
 			Slic3r::format(_u8L("The PNP slicer reported success but produced no G-code at %1%."), job.output_path));
 
+	// F10: keep the raw slice_stats event (empty until pnp ships it) for
+	// worker_main's apply_slice_stats().
+	m_slice_stats_json = parser.slice_stats_json();
+
 	// F08: degraded slice — one aggregated warning notification on completion,
 	// no per-event toasts. Full per-warning detail goes to the log.
 	if (!parser.warnings().empty()) {
@@ -545,6 +559,93 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 					NotificationManager::NotificationLevel::WarningNotificationLevel, text);
 		});
 	}
+}
+
+// F10: fill Print::PrintStatistics from the pnp `slice_stats` event (schema
+// 1.2.0 reserved fields: gcode_prediction_seconds, gcode_weight_grams,
+// gcode_filament_length_mm, extruded_volume_mm3 map, toolchange_count) and
+// compute cost fork-side, mirroring upstream update_print_estimated_stats
+// (`GCode.cpp`): per-filament weight = volume * density / 1000, cost =
+// weight * filament_cost / 1000 (money per kg) + time_cost (money per hour)
+// over the estimated print time. pnp never emits cost (design invariant).
+// Every field is optional; anything missing stays 0 and the legend's
+// zero-guards hide the corresponding rows.
+void PnpSlicingProcess::apply_slice_stats()
+{
+	if (m_fff_print == nullptr)
+		return;
+	PrintStatistics &stats = m_fff_print->print_statistics();
+	stats.clear();
+	if (m_slice_stats_json.empty())
+		return;
+
+	nlohmann::json j = nlohmann::json::parse(m_slice_stats_json, /* callback */ nullptr, /* allow_exceptions */ false);
+	if (j.is_discarded() || !j.is_object())
+		return;
+	auto get_num = [&j](const char *key, double def = 0.) -> double {
+		auto it = j.find(key);
+		return (it != j.end() && it->is_number()) ? it->get<double>() : def;
+	};
+
+	const PrintConfig &config = m_fff_print->config();
+	auto opt_at = [](const ConfigOptionFloats &opt, size_t i) -> double {
+		return opt.values.empty() ? 0. : opt.values[std::min(i, opt.values.size() - 1)];
+	};
+
+	// Per-extruder extruded volumes (mm3), keyed by extruder index.
+	std::map<size_t, double> volumes;
+	if (auto it = j.find("extruded_volume_mm3"); it != j.end() && it->is_object()) {
+		for (const auto &el : it->items()) {
+			if (!el.value().is_number())
+				continue;
+			try {
+				volumes[std::stoul(el.key())] = el.value().get<double>();
+			} catch (const std::exception &) {
+				// non-numeric key: skip, tolerate any shape
+			}
+		}
+	}
+
+	double total_volume        = 0.; // mm3
+	double weight_from_volumes = 0.; // g
+	double length_from_volumes = 0.; // mm of filament
+	double filament_cost_total = 0.; // money
+	for (const auto &[extruder_id, volume] : volumes) {
+		total_volume += volume;
+		const double weight = volume * opt_at(config.filament_density, extruder_id) * 0.001;
+		weight_from_volumes += weight;
+		filament_cost_total += weight * opt_at(config.filament_cost, extruder_id) * 0.001;
+		const double section = PI * sqr(0.5 * opt_at(config.filament_diameter, extruder_id));
+		if (section > 0.)
+			length_from_volumes += volume / section;
+	}
+
+	const double total_weight = get_num("gcode_weight_grams", weight_from_volumes);
+	double       total_cost   = filament_cost_total;
+	if (volumes.empty() && total_weight > 0.)
+		// No per-extruder breakdown: price the whole weight at the first filament's rate.
+		total_cost = total_weight * opt_at(config.filament_cost, 0) * 0.001;
+
+	// Machine time cost (money per hour) over the estimated print time; prefer
+	// the ingested G-code estimate (what the legend's time rows show), fall
+	// back to pnp's own prediction.
+	double print_time_s = m_gcode_result != nullptr
+		? double(m_gcode_result->print_statistics.modes[static_cast<size_t>(PrintEstimatedStatistics::ETimeMode::Normal)].time)
+		: 0.;
+	if (print_time_s <= 0.)
+		print_time_s = get_num("gcode_prediction_seconds");
+	total_cost += config.time_cost.getFloat() * (print_time_s / 3600.0);
+	if (total_weight <= 0. && filament_cost_total <= 0.)
+		// Without any filament data the time-only cost would render alone; keep
+		// the row hidden until pnp ships usable stats.
+		total_cost = 0.;
+
+	stats.total_weight          = total_weight;
+	stats.total_cost            = total_cost;
+	stats.total_extruded_volume = total_volume;
+	stats.total_used_filament   = get_num("gcode_filament_length_mm", length_from_volumes);
+	stats.total_toolchanges     = int(get_num("toolchange_count", 0.));
+	stats.filament_stats        = std::move(volumes);
 }
 
 // Copy the temporary G-code to the user-selected export location.
