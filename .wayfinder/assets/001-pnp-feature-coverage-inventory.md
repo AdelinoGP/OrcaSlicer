@@ -27,7 +27,7 @@ Live combined schema: **159 fields across 20 modules** (manifests declare 179 `[
 | Multi-material / multi-extruder | ⚠️ Plumbing exists (wipe tower, `T<n>` tool changes, per-region extruder via 3MF modifier config, filament colour arrays) but **not proven end-to-end on real fixtures** (TASK-210/211/212 open) |
 | Per-object / modifier-mesh settings | ✅ `ModifierVolume` + 3MF `model_settings.config` sidecar (negative parts, support enforcer/blocker, per-object config deltas) |
 | Skirt / brim | ✅ (`skirt_loops`, `skirt_distance`, `brim_width`) |
-| Raft | ❌ No standalone raft-under-part. Only `support_raft_layers` (support-planner, default 0) exists |
+| Raft | ⚠️ **Corrected by ticket 012 (2026-07-17)** — not "❌". No *implemented* standalone raft-under-part (only `support_raft_layers`, support-planner, default 0), but it is **specced**: ADR-0009 (*Proposed*) + `docs/specs/raft-default-module.md` (design sketch, output carrier still open), pending `support-modules-orca-port.md` §C6. This row was derived from the live config-schema probe, which sees implemented modules only and cannot see the spec backlog |
 | Seam control | ✅ `seam_position` = nearest/rear/random; ⚠️ live-path gaps flagged (TASK-120c) |
 | Input formats | STL, OBJ, 3MF. 3MF: transforms + nested components composed; sidecar per-part config read; **non-uniform scale rejected**; **multi-plate 3MF not supported** (single `<build>` only) |
 | Thumbnail | ⚠️ External PNG in via `--thumbnail`, emitted as Orca-compatible THUMBNAIL_BLOCK. **PNP does not render thumbnails** — the GUI must produce the PNG |
@@ -50,7 +50,7 @@ JSONL on stderr (`docs/09_progress_events.md`). 1.0.0: phase_start/phase_complet
 ## PNP-side handoff items (for pinch_n_print spec-packet workflow)
 
 1. **Print-time estimation** — `estimated_print_time_s` hardcoded 0; Orca preview shows time estimates per feature/layer. Needs a kinematics-based estimator and/or the reserved `slice_stats` event implemented.
-2. **Raft** — no standalone raft; Orca UI exposes it. Either implement or the fork hides the raft controls.
+2. **Raft** — no *implemented* standalone raft; Orca UI exposes it. ~~Either implement or the fork hides the raft controls.~~ **Amended by ticket 012 (2026-07-17):** already specced pnp-side (ADR-0009 *Proposed* + `raft-default-module.md` sketch); the fork does **not** hide the controls, so this must land. See the [handoff asset](handoff-pnp-gap-implementation.md) item 3.
 3. **Multi-material E2E proof** — TASK-210 (support filament routing), TASK-211 (real-fixture T0/T1 E2E), TASK-212 (per-object printer-key allowlist) must close before the fork exposes multi-extruder UI.
 4. **G-code flavor selection** — Marlin only; fork must restrict printer profiles or PNP grows flavor support.
 5. **Multi-plate 3MF** — PNP reads a single `<build>`; fine if the GUI slices per plate (map already locks per-plate loop), but PNP must accept whatever per-plate file the GUI writes (see ticket 004).
@@ -61,3 +61,5 @@ JSONL on stderr (`docs/09_progress_events.md`). 1.0.0: phase_start/phase_complet
 ## Verdict for the fork
 
 PNP covers the core single-material FFF slice surface Orca's v1 scope needs (walls incl. Arachne, 3 infills, top/bottom shells, bridges, supports incl. tree, skirt/brim, seam, ironing, fuzzy skin, cooling, spiral vase) and its G-code is deliberately Orca-viewer-compatible (`;TYPE:`, LAYER_CHANGE, CONFIG_BLOCK, THUMBNAIL_BLOCK). The hard gaps for the fork UI are: no time estimates, no raft, Marlin-only, unproven multi-material, no slicer-side thumbnail rendering, no multi-plate 3MF ingestion.
+
+**Amended by ticket 012 (2026-07-17):** none of these become UI restrictions. The fork ships zero UI-surface restrictions and no capability gate, because pnp gaps are scheduled to close in step with the fork's roadmap (map Notes). Read every "the fork may hide X" hedge in this asset as withdrawn — the gaps above are **scheduled prerequisites** on the pnp side, tracked in the [handoff asset](handoff-pnp-gap-implementation.md).

@@ -16,7 +16,9 @@ What file does the GUI hand `pnp_cli` per plate — 3MF or per-plate STL (or som
 
 **Coordinates: plate-local origin.** Plate contents are translated so the plate origin is (0,0) in the exported 3MF; PNP sees a normal single-bed scene. PNP's single-`<build>` limitation is a non-issue under the per-plate loop — handoff item 7 (multi-plate 3MF) is confirmed won't-fix.
 
-**Non-uniform scale: PNP-side handoff item.** The GUI does NOT bake scale. Until PNP's `slicer-model-io` lifts `NonUniformScaleUnsupported` (handoff item 6, now confirmed PNP-side), the GUI blocks slicing with a clear error when any instance on the plate carries non-uniform scale.
+**Non-uniform scale: PNP-side handoff item.** The GUI does NOT bake scale. ~~Until PNP's `slicer-model-io` lifts `NonUniformScaleUnsupported` (handoff item 6, now confirmed PNP-side), the GUI blocks slicing with a clear error when any instance on the plate carries non-uniform scale.~~
+
+> **SUPERSEDED by [ticket 012](012-v1-ui-surface-restrictions.md) (2026-07-17).** The GUI implements **no non-uniform-scale check at all** — not in the UI, not at slice time. PNP lifts `NonUniformScaleUnsupported` (handoff item 6) before the fork is user-visible, so the restriction is a scheduled prerequisite rather than something the GUI defends against. The rest of this resolution stands: the GUI still does not bake scale.
 
 **Per-object/per-volume config deltas: passed through raw, Orca key names.** The GUI writes the sidecar untouched; the handoff item is for PNP to accept Orca per-object key names (parser-side parity/translation). Until it lands, PNP silently ignores unknown per-object keys — accepted v1 behavior (no GUI-side stripping, no per-object warning UX).
 
