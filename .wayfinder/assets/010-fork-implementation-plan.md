@@ -118,7 +118,7 @@ A driving session may still split F12/F13's internal steps across sequential sub
 
 Tick when a ticket's commit lands; batch line when smoke-verified.
 
-- [ ] B1: F01 · F02 · F03 — batch verified
+- [x] B1: F01 · F02 · F03 — batch verified (ALL_BUILD RelWithDebInfo clean, app launch OK, 2026-07-17)
 - [ ] B2: F04 · F05 · F06 — batch verified
 - [ ] B3: F07 · F08 · F09 — batch verified
 - [ ] B4: F10 — **M1 smoke + gating (items 10, 2)**
