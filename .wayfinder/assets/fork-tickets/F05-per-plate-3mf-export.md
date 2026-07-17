@@ -1,6 +1,6 @@
 ---
 title: Per-plate 3MF export + raw per-object sidecar
-status: open
+status: done
 batch: B2
 blocked-by: []
 files: [src/slic3r/GUI/PnpModelExport.hpp, src/slic3r/GUI/PnpModelExport.cpp, src/slic3r/GUI/CMakeLists.txt]
