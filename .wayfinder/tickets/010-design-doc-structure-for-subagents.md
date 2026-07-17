@@ -3,7 +3,7 @@ title: Design-doc structure for subagent execution
 status: open
 type: grilling
 assignee:
-blocked-by: [003, 004, 005, 008, 011, 012]
+blocked-by: [003, 004, 005, 008, 011, 012, 013]
 ---
 
 ## Question

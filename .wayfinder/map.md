@@ -26,10 +26,10 @@ A handoff-ready design doc — optimized for subagent execution — for converti
 <!-- one line per closed ticket: [title](tickets/NNN-slug.md) — gist -->
 
 - [PNP feature-coverage inventory](tickets/001-pnp-feature-coverage-inventory.md) — PNP covers the core single-material FFF slice surface with Orca-viewer-compatible G-code; hard gaps: no time estimates, no raft, Marlin-only flavor, unproven multi-material, GUI must render thumbnails, no multi-plate 3MF, non-uniform scale rejected. Full matrix + 8 pnp handoff items in [the inventory asset](assets/001-pnp-feature-coverage-inventory.md).
+- [Preset→PNP config translation spec](tickets/005-preset-to-pnp-config-translation.md) — flat-key PNP JSON; of Orca's 925 keys, 65 map identically, ~30 via a verified rename/transform table, ~830 stay unsent with classified warnings; mechanism = one static table in a new `PnpConfigTranslator` GUI translation unit. Full four-tier table in [the mapping asset](assets/005-preset-to-pnp-config-mapping.md).
 
 ## Not yet specified
 
-- UI for per-key config warnings (sharpens after the preset→config translation ticket).
 - Performance/latency expectations vs. in-process slicing; whether incremental re-slice matters.
 - Branding/naming of the fork; relationship messaging vs. pnp_studio.
 
