@@ -381,6 +381,9 @@ set(SLIC3R_GUI_SOURCES
     GUI/Plater.hpp
     GUI/PlateSettingsDialog.cpp
     GUI/PlateSettingsDialog.hpp
+    GUI/PnpConfigTranslator.cpp
+    GUI/PnpConfigTranslator.hpp
+    GUI/PnpConfigWarning.hpp
     GUI/Preferences.cpp
     GUI/Preferences.hpp
     GUI/PresetBundleDialog.cpp

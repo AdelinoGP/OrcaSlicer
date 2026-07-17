@@ -1,6 +1,6 @@
 ---
 title: PnpConfigTranslator — preset → flat PNP JSON + warning vector
-status: open
+status: done
 batch: B1
 blocked-by: []
 files: [src/slic3r/GUI/PnpConfigTranslator.hpp, src/slic3r/GUI/PnpConfigTranslator.cpp, src/slic3r/GUI/CMakeLists.txt]
