@@ -17,6 +17,7 @@
 #include "libslic3r/AppConfig.hpp"
 #include "3DScene.hpp"
 #include "BackgroundSlicingProcess.hpp"
+#include "PnpSlicingProcess.hpp"
 #include "GLShader.hpp"
 #include "GUI.hpp"
 #include "Tab.hpp"
@@ -10839,7 +10840,8 @@ const Print* GLCanvas3D::fff_print() const
 
 const SLAPrint* GLCanvas3D::sla_print() const
 {
-    return (m_process == nullptr) ? nullptr : m_process->sla_print();
+    // PNP fork (F09): SLA short-circuit, removed in F12.
+    return nullptr;
 }
 
 void GLCanvas3D::WipeTowerInfo::apply_wipe_tower(Vec2d pos, double rot) const

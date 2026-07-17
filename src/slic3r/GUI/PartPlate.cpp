@@ -31,6 +31,7 @@
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "BackgroundSlicingProcess.hpp"
+#include "PnpSlicingProcess.hpp"
 #include "Widgets/Label.hpp"
 #include "2DBed.hpp"
 #include "3DBed.hpp"
@@ -3486,7 +3487,7 @@ void PartPlate::update_slice_result_valid_state(bool valid)
 }
 
 //update current slice context into backgroud slicing process
-void PartPlate::update_slice_context(BackgroundSlicingProcess & process)
+void PartPlate::update_slice_context(PnpSlicingProcess & process)
 {
 	auto statuscb = [this](const Slic3r::PrintBase::SlicingStatus& status) {
 		Slic3r::SlicingStatusEvent *event = new Slic3r::SlicingStatusEvent(EVT_SLICING_UPDATE, 0, status);
@@ -5984,7 +5985,7 @@ void PartPlateList::update_logo_texture_filename(const std::string &texture_file
 
 /*slice related functions*/
 //update current slice context into backgroud slicing process
-void PartPlateList::update_slice_context_to_current_plate(BackgroundSlicingProcess& process)
+void PartPlateList::update_slice_context_to_current_plate(PnpSlicingProcess & process)
 {
 	PartPlate* current_plate;
 

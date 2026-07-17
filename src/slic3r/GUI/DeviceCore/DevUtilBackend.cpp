@@ -1,6 +1,6 @@
 #include "DevUtilBackend.h"
 
-#include "slic3r/GUI/BackgroundSlicingProcess.hpp"
+#include "slic3r/GUI/PnpSlicingProcess.hpp"
 
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/GUI_App.hpp"

@@ -71,6 +71,8 @@ class Plater;
 class GLCanvas3D;
 struct Camera;
 class PartPlateList;
+// PNP fork (F09): slice context now binds to the PnpSlicingProcess seam.
+class PnpSlicingProcess;
 
 using GCodeResult = GCodeProcessorResult;
 
@@ -495,7 +497,7 @@ public:
 
     /*slice related functions*/
     //update current slice context into backgroud slicing process
-    void update_slice_context(BackgroundSlicingProcess& process);
+    void update_slice_context(PnpSlicingProcess & process);
     //return the fff print object
     Print* fff_print() { return m_print; }
     //return the slice result
@@ -882,7 +884,7 @@ public:
     void               update_logo_texture_filename(const std::string &texture_filename);
     /*slice related functions*/
     //update current slice context into backgroud slicing process
-    void update_slice_context_to_current_plate(BackgroundSlicingProcess& process);
+    void update_slice_context_to_current_plate(PnpSlicingProcess & process);
     //return the current fff print object
     Print& get_current_fff_print() const;
     //return the slice result

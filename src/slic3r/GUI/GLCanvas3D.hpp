@@ -57,6 +57,8 @@ namespace GUI {
 
 class Bed3D;
 class PartPlateList;
+// PNP fork (F09): canvas holds the PnpSlicingProcess (pnp_cli seam).
+class PnpSlicingProcess;
 
 #if ENABLE_RETINA_GL
 class RetinaHelper;
@@ -563,7 +565,7 @@ private:
     Selection m_selection;
     const DynamicPrintConfig* m_config;
     Model* m_model;
-    BackgroundSlicingProcess *m_process;
+    PnpSlicingProcess *m_process;
     bool m_requires_check_outside_state{ false };
 
     std::array<unsigned int, 2> m_old_size{ 0, 0 };
@@ -812,7 +814,7 @@ public:
     void update_instance_printable_state_for_objects(const std::vector<size_t>& object_idxs);
 
     void set_config(const DynamicPrintConfig* config);
-    void set_process(BackgroundSlicingProcess* process) { m_process = process; }
+    void set_process(PnpSlicingProcess* process) { m_process = process; }
     void set_model(Model* model);
     const Model* get_model() const { return m_model; }
 

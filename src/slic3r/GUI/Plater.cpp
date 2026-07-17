@@ -106,6 +106,11 @@
 #include "Jobs/PlaterWorker.hpp"
 #include "Jobs/BoostThreadWorker.hpp"
 #include "BackgroundSlicingProcess.hpp"
+// PNP fork (F09): Plater slices through the pnp_cli subprocess seam.
+// BackgroundSlicingProcess.hpp stays included for its event classes
+// (SlicingStatusEvent, SlicingProcessCompletedEvent), which PnpSlicingProcess reuses.
+#include "PnpSlicingProcess.hpp"
+#include "PnpBackend.hpp"
 #include "SelectMachine.hpp"
 #include "SendMultiMachinePage.hpp"
 #include "SendToPrinter.hpp"
@@ -5243,7 +5248,8 @@ struct Plater::priv
 
     ProjectDirtyStateManager dirty_state;
 
-    BackgroundSlicingProcess    background_process;
+    // PNP fork (F09): swapped from BackgroundSlicingProcess to the pnp_cli seam.
+    PnpSlicingProcess           background_process;
     bool suppressed_backround_processing_update { false };
 
     // TODO: A mechanism would be useful for blocking the plater interactions:
@@ -9059,6 +9065,15 @@ bool Plater::priv::restart_background_process(unsigned int state)
         return false;
     }
 
+    // PNP fork (F09): slicing runs through the external pnp_cli backend; refuse to
+    // start when it was not discovered / is incompatible, and surface the reason.
+    if (!PnpBackend::get().available()) {
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << boost::format(", Line %1%: pnp backend unavailable: %2%")
+            % __LINE__ % PnpBackend::get().failure_reason();
+        PnpBackend::get().show_failure_notification();
+        return false;
+    }
+
     if ( ! this->background_process.empty() &&
          (state & priv::UPDATE_BACKGROUND_PROCESS_INVALID) == 0 &&
          ( ((state & UPDATE_BACKGROUND_PROCESS_FORCE_RESTART) != 0 && ! this->background_process.finished()) ||
@@ -10582,6 +10597,10 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
     BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(": event_type %1%, percent %2%, text %3%") % evt.GetEventType() % evt.status.percent % evt.status.text;
     //BBS: add slice project logic
     std::string title_text = _u8L("Slicing");
+    // PNP fork (F09): during "Slice all", show which plate of how many is being
+    // sliced, so the per-plate pnp_cli progress reads as "Slicing plate N/M ...".
+    if (m_slice_all && partplate_list.get_plate_count() > 1)
+        title_text += (boost::format(" %1% %2%/%3%") % _u8L("plate") % (m_cur_slice_plate + 1) % partplate_list.get_plate_count()).str();
     evt.status.text = title_text + evt.status.text;
     if (evt.status.percent >= 0) {
          if (!m_worker.is_idle()) {
@@ -10628,20 +10647,15 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
         ModelObject const * model_object = nullptr;
 
         //BBS: add partplate related logic, use the print in background process
+        // PNP fork (F09): SLA short-circuit, removed in F12 — PnpSlicingProcess has no
+        // SLA print; only the FFF branches survive.
         if (evt.status.flags & PrintBase::SlicingStatus::UPDATE_PRINT_STEP_WARNINGS) {
-            state = this->printer_technology == ptFFF ?
-                this->background_process.m_fff_print->step_state_with_warnings(static_cast<PrintStep>(warning_step)) :
-                this->background_process.m_sla_print->step_state_with_warnings(static_cast<SLAPrintStep>(warning_step));
+            if (this->printer_technology == ptFFF)
+                state = this->background_process.m_fff_print->step_state_with_warnings(static_cast<PrintStep>(warning_step));
         } else if (this->printer_technology == ptFFF) {
             const PrintObject *print_object = this->background_process.m_fff_print->get_object(object_id);
             if (print_object) {
                 state = print_object->step_state_with_warnings(static_cast<PrintObjectStep>(warning_step));
-                model_object = print_object->model_object();
-            }
-        } else {
-            const SLAPrintObject *print_object = this->background_process.m_sla_print->get_object(object_id);
-            if (print_object) {
-                state = print_object->step_state_with_warnings(static_cast<SLAPrintObjectStep>(warning_step));
                 model_object = print_object->model_object();
             }
         }
@@ -16968,6 +16982,11 @@ void Plater::reslice_SLA_hollowing(const ModelObject &object, bool postpone_erro
 
 void Plater::reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &object, bool postpone_error_messages)
 {
+    // PNP fork (F09): SLA short-circuit, removed in F12 — PnpSlicingProcess is
+    // FFF-only, so partial SLA reslicing is a no-op.
+    (void)step; (void)object; (void)postpone_error_messages;
+    return;
+#if 0
     //FIXME Don't reslice if export of G-code or sending to OctoPrint is running.
     // bitmask of UpdateBackgroundProcessReturnState
     unsigned int state = this->p->update_background_process(true, postpone_error_messages);
@@ -16990,6 +17009,7 @@ void Plater::reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &
     this->p->background_process.set_task(task);
     // and let the background processing start.
     this->p->restart_background_process(state | priv::UPDATE_BACKGROUND_PROCESS_FORCE_RESTART);
+#endif
 }
 void Plater::send_gcode_legacy(int plate_idx, Export3mfProgressFn proFn)
 {
@@ -18145,7 +18165,8 @@ void Plater::suppress_background_process(const bool stop_background_process)
 }
 
 // Expose the slicing process to the device GUI.
-BackgroundSlicingProcess& Plater::background_process() { return p->background_process; }
+// PNP fork (F09): type swapped from BackgroundSlicingProcess.
+PnpSlicingProcess& Plater::background_process() { return p->background_process; }
 
 void Plater::center_selection()             { p->center_selection(); }
 void Plater::drop_selection()               { p->drop_selection(); }

@@ -51,6 +51,8 @@ class SLAPrint;
 class PartPlateList;
 class SlicingStatusEvent;
 class BackgroundSlicingProcess;
+// PNP fork (F09): Plater now slices through PnpSlicingProcess (pnp_cli subprocess seam).
+namespace GUI { class PnpSlicingProcess; }
 enum SLAPrintObjectStep : unsigned int;
 enum class ConversionType : int;
 class DevAms;
@@ -528,7 +530,8 @@ public:
     void suppress_background_process(const bool stop_background_process) ;
     // Expose the slicing process so the device GUI can read the current
     // GCodeProcessorResult (e.g. the nozzle grouping for print-dispatch mapping).
-    BackgroundSlicingProcess& background_process();
+    // PNP fork (F09): type swapped from BackgroundSlicingProcess.
+    PnpSlicingProcess& background_process();
     /* -1: send current gcode if not specified
      * -2: send all gcode to target machine */
     int send_gcode(int plate_idx = -1, Export3mfProgressFn proFn = nullptr);

@@ -34,6 +34,8 @@ class GLToolbar;
 class Bed3D;
 struct Camera;
 class Plater;
+// PNP fork (F09): views hold the PnpSlicingProcess (pnp_cli seam).
+class PnpSlicingProcess;
 #ifdef _WIN32
 class BitmapComboBox;
 #endif
@@ -44,7 +46,7 @@ class View3D : public wxPanel
     GLCanvas3D* m_canvas;
 
 public:
-    View3D(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process);
+    View3D(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, PnpSlicingProcess* process);
     virtual ~View3D();
 
     wxGLCanvas* get_wxglcanvas() { return m_canvas_widget; }
@@ -81,7 +83,7 @@ public:
     void render();
 
 private:
-    bool init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process);
+    bool init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, PnpSlicingProcess* process);
 };
 
 class Preview : public wxPanel
@@ -89,7 +91,7 @@ class Preview : public wxPanel
     wxGLCanvas* m_canvas_widget { nullptr };
     GLCanvas3D* m_canvas { nullptr };
     DynamicPrintConfig* m_config;
-    BackgroundSlicingProcess* m_process;
+    PnpSlicingProcess* m_process;
     GCodeProcessorResult* m_gcode_result;
 
     // Calling this function object forces Plater::schedule_background_process.
@@ -122,7 +124,7 @@ public:
         Legend
     };
 
-    Preview(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process, 
+    Preview(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, PnpSlicingProcess* process, 
         GCodeProcessorResult* gcode_result, std::function<void()> schedule_background_process = []() {});
     virtual ~Preview();
 
@@ -182,7 +184,7 @@ class AssembleView : public wxPanel
     wxGLCanvas* m_canvas_widget{ nullptr };
     GLCanvas3D* m_canvas{ nullptr };
 public:
-    AssembleView(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process);
+    AssembleView(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, PnpSlicingProcess* process);
     ~AssembleView();
 
     wxGLCanvas* get_wxglcanvas() { return m_canvas_widget; }
@@ -196,7 +198,7 @@ public:
     void select_view(const std::string& direction);
 
 private:
-    bool init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, BackgroundSlicingProcess* process);
+    bool init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig* config, PnpSlicingProcess* process);
 };
 
 } // namespace GUI

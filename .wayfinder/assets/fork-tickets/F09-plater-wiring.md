@@ -1,6 +1,6 @@
 ---
 title: Plater wiring — BSP → PnpSlicingProcess swap, slice-all loop
-status: open
+status: active
 batch: B3
 blocked-by: [F04]
 files: [src/slic3r/GUI/Plater.cpp, src/slic3r/GUI/Plater.hpp, src/slic3r/GUI/MainFrame.cpp, src/slic3r/GUI/GUI_Preview.cpp]
