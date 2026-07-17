@@ -340,6 +340,15 @@ void PnpSlicingProcess::worker_main(SliceJob job)
 			if (need_ingest)
 				ingest_pnp_gcode(*m_gcode_result, job.output_path, m_canceled);
 
+			// Preview gate: GUI_Preview::load_print_as_fff renders toolpaths
+			// only when psGCodeExport is done (the "directly preview" path used
+			// for loaded .gcode.3mf files) — otherwise it bails before reading
+			// m_gcode_result. Print::process() never runs in the pnp flow, so
+			// no step is ever marked; set it explicitly (Print::apply()
+			// invalidates it again on any model/config change).
+			if (m_fff_print != nullptr)
+				m_fff_print->set_gcode_file_ready();
+
 			// Let the G-code viewer know slicing proper is done (same event BSP
 			// posts before its G-code export phase; the int payload is unused by
 			// Plater::priv::on_slicing_completed).
