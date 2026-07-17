@@ -5,6 +5,7 @@
 
 #include "PnpConfigTranslator.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 #include <set>
 #include <string>
@@ -227,12 +228,15 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     // Tier B — renames / transforms (mapping asset, Tier-B table).
     // -----------------------------------------------------------------------
 
-    // printable_area -> bed_shape: points list -> array of [x, y] pairs.
+    // printable_area -> bed_shape: points list -> flat [x0, y0, x1, y1, ...]
+    // in mm (pnp types it float-list; nested pairs fail config resolution).
     handled.insert("printable_area");
     if (auto* pts = cfg.option<ConfigOptionPoints>("printable_area"); pts != nullptr) {
         json shape = json::array();
-        for (const Vec2d& p : pts->values)
-            shape.push_back(json::array({p.x(), p.y()}));
+        for (const Vec2d& p : pts->values) {
+            shape.push_back(p.x());
+            shape.push_back(p.y());
+        }
         out["bed_shape"] = std::move(shape);
     }
 
@@ -276,6 +280,42 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     // (their identity copies are Tier A above).
     put("ironing_flow_rate", option_to_json(cfg.option("ironing_flow")));
     put("ironing_spacing_mm", option_to_json(cfg.option("ironing_spacing")));
+    // Unit fix over the Tier-A copy: Orca ironing_flow is a percent (e.g. 10),
+    // pnp ironing_flow is a fraction in [0.01, 1] (ironing_flow_rate above is
+    // the percent-style variant and passes through raw).
+    if (const ConfigOption* opt = cfg.option("ironing_flow"); opt != nullptr)
+        out["ironing_flow"] = std::clamp(opt->getFloat() / 100., 0.01, 1.0);
+
+    // Unit fixes over Tier-A copies: pnp types these keys as plain floats (mm),
+    // so Orca float-or-percent widths must be resolved against the nozzle
+    // diameter here — "105%" strings fail pnp config resolution outright.
+    const double nozzle_d = cfg.option("nozzle_diameter") != nullptr ? cfg.opt_float("nozzle_diameter", 0) : 0.;
+    for (const char* key : {"line_width", "inner_wall_line_width", "outer_wall_line_width"}) {
+        auto* fop = dynamic_cast<const ConfigOptionFloatOrPercent*>(cfg.option(key));
+        if (fop != nullptr && fop->percent && nozzle_d > 0.)
+            out[key] = fop->get_abs_value(nozzle_d);
+    }
+    // overhang_1_4_speed percent resolves over outer_wall_speed (its Orca
+    // ratio_over); pnp types it float.
+    if (auto* v = cfg.option<ConfigOptionFloatsOrPercents>("overhang_1_4_speed");
+        v != nullptr && !v->values.empty() && v->values.front().percent)
+        out["overhang_1_4_speed"] = v->values.front().value / 100. * cfg.opt_float("outer_wall_speed");
+    // Orca bead widths are percent-of-nozzle-diameter; pnp expects absolute
+    // values in its internal units (1 unit = 100 nm, i.e. mm * 10000).
+    for (const char* key : {"min_bead_width", "initial_layer_min_bead_width"}) {
+        const ConfigOption* opt = cfg.option(key);
+        if (opt != nullptr && nozzle_d > 0.)
+            out[key] = std::round(opt->getFloat() / 100. * nozzle_d * 10000.);
+    }
+
+    // Orca tree_support_wall_count 0 means "auto"; pnp requires [1, 10] with no
+    // auto mode. Drop the key so pnp's default applies, and log the fallback.
+    if (const ConfigOption* opt = cfg.option("tree_support_wall_count");
+        opt != nullptr && opt->getInt() < 1) {
+        out.erase("tree_support_wall_count");
+        warn("tree_support_wall_count", PnpWarningClass::LossyFallback,
+             opt->serialize(), "(omitted; pnp default)");
+    }
 
     // seam_position -> seam_mode. nearest/back/random map; Orca "aligned"
     // (and "aligned_back") have no PNP equivalent -> "nearest" + lossy warning.
