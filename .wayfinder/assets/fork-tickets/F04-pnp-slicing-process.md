@@ -1,6 +1,6 @@
 ---
 title: PnpSlicingProcess core — worker thread, boost::process, temp dirs, reuse
-status: open
+status: done
 batch: B2
 blocked-by: [F01, F02, F03]
 files: [src/slic3r/GUI/PnpSlicingProcess.hpp, src/slic3r/GUI/PnpSlicingProcess.cpp, src/slic3r/GUI/CMakeLists.txt]
