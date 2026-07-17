@@ -1,6 +1,6 @@
 ---
 title: pnp_cli discovery, Preferences override, schema handshake
-status: open
+status: done
 batch: B1
 blocked-by: []
 files: [src/slic3r/GUI/PnpBackend.hpp, src/slic3r/GUI/PnpBackend.cpp, src/slic3r/GUI/Preferences.cpp, src/slic3r/GUI/GUI_App.cpp, src/slic3r/GUI/CMakeLists.txt]

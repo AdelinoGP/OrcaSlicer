@@ -107,6 +107,7 @@
 #include "DeepLinkHandlerMac.h"
 #endif
 #include "NotificationManager.hpp"
+#include "PnpBackend.hpp"
 #include "UnsavedChangesDialog.hpp"
 #include "SavePresetDialog.hpp"
 #include "PrintHostDialogs.hpp"
@@ -923,6 +924,15 @@ void GUI_App::post_init()
         plater_->get_notification_manager()->push_hint_notification(false);
     }
 #endif
+
+    // PNP: locate pnp_cli and run the config-schema version handshake. On failure the
+    // GUI stays fully usable, but slicing is disabled (PnpBackend::available() == false)
+    // and a persistent notification points at the failing path.
+    if (is_editor()) {
+        PnpBackend &pnp = PnpBackend::get();
+        pnp.probe();
+        pnp.show_failure_notification();
+    }
 
     hms_query = new HMSQuery();
 

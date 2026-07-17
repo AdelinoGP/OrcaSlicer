@@ -18,6 +18,7 @@
 #include "slic3r/Utils/bambu_networking.hpp"
 #include "slic3r/Utils/NetworkAgent.hpp"
 #include "DownloadProgressDialog.hpp"
+#include "PnpBackend.hpp"
 
 #ifdef __WINDOWS__
 #ifdef _MSW_DARK_MODE
@@ -1615,6 +1616,55 @@ void PreferencesDialog::create_items()
 
     auto item_downloads        = create_item_downloads(_L("Downloads folder"), _L("Target folder for downloaded items"));
     g_sizer->Add(item_downloads);
+
+    // PNP: optional override for the directory containing pnp_cli (+ modules/ beside it).
+    // Empty = use the copy bundled next to the application executable. Re-probes the
+    // backend handshake whenever the value changes.
+    {
+        wxString    pnp_tooltip = _L("Folder containing pnp_cli and its modules directory. Leave empty to use the copy bundled with the application.");
+        wxBoxSizer *pnp_sizer   = create_item_label(_L("PNP CLI directory"), pnp_tooltip);
+
+        wxString pnp_dir = wxString::FromUTF8(app_config->get(PnpBackend::CONFIG_KEY_CLI_DIR));
+
+        auto pnp_path_text = new wxStaticText(m_parent, wxID_ANY, pnp_dir, wxDefaultPosition, wxSize(FromDIP(120), -1), wxST_ELLIPSIZE_END);
+        pnp_path_text->SetForegroundColour(DESIGN_GRAY600_COLOR);
+        pnp_path_text->SetFont(::Label::Body_14);
+        pnp_path_text->Wrap(-1);
+        pnp_path_text->SetToolTip(pnp_dir.IsEmpty() ? pnp_tooltip : pnp_dir);
+
+        auto pnp_apply = [this, pnp_path_text, pnp_sizer, pnp_tooltip](const wxString &dir) {
+            app_config->set(PnpBackend::CONFIG_KEY_CLI_DIR, std::string(dir.ToUTF8().data()));
+            app_config->save();
+            pnp_path_text->SetLabelText(dir);
+            pnp_path_text->SetToolTip(dir.IsEmpty() ? pnp_tooltip : dir);
+            pnp_sizer->Layout();
+            // Re-run discovery + schema handshake against the new location.
+            PnpBackend &pnp = PnpBackend::get();
+            pnp.probe();
+            pnp.show_failure_notification();
+        };
+
+        auto pnp_button_browse = new Button(m_parent, _L("Browse") + dots);
+        pnp_button_browse->SetStyle(ButtonStyle::Regular, ButtonType::Parameter);
+        pnp_button_browse->SetToolTip(pnp_tooltip);
+        pnp_button_browse->Bind(wxEVT_BUTTON, [this, pnp_apply](auto &e) {
+            wxString defaultPath = wxString::FromUTF8(app_config->get(PnpBackend::CONFIG_KEY_CLI_DIR));
+            wxDirDialog dialog(this, _L("Choose PNP CLI Directory"), defaultPath);
+            if (dialog.ShowModal() == wxID_OK)
+                pnp_apply(dialog.GetPath());
+        });
+
+        auto pnp_button_reset = new Button(m_parent, _L("Clear"));
+        pnp_button_reset->SetStyle(ButtonStyle::Alert, ButtonType::Parameter);
+        pnp_button_reset->SetToolTip(_L("Use the pnp_cli bundled with the application."));
+        pnp_button_reset->Bind(wxEVT_BUTTON, [pnp_apply](auto &e) { pnp_apply(wxString()); });
+
+        pnp_sizer->Add(pnp_button_browse, 0, wxALIGN_CENTER_VERTICAL);
+        pnp_sizer->Add(pnp_button_reset, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(5));
+        pnp_sizer->Add(pnp_path_text, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(10));
+
+        g_sizer->Add(pnp_sizer);
+    }
 
     //// GENERAL > Project
     g_sizer->Add(create_item_title(_L("Project")), 1, wxEXPAND);
