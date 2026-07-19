@@ -53,6 +53,53 @@ cancel in v1.
 Batches before B2 land can skip smoke steps that require the seam (nothing slices yet); B1's batch
 check is full build + app launch only.
 
+## Driving-session build & verify gotchas (Windows / MSBuild / GUI exe)
+
+Environment-specific lessons proven across batches on this Windows checkout. Follow them — most
+cost a wasted 10-minute build to rediscover.
+
+- **Run `ALL_BUILD` in the FOREGROUND, not a background job.** Background bash commands are killed
+  by a harness lifetime cap (~5–10 min) before a full build finishes (surfaces as status `killed`
+  with `MSB4166` in the log). Use a foreground `cmake --build` with the max `600000`ms Bash
+  timeout; builds are incremental, so just re-invoke if one pass hits the timeout. The full command:
+  `cmake --build . --config RelWithDebInfo --target ALL_BUILD -- -m -nodeReuse:false` from
+  `build-dbginfo`.
+- **Never `taskkill` a live MSBuild/cmake.** Force-killing reused MSBuild nodes poisons the next
+  build with `MSB4166 "child node exited prematurely"` — infrastructure noise, not a compile error.
+  `-nodeReuse:false` prevents it. To stop a build, prefer letting it time out or Ctrl-C the
+  foreground job.
+- **Create `target/` before redirecting build/test logs.** A first-run `tee`/`>` to
+  `target/<log>` fails silently (dir absent) and discards the whole build's output — you lose all
+  error visibility. `mkdir -p target` first.
+- **Header edits cascade.** Editing widely-included headers (`Model.hpp`, config headers) triggers
+  a broad GUI recompile → expect a ~15-min first build, fast incrementals after. Not a hang.
+- **CMake auto-reconfigures** on the next build after any `CMakeLists.txt` edit or source
+  deletion. Confirm a removed target is actually gone by grepping the regenerated
+  `build-dbginfo/OrcaSlicer.slnx` and the relevant `*.vcxproj` for 0 references. Stale `.exe` /
+  `*.dir` left on disk are harmless cruft, not live targets. A deleted `.cpp` still referenced by a
+  live target hard-errors the build, so a clean `ALL_BUILD` proves the reconfigure dropped it.
+- **`orca-slicer.exe` is a Windows GUI-subsystem binary** — its `--help`/CLI text does **not** reach
+  git-bash stdout. Verify CLI behavior via **exit codes** and by reading `--info` **output files**,
+  never by grepping captured `--help`. `--info <stl>` prints geometry to a redirected file and
+  exits 0; a gutted/removed CLI action should exit cleanly (bash reports the `flush_and_exit` error
+  code, e.g. `127`) with its message in the output file — distinguish that from a real crash
+  (`0xC000xxxx`, or bash `134`/`139`).
+- **The runnable app is `build-dbginfo/src/RelWithDebInfo/orca-slicer.exe`** (freshly linked each
+  build), with `pnp_cli.exe` + `modules/` staged beside it. The `build-dbginfo/OrcaSlicer/`
+  `orca-slicer.exe` is a stale leftover — do not launch it for smoke.
+- **Test-suite fallout from rip-outs.** With `BUILD_TESTS=ON`, `ALL_BUILD` includes every
+  `tests/*` target, so deleting a class breaks any test that uses it even when that test isn't in
+  the active ticket's `files`. When the broken test is owned by no other ticket's frontmatter
+  (check the sibling tickets), the driving session deletes the test + its `tests/*/CMakeLists.txt`
+  entry to preserve the always-compiling invariant (precedent: F11 removed
+  `tests/libslic3r/test_calib.cpp`; F12 will need `tests/sla_print/`). If it *is* owned elsewhere,
+  stop and flag rather than improvising.
+- **Stale pnp staging.** A WASM `TypedInstantiation` error on a GUI slice means the staged
+  `pnp_cli.exe`+`modules/` went stale against the parallel `pinch_n_print` workstream — restage
+  **both** from `F:\slicerProject\pinch_n_print\target\dist\` (run `cargo xtask dist` there first if
+  that repo's git log moved) before diagnosing anything else. The single `"pnp backend
+  unavailable"` line at startup is a harmless pre-probe ordering artifact — don't chase it.
+
 ## Cross-repo pnp gating
 
 pnp handoff items ([full list](handoff-pnp-gap-implementation.md)) are **scheduled prerequisites
