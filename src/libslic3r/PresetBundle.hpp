@@ -338,6 +338,13 @@ public:
 	const PresetCollection& 	materials(PrinterTechnology) const { return this->filaments; }
     PrinterPresetCollection     printers;
     PhysicalPrinterCollection   physical_printers;
+    // PNP fork (F13): preset-type -> collection lookup used by the GUI (DiffPresetDialog
+    // et al.). FFF types map to their collection; SLA and any other type return nullptr
+    // (SLA collections were removed in F12). Callers MUST null-check before dereferencing —
+    // a stale caller that iterated the SLA types and dereferenced the null crashed the app
+    // at startup. Centralised here so the SLA->nullptr contract is unit-testable.
+    PresetCollection*           get_preset_collection(Preset::Type type);
+    const PresetCollection*     get_preset_collection(Preset::Type type) const;
     // Filament preset names for a multi-extruder or multi-material print.
     // extruders.size() should be the same as printers.get_edited_preset().config.nozzle_diameter.size()
     std::vector<std::string>    filament_presets;

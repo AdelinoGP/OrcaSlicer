@@ -445,3 +445,29 @@ TEST_CASE("Profile validator flags dangling and renamed preset references", "[Pr
     }
 }
 
+
+// PNP fork (F13) regression. SLA preset collections were removed in F12, so the
+// preset-type -> collection lookup must return nullptr for SLA types. A stale GUI caller
+// (DiffPresetDialog::create_presets_sizer) still iterated the SLA types and dereferenced
+// that null, crashing the app on startup with an ACCESS_VIOLATION in get_selected_idx.
+// The mapping is now centralised as PresetBundle::get_preset_collection; guard the
+// contract so callers can rely on null for SLA / unknown types.
+TEST_CASE("PresetBundle::get_preset_collection returns null for SLA types", "[Preset][Bundle]")
+{
+    PresetBundle bundle;
+
+    // FFF types resolve to their collections.
+    REQUIRE(bundle.get_preset_collection(Preset::TYPE_PRINTER)  != nullptr);
+    REQUIRE(bundle.get_preset_collection(Preset::TYPE_FILAMENT) == &bundle.filaments);
+    REQUIRE(bundle.get_preset_collection(Preset::TYPE_PRINT)    == &bundle.prints);
+
+    // SLA types have no collection in this fork -> nullptr (must never be dereferenced).
+    REQUIRE(bundle.get_preset_collection(Preset::TYPE_SLA_PRINT)    == nullptr);
+    REQUIRE(bundle.get_preset_collection(Preset::TYPE_SLA_MATERIAL) == nullptr);
+    REQUIRE(bundle.get_preset_collection(Preset::TYPE_INVALID)      == nullptr);
+
+    // const overload agrees.
+    const PresetBundle& cbundle = bundle;
+    REQUIRE(cbundle.get_preset_collection(Preset::TYPE_SLA_MATERIAL) == nullptr);
+    REQUIRE(cbundle.get_preset_collection(Preset::TYPE_PRINT)        == &cbundle.prints);
+}

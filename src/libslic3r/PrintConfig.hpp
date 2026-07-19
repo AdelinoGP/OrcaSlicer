@@ -598,6 +598,13 @@ static std::string get_bed_temp_1st_layer_key(const BedType type)
 }
 
 extern const std::vector<std::string> filament_extruder_override_keys;
+// PNP fork (F13): the config keys the Plater view / Canvas3D need default values
+// for (Plater::priv::config = new_from_defaults_keys(...)). Every key MUST exist in
+// the print config def, or new_from_defaults_keys throws UnknownOptionException and
+// the GUI dies at startup (that is how the removed SLA "material_colour" crashed the
+// app). Named here so tests/libslic3r can assert the invariant. See
+// test_config.cpp "Plater default view config keys are all defined".
+extern const std::vector<std::string> plater_view_default_config_keys;
 // Full override-key check incl. filament_retract_length_nc (defined outside the generator list).
 extern bool is_filament_extruder_override_key(const std::string &opt_key);
 

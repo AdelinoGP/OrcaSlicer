@@ -86,6 +86,31 @@ const std::vector<std::string> filament_extruder_override_keys = {
     "filament_retraction_distances_when_cut"
 };
 
+// PNP fork (F13): config keys the Plater view / Canvas3D need default values for.
+// Moved out of Plater::priv's constructor (src/slic3r/GUI/Plater.cpp) so
+// tests/libslic3r can assert every key is defined in the print config def —
+// new_from_defaults_keys(this) throws UnknownOptionException on an undefined key
+// and kills the GUI at startup (regression: the removed SLA "material_colour").
+const std::vector<std::string> plater_view_default_config_keys = {
+    "printable_area", "bed_exclude_area", "wrapping_exclude_area", "extruder_printable_area", "bed_custom_texture", "bed_custom_model", "print_sequence",
+    "extruder_clearance_radius",
+    "extruder_clearance_height_to_lid", "extruder_clearance_height_to_rod",
+    "nozzle_height", "skirt_type", "skirt_loops", "skirt_speed", "min_skirt_length", "skirt_distance", "skirt_start_angle",
+    "brim_width", "brim_object_gap", "brim_flow_ratio", "brim_use_efc_outline", "combine_brims", "brim_type", "nozzle_diameter", "single_extruder_multi_material", "preferred_orientation",
+    "enable_prime_tower", "wipe_tower_x", "wipe_tower_y", "prime_tower_width", "prime_tower_brim_width", "prime_tower_skip_points", "prime_tower_enable_framework",
+    "prime_tower_infill_gap", "prime_volume",
+    "extruder_colour", "filament_colour", "filament_type", "printable_height", "extruder_printable_height", "printer_model", "printer_technology",
+    // These values are necessary to construct SlicingParameters by the Canvas3D variable layer height editor.
+    "layer_height", "initial_layer_print_height", "min_layer_height", "max_layer_height",
+    "wall_loops", "outer_wall_filament_id", "inner_wall_filament_id", "sparse_infill_density", "sparse_infill_filament_id", "top_shell_layers",
+    "enable_support", "support_filament", "support_interface_filament",
+    "support_top_z_distance", "support_bottom_z_distance", "raft_layers",
+    "wipe_tower_rotation_angle", "wipe_tower_cone_angle", "wipe_tower_extra_spacing", "wipe_tower_extra_flow", "wipe_tower_max_purge_speed",
+    "wipe_tower_wall_type", "wipe_tower_extra_rib_length", "wipe_tower_rib_width", "wipe_tower_fillet_wall",
+    "wipe_tower_filament",
+    "best_object_pos", "master_extruder_id"
+};
+
 // Some filament override parameters are generated from filament_extruder_override_keys,
 // while filament_retract_length_nc is defined separately. Keep the generator list
 // unchanged and use this helper for behavior checks that need the full override set.

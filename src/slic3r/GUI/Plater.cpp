@@ -5768,28 +5768,11 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     : q(q)
     , main_frame(main_frame)
     //BBS: add bed_exclude_area
-    , config(Slic3r::DynamicPrintConfig::new_from_defaults_keys({
-        "printable_area", "bed_exclude_area", "wrapping_exclude_area", "extruder_printable_area", "bed_custom_texture", "bed_custom_model", "print_sequence",
-        "extruder_clearance_radius",
-        "extruder_clearance_height_to_lid", "extruder_clearance_height_to_rod",
-		"nozzle_height", "skirt_type", "skirt_loops", "skirt_speed","min_skirt_length", "skirt_distance", "skirt_start_angle",
-        "brim_width", "brim_object_gap", "brim_flow_ratio", "brim_use_efc_outline", "combine_brims", "brim_type", "nozzle_diameter", "single_extruder_multi_material", "preferred_orientation",
-        "enable_prime_tower", "wipe_tower_x", "wipe_tower_y", "prime_tower_width", "prime_tower_brim_width", "prime_tower_skip_points", "prime_tower_enable_framework",
-        "prime_tower_infill_gap", "prime_volume",
-        // PNP fork (F13): "material_colour" removed — it is an SLA material option
-        // whose config def was dropped with SLA in F12, so new_from_defaults_keys
-        // threw UnknownOptionException on it and terminated the app at startup.
-        "extruder_colour", "filament_colour", "filament_type", "printable_height", "extruder_printable_height", "printer_model", "printer_technology",
-        // These values are necessary to construct SlicingParameters by the Canvas3D variable layer height editor.
-        "layer_height", "initial_layer_print_height", "min_layer_height", "max_layer_height",
-        "wall_loops", "outer_wall_filament_id", "inner_wall_filament_id", "sparse_infill_density", "sparse_infill_filament_id", "top_shell_layers",
-        "enable_support", "support_filament", "support_interface_filament",
-        "support_top_z_distance", "support_bottom_z_distance", "raft_layers",
-        "wipe_tower_rotation_angle", "wipe_tower_cone_angle", "wipe_tower_extra_spacing", "wipe_tower_extra_flow", "wipe_tower_max_purge_speed",
-        "wipe_tower_wall_type", "wipe_tower_extra_rib_length","wipe_tower_rib_width","wipe_tower_fillet_wall",
-        "wipe_tower_filament",
-        "best_object_pos",  "master_extruder_id"
-        }))
+    // PNP fork (F13): the key list moved to Slic3r::plater_view_default_config_keys
+    // (libslic3r/PrintConfig) so tests/libslic3r guards that every key is defined —
+    // a def-less key (e.g. the removed SLA "material_colour") makes
+    // new_from_defaults_keys throw UnknownOptionException and kills the GUI at startup.
+    , config(Slic3r::DynamicPrintConfig::new_from_defaults_keys(Slic3r::plater_view_default_config_keys))
     , sidebar(new Sidebar(q))
     , notification_manager(std::make_unique<NotificationManager>(q))
     , m_worker{q, std::make_unique<NotificationProgressIndicator>(notification_manager.get()), "ui_worker"}

@@ -3773,6 +3773,25 @@ bool PresetBundle::check_filament_temp_equation_by_printer_type_and_nozzle_for_m
     return is_equation;
 }
 
+// PNP fork (F13): preset-type -> collection lookup. SLA collections were removed in
+// F12, so SLA and any other type return nullptr; callers MUST null-check. This
+// centralises a mapping that was duplicated in the GUI, where a copy still iterating
+// the SLA types dereferenced the null and crashed the app at startup.
+const PresetCollection* PresetBundle::get_preset_collection(Preset::Type type) const
+{
+    switch (type) {
+    case Preset::TYPE_PRINTER:  return &this->printers;
+    case Preset::TYPE_FILAMENT: return &this->filaments;
+    case Preset::TYPE_PRINT:    return &this->prints;
+    default:                    return nullptr;
+    }
+}
+
+PresetCollection* PresetBundle::get_preset_collection(Preset::Type type)
+{
+    return const_cast<PresetCollection*>(const_cast<const PresetBundle*>(this)->get_preset_collection(type));
+}
+
 Preset *PresetBundle::get_similar_printer_preset(std::string printer_model, std::string printer_variant)
 {
     if (printer_model.empty())

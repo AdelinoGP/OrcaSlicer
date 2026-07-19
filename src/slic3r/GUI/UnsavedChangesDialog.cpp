@@ -1934,11 +1934,9 @@ FullCompareDialog::FullCompareDialog(const wxString& option_name, const wxString
 static PresetCollection* get_preset_collection(Preset::Type type, PresetBundle* preset_bundle = nullptr) {
     if (!preset_bundle)
         preset_bundle = wxGetApp().preset_bundle;
-    // PNP fork (F12): SLA removed — no TYPE_SLA_* collections.
-    return  type == Preset::Type::TYPE_PRINTER      ? &preset_bundle->printers :
-            type == Preset::Type::TYPE_FILAMENT     ? &preset_bundle->filaments :
-            type == Preset::Type::TYPE_PRINT        ? &preset_bundle->prints :
-            nullptr;
+    // PNP fork (F13): delegate to the centralised PresetBundle mapping. Returns nullptr
+    // for SLA (removed in F12) and any other type — callers null-check.
+    return preset_bundle->get_preset_collection(type);
 }
 
 //------------------------------------------

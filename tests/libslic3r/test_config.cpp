@@ -4,6 +4,9 @@
 #include "libslic3r/PrintConfigConstants.hpp"
 #include "libslic3r/LocalesUtils.hpp"
 
+#include <algorithm>
+#include <memory>
+
 #include <cereal/types/polymorphic.hpp>
 #include <cereal/types/string.hpp> 
 #include <cereal/types/vector.hpp> 
@@ -642,6 +645,37 @@ SCENARIO("ConfigOptionVector::set_to_index throws on incompatible type", "[Confi
             THEN("A ConfigurationError is thrown") {
                 REQUIRE_THROWS_AS(dest.set_to_index(&src, variant_index, stride), Slic3r::ConfigurationError);
             }
+        }
+    }
+}
+
+// PNP fork (F13) regression. The Plater view / Canvas3D build their config via
+// DynamicPrintConfig::new_from_defaults_keys(plater_view_default_config_keys). If any
+// key is absent from the print config def, that call throws UnknownOptionException and
+// the GUI dies at startup — exactly how the removed SLA option "material_colour"
+// crashed the app after the SLA cut (F12). Guard that every key stays defined so a
+// def-less key can never be (re)introduced into the list unnoticed.
+SCENARIO("Plater default view config keys are all defined", "[Config]") {
+    GIVEN("the plater_view_default_config_keys list") {
+        REQUIRE_FALSE(plater_view_default_config_keys.empty());
+
+        THEN("every key resolves in the print config def") {
+            for (const std::string& opt_key : plater_view_default_config_keys) {
+                INFO("undefined plater view config key: " << opt_key);
+                REQUIRE(print_config_def.get(opt_key) != nullptr);
+            }
+        }
+
+        THEN("new_from_defaults_keys does not throw (the material_colour crash path)") {
+            std::unique_ptr<DynamicPrintConfig> cfg;
+            REQUIRE_NOTHROW(cfg.reset(DynamicPrintConfig::new_from_defaults_keys(plater_view_default_config_keys)));
+            REQUIRE(cfg != nullptr);
+        }
+
+        THEN("the removed SLA option material_colour is not in the list") {
+            REQUIRE(std::find(plater_view_default_config_keys.begin(),
+                              plater_view_default_config_keys.end(),
+                              std::string("material_colour")) == plater_view_default_config_keys.end());
         }
     }
 }
