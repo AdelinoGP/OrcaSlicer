@@ -1,6 +1,6 @@
 ---
 title: Headless --slice CLI deletion + calibration mock
-status: open
+status: done
 batch: B5
 blocked-by: [F10]
 files: [src/OrcaSlicer.cpp, src/slic3r/Utils/CalibUtils.cpp, src/libslic3r/calib.cpp, src/libslic3r/calib.hpp, src/libslic3r/Model.hpp, src/libslic3r/Model.cpp, src/libslic3r/Print.cpp, src/libslic3r/GCode.cpp, src/slic3r/GUI/Plater.cpp, src/dev-utils/OrcaSlicer_profile_validator.cpp]

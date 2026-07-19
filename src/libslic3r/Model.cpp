@@ -81,17 +81,6 @@ Model& Model::assign_copy(const Model &rhs)
     // BBS
     this->plates_custom_gcodes = rhs.plates_custom_gcodes;
     this->curr_plate_index = rhs.curr_plate_index;
-    this->calib_pa_pattern.reset();
-
-    if (rhs.calib_pa_pattern) {
-        this->calib_pa_pattern = std::make_unique<CalibPressureAdvancePattern>(
-            CalibPressureAdvancePattern(*rhs.calib_pa_pattern)
-        );
-    }
-
-    if (rhs.calib_pa_pattern) {
-        this->calib_pa_pattern = std::make_unique<CalibPressureAdvancePattern>(CalibPressureAdvancePattern(*rhs.calib_pa_pattern));
-    }
 
     // BBS: for design info
     this->design_info = rhs.design_info;
@@ -128,8 +117,6 @@ Model& Model::assign_copy(Model &&rhs)
     // BBS
     this->plates_custom_gcodes = std::move(rhs.plates_custom_gcodes);
     this->curr_plate_index = rhs.curr_plate_index;
-    this->calib_pa_pattern.reset();
-    this->calib_pa_pattern.swap(rhs.calib_pa_pattern);
 
     //BBS: add auxiliary path logic
     // BBS: backup, all in one temp dir
@@ -1058,7 +1045,6 @@ void Model::load_from(Model& model)
     model.design_info.reset();
     model.model_info.reset();
     model.profile_info.reset();
-    model.calib_pa_pattern.reset();
 }
 
 // BBS: backup

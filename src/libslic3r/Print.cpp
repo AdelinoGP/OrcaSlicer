@@ -431,9 +431,11 @@ bool Print::invalidate_state_by_config_options(const ConfigOptionResolver & /* n
     return invalidated;
 }
 
-void Print::set_calib_params(const Calib_Params& params) {
-    m_calib_params = params;
-    m_calib_params.mode = params.mode;
+void Print::set_calib_params(const Calib_Params& /*params*/) {
+    // F11 (native-slicing rip-out §2): calibration generation was deleted.
+    // The member/accessors remain declared in Print.hpp for ABI stability but
+    // are never populated, so calib_mode() always reports Calib_None and the
+    // G-code generator follows the normal (non-calibration) path.
 }
 
 bool Print::invalidate_step(PrintStep step)
