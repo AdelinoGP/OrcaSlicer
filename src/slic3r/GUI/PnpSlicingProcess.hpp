@@ -59,7 +59,6 @@ public:
 	~PnpSlicingProcess();
 
 	void set_fff_print(Print *print) { m_fff_print = print; m_print = print; }
-	void set_thumbnail_cb(ThumbnailsGeneratorCallback cb) { m_thumbnail_cb = cb; }
 	void set_gcode_result(GCodeProcessorResult *result) { m_gcode_result = result; }
 
 	//BBS-compatible partplate related logic (mirrors BSP).
@@ -145,6 +144,7 @@ private:
 		boost::filesystem::path model_path;   // exported plate 3MF
 		boost::filesystem::path config_path;  // translated flat PNP config
 		std::string             output_path;  // PartPlate::get_tmp_gcode_path()
+		boost::filesystem::path thumbnail_path; // F14: PNG rendered on the UI thread; empty = no thumbnail
 		int                     plate_idx { -1 };
 		int                     estimated_layer_count { 1 };
 		bool                    reuse { false }; // skip the subprocess, straight to finalize
@@ -179,7 +179,6 @@ private:
 	PrintBase                  *m_print = nullptr;
 	Print                      *m_fff_print = nullptr;
 	GCodeProcessorResult       *m_gcode_result = nullptr;
-	ThumbnailsGeneratorCallback m_thumbnail_cb = nullptr;
 	GUI::PartPlate             *m_current_plate = nullptr;
 	PrinterTechnology           m_printer_tech = ptUnknown;
 

@@ -19,6 +19,7 @@
 
 // Print now includes tbb, and tbb includes Windows. This breaks compilation of wxWidgets if included before wx.
 #include "libslic3r/Print.hpp"
+#include "libslic3r/GCode/Thumbnails.hpp"
 #include "libslic3r/Exception.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Thread.hpp"
@@ -231,6 +232,39 @@ bool PnpSlicingProcess::start()
 			return false;
 		}
 
+		// F14: render the plate thumbnail here, on the UI thread, before the
+		// worker is spawned — GL rendering is main-thread only. Reuse Orca's
+		// cached plate-thumbnail path (populates PartPlate::thumbnail_data),
+		// encode it as PNG (the only Orca encoder that does not row-flip the
+		// GL buffer, so it is already top-down for pnp), and drop it in the
+		// per-slice temp dir. pnp resizes/transcodes this single source PNG
+		// per the `thumbnails` config key injected below. Any failure here is
+		// non-fatal: a slice with no thumbnail is fine.
+		wxGetApp().plater()->update_all_plate_thumbnails(true);
+		const ThumbnailData &thumb = m_current_plate->thumbnail_data;
+		if (!thumb.is_valid()) {
+			BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": plate thumbnail render produced no valid data; slicing without a thumbnail";
+		} else {
+			std::unique_ptr<GCodeThumbnails::CompressedImageBuffer> compressed =
+				GCodeThumbnails::compress_thumbnail(thumb, GCodeThumbnailsFormat::PNG);
+			if (compressed && compressed->data != nullptr && compressed->size > 0) {
+				boost::filesystem::path thumb_path = job.input_dir / "thumbnail.png";
+				try {
+					boost::nowide::ofstream thumb_file(thumb_path.string().c_str(), std::ios::binary | std::ios::trunc);
+					thumb_file.write(reinterpret_cast<const char *>(compressed->data), std::streamsize(compressed->size));
+					thumb_file.close();
+					if (!thumb_file)
+						throw std::runtime_error("write failed");
+					job.thumbnail_path = thumb_path;
+				} catch (const std::exception &ex) {
+					BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": failed to write plate thumbnail "
+					                           << thumb_path.string() << ": " << ex.what() << "; slicing without a thumbnail";
+				}
+			} else {
+				BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": plate thumbnail PNG encode produced no data; slicing without a thumbnail";
+			}
+		}
+
 		const DynamicPrintConfig &full_config = m_print->full_print_config();
 		PnpTranslationResult      translated  = PnpConfigTranslator::translate(full_config);
 		// Schema guard: drop any key the pnp config-schema would reject so a
@@ -245,6 +279,17 @@ bool PnpSlicingProcess::start()
 		}
 		// F03: dev-instrument sink for unmapped/lossy keys.
 		log_pnp_config_warnings(full_config, std::move(translated.warnings), job.plate_idx);
+		// F14: hand pnp the requested thumbnail sizes/formats via the
+		// `thumbnails` passthrough key (Orca coString "XxY/EXT,..."; legacy
+		// thumbnails_format is already folded into the /EXT suffix at config
+		// load). It is intentionally NOT in pnp's config-schema, so it MUST be
+		// injected AFTER apply_schema_guard, which would otherwise strip it.
+		// Only sent when we actually rendered a source PNG for pnp to work on.
+		if (!job.thumbnail_path.empty() && full_config.has("thumbnails")) {
+			const std::string thumbs = full_config.opt_string("thumbnails");
+			if (!thumbs.empty())
+				translated.json["thumbnails"] = thumbs;
+		}
 		try {
 			boost::nowide::ofstream config_file(job.config_path.string().c_str(), std::ios::binary | std::ios::trunc);
 			config_file << translated.json.dump(2);
@@ -427,7 +472,7 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 	// --instrument-stderr is required for any progress events: the current
 	// pnp_cli emits no JSONL stream by default (docs/09's default-on stream is
 	// not shipped yet), only human-readable log lines that the parser skips.
-	const std::vector<std::string> args {
+	std::vector<std::string> args {
 		"slice",
 		"--model",      job.model_path.string(),
 		"--config",     job.config_path.string(),
@@ -435,12 +480,19 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 		"--output",     job.output_path,
 		"--instrument-stderr",
 	};
+	// F14: pass the single rendered source PNG; pnp resizes/transcodes it per
+	// the `thumbnails` config key. Empty path = no thumbnail for this slice.
+	if (!job.thumbnail_path.empty()) {
+		args.push_back("--thumbnail");
+		args.push_back(job.thumbnail_path.string());
+	}
 	BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": " << backend.cli_path().string()
 	                        << " slice --model " << job.model_path.string()
 	                        << " --config " << job.config_path.string()
 	                        << " --module-dir " << backend.module_dir().string()
 	                        << " --output " << job.output_path
-	                        << " --instrument-stderr";
+	                        << " --instrument-stderr"
+	                        << (job.thumbnail_path.empty() ? std::string() : " --thumbnail " + job.thumbnail_path.string());
 
 	m_slice_stats_json.clear();
 	PnpProgressParser parser(job.estimated_layer_count);

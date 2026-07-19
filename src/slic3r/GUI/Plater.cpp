@@ -5822,7 +5822,8 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     sla_print.set_status_callback(statuscb); */
 
     // BBS: to be checked. Not follow patch.
-    background_process.set_thumbnail_cb([this](const ThumbnailsParams& params) { return this->generate_thumbnails(params, Camera::EType::Ortho); });
+    // F14: PnpSlicingProcess renders the plate thumbnail itself on the UI
+    // thread in start() (BSP's thumbnail_cb inversion is dead under shell-out).
     background_process.set_slicing_completed_event(EVT_SLICING_COMPLETED);
     background_process.set_finished_event(EVT_PROCESS_COMPLETED);
     background_process.set_export_began_event(EVT_EXPORT_BEGAN);
