@@ -1953,9 +1953,15 @@ void DiffPresetDialog::create_presets_sizer()
 {
     m_presets_sizer = new wxBoxSizer(wxVERTICAL);
 
-    for (auto new_type : { Preset::TYPE_PRINTER, Preset::TYPE_FILAMENT, Preset::TYPE_SLA_MATERIAL, Preset::TYPE_PRINT, Preset::TYPE_SLA_PRINT })
+    // PNP fork (F13): SLA preset collections were removed in F12, so
+    // get_preset_collection(TYPE_SLA_*) now returns nullptr. Iterating the SLA
+    // types here dereferenced that null (get_selected_idx) and crashed the GUI on
+    // startup via DiffPresetDialog. Drop the SLA types; guard null defensively.
+    for (auto new_type : { Preset::TYPE_PRINTER, Preset::TYPE_FILAMENT, Preset::TYPE_PRINT })
     {
         const PresetCollection* collection = get_preset_collection(new_type);
+        if (!collection)
+            continue;
         wxBoxSizer* sizer = new wxBoxSizer(wxHORIZONTAL);
         PresetComboBox* presets_left;
         PresetComboBox* presets_right;
