@@ -9,7 +9,6 @@
 #include "../libslic3r.h"
 #include "../Exception.hpp"
 #include "../Model.hpp"
-#include "../GCode.hpp"
 #include "../PrintConfig.hpp"
 #include "../Utils.hpp"
 #include "../I18N.hpp"

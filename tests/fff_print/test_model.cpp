@@ -45,16 +45,6 @@ SCENARIO("Model construction", "[Model]") {
             arrange_objects(model, InfiniteBed{scaled(Vec2d(100, 100))}, ArrangeParams{scaled(min_object_distance(config))});
 			model_object->ensure_on_bed();
 			print.auto_assign_extruders(model_object);
-			THEN("Print works?") {
-				print.set_status_silent();
-				print.apply(model, config);
-				print.process();
-				ScopedTemporaryFile temp(".gcode");
-                print.export_gcode(temp.string(), nullptr, nullptr);
-                REQUIRE(boost::filesystem::exists(temp.path()));
-				REQUIRE(boost::filesystem::is_regular_file(temp.path()));
-				REQUIRE(boost::filesystem::file_size(temp.path()) > 0);
-			}
         }
     }
 }

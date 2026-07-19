@@ -7,7 +7,6 @@
 #include "Extruder.hpp"
 #include "Point.hpp"
 #include "PrintConfig.hpp"
-#include "GCode/CoolingBuffer.hpp"
 
 namespace Slic3r {
 

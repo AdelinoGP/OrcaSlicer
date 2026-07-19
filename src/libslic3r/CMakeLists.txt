@@ -32,43 +32,8 @@ set(lisbslic3r_sources
     AnyPtr.hpp
     AppConfig.cpp
     AppConfig.hpp
-    Arachne/BeadingStrategy/BeadingStrategy.cpp
-    Arachne/BeadingStrategy/BeadingStrategyFactory.cpp
-    Arachne/BeadingStrategy/BeadingStrategyFactory.hpp
-    Arachne/BeadingStrategy/BeadingStrategy.hpp
-    Arachne/BeadingStrategy/DistributedBeadingStrategy.cpp
-    Arachne/BeadingStrategy/DistributedBeadingStrategy.hpp
-    Arachne/BeadingStrategy/LimitedBeadingStrategy.cpp
-    Arachne/BeadingStrategy/LimitedBeadingStrategy.hpp
-    Arachne/BeadingStrategy/OuterWallInsetBeadingStrategy.cpp
-    Arachne/BeadingStrategy/OuterWallInsetBeadingStrategy.hpp
-    Arachne/BeadingStrategy/RedistributeBeadingStrategy.cpp
-    Arachne/BeadingStrategy/RedistributeBeadingStrategy.hpp
-    Arachne/BeadingStrategy/WideningBeadingStrategy.cpp
-    Arachne/BeadingStrategy/WideningBeadingStrategy.hpp
-    Arachne/SkeletalTrapezoidation.cpp
-    Arachne/SkeletalTrapezoidationEdge.hpp
-    Arachne/SkeletalTrapezoidationGraph.cpp
-    Arachne/SkeletalTrapezoidationGraph.hpp
-    Arachne/SkeletalTrapezoidation.hpp
-    Arachne/SkeletalTrapezoidationJoint.hpp
-    Arachne/utils/ExtrusionJunction.hpp
-    Arachne/utils/ExtrusionLine.cpp
-    Arachne/utils/ExtrusionLine.hpp
-    Arachne/utils/HalfEdgeGraph.hpp
-    Arachne/utils/HalfEdge.hpp
-    Arachne/utils/HalfEdgeNode.hpp
     Arachne/utils/PolygonsPointIndex.hpp
     Arachne/utils/PolygonsSegmentIndex.hpp
-    Arachne/utils/PolylineStitcher.cpp
-    Arachne/utils/PolylineStitcher.hpp
-    Arachne/utils/SparseGrid.hpp
-    Arachne/utils/SparseLineGrid.hpp
-    Arachne/utils/SparsePointGrid.hpp
-    Arachne/utils/SquareGrid.cpp
-    Arachne/utils/SquareGrid.hpp
-    Arachne/WallToolPaths.cpp
-    Arachne/WallToolPaths.hpp
     ArcFitter.cpp
     ArcFitter.hpp
     Arrange.cpp
@@ -79,9 +44,7 @@ set(lisbslic3r_sources
     BoundingBox.hpp
     BridgeDetector.cpp
     BridgeDetector.hpp
-    Brim.cpp
     BrimEarsPoint.hpp
-    Brim.hpp
     BuildVolume.cpp
     BuildVolume.hpp
     calib.cpp
@@ -131,51 +94,7 @@ set(lisbslic3r_sources
     ExtrusionSimulator.hpp
     FaceDetector.cpp
     FaceDetector.hpp
-    Feature/FuzzySkin/FuzzySkin.cpp
-    Feature/FuzzySkin/FuzzySkin.hpp
-    Feature/Interlocking/InterlockingGenerator.cpp
-    Feature/Interlocking/InterlockingGenerator.hpp
-    Feature/Interlocking/VoxelUtils.cpp
-    Feature/Interlocking/VoxelUtils.hpp
     FileParserError.hpp
-    Fill/Fill3DHoneycomb.cpp
-    Fill/Fill3DHoneycomb.hpp
-    Fill/FillAdaptive.cpp
-    Fill/FillAdaptive.hpp
-    Fill/FillBase.cpp
-    Fill/FillBase.hpp
-    Fill/FillConcentric.cpp
-    Fill/FillConcentric.hpp
-    Fill/FillConcentricInternal.cpp
-    Fill/FillConcentricInternal.hpp
-    Fill/Fill.cpp
-    Fill/FillCrossHatch.cpp
-    Fill/FillCrossHatch.hpp
-    Fill/FillGyroid.cpp
-    Fill/FillGyroid.hpp
-    Fill/FillHoneycomb.cpp
-    Fill/FillHoneycomb.hpp
-    Fill/Fill.hpp
-    Fill/FillLightning.cpp
-    Fill/FillLightning.hpp
-    Fill/FillLine.cpp
-    Fill/FillLine.hpp
-    Fill/FillPlanePath.cpp
-    Fill/FillPlanePath.hpp
-    Fill/FillRectilinear.cpp
-    Fill/FillRectilinear.hpp
-    Fill/FillTpmsD.cpp
-    Fill/FillTpmsD.hpp
-    Fill/FillTpmsFK.cpp
-    Fill/FillTpmsFK.hpp
-    Fill/Lightning/DistanceField.cpp
-    Fill/Lightning/DistanceField.hpp
-    Fill/Lightning/Generator.cpp
-    Fill/Lightning/Generator.hpp
-    Fill/Lightning/Layer.cpp
-    Fill/Lightning/Layer.hpp
-    Fill/Lightning/TreeNode.cpp
-    Fill/Lightning/TreeNode.hpp
     Flow.cpp
     Flow.hpp
     FlushVolCalc.cpp
@@ -201,56 +120,26 @@ set(lisbslic3r_sources
     Format/svg.hpp
     Format/ZipperArchiveImport.cpp
     Format/ZipperArchiveImport.hpp
-    GCode/AdaptivePAInterpolator.cpp
-    GCode/AdaptivePAInterpolator.hpp
-    GCode/AdaptivePAProcessor.cpp
-    GCode/AdaptivePAProcessor.hpp
-    GCode/AvoidCrossingPerimeters.cpp
-    GCode/AvoidCrossingPerimeters.hpp
-    GCode/ConflictChecker.cpp
-    GCode/ConflictChecker.hpp
-    GCode/CoolingBuffer.cpp
-    GCode/CoolingBuffer.hpp
-    GCode/TimelapsePosPicker.cpp
-    GCode/TimelapsePosPicker.hpp
-    GCode.cpp
-    GCode/ExtrusionProcessor.hpp
-    GCode/FanMover.cpp
-    GCode/FanMover.hpp
     GCode/GCodeProcessor.cpp
     GCode/GCodeProcessor.hpp
+    GCode/ConflictChecker.hpp
     GCode/ElegooGCodeProcessorHelper.cpp
-    GCode.hpp
-    GCode/PchipInterpolatorHelper.cpp
-    GCode/PchipInterpolatorHelper.hpp
+    GCode/ToolOrdering.cpp
+    GCode/ToolOrdering.hpp
+    GCode/WipeTower.cpp
+    GCode/WipeTower.hpp
+    GCode/WipeTower2.cpp
+    GCode/WipeTower2.hpp
     GCode/PostProcessor.cpp
     GCode/PostProcessor.hpp
-    GCode/PressureEqualizer.cpp
-    GCode/PressureEqualizer.hpp
-    GCode/PrintExtents.cpp
-    GCode/PrintExtents.hpp
     GCodeReader.cpp
     GCodeReader.hpp
-    GCode/RetractWhenCrossingPerimeters.cpp
-    GCode/RetractWhenCrossingPerimeters.hpp
-    GCode/SeamPlacer.cpp
-    GCode/SeamPlacer.hpp
     #GCodeSender.cpp
     #GCodeSender.hpp
-    GCode/SmallAreaInfillFlowCompensator.cpp
-    GCode/SmallAreaInfillFlowCompensator.hpp
-    GCode/SpiralVase.cpp
-    GCode/SpiralVase.hpp
     GCode/ThumbnailData.cpp
     GCode/ThumbnailData.hpp
     GCode/Thumbnails.cpp
     GCode/Thumbnails.hpp
-    GCode/ToolOrdering.cpp
-    GCode/ToolOrdering.hpp
-    GCode/WipeTower2.cpp
-    GCode/WipeTower2.hpp
-    GCode/WipeTower.cpp
-    GCode/WipeTower.hpp
     GCodeWriter.cpp
     GCodeWriter.hpp
     Geometry/ArcWelder.hpp
@@ -301,7 +190,6 @@ set(lisbslic3r_sources
     Model.cpp
     Model.hpp
     MTUtils.hpp
-    MultiMaterialSegmentation.cpp
     MultiMaterialSegmentation.hpp
     MultiPoint.cpp
     MultiPoint.hpp
@@ -325,8 +213,6 @@ set(lisbslic3r_sources
     ParameterUtils.hpp
     pchheader.cpp
     pchheader.hpp
-    PerimeterGenerator.cpp
-    PerimeterGenerator.hpp
     PlaceholderParser.cpp
     PlaceholderParser.hpp
     Platform.cpp
@@ -357,7 +243,6 @@ set(lisbslic3r_sources
     Print.cpp
     Print.hpp
     PrintObject.cpp
-    PrintObjectSlice.cpp
     PrintRegion.cpp
     ProjectTask.cpp
     ProjectTask.hpp
@@ -384,21 +269,6 @@ set(lisbslic3r_sources
     SlicingAdaptive.hpp
     Slicing.cpp
     Slicing.hpp
-    Support/SupportCommon.cpp
-    Support/SupportCommon.hpp
-    Support/SupportLayer.hpp
-    Support/SupportMaterial.cpp
-    Support/SupportMaterial.hpp
-    Support/SupportParameters.hpp
-    Support/SupportSpotsGenerator.cpp
-    Support/SupportSpotsGenerator.hpp
-    Support/TreeModelVolumes.cpp
-    Support/TreeModelVolumes.hpp
-    Support/TreeSupport3D.cpp
-    Support/TreeSupport3D.hpp
-    Support/TreeSupportCommon.hpp
-    Support/TreeSupport.cpp
-    Support/TreeSupport.hpp
     SurfaceCollection.cpp
     SurfaceCollection.hpp
     Surface.cpp

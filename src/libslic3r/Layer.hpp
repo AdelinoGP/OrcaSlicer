@@ -19,14 +19,6 @@ class PrintRegion;
 class PrintObject;
 class Print;
 
-namespace FillAdaptive {
-    struct Octree;
-};
-
-namespace FillLightning {
-    class Generator;
-};
-
 namespace sla {
     class IndexedMesh;
 };
@@ -82,8 +74,7 @@ public:
 
     void    slices_to_fill_surfaces_clipped();
     void    prepare_fill_surfaces();
-    //BBS
-    void    make_perimeters(const SurfaceCollection &slices, const LayerRegionPtrs &compatible_regions, SurfaceCollection* fill_surfaces, ExPolygons* fill_no_overlap);
+    // PNP fork (F13): LayerRegion::make_perimeters removed (native pipeline).
     void    process_external_surfaces(const Layer *lower_layer, const Polygons *lower_layer_covered);
     double  infill_area_threshold() const;
     // Trim surfaces by trimming polygons. Used by the elephant foot compensation at the 1st layer.
@@ -193,12 +184,8 @@ public:
     // Whether two regions can be printed in a continues perimeter
     static bool             is_perimeter_compatible(const Print& print, const PrintRegion& a, const PrintRegion& b);
     void                    make_perimeters();
-    // Phony version of make_fills() without parameters for Perl integration only.
-    void                    make_fills() { this->make_fills(nullptr, nullptr); }
-    void                    make_fills(FillAdaptive::Octree* adaptive_fill_octree, FillAdaptive::Octree* support_fill_octree, FillLightning::Generator* lightning_generator = nullptr);
-    Polylines               generate_sparse_infill_polylines_for_anchoring(FillAdaptive::Octree *adaptive_fill_octree,
-                                                                           FillAdaptive::Octree *support_fill_octree,
-                                                                           FillLightning::Generator* lightning_generator) const;
+    // PNP fork (F13): make_fills / generate_sparse_infill_polylines_for_anchoring
+    // removed with the native Fill/ pipeline (FillAdaptive / FillLightning gone).
     void 					make_ironing();
     void                    make_contour_z(const sla::IndexedMesh &mesh);
 

@@ -16,7 +16,7 @@
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include "3DScene.hpp"
-#include "BackgroundSlicingProcess.hpp"
+#include "SlicingProcessEvents.hpp"
 #include "PnpSlicingProcess.hpp"
 #include "GLShader.hpp"
 #include "GUI.hpp"

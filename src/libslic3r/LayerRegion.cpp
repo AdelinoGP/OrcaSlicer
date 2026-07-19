@@ -2,7 +2,6 @@
 #include "BridgeDetector.hpp"
 #include "ClipperUtils.hpp"
 #include "Geometry.hpp"
-#include "PerimeterGenerator.hpp"
 #include "Point.hpp"
 #include "Print.hpp"
 #include "Surface.hpp"
@@ -79,67 +78,8 @@ void LayerRegion::slices_to_fill_surfaces_clipped()
     }
 }
 
-void LayerRegion::make_perimeters(const SurfaceCollection &slices, const LayerRegionPtrs &compatible_regions, SurfaceCollection* fill_surfaces, ExPolygons* fill_no_overlap)
-{
-    this->perimeters.clear();
-    this->thin_fills.clear();
-
-    const PrintConfig       &print_config  = this->layer()->object()->print()->config();
-    const PrintRegionConfig &region_config = this->region().config();
-    const PrintObjectConfig& object_config = this->layer()->object()->config();
-    // This needs to be in sync with PrintObject::_slice() slicing_mode_normal_below_layer!
-    bool spiral_mode = print_config.spiral_mode &&
-        //FIXME account for raft layers.
-        (this->layer()->id() >= size_t(region_config.bottom_shell_layers.value) &&
-         this->layer()->print_z >= region_config.bottom_shell_thickness - EPSILON);
-
-    double model_rotation_rad = 0.0;
-    if (region_config.align_infill_direction_to_model) {
-        auto m = this->layer()->object()->trafo().matrix();
-        model_rotation_rad = std::atan2((double)m(1, 0), (double)m(0, 0));
-    }
-
-    PerimeterGenerator g(
-        // input:
-        &slices,
-        &compatible_regions,
-        this->layer()->height,
-        this->layer()->slice_z,
-        this->flow(frPerimeter),
-        &region_config,
-        &this->layer()->object()->config(),
-        &print_config,
-        spiral_mode,
-        model_rotation_rad,
-        
-        // output:
-        &this->perimeters,
-        &this->thin_fills,
-        fill_surfaces,
-        //BBS
-        fill_no_overlap
-    );
-    
-    if (this->layer()->lower_layer != nullptr)
-        // Cummulative sum of polygons over all the regions.
-        g.lower_slices = &this->layer()->lower_layer->lslices;
-    if (this->layer()->upper_layer != NULL)
-        g.upper_slices = &this->layer()->upper_layer->lslices;
-
-    int region_id = this->region().print_object_region_id();
-    if (this->layer()->upper_layer != NULL)
-        g.upper_slices_same_region = &this->layer()->upper_layer->get_region(region_id)->slices;
-
-    g.layer_id              = (int)this->layer()->id();
-    g.ext_perimeter_flow    = this->flow(frExternalPerimeter);
-    g.overhang_flow         = this->bridging_flow(frPerimeter, object_config.thick_bridges);
-    g.solid_infill_flow     = this->flow(frSolidInfill);
-
-    if (this->layer()->object()->config().wall_generator.value == PerimeterGeneratorType::Arachne && !spiral_mode)
-        g.process_arachne();
-    else
-        g.process_classic();
-}
+// PNP fork (F13): LayerRegion::make_perimeters removed with the native
+// PerimeterGenerator pipeline. LayerRegion survives as a data container.
 
 #if 1
 

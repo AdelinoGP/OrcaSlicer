@@ -30,7 +30,7 @@
 #include "GUI_App.hpp"
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/PresetBundle.hpp"
-#include "BackgroundSlicingProcess.hpp"
+#include "SlicingProcessEvents.hpp"
 #include "PnpSlicingProcess.hpp"
 #include "Widgets/Label.hpp"
 #include "2DBed.hpp"

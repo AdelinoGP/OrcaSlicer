@@ -38,8 +38,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/AuxiliaryDialog.cpp
     GUI/AuxiliaryDialog.hpp
     GUI/Auxiliary.hpp
-    GUI/BackgroundSlicingProcess.cpp
-    GUI/BackgroundSlicingProcess.hpp
+    GUI/SlicingProcessEvents.cpp
+    GUI/SlicingProcessEvents.hpp
     GUI/BBLStatusBarBind.cpp
     GUI/BBLStatusBarBind.hpp
     GUI/BBLStatusBar.cpp

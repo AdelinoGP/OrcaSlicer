@@ -99,9 +99,9 @@
 #include "Jobs/NotificationProgressIndicator.hpp"
 #include "Jobs/PlaterWorker.hpp"
 #include "Jobs/BoostThreadWorker.hpp"
-#include "BackgroundSlicingProcess.hpp"
+#include "SlicingProcessEvents.hpp"
 // PNP fork (F09): Plater slices through the pnp_cli subprocess seam.
-// BackgroundSlicingProcess.hpp stays included for its event classes
+// SlicingProcessEvents.hpp provides the event classes
 // (SlicingStatusEvent, SlicingProcessCompletedEvent), which PnpSlicingProcess reuses.
 #include "PnpSlicingProcess.hpp"
 #include "PnpBackend.hpp"

@@ -1,7 +1,6 @@
 #include "Layer.hpp"
 #include "ClipperUtils.hpp"
 #include "Print.hpp"
-#include "Fill/Fill.hpp"
 #include "ShortestPath.hpp"
 #include "SVG.hpp"
 #include "BoundingBox.hpp"
@@ -183,103 +182,9 @@ bool Layer::is_perimeter_compatible(const Print& print, const PrintRegion& a, co
 // Here the perimeters are created cummulatively for all layer regions sharing the same parameters influencing the perimeters.
 // The perimeter paths and the thin fills (ExtrusionEntityCollection) are assigned to the first compatible layer region.
 // The resulting fill surface is split back among the originating regions.
-void Layer::make_perimeters()
-{
-    BOOST_LOG_TRIVIAL(trace) << "Generating perimeters for layer " << this->id();
-
-    // keep track of regions whose perimeters we have already generated
-    std::vector<unsigned char> done(m_regions.size(), false);
-
-    for (LayerRegionPtrs::iterator layerm = m_regions.begin(); layerm != m_regions.end(); ++ layerm)
-    	if ((*layerm)->slices.empty()) {
- 			(*layerm)->perimeters.clear();
- 			(*layerm)->fills.clear();
- 			(*layerm)->thin_fills.clear();
-    	} else {
-	        size_t region_id = layerm - m_regions.begin();
-	        if (done[region_id])
-	            continue;
-	        BOOST_LOG_TRIVIAL(trace) << "Generating perimeters for layer " << this->id() << ", region " << region_id;
-	        done[region_id] = true;
-	        const PrintRegion &this_region = (*layerm)->region();
-
-	        // find compatible regions
-	        LayerRegionPtrs layerms;
-	        layerms.push_back(*layerm);
-	        for (LayerRegionPtrs::const_iterator it = layerm + 1; it != m_regions.end(); ++it)
-	            if (! (*it)->slices.empty()) {
-		            LayerRegion* other_layerm = *it;
-		            const PrintRegion &other_region = other_layerm->region();
-                    if (is_perimeter_compatible(*m_object->print(), this_region, other_region))
-		            {
-			 			other_layerm->perimeters.clear();
-			 			other_layerm->fills.clear();
-			 			other_layerm->thin_fills.clear();
-		                layerms.push_back(other_layerm);
-		                done[it - m_regions.begin()] = true;
-		            }
-		        }
-
-	        if (layerms.size() == 1) {  // optimization
-	            (*layerm)->fill_surfaces.surfaces.clear();
-                (*layerm)->make_perimeters((*layerm)->slices, {*layerm}, &(*layerm)->fill_surfaces, &(*layerm)->fill_no_overlap_expolygons);
-	            (*layerm)->fill_expolygons = to_expolygons((*layerm)->fill_surfaces.surfaces);
-	        } else {
-	            SurfaceCollection new_slices;
-	            // Use the region with highest infill rate, as the make_perimeters() function below decides on the gap fill based on the infill existence.
-	            LayerRegion *layerm_config = layerms.front();
-	            {
-	                // group slices (surfaces) according to number of extra perimeters
-	                std::map<unsigned short, Surfaces> slices;  // extra_perimeters => [ surface, surface... ]
-	                for (LayerRegion *layerm : layerms) {
-	                    for (const Surface &surface : layerm->slices.surfaces)
-	                        slices[surface.extra_perimeters].emplace_back(surface);
-	                    if (layerm->region().config().sparse_infill_density > layerm_config->region().config().sparse_infill_density)
-	                    	layerm_config = layerm;
-	                }
-	                // merge the surfaces assigned to each group
-	                for (std::pair<const unsigned short,Surfaces> &surfaces_with_extra_perimeters : slices)
-	                    new_slices.append(offset_ex(surfaces_with_extra_perimeters.second, ClipperSafetyOffset), surfaces_with_extra_perimeters.second.front());
-	            }
-
-	            // make perimeters
-	            SurfaceCollection fill_surfaces;
-                //BBS
-                ExPolygons fill_no_overlap;
-	            layerm_config->make_perimeters(new_slices, layerms, &fill_surfaces, &fill_no_overlap);
-
-	            // assign fill_surfaces to each layer
-	            if (!fill_surfaces.surfaces.empty()) {
-	                for (LayerRegionPtrs::iterator l = layerms.begin(); l != layerms.end(); ++l) {
-	                    // Separate the fill surfaces.
-	                    ExPolygons expp = intersection_ex(fill_surfaces.surfaces, (*l)->slices.surfaces);
-	                    (*l)->fill_expolygons = expp;
-	                    (*l)->fill_surfaces.set(std::move(expp), fill_surfaces.surfaces.front());
-                        //BBS: Separate fill_no_overlap
-                        (*l)->fill_no_overlap_expolygons = intersection_ex((*l)->slices.surfaces, fill_no_overlap);
-	                }
-
-	                // When counterbore hole bridging (chbFilled) is active, process_no_bridge may
-	                // create fill surfaces that extend beyond all region slices (e.g. by clearing
-	                // holes in the bridge expolygon). These "extra" fills are lost during the
-	                // intersection-based splitting above. Recover them and assign to the first
-	                // merged region so the sacrificial bridge layer is not broken.
-	                if (layerm_config->region().config().counterbore_hole_bridging.value != chbNone) {
-	                    Polygons all_region_slices_p;
-	                    for (LayerRegion *l : layerms)
-	                        polygons_append(all_region_slices_p, to_polygons(l->slices.surfaces));
-	                    ExPolygons extra_fill = diff_ex(fill_surfaces.surfaces, all_region_slices_p, ApplySafetyOffset::Yes);
-	                    if (!extra_fill.empty()) {
-	                        append(layerms.front()->fill_expolygons, extra_fill);
-	                        layerms.front()->fill_expolygons = union_ex(layerms.front()->fill_expolygons);
-	                        layerms.front()->fill_surfaces.append(std::move(extra_fill), fill_surfaces.surfaces.front());
-	                    }
-	                }
-	            }
-	        }
-	    }
-    BOOST_LOG_TRIVIAL(trace) << "Generating perimeters for layer " << this->id() << " - Done";
-}
+// PNP fork (F13): Layer::make_perimeters removed with the native perimeter
+// pipeline (it drove LayerRegion::make_perimeters). Layer survives as a data
+// container for the preview / layer-height editor.
 
 void Layer::export_region_slices_to_svg(const char *path) const
 {

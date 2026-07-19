@@ -803,108 +803,28 @@ void GLGizmoFdmSupports::update_support_volumes()
         return;
     }
 
-    //generate_support_preview in async mode
+    // PNP fork (F13): the native support-preview worker is removed with the
+    // Print::process / Support pipeline. The gizmo stays PAINT-ONLY — painted
+    // facets still reach PNP via the per-object sidecar (ticket 004); the user
+    // simply sees no generated-support overlay until a real slice. Restoring the
+    // overlay via a CLI geometry query is pnp handoff item 13.
     std::unique_lock<std::mutex> lck(m_mutex);
-    m_volume_ready = false;
-    //destroy previous support volume
     if (m_support_volume)
     {
         delete m_support_volume;
         m_support_volume = NULL;
     }
+    m_volume_ready = true;
+    m_volume_valid = true;
+    m_edit_state   = state_ready;
     lck.unlock();
-
-    if (m_thread.joinable()) {
-        //join the thread in ui thread
-        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << "try to join thread for 100 ms";
-        auto ret = m_thread.try_join_for(boost::chrono::milliseconds(100));
-        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << "join thread returns "<<ret;
-    }
-    m_cancel = false;
-    m_thread = create_thread([this]{this->run_thread();});
-    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ",created thread to generate support volumes";
     return;
 }
 
 void GLGizmoFdmSupports::run_thread()
 {
-    try {
-        Print *print = m_print_instance.print_object->print();
-
-        print->restart();
-        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ",before generate_support_preview";
-        m_print_instance.print_object->generate_support_preview();
-        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ",after generate_support_preview";
-
-        if (m_cancel)
-        {
-            BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ", cancelled";
-            goto _finished;
-        }
-
-        std::unique_lock<std::mutex> lck(m_mutex);
-        m_support_volume = new GLVolume(0.5f, 0.5f, 0.5f, 0.5f);
-        //m_support_volume->is_support_part = true;
-        m_support_volume->force_native_color = true;
-        m_support_volume->set_render_color();
-        lck.unlock();
-
-        auto record_timestamp = [this]()
-        {
-            const ModelObject* mo = m_c->selection_info()->model_object();
-
-            int volume_id = -1;
-            for (const ModelVolume* mv : mo->volumes) {
-                if (!mv->is_model_part())
-                    continue;
-
-                ++volume_id;
-                m_volume_timestamps[volume_id] = mv->supported_facets.timestamp();
-            }
-        };
-
-        if (m_cancel)
-        {
-            BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ", cancelled";
-            goto _finished;
-        }
-
-        if (!m_print_instance.print_object->support_layers().size())
-        {
-            BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ",no support layer found, update status to 100%\n";
-            print->set_status(100, L("Support generated"));
-            goto _finished;
-        }
-        GLModel::Geometry init_data;
-        init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3N3 };
-        for (const SupportLayer *support_layer : m_print_instance.print_object->support_layers())
-        {
-            for (const ExtrusionEntity *extrusion_entity : support_layer->support_fills.entities)
-            {
-                _3DScene::extrusionentity_to_verts(extrusion_entity, float(support_layer->print_z), m_print_instance.shift, init_data);
-            }
-        }
-        m_support_volume->model.init_from(std::move(init_data));
-        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ", finished extrusionentity_to_verts, update status to 100%";
-        print->set_status(100, L("Support generated"));
-        
-        record_timestamp();
-    }
-    catch (...) {
-        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ",exception catched, mostly cancelling from gui!";
-        //wxTheApp->OnUnhandledException();
-    }
-
-_finished:
-    std::unique_lock<std::mutex> lck(m_mutex);
-    if (m_edit_state == state_generating)
-        m_edit_state = state_ready;
-
-    lck.unlock();
-    m_parent.set_as_dirty();
-    m_parent.post_event(SimpleEvent(wxEVT_PAINT));
-    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ", finished all";
-    return;
+    // PNP fork (F13): support-preview generation removed (native pipeline gone).
+    // Retained as an empty stub; update_support_volumes() no longer spawns it.
 }
 
 void GLGizmoFdmSupports::generate_support_volume()

@@ -39,8 +39,6 @@ class wxGLContext;
 #define ENABLE_RETINA_GL (__APPLE__ || __WXGTK3__)
 
 namespace Slic3r {
-
-class BackgroundSlicingProcess;
 class BuildVolume;
 struct ThumbnailData;
 struct ThumbnailsParams;

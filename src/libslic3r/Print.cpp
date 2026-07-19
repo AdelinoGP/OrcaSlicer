@@ -2,7 +2,6 @@
 #include "Exception.hpp"
 #include "Print.hpp"
 #include "BoundingBox.hpp"
-#include "Brim.hpp"
 #include "ClipperUtils.hpp"
 #include "Extruder.hpp"
 #include "Flow.hpp"
@@ -11,13 +10,17 @@
 #include "ShortestPath.hpp"
 #include "Thread.hpp"
 #include "Time.hpp"
-#include "GCode.hpp"
 #include "GCode/WipeTower.hpp"
 #include "GCode/WipeTower2.hpp"
+// PNP fork (F13): retained only for the ExtrusionLayer/ExtrusionLayers types
+// used by FakeWipeTower::getTrueExtrusionLayersFromWipeTower (the ConflictChecker
+// generator .cpp is deleted).
+#include "GCode/ConflictChecker.hpp"
 #include "Utils.hpp"
 #include "PrintConfig.hpp"
 #include "MaterialType.hpp"
 #include "Model.hpp"
+#include "Layer.hpp"
 #include "format.hpp"
 #include <float.h>
 
@@ -39,7 +42,6 @@
 //BBS: add json support
 #include "nlohmann/json.hpp"
 
-#include "GCode/ConflictChecker.hpp"
 #include "ParameterUtils.hpp"
 
 #include <codecvt>
@@ -939,6 +941,50 @@ StringObjectException Print::sequential_print_clearance_valid(const Print &print
     }
 
     return single_object_exception;
+}
+
+// PNP fork (F13): relocated from the deleted GCode.cpp generator. Orders print
+// instances by their model order; used by the retained sequential-print clearance
+// validation. Self-contained (Model / PrintInstance only), no slicing dependency.
+static std::vector<const PrintInstance*> sort_object_instances_by_model_order(const Print& print, bool init_order = false)
+{
+    auto find_object_index = [](const Model& model, const ModelObject* obj) {
+        for (int index = 0; index < model.objects.size(); index++)
+        {
+            if (model.objects[index] == obj)
+                return index;
+        }
+        return -1;
+    };
+
+    // Build up map from ModelInstance* to PrintInstance*
+    std::vector<std::pair<const ModelInstance*, const PrintInstance*>> model_instance_to_print_instance;
+    model_instance_to_print_instance.reserve(print.num_object_instances());
+    for (const PrintObject *print_object : print.objects())
+        for (const PrintInstance &print_instance : print_object->instances())
+        {
+            if (init_order)
+                const_cast<ModelInstance*>(print_instance.model_instance)->arrange_order = find_object_index(print.model(), print_object->model_object());
+            model_instance_to_print_instance.emplace_back(print_instance.model_instance, &print_instance);
+        }
+    std::sort(model_instance_to_print_instance.begin(), model_instance_to_print_instance.end(), [](auto &l, auto &r) { return l.first->arrange_order < r.first->arrange_order; });
+    if (init_order) {
+        // Re-assign the arrange_order so each instance has a unique order number
+        for (int k = 0; k < model_instance_to_print_instance.size(); k++) {
+            const_cast<ModelInstance*>(model_instance_to_print_instance[k].first)->arrange_order = k + 1;
+        }
+    }
+
+    std::vector<const PrintInstance*> instances;
+    instances.reserve(model_instance_to_print_instance.size());
+    for (const ModelObject *model_object : print.model().objects)
+        for (const ModelInstance *model_instance : model_object->instances) {
+            auto it = std::lower_bound(model_instance_to_print_instance.begin(), model_instance_to_print_instance.end(), std::make_pair(model_instance, nullptr), [](auto &l, auto &r) { return l.first->arrange_order < r.first->arrange_order; });
+            if (it != model_instance_to_print_instance.end() && it->first == model_instance)
+                instances.emplace_back(it->second);
+        }
+    std::sort(instances.begin(), instances.end(), [](auto& l, auto& r) { return l->model_instance->arrange_order < r->model_instance->arrange_order; });
+    return instances;
 }
 
 //BBS
@@ -1945,22 +1991,6 @@ StringObjectException Print::validate(std::vector<StringObjectException> *warnin
             if (m_default_region_config.precise_outer_wall && m_default_region_config.wall_sequence != WallSequence::InnerOuter)
                 warn(L("The precise wall option will be ignored for outer-inner or inner-outer-inner wall sequences."), "precise_outer_wall");
 
-            // check adaptive pressure advance model
-            for (unsigned int extruder_id : extruders) {
-                if (m_config.adaptive_pressure_advance.get_at(extruder_id) && 
-                    m_config.enable_pressure_advance.get_at(extruder_id)) {
-                    
-                    const std::string pa_model = m_config.adaptive_pressure_advance_model.get_at(extruder_id);
-                    if (!pa_model.empty()) {
-                        std::string validation_error = AdaptivePAProcessor::validate_adaptive_pa_model(pa_model);
-                        if (!validation_error.empty()) {
-                            warn(L("The Adaptive Pressure Advance model for one or more extruders may contain invalid values."),
-                                 "adaptive_pressure_advance_model");
-                            break;
-                        }
-                    }
-                }
-            }
 
         } catch (std::exception& e) {
             BOOST_LOG_TRIVIAL(warning) << "Orca: validate motion ability failed: " << e.what() << std::endl;
@@ -2202,908 +2232,11 @@ std::map<ObjectID, unsigned int> getObjectExtruderMap(const Print& print) {
     return objectExtruderMap;
 }
 
-// Slicing process, running at a background thread.
-void Print::process(long long *time_cost_with_cache, bool use_cache)
+// PNP fork (F13): native slicing pipeline removed. Slicing now happens in the
+// external pnp_cli subprocess (PnpSlicingProcess); Print::process is never
+// invoked, and is retained only to satisfy the PrintBase pure-virtual interface.
+void Print::process(long long* /*time_cost_with_cache*/, bool /*use_cache*/)
 {
-    long long start_time = 0, end_time = 0;
-    if (time_cost_with_cache)
-        *time_cost_with_cache = 0;
-
-    name_tbb_thread_pool_threads_set_locale();
-
-    //compute the PrintObject with the same geometries
-    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": this=%1%, enter, use_cache=%2%, object size=%3%")%this%use_cache%m_objects.size();
-    if (m_objects.empty())
-        return;
-
-    for (PrintObject *obj : m_objects)
-        obj->clear_shared_object();
-
-    //add the print_object share check logic
-    auto is_print_object_the_same = [this](const PrintObject* object1, const PrintObject* object2) -> bool{
-        if (object1->trafo().matrix() != object2->trafo().matrix())
-            return false;
-        const ModelObject* model_obj1 = object1->model_object();
-        const ModelObject* model_obj2 = object2->model_object();
-        if (model_obj1->volumes.size() != model_obj2->volumes.size())
-            return false;
-        bool has_extruder1 = model_obj1->config.has("extruder");
-        bool has_extruder2 = model_obj2->config.has("extruder");
-        if ((has_extruder1 != has_extruder2)
-            || (has_extruder1 && model_obj1->config.extruder() != model_obj2->config.extruder()))
-            return false;
-        for (int index = 0; index < model_obj1->volumes.size(); index++) {
-            const ModelVolume &model_volume1 = *model_obj1->volumes[index];
-            const ModelVolume &model_volume2 = *model_obj2->volumes[index];
-            if (model_volume1.type() != model_volume2.type())
-                return false;
-            if (model_volume1.mesh_ptr() != model_volume2.mesh_ptr())
-                return false;
-            if (!(model_volume1.get_transformation() == model_volume2.get_transformation()))
-                return false;
-            has_extruder1 = model_volume1.config.has("extruder");
-            has_extruder2 = model_volume2.config.has("extruder");
-            if ((has_extruder1 != has_extruder2)
-                || (has_extruder1 && model_volume1.config.extruder() != model_volume2.config.extruder()))
-                return false;
-            if (!model_volume1.supported_facets.equals(model_volume2.supported_facets))
-                return false;
-            if (!model_volume1.seam_facets.equals(model_volume2.seam_facets))
-                return false;
-            if (!model_volume1.mmu_segmentation_facets.equals(model_volume2.mmu_segmentation_facets))
-                return false;
-            if (!model_volume1.fuzzy_skin_facets.equals(model_volume2.fuzzy_skin_facets))
-                return false;
-            if (model_volume1.config.get() != model_volume2.config.get())
-                return false;
-        }
-        //if (!object1->config().equals(object2->config()))
-        //    return false;
-        if (model_obj1->layer_height_profile.get() != model_obj2->layer_height_profile.get())
-            return false;
-        if (model_obj1->config.get() != model_obj2->config.get())
-            return false;
-        return true;
-    };
-    int object_count = m_objects.size();
-    std::set<PrintObject*> need_slicing_objects;
-    std::set<PrintObject*> re_slicing_objects;
-    if (!use_cache) {
-        for (int index = 0; index < object_count; index++)
-        {
-            PrintObject *obj =  m_objects[index];
-            for (PrintObject *slicing_obj : need_slicing_objects)
-            {
-                if (is_print_object_the_same(obj, slicing_obj)) {
-                    obj->set_shared_object(slicing_obj);
-                    break;
-                }
-            }
-            if (!obj->get_shared_object())
-                need_slicing_objects.insert(obj);
-        }
-    }
-    else {
-        for (int index = 0; index < object_count; index++)
-        {
-            PrintObject *obj =  m_objects[index];
-            if (obj->layer_count() > 0)
-                need_slicing_objects.insert(obj);
-        }
-        for (int index = 0; index < object_count; index++)
-        {
-            PrintObject *obj =  m_objects[index];
-            bool found_shared = false;
-            if (need_slicing_objects.find(obj) == need_slicing_objects.end()) {
-                for (PrintObject *slicing_obj : need_slicing_objects)
-                {
-                    if (is_print_object_the_same(obj, slicing_obj)) {
-                        obj->set_shared_object(slicing_obj);
-                        found_shared = true;
-                        break;
-                    }
-                }
-                if (!found_shared) {
-                    BOOST_LOG_TRIVIAL(warning) << boost::format("Also can not find the shared object, identify_id %1%, maybe shared object is skipped")%obj->model_object()->instances[0]->loaded_id;
-                    //throw Slic3r::SlicingError("Cannot find the cached data.");
-                    //don't report errot, set use_cache to false, and reslice these objects
-                    need_slicing_objects.insert(obj);
-                    re_slicing_objects.insert(obj);
-                    //use_cache = false;
-                }
-            }
-        }
-    }
-
-    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": total object counts %1% in current print, need to slice %2%")%m_objects.size()%need_slicing_objects.size();
-    BOOST_LOG_TRIVIAL(info) << "Starting the slicing process." << log_memory_info();
-    if (!use_cache) {
-        for (PrintObject *obj : m_objects) {
-            if (need_slicing_objects.count(obj) != 0) {
-                obj->make_perimeters();
-            }
-            else {
-                if (obj->set_started(posSlice))
-                    obj->set_done(posSlice);
-                if (obj->set_started(posPerimeters))
-                    obj->set_done(posPerimeters);
-            }
-        }
-        for (PrintObject *obj : m_objects) {
-            if (need_slicing_objects.count(obj) != 0) {
-                obj->estimate_curled_extrusions();
-            }
-            else {
-                if (obj->set_started(posEstimateCurledExtrusions))
-                    obj->set_done(posEstimateCurledExtrusions);
-            }
-        }
-        for (PrintObject *obj : m_objects) {
-            if (need_slicing_objects.count(obj) != 0) {
-                obj->infill();
-            }
-            else {
-                if (obj->set_started(posPrepareInfill))
-                    obj->set_done(posPrepareInfill);
-                if (obj->set_started(posInfill))
-                    obj->set_done(posInfill);
-            }
-        }
-        for (PrintObject *obj : m_objects) {
-            if (need_slicing_objects.count(obj) != 0) {
-                obj->ironing();
-            }
-            else {
-                if (obj->set_started(posIroning))
-                    obj->set_done(posIroning);
-            }
-        }
-
-        // Z-Contouring
-        for (PrintObject *obj : m_objects) {
-            bool need_contouring = need_slicing_objects.count(obj) != 0 && obj->need_z_contouring();
-            if (need_contouring) {
-                obj->contour_z();
-            } else {
-                if (obj->set_started(posContouring))
-                    obj->set_done(posContouring);
-            }
-        }
-
-        tbb::parallel_for(tbb::blocked_range<int>(0, int(m_objects.size())),
-            [this, need_slicing_objects](const tbb::blocked_range<int>& range) {
-                for (int i = range.begin(); i < range.end(); i++) {
-                    PrintObject* obj = m_objects[i];
-                    if (need_slicing_objects.count(obj) != 0) {
-                        obj->generate_support_material();
-                    }
-                    else {
-                        if (obj->set_started(posSupportMaterial))
-                            obj->set_done(posSupportMaterial);
-                    }
-                }
-            }
-        );
-
-        for (PrintObject* obj : m_objects) {
-            if (need_slicing_objects.count(obj) != 0) {
-                obj->detect_overhangs_for_lift();
-            }
-            else {
-                if (obj->set_started(posDetectOverhangsForLift))
-                    obj->set_done(posDetectOverhangsForLift);
-            }
-        }
-    }
-    else {
-        for (PrintObject *obj : m_objects) {
-            if (re_slicing_objects.count(obj) == 0) {
-                if (obj->set_started(posSlice))
-                    obj->set_done(posSlice);
-                if (obj->set_started(posPerimeters))
-                    obj->set_done(posPerimeters);
-                if (obj->set_started(posPrepareInfill))
-                    obj->set_done(posPrepareInfill);
-                if (obj->set_started(posInfill))
-                    obj->set_done(posInfill);
-                if (obj->set_started(posIroning))
-                    obj->set_done(posIroning);
-                if (obj->set_started(posContouring))
-                    obj->set_done(posContouring);
-                if (obj->set_started(posSupportMaterial))
-                    obj->set_done(posSupportMaterial);
-                if (obj->set_started(posDetectOverhangsForLift))
-                    obj->set_done(posDetectOverhangsForLift);
-            }
-            else {
-                obj->make_perimeters();
-                obj->infill();
-                obj->ironing();
-                obj->generate_support_material();
-                obj->detect_overhangs_for_lift();
-                obj->estimate_curled_extrusions();
-            }
-        }
-    }
-
-    for (PrintObject *obj : m_objects)
-    {
-        if (need_slicing_objects.count(obj) == 0) {
-            obj->copy_layers_from_shared_object();
-            obj->copy_layers_overhang_from_shared_object();
-        }
-    }
-
-
-
-    if (this->set_started(psWipeTower)) {
-        {
-            std::vector<std::set<int>> geometric_unprintables(m_config.nozzle_diameter.size());
-            for (PrintObject* obj : m_objects) {
-                std::vector<std::set<int>> obj_geometric_unprintables = obj->detect_extruder_geometric_unprintables();
-                for (size_t idx = 0; idx < obj_geometric_unprintables.size(); ++idx) {
-                    if (idx < geometric_unprintables.size()) {
-                        geometric_unprintables[idx].insert(obj_geometric_unprintables[idx].begin(), obj_geometric_unprintables[idx].end());
-                    }
-                }
-            }
-            this->set_geometric_unprintable_filaments(geometric_unprintables);
-        }
-
-        m_wipe_tower_data.clear();
-        m_tool_ordering.clear();
-        if (this->has_wipe_tower()) {
-            this->_make_wipe_tower();
-        }
-        else if (this->config().print_sequence != PrintSequence::ByObject) {
-            // Initialize the tool ordering, so it could be used by the G-code preview slider for planning tool changes and filament switches.
-            m_tool_ordering = ToolOrdering(*this, -1, false);
-            m_tool_ordering.sort_and_build_data(*this, -1, false);
-            if (m_tool_ordering.empty() || m_tool_ordering.last_extruder() == unsigned(-1))
-                throw Slic3r::SlicingError("The print is empty. The model is not printable with current print settings.");
-
-        }
-        this->set_done(psWipeTower);
-    }
-
-    if (this->has_wipe_tower()) {
-        m_fake_wipe_tower.set_pos({ m_config.wipe_tower_x.get_at(m_plate_index), m_config.wipe_tower_y.get_at(m_plate_index) });
-    }
-
-    if (this->set_started(psSkirtBrim)) {
-        this->set_status(70, L("Generating skirt & brim"));
-
-        if (time_cost_with_cache)
-            start_time = (long long)Slic3r::Utils::get_current_time_utc();
-
-        m_skirt.clear();
-        m_skirt_brim_groups.clear();
-        m_has_shared_per_object_skirt = false;
-        m_skirt_convex_hull.clear();
-        m_objectBrimAreas.clear();
-        m_supportBrimAreas.clear();
-        m_first_layer_convex_hull.points.clear();
-        for (PrintObject *object : m_objects)  object->m_skirt.clear();
-
-        //BBS: get the objects' indices when GCodes are generated
-        ToolOrdering tool_ordering;
-        unsigned int initial_extruder_id = (unsigned int)-1;
-        bool         has_wipe_tower = false;
-        std::vector<const PrintInstance*> 					print_object_instances_ordering;
-        std::vector<const PrintInstance*>::const_iterator 	print_object_instance_sequential_active;
-        std::vector<std::pair<coordf_t, std::vector<GCode::LayerToPrint>>> layers_to_print = GCode::collect_layers_to_print(*this);
-        std::vector<unsigned int> printExtruders;
-        // Cleared on every process so a print-sequence or selector-mode change can never leave
-        // stale object pointers behind; repopulated below only by the sequential selector path.
-        m_sequential_dynamic_orderings.clear();
-        if (this->config().print_sequence == PrintSequence::ByObject) {
-            // Order object instances for sequential print.
-            print_object_instances_ordering = sort_object_instances_by_model_order(*this);
-            std::vector<unsigned int> first_layer_used_filaments;
-            std::vector<std::vector<unsigned int>> all_filaments;
-            for (print_object_instance_sequential_active = print_object_instances_ordering.begin(); print_object_instance_sequential_active != print_object_instances_ordering.end(); ++print_object_instance_sequential_active) {
-                tool_ordering = ToolOrdering(*(*print_object_instance_sequential_active)->print_object, initial_extruder_id);
-                for (size_t idx = 0; idx < tool_ordering.layer_tools().size(); ++idx) {
-                    auto& layer_filament = tool_ordering.layer_tools()[idx].extruders;
-                    all_filaments.emplace_back(layer_filament);
-                    if (idx == 0)
-                        first_layer_used_filaments.insert(first_layer_used_filaments.end(), layer_filament.begin(), layer_filament.end());
-                }
-            }
-            sort_remove_duplicates(first_layer_used_filaments);
-            auto used_filaments = collect_sorted_used_filaments(all_filaments);
-            this->set_slice_used_filaments(first_layer_used_filaments,used_filaments);
-
-            auto physical_unprintables = this->get_physical_unprintable_filaments(used_filaments);
-            auto geometric_unprintables = this->get_geometric_unprintable_filaments();
-            auto filament_unprintable_volumes = this->get_filament_unprintable_flow(used_filaments);
-            // Selector (per-layer regroup) prints skip the static grouping: their print-wide result
-            // is stitched from the per-object plans after the ordering loop below.
-            const bool dynamic_reorder = this->is_dynamic_group_reorder();
-            if (!dynamic_reorder) {
-                std::vector<int>filament_maps = this->get_filament_maps();
-                auto map_mode = get_filament_map_mode();
-                // Grouping returns a nozzle-aware result; the 1-based extruder map for the by-object
-                // path is derived from it. It is computed in every static map mode (in manual modes it
-                // mirrors the user's assignment) and published print-wide: GCode's per-nozzle
-                // placeholder and config-index lookups read it via get_layered_nozzle_group_result(),
-                // and without it sequential exports on multi-nozzle printers see an empty nozzle table
-                // (e.g. nozzle_diameter_at_nozzle_id[]) and custom g-code fails to resolve.
-                auto grouping_result = ToolOrdering::get_recommended_filament_maps(all_filaments, this, map_mode, physical_unprintables, geometric_unprintables, filament_unprintable_volumes);
-                this->set_nozzle_group_result(std::make_shared<MultiNozzleUtils::LayeredNozzleGroupResult>(grouping_result));
-                // Orca: the sequential write-back stays gated to auto modes. In manual modes the
-                // config maps already carry the user's assignment (the per-object ToolOrdering below
-                // consumes them directly), so a write-back would only re-store the pre-slice values;
-                // keeping the gate avoids churning the config on every sequential manual slice.
-                if (map_mode < FilamentMapMode::fmmManual) {
-                    auto derived_maps = grouping_result.get_extruder_map(false);
-                    if (!derived_maps.empty()) {
-                        filament_maps = derived_maps;
-                        // Write the maps back: used filaments adopt the engine's extruder/nozzle
-                        // choice, unused ones keep their config assignment.
-                        // Orca: the config maps are the merge base; fall back to a synthesized base
-                        // when no producer sized them to the filament count (CLI runs until the
-                        // per-filament synthesis lands there), where indexing per filament would
-                        // run out of bounds.
-                        std::vector<int> base_filament_map = m_config.filament_map.values;
-                        if (base_filament_map.size() != derived_maps.size())
-                            base_filament_map.assign(derived_maps.size(), 1);
-                        std::vector<int> base_volume_map = m_config.filament_volume_map.values;
-                        if (base_volume_map.size() != derived_maps.size())
-                            base_volume_map.assign(derived_maps.size(), (int)nvtStandard);
-                        update_filament_maps_to_config(FilamentGroupUtils::update_used_filament_values(base_filament_map, derived_maps, used_filaments),
-                                                       FilamentGroupUtils::update_used_filament_values(base_volume_map, grouping_result.get_volume_map(), used_filaments),
-                                                       grouping_result.get_nozzle_map());
-                    }
-                }
-                // check map valid both in auto and mannual mode
-                std::transform(filament_maps.begin(), filament_maps.end(), filament_maps.begin(), [](int value) {return value - 1; });
-            }
-
-            //        print_object_instances_ordering = sort_object_instances_by_max_z(print);
-            const PrintObject                     *prev_planned_object = nullptr;
-            unsigned int                           seq_last_extruder   = (unsigned int)-1;
-            MultiNozzleUtils::NozzleStatusRecorder nozzle_status;
-            std::vector<std::vector<int>>          nozzle_map_per_layer;
-            std::vector<std::vector<unsigned int>> stitched_layer_filaments;
-            print_object_instance_sequential_active = print_object_instances_ordering.begin();
-            for (; print_object_instance_sequential_active != print_object_instances_ordering.end(); ++print_object_instance_sequential_active) {
-                const PrintObject *print_object = (*print_object_instance_sequential_active)->print_object;
-                if (dynamic_reorder) {
-                    if (print_object != prev_planned_object) {
-                        // Plan each unique object once, threading the physical nozzle occupancy and
-                        // the previous object's last filament into the next plan; repeated instances
-                        // of an object reuse the plan, mirroring the export loop's reuse.
-                        ToolOrdering ordering(*print_object, seq_last_extruder);
-                        ordering.set_nozzle_status(nozzle_status);
-                        ordering.sort_and_build_data(*print_object, seq_last_extruder);
-                        nozzle_status = ordering.get_nozzle_status();
-                        if (ordering.last_extruder() != static_cast<unsigned int>(-1))
-                            seq_last_extruder = ordering.last_extruder();
-                        const auto &object_maps = ordering.get_layered_nozzle_group_result().get_layer_filament_nozzle_maps();
-                        nozzle_map_per_layer.insert(nozzle_map_per_layer.end(), object_maps.begin(), object_maps.end());
-                        // Orca: the stitch input comes from the same orderings that produced the
-                        // per-layer maps — the collection loop above is per-instance and seeded -1,
-                        // so its layers are misaligned with these plans. layer_tools() of a sorted
-                        // ordering already carries the planned per-layer filament order.
-                        for (const auto &layer_tool : ordering.layer_tools())
-                            stitched_layer_filaments.emplace_back(layer_tool.extruders);
-                        m_sequential_dynamic_orderings[print_object] = std::move(ordering);
-                        prev_planned_object = print_object;
-                    }
-                    tool_ordering = m_sequential_dynamic_orderings.at(print_object);
-                } else {
-                    tool_ordering = ToolOrdering(*print_object, initial_extruder_id);
-                    tool_ordering.sort_and_build_data(*print_object, initial_extruder_id);
-                }
-                if ((initial_extruder_id = tool_ordering.first_extruder()) != static_cast<unsigned int>(-1)) {
-                    append(printExtruders, tool_ordering.tools_for_layer(layers_to_print.front().first).extruders);
-                }
-            }
-            if (dynamic_reorder && m_objects.size() > 1) {
-                // Stitch the per-object plans into one print-wide selector result. A single-object
-                // sequential print publishes (and writes back) from its own ordering instead: the
-                // per-object publish gate treats one object as not sequential.
-                auto stitched = ToolOrdering::build_sequential_group_result(this, std::move(nozzle_map_per_layer), stitched_layer_filaments,
-                                                                            stitched_layer_filaments, used_filaments, physical_unprintables,
-                                                                            geometric_unprintables, filament_unprintable_volumes);
-                this->set_nozzle_group_result(std::make_shared<MultiNozzleUtils::LayeredNozzleGroupResult>(stitched));
-                update_to_config_by_nozzle_group_result(stitched);
-            }
-        }
-        else {
-            tool_ordering = this->tool_ordering();
-            tool_ordering.assign_custom_gcodes(*this);
-
-            std::vector<unsigned int> first_layer_used_filaments;
-            if (!tool_ordering.layer_tools().empty())
-                first_layer_used_filaments = tool_ordering.layer_tools().front().extruders;
-
-            this->set_slice_used_filaments(first_layer_used_filaments, tool_ordering.all_extruders());
-            has_wipe_tower = this->has_wipe_tower() && tool_ordering.has_wipe_tower();
-            initial_extruder_id = tool_ordering.first_extruder();
-            print_object_instances_ordering = chain_print_object_instances(*this);
-            append(printExtruders, tool_ordering.tools_for_layer(layers_to_print.front().first).extruders);
-        }
-
-        auto objectExtruderMap = getObjectExtruderMap(*this);
-        std::vector<std::pair<ObjectID, unsigned int>> objPrintVec;
-        for (const PrintInstance* instance : print_object_instances_ordering) {
-            const ObjectID& print_object_ID = instance->print_object->id();
-            bool existObject = false;
-            for (auto& objIDPair : objPrintVec) {
-                if (print_object_ID == objIDPair.first) existObject = true;
-            }
-            if (!existObject && objectExtruderMap.find(print_object_ID) != objectExtruderMap.end())
-                objPrintVec.push_back(std::make_pair(print_object_ID, objectExtruderMap.at(print_object_ID)));
-        }
-        // BBS: m_brimMap and m_supportBrimMap are used instead of m_brim to generate brim of objs and supports seperately
-        m_brimMap.clear();
-        m_supportBrimMap.clear();
-        m_first_layer_convex_hull.points.clear();
-        if (this->has_brim()) {
-            Polygons islands_area;
-            make_brim(*this, this->make_try_cancel(), islands_area, m_brimMap,
-                m_supportBrimMap, objPrintVec, printExtruders, &m_objectBrimAreas, &m_supportBrimAreas);
-            for (Polygon& poly_ex : islands_area)
-                poly_ex.douglas_peucker(SCALED_RESOLUTION);
-            for (Polygon &poly : union_(this->first_layer_islands(), islands_area))
-                append(m_first_layer_convex_hull.points, std::move(poly.points));
-        }
-
-
-        if (has_skirt() || has_infinite_skirt() || has_brim()) {
-            // Generate skirt/brim groups after brim so per-object and draft-shield footprints
-            // include brims when grouping and offsetting skirt loops.
-            assert(m_skirt.empty());
-            _make_skirt();
-            if (m_config.print_sequence == PrintSequence::ByObject &&
-                m_config.skirt_type == stPerObject &&
-                this->has_shared_per_object_skirt()) {
-                throw Slic3r::SlicingError(L("Per-object skirts cannot fit between the objects in By object print sequence.\n\nMove the objects farther apart, reduce brim/skirt size, switch Skirt type to Combined, or switch Print sequence to By layer."));
-            }
-        }
-
-        this->finalize_first_layer_convex_hull();
-        this->set_done(psSkirtBrim);
-
-        if (time_cost_with_cache) {
-            end_time = (long long)Slic3r::Utils::get_current_time_utc();
-            *time_cost_with_cache = *time_cost_with_cache + end_time - start_time;
-        }
-    }
-    //BBS
-    for (PrintObject *obj : m_objects) {
-        if (((!use_cache)&&(need_slicing_objects.count(obj) != 0))
-            || (use_cache &&(re_slicing_objects.count(obj) != 0))){
-            obj->simplify_extrusion_path();
-        }
-        else {
-            if (obj->set_started(posSimplifyPath))
-                obj->set_done(posSimplifyPath);
-            if (obj->set_started(posSimplifyInfill))
-                obj->set_done(posSimplifyInfill);
-            if (obj->set_started(posSimplifySupportPath))
-                obj->set_done(posSimplifySupportPath);
-        }
-    }
-
-    // BBS
-    bool has_adaptive_layer_height = false;
-    for (PrintObject* obj : m_objects) {
-        if (obj->model_object()->layer_height_profile.empty() == false) {
-            has_adaptive_layer_height = true;
-            break;
-        }
-    }
-    if(!m_no_check /*&& !has_adaptive_layer_height*/)
-    {
-        using Clock                 = std::chrono::high_resolution_clock;
-        auto            startTime   = Clock::now();
-        std::optional<const FakeWipeTower *> wipe_tower_opt = {};
-        if (this->has_wipe_tower()) {
-            m_fake_wipe_tower.set_pos({m_config.wipe_tower_x.get_at(m_plate_index), m_config.wipe_tower_y.get_at(m_plate_index)});
-            wipe_tower_opt = std::make_optional<const FakeWipeTower *>(&m_fake_wipe_tower);
-        }
-        auto            conflictRes = ConflictChecker::find_inter_of_lines_in_diff_objs(m_objects, wipe_tower_opt);
-        auto            endTime     = Clock::now();
-        volatile double seconds     = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count() / (double) 1000;
-        BOOST_LOG_TRIVIAL(info) << "gcode path conflicts check takes " << seconds << " secs.";
-
-        m_conflict_result = conflictRes;
-        if (conflictRes.has_value()) {
-            BOOST_LOG_TRIVIAL(error) << boost::format("gcode path conflicts found between %1% and %2%")%conflictRes.value()._objName1 %conflictRes.value()._objName2;
-        }
-    }
-
-    BOOST_LOG_TRIVIAL(info) << "Slicing process finished." << log_memory_info();
-}
-
-// G-code export process, running at a background thread.
-// The export_gcode may die for various reasons (fails to process filename_format,
-// write error into the G-code, cannot execute post-processing scripts).
-// It is up to the caller to show an error message.
-std::string Print::export_gcode(const std::string& path_template, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
-{
-    // output everything to a G-code file
-    // The following call may die if the filename_format template substitution fails.
-    std::string path = this->output_filepath(path_template);
-    std::string message;
-    if (!path.empty() && result == nullptr) {
-        // Only show the path if preview_data is not set -> running from command line.
-        message = L("Exporting G-code");
-        message += " to ";
-        message += path;
-    } else
-        message = L("Generating G-code");
-    this->set_status(80, message);
-
-    // The following line may die for multiple reasons.
-    GCode gcode;
-    //BBS: compute plate offset for gcode-generator
-    const Vec3d origin = this->get_plate_origin();
-    gcode.set_gcode_offset(origin(0), origin(1));
-    gcode.do_export(this, path.c_str(), result, thumbnail_cb);
-    gcode.export_layer_filaments(result);
-    //BBS
-    if (result != nullptr) {
-        result->conflict_result = m_conflict_result;
-        // Surface the slicer's per-filament nozzle grouping onto the post-slice result
-        // the device GUI reads. This is the static L/R + rack subset the multi-nozzle path computes;
-        // null for single-nozzle prints where nothing computes it. It is assigned after g-code
-        // generation and read by no emitter, so it does not affect the emitted g-code.
-        result->nozzle_group_result = this->get_layered_nozzle_group_result();
-    }
-    return path.c_str();
-}
-
-void Print::_make_skirt()
-{
-    const bool generate_skirt = this->has_skirt() || this->has_infinite_skirt();
-
-    // First off we need to decide how tall the skirt must be.
-    // The skirt_height option from config is expressed in layers, but our
-    // object might have different layer heights, so we need to find the print_z
-    // of the highest layer involved.
-    // Note that unless has_infinite_skirt() == true
-    // the actual skirt might not reach this $skirt_height_z value since the print
-    // order of objects on each layer is not guaranteed and will not generally
-    // include the thickest object first. It is just guaranteed that a skirt is
-    // prepended to the first 'n' layers (with 'n' = skirt_height).
-    // $skirt_height_z in this case is the highest possible skirt height for safety.
-    coordf_t skirt_height_z = 0.;
-    if (generate_skirt) {
-        for (const PrintObject *object : m_objects) {
-            size_t skirt_layers = this->has_infinite_skirt() ?
-                object->layer_count() :
-                std::min(size_t(m_config.skirt_height.value), object->layer_count());
-            skirt_height_z = std::max(skirt_height_z, object->m_layers[skirt_layers-1]->print_z);
-        }
-    }
-
-    struct ObjectSkirtHull {
-        PrintObject* object;
-        Polygon      hull;
-    };
-
-    // Orca: build one local occupied hull per object from object and support geometry up to skirt height.
-    std::vector<ObjectSkirtHull> object_convex_hulls;
-    for (PrintObject *object : m_objects) {
-        Points object_points;
-        // Get object layers up to skirt_height_z.
-        for (const Layer *layer : object->m_layers) {
-            if (generate_skirt && layer->print_z > skirt_height_z)
-                break;
-            for (const ExPolygon &expoly : layer->lslices)
-                // Collect the outer contour points only, ignore holes for the calculation of the convex hull.
-                append(object_points, expoly.contour.points);
-        }
-        // Get support layers up to skirt_height_z.
-        for (const SupportLayer *layer : object->support_layers()) {
-            if (generate_skirt && layer->print_z > skirt_height_z)
-                break;
-            layer->support_fills.collect_points(object_points);
-        }
-
-        object_convex_hulls.push_back({ object, Slic3r::Geometry::convex_hull(object_points) });
-    }
-
-    if (object_convex_hulls.empty())
-        return;
-
-    this->throw_if_canceled();
-
-    // Skirt may be printed on several layers, having distinct layer heights,
-    // but loops must be aligned so can't vary width/spacing
-    // TODO: use each extruder's own flow
-    double initial_layer_print_height = this->skirt_first_layer_height();
-    Flow   flow = this->skirt_flow();
-    float  spacing = flow.spacing();
-    double mm3_per_mm = flow.mm3_per_mm();
-
-    std::vector<size_t> extruders;
-    std::vector<double> extruders_e_per_mm;
-    {
-        auto set_extruders = this->extruders();
-        extruders.reserve(set_extruders.size());
-        extruders_e_per_mm.reserve(set_extruders.size());
-        for (auto &extruder_id : set_extruders) {
-            extruders.push_back(extruder_id);
-            extruders_e_per_mm.push_back(Extruder((unsigned int)extruder_id, &m_config, m_config.single_extruder_multi_material).e_per_mm(mm3_per_mm));
-        }
-    }
-
-    // Initial skirt centerline offset from the occupied outline.
-    // The skirt will touch the occupied outline if skirt_distance is zero.
-    // Generate loops inward to outward; callers reverse them before G-code export.
-    // Loop while we have less skirts than required or any extruder hasn't reached the min length if any.
-    auto append_skirt_loops_for_hull = [&](const Polygon& hull, ExtrusionEntityCollection& dst, bool collect_skirt_hull) {
-        float distance = float(scale_(m_config.skirt_distance.value - spacing/2.));
-        std::vector<coordf_t> extruded_length(extruders.size(), 0.);
-        for (size_t i = m_config.skirt_loops, extruder_idx = 0; i > 0; -- i) {
-            this->throw_if_canceled();
-            // Offset the skirt outside.
-            distance += float(scale_(spacing));
-            // Generate the skirt centerline.
-            Polygon loop;
-            {
-                // Orca: the hull already represents the occupied outline used for this skirt.
-                Polygons loops = offset(hull, distance, ClipperLib::jtRound, float(scale_(0.1)));
-                Geometry::simplify_polygons(loops, scale_(0.05), &loops);
-			    if (loops.empty())
-				    break;
-			    loop = loops.front();
-            }
-            // Extrude the skirt loop.
-            ExtrusionLoop eloop(elrSkirt);
-            eloop.paths.emplace_back(ExtrusionPath(
-                ExtrusionPath(
-                    erSkirt,
-                    (float)mm3_per_mm,         // this will be overridden at G-code export time
-                    flow.width(),
-				    (float)initial_layer_print_height  // this will be overridden at G-code export time
-                )));
-            eloop.paths.back().polyline = Polyline3(loop.split_at_first_point());
-            dst.append(eloop);
-            if (m_config.min_skirt_length.value > 0) {
-                // The skirt length is limited. Sum the total amount of filament length extruded, in mm.
-                extruded_length[extruder_idx] += unscale<double>(loop.length()) * extruders_e_per_mm[extruder_idx];
-                if (extruded_length[extruder_idx] < m_config.min_skirt_length.value) {
-                    // Not extruded enough yet with the current extruder. Add another loop.
-                    if (i == 1)
-                        ++ i;
-                } else {
-                    assert(extruded_length[extruder_idx] >= m_config.min_skirt_length.value);
-                    // Enough extruded with the current extruder. Extrude with the next one,
-                    // until the prescribed number of skirt loops is extruded.
-                    if (extruder_idx + 1 < extruders.size())
-                        ++ extruder_idx;
-                }
-            } else {
-                // The skirt length is not limited, extrude the skirt with the 1st extruder only.
-            }
-        }
-
-        if (collect_skirt_hull)
-            for (Polygon &poly : offset(hull, distance + 0.5f * float(scale_(spacing)), ClipperLib::jtRound, float(scale_(0.1))))
-                append(m_skirt_convex_hull, std::move(poly.points));
-    };
-
-    m_skirt.clear();
-    m_skirt_brim_groups.clear();
-    m_has_shared_per_object_skirt = false;
-    for (const ObjectSkirtHull& object_hull : object_convex_hulls)
-        object_hull.object->m_skirt.clear();
-
-    if (m_config.skirt_type == stCombined || m_config.skirt_type == stPerObject) {
-        struct SkirtGroupItem {
-            Points       occupied_points;
-            ObjectID     object_id;
-            bool         emits_skirt;
-        };
-
-        // Orca: group items represent occupied first-layer areas. Object items emit skirts;
-        // obstacle-only items, such as wipe tower, only force nearby object groups to merge.
-        std::vector<SkirtGroupItem> group_items;
-        const coord_t grouping_offset = scale_(m_config.skirt_distance.value + m_config.skirt_loops.value * spacing);
-        for (const ObjectSkirtHull& object_hull : object_convex_hulls) {
-            PrintObject* object = object_hull.object;
-            Points occupied_points;
-            for (const PrintInstance &instance : object->instances()) {
-                Points copy_points = object_hull.hull.points;
-                for (Point &pt : copy_points)
-                    pt += instance.shift;
-                append(occupied_points, copy_points);
-            }
-
-            auto append_brim_points = [&occupied_points](const ExPolygons& areas) {
-                for (const ExPolygon& area : areas)
-                    append(occupied_points, area.contour.points);
-            };
-            if (auto it = m_objectBrimAreas.find(object->id()); it != m_objectBrimAreas.end())
-                append_brim_points(it->second);
-            if (auto it = m_supportBrimAreas.find(object->id()); it != m_supportBrimAreas.end())
-                append_brim_points(it->second);
-            if (occupied_points.size() < 3)
-                continue;
-
-            // Orca: include the object's brim/support-brim footprint before checking skirt collisions.
-            group_items.push_back({ std::move(occupied_points), object->id(), true });
-        }
-
-        // Orca: the wipe tower contributes occupied area, but does not emit a skirt by itself.
-        Points wipe_tower_points = this->first_layer_wipe_tower_corners();
-        if (wipe_tower_points.size() >= 3)
-            group_items.push_back({ std::move(wipe_tower_points), ObjectID(), false });
-
-        std::vector<size_t> parent(group_items.size());
-        std::iota(parent.begin(), parent.end(), 0);
-        // Orca: union-find keeps collision merging local without repeatedly rebuilding item lists.
-        auto find_parent = [&parent](size_t idx) {
-            while (parent[idx] != idx) {
-                parent[idx] = parent[parent[idx]];
-                idx = parent[idx];
-            }
-            return idx;
-        };
-        auto unite = [&parent, &find_parent](size_t a, size_t b) {
-            a = find_parent(a);
-            b = find_parent(b);
-            if (a != b)
-                parent[b] = a;
-        };
-
-        // Orca: combined skirt is the same grouping model with all items forced into one group.
-        if (m_config.skirt_type == stCombined && !group_items.empty())
-            for (size_t i = 1; i < group_items.size(); ++i)
-                unite(0, i);
-
-        auto build_grouped_points = [&]() {
-            struct GroupData {
-                Points                points;
-                std::vector<ObjectID> object_ids;
-                bool                  emits_skirt = false;
-            };
-
-            std::map<size_t, GroupData> grouped;
-            for (size_t i = 0; i < group_items.size(); ++i) {
-                GroupData& group = grouped[find_parent(i)];
-                append(group.points, group_items[i].occupied_points);
-                if (group_items[i].object_id.valid())
-                    group.object_ids.push_back(group_items[i].object_id);
-                group.emits_skirt = group.emits_skirt || group_items[i].emits_skirt;
-            }
-            return grouped;
-        };
-
-        bool groups_changed = m_config.skirt_type == stPerObject;
-        while (groups_changed) {
-            groups_changed = false;
-            auto grouped_points = build_grouped_points();
-            std::vector<std::pair<size_t, Polygon>> group_envelopes;
-            for (const auto& [root, group] : grouped_points) {
-                if (group.points.size() < 3)
-                    continue;
-
-                // Orca: emitting groups are expanded to their final skirt reach; obstacle groups are not.
-                Polygon envelope = Geometry::convex_hull(group.points);
-                if (group.emits_skirt) {
-                    // Orca: merge groups when a skirt envelope intersects another group or obstacle.
-                    Polygons envelopes = offset(envelope, grouping_offset, ClipperLib::jtRound, float(scale_(0.1)));
-                    if (envelopes.empty())
-                        continue;
-                    envelope = std::move(envelopes.front());
-                }
-                group_envelopes.emplace_back(root, std::move(envelope));
-            }
-
-            for (size_t i = 0; i < group_envelopes.size(); ++i) {
-                for (size_t j = i + 1; j < group_envelopes.size(); ++j) {
-                    const size_t root_i = find_parent(group_envelopes[i].first);
-                    const size_t root_j = find_parent(group_envelopes[j].first);
-                    if (root_i != root_j && !intersection(group_envelopes[i].second, group_envelopes[j].second).empty()) {
-                        unite(root_i, root_j);
-                        groups_changed = true;
-                    }
-                }
-            }
-        }
-
-        auto make_group_brims = [this](const std::vector<ObjectID>& group_object_ids) {
-            std::vector<SkirtBrimGroup::Brim> brims;
-            std::vector<ObjectID> brim_object_ids;
-            for (ObjectID object_id : group_object_ids) {
-                const auto brim_it = m_brimMap.find(object_id);
-                if (brim_it != m_brimMap.end() && !brim_it->second.empty())
-                    brim_object_ids.push_back(object_id);
-            }
-
-            const bool global_combined_brim = m_config.combine_brims && m_config.skirt_type != stPerObject && m_brimMap.size() == 1;
-            auto brim_owner_ids = [&group_object_ids, global_combined_brim](const std::vector<ObjectID>& object_ids) {
-                return global_combined_brim ? group_object_ids : object_ids;
-            };
-
-            const bool combine_group_brims = m_config.combine_brims && brim_object_ids.size() > 1;
-            if (!combine_group_brims) {
-                for (ObjectID object_id : brim_object_ids)
-                    brims.push_back({ m_brimMap.at(object_id), brim_owner_ids({ object_id }) });
-                return brims;
-            }
-
-            std::vector<size_t> brim_parent(brim_object_ids.size());
-            std::iota(brim_parent.begin(), brim_parent.end(), 0);
-            auto find_brim_parent = [&brim_parent](size_t idx) {
-                while (brim_parent[idx] != idx) {
-                    brim_parent[idx] = brim_parent[brim_parent[idx]];
-                    idx = brim_parent[idx];
-                }
-                return idx;
-            };
-            auto unite_brims = [&brim_parent, &find_brim_parent](size_t a, size_t b) {
-                a = find_brim_parent(a);
-                b = find_brim_parent(b);
-                if (a != b)
-                    brim_parent[b] = a;
-            };
-
-            const coord_t brim_contact_distance = coord_t(brim_flow().scaled_spacing() * 2.);
-            for (size_t i = 0; i < brim_object_ids.size(); ++i) {
-                const auto area_i = m_objectBrimAreas.find(brim_object_ids[i]);
-                if (area_i == m_objectBrimAreas.end())
-                    continue;
-                for (size_t j = i + 1; j < brim_object_ids.size(); ++j) {
-                    const auto area_j = m_objectBrimAreas.find(brim_object_ids[j]);
-                    if (area_j != m_objectBrimAreas.end() &&
-                        !intersection_ex(offset_ex(area_i->second, brim_contact_distance, jtRound, SCALED_RESOLUTION), area_j->second).empty())
-                        unite_brims(i, j);
-                }
-            }
-
-            std::map<size_t, std::vector<ObjectID>> combined_brim_ids;
-            for (size_t i = 0; i < brim_object_ids.size(); ++i)
-                combined_brim_ids[find_brim_parent(i)].push_back(brim_object_ids[i]);
-
-            for (const auto& [_, object_ids] : combined_brim_ids) {
-                if (object_ids.size() == 1) {
-                    brims.push_back({ m_brimMap.at(object_ids.front()), brim_owner_ids(object_ids) });
-                    continue;
-                }
-
-                ExPolygons combined_area;
-                for (ObjectID object_id : object_ids)
-                    expolygons_append(combined_area, m_objectBrimAreas.at(object_id));
-                combined_area = union_ex(combined_area);
-                const float scaled_resolution  = float(scaled(m_config.resolution.value));
-                const float brim_cleanup_delta = std::max(scaled_resolution, float(SCALED_EPSILON));
-                combined_area = offset2_ex(combined_area, brim_cleanup_delta, -brim_cleanup_delta, jtRound, scaled_resolution);
-
-                Polygons islands_area;
-                brims.push_back({ makeBrimInfillFromPlateCoordinates(combined_area, *this, islands_area), object_ids });
-            }
-
-            return brims;
-        };
-
-        auto grouped_points = build_grouped_points();
-        for (auto& [_, group] : grouped_points) {
-            if (!group.emits_skirt || group.points.size() < 3)
-                continue;
-            if (generate_skirt && m_config.skirt_type == stPerObject && group.object_ids.size() > 1)
-                m_has_shared_per_object_skirt = true;
-            // Orca: after merging, use the occupied outline directly; do not add skirt distance twice.
-            ExtrusionEntityCollection group_skirt;
-            if (generate_skirt)
-                append_skirt_loops_for_hull(Geometry::convex_hull(group.points), group_skirt, true);
-            std::vector<SkirtBrimGroup::Brim> group_brims = make_group_brims(group.object_ids);
-            if (!group_skirt.empty()) {
-                group_skirt.reverse();
-                // Orca: keep m_skirt as a flattened compatibility mirror for preview/extents.
-                m_skirt.append(group_skirt.entities);
-            }
-            if (!group_skirt.empty() || !group_brims.empty())
-                m_skirt_brim_groups.push_back({ std::move(group_skirt), std::move(group.object_ids), std::move(group_brims) });
-        }
-    }
 }
 
 Polygons Print::first_layer_islands() const
@@ -4263,36 +3396,6 @@ void Print::set_gcode_file_invalidated()
 }
 
 //BBS: add gcode file preload logic
-void Print::export_gcode_from_previous_file(const std::string& file, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb)
-{
-    try {
-        GCodeProcessor processor;
-        GCodeProcessor::s_IsBBLPrinter = is_BBL_printer();
-        const Vec3d origin = this->get_plate_origin();
-        processor.set_xy_offset(origin(0), origin(1));
-        // Reloaded sliced projects re-estimate with the same nozzle-grouping slot context as the
-        // original export; process_file re-derives the device-side nozzle grouping onto the result
-        // (via ensure_nozzle_group_result), so the multi-nozzle send/monitor mapping survives here.
-        if (result != nullptr && result->nozzle_group_result)
-            processor.initialize_from_context(result->nozzle_group_result);
-        //processor.enable_producers(true);
-        processor.process_file(file);
-
-        // filament seq is loaded from file, processor result will override the value
-        auto filament_seq_loaded = result->filament_change_sequence;
-        auto nozzle_seq_loaded   = result->nozzle_change_sequence;
-        *result = std::move(processor.extract_result());
-        result->filament_change_sequence = filament_seq_loaded;
-        result->nozzle_change_sequence   = nozzle_seq_loaded;
-    } catch (std::exception & /* ex */) {
-        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ <<  boost::format(": found errors when process gcode file %1%") %file.c_str();
-        throw Slic3r::RuntimeError(
-            std::string("Failed to process the G-code file ") + file + " from previous 3mf\n");
-    }
-
-    BOOST_LOG_TRIVIAL(info) << __FUNCTION__ <<  boost::format(":  process the G-code file %1% successfully")%file.c_str();
-}
-
 std::tuple<float, float> Print::object_skirt_offset(double margin_height) const
 {
     if (config().skirt_loops == 0 || config().skirt_type != stPerObject || m_objects.empty())

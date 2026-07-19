@@ -80,34 +80,6 @@ void init_print(std::initializer_list<TriangleMesh> meshes, Slic3r::Print &print
 void init_print(std::initializer_list<TestMesh> meshes, Slic3r::Print &print, Slic3r::Model &model, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items);
 void init_print(std::initializer_list<TriangleMesh> meshes, Slic3r::Print &print, Slic3r::Model &model, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items);
 
-// init_print followed by process(), leaving a sliced `print` to inspect.
-void init_and_process_print(std::initializer_list<TestMesh> meshes, Slic3r::Print &print, const DynamicPrintConfig& config);
-void init_and_process_print(std::initializer_list<TriangleMesh> meshes, Slic3r::Print &print, const DynamicPrintConfig& config);
-void init_and_process_print(std::initializer_list<TestMesh> meshes, Slic3r::Print &print, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items);
-void init_and_process_print(std::initializer_list<TriangleMesh> meshes, Slic3r::Print &print, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items);
-
-// Process `print` and return its exported G-code.
-std::string gcode(Print& print);
-
-// Build, slice, and return the G-code for `meshes` under the given config.
-std::string slice(std::initializer_list<TestMesh> meshes, const DynamicPrintConfig &config);
-std::string slice(std::initializer_list<TriangleMesh> meshes, const DynamicPrintConfig &config);
-std::string slice(std::initializer_list<TestMesh> meshes, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items);
-std::string slice(std::initializer_list<TriangleMesh> meshes, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items);
-
-// Slice `meshes`, applying per_object_overrides[i] to object i first (empty entry = none).
-std::string slice_with_object_overrides(std::initializer_list<TriangleMesh> meshes, const DynamicPrintConfig &config,
-    const std::vector<std::vector<Slic3r::ConfigBase::SetDeserializeItem>> &per_object_overrides);
-
-// Slice two auto-arranged 20mm cubes (the arranger positions them).
-std::string slice_two_cubes_arranged(std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items);
-
-// Place two 20mm cubes `gap` mm apart edge-to-edge, not auto-arranged (the caller controls spacing).
-void place_two_cubes_apart(double gap, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items,
-    Slic3r::Print &print, Slic3r::Model &model);
-// Slice two 20mm cubes `gap` mm apart (not auto-arranged) and return the G-code.
-std::string slice_two_cubes_apart(double gap, std::initializer_list<Slic3r::ConfigBase::SetDeserializeItem> config_items);
-
 // Distinct layer Z heights carrying an extrusion of the given `role` (e.g. "skirt").
 std::set<double> layers_with_role(const std::string &gcode, const std::string &role);
 

@@ -2,8 +2,6 @@
 #define slic3r_Print_hpp_
 
 #include "PrintBase.hpp"
-#include "Fill/FillAdaptive.hpp"
-#include "Fill/FillLightning.hpp"
 
 #include "BoundingBox.hpp"
 #include "ExtrusionEntityCollection.hpp"
@@ -63,17 +61,8 @@ enum SupportNecessaryType {
     LargeOverhang,
 };
 
-namespace FillAdaptive {
-    struct Octree;
-    struct OctreeDeleter;
-    using OctreePtr = std::unique_ptr<Octree, OctreeDeleter>;
-};
-
-namespace FillLightning {
-    class Generator;
-    struct GeneratorDeleter;
-    using GeneratorPtr = std::unique_ptr<Generator, GeneratorDeleter>;
-}; // namespace FillLightning
+// PNP fork (F13): FillAdaptive / FillLightning removed with the native Fill/
+// pipeline; their octree/generator members on PrintObject are gone.
 
 // Print step IDs for keeping track of the print state.
 // The Print steps are applied in this order.
@@ -355,7 +344,6 @@ public:
     const Point& 			     center_offset() const  { return m_center_offset; }
 
     // BBS
-    void generate_support_preview();
     const std::vector<VolumeSlices>& firstLayerObjSlice() const { return firstLayerObjSliceByVolume; }
     std::vector<VolumeSlices>& firstLayerObjSliceMod() { return firstLayerObjSliceByVolume; }
     const std::vector<groupedVolumeSlices>& firstLayerObjGroups() const { return firstLayerObjSliceByGroups; }
@@ -399,7 +387,6 @@ public:
 
     // BBS
     SupportLayer* add_tree_support_layer(int id, coordf_t height, coordf_t print_z, coordf_t slice_z);
-    std::shared_ptr<TreeSupportData> alloc_tree_support_preview_cache();
     void clear_tree_support_preview_cache() { m_tree_support_preview_cache.reset(); }
 
     size_t          support_layer_count() const { return m_support_layers.size(); }
@@ -494,14 +481,8 @@ public:
     static PrintObjectConfig object_config_from_model_object(const PrintObjectConfig &default_object_config, const ModelObject &object, size_t num_extruders, std::vector<int>& variant_index);
 
 private:
-    void make_perimeters();
-    void prepare_infill();
-    void infill();
-    void ironing();
     bool need_z_contouring() const;
     void contour_z();
-    void generate_support_material();
-    void estimate_curled_extrusions();
     void simplify_extrusion_path();
 
     /**
@@ -528,17 +509,9 @@ private:
     void detect_surfaces_type();
     void process_external_surfaces();
     void discover_vertical_shells();
-    void bridge_over_infill();
     void clip_fill_surfaces();
     void discover_horizontal_shells();
     void combine_infill();
-    void _generate_support_material();
-    std::pair<FillAdaptive::OctreePtr, FillAdaptive::OctreePtr> prepare_adaptive_infill_data(
-        const std::vector<std::pair<const Surface*, float>>& surfaces_w_bottom_z) const;
-    FillLightning::GeneratorPtr prepare_lightning_infill_data();
-
-    // BBS
-    SupportNecessaryType is_support_necessary();
 
     // XYZ in scaled coordinates
     Vec3crd									m_size;
@@ -565,9 +538,6 @@ private:
     // this is set to true when LayerRegion->slices is split in top/internal/bottom
     // so that next call to make_perimeters() performs a union() before computing loops
     bool                    				m_typed_slices = false;
-
-    std::pair<FillAdaptive::OctreePtr, FillAdaptive::OctreePtr> m_adaptive_fill_octrees;
-    FillLightning::GeneratorPtr m_lightning_generator;
 
     std::vector < VolumeSlices >            firstLayerObjSliceByVolume;
     std::vector<groupedVolumeSlices>        firstLayerObjSliceByGroups;
@@ -912,9 +882,6 @@ public:
     ApplyStatus         apply(const Model &model, DynamicPrintConfig config, bool extruder_applied = false) override;
 
     void                process(long long *time_cost_with_cache = nullptr, bool use_cache = false) override;
-    // Exports G-code into a file name based on the path_template, returns the file path of the generated G-code file.
-    // If preview_data is not null, the preview_data is filled in for the G-code visualization (not used by the command line Slic3r).
-    std::string         export_gcode(const std::string& path_template, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb = nullptr);
     //return 0 means successful
     int                 export_cached_data(const std::string& dir_path, bool with_space=false);
     int                 load_cached_data(const std::string& directory);
@@ -1108,7 +1075,6 @@ public:
     //BBS: export gcode from previous gcode file from 3mf
     void set_gcode_file_ready();
     void set_gcode_file_invalidated();
-    void export_gcode_from_previous_file(const std::string& file, GCodeProcessorResult* result, ThumbnailsGeneratorCallback thumbnail_cb = nullptr);
     //BBS: add modify_count logic
     int get_modified_count() const {return m_modified_count;}
     //BBS: add status for whether support used
@@ -1246,7 +1212,6 @@ private:
     bool                has_tpu_filament() const;
     bool                invalidate_state_by_config_options(const ConfigOptionResolver &new_config, const std::vector<t_config_option_key> &opt_keys);
 
-    void                _make_skirt();
     void                _make_wipe_tower();
     void                finalize_first_layer_convex_hull();
     void                update_filament_self_index_cache();

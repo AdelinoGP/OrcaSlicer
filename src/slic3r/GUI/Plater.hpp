@@ -49,7 +49,6 @@ class Print;
 //BBS: add partplatelist and SlicingStatusEvent
 class PartPlateList;
 class SlicingStatusEvent;
-class BackgroundSlicingProcess;
 // PNP fork (F09): Plater now slices through PnpSlicingProcess (pnp_cli subprocess seam).
 namespace GUI { class PnpSlicingProcess; }
 enum class ConversionType : int;

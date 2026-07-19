@@ -38,9 +38,9 @@
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "slic3r/Utils/PrintHost.hpp"
 #include "PartPlate.hpp"
-// Reuse BSP's event classes (SlicingStatusEvent, SlicingProcessCompletedEvent)
-// unchanged so Plater's existing handlers survive the swap.
-#include "BackgroundSlicingProcess.hpp"
+// Reuse the slicing-process event classes (SlicingStatusEvent,
+// SlicingProcessCompletedEvent) so Plater's existing handlers survive the swap.
+#include "SlicingProcessEvents.hpp"
 
 namespace boost { namespace process { class child; } }
 

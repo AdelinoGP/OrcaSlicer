@@ -1,5 +1,5 @@
 #include "IMSlider.hpp"
-#include "libslic3r/GCode.hpp"
+#include "libslic3r/Layer.hpp"
 #include "GUI_App.hpp"
 #include "NotificationManager.hpp"
 #include "Widgets/StateColor.hpp"

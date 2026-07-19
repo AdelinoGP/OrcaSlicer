@@ -16,7 +16,10 @@
 #include "Geometry.hpp"
 #include "PrintConfig.hpp"
 #include "Surface.hpp"
-#include "Fill/FillRectilinear.hpp"
+// PNP fork (F13): native Fill/ removed. WipeTower2 is retained only for its
+// types and static geometry helpers (used by the GUI plate-layout / preview);
+// the cone-base infill below is dead runtime code, so its Fill dependency is
+// severed rather than the whole unit deleted.
 
 #include <boost/algorithm/string/predicate.hpp>
 
@@ -2593,14 +2596,10 @@ Polygon WipeTower2::generate_support_cone_wall(
             ExPolygon& bottom_expoly = infill_areas.front().contour.points.front().y() < infill_areas.back().contour.points.front().y() ?
                                            infill_areas[0] :
                                            infill_areas[1];
-            std::unique_ptr<Fill> filler(Fill::new_from_type(ipMonotonicLine));
-            filler->angle   = Geometry::deg2rad(45.f);
-            filler->spacing = spacing;
-            FillParams params;
-            params.density = 1.f;
-            Surface surface(stBottom, bottom_expoly);
-            filler->bounding_box = get_extents(bottom_expoly);
-            polylines            = filler->fill_surface(&surface, params);
+            // PNP fork (F13): cone-base infill disabled (native Fill/ removed).
+            // This branch is unreachable at runtime — the wipe tower is never
+            // generated in the fork; polylines stays empty.
+            (void) bottom_expoly;
             if (!polylines.empty()) {
                 if (polylines.front().points.front().x() > polylines.back().points.back().x()) {
                     std::reverse(polylines.begin(), polylines.end());

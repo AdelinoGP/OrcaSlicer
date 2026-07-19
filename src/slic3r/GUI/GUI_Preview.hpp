@@ -24,7 +24,6 @@ namespace Slic3r {
 
 class DynamicPrintConfig;
 class Print;
-class BackgroundSlicingProcess;
 class Model;
 
 namespace GUI {

@@ -522,7 +522,6 @@ public:
     void set_plate_name(const std::string& name) { m_plate_name = name; }
 protected:
 	friend class PrintObjectBase;
-    friend class BackgroundSlicingProcess;
 
     std::mutex&            state_mutex() const { return m_state_mutex; }
     std::function<void()>  cancel_callback() { return m_cancel_callback; }
