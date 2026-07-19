@@ -311,9 +311,8 @@ bool ObjectSettings::update_settings_list()
 
 bool ObjectSettings::add_missed_options(ModelConfig* config_to, const DynamicPrintConfig& config_from)
 {
-    const DynamicPrintConfig& print_config = wxGetApp().plater()->printer_technology() == ptFFF ?
-                                             wxGetApp().preset_bundle->prints.get_edited_preset().config :
-                                             wxGetApp().preset_bundle->sla_prints.get_edited_preset().config;
+    // PNP fork (F12): SLA removed — always the FFF process preset.
+    const DynamicPrintConfig& print_config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
     bool is_added = false;
 
     for (auto opt_key : config_from.diff(print_config))
@@ -336,9 +335,8 @@ void ObjectSettings::update_config_values(ModelConfig* config)
         return;
 
     // update config values according to configuration hierarchy
-    DynamicPrintConfig  main_config   = printer_technology == ptFFF ?
-                                        wxGetApp().preset_bundle->prints.get_edited_preset().config :
-                                        wxGetApp().preset_bundle->sla_prints.get_edited_preset().config;
+    // PNP fork (F12): SLA removed — always the FFF process preset.
+    DynamicPrintConfig  main_config   = wxGetApp().preset_bundle->prints.get_edited_preset().config;
 
     auto load_config = [this, config, &main_config]()
     {

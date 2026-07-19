@@ -17,10 +17,8 @@
 
 // Print now includes tbb, and tbb includes Windows. This breaks compilation of wxWidgets if included before wx.
 #include "libslic3r/Print.hpp"
-#include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/GCode/PostProcessor.hpp"
-#include "libslic3r/Format/SL1.hpp"
 #include "libslic3r/Thread.hpp"
 #include "libslic3r/libslic3r.h"
 
@@ -165,9 +163,9 @@ bool BackgroundSlicingProcess::select_technology(PrinterTechnology tech)
 		changed = true;
 	}
 
+	// PNP fork (F12): SLA removed — always FFF.
 	switch (tech) {
 	case ptFFF: m_print = m_fff_print; break;
-	case ptSLA: m_print = m_sla_print; break;
 	default: assert(false); break;
 	}
 	assert(m_print != nullptr);
@@ -279,47 +277,8 @@ void BackgroundSlicingProcess::process_fff()
 	}
 }
 
-static void write_thumbnail(Zipper& zipper, const ThumbnailData& data)
-{
-    size_t png_size = 0;
-    void* png_data = tdefl_write_image_to_png_file_in_memory_ex((const void*)data.pixels.data(), data.width, data.height, 4, &png_size, MZ_DEFAULT_LEVEL, 1);
-    if (png_data != nullptr)
-    {
-        zipper.add_entry("thumbnail/thumbnail" + std::to_string(data.width) + "x" + std::to_string(data.height) + ".png", (const std::uint8_t*)png_data, png_size);
-        mz_free(png_data);
-    }
-}
-
-void BackgroundSlicingProcess::process_sla()
-{
-    assert(m_print == m_sla_print);
-    m_print->process();
-    if (this->set_step_started(bspsGCodeFinalize)) {
-        if (! m_export_path.empty()) {
-			wxQueueEvent(GUI::wxGetApp().mainframe->m_plater, new wxCommandEvent(m_event_export_began_id));
-
-            const std::string export_path = m_sla_print->print_statistics().finalize_output_path(m_export_path);
-
-			//BBS: add plate id for thumbnail generation
-            ThumbnailsList thumbnails = this->render_thumbnails(
-				ThumbnailsParams{ current_print()->full_print_config().option<ConfigOptionPoints>("thumbnails")->values, true, true, true, true, 0 });
-
-            Zipper zipper(export_path);
-            m_sla_archive.export_print(zipper, *m_sla_print);																											         // true, false, true, true); // renders also supports and pad
-			for (const ThumbnailData& data : thumbnails)
-                if (data.is_valid())
-                    write_thumbnail(zipper, data);
-            zipper.finalize();
-
-            //m_print->set_status(100, (boost::format(_utf8(L("Masked SLA file exported to %1%"))) % export_path).str());
-			m_print->set_status(100, (boost::format(_utf8("Masked SLA file exported to %1%")) % export_path).str());
-        } else {
-			//m_print->set_status(100, _utf8(L("Slicing complete")));
-			m_print->set_status(100, _utf8("Slicing complete"));
-        }
-        this->set_step_done(bspsGCodeFinalize);
-    }
-}
+// PNP fork (F12): write_thumbnail() and process_sla() removed with the SLA cut
+// (write_thumbnail's only caller was the SLA archive export path).
 
 void BackgroundSlicingProcess::thread_proc()
 {
@@ -328,7 +287,7 @@ void BackgroundSlicingProcess::thread_proc()
     name_tbb_thread_pool_threads_set_locale();
 
 	assert(m_print != nullptr);
-	assert(m_print == m_fff_print || m_print == m_sla_print);
+	assert(m_print == m_fff_print);
 	std::unique_lock<std::mutex> lck(m_mutex);
 	// Let the caller know we are ready to run the background processing task.
 	m_state = STATE_IDLE;
@@ -454,9 +413,9 @@ void BackgroundSlicingProcess::call_process(std::exception_ptr &ex) throw()
 {
 	try {
 		assert(m_print != nullptr);
+		// PNP fork (F12): SLA removed.
 		switch (m_print->technology()) {
 		case ptFFF: this->process_fff(); break;
-		case ptSLA: this->process_sla(); break;
 		default: m_print->process(); break;
 		}
 	} catch (CanceledException& /* ex */) {
@@ -950,19 +909,8 @@ void BackgroundSlicingProcess::prepare_upload()
 			    m_upload_job.upload_data.upload_path = output_name_str;
 			}
 		}
-    } else {
-        m_upload_job.upload_data.upload_path = m_sla_print->print_statistics().finalize_output_path(m_upload_job.upload_data.upload_path.string());
-        
-        ThumbnailsList thumbnails = this->render_thumbnails(
-        	ThumbnailsParams{current_print()->full_print_config().option<ConfigOptionPoints>("thumbnails")->values, true, true, true, true});
-																												 // true, false, true, true); // renders also supports and pad
-        Zipper zipper{source_path.string()};
-        m_sla_archive.export_print(zipper, *m_sla_print, m_upload_job.upload_data.upload_path.string());
-        for (const ThumbnailData& data : thumbnails)
-	        if (data.is_valid())
-	            write_thumbnail(zipper, data);
-        zipper.finalize();
     }
+    // PNP fork (F12): SLA upload path removed.
 
     m_print->set_status(100, (boost::format(_utf8(L("Scheduling upload to `%1%`. See Window -> Print Host Upload Queue"))) % m_upload_job.printhost->get_host()).str());
 

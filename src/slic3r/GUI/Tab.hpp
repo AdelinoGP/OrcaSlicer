@@ -675,39 +675,7 @@ public:
 	bool		apply_extruder_cnt_from_cache();
 };
 
-class TabSLAMaterial : public Tab
-{
-public:
-	//BBS: GUI refactor
-    TabSLAMaterial(ParamsPanel* parent) :
-		Tab(parent, _(_devL("Material Settings")), Slic3r::Preset::TYPE_SLA_MATERIAL) {}
-    ~TabSLAMaterial() {}
-
-	void		build() override;
-	void		reload_config() override;
-	void		toggle_options() override;
-	void		update() override;
-	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptSLA; }
-};
-
-class TabSLAPrint : public Tab
-{
-public:
-	//BBS: GUI refactor
-    TabSLAPrint(ParamsPanel* parent) :
-        Tab(parent, _(L("Process Settings")), Slic3r::Preset::TYPE_SLA_PRINT) {}
-    ~TabSLAPrint() {}
-
-	ogStaticText* m_support_object_elevation_description_line = nullptr;
-
-    void		build() override;
-	void		reload_config() override;
-	void		update_description_lines() override;
-	void		toggle_options() override;
-    void		update() override;
-	void		clear_pages() override;
-	bool 		supports_printer_technology(const PrinterTechnology tech) const override { return tech == ptSLA; }
-};
+// PNP fork (F12): TabSLAMaterial / TabSLAPrint removed with the SLA cut.
 
 } // GUI
 } // Slic3r

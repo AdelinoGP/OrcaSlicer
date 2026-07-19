@@ -43,8 +43,6 @@ namespace GUI {
     class Size;
 }
 
-class SLAPrintObject;
-enum  SLAPrintObjectStep : unsigned int;
 class BuildVolume;
 class DynamicPrintConfig;
 class ExtrusionPath;
@@ -120,8 +118,6 @@ protected:
     // BBS
     Vec3d m_offset_to_assembly{ 0.0, 0.0, 0.0 };
 
-    // Shift in z required by sla supports+pad
-    double        m_sla_shift_z;
     // Bounding box of this volume, in unscaled coordinates.
     std::optional<BoundingBoxf3> m_transformed_bounding_box;
     // Convex hull of the volume, if any.
@@ -309,9 +305,6 @@ public:
     void set_volume_mirror(const Vec3d& mirror) { m_volume_transformation.set_mirror(mirror); set_bounding_boxes_as_dirty(); }
     void set_volume_mirror(Axis axis, double mirror) { m_volume_transformation.set_mirror(axis, mirror); set_bounding_boxes_as_dirty(); }
 
-    double get_sla_shift_z() const { return m_sla_shift_z; }
-    void set_sla_shift_z(double z) { m_sla_shift_z = z; }
-
     void set_convex_hull(std::shared_ptr<const TriangleMesh> convex_hull) { m_convex_hull = std::move(convex_hull); }
     void set_convex_hull(const TriangleMesh &convex_hull) { m_convex_hull = std::make_shared<const TriangleMesh>(convex_hull); }
     void set_convex_hull(TriangleMesh &&convex_hull) { m_convex_hull = std::make_shared<const TriangleMesh>(std::move(convex_hull)); }
@@ -471,16 +464,6 @@ public:
         bool               in_assemble_view = false,
         bool               use_loaded_id = false,
         bool               need_raycaster = true);
-    // Load SLA auxiliary GLVolumes (for support trees or pad).
-    void load_object_auxiliary(
-        const SLAPrintObject           *print_object,
-        int                             obj_idx,
-        // pairs of <instance_idx, print_instance_idx>
-        const std::vector<std::pair<size_t, size_t>>& instances,
-        SLAPrintObjectStep              milestone,
-        // Timestamp of the last change of the milestone
-        size_t                          timestamp);
-
     int load_wipe_tower_preview(
         int obj_idx, float pos_x, float pos_y, float width, float depth, float height, float rotation_angle, bool size_unknown, float brim_width);
     int load_real_wipe_tower_preview(

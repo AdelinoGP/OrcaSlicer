@@ -2686,6 +2686,39 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                 add_error("Error while extract project config file to file");
                 return;
             }
+            // PNP fork (F12): SLA has been removed. Detect an SLA project BEFORE
+            // handing the config to load_from_json. Unlike the ini/gcode loaders,
+            // load_from_json aborts the *entire* project config on the first
+            // unknown key, and JSON key order is not guaranteed, so an SLA-only
+            // key can be reached (and throw) before printer_technology. This
+            // pre-pass scans the raw JSON so we can refuse SLA projects with a
+            // clear message instead of an opaque whole-config load failure.
+            //
+            // Refusal MUST throw (not add_error): add_error only records into
+            // m_errors, which is log-only — the extract loop does not check it, so
+            // the load would otherwise continue with an empty config and then crash
+            // downstream. version_error (a Slic3r::FileIOError) is the importer's
+            // idiomatic "reject this 3mf with a user-visible message" signal; the
+            // GUI catches it via GUI::show_error and the CLI via its load try/catch.
+            {
+                bool is_sla_project = false;
+                boost::nowide::ifstream ifs(dest_file);
+                if (ifs.good()) {
+                    try {
+                        nlohmann::json j;
+                        ifs >> j;
+                        auto it = j.find("printer_technology");
+                        is_sla_project = it != j.end() && it->is_string() &&
+                            boost::algorithm::iequals(it->get<std::string>(), std::string("SLA"));
+                    } catch (...) {
+                        // Malformed / unexpected JSON: fall through to load_from_json,
+                        // which reports its own error in the normal way.
+                        is_sla_project = false;
+                    }
+                }
+                if (is_sla_project)
+                    throw version_error(_(L("SLA projects are not supported by this build.")));
+            }
             std::map<std::string, std::string> key_values;
             std::string reason;
             int ret = config.load_from_json(dest_file, config_substitutions, true, key_values, reason);

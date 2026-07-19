@@ -389,27 +389,8 @@ TEST_CASE("Renamed names are normalized into a SYSTEM preset's compatible lists"
           std::vector<std::string>{ "New Printer" });
 }
 
-TEST_CASE("compatible_prints on SLA materials resolves against sla_prints, not prints", "[Preset][Rename]")
-{
-    PresetBundle bundle;
-
-    // A renamed SLA process, and a same-named FFF process that must NOT be picked up: resolving the
-    // SLA material's compatible_prints against `prints` would wrongly rewrite to "Wrong FFF Process".
-    add_inmemory_preset(bundle.sla_prints, "New SLA Process");
-    set_renamed_from(bundle.sla_prints, "New SLA Process", { "Old SLA Process" });
-    add_inmemory_preset(bundle.prints, "Wrong FFF Process");
-    set_renamed_from(bundle.prints, "Wrong FFF Process", { "Old SLA Process" });
-
-    add_inmemory_preset(bundle.sla_materials, "My SLA Material");
-    compatible_list(bundle.sla_materials, "My SLA Material", "compatible_prints") = { "Old SLA Process" };
-
-    AppConfig app_config;
-    bundle.load_installed_printers(app_config);
-    bundle.normalize_compatible_presets();
-
-    CHECK(compatible_list(bundle.sla_materials, "My SLA Material", "compatible_prints") ==
-          std::vector<std::string>{ "New SLA Process" });
-}
+// PNP fork (F12): removed the "compatible_prints on SLA materials" case — sla_prints/sla_materials
+// collections were deleted with the SLA cut.
 
 TEST_CASE("Profile validator flags dangling and renamed preset references", "[Preset][Validate]")
 {

@@ -193,8 +193,6 @@ set(lisbslic3r_sources
     Format/OBJ.hpp
     Format/objparser.cpp
     Format/objparser.hpp
-    Format/SL1.cpp
-    Format/SL1.hpp
     Format/STEP.cpp
     Format/STEP.hpp
     Format/STL.cpp
@@ -373,44 +371,13 @@ set(lisbslic3r_sources
     ShortestPath.cpp
     ShortestPath.hpp
     SLA/AGGRaster.hpp
-    SLA/BoostAdapter.hpp
-    SLA/Clustering.cpp
-    SLA/Clustering.hpp
-    SLA/ConcaveHull.cpp
-    SLA/ConcaveHull.hpp
     SLA/Concurrency.hpp
-    SLA/Hollowing.cpp
-    SLA/Hollowing.hpp
     SLA/IndexedMesh.cpp
     SLA/IndexedMesh.hpp
-    SLA/JobController.hpp
-    SLA/Pad.cpp
-    SLA/Pad.hpp
-    SLAPrint.cpp
-    SLAPrint.hpp
-    SLAPrintSteps.cpp
-    SLAPrintSteps.hpp
     SLA/RasterBase.cpp
     SLA/RasterBase.hpp
-    SLA/RasterToPolygons.cpp
-    SLA/RasterToPolygons.hpp
-    SLA/ReprojectPointsOnMesh.hpp
     SLA/Rotfinder.cpp
     SLA/Rotfinder.hpp
-    SLA/SpatIndex.cpp
-    SLA/SpatIndex.hpp
-    SLA/SupportPointGenerator.cpp
-    SLA/SupportPointGenerator.hpp
-    SLA/SupportPoint.hpp
-    SLA/SupportTreeBuilder.cpp
-    SLA/SupportTreeBuilder.hpp
-    SLA/SupportTreeBuildsteps.cpp
-    SLA/SupportTreeBuildsteps.hpp
-    SLA/SupportTree.cpp
-    SLA/SupportTree.hpp
-    #SLA/SupportTreeIGL.cpp
-    SLA/SupportTreeMesher.cpp
-    SLA/SupportTreeMesher.hpp
     SlicesToTriangleMesh.cpp
     SlicesToTriangleMesh.hpp
     SlicingAdaptive.cpp

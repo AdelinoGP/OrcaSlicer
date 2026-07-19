@@ -101,16 +101,7 @@ PresetComboBox::PresetComboBox(wxWindow* parent, Preset::Type preset_type, const
         m_main_bitmap_name = "spool";
         break;
     }
-    case Preset::TYPE_SLA_PRINT: {
-        m_collection = &m_preset_bundle->sla_prints;
-        m_main_bitmap_name = "cog";
-        break;
-    }
-    case Preset::TYPE_SLA_MATERIAL: {
-        m_collection = &m_preset_bundle->sla_materials;
-        m_main_bitmap_name = "blank_16";
-        break;
-    }
+    // PNP fork (F12): SLA removed — no TYPE_SLA_PRINT / TYPE_SLA_MATERIAL collections.
     case Preset::TYPE_PRINTER: {
         m_collection = &m_preset_bundle->printers;
         m_main_bitmap_name = "printer";

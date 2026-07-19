@@ -8,7 +8,6 @@
 #include <libslic3r/Format/OBJ.hpp> // load_obj for default mesh
 #include <libslic3r/CutSurface.hpp> // use surface cuts
 #include <libslic3r/BuildVolume.hpp> // create object
-#include <libslic3r/SLA/ReprojectPointsOnMesh.hpp>
 
 #include "libslic3r/libslic3r.h"
 #include "slic3r/GUI/Plater.hpp"
@@ -447,8 +446,7 @@ void UpdateJob::update_volume(ModelVolume *volume, TriangleMesh &&mesh, const Da
         return;
 
     Plater *plater = app.plater();
-    if (plater->printer_technology() == ptSLA)
-        sla::reproject_points_and_holes(object);
+    // PNP fork (F12): SLA removed — no SLA support-point/hole reprojection.
     plater->changed_object(*object);
 }
 

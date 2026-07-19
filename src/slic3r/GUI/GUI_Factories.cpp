@@ -167,13 +167,7 @@ std::map<std::string, std::vector<SimpleSettingData>> SettingsFactory::PART_CATE
 
 std::vector<std::string> SettingsFactory::get_options(const bool is_part)
 {
-    if (printer_technology() == ptSLA) {
-        SLAPrintObjectConfig full_sla_config;
-        auto options = full_sla_config.keys();
-        options.erase(find(options.begin(), options.end(), "layer_height"));
-        return options;
-    }
-
+    // PNP fork (F12): SLA removed — always the FFF option set.
     PrintRegionConfig reg_config;
     auto options = reg_config.keys();
     if (!is_part) {

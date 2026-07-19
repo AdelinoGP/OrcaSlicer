@@ -24,7 +24,6 @@ add_executable(${_TEST_NAME}_tests
     test_nozzle_volume_type.cpp
     test_stl.cpp
     test_meshboolean.cpp
-    test_marchingsquares.cpp
     test_utils.cpp
     test_timeutils.cpp
     test_voronoi.cpp
@@ -33,10 +32,6 @@ add_executable(${_TEST_NAME}_tests
     test_indexed_triangle_set.cpp
     ../libnest2d/printer_parts.cpp
     )
-
-if (TARGET OpenVDB::openvdb)
-    target_sources(${_TEST_NAME}_tests PRIVATE test_hollowing.cpp)
-endif()
 
 target_link_libraries(${_TEST_NAME}_tests test_common libslic3r Catch2::Catch2WithMain)
 target_include_directories(${_TEST_NAME}_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)

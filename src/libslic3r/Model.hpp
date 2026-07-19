@@ -9,8 +9,6 @@
 #include "AppConfig.hpp"
 #include "PrintConfig.hpp"
 #include "Slicing.hpp"
-#include "SLA/SupportPoint.hpp"
-#include "SLA/Hollowing.hpp"
 #include "BrimEarsPoint.hpp"
 #include "TriangleMesh.hpp"
 #include "CustomGCode.hpp"
@@ -57,7 +55,6 @@ class ModelObject;
 class ModelVolume;
 class ModelWipeTower;
 class Print;
-class SLAPrint;
 class TriangleSelector;
 //BBS: add Preset
 class Preset;
@@ -374,17 +371,6 @@ public:
     // Whether or not this object is printable
     bool                    printable { true };
 
-    // This vector holds position of selected support points for SLA. The data are
-    // saved in mesh coordinates to allow using them for several instances.
-    // The format is (x, y, z, point_size, supports_island)
-    sla::SupportPoints      sla_support_points;
-    // To keep track of where the points came from (used for synchronization between
-    // the SLA gizmo and the backend).
-    sla::PointsStatus       sla_points_status = sla::PointsStatus::NoPoints;
-
-    // Holes to be drilled into the object so resin can flow out
-    sla::DrainHoles         sla_drain_holes;
-
     BrimPoints              brim_points;
 
     /* This vector accumulates the total translation applied to the object by the
@@ -661,7 +647,6 @@ private:
 
     // Called by Print::apply() to set the model pointer after making a copy.
     friend class Print;
-    friend class SLAPrint;
     void        set_model(Model *model) { m_model = model; }
 
     // Undo / Redo through the cereal serialization library
@@ -679,8 +664,8 @@ private:
         Internal::StaticSerializationWrapper<ModelConfigObject const> config_wrapper(config);
         Internal::StaticSerializationWrapper<LayerHeightProfile const> layer_heigth_profile_wrapper(layer_height_profile);
         ar(name, module_name, input_file, instances, volumes, config_wrapper, layer_config_ranges, layer_heigth_profile_wrapper,
-            sla_support_points, sla_points_status, sla_drain_holes, printable, origin_translation, brim_points,
-            m_bounding_box_approx, m_bounding_box_approx_valid, 
+            printable, origin_translation, brim_points,
+            m_bounding_box_approx, m_bounding_box_approx_valid,
             m_bounding_box_exact, m_bounding_box_exact_valid, m_min_max_z_valid,
             m_raw_bounding_box, m_raw_bounding_box_valid, m_raw_mesh_bounding_box, m_raw_mesh_bounding_box_valid,
             cut_connectors, cut_id);
@@ -692,8 +677,8 @@ private:
         // BBS: add backup, check modify
         SaveObjectGaurd gaurd(*this);
         ar(name, module_name, input_file, instances, volumes, config_wrapper, layer_config_ranges, layer_heigth_profile_wrapper,
-            sla_support_points, sla_points_status, sla_drain_holes, printable, origin_translation, brim_points,
-            m_bounding_box_approx, m_bounding_box_approx_valid, 
+            printable, origin_translation, brim_points,
+            m_bounding_box_approx, m_bounding_box_approx_valid,
             m_bounding_box_exact, m_bounding_box_exact_valid, m_min_max_z_valid,
             m_raw_bounding_box, m_raw_bounding_box_valid, m_raw_mesh_bounding_box, m_raw_mesh_bounding_box_valid,
             cut_connectors, cut_id);
@@ -1028,7 +1013,6 @@ public:
 
 protected:
 	friend class Print;
-    friend class SLAPrint;
     friend class Model;
 	friend class ModelObject;
     friend void model_volume_list_update_supports(ModelObject& model_object_dst, const ModelObject& model_object_new);
@@ -1376,7 +1360,6 @@ public:
 
 protected:
     friend class Print;
-    friend class SLAPrint;
     friend class Model;
     friend class ModelObject;
 

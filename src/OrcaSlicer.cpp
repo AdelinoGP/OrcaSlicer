@@ -56,13 +56,11 @@ using namespace nlohmann;
 #include "libslic3r/ModelArrange.hpp"
 #include "libslic3r/Platform.hpp"
 #include "libslic3r/Print.hpp"
-#include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/TriangleMesh.hpp"
 #include "libslic3r/Format/AMF.hpp"
 #include "libslic3r/Format/3mf.hpp"
 #include "libslic3r/Format/STL.hpp"
 #include "libslic3r/Format/OBJ.hpp"
-#include "libslic3r/Format/SL1.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Time.hpp"
 #include "libslic3r/Thread.hpp"
@@ -5561,8 +5559,6 @@ int CLI::run(int argc, char **argv)
             this->print_help();
         } else if (opt_key == "help_fff") {
             this->print_help(true, ptFFF);
-        } else if (opt_key == "help_sla") {
-            this->print_help(true, ptSLA);
         } else if (opt_key == "pipe") {
             //already processed before
         } else if (opt_key == "load_slicedata") {

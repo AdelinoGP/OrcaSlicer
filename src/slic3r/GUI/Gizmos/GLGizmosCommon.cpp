@@ -3,7 +3,6 @@
 #include <cassert>
 
 #include "slic3r/GUI/GLCanvas3D.hpp"
-#include "libslic3r/SLAPrint.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Camera.hpp"
 #include "slic3r/GUI/Plater.hpp"
@@ -114,7 +113,8 @@ void SelectionInfo::on_update()
     // if (selection.is_single_full_instance()) {
     if (!selection.is_empty()) {
         m_model_object = selection.get_model()->objects[selection.get_object_idx()];
-        m_z_shift = selection.get_first_volume()->get_sla_shift_z();
+        // PNP fork (F12): SLA removed — no elevation shift.
+        m_z_shift = 0.0;
     }
 }
 

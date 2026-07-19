@@ -2071,9 +2071,8 @@ void ObjectList::add_category_to_settings_from_selection(const std::vector< std:
                                                             _u8L("Object setting added");
     take_snapshot(snapshot_text);
 
-    const DynamicPrintConfig& from_config = printer_technology() == ptFFF ?
-                                            wxGetApp().preset_bundle->prints.get_edited_preset().config :
-                                            wxGetApp().preset_bundle->sla_prints.get_edited_preset().config;
+    // PNP fork (F12): SLA removed — always the FFF process preset.
+    const DynamicPrintConfig& from_config = wxGetApp().preset_bundle->prints.get_edited_preset().config;
 
     for (auto& opt : category_options) {
         auto& opt_key = opt.first;

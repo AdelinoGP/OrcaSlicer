@@ -453,8 +453,6 @@ public:
         enum FlagBits {
             DEFAULT                             = 0,
             RELOAD_SCENE                        = 1 << 1,
-            RELOAD_SLA_SUPPORT_POINTS           = 1 << 2,
-            RELOAD_SLA_PREVIEW                  = 1 << 3,
             // UPDATE_PRINT_STEP_WARNINGS is mutually exclusive with UPDATE_PRINT_OBJECT_STEP_WARNINGS.
             UPDATE_PRINT_STEP_WARNINGS          = 1 << 4,
             UPDATE_PRINT_OBJECT_STEP_WARNINGS   = 1 << 5

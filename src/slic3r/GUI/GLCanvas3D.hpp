@@ -49,7 +49,6 @@ class ModelInstance;
 struct TextInfo;
 class PrintObject;
 class Print;
-class SLAPrint;
 class PresetBundle;
 namespace CustomGCode { struct Item; }
 
@@ -1032,7 +1031,6 @@ public:
     void set_gcode_view_type(libvgcode::EViewType type) { return m_gcode_viewer.set_view_type(type); }
     libvgcode::EViewType get_gcode_view_type() const { return m_gcode_viewer.get_view_type(); }
 
-    void load_sla_preview();
     void bind_event_handlers();
     void unbind_event_handlers();
 
@@ -1203,7 +1201,6 @@ public:
     void update_sequential_clearance();
 
     const Print* fff_print() const;
-    const SLAPrint* sla_print() const;
 
     void reset_old_size() { m_old_size = { 0, 0 }; }
 
@@ -1298,7 +1295,6 @@ private:
 #if ENABLE_SHOW_CAMERA_TARGET
     void _render_camera_target();
 #endif // ENABLE_SHOW_CAMERA_TARGET
-    void _render_sla_slices();
     void _render_selection_sidebar_hints() { m_selection.render_sidebar_hints(m_sidebar_field, m_gizmos.get_uniform_scaling()); }
     //BBS: GUI refactor: adjust main toolbar position
     bool _render_orient_menu(float left, float right, float bottom, float top);
@@ -1313,9 +1309,6 @@ private:
     void _start_timer() { m_timer.Start(100, wxTIMER_CONTINUOUS); }
     void _stop_timer() { m_timer.Stop(); }
 
-    // Load SLA objects and support structures for objects, for which the slaposSliceSupports step has been finished.
-  	void _load_sla_shells();
-    void _update_sla_shells_outside_state() { check_volumes_outside_state(); }
     void _set_warning_notification_if_needed(EWarning warning);
 
     //BBS: add partplate print volume get function

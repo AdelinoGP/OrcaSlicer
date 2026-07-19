@@ -11,7 +11,6 @@
 
 #include "libslic3r/PrintBase.hpp"
 #include "libslic3r/GCode/ThumbnailData.hpp"
-#include "libslic3r/Format/SL1.hpp"
 #include "slic3r/Utils/PrintHost.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "PartPlate.hpp"
@@ -22,7 +21,6 @@ namespace Slic3r {
 
 class DynamicPrintConfig;
 class Model;
-class SLAPrint;
 
 class SlicingStatusEvent : public wxEvent
 {
@@ -85,7 +83,7 @@ public:
 	~BackgroundSlicingProcess();
 
 	void set_fff_print(Print *print) { m_fff_print = print; }
-    void set_sla_print(SLAPrint *print) { m_sla_print = print; m_sla_print->set_printer(&m_sla_archive); }
+	// PNP fork (F12): SLA removed — set_sla_print deleted.
 	void set_thumbnail_cb(ThumbnailsGeneratorCallback cb) { m_thumbnail_cb = cb; }
 	void set_gcode_result(GCodeProcessorResult* result) { m_gcode_result = result; }
 
@@ -121,7 +119,6 @@ public:
 	const PrintBase*    current_print() const { return m_print; }
 	const Print* 		fff_print() const { return m_fff_print; }
 	Print* 				fff_print() { return m_fff_print; }
-	const SLAPrint* 	sla_print() const { return m_sla_print; }
     // Take the project path (if provided), extract the name of the project, run it through the macro processor and save it next to the project file.
     // If the project_path is empty, just run output_filepath().
 	std::string 		output_filepath_for_project(const boost::filesystem::path &project_path);
@@ -212,9 +209,6 @@ private:
 	// Helper to wrap the FFF slicing & G-code generation.
 	void	process_fff();
 
-    // Temporary: for mimicking the fff file export behavior with the raster output
-    void	process_sla();
-
     // Call Print::process() and catch all exceptions into ex, thus no exception could be thrown
     // by this method. This exception behavior is required to combine C++ exceptions with Win32 SEH exceptions
     // on the same thread.
@@ -229,16 +223,14 @@ private:
 	void    	  call_process_seh_throw(std::exception_ptr &ex) throw();
 #endif // _WIN32
 
-	// Currently active print. It is one of m_fff_print and m_sla_print.
+	// Currently active print (PNP fork F12: SLA removed, always m_fff_print).
 	PrintBase				   *m_print 			 = nullptr;
 	// Non-owned pointers to Print instances.
 	Print 					   *m_fff_print 		 = nullptr;
-	SLAPrint 				   *m_sla_print			 = nullptr;
 	// Data structure, to which the G-code export writes its annotations.
 	GCodeProcessorResult     *m_gcode_result 		 = nullptr;
 	// Callback function, used to write thumbnails into gcode.
 	ThumbnailsGeneratorCallback m_thumbnail_cb 	     = nullptr;
-	SL1Archive                  m_sla_archive;
 		// Temporary G-code, there is one defined for the BackgroundSlicingProcess, differentiated from the other processes by a process ID.
 	std::string 				m_temp_output_path;
 	// Output path provided by the user. The output path may be set even if the slicing is running,

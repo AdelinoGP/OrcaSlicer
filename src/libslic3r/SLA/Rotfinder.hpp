@@ -9,7 +9,6 @@
 namespace Slic3r {
 
 class ModelObject;
-class SLAPrintObject;
 class TriangleMesh;
 class DynamicPrintConfig;
 

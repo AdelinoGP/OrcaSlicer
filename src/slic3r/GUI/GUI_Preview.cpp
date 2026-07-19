@@ -32,7 +32,6 @@
 
 // this include must follow the wxWidgets ones or it won't compile on Windows -> see http://trac.wxwidgets.org/ticket/2421
 #include "libslic3r/Print.hpp"
-#include "libslic3r/SLAPrint.hpp"
 #include "NotificationManager.hpp"
 
 #ifdef _WIN32

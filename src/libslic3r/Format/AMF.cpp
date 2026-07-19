@@ -757,27 +757,7 @@ void AMFParserContext::endElement(const char * /* name */)
                 }
                 m_object->layer_height_profile.set(std::move(data));
             }
-            else if (m_path.size() == 3 && m_path[1] == NODE_TYPE_OBJECT && m_object && strcmp(opt_key, "sla_support_points") == 0) {
-                // Parse object's layer height profile, a semicolon separated list of floats.
-                unsigned char coord_idx = 0;
-                Eigen::Matrix<float, 5, 1, Eigen::DontAlign> point(Eigen::Matrix<float, 5, 1, Eigen::DontAlign>::Zero());
-                char *p = m_value[1].data();
-                for (;;) {
-                    char *end = strchr(p, ';');
-                    if (end != nullptr)
-	                    *end = 0;
-
-                    point(coord_idx) = float(atof(p));
-                    if (++coord_idx == 5) {
-                        m_object->sla_support_points.push_back(sla::SupportPoint(point));
-                        coord_idx = 0;
-                    }
-					if (end == nullptr)
-						break;
-					p = end + 1;
-                }
-                m_object->sla_points_status = sla::PointsStatus::UserModified;
-            }
+            // PNP fork (F12): SLA removed — "sla_support_points" metadata is ignored.
             else if (m_path.size() == 5 && m_path[1] == NODE_TYPE_OBJECT && m_path[3] == NODE_TYPE_RANGE &&
                      m_object && strcmp(opt_key, "layer_height_range") == 0) {
                 // Parse object's layer_height_range, a semicolon separated doubles.
@@ -1202,17 +1182,7 @@ bool load_amf(const char *path, DynamicPrintConfig *config, ConfigSubstitutionCo
         }
 
 
-        const std::vector<sla::SupportPoint>& sla_support_points = object->sla_support_points;
-        if (!sla_support_points.empty()) {
-            // Store the SLA supports as a single semicolon separated list.
-            stream << "    <metadata type=\"slic3r.sla_support_points\">";
-            for (size_t i = 0; i < sla_support_points.size(); ++i) {
-                if (i != 0)
-                    stream << ";";
-                stream << sla_support_points[i].pos(0) << ";" << sla_support_points[i].pos(1) << ";" << sla_support_points[i].pos(2) << ";" << sla_support_points[i].head_front_radius << ";" << sla_support_points[i].is_new_island;
-            }
-            stream << "\n    </metadata>\n";
-        }
+        // PNP fork (F12): SLA removed — no SLA support points to write.
 
         stream << "    <mesh>\n";
         stream << "      <vertices>\n";

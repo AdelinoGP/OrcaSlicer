@@ -60,7 +60,6 @@
 #include <wx/fontutil.h>
 // Print now includes tbb, and tbb includes Windows. This breaks compilation of wxWidgets if included before wx.
 #include "libslic3r/Print.hpp"
-#include "libslic3r/SLAPrint.hpp"
 
 #include "wxExtensions.hpp"
 
@@ -2072,7 +2071,6 @@ void GLCanvas3D::render(bool only_init)
         // Depth pass for object-on-object and self shadows; consumed by the gouraud shader below.
         _render_shadows(camera.get_view_matrix(), camera.get_projection_matrix());
         _render_objects(GLVolumeCollection::ERenderType::Opaque, !m_gizmos.is_running());
-        _render_sla_slices();
         _render_selection();
         _render_objects(GLVolumeCollection::ERenderType::Transparent, !m_gizmos.is_running());
         _render_wireframe_overlay();
@@ -2080,7 +2078,6 @@ void GLCanvas3D::render(bool only_init)
     /* preview render */
     else if (m_canvas_type == ECanvasType::CanvasPreview && m_render_preview) {
         _render_objects(GLVolumeCollection::ERenderType::Opaque, !m_gizmos.is_running());
-        _render_sla_slices();
         _render_selection();
         _render_bed(camera.get_view_matrix(), camera.get_projection_matrix(), !camera.is_looking_downward(), m_show_world_axes);
         _render_platelist(camera.get_view_matrix(), camera.get_projection_matrix(), !camera.is_looking_downward(), only_current, true, hover_id);
@@ -2501,15 +2498,6 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
         size_t                      volume_idx;
     };
 
-    // SLA steps to pull the preview meshes for.
-	typedef std::array<SLAPrintObjectStep, 3> SLASteps;
-    SLASteps sla_steps = { slaposDrillHoles, slaposSupportTree, slaposPad };
-    struct SLASupportState {
-        std::array<PrintStateBase::StateWithTimeStamp, std::tuple_size<SLASteps>::value> step;
-    };
-    // State of the sla_steps for all SLAPrintObjects.
-    std::vector<SLASupportState>   sla_support_state;
-
     std::vector<size_t> instance_ids_selected;
     std::vector<size_t> map_glvolume_old_to_new(m_volumes.volumes.size(), size_t(-1));
     std::vector<GLVolumeState> deleted_volumes;
@@ -2550,33 +2538,6 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
             }
         }
     }
-    if (printer_technology == ptSLA) {
-        const SLAPrint* sla_print = this->sla_print();
-#ifndef NDEBUG
-        // Verify that the SLAPrint object is synchronized with m_model.
-        check_model_ids_equal(*m_model, sla_print->model());
-#endif /* NDEBUG */
-        sla_support_state.reserve(sla_print->objects().size());
-        for (const SLAPrintObject* print_object : sla_print->objects()) {
-            SLASupportState state;
-            for (size_t istep = 0; istep < sla_steps.size(); ++istep) {
-                state.step[istep] = print_object->step_state_with_timestamp(sla_steps[istep]);
-                if (state.step[istep].state == PrintStateBase::DONE) {
-                    if (!print_object->has_mesh(sla_steps[istep]))
-                        // Consider the DONE step without a valid mesh as invalid for the purpose
-                        // of mesh visualization.
-                        state.step[istep].state = PrintStateBase::INVALID;
-                    else if (sla_steps[istep] != slaposDrillHoles)
-                        for (const ModelInstance* model_instance : print_object->model_object()->instances)
-                            // Only the instances, which are currently printable, will have the SLA support structures kept.
-                            // The instances outside the print bed will have the GLVolumes of their support structures released.
-                            if (model_instance->is_printable())
-                                aux_volume_state.emplace_back(state.step[istep].timestamp, model_instance->id());
-                }
-            }
-            sla_support_state.emplace_back(state);
-        }
-    }
     std::sort(model_volume_state.begin(), model_volume_state.end(), model_volume_state_lower);
     std::sort(aux_volume_state.begin(), aux_volume_state.end(), model_volume_state_lower);
 
@@ -2599,12 +2560,10 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
         ModelVolumeState  key(volume);
         ModelVolumeState* mvs = nullptr;
         if (volume->volume_idx() < 0) {
+            // PNP fork (F12): SLA removed — aux_volume_state is never populated, but keep the lookup harmless.
             auto it = std::lower_bound(aux_volume_state.begin(), aux_volume_state.end(), key, model_volume_state_lower);
             if (it != aux_volume_state.end() && it->geometry_id == key.geometry_id)
-                // This can be an SLA support structure that should not be rendered (in case someone used undo
-                // to revert to before it was generated). We only reuse the volume if that's not the case.
-                if (m_model->objects[volume->composite_id.object_id]->sla_points_status != sla::PointsStatus::NoPoints)
-                    mvs = &(*it);
+                mvs = &(*it);
         }
         else {
             auto it = std::lower_bound(model_volume_state.begin(), model_volume_state.end(), key, model_volume_state_lower);
@@ -2641,7 +2600,6 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
         }
         else {
             // This GLVolume will be reused.
-            volume->set_sla_shift_z(0.0);
             map_glvolume_old_to_new[volume_id] = glvolumes_new.size();
             mvs->volume_idx = glvolumes_new.size();
             glvolumes_new.emplace_back(volume);
@@ -2756,98 +2714,6 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
                 }
             }
         }
-    }
-    if (printer_technology == ptSLA) {
-        size_t idx = 0;
-        const SLAPrint *sla_print = this->sla_print();
-		std::vector<double> shift_zs(m_model->objects.size(), 0);
-        double relative_correction_z = sla_print->relative_correction().z();
-        if (relative_correction_z <= EPSILON)
-            relative_correction_z = 1.;
-		for (const SLAPrintObject *print_object : sla_print->objects()) {
-            SLASupportState   &state        = sla_support_state[idx ++];
-            const ModelObject *model_object = print_object->model_object();
-            // Find an index of the ModelObject
-            int object_idx;
-            // There may be new SLA volumes added to the scene for this print_object.
-            // Find the object index of this print_object in the Model::objects list.
-            auto it = std::find(sla_print->model().objects.begin(), sla_print->model().objects.end(), model_object);
-            assert(it != sla_print->model().objects.end());
-			object_idx = it - sla_print->model().objects.begin();
-			// Cache the Z offset to be applied to all volumes with this object_idx.
-			shift_zs[object_idx] = print_object->get_current_elevation() / relative_correction_z;
-            // Collect indices of this print_object's instances, for which the SLA support meshes are to be added to the scene.
-            // pairs of <instance_idx, print_instance_idx>
-			std::vector<std::pair<size_t, size_t>> instances[std::tuple_size<SLASteps>::value];
-            for (size_t print_instance_idx = 0; print_instance_idx < print_object->instances().size(); ++ print_instance_idx) {
-                const SLAPrintObject::Instance &instance = print_object->instances()[print_instance_idx];
-                // Find index of ModelInstance corresponding to this SLAPrintObject::Instance.
-				auto it = std::find_if(model_object->instances.begin(), model_object->instances.end(),
-                    [&instance](const ModelInstance *mi) { return mi->id() == instance.instance_id; });
-                assert(it != model_object->instances.end());
-                int instance_idx = it - model_object->instances.begin();
-                for (size_t istep = 0; istep < sla_steps.size(); ++ istep)
-                    if (sla_steps[istep] == slaposDrillHoles) {
-                    	// Hollowing is a special case, where the mesh from the backend is being loaded into the 1st volume of an instance,
-                    	// not into its own GLVolume.
-                        // There shall always be such a GLVolume allocated.
-                        ModelVolumeState key(model_object->volumes.front()->id(), instance.instance_id);
-                        auto it = std::lower_bound(model_volume_state.begin(), model_volume_state.end(), key, model_volume_state_lower);
-                        assert(it != model_volume_state.end() && it->geometry_id == key.geometry_id);
-                        assert(!it->new_geometry());
-                        GLVolume &volume = *m_volumes.volumes[it->volume_idx];
-                        if (! volume.offsets.empty() && state.step[istep].timestamp != volume.offsets.front()) {
-                        	// The backend either produced a new hollowed mesh, or it invalidated the one that the front end has seen.
-                            volume.model.reset();
-                            if (state.step[istep].state == PrintStateBase::DONE) {
-                                TriangleMesh mesh = print_object->get_mesh(slaposDrillHoles);
-	                            assert(! mesh.empty());
-                                mesh.transform(sla_print->sla_trafo(*m_model->objects[volume.object_idx()]).inverse());
-                                volume.model.init_from(mesh);
-                                volume.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<TriangleMesh>(mesh));
-                            }
-                            else {
-	                        	// Reload the original volume.
-                                const TriangleMesh& new_mesh = m_model->objects[volume.object_idx()]->volumes[volume.volume_idx()]->mesh();
-                                volume.model.init_from(new_mesh);
-                                volume.mesh_raycaster = std::make_unique<GUI::MeshRaycaster>(std::make_shared<TriangleMesh>(new_mesh));
-                            }
-	                    }
-                    	//FIXME it is an ugly hack to write the timestamp into the "offsets" field to not have to add another member variable
-                    	// to the GLVolume. We should refactor GLVolume significantly, so that the GLVolume will not contain member variables
-                    	// of various concenrs (model vs. 3D print path).
-                    	volume.offsets = { state.step[istep].timestamp };
-                    }
-                    else if (state.step[istep].state == PrintStateBase::DONE) {
-                        // Check whether there is an existing auxiliary volume to be updated, or a new auxiliary volume to be created.
-						ModelVolumeState key(state.step[istep].timestamp, instance.instance_id.id);
-						auto it = std::lower_bound(aux_volume_state.begin(), aux_volume_state.end(), key, model_volume_state_lower);
-						assert(it != aux_volume_state.end() && it->geometry_id == key.geometry_id);
-                    	if (it->new_geometry()) {
-                            // This can be an SLA support structure that should not be rendered (in case someone used undo
-                            // to revert to before it was generated). If that's the case, we should not generate anything.
-                            if (model_object->sla_points_status != sla::PointsStatus::NoPoints)
-                                instances[istep].emplace_back(std::pair<size_t, size_t>(instance_idx, print_instance_idx));
-                            else
-                                shift_zs[object_idx] = 0.;
-                        }
-                        else {
-                            // Recycling an old GLVolume. Update the Object/Instance indices into the current Model.
-                            m_volumes.volumes[it->volume_idx]->composite_id = GLVolume::CompositeID(object_idx, m_volumes.volumes[it->volume_idx]->volume_idx(), instance_idx);
-                            m_volumes.volumes[it->volume_idx]->set_instance_transformation(model_object->instances[instance_idx]->get_transformation());
-                        }
-                    }
-            }
-
-            for (size_t istep = 0; istep < sla_steps.size(); ++istep)
-                if (!instances[istep].empty())
-                    m_volumes.load_object_auxiliary(print_object, object_idx, instances[istep], sla_steps[istep], state.step[istep].timestamp);
-        }
-
-		// Shift-up all volumes of the object so that it has the right elevation with respect to the print bed
-		for (GLVolume* volume : m_volumes.volumes)
-			if (volume->object_idx() < (int)m_model->objects.size() && m_model->objects[volume->object_idx()]->instances[volume->instance_idx()]->is_printable())
-				volume->set_sla_shift_z(shift_zs[volume->object_idx()]);
     }
 
     // BBS
@@ -3114,19 +2980,6 @@ void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult& gcode_result, co
 
     set_as_dirty();
     request_extra_frame();
-}
-
-void GLCanvas3D::load_sla_preview()
-{
-    const SLAPrint* print = sla_print();
-    if (m_canvas != nullptr && print != nullptr) {
-        _set_current();
-	    // Release OpenGL data before generating new data.
-	    reset_volumes();
-        _load_sla_shells();
-        _update_sla_shells_outside_state();
-        _set_warning_notification_if_needed(EWarning::SlaSupportsOutside);
-    }
 }
 
 void GLCanvas3D::bind_event_handlers()
@@ -7260,10 +7113,6 @@ void GLCanvas3D::_picking_pass()
     {
         if (m_volumes.volumes[hit.raycaster_id]->is_wipe_tower)
             object_type = "Volume (Wipe tower)";
-        else if (m_volumes.volumes[hit.raycaster_id]->volume_idx() == -int(slaposPad))
-            object_type = "Volume (SLA pad)";
-        else if (m_volumes.volumes[hit.raycaster_id]->volume_idx() == -int(slaposSupportTree))
-            object_type = "Volume (SLA supports)";
         else if (m_volumes.volumes[hit.raycaster_id]->is_modifier)
             object_type = "Volume (Modifier)";
         else
@@ -9962,137 +9811,6 @@ void GLCanvas3D::_render_camera_target()
 }
 #endif // ENABLE_SHOW_CAMERA_TARGET
 
-void GLCanvas3D::_render_sla_slices()
-{
-    if (!m_use_clipping_planes || current_printer_technology() != ptSLA)
-        return;
-
-    const SLAPrint* print = this->sla_print();
-    const PrintObjects& print_objects = print->objects();
-    if (print_objects.empty())
-        // nothing to render, return
-        return;
-
-    double clip_min_z = -m_clipping_planes[0].get_data()[3];
-    double clip_max_z = m_clipping_planes[1].get_data()[3];
-    for (unsigned int i = 0; i < (unsigned int)print_objects.size(); ++i) {
-        const SLAPrintObject* obj = print_objects[i];
-
-        if (!obj->is_step_done(slaposSliceSupports))
-            continue;
-
-        SlaCap::ObjectIdToModelsMap::iterator it_caps_bottom = m_sla_caps[0].triangles.find(i);
-        SlaCap::ObjectIdToModelsMap::iterator it_caps_top = m_sla_caps[1].triangles.find(i);
-        {
-            if (it_caps_bottom == m_sla_caps[0].triangles.end())
-                it_caps_bottom = m_sla_caps[0].triangles.emplace(i, SlaCap::Triangles()).first;
-            if (!m_sla_caps[0].matches(clip_min_z)) {
-                m_sla_caps[0].z = clip_min_z;
-                it_caps_bottom->second.object.reset();
-                it_caps_bottom->second.supports.reset();
-            }
-            if (it_caps_top == m_sla_caps[1].triangles.end())
-                it_caps_top = m_sla_caps[1].triangles.emplace(i, SlaCap::Triangles()).first;
-            if (!m_sla_caps[1].matches(clip_max_z)) {
-                m_sla_caps[1].z = clip_max_z;
-                it_caps_top->second.object.reset();
-                it_caps_top->second.supports.reset();
-            }
-        }
-        GLModel& bottom_obj_triangles = it_caps_bottom->second.object;
-        GLModel& bottom_sup_triangles = it_caps_bottom->second.supports;
-        GLModel& top_obj_triangles = it_caps_top->second.object;
-        GLModel& top_sup_triangles = it_caps_top->second.supports;
-
-        auto init_model = [](GLModel& model, const Pointf3s& triangles, const ColorRGBA& color) {
-            GLModel::Geometry init_data;
-            init_data.format = { GLModel::Geometry::EPrimitiveType::Triangles, GLModel::Geometry::EVertexLayout::P3 };
-            init_data.reserve_vertices(triangles.size());
-            init_data.reserve_indices(triangles.size() / 3);
-            init_data.color = color;
-
-            unsigned int vertices_count = 0;
-            for (const Vec3d& v : triangles) {
-                init_data.add_vertex((Vec3f)v.cast<float>());
-                ++vertices_count;
-                if (vertices_count % 3 == 0) {
-                    init_data.add_triangle(vertices_count - 3, vertices_count - 2, vertices_count - 1);
-                }
-            }
-
-            if (!init_data.is_empty())
-                model.init_from(std::move(init_data));
-        };
-
-        if ((!bottom_obj_triangles.is_initialized() || !bottom_sup_triangles.is_initialized() ||
-            !top_obj_triangles.is_initialized() || !top_sup_triangles.is_initialized()) && !obj->get_slice_index().empty()) {
-            double layer_height         = print->default_object_config().layer_height.value;
-            double initial_layer_height = print->material_config().initial_layer_height.value;
-            bool   left_handed          = obj->is_left_handed();
-
-            coord_t key_zero = obj->get_slice_index().front().print_level();
-            // Slice at the center of the slab starting at clip_min_z will be rendered for the lower plane.
-            coord_t key_low  = coord_t((clip_min_z - initial_layer_height + layer_height) / SCALING_FACTOR) + key_zero;
-            // Slice at the center of the slab ending at clip_max_z will be rendered for the upper plane.
-            coord_t key_high = coord_t((clip_max_z - initial_layer_height) / SCALING_FACTOR) + key_zero;
-
-            const SliceRecord& slice_low  = obj->closest_slice_to_print_level(key_low, coord_t(SCALED_EPSILON));
-            const SliceRecord& slice_high = obj->closest_slice_to_print_level(key_high, coord_t(SCALED_EPSILON));
-
-            // Offset to avoid OpenGL Z fighting between the object's horizontal surfaces and the triangluated surfaces of the cuts.
-            double plane_shift_z = 0.002;
-
-            if (slice_low.is_valid()) {
-                const ExPolygons& obj_bottom = slice_low.get_slice(soModel);
-                const ExPolygons& sup_bottom = slice_low.get_slice(soSupport);
-                // calculate model bottom cap
-                // calculate model bottom cap
-                if (!bottom_obj_triangles.is_initialized() && !obj_bottom.empty())
-                    init_model(bottom_obj_triangles, triangulate_expolygons_3d(obj_bottom, clip_min_z - plane_shift_z, !left_handed), { 1.0f, 0.37f, 0.0f, 1.0f });
-                // calculate support bottom cap
-                if (!bottom_sup_triangles.is_initialized() && !sup_bottom.empty())
-                    init_model(bottom_sup_triangles, triangulate_expolygons_3d(sup_bottom, clip_min_z - plane_shift_z, !left_handed), { 1.0f, 0.0f, 0.37f, 1.0f });
-            }
-
-            if (slice_high.is_valid()) {
-                const ExPolygons& obj_top = slice_high.get_slice(soModel);
-                const ExPolygons& sup_top = slice_high.get_slice(soSupport);
-                // calculate model top cap
-                // calculate model top cap
-                if (!top_obj_triangles.is_initialized() && !obj_top.empty())
-                    init_model(top_obj_triangles, triangulate_expolygons_3d(obj_top, clip_max_z + plane_shift_z, left_handed), { 1.0f, 0.37f, 0.0f, 1.0f });
-                // calculate support top cap
-                if (!top_sup_triangles.is_initialized() && !sup_top.empty())
-                    init_model(top_sup_triangles, triangulate_expolygons_3d(sup_top, clip_max_z + plane_shift_z, left_handed), { 1.0f, 0.0f, 0.37f, 1.0f });
-            }
-        }
-
-        GLShaderProgram* shader = wxGetApp().get_shader("flat");
-        if (shader != nullptr) {
-            shader->start_using();
-
-            for (const SLAPrintObject::Instance& inst : obj->instances()) {
-                const Camera& camera = wxGetApp().plater()->get_camera();
-                const Transform3d view_model_matrix = camera.get_view_matrix() *
-                    Geometry::assemble_transform(Vec3d(unscale<double>(inst.shift.x()), unscale<double>(inst.shift.y()), 0.0),
-                        inst.rotation * Vec3d::UnitZ(), Vec3d::Ones(),
-                        obj->is_left_handed() ? Vec3d(-1.0f, 1.0f, 1.0f) : Vec3d::Ones());
-
-                shader->set_uniform("view_model_matrix", view_model_matrix);
-                shader->set_uniform("projection_matrix", camera.get_projection_matrix());
-
-                bottom_obj_triangles.render();
-                top_obj_triangles.render();
-                bottom_sup_triangles.render();
-                top_sup_triangles.render();
-
-            }
-
-            shader->stop_using();
-        }
-    }
-}
-
 void GLCanvas3D::_update_volumes_hover_state()
 {
     for (GLVolume* v : m_volumes.volumes) {
@@ -10222,50 +9940,6 @@ Vec3d GLCanvas3D::_mouse_to_bed_3d(const Point& mouse_pos)
 // 1) This function only loads objects, for which the step slaposSliceSupports already finished. Therefore objects outside of the print bed never load.
 // 2) This function loads object mesh with the relative scaling correction (the "relative_correction" parameter) was applied,
 // 	  therefore the mesh may be slightly larger or smaller than the mesh shown in the 3D scene.
-void GLCanvas3D::_load_sla_shells()
-{
-    const SLAPrint* print = this->sla_print();
-    if (print->objects().empty())
-        // nothing to render, return
-        return;
-
-    auto add_volume = [this](const SLAPrintObject &object, int volume_id, const SLAPrintObject::Instance& instance,
-        const TriangleMesh& mesh, const ColorRGBA& color, bool outside_printer_detection_enabled) {
-        m_volumes.volumes.emplace_back(new GLVolume(color));
-        GLVolume& v = *m_volumes.volumes.back();
-        v.model.init_from(mesh);
-        v.shader_outside_printer_detection_enabled = outside_printer_detection_enabled;
-        v.composite_id.volume_id = volume_id;
-        v.set_instance_offset(unscale(instance.shift.x(), instance.shift.y(), 0.0));
-        v.set_instance_rotation({ 0.0, 0.0, (double)instance.rotation });
-        v.set_instance_mirror(X, object.is_left_handed() ? -1. : 1.);
-        v.set_convex_hull(mesh.convex_hull_3d());
-    };
-
-    // adds objects' volumes
-    for (const SLAPrintObject* obj : print->objects())
-        if (obj->is_step_done(slaposSliceSupports)) {
-            unsigned int initial_volumes_count = (unsigned int)m_volumes.volumes.size();
-            for (const SLAPrintObject::Instance& instance : obj->instances()) {
-                add_volume(*obj, 0, instance, obj->get_mesh_to_print(), GLVolume::MODEL_COLOR[0], true);
-                // Set the extruder_id and volume_id to achieve the same color as in the 3D scene when
-                // through the update_volumes_colors_by_extruder() call.
-                m_volumes.volumes.back()->extruder_id = obj->model_object()->volumes.front()->extruder_id();
-                if (obj->is_step_done(slaposSupportTree) && obj->has_mesh(slaposSupportTree))
-                    add_volume(*obj, -int(slaposSupportTree), instance, obj->support_mesh(), GLVolume::SLA_SUPPORT_COLOR, true);
-                if (obj->is_step_done(slaposPad) && obj->has_mesh(slaposPad))
-                    add_volume(*obj, -int(slaposPad), instance, obj->pad_mesh(), GLVolume::SLA_PAD_COLOR, false);
-            }
-            double shift_z = obj->get_current_elevation();
-            for (unsigned int i = initial_volumes_count; i < m_volumes.volumes.size(); ++ i) {
-                // apply shift z
-                m_volumes.volumes[i]->set_sla_shift_z(shift_z);
-            }
-        }
-
-    update_volumes_colors_by_extruder();
-}
-
 void GLCanvas3D::_set_warning_notification_if_needed(EWarning warning)
 {
     _set_current();
@@ -10836,12 +10510,6 @@ void GLCanvas3D::highlight_gizmo(const std::string& gizmo_name)
 const Print* GLCanvas3D::fff_print() const
 {
     return (m_process == nullptr) ? nullptr : m_process->fff_print();
-}
-
-const SLAPrint* GLCanvas3D::sla_print() const
-{
-    // PNP fork (F09): SLA short-circuit, removed in F12.
-    return nullptr;
 }
 
 void GLCanvas3D::WipeTowerInfo::apply_wipe_tower(Vec2d pos, double rot) const

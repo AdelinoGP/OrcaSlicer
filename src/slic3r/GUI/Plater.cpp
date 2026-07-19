@@ -56,13 +56,9 @@
 #include "libslic3r/Format/bbs_3mf.hpp"
 #include "libslic3r/GCode/ThumbnailData.hpp"
 #include "libslic3r/Model.hpp"
-#include "libslic3r/SLA/Hollowing.hpp"
-#include "libslic3r/SLA/SupportPoint.hpp"
-#include "libslic3r/SLA/ReprojectPointsOnMesh.hpp"
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/Print.hpp"
 #include "libslic3r/PrintConfig.hpp"
-#include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "slic3r/Utils/CrealityPrint.hpp"
@@ -99,8 +95,6 @@
 #include "Jobs/ArrangeJob.hpp"
 #include "Jobs/FillBedJob.hpp"
 #include "Jobs/RotoptimizeJob.hpp"
-#include "Jobs/SLAImportJob.hpp"
-#include "Jobs/SLAImportDialog.hpp"
 #include "Jobs/PrintJob.hpp"
 #include "Jobs/NotificationProgressIndicator.hpp"
 #include "Jobs/PlaterWorker.hpp"
@@ -5196,7 +5190,7 @@ struct Plater::priv
     // Data
     Slic3r::DynamicPrintConfig *config;        // FIXME: leak?
     Slic3r::Print               fff_print;
-    Slic3r::SLAPrint            sla_print;
+    // PNP fork (F12): SLA removed — no SLAPrint member.
     Slic3r::Model               model;
     PrinterTechnology           printer_technology = ptFFF;
     Slic3r::GCodeProcessorResult gcode_result;
@@ -5260,7 +5254,7 @@ struct Plater::priv
     // UIThreadWorker can be used as a replacement for BoostThreadWorker if
     // no additional worker threads are desired (useful for debugging or profiling)
     PlaterWorker<BoostThreadWorker> m_worker;
-    SLAImportDialog *               m_sla_import_dlg;
+    // PNP fork (F12): SLA removed — no SLA import dialog.
 
     int                         m_job_prepare_state;
 
@@ -5700,7 +5694,6 @@ private:
     bool layers_height_allowed() const;
 
     void update_fff_scene();
-    void update_sla_scene();
 
     void undo_redo_to(std::vector<UndoRedo::Snapshot>::const_iterator it_snapshot);
     void update_after_undo_redo(const UndoRedo::Snapshot& snapshot, bool temp_snapshot_was_taken = false);
@@ -5797,7 +5790,6 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     , sidebar(new Sidebar(q))
     , notification_manager(std::make_unique<NotificationManager>(q))
     , m_worker{q, std::make_unique<NotificationProgressIndicator>(notification_manager.get()), "ui_worker"}
-    , m_sla_import_dlg{new SLAImportDialog{q}}
     , m_job_prepare_state(Job::JobPrepareState::PREPARE_STATE_DEFAULT)
     , delayed_scene_refresh(false)
     , collapse_toolbar(GLToolbar::Normal, "Collapse")
@@ -9218,14 +9210,6 @@ void Plater::priv::update_fff_scene_only_shells(bool only_shells)
     }
 }
 
-void Plater::priv::update_sla_scene()
-{
-    // Update the SLAPrint from the current Model, so that the reload_scene()
-    // pulls the correct data.
-    delayed_scene_refresh = false;
-    this->update_restart_background_process(true, true);
-}
-
 bool Plater::priv::replace_volume_with_stl(int object_idx, int volume_idx, const fs::path& new_path, const std::string& snapshot)
 {
     const std::string path = new_path.string();
@@ -9332,7 +9316,6 @@ bool Plater::priv::replace_volume_with_stl(int object_idx, int volume_idx, const
     // update new name in ObjectList
     sidebar->obj_list()->update_name_in_list(object_idx, volume_idx);
 
-    sla::reproject_points_and_holes(old_model_object);
 
     return true;
 }
@@ -9866,7 +9849,6 @@ void Plater::priv::reload_from_disk()
                 if (!sinking) old_model_object->ensure_on_bed();
                 old_model_object->sort_volumes(wxGetApp().app_config->get("order_volumes") == "1");
 
-                sla::reproject_points_and_holes(old_model_object);
 
                 // Fix warning icon in object list
                 wxGetApp().obj_list()->update_item_error_icon(obj_idx, vol_idx);
@@ -9939,7 +9921,6 @@ void Plater::priv::reload_from_disk()
                     old_model_object->ensure_on_bed();
                 old_model_object->sort_volumes(true);
 
-                sla::reproject_points_and_holes(old_model_object);
             }
         }
 #endif // ENABLE_RELOAD_FROM_DISK_REWORK
@@ -10615,26 +10596,11 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
             plate_list.get_curr_plate()->update_slicing_percent(evt.status.percent);
     }
 
-    if (evt.status.flags & (PrintBase::SlicingStatus::RELOAD_SCENE | PrintBase::SlicingStatus::RELOAD_SLA_SUPPORT_POINTS)) {
-        switch (this->printer_technology) {
-        case ptFFF:
-            //BBS: add slice project logic, only display shells at the beginning
-            if (!m_slice_all || (m_cur_slice_plate == (partplate_list.get_plate_count() - 1)))
-                //this->update_fff_scene();
-                this->update_fff_scene_only_shells();
-            break;
-        case ptSLA:
-            // If RELOAD_SLA_SUPPORT_POINTS, then the SLA gizmo is updated (reload_scene calls update_gizmos_data)
-            if (view3D->is_dragging())
-                delayed_scene_refresh = true;
-            else
-                this->update_sla_scene();
-            break;
-        default: break;
-        }
-    } else if (evt.status.flags & PrintBase::SlicingStatus::RELOAD_SLA_PREVIEW) {
-        // Update the SLA preview. Only called if not RELOAD_SLA_SUPPORT_POINTS, as the block above will refresh the preview anyways.
-        this->preview->reload_print();
+    if (evt.status.flags & PrintBase::SlicingStatus::RELOAD_SCENE) {
+        //BBS: add slice project logic, only display shells at the beginning
+        if (!m_slice_all || (m_cur_slice_plate == (partplate_list.get_plate_count() - 1)))
+            //this->update_fff_scene();
+            this->update_fff_scene_only_shells();
     }
 
     if (evt.status.flags & (PrintBase::SlicingStatus::UPDATE_PRINT_STEP_WARNINGS | PrintBase::SlicingStatus::UPDATE_PRINT_OBJECT_STEP_WARNINGS)) {
@@ -10684,13 +10650,9 @@ void Plater::priv::on_slicing_completed(wxCommandEvent & evt)
     if (view3D->is_dragging()) // updating scene now would interfere with the gizmo dragging
         delayed_scene_refresh = true;
     else {
-        if (this->printer_technology == ptFFF) {
-            //BBS: only reload shells
-            this->update_fff_scene_only_shells(false);
-            //this->update_fff_scene();
-        }
-        else
-            this->update_sla_scene();
+        //BBS: only reload shells (PNP fork F12: SLA removed, always FFF)
+        this->update_fff_scene_only_shells(false);
+        //this->update_fff_scene();
     }
     BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format("exit.");
 }
@@ -10885,12 +10847,9 @@ void Plater::priv::on_process_completed(SlicingProcessCompletedEvent &evt)
     if (view3D->is_dragging()) // updating scene now would interfere with the gizmo dragging
         delayed_scene_refresh = true;
     else {
-        if (this->printer_technology == ptFFF) {
-            if (is_finished)
-                this->update_fff_scene();
-        }
-        else
-            this->update_sla_scene();
+        // PNP fork (F12): SLA removed, always FFF.
+        if (is_finished)
+            this->update_fff_scene();
     }
 
     //BBS: add slice&&print status update logic
@@ -11514,7 +11473,7 @@ void Plater::priv::on_right_click(RBtnEvent& evt)
                    is_part                  ? menus.assemble_part_menu()   : menus.assemble_multi_selection_menu();
             } else {
                 if (is_some_full_instances)
-                    menu = printer_technology == ptSLA ? menus.sla_object_menu() : menus.object_menu();
+                    menu = menus.object_menu(); // PNP fork (F12): SLA removed.
                 else if (is_part) {
                     const GLVolume* gl_volume = selection.get_first_volume();
                     const ModelVolume *model_volume = get_model_volume(*gl_volume, selection.get_model()->objects);
@@ -11555,7 +11514,8 @@ void Plater::priv::on_3dcanvas_mouse_dragging_finished(SimpleEvent&)
 {
     if (delayed_scene_refresh) {
         delayed_scene_refresh = false;
-        update_sla_scene();
+        // PNP fork (F12): SLA removed — refresh the FFF scene.
+        update_fff_scene();
     }
 
     //partplate_list.reload_all_objects();
@@ -12917,8 +12877,6 @@ const Model&    Plater::model() const       { return p->model; }
 Model&          Plater::model()             { return p->model; }
 const Print&    Plater::fff_print() const   { return p->fff_print; }
 Print&          Plater::fff_print()         { return p->fff_print; }
-const SLAPrint& Plater::sla_print() const   { return p->sla_print; }
-SLAPrint&       Plater::sla_print()         { return p->sla_print; }
 
 int Plater::new_project(bool skip_confirm, bool silent, const wxString& project_name)
 {
@@ -13650,11 +13608,7 @@ void Plater::import_zip_archive()
 
 void Plater::import_sl1_archive()
 {
-    auto &w = get_ui_job_worker();
-    if (w.is_idle() && p->m_sla_import_dlg->ShowModal() == wxID_OK) {
-        p->take_snapshot(_u8L("Import SLA archive"));
-        replace_job(w, std::make_unique<SLAImportJob>(p->m_sla_import_dlg));
-    }
+    // PNP fork (F12): SLA removed — importing SLA archives is no longer supported.
 }
 
 void Plater::extract_config_from_project()
@@ -15326,85 +15280,18 @@ void Plater::export_stl(bool extended, bool selection_only, bool multi_stls, Fil
         return mesh;
     };
 #endif
-    auto mesh_to_export_sla = [&, this](const ModelObject& mo, int instance_id) {
-        TriangleMesh mesh;
-
-        const SLAPrintObject *object = this->p->sla_print.get_print_object_by_model_object_id(mo.id());
-
-        if (auto m = object->get_mesh_to_print(); m.empty())
-            mesh = combine_mesh_fff(mo, instance_id, [this](const std::string& msg) {return get_notification_manager()->push_general_error_notification(msg); });
-        else {
-            const Transform3d mesh_trafo_inv = object->trafo().inverse();
-            const bool is_left_handed = object->is_left_handed();
-
-            auto pad_mesh = extended? object->pad_mesh() : TriangleMesh{};
-            pad_mesh.transform(mesh_trafo_inv);
-
-            auto supports_mesh = extended ? object->support_mesh() : TriangleMesh{};
-            supports_mesh.transform(mesh_trafo_inv);
-
-            const std::vector<SLAPrintObject::Instance>& obj_instances = object->instances();
-            for (const SLAPrintObject::Instance& obj_instance : obj_instances) {
-                auto it = std::find_if(object->model_object()->instances.begin(), object->model_object()->instances.end(),
-                                       [&obj_instance](const ModelInstance *mi) { return mi->id() == obj_instance.instance_id; });
-                assert(it != object->model_object()->instances.end());
-
-                if (it != object->model_object()->instances.end()) {
-                    const bool one_inst_only = selection_only && ! selection.is_single_full_object();
-
-                    const int instance_idx = it - object->model_object()->instances.begin();
-                    const Transform3d& inst_transform = one_inst_only
-                                                            ? Transform3d::Identity()
-                                                            : object->model_object()->instances[instance_idx]->get_transformation().get_matrix();
-
-                    TriangleMesh inst_mesh;
-
-                    if (!pad_mesh.empty()) {
-                        TriangleMesh inst_pad_mesh = pad_mesh;
-                        inst_pad_mesh.transform(inst_transform, is_left_handed);
-                        inst_mesh.merge(inst_pad_mesh);
-                    }
-
-                    if (!supports_mesh.empty()) {
-                        TriangleMesh inst_supports_mesh = supports_mesh;
-                        inst_supports_mesh.transform(inst_transform, is_left_handed);
-                        inst_mesh.merge(inst_supports_mesh);
-                    }
-
-                    TriangleMesh inst_object_mesh = object->get_mesh_to_print();
-
-                    inst_object_mesh.transform(mesh_trafo_inv);
-                    inst_object_mesh.transform(inst_transform, is_left_handed);
-
-                    inst_mesh.merge(inst_object_mesh);
-
-                           // ensure that the instance lays on the bed
-                    inst_mesh.translate(0.0f, 0.0f, -inst_mesh.bounding_box().min.z());
-
-                           // merge instance with global mesh
-                    mesh.merge(inst_mesh);
-
-                    if (one_inst_only)
-                        break;
-                }
-            }
-        }
-
-        return mesh;
-    };
+    // PNP fork (F12): SLA removed — mesh_to_export_sla lambda deleted.
 
     std::function<TriangleMesh(const ModelObject& mo, int instance_id)>
         mesh_to_export;
 
-    if (p->printer_technology == ptFFF)
+    // PNP fork (F12): SLA removed — always the FFF export path.
 #if EXPORT_WITH_BOOLEAN
-        mesh_to_export = [this](const ModelObject& mo, int instance_id) {return Plater::combine_mesh_fff(mo, instance_id,
-            [this](const std::string& msg) {return get_notification_manager()->push_general_error_notification(msg); }); };
+    mesh_to_export = [this](const ModelObject& mo, int instance_id) {return Plater::combine_mesh_fff(mo, instance_id,
+        [this](const std::string& msg) {return get_notification_manager()->push_general_error_notification(msg); }); };
 #else
-        mesh_to_export = mesh_to_export_fff_no_boolean;
+    mesh_to_export = mesh_to_export_fff_no_boolean;
 #endif
-    else
-        mesh_to_export = mesh_to_export_sla;
 
     auto get_save_file = [file_type](std::string const & dir, std::string const & name) {
         std::string ext = "";
@@ -15920,11 +15807,7 @@ void Plater::reslice()
         return;
     }
 
-    if (printer_technology() == ptSLA) {
-        for (auto& object : model().objects)
-            if (object->sla_points_status == sla::PointsStatus::NoPoints)
-                object->sla_points_status = sla::PointsStatus::Generating;
-    }
+    // PNP fork (F12): SLA removed — no SLA support-point status to seed.
 
     //FIXME Don't reslice if export of G-code or sending to OctoPrint is running.
     // bitmask of UpdateBackgroundProcessReturnState
@@ -16107,47 +15990,9 @@ int Plater::start_next_slice()
 }
 
 
-void Plater::reslice_SLA_supports(const ModelObject &object, bool postpone_error_messages)
-{
-    reslice_SLA_until_step(slaposPad, object, postpone_error_messages);
-}
+// PNP fork (F12): reslice_SLA_supports / reslice_SLA_hollowing / reslice_SLA_until_step
+// removed with the SLA cut.
 
-void Plater::reslice_SLA_hollowing(const ModelObject &object, bool postpone_error_messages)
-{
-    reslice_SLA_until_step(slaposDrillHoles, object, postpone_error_messages);
-}
-
-void Plater::reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &object, bool postpone_error_messages)
-{
-    // PNP fork (F09): SLA short-circuit, removed in F12 — PnpSlicingProcess is
-    // FFF-only, so partial SLA reslicing is a no-op.
-    (void)step; (void)object; (void)postpone_error_messages;
-    return;
-#if 0
-    //FIXME Don't reslice if export of G-code or sending to OctoPrint is running.
-    // bitmask of UpdateBackgroundProcessReturnState
-    unsigned int state = this->p->update_background_process(true, postpone_error_messages);
-    if (state & priv::UPDATE_BACKGROUND_PROCESS_REFRESH_SCENE)
-        this->p->view3D->reload_scene(false);
-
-    if (this->p->background_process.empty() || (state & priv::UPDATE_BACKGROUND_PROCESS_INVALID))
-        // Nothing to do on empty input or invalid configuration.
-        return;
-
-    // Limit calculation to the single object only.
-    PrintBase::TaskParams task;
-    task.single_model_object = object.id();
-    // If the background processing is not enabled, calculate supports just for the single instance.
-    // Otherwise calculate everything, but start with the provided object.
-    if (!this->p->background_processing_enabled()) {
-        task.single_model_instance_only = true;
-        task.to_object_step = step;
-    }
-    this->p->background_process.set_task(task);
-    // and let the background processing start.
-    this->p->restart_background_process(state | priv::UPDATE_BACKGROUND_PROCESS_FORCE_RESTART);
-#endif
-}
 void Plater::send_gcode_legacy(int plate_idx, Export3mfProgressFn proFn)
 {
     // if physical_printer is selected, send gcode for this printer
@@ -17217,7 +17062,6 @@ void Plater::clear_before_change_mesh(int obj_idx)
 void Plater::changed_mesh(int obj_idx)
 {
     ModelObject* mo = model().objects[obj_idx];
-    sla::reproject_points_and_holes(mo);
     update();
     p->object_list_changed();
     p->schedule_background_process();

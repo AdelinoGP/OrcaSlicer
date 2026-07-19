@@ -30,12 +30,10 @@ enum class SLAGizmoEventType : unsigned char {
 #include "slic3r/GUI/Gizmos/GLGizmoMoveScale.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoRotate.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoFlatten.hpp"
-#include "slic3r/GUI/Gizmos/GLGizmoSlaSupports.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoFdmSupports.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoFuzzySkin.hpp"
 #include "slic3r/GUI/Gizmos/GLGizmoMmuSegmentation.hpp"
 // BBS
 #include "slic3r/GUI/Gizmos/GLGizmoAdvancedCut.hpp"
-#include "slic3r/GUI/Gizmos/GLGizmoHollow.hpp"
 
 #endif //slic3r_GLGizmos_hpp_

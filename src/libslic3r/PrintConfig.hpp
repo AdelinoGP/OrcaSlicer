@@ -307,25 +307,6 @@ enum LiftType {
     SlopeLift
 };
 
-enum SLAMaterial {
-    slamTough,
-    slamFlex,
-    slamCasting,
-    slamDental,
-    slamHeatResistant,
-};
-
-enum SLADisplayOrientation {
-    sladoLandscape,
-    sladoPortrait
-};
-
-enum SLAPillarConnectionMode {
-    slapcmZigZag,
-    slapcmCross,
-    slapcmDynamic
-};
-
 enum BrimType {
     btAutoBrim,  // BBS
     btEar, // Orca
@@ -652,8 +633,6 @@ CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SupportMaterialInterfacePattern)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SupportType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SeamPosition)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SeamScarfType)
-CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLADisplayOrientation)
-CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(SLAPillarConnectionMode)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BrimType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(TimelapseType)
 CONFIG_OPTION_ENUM_DECLARE_STATIC_MAPS(BedType)
@@ -700,7 +679,6 @@ private:
     void init_common_params();
     void init_fff_params();
     void init_extruder_option_keys();
-    void init_sla_params();
 
     std::vector<std::string>    m_extruder_option_keys;
     std::vector<std::string>    m_extruder_retract_keys;
@@ -1900,207 +1878,6 @@ PRINT_CONFIG_CLASS_DERIVED_DEFINE0(
 // Validate the FullPrintConfig. Returns an empty string on success, otherwise an error message is returned.
 std::map<std::string, std::string> validate(const FullPrintConfig &config, bool under_cli = false);
 
-PRINT_CONFIG_CLASS_DEFINE(
-    SLAPrintConfig,
-    ((ConfigOptionString,     filename_format))
-)
-
-PRINT_CONFIG_CLASS_DEFINE(
-    SLAPrintObjectConfig,
-
-    ((ConfigOptionFloat, layer_height))
-
-    //Number of the layers needed for the exposure time fade [3;20]
-    ((ConfigOptionInt,  faded_layers))/*= 10*/
-
-    ((ConfigOptionFloat, slice_closing_radius))
-
-    // Enabling or disabling support creation
-    ((ConfigOptionBool,  supports_enable))
-
-    // Diameter in mm of the pointing side of the head.
-    ((ConfigOptionFloat, support_head_front_diameter))/*= 0.2*/
-
-    // How much the pinhead has to penetrate the model surface
-    ((ConfigOptionFloat, support_head_penetration))/*= 0.2*/
-
-    // Width in mm from the back sphere center to the front sphere center.
-    ((ConfigOptionFloat, support_head_width))/*= 1.0*/
-
-    // Radius in mm of the support pillars.
-    ((ConfigOptionFloat, support_pillar_diameter))/*= 0.8*/
-
-    // The percentage of smaller pillars compared to the normal pillar diameter
-    // which are used in problematic areas where a normal pilla cannot fit.
-    ((ConfigOptionPercent, support_small_pillar_diameter_percent))
-
-    // How much bridge (supporting another pinhead) can be placed on a pillar.
-    ((ConfigOptionInt,   support_max_bridges_on_pillar))
-
-    // How the pillars are bridged together
-    ((ConfigOptionEnum<SLAPillarConnectionMode>, support_pillar_connection_mode))
-
-    // Generate only ground facing supports
-    ((ConfigOptionBool, support_buildplate_only))
-
-    // TODO: unimplemented at the moment. This coefficient will have an impact
-    // when bridges and pillars are merged. The resulting pillar should be a bit
-    // thicker than the ones merging into it. How much thicker? I don't know
-    // but it will be derived from this value.
-    ((ConfigOptionFloat, support_pillar_widening_factor))
-
-    // Radius in mm of the pillar base.
-    ((ConfigOptionFloat, support_base_diameter))/*= 2.0*/
-
-    // The height of the pillar base cone in mm.
-    ((ConfigOptionFloat, support_base_height))/*= 1.0*/
-
-    // The minimum distance of the pillar base from the model in mm.
-    ((ConfigOptionFloat, support_base_safety_distance)) /*= 1.0*/
-
-    // The default angle for connecting support sticks and junctions.
-    ((ConfigOptionFloat, support_critical_angle))/*= 45*/
-
-    // The max length of a bridge in mm
-    ((ConfigOptionFloat, support_max_bridge_length))/*= 15.0*/
-
-    // The max distance of two pillars to get cross linked.
-    ((ConfigOptionFloat, support_max_pillar_link_distance))
-
-    // The elevation in Z direction upwards. This is the space between the pad
-    // and the model object's bounding box bottom. Units in mm.
-    ((ConfigOptionFloat, support_object_elevation))/*= 5.0*/
-
-    /////// Following options influence automatic support points placement:
-    ((ConfigOptionInt, support_points_density_relative))
-    ((ConfigOptionFloat, support_points_minimal_distance))
-
-    // Now for the base pool (pad) /////////////////////////////////////////////
-
-    // Enabling or disabling support creation
-    ((ConfigOptionBool,  pad_enable))
-
-    // The thickness of the pad walls
-    ((ConfigOptionFloat, pad_wall_thickness))/*= 2*/
-
-    // The height of the pad from the bottom to the top not considering the pit
-    ((ConfigOptionFloat, pad_wall_height))/*= 5*/
-
-    // How far should the pad extend around the contained geometry
-    ((ConfigOptionFloat, pad_brim_size))
-
-    // The greatest distance where two individual pads are merged into one. The
-    // distance is measured roughly from the centroids of the pads.
-    ((ConfigOptionFloat, pad_max_merge_distance))/*= 50*/
-
-    // The smoothing radius of the pad edges
-    // ((ConfigOptionFloat, pad_edge_radius))/*= 1*/;
-
-    // The slope of the pad wall...
-    ((ConfigOptionFloat, pad_wall_slope))
-
-    // /////////////////////////////////////////////////////////////////////////
-    // Zero elevation mode parameters:
-    //    - The object pad will be derived from the model geometry.
-    //    - There will be a gap between the object pad and the generated pad
-    //      according to the support_base_safety_distance parameter.
-    //    - The two pads will be connected with tiny connector sticks
-    // /////////////////////////////////////////////////////////////////////////
-
-    // Disable the elevation (ignore its value) and use the zero elevation mode
-    ((ConfigOptionBool, pad_around_object))
-
-    ((ConfigOptionBool, pad_around_object_everywhere))
-
-    // This is the gap between the object bottom and the generated pad
-    ((ConfigOptionFloat, pad_object_gap))
-
-    // How far to place the connector sticks on the object pad perimeter
-    ((ConfigOptionFloat, pad_object_connector_stride))
-
-    // The width of the connectors sticks
-    ((ConfigOptionFloat, pad_object_connector_width))
-
-    // How much should the tiny connectors penetrate into the model body
-    ((ConfigOptionFloat, pad_object_connector_penetration))
-
-    // /////////////////////////////////////////////////////////////////////////
-    // Model hollowing parameters:
-    //   - Models can be hollowed out as part of the SLA print process
-    //   - Thickness of the hollowed model walls can be adjusted
-    //   -
-    //   - Additional holes will be drilled into the hollow model to allow for
-    //   - resin removal.
-    // /////////////////////////////////////////////////////////////////////////
-
-    ((ConfigOptionBool, hollowing_enable))
-
-    // The minimum thickness of the model walls to maintain. Note that the
-    // resulting walls may be thicker due to smoothing out fine cavities where
-    // resin could stuck.
-    ((ConfigOptionFloat, hollowing_min_thickness))
-
-    // Indirectly controls the voxel size (resolution) used by openvdb
-    ((ConfigOptionFloat, hollowing_quality))
-
-    // Indirectly controls the minimum size of created cavities.
-    ((ConfigOptionFloat, hollowing_closing_distance))
-)
-
-enum SLAMaterialSpeed { slamsSlow, slamsFast };
-
-PRINT_CONFIG_CLASS_DEFINE(
-    SLAMaterialConfig,
-
-    ((ConfigOptionFloat,                       initial_layer_height))
-    ((ConfigOptionFloat,                       bottle_cost))
-    ((ConfigOptionFloat,                       bottle_volume))
-    ((ConfigOptionFloat,                       bottle_weight))
-    ((ConfigOptionFloat,                       material_density))
-    ((ConfigOptionFloat,                       exposure_time))
-    ((ConfigOptionFloat,                       initial_exposure_time))
-    ((ConfigOptionFloats,                      material_correction))
-    ((ConfigOptionFloat,                       material_correction_x))
-    ((ConfigOptionFloat,                       material_correction_y))
-    ((ConfigOptionFloat,                       material_correction_z))
-    ((ConfigOptionEnum<SLAMaterialSpeed>,      material_print_speed))
-)
-
-PRINT_CONFIG_CLASS_DEFINE(
-    SLAPrinterConfig,
-
-    ((ConfigOptionEnum<PrinterTechnology>,    printer_technology))
-    ((ConfigOptionPoints,                     printable_area))
-    ((ConfigOptionFloat,                      printable_height))
-    ((ConfigOptionFloat,                      display_width))
-    ((ConfigOptionFloat,                      display_height))
-    ((ConfigOptionInt,                        display_pixels_x))
-    ((ConfigOptionInt,                        display_pixels_y))
-    ((ConfigOptionEnum<SLADisplayOrientation>,display_orientation))
-    ((ConfigOptionBool,                       display_mirror_x))
-    ((ConfigOptionBool,                       display_mirror_y))
-    ((ConfigOptionFloats,                     relative_correction))
-    ((ConfigOptionFloat,                      relative_correction_x))
-    ((ConfigOptionFloat,                      relative_correction_y))
-    ((ConfigOptionFloat,                      relative_correction_z))
-    ((ConfigOptionFloat,                      absolute_correction))
-    ((ConfigOptionFloat,                      elefant_foot_compensation))
-    ((ConfigOptionFloat,                      elefant_foot_min_width))
-    ((ConfigOptionFloat,                      gamma_correction))
-    ((ConfigOptionFloat,                      fast_tilt_time))
-    ((ConfigOptionFloat,                      slow_tilt_time))
-    ((ConfigOptionFloat,                      area_fill))
-    ((ConfigOptionFloat,                      min_exposure_time))
-    ((ConfigOptionFloat,                      max_exposure_time))
-    ((ConfigOptionFloat,                      min_initial_exposure_time))
-    ((ConfigOptionFloat,                      max_initial_exposure_time))
-)
-
-PRINT_CONFIG_CLASS_DERIVED_DEFINE0(
-    SLAFullPrintConfig,
-    (SLAPrinterConfig, SLAPrintConfig, SLAPrintObjectConfig, SLAMaterialConfig)
-)
-
 #undef STATIC_PRINT_CONFIG_CACHE
 #undef STATIC_PRINT_CONFIG_CACHE_BASE
 #undef STATIC_PRINT_CONFIG_CACHE_DERIVED
@@ -2257,7 +2034,6 @@ bool is_XL_printer(const PrintConfig &cfg);
 Polygon get_shared_poly(const std::vector<Pointfs>& extruder_polys);
 Points get_bed_shape(const DynamicPrintConfig &cfg, bool use_share = true);
 Points get_bed_shape(const PrintConfig &cfg, bool use_share = false);
-Points get_bed_shape(const SLAPrinterConfig &cfg);
 Slic3r::Polygons get_bed_excluded_area(const PrintConfig& cfg);
 Slic3r::Polygon get_bed_shape_with_excluded_area(const PrintConfig& cfg, bool use_share = false);
 bool has_skirt(const DynamicPrintConfig& cfg);

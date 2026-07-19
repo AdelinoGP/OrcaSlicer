@@ -91,9 +91,8 @@ bool ObjectTableSettings::update_settings_list(bool is_object, bool is_multiple_
     const auto printer_technology   = wxGetApp().plater()->printer_technology();
 
     // update config values according to configuration hierarchy
-    m_current_config   = printer_technology == ptFFF ?
-                                        wxGetApp().preset_bundle->prints.get_edited_preset().config :
-                                        wxGetApp().preset_bundle->sla_prints.get_edited_preset().config;
+    // PNP fork (F12): SLA removed — always the FFF process preset.
+    m_current_config   = wxGetApp().preset_bundle->prints.get_edited_preset().config;
 
     //ConfigManipulation config_manipulation(load_config, toggle_field, nullptr, config);
 

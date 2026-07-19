@@ -1,6 +1,6 @@
 ---
 title: SLA full cut incl. 3MF SLA-project detection
-status: open
+status: active
 batch: B6
 blocked-by: [F11]
 files: [src/libslic3r/SLAPrint.cpp, src/libslic3r/SLA/, src/libslic3r/PrintConfig.cpp, src/libslic3r/Model.hpp, src/libslic3r/Format/bbs_3mf.cpp, src/slic3r/GUI/Plater.cpp, src/slic3r/GUI/GLCanvas3D.cpp, src/slic3r/GUI/Tab.cpp, src/slic3r/GUI/ConfigWizard.cpp, src/libslic3r/CMakeLists.txt]

@@ -8,9 +8,9 @@
 #include <libslic3r/Optimize/BruteforceOptimizer.hpp>
 #include <libslic3r/Optimize/NLoptOptimizer.hpp>
 
-#include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
+#include <libslic3r/Model.hpp>
 #include <libslic3r/Geometry.hpp>
 
 #include <thread>
@@ -193,10 +193,14 @@ XYRotation from_transform3f(const Transform3f &tr)
     return {rot3.x(), rot3.y()};
 }
 
-inline bool is_on_floor(const SLAPrintObjectConfig &cfg)
+// PNP: SLAPrintObjectConfig was removed with the SLA cut. Read the two
+// elevation-related options generically so this FFF-usable orientation
+// optimizer keeps compiling and behaving. Absent keys (the FFF case) default
+// to "on floor", which matches an object resting directly on the bed.
+inline bool is_on_floor(const DynamicPrintConfig &cfg)
 {
-    auto opt_elevation = cfg.support_object_elevation.getFloat();
-    auto opt_padaround = cfg.pad_around_object.getBool();
+    double opt_elevation = cfg.has("support_object_elevation") ? cfg.opt_float("support_object_elevation") : 0.;
+    bool   opt_padaround = cfg.has("pad_around_object") ? cfg.opt_bool("pad_around_object") : false;
 
     return opt_elevation < EPSILON || opt_padaround;
 }
@@ -357,7 +361,7 @@ Vec2d find_least_supports_rotation(const ModelObject &      mo,
 {
     RotfinderBoilerplate<1000> bp{mo, params};
 
-    SLAPrintObjectConfig pocfg;
+    DynamicPrintConfig pocfg;
     if (params.print_config())
         pocfg.apply(*params.print_config(), true);
 

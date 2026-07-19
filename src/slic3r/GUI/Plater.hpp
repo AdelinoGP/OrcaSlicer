@@ -46,14 +46,12 @@ class Model;
 class ModelObject;
 class ModelInstance;
 class Print;
-class SLAPrint;
 //BBS: add partplatelist and SlicingStatusEvent
 class PartPlateList;
 class SlicingStatusEvent;
 class BackgroundSlicingProcess;
 // PNP fork (F09): Plater now slices through PnpSlicingProcess (pnp_cli subprocess seam).
 namespace GUI { class PnpSlicingProcess; }
-enum SLAPrintObjectStep : unsigned int;
 enum class ConversionType : int;
 class DevAms;
 
@@ -312,8 +310,6 @@ public:
     Model& model();
     const Print& fff_print() const;
     Print& fff_print();
-    const SLAPrint& sla_print() const;
-    SLAPrint& sla_print();
 
     int new_project(bool skip_confirm = false, bool silent = false, const wxString& project_name = wxString());
     // BBS: save & backup
@@ -515,9 +511,6 @@ public:
     void export_toolpaths_to_obj() const;
     void reslice();
     void record_slice_preset(std::string action);
-    void reslice_SLA_supports(const ModelObject &object, bool postpone_error_messages = false);
-    void reslice_SLA_hollowing(const ModelObject &object, bool postpone_error_messages = false);
-    void reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &object, bool postpone_error_messages = false);
 
     void clear_before_change_mesh(int obj_idx);
     void changed_mesh(int obj_idx);

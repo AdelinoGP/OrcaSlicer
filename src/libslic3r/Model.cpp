@@ -1116,9 +1116,6 @@ ModelObject& ModelObject::assign_copy(const ModelObject &rhs)
     // Copies the config's ID
     this->config                      = rhs.config;
     assert(this->config.id() == rhs.config.id());
-    this->sla_support_points          = rhs.sla_support_points;
-    this->sla_points_status           = rhs.sla_points_status;
-    this->sla_drain_holes             = rhs.sla_drain_holes;
     this->brim_points                 = rhs.brim_points;
     this->layer_config_ranges         = rhs.layer_config_ranges;
     this->layer_height_profile        = rhs.layer_height_profile;
@@ -1156,9 +1153,6 @@ ModelObject& ModelObject::assign_copy(ModelObject &&rhs)
     // Moves the config's ID
     this->config                      = std::move(rhs.config);
     assert(this->config.id() == rhs.config.id());
-    this->sla_support_points          = std::move(rhs.sla_support_points);
-    this->sla_points_status           = std::move(rhs.sla_points_status);
-    this->sla_drain_holes             = std::move(rhs.sla_drain_holes);
     this->brim_points                 = std::move(rhs.brim_points);
     this->layer_config_ranges         = std::move(rhs.layer_config_ranges);
     this->layer_height_profile        = std::move(rhs.layer_height_profile);
@@ -1820,9 +1814,6 @@ void ModelObject::convert_units(ModelObjectPtrs& new_objects, ConversionType con
                  conv_type == ConversionType::CONV_FROM_METER  ? 1000.f : conv_type == ConversionType::CONV_TO_METER ? 0.001f         : 1.f;
 
     new_object->set_model(nullptr);
-    new_object->sla_support_points.clear();
-    new_object->sla_drain_holes.clear();
-    new_object->sla_points_status = sla::PointsStatus::NoPoints;
     new_object->brim_points.clear();
     new_object->clear_volumes();
     new_object->input_file.clear();
@@ -1931,9 +1922,6 @@ void ModelObject::clone_for_cut(ModelObject **obj)
 {
     (*obj) = ModelObject::new_clone(*this);
     (*obj)->set_model(this->get_model());
-    (*obj)->sla_support_points.clear();
-    (*obj)->sla_drain_holes.clear();
-    (*obj)->sla_points_status = sla::PointsStatus::NoPoints;
     (*obj)->clear_volumes();
     (*obj)->input_file.clear();
 }
@@ -2181,9 +2169,6 @@ ModelObjectPtrs ModelObject::merge_volumes(std::vector<int>& vol_indeces)
 
     ModelObject* upper = ModelObject::new_clone(*this);
     upper->set_model(nullptr);
-    upper->sla_support_points.clear();
-    upper->sla_drain_holes.clear();
-    upper->sla_points_status = sla::PointsStatus::NoPoints;
     upper->brim_points.clear();
     upper->clear_volumes();
     upper->input_file.clear();

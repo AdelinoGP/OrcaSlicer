@@ -6614,7 +6614,8 @@ bool Tab::select_preset(
         // whether to discard the changes or keep the current print selection.
         PresetWithVendorProfile printer_profile = m_preset_bundle->printers.get_edited_preset_with_vendor_profile();
         PrinterTechnology  printer_technology = printer_profile.preset.printer_technology();
-        PresetCollection  &dependent = (printer_technology == ptFFF) ? m_preset_bundle->filaments : m_preset_bundle->sla_materials;
+        // PNP fork (F12): SLA removed — dependent is always filaments.
+        PresetCollection  &dependent = m_preset_bundle->filaments;
         bool 			   old_preset_dirty = dependent.current_is_dirty();
         bool 			   new_preset_compatible = is_compatible_with_print(dependent.get_edited_preset_with_vendor_profile(),
         	m_presets->get_preset_with_vendor_profile(*m_presets->find_preset(preset_name, true)), printer_profile);
@@ -6622,7 +6623,7 @@ bool Tab::select_preset(
             canceled = old_preset_dirty && ! may_discard_current_dirty_preset(&dependent, preset_name) && ! new_preset_compatible && !force_select;
         if (! canceled) {
             // The preset will be switched to a different, compatible preset, or the '-- default --'.
-            m_dependent_tabs.emplace_back((printer_technology == ptFFF) ? Preset::Type::TYPE_FILAMENT : Preset::Type::TYPE_SLA_MATERIAL);
+            m_dependent_tabs.emplace_back(Preset::Type::TYPE_FILAMENT);
             if (old_preset_dirty && ! new_preset_compatible)
                 dependent.discard_current_changes();
         }
@@ -7627,8 +7628,9 @@ wxSizer* Tab::compatible_widget_create(wxWindow* parent, PresetDependencies &dep
     {
         // Collect names of non-default non-external profiles.
         PrinterTechnology printer_technology = m_preset_bundle->printers.get_edited_preset().printer_technology();
+        // PNP fork (F12): SLA removed — non-printer dependents are always prints.
         PresetCollection &depending_presets  = (deps.type == Preset::TYPE_PRINTER) ? m_preset_bundle->printers :
-                (printer_technology == ptFFF) ? m_preset_bundle->prints : m_preset_bundle->sla_prints;
+                m_preset_bundle->prints;
         wxArrayString presets;
         for (size_t idx = 0; idx < depending_presets.size(); ++ idx)
         {
@@ -8558,300 +8560,6 @@ const ConfigOptionsGroupShp Page::get_optgroup(const wxString& title) const
     }
 
     return nullptr;
-}
-
-void TabSLAMaterial::build()
-{
-    m_presets = &m_preset_bundle->sla_materials;
-    load_initial_data();
-
-    //auto page = add_options_page(L("Material"), "");
-
-    //auto optgroup = page->new_optgroup(L("Material"));
-    //optgroup->append_single_option_line("material_colour");
-    //optgroup->append_single_option_line("bottle_cost");
-    //optgroup->append_single_option_line("bottle_volume");
-    //optgroup->append_single_option_line("bottle_weight");
-    //optgroup->append_single_option_line("material_density");
-
-    //optgroup->m_on_change = [this, optgroup](t_config_option_key opt_key, boost::any value)
-    //{
-    //    if (opt_key == "material_colour") {
-    //        update_dirty();
-    //        on_value_change(opt_key, value);
-    //        return;
-    //    }
-
-    //    DynamicPrintConfig new_conf = *m_config;
-
-    //    if (opt_key == "bottle_volume") {
-    //        double new_bottle_weight =  boost::any_cast<double>(value)*(new_conf.option("material_density")->getFloat() / 1000);
-    //        new_conf.set_key_value("bottle_weight", new ConfigOptionFloat(new_bottle_weight));
-    //    }
-    //    if (opt_key == "bottle_weight") {
-    //        double new_bottle_volume =  boost::any_cast<double>(value)/new_conf.option("material_density")->getFloat() * 1000;
-    //        new_conf.set_key_value("bottle_volume", new ConfigOptionFloat(new_bottle_volume));
-    //    }
-    //    if (opt_key == "material_density") {
-    //        double new_bottle_volume = new_conf.option("bottle_weight")->getFloat() / boost::any_cast<double>(value) * 1000;
-    //        new_conf.set_key_value("bottle_volume", new ConfigOptionFloat(new_bottle_volume));
-    //    }
-
-    //    load_config(new_conf);
-
-    //    update_dirty();
-
-    //    // BBS
-    //    // Change of any from those options influences for an update of "Sliced Info"
-    //    //wxGetApp().sidebar().Layout();
-    //};
-
-    //optgroup = page->new_optgroup(L("Layers"));
-    //optgroup->append_single_option_line("initial_layer_height");
-
-    //optgroup = page->new_optgroup(L("Exposure"));
-    //optgroup->append_single_option_line("exposure_time");
-    //optgroup->append_single_option_line("initial_exposure_time");
-
-    //optgroup = page->new_optgroup(L("Corrections"));
-    //auto line = Line{ m_config->def()->get("material_correction")->full_label, "" };
-    //for (auto& axis : { "X", "Y", "Z" }) {
-    //    auto opt = optgroup->get_option(std::string("material_correction_") + char(std::tolower(axis[0])));
-    //    opt.opt.label = axis;
-    //    line.append_option(opt);
-    //}
-
-    //optgroup->append_line(line);
-
-    //page = add_options_page(L("Dependencies"), "wrench.png");
-    //optgroup = page->new_optgroup(L("Profile dependencies"));
-
-    //create_line_with_widget(optgroup.get(), "compatible_printers", "", [this](wxWindow* parent) {
-    //    return compatible_widget_create(parent, m_compatible_printers);
-    //});
-    //
-    //Option option = optgroup->get_option("compatible_printers_condition");
-    //option.opt.full_width = true;
-    //optgroup->append_single_option_line(option);
-
-    //create_line_with_widget(optgroup.get(), "compatible_prints", "", [this](wxWindow* parent) {
-    //    return compatible_widget_create(parent, m_compatible_prints);
-    //});
-
-    //option = optgroup->get_option("compatible_prints_condition");
-    //option.opt.full_width = true;
-    //optgroup->append_single_option_line(option);
-
-    //build_preset_description_line(optgroup.get());
-
-    //page = add_options_page(L("Material printing profile"), "printer.png");
-    //optgroup = page->new_optgroup(L("Material printing profile"));
-    //option = optgroup->get_option("material_print_speed");
-    //optgroup->append_single_option_line(option);
-}
-
-// Reload current config (aka presets->edited_preset->config) into the UI fields.
-void TabSLAMaterial::reload_config()
-{
-    this->compatible_widget_reload(m_compatible_printers);
-    this->compatible_widget_reload(m_compatible_prints);
-    Tab::reload_config();
-}
-
-void TabSLAMaterial::toggle_options()
-{
-    const Preset &current_printer = m_preset_bundle->printers.get_edited_preset();
-    std::string model = current_printer.config.opt_string("printer_model");
-    m_config_manipulation.toggle_field("material_print_speed", model != "SL1");
-}
-
-void TabSLAMaterial::update()
-{
-    if (m_preset_bundle->printers.get_selected_preset().printer_technology() == ptFFF)
-        return;
-
-    update_description_lines();
-    Layout();
-
-// #ys_FIXME. Just a template for this function
-//     m_update_cnt++;
-//     ! something to update
-//     m_update_cnt--;
-//
-//     if (m_update_cnt == 0)
-        wxGetApp().mainframe->on_config_changed(m_config);
-}
-
-void TabSLAPrint::build()
-{
-    m_presets = &m_preset_bundle->sla_prints;
-    load_initial_data();
-
-//    auto page = add_options_page(L("Layers and perimeters"), "layers");
-//
-//    auto optgroup = page->new_optgroup(L("Layers"));
-//    optgroup->append_single_option_line("layer_height");
-//    optgroup->append_single_option_line("faded_layers");
-//
-//    page = add_options_page(L("Supports"), "support"/*"sla_supports"*/);
-//    optgroup = page->new_optgroup(L("Supports"));
-//    optgroup->append_single_option_line("supports_enable");
-//
-//    optgroup = page->new_optgroup(L("Support head"));
-//    optgroup->append_single_option_line("support_head_front_diameter");
-//    optgroup->append_single_option_line("support_head_penetration");
-//    optgroup->append_single_option_line("support_head_width");
-//
-//    optgroup = page->new_optgroup(L("Support pillar"));
-//    optgroup->append_single_option_line("support_pillar_diameter");
-//    optgroup->append_single_option_line("support_small_pillar_diameter_percent");
-//    optgroup->append_single_option_line("support_max_bridges_on_pillar");
-//
-//    optgroup->append_single_option_line("support_pillar_connection_mode");
-//    optgroup->append_single_option_line("support_buildplate_only");
-//    // TODO: This parameter is not used at the moment.
-//    // optgroup->append_single_option_line("support_pillar_widening_factor");
-//    optgroup->append_single_option_line("support_base_diameter");
-//    optgroup->append_single_option_line("support_base_height");
-//    optgroup->append_single_option_line("support_base_safety_distance");
-//
-//    // Mirrored parameter from Pad page for toggling elevation on the same page
-//    optgroup->append_single_option_line("support_object_elevation");
-//
-//    Line line{ "", "" };
-//    line.full_width = 1;
-//    line.widget = [this](wxWindow* parent) {
-//        return description_line_widget(parent, &m_support_object_elevation_description_line);
-//    };
-//    optgroup->append_line(line);
-//
-//    optgroup = page->new_optgroup(L("Connection of the support sticks and junctions"));
-//    optgroup->append_single_option_line("support_critical_angle");
-//    optgroup->append_single_option_line("support_max_bridge_length");
-//    optgroup->append_single_option_line("support_max_pillar_link_distance");
-//
-//    optgroup = page->new_optgroup(L("Automatic generation"));
-//    optgroup->append_single_option_line("support_points_density_relative");
-//    optgroup->append_single_option_line("support_points_minimal_distance");
-//
-//    page = add_options_page(L("Pad"), "");
-//    optgroup = page->new_optgroup(L("Pad"));
-//    optgroup->append_single_option_line("pad_enable");
-//    optgroup->append_single_option_line("pad_wall_thickness");
-//    optgroup->append_single_option_line("pad_wall_height");
-//    optgroup->append_single_option_line("pad_brim_size");
-//    optgroup->append_single_option_line("pad_max_merge_distance");
-//    // TODO: Disabling this parameter for the beta release
-////    optgroup->append_single_option_line("pad_edge_radius");
-//    optgroup->append_single_option_line("pad_wall_slope");
-//
-//    optgroup->append_single_option_line("pad_around_object");
-//    optgroup->append_single_option_line("pad_around_object_everywhere");
-//    optgroup->append_single_option_line("pad_object_gap");
-//    optgroup->append_single_option_line("pad_object_connector_stride");
-//    optgroup->append_single_option_line("pad_object_connector_width");
-//    optgroup->append_single_option_line("pad_object_connector_penetration");
-//
-//    page = add_options_page(L("Hollowing"), "hollowing");
-//    optgroup = page->new_optgroup(L("Hollowing"));
-//    optgroup->append_single_option_line("hollowing_enable");
-//    optgroup->append_single_option_line("hollowing_min_thickness");
-//    optgroup->append_single_option_line("hollowing_quality");
-//    optgroup->append_single_option_line("hollowing_closing_distance");
-//
-//    page = add_options_page(L("Advanced"), "advanced");
-//    optgroup = page->new_optgroup(L("Slicing"));
-//    optgroup->append_single_option_line("slice_closing_radius");
-//    optgroup->append_single_option_line("slicing_mode");
-//
-//    page = add_options_page(L("Output options"), "output+page_white");
-//    optgroup = page->new_optgroup(L("Output file"));
-//    Option option = optgroup->get_option("filename_format");
-//    option.opt.full_width = true;
-//    optgroup->append_single_option_line(option);
-//
-//    page = add_options_page(L("Dependencies"), "advanced");
-//    optgroup = page->new_optgroup(L("Profile dependencies"));
-//
-//    create_line_with_widget(optgroup.get(), "compatible_printers", "", [this](wxWindow* parent) {
-//        return compatible_widget_create(parent, m_compatible_printers);
-//    });
-//
-//    option = optgroup->get_option("compatible_printers_condition");
-//    option.opt.full_width = true;
-//    optgroup->append_single_option_line(option);
-//
-//    build_preset_description_line(optgroup.get());
-}
-
-// Reload current config (aka presets->edited_preset->config) into the UI fields.
-void TabSLAPrint::reload_config()
-{
-    this->compatible_widget_reload(m_compatible_printers);
-    Tab::reload_config();
-}
-
-void TabSLAPrint::update_description_lines()
-{
-    Tab::update_description_lines();
-
-    //if (m_active_page && m_active_page->title() == "Supports")
-    //{
-    //    bool is_visible = m_config->def()->get("support_object_elevation")->mode <= m_mode;
-    //    if (m_support_object_elevation_description_line)
-    //    {
-    //        m_support_object_elevation_description_line->Show(is_visible);
-    //        if (is_visible)
-    //        {
-    //            bool elev = !m_config->opt_bool("pad_enable") || !m_config->opt_bool("pad_around_object");
-    //            m_support_object_elevation_description_line->SetText(elev ? "" :
-    //                from_u8((boost::format(_u8L("\"%1%\" is disabled because \"%2%\" is on in \"%3%\" category.\n"
-    //                    "To enable \"%1%\", please switch off \"%2%\""))
-    //                    % _L("Object elevation") % _L("Pad around object") % _L("Pad")).str()));
-    //        }
-    //    }
-    //}
-}
-
-void TabSLAPrint::toggle_options()
-{
-    if (m_active_page)
-        m_config_manipulation.toggle_print_sla_options(m_config);
-}
-
-void TabSLAPrint::update()
-{
-    if (m_preset_bundle->printers.get_selected_preset().printer_technology() == ptFFF)
-        return;
-
-    m_update_cnt++;
-
-    m_config_manipulation.update_print_sla_config(m_config, true);
-
-    update_description_lines();
-    //BBS: GUI refactor
-    //Layout();
-    m_parent->Layout();
-
-    m_update_cnt--;
-
-    if (m_update_cnt == 0) {
-        toggle_options();
-
-        // update() could be called during undo/redo execution
-        // Update of objectList can cause a crash in this case (because m_objects doesn't match ObjectList)
-        if (!wxGetApp().plater()->inside_snapshot_capture())
-            wxGetApp().obj_list()->update_and_show_object_settings_item();
-
-        wxGetApp().mainframe->on_config_changed(m_config);
-    }
-}
-
-void TabSLAPrint::clear_pages()
-{
-    Tab::clear_pages();
-
-    m_support_object_elevation_description_line = nullptr;
 }
 
 ConfigManipulation Tab::get_config_manipulation()

@@ -578,7 +578,8 @@ std::vector<const ConfigOption *> GLGizmoBrimEars::get_config_options(const std:
     if (!mo) return out;
 
     const DynamicPrintConfig           &object_cfg  = mo->config.get();
-    const DynamicPrintConfig           &print_cfg   = wxGetApp().preset_bundle->sla_prints.get_edited_preset().config;
+    // PNP fork (F12): SLA removed — always the FFF process preset.
+    const DynamicPrintConfig           &print_cfg   = wxGetApp().preset_bundle->prints.get_edited_preset().config;
     std::unique_ptr<DynamicPrintConfig> default_cfg = nullptr;
 
     for (const std::string &key : keys) {

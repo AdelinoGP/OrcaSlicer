@@ -96,7 +96,7 @@ void GLGizmoFlatten::on_render()
     if (selection.is_single_full_instance()) {
         const Transform3d& inst_matrix = selection.get_first_volume()->get_instance_transformation().get_matrix();
         const Camera& camera = wxGetApp().plater()->get_camera();
-        const Transform3d model_matrix = Geometry::translation_transform(selection.get_first_volume()->get_sla_shift_z() * Vec3d::UnitZ()) * inst_matrix;
+        const Transform3d model_matrix = inst_matrix;
         const Transform3d view_model_matrix = camera.get_view_matrix() * model_matrix;
 
         shader->set_uniform("view_model_matrix", view_model_matrix);
@@ -123,8 +123,7 @@ void GLGizmoFlatten::on_register_raycasters_for_picking()
 
     if (!m_planes.empty()) {
         const Selection& selection = m_parent.get_selection();
-        const Transform3d matrix = Geometry::translation_transform(selection.get_first_volume()->get_sla_shift_z() * Vec3d::UnitZ()) *
-            selection.get_first_volume()->get_instance_transformation().get_matrix();
+        const Transform3d matrix = selection.get_first_volume()->get_instance_transformation().get_matrix();
 
         for (int i = 0; i < (int)m_planes.size(); ++i) {
             m_planes_casters.emplace_back(m_parent.add_raycaster_for_picking(SceneRaycaster::EType::Gizmo, i, *m_planes[i].vbo.mesh_raycaster, matrix));

@@ -515,8 +515,6 @@ ModelVolumeType type_from_string(const std::string &s)
         typedef std::map<int, Geometry> IdToGeometryMap;
         typedef std::map<int, std::vector<coordf_t>> IdToLayerHeightsProfileMap;
         typedef std::map<int, t_layer_config_ranges> IdToLayerConfigRangesMap;
-        typedef std::map<int, std::vector<sla::SupportPoint>> IdToSlaSupportPointsMap;
-        typedef std::map<int, std::vector<sla::DrainHole>> IdToSlaDrainHolesMap;
 
         // Version of the 3mf file
         unsigned int m_version;
@@ -544,8 +542,6 @@ ModelVolumeType type_from_string(const std::string &s)
         IdToMetadataMap m_objects_metadata;
         IdToLayerHeightsProfileMap m_layer_heights_profiles;
         IdToLayerConfigRangesMap m_layer_config_ranges;
-        IdToSlaSupportPointsMap m_sla_support_points;
-        IdToSlaDrainHolesMap    m_sla_drain_holes;
         std::string m_curr_metadata_name;
         std::string m_curr_characters;
         std::string m_name;
@@ -696,7 +692,6 @@ ModelVolumeType type_from_string(const std::string &s)
         m_objects_metadata.clear();
         m_layer_heights_profiles.clear();
         m_layer_config_ranges.clear();
-        m_sla_support_points.clear();
         m_curr_metadata_name.clear();
         m_curr_characters.clear();
         clear_errors();
@@ -877,17 +872,7 @@ ModelVolumeType type_from_string(const std::string &s)
             if (obj_layer_config_ranges != m_layer_config_ranges.end())
                 model_object->layer_config_ranges = std::move(obj_layer_config_ranges->second);
 
-            // m_sla_support_points are indexed by a 1 based model object index.
-            IdToSlaSupportPointsMap::iterator obj_sla_support_points = m_sla_support_points.find(object.second + 1);
-            if (obj_sla_support_points != m_sla_support_points.end() && !obj_sla_support_points->second.empty()) {
-                model_object->sla_support_points = std::move(obj_sla_support_points->second);
-                model_object->sla_points_status = sla::PointsStatus::UserModified;
-            }
-
-            IdToSlaDrainHolesMap::iterator obj_drain_holes = m_sla_drain_holes.find(object.second + 1);
-            if (obj_drain_holes != m_sla_drain_holes.end() && !obj_drain_holes->second.empty()) {
-                model_object->sla_drain_holes = std::move(obj_drain_holes->second);
-            }
+            // PNP fork (F12): SLA removed — SLA support points / drain holes are no longer stored on ModelObject.
 
             ObjectMetadata::VolumeMetadataList volumes;
             ObjectMetadata::VolumeMetadataList* volumes_ptr = nullptr;
@@ -1163,169 +1148,14 @@ ModelVolumeType type_from_string(const std::string &s)
 
     void _3MF_Importer::_extract_sla_support_points_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat)
     {
-        if (stat.m_uncomp_size > 0) {
-            std::string buffer((size_t)stat.m_uncomp_size, 0);
-            mz_bool res = mz_zip_reader_extract_file_to_mem(&archive, stat.m_filename, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
-            if (res == 0) {
-                add_error("Error while reading sla support points data to buffer");
-                return;
-            }
-
-            if (buffer.back() == '\n')
-                buffer.pop_back();
-
-            std::vector<std::string> objects;
-            boost::split(objects, buffer, boost::is_any_of("\n"), boost::token_compress_off);
-
-            // Info on format versioning - see 3mf.hpp
-            int version = 0;
-            std::string key("support_points_format_version=");
-            if (!objects.empty() && objects[0].find(key) != std::string::npos) {
-                objects[0].erase(objects[0].begin(), objects[0].begin() + long(key.size())); // removes the string
-                version = std::stoi(objects[0]);
-                objects.erase(objects.begin()); // pop the header
-            }
-
-            for (const std::string& object : objects) {
-                std::vector<std::string> object_data;
-                boost::split(object_data, object, boost::is_any_of("|"), boost::token_compress_off);
-
-                if (object_data.size() != 2) {
-                    add_error("Error while reading object data");
-                    continue;
-                }
-
-                std::vector<std::string> object_data_id;
-                boost::split(object_data_id, object_data[0], boost::is_any_of("="), boost::token_compress_off);
-                if (object_data_id.size() != 2) {
-                    add_error("Error while reading object id");
-                    continue;
-                }
-
-                int object_id = std::atoi(object_data_id[1].c_str());
-                if (object_id == 0) {
-                    add_error("Found invalid object id");
-                    continue;
-                }
-
-                IdToSlaSupportPointsMap::iterator object_item = m_sla_support_points.find(object_id);
-                if (object_item != m_sla_support_points.end()) {
-                    add_error("Found duplicated SLA support points");
-                    continue;
-                }
-
-                std::vector<std::string> object_data_points;
-                boost::split(object_data_points, object_data[1], boost::is_any_of(" "), boost::token_compress_off);
-
-                std::vector<sla::SupportPoint> sla_support_points;
-
-                if (version == 0) {
-                    for (unsigned int i=0; i<object_data_points.size(); i+=3)
-                    sla_support_points.emplace_back(float(std::atof(object_data_points[i+0].c_str())),
-                                                    float(std::atof(object_data_points[i+1].c_str())),
-													float(std::atof(object_data_points[i+2].c_str())),
-                                                    0.4f,
-                                                    false);
-                }
-                if (version == 1) {
-                    for (unsigned int i=0; i<object_data_points.size(); i+=5)
-                    sla_support_points.emplace_back(float(std::atof(object_data_points[i+0].c_str())),
-                                                    float(std::atof(object_data_points[i+1].c_str())),
-                                                    float(std::atof(object_data_points[i+2].c_str())),
-                                                    float(std::atof(object_data_points[i+3].c_str())),
-													//FIXME storing boolean as 0 / 1 and importing it as float.
-                                                    std::abs(std::atof(object_data_points[i+4].c_str()) - 1.) < EPSILON);
-                }
-
-                if (!sla_support_points.empty())
-                    m_sla_support_points.insert({ object_id, sla_support_points });
-            }
-        }
+        // PNP fork (F12): SLA removed - SLA support points are ignored.
+        (void)archive; (void)stat;
     }
 
     void _3MF_Importer::_extract_sla_drain_holes_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat)
     {
-        if (stat.m_uncomp_size > 0) {
-            std::string buffer(size_t(stat.m_uncomp_size), 0);
-            mz_bool res = mz_zip_reader_extract_file_to_mem(&archive, stat.m_filename, (void*)buffer.data(), (size_t)stat.m_uncomp_size, 0);
-            if (res == 0) {
-                add_error("Error while reading sla support points data to buffer");
-                return;
-            }
-
-            if (buffer.back() == '\n')
-                buffer.pop_back();
-
-            std::vector<std::string> objects;
-            boost::split(objects, buffer, boost::is_any_of("\n"), boost::token_compress_off);
-
-            // Info on format versioning - see 3mf.hpp
-            int version = 0;
-            std::string key("drain_holes_format_version=");
-            if (!objects.empty() && objects[0].find(key) != std::string::npos) {
-                objects[0].erase(objects[0].begin(), objects[0].begin() + long(key.size())); // removes the string
-                version = std::stoi(objects[0]);
-                objects.erase(objects.begin()); // pop the header
-            }
-
-            for (const std::string& object : objects) {
-                std::vector<std::string> object_data;
-                boost::split(object_data, object, boost::is_any_of("|"), boost::token_compress_off);
-
-                if (object_data.size() != 2) {
-                    add_error("Error while reading object data");
-                    continue;
-                }
-
-                std::vector<std::string> object_data_id;
-                boost::split(object_data_id, object_data[0], boost::is_any_of("="), boost::token_compress_off);
-                if (object_data_id.size() != 2) {
-                    add_error("Error while reading object id");
-                    continue;
-                }
-
-                int object_id = std::atoi(object_data_id[1].c_str());
-                if (object_id == 0) {
-                    add_error("Found invalid object id");
-                    continue;
-                }
-
-                IdToSlaDrainHolesMap::iterator object_item = m_sla_drain_holes.find(object_id);
-                if (object_item != m_sla_drain_holes.end()) {
-                    add_error("Found duplicated SLA drain holes");
-                    continue;
-                }
-
-                std::vector<std::string> object_data_points;
-                boost::split(object_data_points, object_data[1], boost::is_any_of(" "), boost::token_compress_off);
-
-                sla::DrainHoles sla_drain_holes;
-
-                if (version == 1) {
-                    for (unsigned int i=0; i<object_data_points.size(); i+=8)
-                        sla_drain_holes.emplace_back(Vec3f{float(std::atof(object_data_points[i+0].c_str())),
-                                                      float(std::atof(object_data_points[i+1].c_str())),
-                                                      float(std::atof(object_data_points[i+2].c_str()))},
-                                                     Vec3f{float(std::atof(object_data_points[i+3].c_str())),
-                                                      float(std::atof(object_data_points[i+4].c_str())),
-                                                      float(std::atof(object_data_points[i+5].c_str()))},
-                                                      float(std::atof(object_data_points[i+6].c_str())),
-                                                      float(std::atof(object_data_points[i+7].c_str())));
-                }
-
-                // The holes are saved elevated above the mesh and deeper (bad idea indeed).
-                // This is retained for compatibility.
-                // Place the hole to the mesh and make it shallower to compensate.
-                // The offset is 1 mm above the mesh.
-                for (sla::DrainHole& hole : sla_drain_holes) {
-                    hole.pos += hole.normal.normalized();
-                    hole.height -= 1.f;
-                }
-
-                if (!sla_drain_holes.empty())
-                    m_sla_drain_holes.insert({ object_id, sla_drain_holes });
-            }
-        }
+        // PNP fork (F12): SLA removed - SLA drain holes are ignored.
+        (void)archive; (void)stat;
     }
 
     bool _3MF_Importer::_extract_model_config_from_archive(mz_zip_archive& archive, const mz_zip_archive_file_stat& stat, Model& model)
@@ -2979,87 +2809,15 @@ ModelVolumeType type_from_string(const std::string &s)
 
     bool _3MF_Exporter::_add_sla_support_points_file_to_archive(mz_zip_archive& archive, Model& model)
     {
-        assert(is_decimal_separator_point());
-        std::string out = "";
-        char buffer[1024];
-
-        unsigned int count = 0;
-        for (const ModelObject* object : model.objects) {
-            ++count;
-            const std::vector<sla::SupportPoint>& sla_support_points = object->sla_support_points;
-            if (!sla_support_points.empty()) {
-                sprintf(buffer, "object_id=%d|", count);
-                out += buffer;
-
-                // Store the layer height profile as a single space separated list.
-                for (size_t i = 0; i < sla_support_points.size(); ++i) {
-                    sprintf(buffer, (i==0 ? "%f %f %f %f %f" : " %f %f %f %f %f"),  sla_support_points[i].pos(0), sla_support_points[i].pos(1), sla_support_points[i].pos(2), sla_support_points[i].head_front_radius, (float)sla_support_points[i].is_new_island);
-                    out += buffer;
-                }
-                out += "\n";
-            }
-        }
-
-        if (!out.empty()) {
-            // Adds version header at the beginning:
-            out = std::string("support_points_format_version=") + std::to_string(support_points_format_version) + std::string("\n") + out;
-
-            if (!mz_zip_writer_add_mem(&archive, SLA_SUPPORT_POINTS_FILE.c_str(), (const void*)out.data(), out.length(), MZ_DEFAULT_COMPRESSION)) {
-                add_error("Unable to add sla support points file to archive");
-                return false;
-            }
-        }
+        // PNP fork (F12): SLA removed — no SLA support points to write.
+        (void)archive; (void)model;
         return true;
     }
 
     bool _3MF_Exporter::_add_sla_drain_holes_file_to_archive(mz_zip_archive& archive, Model& model)
     {
-        assert(is_decimal_separator_point());
-        const char *const fmt = "object_id=%d|";
-        std::string out;
-
-        unsigned int count = 0;
-        for (const ModelObject* object : model.objects) {
-            ++count;
-            sla::DrainHoles drain_holes = object->sla_drain_holes;
-
-            // The holes were placed 1mm above the mesh in the first implementation.
-            // This was a bad idea and the reference point was changed in 2.3 so
-            // to be on the mesh exactly. The elevated position is still saved
-            // in 3MFs for compatibility reasons.
-            for (sla::DrainHole& hole : drain_holes) {
-                hole.pos -= hole.normal.normalized();
-                hole.height += 1.f;
-            }
-
-            if (!drain_holes.empty()) {
-                out += string_printf(fmt, count);
-
-                // Store the layer height profile as a single space separated list.
-                for (size_t i = 0; i < drain_holes.size(); ++i)
-                    out += string_printf((i == 0 ? "%f %f %f %f %f %f %f %f" : " %f %f %f %f %f %f %f %f"),
-                                         drain_holes[i].pos(0),
-                                         drain_holes[i].pos(1),
-                                         drain_holes[i].pos(2),
-                                         drain_holes[i].normal(0),
-                                         drain_holes[i].normal(1),
-                                         drain_holes[i].normal(2),
-                                         drain_holes[i].radius,
-                                         drain_holes[i].height);
-
-                out += "\n";
-            }
-        }
-
-        if (!out.empty()) {
-            // Adds version header at the beginning:
-            out = std::string("drain_holes_format_version=") + std::to_string(drain_holes_format_version) + std::string("\n") + out;
-
-            if (!mz_zip_writer_add_mem(&archive, SLA_DRAIN_HOLES_FILE.c_str(), static_cast<const void*>(out.data()), out.length(), mz_uint(MZ_DEFAULT_COMPRESSION))) {
-                add_error("Unable to add sla support points file to archive");
-                return false;
-            }
-        }
+        // PNP fork (F12): SLA removed — no SLA drain holes to write.
+        (void)archive; (void)model;
         return true;
     }
 

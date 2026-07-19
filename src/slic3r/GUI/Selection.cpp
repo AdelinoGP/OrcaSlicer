@@ -995,7 +995,6 @@ const BoundingBoxf3& Selection::get_unscaled_instance_bounding_box() const
                 if (volume.is_modifier)
                     continue;
                 Transform3d trafo = volume.get_instance_transformation().get_matrix_no_scaling_factor() * volume.get_volume_transformation().get_matrix();
-                trafo.translation().z() += volume.get_sla_shift_z();
                 (*bbox)->merge(volume.transformed_convex_hull_bounding_box(trafo));
             }
         }
@@ -1016,7 +1015,6 @@ const BoundingBoxf3& Selection::get_scaled_instance_bounding_box() const
                 if (volume.is_modifier)
                     continue;
                 Transform3d trafo = volume.get_instance_transformation().get_matrix() * volume.get_volume_transformation().get_matrix();
-                trafo.translation().z() += volume.get_sla_shift_z();
                 (*bbox)->merge(volume.transformed_convex_hull_bounding_box(trafo));
             }
         }
@@ -1035,7 +1033,6 @@ const BoundingBoxf3 &Selection::get_full_unscaled_instance_bounding_box() const
             for (unsigned int i : m_list) {
                 const GLVolume &volume = *(*m_volumes)[i];
                 Transform3d     trafo  = volume.get_instance_transformation().get_matrix_no_scaling_factor() * volume.get_volume_transformation().get_matrix();
-                trafo.translation().z() += volume.get_sla_shift_z();
                 (*bbox)->merge(volume.transformed_convex_hull_bounding_box(trafo));
             }
         }
@@ -1054,7 +1051,6 @@ const BoundingBoxf3 &Selection::get_full_scaled_instance_bounding_box() const
             for (unsigned int i : m_list) {
                 const GLVolume &volume = *(*m_volumes)[i];
                 Transform3d     trafo  = volume.get_instance_transformation().get_matrix() * volume.get_volume_transformation().get_matrix();
-                trafo.translation().z() += volume.get_sla_shift_z();
                 (*bbox)->merge(volume.transformed_convex_hull_bounding_box(trafo));
             }
         }
@@ -1073,7 +1069,6 @@ const BoundingBoxf3 &Selection::get_full_unscaled_instance_local_bounding_box() 
             for (unsigned int i : m_list) {
                 const GLVolume &volume = *(*m_volumes)[i];
                 Transform3d     trafo  = volume.get_volume_transformation().get_matrix();
-                trafo.translation().z() += volume.get_sla_shift_z();
                 (*bbox)->merge(volume.transformed_convex_hull_bounding_box(trafo));
             }
         }
@@ -2136,9 +2131,6 @@ void Selection::copy_to_clipboard()
         dst_object->name                 = src_object->name;
         dst_object->input_file           = src_object->input_file;
 		dst_object->config.assign_config(src_object->config);
-        dst_object->sla_support_points   = src_object->sla_support_points;
-        dst_object->sla_points_status    = src_object->sla_points_status;
-        dst_object->sla_drain_holes      = src_object->sla_drain_holes;
         dst_object->brim_points          = src_object->brim_points;
         dst_object->layer_config_ranges  = src_object->layer_config_ranges;     // #ys_FIXME_experiment
         dst_object->layer_height_profile.assign(src_object->layer_height_profile);

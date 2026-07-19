@@ -540,17 +540,8 @@ bool start_dragging(const Vec2d                &mouse_pos,
     // screen coordinate of volume center
     auto coor                           = CameraUtils::project(camera, volume_center);
     Vec2d mouse_offset                   = coor.cast<double>() - mouse_pos;
+    // PNP fork (F12): SLA removed — no sla_shift_z, so no SLA-move compensation needed.
     Vec2d mouse_offset_without_sla_shift = mouse_offset;
-    if (double sla_shift = gl_volume.get_sla_shift_z(); !is_approx(sla_shift, 0.)) {
-        Transform3d to_world_without_sla_move = instance->get_matrix() * volume->get_matrix();
-        if (volume->emboss_shape.has_value() && volume->emboss_shape->fix_3mf_tr.has_value())
-            to_world_without_sla_move = to_world_without_sla_move * (*volume->emboss_shape->fix_3mf_tr);
-        // zero point of volume in world coordinate system
-        volume_center = to_world_without_sla_move.translation();
-        // screen coordinate of volume center
-        coor                           = CameraUtils::project(camera, volume_center);
-        mouse_offset_without_sla_shift = coor.cast<double>() - mouse_pos;
-    }
 
     Transform3d volume_tr = gl_volume.get_volume_transformation().get_matrix();
 

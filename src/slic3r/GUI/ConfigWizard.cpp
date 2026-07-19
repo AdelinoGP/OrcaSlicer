@@ -2033,68 +2033,7 @@ void ConfigWizard::priv::update_materials(Technology technology)
         }
     }
 
-    if (any_sla_selected && (technology & T_SLA)) {
-        sla_materials.clear();
-        aliases_sla.clear();
-
-        // Iterate SLA materials in all bundles
-        for (const auto &pair : bundles) {
-            for (const auto &material : pair.second.preset_bundle->sla_materials) {
-                // Check if material is already added
-                if (sla_materials.containts(&material))
-                	continue;
-                // Iterate printers in all bundles
-				// For now, we only allow the profiles to be compatible with another profiles inside the same bundle.
-                for (const auto& printer : pair.second.preset_bundle->printers) {
-                    if(!printer.is_visible || printer.printer_technology() != ptSLA)
-                        continue;
-                    // Filter out inapplicable printers
-                    if (is_compatible_with_printer(PresetWithVendorProfile(material, nullptr), PresetWithVendorProfile(printer, nullptr))) {
-                        // Check if material is already added
-                        if(!sla_materials.containts(&material)) {
-                            sla_materials.push(&material);
-                            if (!material.alias.empty())
-                                aliases_sla[material.alias].insert(material.name);
-                        }
-                        sla_materials.add_printer(&printer);
-                    }
-                }
-            }
-        }
-        // count compatible printers        
-        for (const auto& preset : sla_materials.presets) {
-            
-            const auto filter = [preset](const std::pair<std::string, size_t> element) {
-                return preset->alias == element.first;
-            };
-            if (std::find_if(sla_materials.compatibility_counter.begin(), sla_materials.compatibility_counter.end(), filter) != sla_materials.compatibility_counter.end()) {
-                continue;
-            }
-            std::vector<size_t> idx_with_same_alias;
-            for (size_t i = 0; i < sla_materials.presets.size(); ++i) {
-                if(preset->alias == sla_materials.presets[i]->alias)
-                    idx_with_same_alias.push_back(i);
-            }
-            size_t counter = 0;
-            for (const auto& printer : sla_materials.printers) {
-                if (!(*printer).is_visible || (*printer).printer_technology() != ptSLA)
-                    continue;
-                bool compatible = false;
-                // Test otrher materials with same alias
-                for (size_t i = 0; i < idx_with_same_alias.size() && !compatible; ++i) {
-                    const Preset& prst = *(sla_materials.presets[idx_with_same_alias[i]]);
-                    const Preset& prntr = *printer;
-                    if (is_compatible_with_printer(PresetWithVendorProfile(prst, prst.vendor), PresetWithVendorProfile(prntr, prntr.vendor))) {
-                        compatible = true;
-                        break;
-                    }
-                }
-                if (compatible)
-                    counter++;
-            }
-            sla_materials.compatibility_counter.emplace_back(preset->alias, counter);
-        }
-    }
+    // PNP fork (F12): SLA removed — no SLA-material compatibility pass.
 }
 
 void ConfigWizard::priv::on_custom_setup(const bool custom_wanted)

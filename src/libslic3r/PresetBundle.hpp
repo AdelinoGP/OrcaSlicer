@@ -332,11 +332,10 @@ public:
     Preset *                    get_similar_printer_preset(std::string printer_model, std::string printer_variant);
 
     PresetCollection            prints;
-    PresetCollection            sla_prints;
     PresetCollection            filaments;
-    PresetCollection            sla_materials;
-	PresetCollection& 			materials(PrinterTechnology pt)       { return pt == ptFFF ? this->filaments : this->sla_materials; }
-	const PresetCollection& 	materials(PrinterTechnology pt) const { return pt == ptFFF ? this->filaments : this->sla_materials; }
+    // PNP fork (F12): SLA removed. Only FFF materials (filaments) remain.
+	PresetCollection& 			materials(PrinterTechnology)       { return this->filaments; }
+	const PresetCollection& 	materials(PrinterTechnology) const { return this->filaments; }
     PrinterPresetCollection     printers;
     PhysicalPrinterCollection   physical_printers;
     // Filament preset names for a multi-extruder or multi-material print.
@@ -549,7 +548,6 @@ private:
         const std::string &path, const boost::property_tree::ptree &tree, ForwardCompatibilitySubstitutionRule compatibility_rule);*/
 
     DynamicPrintConfig          full_fff_config(bool apply_extruder, std::optional<std::vector<int>> filament_maps=std::nullopt, std::optional<std::vector<int>> filament_volume_maps=std::nullopt) const;
-    DynamicPrintConfig          full_sla_config() const;
 
     // Orca: used for validation only
     bool validation_mode = false;

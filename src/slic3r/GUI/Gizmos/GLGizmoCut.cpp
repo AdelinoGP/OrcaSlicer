@@ -1865,7 +1865,6 @@ BoundingBoxf3 GLGizmoCut3D::transformed_bounding_box(const Vec3d& plane_center, 
 
     const auto first_volume = selection.get_first_volume();
     Vec3d instance_offset   = first_volume->get_instance_offset();
-    instance_offset[Z]     += first_volume->get_sla_shift_z();
 
     const auto cut_matrix = Transform3d::Identity() * rotation_m.inverse() * translation_transform(instance_offset - plane_center);
 
@@ -2015,13 +2014,7 @@ void GLGizmoCut3D::PartSelection::add_object(const ModelObject* object)
 {
     m_model = Model();
     m_model.add_object(*object);
-
-    const double sla_shift_z = wxGetApp().plater()->canvas3D()->get_selection().get_first_volume()->get_sla_shift_z();
-    if (!is_approx(sla_shift_z, 0.)) {
-        Vec3d inst_offset = model_object()->instances[m_instance_idx]->get_offset();
-        inst_offset[Z] += sla_shift_z;
-        model_object()->instances[m_instance_idx]->set_offset(inst_offset);
-    }
+    // PNP fork (F12): SLA removed — no elevation shift to apply.
 }
 
 
@@ -3449,12 +3442,9 @@ Transform3d GLGizmoCut3D::get_cut_matrix(const Selection& selection)
     if (!mo)
         return Transform3d::Identity();
 
-    // m_cut_z is the distance from the bed. Subtract possible SLA elevation.
-    const double sla_shift_z = selection.get_first_volume()->get_sla_shift_z();
-
+    // PNP fork (F12): SLA removed — no SLA elevation to subtract.
     const Vec3d instance_offset = mo->instances[instance_idx]->get_offset();
     Vec3d cut_center_offset = m_plane_center - instance_offset;
-    cut_center_offset[Z] -= sla_shift_z;
 
     return translation_transform(cut_center_offset) * m_rotation_m;
 }
@@ -3788,7 +3778,6 @@ bool GLGizmoCut3D::process_cut_line(SLAGizmoEventType action, const Vec2d& mouse
             const auto new_tbb = transformed_bounding_box(new_plane_center, m);
             const GLVolume* first_volume = m_parent.get_selection().get_first_volume();
             Vec3d instance_offset = first_volume->get_instance_offset();
-            instance_offset[Z] += first_volume->get_sla_shift_z();
 
             const Vec3d trans_center_pos = m.inverse() * (new_plane_center - instance_offset) + new_tbb.center();
             if (new_tbb.contains(trans_center_pos)) {

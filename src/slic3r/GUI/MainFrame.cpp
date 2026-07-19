@@ -21,7 +21,6 @@
 #include "libslic3r/Print.hpp"
 #include "libslic3r/Polygon.hpp"
 #include "libslic3r/PrintConfig.hpp"
-#include "libslic3r/SLAPrint.hpp"
 #include "libslic3r/PresetBundle.hpp"
 
 #include "Tab.hpp"
@@ -1668,20 +1667,8 @@ bool MainFrame::can_export_toolpaths() const
 
 bool MainFrame::can_export_supports() const
 {
-    if ((m_plater == nullptr) || (m_plater->printer_technology() != ptSLA) || m_plater->model().objects.empty())
-        return false;
-
-    bool can_export = false;
-    const PrintObjects& objects = m_plater->sla_print().objects();
-    for (const SLAPrintObject* object : objects)
-    {
-        if (object->has_mesh(slaposPad) || object->has_mesh(slaposSupportTree))
-        {
-            can_export = true;
-            break;
-        }
-    }
-    return can_export;
+    // PNP fork (F12): SLA removed — no SLA supports to export.
+    return false;
 }
 
 bool MainFrame::can_export_gcode() const

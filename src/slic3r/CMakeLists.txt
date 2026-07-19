@@ -296,9 +296,6 @@ set(SLIC3R_GUI_SOURCES
     GUI/Jobs/RotoptimizeJob.hpp
     GUI/Jobs/SendJob.cpp
     GUI/Jobs/SendJob.hpp
-    GUI/Jobs/SLAImportDialog.hpp
-    GUI/Jobs/SLAImportJob.cpp
-    GUI/Jobs/SLAImportJob.hpp
     GUI/Jobs/ThreadSafeQueue.hpp
     GUI/Jobs/UpgradeNetworkJob.cpp
     GUI/Jobs/UpgradeNetworkJob.hpp
