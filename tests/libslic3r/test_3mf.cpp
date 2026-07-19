@@ -1,5 +1,6 @@
 
 #include "libslic3r/Model.hpp"
+#include "libslic3r/Exception.hpp"
 #include "libslic3r/Format/3mf.hpp"
 #include "libslic3r/Format/bbs_3mf.hpp"
 #include "libslic3r/Format/STL.hpp"
@@ -341,6 +342,38 @@ SCENARIO("Legacy project loads crash-safe via load_bbs_3mf", "[3mf][MultiNozzle]
                 for (PlateData* p : plates) {
                     REQUIRE(p->config.option<ConfigOptionInts>("filament_volume_map") == nullptr);
                 }
+            }
+            release_PlateData_list(plates);
+        }
+    }
+}
+
+// PNP fork (F12): SLA was fully removed. A .3mf saved under an SLA printer profile carries
+// printer_technology=SLA in Metadata/project_settings.config. The importer MUST refuse it with a
+// clear message BEFORE reaching load_from_json (which would abort the whole project config on the
+// first unknown SLA key, order-dependently). The refusal is a THROWN version_error (a FileIOError):
+// add_error alone is log-only — the extract loop never inspects it, so the load would otherwise
+// proceed with an empty config and crash downstream. This test pins the refusal as a hard throw so a
+// future change cannot silently regress it back to a log-only add_error.
+SCENARIO("SLA .3mf project is refused with a clear error", "[3mf]") {
+    GIVEN("a .3mf whose project_settings.config declares printer_technology=SLA") {
+        std::string path = std::string(TEST_DATA_DIR) + "/test_3mf/sla_project.3mf";
+        Model                model;
+        DynamicPrintConfig   config;
+        ConfigSubstitutionContext ctxt{ ForwardCompatibilitySubstitutionRule::Disable };
+        PlateDataPtrs        plates;
+        std::vector<Preset*> project_presets;
+        bool   is_bbl_3mf = false, is_orca_3mf = false;
+        Semver file_version;
+
+        WHEN("loaded through the BBS importer with LoadConfig") {
+            THEN("it throws a FileIOError naming SLA, rather than loading a broken project") {
+                REQUIRE_THROWS_MATCHES(
+                    load_bbs_3mf(path.c_str(), &config, &ctxt, &model, &plates,
+                                 &project_presets, &is_bbl_3mf, &is_orca_3mf, &file_version, nullptr,
+                                 LoadStrategy::LoadModel | LoadStrategy::LoadConfig),
+                    Slic3r::FileIOError,
+                    Catch::Matchers::MessageMatches(Catch::Matchers::ContainsSubstring("SLA")));
             }
             release_PlateData_list(plates);
         }
