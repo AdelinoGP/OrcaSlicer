@@ -6,6 +6,8 @@
 #include <array>
 #include <thread>
 #include <mutex>
+#include <map>
+#include <string>
 
 #include "libslic3r/ObjectID.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
@@ -159,6 +161,10 @@ private:
 
     // BBS
     DynamicPrintConfig m_config;
+
+    // Raw plate metadata retained verbatim from the source .3mf. Mirrors PlateData::raw_plate_metadata
+    // so values preserved through the importer continue to round-trip after a GUI load-edit-save.
+    std::map<std::string, std::string> m_raw_plate_metadata;
 
     // SoftFever
     // part plate name

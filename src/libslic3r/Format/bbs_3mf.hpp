@@ -5,6 +5,8 @@
 #include "libslic3r/ProjectTask.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include <functional>
+#include <map>
+#include <string>
 
 namespace Slic3r {
 class Model;
@@ -109,6 +111,14 @@ struct PlateData
     // prints, so the saved-3mf output for single-nozzle printers is byte-identical.
     std::vector<MultiNozzleUtils::NozzleInfo> nozzles_info;
     std::optional<MultiNozzleUtils::LayeredNozzleGroupResult> nozzle_group_result;
+
+    // Raw plate metadata retained verbatim from the source .3mf (Bambu/Orca `model_settings.config`).
+    // Holds every non-structural `<metadata>` key emitted by the source under a `<plate>` element,
+    // last-value-wins for duplicate keys. The exporter re-emits each entry after the canonical
+    // structural fields unless the same key is now produced by a dedicated writer (in which case the
+    // canonical value wins). This preserves forward-compatible metadata for settings this fork does
+    // not currently model without rewriting or warning about it.
+    std::map<std::string, std::string> raw_plate_metadata;
 
     // Hexadecimal number,
     // the 0th digit corresponds to extruder 1

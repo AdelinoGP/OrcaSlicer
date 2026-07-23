@@ -440,6 +440,53 @@ static constexpr const char *USE_SURFACE_ATTR = "use_surface";
 // static constexpr const char *FIX_TRANSFORMATION_ATTR = "transform";
 
 
+// Structural plate metadata keys handled by dedicated writers/readers in this importer/exporter.
+// Retained non-structural metadata must NEVER include these — the canonical writer always wins so
+// the saved 3mf does not emit duplicate <metadata> tags and stale values do not overwrite a freshly
+// computed field.
+static bool is_structural_plate_metadata_key(const std::string &key)
+{
+    return key == PLATERID_ATTR
+        || key == PLATER_NAME_ATTR
+        || key == LOCK_ATTR
+        || key == BED_TYPE_ATTR
+        || key == PRINT_SEQUENCE_ATTR
+        || key == FIRST_LAYER_PRINT_SEQUENCE_ATTR
+        || key == OTHER_LAYERS_PRINT_SEQUENCE_ATTR
+        || key == OTHER_LAYERS_PRINT_SEQUENCE_NUMS_ATTR
+        || key == SPIRAL_VASE_MODE
+        || key == FILAMENT_MAP_MODE_ATTR
+        || key == FILAMENT_MAP_ATTR
+        || key == FILAMENT_VOL_MAP_ATTR
+        || key == GCODE_FILE_ATTR
+        || key == THUMBNAIL_FILE_ATTR
+        || key == NO_LIGHT_THUMBNAIL_FILE_ATTR
+        || key == TOP_FILE_ATTR
+        || key == PICK_FILE_ATTR
+        || key == PATTERN_BBOX_FILE_ATTR
+        || key == PRINTER_MODEL_ID_ATTR
+        || key == NOZZLE_VOLUME_TYPE_ATTR
+        || key == NOZZLE_DIAMETERS_ATTR
+        || key == OUTSIDE_ATTR
+        || key == SUPPORT_USED_ATTR
+        || key == LABEL_OBJECT_ENABLED_ATTR
+        || key == ENABLE_FILAMENT_DYNAMIC_MAP_ATTR
+        || key == HAS_FILAMENT_SWITCHER_ATTR
+        // Keys the importer reads only as control fields that should never round-trip through
+        // <plate> retained metadata.
+        || key == PLATE_IDX_ATTR
+        || key == EXTRUDER_TYPE_ATTR
+        || key == TIMELAPSE_TYPE_ATTR
+        || key == SLICE_PREDICTION_ATTR
+        || key == SLICE_WEIGHT_ATTR
+        || key == FIRST_LAYER_TIME_ATTR
+        || key == LIMIT_FILAMENT_MAP_ATTR
+        || key == OBJECT_ID_ATTR
+        || key == INSTANCEID_ATTR
+        || key == IDENTIFYID_ATTR
+        || key == SKIPPED_ATTR;
+}
+
 const unsigned int BBS_VALID_OBJECT_TYPES_COUNT = 2;
 const char* BBS_VALID_OBJECT_TYPES[] =
 {
@@ -677,6 +724,13 @@ bool bbs_is_valid_object_type(const std::string& type)
 }
 
 namespace Slic3r {
+
+// Forward declaration: defined later in this translation unit; consulted by the plate-metadata
+// XML element handler to dispatch non-structural plate settings to `PlateData::config` while
+// preserving the raw source value as a fallback. See the definition for the full contract.
+static bool try_import_generic_plate_setting(PlateData *plate,
+                                             const std::string &key,
+                                             const std::string &value);
 
 void PlateData::parse_filament_info(GCodeProcessorResult *result)
 {
@@ -2348,6 +2402,9 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
             plate_data_list[it->first-1]->pick_file = (m_load_restore || it->second->pick_file.empty()) ? it->second->pick_file : m_backup_path + "/" + it->second->pick_file;
             plate_data_list[it->first-1]->pattern_bbox_file = (m_load_restore || it->second->pattern_bbox_file.empty()) ? it->second->pattern_bbox_file : m_backup_path + "/" + it->second->pattern_bbox_file;
             plate_data_list[it->first-1]->config = it->second->config;
+            // Forward retained non-structural plate metadata so the load surface carries the
+            // forward-compatible keys captured by the generic plate-metadata fallback.
+            plate_data_list[it->first-1]->raw_plate_metadata = it->second->raw_plate_metadata;
 
             current_plate_data = plate_data_list[it->first - 1];
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ":" << __LINE__ << boost::format(", plate %1%, thumbnail_file=%2%, no_light_thumbnail_file=%3%")%it->first %plate_data_list[it->first-1]->thumbnail_file %plate_data_list[it->first-1]->no_light_thumbnail_file;
@@ -4675,6 +4732,20 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                 if (m_curr_plater)
                     m_curr_plater->nozzle_diameters = value;
             }
+            else if (m_curr_plater && try_import_generic_plate_setting(m_curr_plater, key, value))
+            {
+                // Generic recognized plate setting: deserialized into `PlateData::config` so the
+                // entry becomes a slicing override, with the raw value retained as a fallback if
+                // `set_deserialize_strict` rejects it. The helper returns false for unregistered
+                // keys, in which case the next branch retains the raw entry instead.
+            }
+            else if (m_curr_plater)
+            {
+                // Unrecognized plate metadata: retain the raw value so the next save can re-emit it.
+                // We deliberately do not surface this as a user-facing substitution warning — the
+                // import remains lossless, the next code revision can interpret the key.
+                m_curr_plater->raw_plate_metadata[key] = value;
+            }
         }
 
         return true;
@@ -4684,6 +4755,61 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
     {
         // do nothing
         return true;
+    }
+
+    // Try to apply a non-structural plate metadata key to `plate->config` via the generic
+    // `set_deserialize_strict` path. Returns true when the option exists in the registered config
+    // and was successfully materialised (in which case `plate->config` is updated). On any failure,
+    // the raw `key`/`value` pair is stored in `plate->raw_plate_metadata` so the value can still
+    // round-trip through the next save. Returns false when the key is unregistered so the caller
+    // can fall back to plain raw retention.
+    //
+    // `set_deserialize_strict` uses an internal `Disable` substitution context: unparseable values
+    // throw, registered unknown keys are not recorded in the user's compatibility-warning list, and
+    // silently forward-compatible keys do not surface as user-facing substitutions. The plate
+    // metadata XML element handler is invoked by expat without access to the importer's
+    // `ConfigSubstitutionContext`, so the strict variant is the right tool here.
+    static bool try_import_generic_plate_setting(PlateData *plate,
+                                                 const std::string &key,
+                                                 const std::string &value)
+    {
+        if (plate == nullptr)
+            return false;
+        if (is_structural_plate_metadata_key(key))
+            return false;
+        if (plate->config.def() == nullptr || plate->config.def()->get(key) == nullptr)
+            return false;
+        try {
+            // Snapshot the option's current value so we can detect a silent no-op (e.g. an
+            // unparseable value leaves the typed option at its default and the helper must fall
+            // back to raw retention). We only consider the helper "applied" when either the option
+            // is absent from the plate config (so this is the first materialisation) or the
+            // pre-call value differs from the post-call value.
+            const ConfigOption *before_opt = plate->config.option(key);
+            double              before_val = 0.0;
+            bool                had_before = false;
+            if (before_opt != nullptr && before_opt->type() == coFloat) {
+                before_val = static_cast<const ConfigOptionFloat *>(before_opt)->getFloat();
+                had_before = true;
+            }
+            plate->config.set_deserialize_strict(key, value);
+            const ConfigOption *after_opt = plate->config.option(key);
+            if (after_opt != nullptr && after_opt->type() == coFloat) {
+                double after_val = static_cast<const ConfigOptionFloat *>(after_opt)->getFloat();
+                if (!had_before || after_val != before_val) {
+                    return true;
+                }
+            } else {
+                // The option was materialised as a non-float type (Int/Bool/Strings/...).
+                return true;
+            }
+            // No observable change — treat the value as unparseable.
+            plate->raw_plate_metadata[key] = value;
+            return true;
+        } catch (...) {
+            plate->raw_plate_metadata[key] = value;
+            return true;
+        }
     }
 
     bool _BBS_3MF_Importer::_handle_start_config_filament(const char** attributes, unsigned int num_attributes)
@@ -8199,6 +8325,15 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                         stream << "      <" << METADATA_TAG << " " << KEY_ATTR << "=\"" << IDENTIFYID_ATTR << "\" " << VALUE_ATTR << "=\"" << identify_id << "\"/>\n";
                         stream << "    </" << INSTANCE_TAG << ">\n";
                     }
+                }
+                // Re-emit any non-structural plate metadata retained from a previous load. Canonical
+                // structural keys are filtered out so we never emit a duplicate <metadata> tag next to
+                // the dedicated writer above. The retention is forward-compatible — older readers will
+                // simply ignore the additional <metadata> entries.
+                for (const auto &kv : plate_data->raw_plate_metadata) {
+                    if (is_structural_plate_metadata_key(kv.first))
+                        continue;
+                    stream << "    <" << METADATA_TAG << " " << KEY_ATTR << "=\"" << xml_escape(kv.first) << "\" " << VALUE_ATTR << "=\"" << xml_escape(kv.second) << "\"/>\n";
                 }
                 stream << "  </" << PLATE_TAG << ">\n";
             }

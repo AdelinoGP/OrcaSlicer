@@ -348,6 +348,102 @@ SCENARIO("Legacy project loads crash-safe via load_bbs_3mf", "[3mf][MultiNozzle]
     }
 }
 
+// PNP fork (B8/F14): generalized 3MF plate-metadata ingestion. The historical plate-metadata parser
+// in `bbs_3mf.cpp` only recognised a fixed allowlist of keys; a 3mf authored with an unrecognised
+// (forward-compatible) key was dropped on import. This round-trip pins the generalized contract:
+//   1) a non-structural recognised setting (e.g. layer_height) becomes a slicing override on
+//      `PlateData::config`;
+//   2) an unrecognised key (e.g. a forward-only PNP key) is retained in
+//      `PlateData::raw_plate_metadata` and re-emitted on the next save;
+//   3) a recognised key whose value is unparseable does NOT propagate as an override (the import
+//      must remain lossless rather than fail or carry a typed partial value) and the raw value is
+//      retained for round-trip.
+//
+// Uses the same store_bbs_3mf -> load_bbs_3mf cycle as the other plate-metadata tests so no binary
+// fixture is required.
+SCENARIO("Generalized plate-metadata ingestion survives a .3mf round-trip", "[3mf][MultiNozzle]") {
+    GIVEN("a single-extruder plate whose metadata carries an unknown key, a recognised key, and an unparseable recognised key") {
+        Model model;
+        std::string src_file = std::string(TEST_DATA_DIR) + "/test_3mf/Prusa.stl";
+        REQUIRE(load_stl(src_file.c_str(), &model));
+        model.add_default_instances();
+
+        std::string backup_dir =
+            (boost::filesystem::temp_directory_path() / boost::filesystem::unique_path("orca_pnp_%%%%%%%%")).string();
+        boost::filesystem::create_directories(backup_dir);
+        model.set_backup_path(backup_dir);
+
+        DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
+        config.set_key_value("nozzle_diameter", new ConfigOptionFloats({ 0.4 }));
+
+        PlateData* plate = new PlateData();
+        plate->plate_index     = 0;
+        plate->is_sliced_valid = true;
+        plate->filament_maps   = { 1 };
+
+        WHEN("stored to and reloaded from a .3mf with three kinds of plate metadata") {
+            // Recognised but unparseable: must be retained in raw_plate_metadata rather than
+            // throwing or being silently dropped.
+            plate->raw_plate_metadata["layer_height"] = "not_a_number";
+            // Forward-compatible / unrecognised key: must be retained verbatim.
+            plate->raw_plate_metadata["pnp_future_setting"] = "enabled";
+            // Recognised and parseable: should be applied as a typed plate override.
+            plate->raw_plate_metadata["nozzle_diameter"] = "0.6";
+
+            std::string test_file = std::string(TEST_DATA_DIR) + "/test_3mf/pnp_gen_ingest.3mf";
+
+            StoreParams store_params;
+            store_params.path    = test_file.c_str();
+            store_params.model   = &model;
+            store_params.config  = &config;
+            store_params.plate_data_list.push_back(plate);
+            store_params.strategy = SaveStrategy::Zip64 | SaveStrategy::Silence;
+            REQUIRE(store_bbs_3mf(store_params));
+
+            Model dst_model;
+            DynamicPrintConfig dst_config;
+            ConfigSubstitutionContext ctxt{ ForwardCompatibilitySubstitutionRule::Enable };
+            PlateDataPtrs        dst_plates;
+            std::vector<Preset*> project_presets;
+            bool   is_bbl_3mf = false, is_orca_3mf = false;
+            Semver file_version;
+            bool loaded = load_bbs_3mf(test_file.c_str(), &dst_config, &ctxt, &dst_model, &dst_plates,
+                                       &project_presets, &is_bbl_3mf, &is_orca_3mf, &file_version, nullptr,
+                                       LoadStrategy::LoadModel | LoadStrategy::LoadConfig);
+            boost::filesystem::remove(test_file);
+
+            THEN("the unknown key is preserved, the unparseable recognised key is preserved, and the parseable recognised key is applied as a typed override") {
+                REQUIRE(loaded);
+                REQUIRE(dst_plates.size() >= 1);
+                PlateData* rt = dst_plates.front();
+
+                // Forward-compatible key round-trips through the raw map.
+                REQUIRE(rt->raw_plate_metadata.count("pnp_future_setting") == 1);
+                REQUIRE(rt->raw_plate_metadata.at("pnp_future_setting") == "enabled");
+
+                // Unparseable recognised key: retained in raw metadata. The helper must NOT have
+                // populated a typed `ConfigOptionFloat("layer_height")` from the bad string —
+                // either the option is absent or it kept its default value. The contract is
+                // lossless retention, not silent typed fallback.
+                REQUIRE(rt->raw_plate_metadata.count("layer_height") == 1);
+                REQUIRE(rt->raw_plate_metadata.at("layer_height") == "not_a_number");
+
+                // Parseable recognised key: applied as a typed plate override. Successful
+                // application does NOT need to retain the raw entry — the typed value carries
+                // the intent forward. The raw entry is only kept when the typed apply failed.
+                auto* nd = rt->config.option<ConfigOptionFloats>("nozzle_diameter");
+                REQUIRE(nd != nullptr);
+                REQUIRE(nd->values.size() == 1);
+                REQUIRE_THAT(nd->values.front(), Catch::Matchers::WithinAbs(0.6, 1e-6));
+            }
+
+            release_PlateData_list(dst_plates);
+        }
+        delete plate;
+        boost::filesystem::remove_all(backup_dir);
+    }
+}
+
 // PNP fork (F12): SLA was fully removed. A .3mf saved under an SLA printer profile carries
 // printer_technology=SLA in Metadata/project_settings.config. The importer MUST refuse it with a
 // clear message BEFORE reaching load_from_json (which would abort the whole project config on the

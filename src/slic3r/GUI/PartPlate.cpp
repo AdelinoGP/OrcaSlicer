@@ -6301,6 +6301,10 @@ int PartPlateList::store_to_3mf_structure(PlateDataPtrs& plate_data_list, bool w
 		BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": plate %1% after load, width %2%, height %3%, size %4%!")
 			%(i+1) %plate_data_item->plate_thumbnail.width %plate_data_item->plate_thumbnail.height %plate_data_item->plate_thumbnail.pixels.size();
 		plate_data_item->config.apply(*m_plate_list[i]->config());
+		// Forward the retained non-structural plate metadata so the next save can re-emit keys
+		// this fork does not currently model. Carried by `PartPlate::m_raw_plate_metadata` from
+		// `load_from_3mf_structure` so a GUI load-edit-save preserves forward-compatible metadata.
+		plate_data_item->raw_plate_metadata = m_plate_list[i]->m_raw_plate_metadata;
 
 		if (m_plate_list[i]->no_light_thumbnail_data.is_valid())
 			plate_data_item->no_light_thumbnail_file = "valid_no_light";
@@ -6385,6 +6389,9 @@ int PartPlateList::load_from_3mf_structure(PlateDataPtrs& plate_data_list, int f
 		int index = create_plate(false);
 		m_plate_list[index]->m_locked = plate_data_list[i]->locked;
 		m_plate_list[index]->config()->apply(plate_data_list[i]->config);
+		// Forward retained non-structural plate metadata so the GUI can preserve it through an
+		// edit/save cycle. The data is consumed by `store_to_3mf_structure` when the next save runs.
+		m_plate_list[index]->m_raw_plate_metadata = plate_data_list[i]->raw_plate_metadata;
 		m_plate_list[index]->set_plate_name(plate_data_list[i]->plate_name);
 		if (plate_data_list[i]->plate_index != index)
 		{
