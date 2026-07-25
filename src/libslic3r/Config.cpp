@@ -1450,6 +1450,23 @@ ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &file, Fo
                     ++ key_value_pairs;
                 } catch (UnknownOptionException & /* e */) {
                     // ignore
+                } catch (BadOptionValueException & /* e */) {
+                    // A CONFIG_BLOCK is a foreign producer's artifact, and one key whose value
+                    // this build cannot parse must not cost us the whole file: skip it, leave the
+                    // option at its default, and keep reading. Symmetric with the unknown-key case
+                    // just above -- that already tolerates a key we do not recognise, and there is
+                    // no reason a recognised key with an unreadable value should be more fatal.
+                    //
+                    // PNP fork: this is not hypothetical. pnp echoes its resolved config into the
+                    // CONFIG_BLOCK, and for keys absent from its typed schema it infers the type
+                    // from the value, so Orca's string "0"/"1" comes back as false/true. On a real
+                    // slice that mistyped 69 numeric keys; the first of them (adaptive_bed_mesh_margin,
+                    // a coFloat receiving "false") threw here and killed G-code preview entirely.
+                    // Substitution cannot rescue it either -- set_deserialize_raw only substitutes
+                    // coBools and enum/bool pairs, so a coFloat has no recovery path.
+                    BOOST_LOG_TRIVIAL(warning)
+                        << "load_from_gcode_file: ignoring key \"" << key << "\" with unparseable value \""
+                        << value << "\"; leaving it at its default";
                 }
             }
         }
