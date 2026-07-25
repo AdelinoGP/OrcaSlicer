@@ -476,6 +476,67 @@ SCENARIO("SLA .3mf project is refused with a clear error", "[3mf]") {
     }
 }
 
+// A .3mf can be recognised as a project (is_bbl_3mf) purely from its generator metadata tag, with an
+// absent or empty embedded project config — both samples under resources/handy_models are exactly
+// that. `CLI::run`'s project branch read that config with `opt_float("printable_height")`, which is
+// `option<ConfigOptionFloat>(key)->value`: a missing key is a NULL DEREFERENCE, not a default. Every
+// such file therefore killed the CLI with an ACCESS_VIOLATION before any action ran (fault address
+// 0x8 — the `value` offset). The fix guards the read the way the extruder_clearance_* reads beside
+// it already were.
+//
+// This pins the reachable state that made the unguarded read fatal. If a future importer change
+// starts populating printable_height by default, this test will fail — that is deliberate: it means
+// the hazard's shape moved and the CLI-side guard needs re-examining, not that the guard is stale.
+SCENARIO("A project .3mf may carry no printable_height", "[3mf]") {
+    GIVEN("a .3mf stored with an empty project config") {
+        Model model;
+        std::string src_file = std::string(TEST_DATA_DIR) + "/test_3mf/Prusa.stl";
+        REQUIRE(load_stl(src_file.c_str(), &model));
+        model.add_default_instances();
+
+        std::string backup_dir =
+            (boost::filesystem::temp_directory_path() / boost::filesystem::unique_path("orca_ph_%%%%%%%%")).string();
+        boost::filesystem::create_directories(backup_dir);
+        model.set_backup_path(backup_dir);
+
+        DynamicPrintConfig config; // deliberately empty — no printable_height
+        REQUIRE(config.option<ConfigOptionFloat>("printable_height") == nullptr);
+
+        WHEN("stored and reloaded through the BBS importer") {
+            std::string test_file = std::string(TEST_DATA_DIR) + "/test_3mf/no_printable_height.3mf";
+
+            StoreParams store_params;
+            store_params.path     = test_file.c_str();
+            store_params.model    = &model;
+            store_params.config   = &config;
+            store_params.strategy = SaveStrategy::Zip64 | SaveStrategy::Silence;
+            REQUIRE(store_bbs_3mf(store_params));
+
+            Model dst_model;
+            DynamicPrintConfig dst_config;
+            ConfigSubstitutionContext ctxt{ ForwardCompatibilitySubstitutionRule::Enable };
+            PlateDataPtrs        dst_plates;
+            std::vector<Preset*> project_presets;
+            bool   is_bbl_3mf = false, is_orca_3mf = false;
+            Semver file_version;
+            bool loaded = load_bbs_3mf(test_file.c_str(), &dst_config, &ctxt, &dst_model, &dst_plates,
+                                       &project_presets, &is_bbl_3mf, &is_orca_3mf, &file_version, nullptr,
+                                       LoadStrategy::LoadModel | LoadStrategy::LoadConfig);
+            boost::filesystem::remove(test_file);
+
+            THEN("it loads as a project whose config has no printable_height option") {
+                REQUIRE(loaded);
+                // is_bbl_3mf is what sends CLI::run down the project branch holding the read.
+                REQUIRE(is_bbl_3mf);
+                REQUIRE(dst_config.option<ConfigOptionFloat>("printable_height") == nullptr);
+            }
+            release_PlateData_list(dst_plates);
+        }
+
+        boost::filesystem::remove_all(backup_dir);
+    }
+}
+
 // Device-side nozzle-grouping serialization surface.
 // Direct unit coverage for the pure serialize/deserialize + StaticNozzleGroupResult helpers that the
 // gcode.3mf writer/reader lean on.

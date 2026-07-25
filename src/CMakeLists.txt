@@ -203,7 +203,12 @@ if (WIN32)
         if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
             orcaslicer_copy_dlls(COPY_DLLS "Debug" "d" output_dlls_Debug)
         elseif("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
-            orcaslicer_copy_dlls(COPY_DLLS "RelWithDebInfo" "" output_dlls_Release)
+            # Must land in output_dlls_RelWithDebInfo, not output_dlls_Release: the install
+            # rule below reads output_dlls_${build_type}, and build_type is "RelWithDebInfo"
+            # here. Returning the list under the Release name left that variable empty, so a
+            # RelWithDebInfo install tree got no third-party DLLs and its orca-slicer.exe
+            # failed to start with "OrcaSlicer.dll was not loaded, error=126".
+            orcaslicer_copy_dlls(COPY_DLLS "RelWithDebInfo" "" output_dlls_RelWithDebInfo)
         else()
             orcaslicer_copy_dlls(COPY_DLLS "Release" "" output_dlls_Release)
         endif()
@@ -251,6 +256,27 @@ else ()
         COMMAND ln -sfn "${SLIC3R_RESOURCES_DIR}" "${BIN_RESOURCES_DIR}"
         COMMENT "Symlinking the resources directory into the build tree"
         VERBATIM)
+endif ()
+
+# Stage the PNP backend beside the freshly built executable so a developer build finds it
+# without a manual copy -- PnpBackend::resolve_paths (src/slic3r/GUI/PnpBackend.cpp) derives
+# both pnp_cli and modules/ from the running binary's own directory. TARGET_FILE_DIR resolves
+# to the config being built, which covers multi-config and single-config generators alike
+# without the shell conditionals the resources junction above needs. PNP_DIST_AVAILABLE is
+# set in the root CMakeLists.txt and also gates the matching install() rules there.
+if (PNP_DIST_AVAILABLE)
+    add_custom_command(TARGET OrcaSlicer POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${PNP_DIST_DIR}/${PNP_CLI_EXE_NAME}"
+                "$<TARGET_FILE_DIR:OrcaSlicer>/${PNP_CLI_EXE_NAME}"
+        # copy_directory copies the source's contents, so the destination is the modules
+        # directory itself -- naming the output dir here would scatter every module beside the exe.
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${PNP_DIST_DIR}/modules"
+                "$<TARGET_FILE_DIR:OrcaSlicer>/modules"
+        COMMENT "Staging the PNP backend (pnp_cli + modules) into the build tree"
+        VERBATIM
+    )
 endif ()
 
 # Slic3r binary install target. Default build type is release in case no CMAKE_BUILD_TYPE is provided.

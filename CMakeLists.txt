@@ -167,6 +167,40 @@ option(SLIC3R_BUILD_SANDBOXES   "Build development sandboxes" OFF)
 option(BUILD_TESTS       "Build unit tests" OFF)
 option(ORCA_TOOLS       "Build Orca tools" OFF)
 
+# PNP backend bundling. This fork slices through the pnp_cli backend instead of the
+# native libslic3r pipeline, and PnpBackend::resolve_paths (src/slic3r/GUI/PnpBackend.cpp)
+# locates it relative to the running binary's own directory -- so both the build tree
+# and the install tree have to reproduce that flat layout.
+option(PNP_BUNDLE_CLI "Stage and install the pnp_cli backend (pnp_cli + modules/) beside the OrcaSlicer executable" ON)
+set(PNP_DIST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../target/dist" CACHE PATH
+    "Staging directory produced by 'cargo xtask dist' in the pnp workspace; holds pnp_cli and modules/")
+
+if (WIN32)
+    set(PNP_CLI_EXE_NAME "pnp_cli.exe")
+else ()
+    set(PNP_CLI_EXE_NAME "pnp_cli")
+endif ()
+
+# A fork-only checkout with no pnp workspace beside it still has to configure and build,
+# so an absent dist tree is a warning rather than an error. Both the build-tree staging
+# (src/CMakeLists.txt) and the install rules below key off this one flag, so they cannot
+# disagree about whether the backend is there.
+set(PNP_DIST_AVAILABLE OFF)
+if (PNP_BUNDLE_CLI)
+    if (EXISTS "${PNP_DIST_DIR}/${PNP_CLI_EXE_NAME}")
+        set(PNP_DIST_AVAILABLE ON)
+        message(STATUS "PNP backend: bundling pnp_cli + modules/ from ${PNP_DIST_DIR}")
+    else ()
+        message(WARNING
+            "PNP backend: \"${PNP_DIST_DIR}/${PNP_CLI_EXE_NAME}\" does not exist. "
+            "pnp_cli and modules/ will NOT be bundled and the built OrcaSlicer will report the "
+            "slicing backend as unavailable. To fix: run 'cargo xtask dist' in the pnp workspace "
+            "(it stages target/dist/${PNP_CLI_EXE_NAME} + target/dist/modules/), or re-configure with "
+            "-DPNP_DIST_DIR=<path> to point at an existing dist tree. "
+            "Configure with -DPNP_BUNDLE_CLI=OFF to skip bundling and silence this warning.")
+    endif ()
+endif ()
+
 if (FLATPAK)
     set(SLIC3R_FHS ON CACHE BOOL "" FORCE)
     set(SLIC3R_DESKTOP_INTEGRATION OFF CACHE BOOL "" FORCE)
@@ -923,6 +957,23 @@ elseif (CMAKE_MACOSX_BUNDLE)
 else ()
     install(FILES src/dev-utils/platform/unix/com.orcaslicer.OrcaSlicer.desktop DESTINATION ${CMAKE_INSTALL_PREFIX}/resources/applications)
     install(DIRECTORY "${SLIC3R_RESOURCES_DIR}/" DESTINATION "${CMAKE_INSTALL_PREFIX}/resources")
+endif ()
+
+# PNP backend install rules. Kept as one guarded block rather than inlined into each
+# branch above so the Windows and non-Windows layouts can never drift apart. CPack packages
+# whatever install() stages, so this is what puts pnp_cli into the NSIS installer and the
+# portable zip. The trailing slash on the DIRECTORY source copies modules/'s *contents*
+# into ./modules (same idiom as the resources rules above) -- without it the result would
+# be ./modules/modules. Only the Windows layout is verified for v1; the non-Windows branch
+# mirrors it into CMAKE_INSTALL_BINDIR, which is where OrcaSlicer's own RUNTIME target goes.
+if (PNP_DIST_AVAILABLE)
+    if (WIN32)
+        install(PROGRAMS "${PNP_DIST_DIR}/${PNP_CLI_EXE_NAME}" DESTINATION ".")
+        install(DIRECTORY "${PNP_DIST_DIR}/modules/" DESTINATION "./modules")
+    else ()
+        install(PROGRAMS "${PNP_DIST_DIR}/${PNP_CLI_EXE_NAME}" DESTINATION "${CMAKE_INSTALL_BINDIR}")
+        install(DIRECTORY "${PNP_DIST_DIR}/modules/" DESTINATION "${CMAKE_INSTALL_BINDIR}/modules")
+    endif ()
 endif ()
 
 install(FILES ${CMAKE_SOURCE_DIR}/LICENSE.txt DESTINATION ".")

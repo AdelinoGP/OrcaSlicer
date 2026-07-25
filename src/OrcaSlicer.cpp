@@ -1791,7 +1791,14 @@ int CLI::run(int argc, char **argv)
                         old_printable_width = (int)(old_printable_area[2].x() - old_printable_area[0].x());
                         old_printable_depth = (int)(old_printable_area[2].y() - old_printable_area[0].y());
                     }
-                    old_printable_height = (int)(config.opt_float("printable_height"));
+                    // Guarded like the extruder_clearance_* reads below: opt_float is
+                    // option<ConfigOptionFloat>(key)->value, so a missing key is a null dereference,
+                    // not a default. A 3mf that carries an OrcaSlicer/BambuStudio generator tag is
+                    // treated as a project (is_bbl_3mf) even when its embedded project config is
+                    // absent or empty -- both bundled samples under resources/handy_models are like
+                    // this -- and every such file crashed the CLI here with an ACCESS_VIOLATION.
+                    if (config.option<ConfigOptionFloat>("printable_height"))
+                        old_printable_height = (int)(config.opt_float("printable_height"));
 
                     if (config.option<ConfigOptionFloat>("extruder_clearance_height_to_rod"))
                         old_height_to_rod = config.opt_float("extruder_clearance_height_to_rod");

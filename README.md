@@ -169,6 +169,24 @@ AppImages are published for both **x86_64** and **aarch64** (ARM64). Pick the fi
  3. If you run into trouble executing it, try this command in the terminal:
     `chmod +x /path_to_appimage/OrcaSlicer_Linux.AppImage`
 
+# PNP backend (`pnp_cli`)
+
+This fork slices with the PNP backend rather than the native OrcaSlicer slicer. The GUI shells out to `pnp_cli`, so a build without it will start but refuse to slice and show a persistent "PNP slicing backend is unavailable" notification.
+
+`pnp_cli` (`pnp_cli.exe` on Windows) and its `modules/` directory must sit **flat in the same directory as `orca-slicer.exe`** — the backend resolves both relative to the running executable.
+
+- **Local/dev builds:** run `cargo xtask dist` in the pnp workspace. It stages `target/dist/pnp_cli.exe` and `target/dist/modules/`, which CMake picks up automatically — `PNP_DIST_DIR` defaults to the pnp workspace beside this checkout. Alternatively, copy those two entries next to `orca-slicer.exe` by hand.
+- **Installer / portable builds:** the `install` target stages the backend into the install tree, which is exactly what CPack and the portable zip package — so the backend ships automatically *provided a dist tree exists when CMake configures*. A CI job that checks this repo out on its own has no pnp workspace beside it, so it must produce the dist tree first and point at it with `-DPNP_DIST_DIR=<path>`. **This is not yet wired into `.github/workflows/build_orca.yml`;** until it is, an installer built by that workflow will not contain `pnp_cli`.
+
+If the dist directory is missing at configure time, CMake warns and skips bundling; it does not fail the build. Check the configure output for `PNP backend:` to see which way it went.
+
+Configure options:
+
+- `-DPNP_DIST_DIR=<path>` — bundle from a different dist tree.
+- `-DPNP_BUNDLE_CLI=OFF` — skip bundling entirely.
+
+For backend iteration you can also set **PNP CLI directory** under *Preferences → General* to the folder holding `pnp_cli`. That override wins over the bundled copy whenever it actually contains the executable; if it does not, the app logs a warning and falls back to the application directory. **Clear** resets it to the bundled copy.
+
 # How to Compile
 
 All updated build instructions for Windows, macOS, and Linux are now available on the official [OrcaSlicer Wiki - How to build](https://www.orcaslicer.com/wiki/how_to_build) page.
