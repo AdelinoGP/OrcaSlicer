@@ -192,6 +192,71 @@ did not fire either — the GUI gets its stack traces from an explicit `__try/__
 `OnInit`, not from that filter. Diagnosing the crash above needed both to be added temporarily;
 both were reverted, since neither was in scope.
 
+### B9 follow-up: schema gate, remaining guards, first wire-contract coverage
+
+Landed after the batch commit; `pnp-batch-B9` stays on the gated commit.
+
+**The per-slice progress-schema gate from [ticket 009](../../tickets/009-pnp-cli-distribution-and-discovery.md)
+was never implemented.** `PnpProgressParser` parsed `schema_version`, stored it, exposed it via
+`schema_version()` — and nothing read it. The header comment even told the caller to gate against
+`PnpBackend::SUPPORTED_CONFIG_SCHEMA_MAJOR`, which is the *config* line, and that conflation is the
+bug: pnp exposes **two independent semver lines**, and they move separately. Config schema is at
+`1.0.0` while the progress stream is already at `1.3.0`. The startup probe gates only the former, so
+it offers no protection here at all — a pnp bumping the progress major to 2.0.0 while leaving config
+schema at 1.x would pass the handshake and then drive the progress bar and the legend from events
+this build cannot read. This session watched that line move 1.2.0 → 1.3.0 with nothing noticing.
+
+Now implemented: `SUPPORTED_PROGRESS_SCHEMA_MAJOR` sits beside `SUPPORTED_CONFIG_SCHEMA_MAJOR` on
+`PnpBackend`, so both wire gates are declared in one place. `PnpProgressParser::check_schema_version`
+runs once, where the first `schema_version` is captured, and reports a mismatch through the parser's
+existing fatal channel — `PnpSlicingProcess` already computes
+`failed = exit_code != 0 || parser.has_fatal_error() || ...` and throws `SlicingError`, so the slice
+fails through F08's normal path with no new plumbing. Behaviour by case:
+
+| First `schema_version` seen | Result |
+|---|---|
+| Same major (`1.x.y`) | Accept, log at info |
+| Different major (`2.0.0`) | Fatal — message names found-vs-supported |
+| Present but not semver | Fatal — cannot be shown to be same-major, so no benign reading |
+| Absent | Accept, log. Absence is not evidence of incompatibility, and refusing it would turn one dropped field upstream into a total slicing outage |
+
+Ticket 009's resolution text is left as written: it was right, the implementation drifted from it.
+
+**Remaining `opt_float` guards.** The two other unguarded `opt_float("printable_height")` reads in
+`CLI::run` — the `--uptodate` branch and the `--downward-check` branch — now carry the same guard.
+Both read machine-preset configs rather than project configs, so neither is known to be reachable;
+the guard costs nothing and removes the class from the file. Every other candidate in `CLI::run`
+(`max_layer_height`, `min_layer_height`, `default_print_profile`, `different_settings_to_system`,
+all three `extruder_clearance_*`) was already guarded.
+
+**First committed coverage of the pnp wire contract.** New `pnp_runtime_tests` target — kept
+separate from `pnp_config_translator_tests` because the warnings-log cases redirect the global
+`data_dir()`, which is not state to hand the translator cases as a side effect. 14 cases, 98
+assertions:
+
+- `PnpProgressParser`: phase→percent model, monotonicity under out-of-order events, stream
+  `layer_count` overriding the GUI estimate, plate-label prefixing, `slice_stats` stored verbatim,
+  fatal-vs-degraded separation, line reassembly across pipe reads, final-line flush, all five
+  schema-gate cases, and **forward compatibility** — unknown event types and unknown fields ignored,
+  garbage lines skipped and counted but never fatal. That tolerance is what let 1.3.0 land safely.
+- `log_pnp_config_warnings`: the Tier-D filter (not-yet-mapped at default dropped, moved-off-default
+  kept), the other three classes never filtered, record fields, `sent_value` only on lossy-fallback,
+  and append-not-truncate across slices — the writer-level meaning of "warnings jsonl grows".
+
+The schema-gate accept case is asserted against a line captured verbatim from a real `pnp_cli` run,
+so it fails if the supported major and what pnp actually ships ever diverge.
+
+**Verification, and its limits.** `ALL_BUILD` RelWithDebInfo clean (0 errors) and `ctest`
+**200/200** (186 → 200; +14 new cases). By explicit decision the install target and the packaged
+acceptance sweep were **not** re-run for this follow-up, so the gate's accept path is verified by
+unit test against a captured real line — plus the measurement that 130 of 130 JSONL lines in a
+packaged-run capture carry `schema_version: "1.3.0"` — rather than by a fresh live packaged slice.
+
 ### Sign-off
 
 Release readiness: **awaiting the human's sign-off**, pending the GUI-only list above.
+
+Note that the follow-up above does not shrink that list. The backlog is human-only by construction:
+what it contains is precisely the set of behaviours that need eyes on a GL canvas. The new coverage
+narrows one item — the progress/legend/warnings *logic* is now tested — while everything visual
+about it, and items 2 through 8 entirely, still need a person driving the UI.

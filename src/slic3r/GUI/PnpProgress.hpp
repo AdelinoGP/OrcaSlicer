@@ -8,9 +8,12 @@
 // 10-90 per_layer scaled by layer_index against the best-known layer total
 // (stream-provided layer_count when pnp ships it, else the GUI estimate passed
 // to the constructor), 90-100 postpass/finish. Percent is clamped monotonic
-// non-decreasing. Garbage lines are skipped; the child's exit code — not the
-// stream — decides success. Degraded-slice warnings are collected, never
-// surfaced per-event (F08 aggregates them at completion).
+// non-decreasing. Garbage lines are skipped. Success is decided by the child's
+// exit code OR by has_fatal_error(): the stream can condemn a slice on its own
+// (a fatal module_error, a validation_error, or an unusable schema_version),
+// and PnpSlicingProcess treats either signal as failure. Degraded-slice
+// warnings are collected, never surfaced per-event (F08 aggregates them at
+// completion).
 //
 // Threading: feed()/feed_line() are called on the slicing worker thread. The
 // parser itself posts no events; the caller (PnpSlicingProcess, F04) forwards
@@ -63,8 +66,15 @@ public:
 
     int current_percent() const { return m_percent; }
 
-    // schema_version from the first parsed event (empty until then); the
-    // caller gates on semver major against PnpBackend::SUPPORTED_CONFIG_SCHEMA_MAJOR.
+    // schema_version from the first event that carries one (empty until then).
+    // The parser itself gates its major against
+    // PnpBackend::SUPPORTED_PROGRESS_SCHEMA_MAJOR -- note that is the PROGRESS
+    // line, not the config line the startup probe checks; they are independent
+    // and move separately. A mismatch, or a value that is present but not
+    // semver, is reported as a fatal error (the slice then fails through F08's
+    // normal path). An absent schema_version is accepted and logged: absence is
+    // not evidence of incompatibility, and refusing it would turn one dropped
+    // field upstream into a total slicing outage.
     const std::string& schema_version() const { return m_schema_version; }
 
     // Collected degraded-slice / non-fatal module warnings, in stream order.
@@ -86,6 +96,9 @@ public:
     int skipped_line_count() const { return m_skipped_lines; }
 
 private:
+    // Evaluates m_schema_version against the supported progress-schema major.
+    // Called once, when the first schema_version in the stream is captured.
+    void check_schema_version();
     void emit_update(const std::string& text);
 
     UpdateCallback       m_on_update;

@@ -24,9 +24,18 @@ namespace GUI {
 class PnpBackend
 {
 public:
-    // The config-schema wire-contract MAJOR this GUI was built against.
-    // Same-major = compatible (pnp CONFIG_SCHEMA_WIRE_VERSION rule).
+    // pnp exposes two INDEPENDENT wire-version lines, and they move separately: at the time
+    // of writing the config schema is 1.0.0 while the progress stream is already 1.3.0. The
+    // startup handshake gates only the former, so it offers no protection at all against a
+    // progress-stream major bump — hence both constants live here, together, as the one place
+    // to look when pnp bumps anything. Same-major = compatible, per pnp's own rule.
+
+    // Config-schema wire contract (`pnp_cli module config-schema` JSON), checked once by probe().
     static constexpr int SUPPORTED_CONFIG_SCHEMA_MAJOR = 1;
+
+    // Progress-event wire contract (the slice JSONL stream), checked per slice by
+    // PnpProgressParser against the first event that carries a schema_version.
+    static constexpr int SUPPORTED_PROGRESS_SCHEMA_MAJOR = 1;
 
     // AppConfig key for the optional Preferences override directory.
     static constexpr const char *CONFIG_KEY_CLI_DIR = "pnp_cli_directory";

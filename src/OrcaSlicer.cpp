@@ -2348,7 +2348,12 @@ int CLI::run(int argc, char **argv)
                             orig_printable_width = (int)(orig_printable_area[2].x() - orig_printable_area[0].x());
                             orig_printable_depth = (int)(orig_printable_area[2].y() - orig_printable_area[0].y());
                         }
-                        orig_printable_height = (int)(config.opt_float("printable_height"));
+                        // Guarded for the same reason as the read in the 3mf-load branch above:
+                        // opt_float is a null dereference on a missing key. This config comes from a
+                        // machine preset rather than a project, so the key is normally present --
+                        // the guard costs nothing and removes the last of the class from this path.
+                        if (config.option<ConfigOptionFloat>("printable_height"))
+                            orig_printable_height = (int)(config.opt_float("printable_height"));
                         BOOST_LOG_TRIVIAL(info) << __FUNCTION__<< boost::format(":%1%, check printable size: old_printable_width=%2%, orig_printable_width=%3%, old_printable_depth=%4%, orig_printable_depth=%5%, old_printable_height=%6%, orig_printable_height=%7%")
                                     %__LINE__ %old_printable_width %orig_printable_width %old_printable_depth %orig_printable_depth %old_printable_height %orig_printable_height;
                         if ((orig_printable_width > 0) && (orig_printable_depth > 0) && (orig_printable_height > 0))
@@ -4143,7 +4148,11 @@ int CLI::run(int argc, char **argv)
             if (temp_printable_area.size() >= 4) {
                 printer_plate.printable_width = (int)(temp_printable_area[2].x() - temp_printable_area[0].x());
                 printer_plate.printable_depth = (int)(temp_printable_area[2].y() - temp_printable_area[0].y());
-                printer_plate.printable_height = (int)(config.opt_float("printable_height"));
+                // Same guard as the other two printable_height reads: opt_float null-dereferences a
+                // missing key. Reached only via --downward-check, against a --downward-settings
+                // machine preset, so the key is normally present.
+                if (config.option<ConfigOptionFloat>("printable_height"))
+                    printer_plate.printable_height = (int)(config.opt_float("printable_height"));
             }
             if (temp_exclude_area.size() >= 4) {
                 printer_plate.exclude_width = (int)(temp_exclude_area[2].x() - temp_exclude_area[0].x());

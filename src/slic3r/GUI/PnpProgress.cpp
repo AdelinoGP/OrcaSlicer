@@ -1,5 +1,10 @@
 #include "PnpProgress.hpp"
 
+#include "PnpBackend.hpp"
+
+#include "libslic3r/Semver.hpp"
+#include "libslic3r/format.hpp"
+
 #include <boost/log/trivial.hpp>
 
 #include <nlohmann/json.hpp>
@@ -113,8 +118,11 @@ void PnpProgressParser::feed_line(const std::string& line)
         return;
     }
 
-    if (m_schema_version.empty())
+    if (m_schema_version.empty()) {
         m_schema_version = get_string(j, "schema_version");
+        if (!m_schema_version.empty())
+            check_schema_version();
+    }
 
     // Best-known layer total: stream-provided layer_count wins over the GUI
     // estimate (pnp handoff item 12: layer_count on phase_start(per_layer) or
@@ -212,6 +220,40 @@ void PnpProgressParser::feed_line(const std::string& line)
         // ignore, do not count as parse errors.
         BOOST_LOG_TRIVIAL(trace) << "pnp progress: ignoring event type " << event;
     }
+}
+
+void PnpProgressParser::check_schema_version()
+{
+    // Per-slice half of the version handshake (wayfinder ticket 009). The startup probe gates
+    // the CONFIG schema; this stream carries the PROGRESS schema, an independent semver line
+    // that moves on its own -- so a pnp bumping only the progress major would otherwise sail
+    // through the probe and then drive the progress bar and the legend from events this build
+    // cannot read. Same-major = accept, per pnp's compatibility rule.
+    const boost::optional<Semver> ver = Semver::parse(m_schema_version);
+    if (!ver) {
+        // Present but not semver. That is a contract violation with no benign reading -- an
+        // unparseable version cannot be shown to be same-major -- so refuse the stream.
+        m_fatal = true;
+        if (m_fatal_message.empty())
+            m_fatal_message = Slic3r::format(
+                "pnp_cli sent an unreadable progress-stream schema version (\"%1%\"); "
+                "this build supports major version %2%.",
+                m_schema_version, PnpBackend::SUPPORTED_PROGRESS_SCHEMA_MAJOR);
+        BOOST_LOG_TRIVIAL(error) << "pnp progress: unparseable schema_version \"" << m_schema_version << "\"";
+        return;
+    }
+    if (ver->maj() != PnpBackend::SUPPORTED_PROGRESS_SCHEMA_MAJOR) {
+        m_fatal = true;
+        if (m_fatal_message.empty())
+            m_fatal_message = Slic3r::format(
+                "pnp_cli sends progress-stream schema version %1%, but this build supports "
+                "major version %2%.",
+                m_schema_version, PnpBackend::SUPPORTED_PROGRESS_SCHEMA_MAJOR);
+        BOOST_LOG_TRIVIAL(error) << "pnp progress: schema major mismatch, stream=" << m_schema_version
+                                 << ", supported major=" << PnpBackend::SUPPORTED_PROGRESS_SCHEMA_MAJOR;
+        return;
+    }
+    BOOST_LOG_TRIVIAL(info) << "pnp progress: stream schema_version=" << m_schema_version << " accepted";
 }
 
 void PnpProgressParser::emit_update(const std::string& text)
