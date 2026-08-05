@@ -36,6 +36,7 @@ const char* const TIER_A_KEYS[] = {
     "extra_perimeters_on_overhangs",
     "filter_out_gap_fill",
     "gap_infill_speed",
+    "initial_layer_line_width",
     "initial_layer_min_bead_width",
     "inner_wall_line_width",
     "inner_wall_speed",
@@ -291,7 +292,13 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     // so Orca float-or-percent widths must be resolved against the nozzle
     // diameter here — "105%" strings fail pnp config resolution outright.
     const double nozzle_d = cfg.option("nozzle_diameter") != nullptr ? cfg.opt_float("nozzle_diameter", 0) : 0.;
-    for (const char* key : {"line_width", "inner_wall_line_width", "outer_wall_line_width"}) {
+    // Of Orca's 37 float-or-percent keys, exactly two are also declared float
+    // in pnp's schema (`line_width`, `initial_layer_line_width`); the rest land
+    // untyped in pnp's extensions map, where a "105%" string is harmless. Both
+    // must be resolved here. The wall widths below are not pnp-declared, but
+    // resolving them costs nothing and keeps the set of widths consistent.
+    for (const char* key :
+         {"line_width", "initial_layer_line_width", "inner_wall_line_width", "outer_wall_line_width"}) {
         auto* fop = dynamic_cast<const ConfigOptionFloatOrPercent*>(cfg.option(key));
         if (fop != nullptr && fop->percent && nozzle_d > 0.)
             out[key] = fop->get_abs_value(nozzle_d);

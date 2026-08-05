@@ -9,6 +9,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -69,6 +70,34 @@ TEST_CASE("translator regressions from first GUI slices", "[pnp][translator]")
             {"line_width", "0.42"},
         }));
         REQUIRE(res.json.at("line_width").get<double>() == Approx(0.42));
+    }
+
+    // Regression: a GUI slice died at pnp config resolution with
+    //   "config key 'initial_layer_line_width': expected Float value, got String".
+    // The key was absent from TIER_A_KEYS *and* from the percent-resolution
+    // list, so nothing emitted it; pnp then fell back to the 3MF sidecar's
+    // project_settings.config, where Orca had stored the raw "100%" string.
+    // pnp declares this key float, so the string was a hard error. Both the
+    // percent and the absolute form must be emitted here, as JSON numbers.
+    SECTION("initial_layer_line_width reaches pnp as a number, never a string")
+    {
+        auto pct = PnpConfigTranslator::translate(make_config({
+            {"nozzle_diameter", "0.5"},
+            {"initial_layer_line_width", "100%"},
+        }));
+        REQUIRE(pct.json.contains("initial_layer_line_width"));
+        REQUIRE(pct.json.at("initial_layer_line_width").is_number());
+        REQUIRE_THAT(pct.json.at("initial_layer_line_width").get<double>(),
+                     Catch::Matchers::WithinAbs(0.5, 1e-9));
+
+        auto abs = PnpConfigTranslator::translate(make_config({
+            {"nozzle_diameter", "0.4"},
+            {"initial_layer_line_width", "0.42"},
+        }));
+        REQUIRE(abs.json.contains("initial_layer_line_width"));
+        REQUIRE(abs.json.at("initial_layer_line_width").is_number());
+        REQUIRE_THAT(abs.json.at("initial_layer_line_width").get<double>(),
+                     Catch::Matchers::WithinAbs(0.42, 1e-9));
     }
 
     SECTION("tree_support_wall_count 0 (Orca auto) is omitted with a warning")
