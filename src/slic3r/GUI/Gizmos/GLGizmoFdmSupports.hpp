@@ -8,6 +8,8 @@
 #include "slic3r/GUI/3DScene.hpp"
 #include "slic3r/GUI/I18N.hpp"
 
+#include <atomic>
+
 #include <boost/thread.hpp>
 
 namespace Slic3r::GUI {
@@ -70,6 +72,25 @@ private:
     bool need_regenerate_support_volumes();
     void generate_support_volume();
     void run_thread();
+
+    // PNP fork: the overlay is regenerated on demand rather than on every
+    // paint stroke. A run costs a full pnp prepass (measured: 5.65 s and a
+    // 43 MB document for benchy), so driving it from the supported_facets
+    // timestamp the way the native pipeline did would stall painting.
+    // need_regenerate_support_volumes() therefore only marks the overlay
+    // stale; this starts the run.
+    void request_support_preview();
+    // Move a finished worker result into the render volume. UI thread only.
+    void consume_support_preview();
+
+    std::atomic<bool> m_preview_cancel { false };
+    // Worker -> UI handoff, guarded by m_mutex.
+    TriangleMesh      m_preview_mesh;
+    std::string       m_preview_error;
+    bool              m_preview_result_pending = false;
+    size_t            m_preview_expolygon_count = 0;
+    // Set while an overlay exists that no longer matches the painted facets.
+    bool              m_preview_stale = false;
     float m_angle_threshold_deg = 40.f;
     bool m_volume_valid = false;
 

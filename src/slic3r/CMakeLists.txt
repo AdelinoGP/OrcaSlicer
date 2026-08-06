@@ -391,6 +391,9 @@ set(SLIC3R_GUI_SOURCES
     GUI/PnpProgress.hpp
     GUI/PnpSlicingProcess.cpp
     GUI/PnpSlicingProcess.hpp
+    GUI/PnpSupportPreview.cpp
+    GUI/PnpSupportPreview.hpp
+    GUI/PnpSupportPreviewDoc.cpp
     GUI/Preferences.cpp
     GUI/Preferences.hpp
     GUI/PresetBundleDialog.cpp

@@ -83,13 +83,15 @@ void ingest_pnp_gcode(GCodeProcessorResult &dst, const std::string &gcode_path, 
 	dst = std::move(processor.extract_result());
 }
 
+} // anonymous namespace
+
 #ifdef _WIN32
 // F08 orphan guard: every pnp_cli child is assigned to one process-lifetime
 // Job Object with kill-on-close, so the OS terminates any in-flight slice the
 // moment this GUI process dies — including on a crash, where no cleanup code
 // runs (the kernel closes the last job handle for us). The handle is created
 // once and intentionally never closed.
-HANDLE pnp_job_object()
+void *pnp_job_object()
 {
 	static HANDLE s_job = []() -> HANDLE {
 		HANDLE job = ::CreateJobObjectW(nullptr, nullptr);
@@ -111,8 +113,6 @@ HANDLE pnp_job_object()
 	return s_job;
 }
 #endif // _WIN32
-
-} // anonymous namespace
 
 PnpSlicingProcess::~PnpSlicingProcess()
 {
@@ -518,7 +518,7 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 		// F08: bind the child to the kill-on-close Job Object so it cannot
 		// outlive the GUI process. Failure is logged, never fatal — the slice
 		// itself still works, only the crash-orphan guard is lost.
-		if (HANDLE job = pnp_job_object(); job != nullptr)
+		if (HANDLE job = static_cast<HANDLE>(pnp_job_object()); job != nullptr)
 			if (!::AssignProcessToJobObject(job, child.native_handle()))
 				BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": AssignProcessToJobObject failed, error "
 				                           << ::GetLastError();

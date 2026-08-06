@@ -51,6 +51,17 @@ class Model;
 
 namespace GUI {
 
+#ifdef _WIN32
+// F08 orphan guard, shared by every pnp_cli child this fork spawns (the slice
+// itself and the gizmo's support preview): one process-lifetime Job Object
+// with kill-on-close, so the OS reaps in-flight children even on a crash.
+// Returns nullptr when the job could not be created; callers log and continue.
+//
+// Typed void* rather than HANDLE so this header (pulled in widely) need not
+// drag in <windows.h>; HANDLE is void* and callers cast at the use site.
+void *pnp_job_object();
+#endif // _WIN32
+
 class PnpSlicingProcess
 {
 public:

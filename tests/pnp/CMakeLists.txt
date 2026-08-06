@@ -16,8 +16,12 @@ target_link_libraries(pnp_config_translator_tests test_common libslic3r Catch2::
 add_executable(pnp_runtime_tests
     test_pnp_progress.cpp
     test_pnp_config_warnings_log.cpp
+    test_pnp_support_preview.cpp
     ${CMAKE_SOURCE_DIR}/src/slic3r/GUI/PnpProgress.cpp
     ${CMAKE_SOURCE_DIR}/src/slic3r/GUI/PnpConfigWarningsLog.cpp
+    # Document half only; PnpSupportPreview.cpp (the pnp_cli runner) needs the
+    # GUI backend and is deliberately not linked here.
+    ${CMAKE_SOURCE_DIR}/src/slic3r/GUI/PnpSupportPreviewDoc.cpp
 )
 target_include_directories(pnp_runtime_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/slic3r/GUI)
 target_link_libraries(pnp_runtime_tests test_common libslic3r Catch2::Catch2WithMain)

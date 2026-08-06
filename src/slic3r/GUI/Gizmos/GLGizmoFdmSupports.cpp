@@ -15,8 +15,16 @@
 #include "slic3r/GUI/GUI.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
 #include "GLGizmoUtils.hpp"
+// PNP fork (pnp handoff item 13): support-preview overlay via pnp_cli.
+#include "slic3r/GUI/PnpSupportPreview.hpp"
+#include "slic3r/GUI/PnpModelExport.hpp"
+#include "slic3r/GUI/PnpConfigTranslator.hpp"
+#include "slic3r/GUI/NotificationManager.hpp"
 
 #include <glad/gl.h>
+
+#include <boost/filesystem.hpp>
+#include <boost/nowide/fstream.hpp>
 
 #include <boost/log/trivial.hpp>
 
@@ -488,6 +496,21 @@ void GLGizmoFdmSupports::on_render_input_window(float x, float y, float bottom_l
     }
     m_imgui->disabled_end();
 
+    // PNP fork (pnp handoff item 13): explicit regeneration. A run is a full
+    // pnp prepass, so it is on demand rather than on every stroke.
+    ImGui::Separator();
+    consume_support_preview();
+    const bool generating = (m_edit_state == state_generating);
+    m_imgui->disabled_begin(generating);
+    if (m_imgui->button(generating ? _L("Generating support preview...") : _L("Preview supports"))) {
+        request_support_preview();
+    }
+    m_imgui->disabled_end();
+    if (m_preview_stale && !generating) {
+        ImGui::SameLine();
+        m_imgui->text(_L("(painting changed; preview is out of date)"));
+    }
+
     ImGui::SameLine();
     GLGizmoUtils::begin_right_aligned_buttons({_L("Done")});
     if (m_imgui->button(_L("Done"))) {
@@ -803,22 +826,159 @@ void GLGizmoFdmSupports::update_support_volumes()
         return;
     }
 
-    // PNP fork (F13): the native support-preview worker is removed with the
-    // Print::process / Support pipeline. The gizmo stays PAINT-ONLY — painted
-    // facets still reach PNP via the per-object sidecar (ticket 004); the user
-    // simply sees no generated-support overlay until a real slice. Restoring the
-    // overlay via a CLI geometry query is pnp handoff item 13.
+    // PNP fork (pnp handoff item 13): the native support-preview worker went
+    // away with Print::process, and pnp_cli grew a `support-preview` geometry
+    // query in its place. Painting no longer *starts* a run — a run is a full
+    // prepass — so this only records that the overlay on screen is now stale.
+    // request_support_preview() is what spawns the worker.
     std::unique_lock<std::mutex> lck(m_mutex);
-    if (m_support_volume)
-    {
-        delete m_support_volume;
-        m_support_volume = NULL;
-    }
-    m_volume_ready = true;
-    m_volume_valid = true;
-    m_edit_state   = state_ready;
+    m_preview_stale = (m_support_volume != nullptr);
+    m_volume_ready  = true;
+    m_volume_valid  = true;
+    m_edit_state    = state_ready;
     lck.unlock();
     return;
+}
+
+// PNP fork: export this plate and its config on the UI thread (the exporter
+// reads Plater model state), then hand the slow part to the worker.
+void GLGizmoFdmSupports::request_support_preview()
+{
+    if (m_edit_state == state_generating)
+        return;
+
+    const int plate_idx = wxGetApp().plater()->get_partplate_list().get_curr_plate_index();
+
+    boost::filesystem::path dir =
+        boost::filesystem::temp_directory_path() /
+        boost::filesystem::unique_path("pnp-support-preview-%%%%%%%%");
+    boost::system::error_code ec;
+    boost::filesystem::create_directories(dir, ec);
+    if (ec) {
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": cannot create " << dir.string() << ": " << ec.message();
+        return;
+    }
+
+    const boost::filesystem::path model_path  = dir / "model.3mf";
+    const boost::filesystem::path config_path = dir / "config.json";
+
+    std::string export_error;
+    if (!export_plate_3mf_for_pnp(plate_idx, model_path, &export_error)) {
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": 3MF export failed: " << export_error;
+        boost::filesystem::remove_all(dir, ec);
+        return;
+    }
+
+    const DynamicPrintConfig full_config = wxGetApp().preset_bundle->full_config();
+    PnpTranslationResult     translated  = PnpConfigTranslator::translate(full_config);
+    // The overlay is only meaningful with supports on; the user is standing in
+    // the support-painting gizmo, so force it rather than inherit the preset.
+    translated.json["enable_support"] = true;
+    {
+        boost::nowide::ofstream out(config_path.string().c_str(), std::ios::binary);
+        out << translated.json.dump(2);
+    }
+
+    double layer_height = 0.2;
+    if (full_config.option<ConfigOptionFloat>("layer_height"))
+        layer_height = full_config.opt_float("layer_height");
+
+    if (m_thread.joinable()) {
+        m_preview_cancel = true;
+        m_thread.join();
+    }
+    m_preview_cancel = false;
+
+    {
+        std::unique_lock<std::mutex> lck(m_mutex);
+        m_edit_state            = state_generating;
+        m_preview_result_pending = false;
+        m_preview_error.clear();
+    }
+
+    m_thread = boost::thread([this, dir, model_path, config_path, layer_height]() {
+        PnpSupportPreviewRun run = run_support_preview(model_path, config_path, layer_height, m_preview_cancel);
+        {
+            std::unique_lock<std::mutex> lck(m_mutex);
+            m_preview_mesh            = std::move(run.mesh);
+            m_preview_error           = run.error;
+            m_preview_expolygon_count = run.expolygon_count;
+            m_preview_result_pending  = true;
+        }
+        boost::system::error_code cleanup_ec;
+        boost::filesystem::remove_all(dir, cleanup_ec);
+        wxGetApp().plater()->CallAfter([]() { wxGetApp().plater()->get_current_canvas3D()->set_as_dirty(); });
+    });
+}
+
+// PNP fork: pick up a finished worker result. UI thread only (touches GL).
+void GLGizmoFdmSupports::consume_support_preview()
+{
+    TriangleMesh mesh;
+    std::string  error;
+    size_t       expolygons = 0;
+    {
+        std::unique_lock<std::mutex> lck(m_mutex);
+        if (!m_preview_result_pending)
+            return;
+        m_preview_result_pending = false;
+        mesh       = std::move(m_preview_mesh);
+        error      = m_preview_error;
+        expolygons = m_preview_expolygon_count;
+        m_preview_mesh = TriangleMesh();
+        m_edit_state   = state_ready;
+    }
+
+    if (!error.empty()) {
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": " << error;
+        wxGetApp().plater()->get_notification_manager()->push_notification(
+            NotificationType::CustomNotification, NotificationManager::NotificationLevel::WarningNotificationLevel,
+            _u8L("Support preview failed: ") + error);
+        return;
+    }
+
+    if (m_support_volume) {
+        delete m_support_volume;
+        m_support_volume = nullptr;
+    }
+    m_preview_stale = false;
+
+    // A run that legitimately finds nothing to support leaves no overlay; say
+    // so rather than let the user read an empty screen as a failure.
+    if (expolygons == 0 || mesh.empty()) {
+        BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": no support geometry for this object";
+        wxGetApp().plater()->get_notification_manager()->push_notification(
+            NotificationType::CustomNotification, NotificationManager::NotificationLevel::RegularNotificationLevel,
+            _u8L("Support preview: this object needs no supports."));
+        return;
+    }
+
+    // No instance transform, matching the pre-F13 volume: that one was built
+    // from print-coordinate extrusions offset by m_print_instance.shift and
+    // rendered with identity. pnp's document comes out of the plate-local 3MF
+    // export with instance transforms already applied, so it lands in the same
+    // space — setting a transform here would apply them twice.
+    m_support_volume = new GLVolume(0.f, 0.7f, 0.f, 0.7f);
+    m_support_volume->force_native_color = true;
+    m_support_volume->model.init_from(mesh);
+
+    // Record the facet timestamps this overlay was built from, so
+    // need_regenerate_support_volumes() only calls it stale once the user
+    // paints again.
+    const ModelObject *mo = m_c->selection_info()->model_object();
+    int                volume_id = -1;
+    for (const ModelVolume *mv : mo->volumes) {
+        if (!mv->is_model_part())
+            continue;
+        ++volume_id;
+        if (volume_id < int(m_volume_timestamps.size()))
+            m_volume_timestamps[volume_id] = mv->supported_facets.timestamp();
+    }
+
+    m_volume_ready = true;
+    m_volume_valid = true;
+    if (m_print_instance.print_object)
+        m_object_id = m_print_instance.print_object->id().id;
 }
 
 void GLGizmoFdmSupports::run_thread()
