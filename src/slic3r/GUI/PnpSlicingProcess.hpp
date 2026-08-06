@@ -43,6 +43,9 @@
 #include "SlicingProcessEvents.hpp"
 
 namespace boost { namespace process { class child; } }
+// opstream is a typedef of basic_opstream<char>, not a class, so it cannot be
+// forward-declared the way `child` can — include the real header.
+#include <boost/process/pipe.hpp>
 
 namespace Slic3r {
 
@@ -212,6 +215,12 @@ private:
 	// The running pnp_cli child, only valid while the worker owns one; used by
 	// stop()/stop_internal() to terminate it. Guarded by m_mutex.
 	boost::process::child      *m_child = nullptr;
+	// pnp handoff item 11: the child's stdin. Closing it is the graceful-cancel
+	// signal (pnp_cli --cancel-on-stdin-eof exits 130); terminate() is only the
+	// fallback when the child does not go away within PNP_CANCEL_GRACE_MS.
+	// Guarded by m_mutex alongside m_child, and owned by run_pnp_cli's frame so
+	// it cannot outlive the child (an early destruction would read as a cancel).
+	boost::process::opstream   *m_child_stdin = nullptr;
 	std::atomic<bool>           m_canceled { false };
 	bool                        m_internal_cancelled = false;
 

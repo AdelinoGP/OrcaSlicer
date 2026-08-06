@@ -25,6 +25,15 @@ A handoff-ready design doc — optimized for subagent execution — for converti
 
 ## Decisions so far
 
+> **PNP handoff closed — 2026-08-05 (batch B9, release gate).** All 16 pnp-side
+> handoff items are resolved or reclassified as non-blocking; the one hard
+> blocker (item 6, non-uniform scale) is done and human-verified. The gist lines
+> below record each ticket's finding **as decided at the time** and are not
+> re-dated — several describe gaps that have since shipped (time estimates,
+> G-code flavors, `aligned` seam, layer count). For current status read the
+> [closure table](assets/handoff-pnp-gap-implementation.md#closed--2026-08-05-batch-b9--release-gate),
+> and re-derive against the live `pnp_cli` before trusting any of it.
+
 <!-- one line per closed ticket: [title](tickets/NNN-slug.md) — gist -->
 
 - [PNP feature-coverage inventory](tickets/001-pnp-feature-coverage-inventory.md) — PNP covers the core single-material FFF slice surface with Orca-viewer-compatible G-code; hard gaps: no time estimates, no raft, Marlin-only flavor, unproven multi-material, GUI must render thumbnails, no multi-plate 3MF, non-uniform scale rejected. Full matrix + 8 pnp handoff items in [the inventory asset](assets/001-pnp-feature-coverage-inventory.md).

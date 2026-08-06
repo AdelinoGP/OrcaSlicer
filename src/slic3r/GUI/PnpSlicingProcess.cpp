@@ -85,6 +85,12 @@ void ingest_pnp_gcode(GCodeProcessorResult &dst, const std::string &gcode_path, 
 
 } // anonymous namespace
 
+// pnp handoff item 11: how long a cancelled pnp_cli gets to unwind after its
+// stdin closes before we kill it. pnp checks its cancel flag between modules,
+// so the wait is bounded by one module's work, not by the whole slice.
+// Deliberately outside the _WIN32 block below — cancel_and_join is shared.
+static constexpr int PNP_CANCEL_GRACE_MS = 3000;
+
 #ifdef _WIN32
 // F08 orphan guard: every pnp_cli child is assigned to one process-lifetime
 // Job Object with kill-on-close, so the OS terminates any in-flight slice the
@@ -340,13 +346,21 @@ void PnpSlicingProcess::stop_internal()
 bool PnpSlicingProcess::cancel_and_join(bool internal)
 {
 	namespace bp = boost::process;
+	// pnp handoff item 11: closing the child's stdin asks pnp_cli to unwind
+	// cleanly (it exits 130). Kill stays as the fallback for a child that is
+	// wedged or predates the flag — a cancel must always actually cancel.
+	bool awaiting_graceful_exit = false;
 	{
 		std::unique_lock<std::mutex> lck(m_mutex);
 		if (m_state == STATE_STARTED || m_state == STATE_RUNNING) {
 			if (internal)
 				m_internal_cancelled = true;
 			m_canceled = true;
-			if (m_child != nullptr) {
+			if (m_child_stdin != nullptr) {
+				m_child_stdin->pipe().close();
+				awaiting_graceful_exit = true;
+				BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": closed pnp_cli stdin, awaiting graceful exit";
+			} else if (m_child != nullptr) {
 				std::error_code ec;
 				m_child->terminate(ec);
 				if (ec)
@@ -355,6 +369,19 @@ bool PnpSlicingProcess::cancel_and_join(bool internal)
 		}
 	}
 	// Join outside the lock; the worker takes m_mutex to update state / m_child.
+	if (awaiting_graceful_exit && m_thread.joinable()) {
+		if (!m_thread.try_join_for(boost::chrono::milliseconds(PNP_CANCEL_GRACE_MS))) {
+			BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": pnp_cli did not exit within "
+			                           << PNP_CANCEL_GRACE_MS << " ms of stdin close; terminating";
+			std::unique_lock<std::mutex> lck(m_mutex);
+			if (m_child != nullptr) {
+				std::error_code ec;
+				m_child->terminate(ec);
+				if (ec)
+					BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": terminate failed: " << ec.message();
+			}
+		}
+	}
 	if (m_thread.joinable())
 		m_thread.join();
 	{
@@ -479,6 +506,11 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 		"--module-dir", backend.module_dir().string(),
 		"--output",     job.output_path,
 		"--instrument-stderr",
+		// pnp handoff item 11: ask pnp_cli to unwind cleanly when we close its
+		// stdin, instead of being killed mid-write. Requires the stdin pipe
+		// wired below — with bp::std_in < bp::null this flag would fire
+		// immediately, because /dev/null reads EOF at once.
+		"--cancel-on-stdin-eof",
 	};
 	// F14: pass the single rendered source PNG; pnp resizes/transcodes it per
 	// the `thumbnails` config key. Empty path = no thumbnail for this slice.
@@ -508,8 +540,11 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 	int         exit_code = -1;
 	try {
 		bp::ipstream err_stream;
+		// Held open for the child's whole lifetime: closing it is the cancel
+		// signal, so an early destruction would abort the slice.
+		bp::opstream child_stdin;
 		bp::child    child(backend.cli_path().string(), bp::args(args),
-		                   bp::std_out > bp::null, bp::std_err > err_stream, bp::std_in < bp::null,
+		                   bp::std_out > bp::null, bp::std_err > err_stream, bp::std_in < child_stdin,
 #ifdef _WIN32
 		                   bp::windows::create_no_window,
 #endif
@@ -523,11 +558,16 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 				BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": AssignProcessToJobObject failed, error "
 				                           << ::GetLastError();
 #endif
-		// Clear m_child before `child` is destroyed on every exit path (incl.
-		// exceptions), so stop() can never terminate a dangling pointer.
+		// Clear m_child / m_child_stdin before `child` and the pipe are
+		// destroyed on every exit path (incl. exceptions), so stop() can never
+		// touch a dangling pointer.
 		struct ChildGuard {
 			PnpSlicingProcess *self;
-			~ChildGuard() { std::unique_lock<std::mutex> lck(self->m_mutex); self->m_child = nullptr; }
+			~ChildGuard() {
+				std::unique_lock<std::mutex> lck(self->m_mutex);
+				self->m_child       = nullptr;
+				self->m_child_stdin = nullptr;
+			}
 		} child_guard { this };
 		{
 			std::unique_lock<std::mutex> lck(m_mutex);
@@ -537,8 +577,9 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 				std::error_code ec;
 				child.terminate(ec);
 			} else {
-				m_child = &child;
-				m_state = STATE_RUNNING;
+				m_child       = &child;
+				m_child_stdin = &child_stdin;
+				m_state       = STATE_RUNNING;
 			}
 		}
 		// Pump the JSONL progress stream. Blocking reads are fine: this thread

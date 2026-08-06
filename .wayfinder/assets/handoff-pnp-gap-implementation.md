@@ -8,6 +8,51 @@ Context: the fork replaces OrcaSlicer's in-process slicing with `pnp_cli slice` 
 
 > **Corrected by fork ticket 013 (2026-07-17): the fork has NO gap-communication channel to the user at all.** This note previously said the fork's only such channel was "a slice-time warning derived from its ticket 005 config-translation table". Ticket 013 decided that warning vector is **written to a log, never shown** (`<data_dir>/pnp-config-warnings.jsonl` + one line in Orca's log) — it is a dev instrument for growing the mapping table, not a user surface. So there is no warning, no dialog, no notification, and no capability gate anywhere in the fork. **Every item below fails silently from the user's point of view**: a Klipper user gets Marlin G-code, a raft user gets no raft, a non-uniformly-scaled object gets a raw loader error, with nothing on screen explaining why. This raises the stakes on the scheduling promise — the fork is not merely undefended, it is *mute*.
 
+---
+
+## CLOSED — 2026-08-05 (batch B9 / release gate)
+
+**This handoff is closed. No item below blocks the fork.** Status was re-derived
+against the live `pnp_cli` staged at `build-dbginfo/src/RelWithDebInfo/`, by
+slicing benchy and reading the resulting G-code and `--instrument-stderr`
+stream — not by reading this document, which had gone stale on four items that
+had already shipped.
+
+| # | Item | Status | Basis |
+|---|------|--------|-------|
+| 1 | Print-time estimation | **Closed** | `gcode_prediction_seconds: 6046`; `; estimated printing time (normal mode) = 1h 40m 45s` |
+| 2 | `slice_stats` event | **Closed** | Event carries `gcode_weight_grams: 12.29`, `gcode_prediction_seconds`, `gcode_filament_length_mm`, `layer_count`, `first_layer_height_mm`, `extruded_volume_mm3`, `toolchange_count`. |
+| 3 | Standalone raft | **Open, pnp-side** | `support-planner` emits a configuration-only `RaftPlan`; its own docs say "Raft geometry is owned by a later packet." |
+| 4 | Multi-material end-to-end | **Closed** | Reported closed by the repo owner, 2026-08-05. Not independently verified from the fork side. |
+| 5 | Marlin-only flavor | **Closed** | `GcodeFlavor` covers marlin, marlin2, klipper, reprapfirmware, repetier. |
+| 6 | Non-uniform scale | **Closed** | GUI slice of a non-uniformly scaled object, human-verified 2026-08-05. Was the only hard blocker. |
+| 7 | Multi-plate 3MF | **Won't-fix** | Closed by fork ticket 004 (per-plate loop makes it moot). |
+| 8 | TASK-120c seam live path | **Closed** | Reported closed by the repo owner, 2026-08-05. Not independently verified from the fork side. |
+| 9 | Orca per-object key parity | **Closed** | Reported closed by the repo owner, 2026-08-05. Not independently verified from the fork side. |
+| 10 | CONFIG_BLOCK passthrough keys | **Closed** | `printer_model`, `filament_density = 1.24`, `filament_cost = 25`, `machine_max_acceleration_extruding = 1250` all echo into the CONFIG_BLOCK. **pnp echoes only keys it was given** — a minimal `--config` produces a CONFIG_BLOCK missing them, which reads as a gap and is not one. Probe with a realistic config. |
+| 11 | Graceful cancel | **Closed** | pnp shipped `--cancel-on-stdin-eof` (exit 130); the fork adopted it 2026-08-05 — stdin close first, `terminate()` only after a 3 s grace. |
+| 12 | `layer_count` in progress stream | **Closed** | `layer_count: 240` in `slice_stats`. |
+| 13 | Support-painting overlay | **Closed** | pnp shipped `pnp_cli support-preview`; the fork restored the overlay 2026-08-05 behind an explicit "Preview supports" button. |
+| 14 | Thumbnails | **Closed** | Inner `; thumbnail begin 16x16 108` tags now emitted, which was the unparseable half. Single-PNG CLI is the agreed v1 shape (the fork ships PNG only). |
+| 15 | M73 + `; filament used [g]` | **Closed** | 284 `M73` lines; `; filament used [g] = 12.29`. (The grams line needs `filament_density` in the config — absent it, only `[mm]`/`[cm3]` are emitted.) |
+| 16 | `aligned` seam mode | **Closed** | `; seam_position = aligned`. Was the most visible per-slice gap — it hit every default slice silently. |
+
+**One item remains open: 3 (raft geometry), pnp-side and non-blocking.** Track
+it in the pinch_n_print spec-packet workflow, not here.
+
+Two cautions for whoever reads this next:
+
+- Every status line above is a **ledger fact** and rots. Re-derive against the
+  live binary before trusting it, the same way this table was built.
+- **Probe with a realistic config.** The first pass at this table wrongly called
+  items 2, 10 and 15 partial, because it sliced with a three-key `--config`.
+  pnp echoes only the keys it is given, so a thin config yields a thin
+  CONFIG_BLOCK and no grams — which looks exactly like a missing feature. The
+  fork always sends a full translated preset, so this failure mode is an
+  artifact of hand-probing, never of a real slice.
+
+---
+
 ## Items
 
 1. **Print-time estimation** — `estimated_print_time_s` is hardcoded 0 in `crates/slicer-gcode/src/emit.rs` (`PrintMetadata`); no kinematics/acceleration model exists. Orca's preview and sidebar show per-feature/per-layer time. Needs an estimator (even a simple feedrate-distance model beats 0) surfaced in G-code metadata. High priority — visible on every slice.
