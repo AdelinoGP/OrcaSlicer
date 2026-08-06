@@ -1,0 +1,3 @@
+[submodule "pinch_n_print_cli"]
+	path = pinch_n_print_cli
+	url = https://github.com/AdelinoGP/pinch_n_print_cli.git

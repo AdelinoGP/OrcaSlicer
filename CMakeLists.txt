@@ -172,8 +172,8 @@ option(ORCA_TOOLS       "Build Orca tools" OFF)
 # locates it relative to the running binary's own directory -- so both the build tree
 # and the install tree have to reproduce that flat layout.
 option(PNP_BUNDLE_CLI "Stage and install the pnp_cli backend (pnp_cli + modules/) beside the OrcaSlicer executable" ON)
-set(PNP_DIST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../target/dist" CACHE PATH
-    "Staging directory produced by 'cargo xtask dist' in the pnp workspace; holds pnp_cli and modules/")
+set(PNP_DIST_DIR "${CMAKE_CURRENT_SOURCE_DIR}/pinch_n_print_cli/target/dist" CACHE PATH
+    "Staging directory produced by 'cargo xtask dist' in the pinch_n_print_cli submodule; holds pnp_cli and modules/")
 
 if (WIN32)
     set(PNP_CLI_EXE_NAME "pnp_cli.exe")
@@ -194,10 +194,11 @@ if (PNP_BUNDLE_CLI)
         message(WARNING
             "PNP backend: \"${PNP_DIST_DIR}/${PNP_CLI_EXE_NAME}\" does not exist. "
             "pnp_cli and modules/ will NOT be bundled and the built OrcaSlicer will report the "
-            "slicing backend as unavailable. To fix: run 'cargo xtask dist' in the pnp workspace "
-            "(it stages target/dist/${PNP_CLI_EXE_NAME} + target/dist/modules/), or re-configure with "
-            "-DPNP_DIST_DIR=<path> to point at an existing dist tree. "
-            "Configure with -DPNP_BUNDLE_CLI=OFF to skip bundling and silence this warning.")
+            "slicing backend as unavailable. To fix: run 'cargo xtask dist' in the "
+            "pinch_n_print_cli submodule (it stages target/dist/${PNP_CLI_EXE_NAME} + "
+            "target/dist/modules/), or re-configure with -DPNP_DIST_DIR=<path> to point at an "
+            "existing dist tree. Configure with -DPNP_BUNDLE_CLI=OFF to skip bundling and "
+            "silence this warning.")
     endif ()
 endif ()
 
