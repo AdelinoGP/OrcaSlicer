@@ -1,6 +1,20 @@
 # CLAUDE.md
 
-OrcaSlicer — open-source C++17 3D slicer. wxWidgets GUI, CMake build system.
+Orca(pnp_gui) — a fork of OrcaSlicer used as the **GUI frontend** for the
+[pinch_n_print_cli](https://github.com/AdelinoGP/pinch_n_print_cli) (PNP) backend. C++17
+wxWidgets GUI, CMake build system. Windows-first fork.
+
+## Fork reality (differs from upstream OrcaSlicer)
+
+- **No native slicing.** `Print::process` is removed; the GUI shells out to `pnp_cli`
+  (`src/slic3r/GUI/PnpBackend.cpp`). Headless `--slice` is gutted — use `pnp_cli` directly.
+- **SLA fully removed** — SLA 3MF files are refused.
+- **Calibration generators removed** — the calibration UI is a mock (not implemented).
+- **Backend staging:** the `pinch_n_print_cli/` submodule holds the Rust backend. `cargo xtask
+  dist` stages `pinch_n_print_cli/target/dist/` (`pnp_cli` + `modules/`), which CMake bundles
+  beside the executable. `PNP_DIST_DIR` defaults to the submodule dist path; `PNP_BUNDLE_CLI=OFF`
+  skips bundling. The backend resolves relative to the running binary, so build tree and install
+  tree must reproduce the flat layout.
 
 ## Build Commands
 
@@ -34,7 +48,7 @@ ctest --test-dir ./tests/fff_print
 ## Key Entry Points
 
 - App startup: `src/OrcaSlicer.cpp`
-- Slicing pipeline: `src/libslic3r/Print.cpp`
+- PNP backend shell-out: `src/slic3r/GUI/PnpBackend.cpp`
 - All print/printer/material settings: `src/libslic3r/PrintConfig.cpp`
 - GUI: `src/slic3r/GUI/`
 - Core algorithms: `src/libslic3r/` (GCode/, Fill/, Support/, Geometry/, Format/, Arachne/)
