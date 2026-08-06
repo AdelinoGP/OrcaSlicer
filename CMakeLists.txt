@@ -162,8 +162,7 @@ if (APPLE)
     message(STATUS "Orca: IS_CROSS_COMPILE: ${IS_CROSS_COMPILE}")
 endif ()
 
-# Proposal for C++ unit tests and sandboxes
-option(SLIC3R_BUILD_SANDBOXES   "Build development sandboxes" OFF)
+# Proposal for C++ unit tests
 option(BUILD_TESTS       "Build unit tests" OFF)
 option(ORCA_TOOLS       "Build Orca tools" OFF)
 
@@ -920,10 +919,6 @@ add_subdirectory(src)
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT OrcaSlicer_app_gui)
 
 add_dependencies(gettext_make_pot hintsToPot)
-
-if(SLIC3R_BUILD_SANDBOXES)
-    add_subdirectory(sandboxes)
-endif()
 
 if(BUILD_TESTS)
     add_subdirectory(tests)

@@ -97,7 +97,7 @@ private:
 
 } // namespace meshsplit_detail
 
-// Funky wrapper for timinig of its_split() using various neighbor index creating methods, see sandboxes/its_neighbor_index/main.cpp
+// Funky wrapper for timing of its_split() using various neighbor index creating methods
 template<class IndexT> struct ItsNeighborsWrapper
 {
     using Index = IndexT;
