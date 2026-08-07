@@ -11,7 +11,9 @@
 --   [x] full dependency set: ConanCenter + one repo recipe (opencascade
 --       minus tcl/Draw); dead SLA-era deps dropped (openvdb, opencsg,
 --       openexr, glew)
---   [ ] full target graph port (libslic3r, libslic3r_gui, exe, shim, tests)
+--   [x] target graph port: libslic3r, libslic3r_gui, OrcaSlicer.dll +
+--       orca-slicer.exe launcher — GUI launches on Windows x64
+--   [ ] tests port (tests/ Catch2 -> xmake test), macOS/Linux
 --   [ ] packaging parity (installers, portable dir)
 -- CMake and deps/ remain authoritative until parity.
 

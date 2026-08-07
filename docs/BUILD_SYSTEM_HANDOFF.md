@@ -1,7 +1,7 @@
 # Technical Handoff: Xmake + Conan Build System Migration
 
 **Date:** 2026-08-06, updated 2026-08-07
-**Status:** Windows x64 **builds and links end-to-end** — `xmake build OrcaSlicer` produces `OrcaSlicer.exe` with the PNP backend staged. Runtime/GUI launch unverified; packaging, tests, macOS/Linux pending. See §6 Steps 1-3.
+**Status:** Windows x64 **builds, links and launches** — `xmake` produces `orca-slicer.exe` + `OrcaSlicer.dll` with resources and the PNP backend staged, and the GUI comes up. Packaging, tests, and macOS/Linux pending. See §6 Steps 1-3.
 **Read first:** `docs/adr/0001-xmake-conan-build-system.md` (the decision, incl. its amendment) and `conan/README.md` (dependency provisioning). `build-system-research.md` is the original cited comparison.
 
 > **Sections 2-4 below are the original 2026-08-06 proof record and have NOT been rewritten.** Several of their conclusions were overturned by later work — most importantly the §3.4 "needs a custom recipe" table (ten entries; the real answer is one) and §4's "nothing has been committed". Where §6 (Next steps) and §5 (Pitfalls) disagree with §2-4, **§5/§6 win** — they were corrected against actual build and link failures.
@@ -238,11 +238,17 @@ Key discoveries that rewrote this step (details in `conan/README.md` + ADR amend
 - opencv needs `imgcodecs` (`cv::imread` in `SkipPartCanvas`), and every jpeg consumer in the graph (wx, libtiff, opencv) must agree on `libjpeg-turbo` or conan raises a `provides` conflict.
 - **Parallelism**: `-j` default OOM-killed this machine mid-build repeatedly; `-j2`/`-j4` are stable. Builds are incremental, so a killed run resumes.
 
+**3d — Windows exe split + GUI launch (commit `94029e9117`).** On Windows `OrcaSlicer` is a SHARED lib (`OrcaSlicer.dll`, exports `orcaslicer_main`) and `OrcaSlicer_app_gui` is the WIN32 launcher `orca-slicer.exe` that probes OpenGL then `LoadLibrary`s the dll — same split as `src/CMakeLists.txt:105-178`. `resources/` is symlinked beside the exe (copy fallback). **Verified: the GUI launches**, main window `Untitled - OrcaSlicer`, no warning dialogs.
+
+Three traps in the `.rc`/manifest path, all silent:
+- `add_files()` resolves at **load time**, so a generated file that does not exist yet is skipped without a warning — the exe then links with no manifest (wx pops a "Common Controls v6" warning dialog at startup) and no icon. Render generated sources in `on_load` and register them with `target:add("files", ...)`. `on_load` also has `os.mkdir`, which description scope lacks.
+- `set_values` stores a flat string list, **not** a Lua map — passing `version_vars` through it yields empty substitutions and `RC2127` on an empty `FILEVERSION`. Pass `KEY=VALUE` strings and reassemble.
+- The RC compiler treats a backslash in a string literal as an escape, so a native Windows path in the icon line silently becomes garbage (`esources` → CR + `esources`). Use forward slashes, as CMake's `SLIC3R_RESOURCES_DIR` does.
+
 **Remaining in Step 3:**
-- Runtime smoke test — **not done**. The exe launches but does not exit: it is built as a console binary, while CMake builds `OrcaSlicer` as a SHARED lib plus a WIN32 `OrcaSlicer_app_gui` shim (`src/CMakeLists.txt`). Port the shim, then verify GUI launch (and the wx fork-patch question, ADR open question 1).
-- `.rc` compilation (generated at `build/config/OrcaSlicer.rc`, not yet fed to `add_files`), `.manifest`, `Info.plist`, `/DEBUG` in release.
-- `resources/` staging beside the exe (CMake makes a junction/symlink).
+- macOS `Info.plist`; Linux `orca-slicer` naming/FHS.
 - Tests: port `tests/` Catch2 to `xmake test` (keep ctest working in parallel).
+- Deeper runtime verification: the GUI boots, but slicing/PNP handoff, dark theme and dialog rendering are unexercised (ADR open question 1 — wx fork-patch equivalence — needs human visual inspection).
 - `unix/fhs.hpp` is generated with the portable layout on all platforms; Linux packaging will need the real FHS values (CMake uses `#cmakedefine`, which `add_configfiles` cannot render).
 
 ### Step 4 — PNP integration (already scaffolded, dist verified present)
