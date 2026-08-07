@@ -44,6 +44,12 @@ class OrcaPnpDeps(ConanFile):
         "wxwidgets/*:html": True,
         "wxwidgets/*:stc": False,
         "wxwidgets/*:cairo": False,
+        # single jpeg implementation graph-wide (libjpeg would conflict via
+        # `provides`); the code needs turbo's JCS_EXT_* colorspaces.
+        # libtiff is wx's unconditional recipe dep (wxUSE_LIBTIFF is off) and
+        # must agree on the jpeg provider too.
+        "wxwidgets/*:jpeg": "libjpeg-turbo",
+        "libtiff/*:jpeg": "libjpeg-turbo",
         "wxwidgets/*:custom_enables":
             "wxUSE_PRIVATE_FONTS, wxUSE_GLCANVAS_EGL, wxUSE_WEBREQUEST, wxUSE_WEBVIEW_EDGE",
         "wxwidgets/*:custom_disables":
@@ -53,7 +59,7 @@ class OrcaPnpDeps(ConanFile):
         "boost/*:header_only": True,
         "zlib/*:shared": False,
         "libpng/*:shared": False,
-        "libjpeg/*:shared": False,
+        "libjpeg-turbo/*:shared": False,
 
         # OCCT: static everywhere (deps/ built it Shared on Windows; static is
         # the deliberate divergence — AGPL app, no DLL staging, no /MT
@@ -103,7 +109,10 @@ class OrcaPnpDeps(ConanFile):
         self.requires("libnoise/1.0.0")
         self.requires("zlib/1.3.1")
         self.requires("libpng/1.6.47")
-        self.requires("libjpeg/9f")
+        # deps/JPEG pins libjpeg-turbo 3.0.1; 3.0.2 is the nearest served.
+        # NOT vanilla libjpeg: Thumbnails.cpp needs JCS_EXT_RGBA + size_t
+        # jpeg_mem_dest (turbo API)
+        self.requires("libjpeg-turbo/3.0.2")
         self.requires("expat/2.8.2")
         self.requires("nanosvg/cci.20231025")
         self.requires("opencascade/7.6.0")

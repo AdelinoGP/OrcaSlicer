@@ -17,7 +17,9 @@
 
 set_project("OrcaSlicer")
 set_version("2.5.0-pnp")
-set_languages("c++17")
+-- NOTE: not c99 — xmake compiles .c files as C++ (-TP) on MSVC for c99
+-- (no /std:c99 exists), which breaks K&R sources like mcut's shewchuk.c.
+set_languages("c11", "c++17")
 set_default("libslic3r", "libslic3r_gui", "OrcaSlicer")
 
 add_rules("mode.debug", "mode.release", "mode.releasedbg")
@@ -27,6 +29,23 @@ add_rules("mode.debug", "mode.release", "mode.releasedbg")
 -- *libraries*, not static CRT). Keep in sync with conan/profile_host.txt.
 if is_plat("windows") then
     set_runtimes(is_mode("debug") and "MDd" or "MD")
+end
+
+-- Global compile definitions (mirrors root CMakeLists.txt lines 81-560)
+add_defines("BBL_RELEASE_TO_PUBLIC=" .. (is_mode("debug") and "0" or "1"))
+add_defines("wxUSE_UNICODE", "_UNICODE", "UNICODE", "WXINTL_NO_GETTEXT_MACRO",
+    "wxNO_UNSAFE_WXSTRING_CONV")
+if is_plat("windows") then
+    -- WIN32/_WINDOWS: CMake's MSVC default flags define them; sources use
+    -- `#if WIN32` (C1017 when the macro is missing/empty)
+    add_defines("WIN32", "_WINDOWS",
+        "_USE_MATH_DEFINES", "_CRT_SECURE_NO_WARNINGS", "_SCL_SECURE_NO_WARNINGS",
+        "BOOST_ALL_NO_LIB", "BOOST_USE_WINAPI_VERSION=0x602", "BOOST_SYSTEM_USE_UTF8")
+    -- force UTF-8 source/exec charset (upstream GH PR #5583); /bigobj for
+    -- heavy template TUs (MeshBoolean, GUI) — upstream sets it per-target,
+    -- global here is harmless
+    add_cxflags("/utf-8")
+    add_cxxflags("/bigobj")
 end
 
 -- ---------------------------------------------------------------- options
@@ -50,6 +69,10 @@ option("pnp_dist_dir")
     set_default("pinch_n_print_cli/target/dist")
     set_description("Staging directory produced by 'cargo xtask dist' (holds pnp_cli and modules/)")
 option_end()
+
+if has_config("slic3r_gui") then
+    add_defines("SLIC3R_GUI")
+end
 
 -- ------------------------------------------------------------ dependencies
 --
@@ -255,6 +278,109 @@ add_rules("git_commit_hash")
 -- Keep the exclusion list (remove_files in the target) in sync with
 -- src/libslic3r/CMakeLists.txt.
 
+-- ------------------------------------------- vendored libraries (deps_src/)
+-- Static ports of deps_src/<lib>/CMakeLists.txt. Public include dirs mirror
+-- each library's exported interface; deps_src itself is exported by admesh
+-- (dir-qualified includes like "admesh/stl.h", "clipper/clipper_z.hpp").
+
+target("admesh")
+    set_kind("static")
+    add_files("deps_src/admesh/*.cpp")
+    add_sysincludedirs("deps_src/admesh", "deps_src", {public = true})
+    -- admesh sources include libslic3r/ headers (LocalesUtils.hpp)
+    add_includedirs("src")
+    add_rules("pnp.conan")
+    set_values("pnp.conan.packages", "boost", "eigen")
+target_end()
+
+target("clipper")
+    set_kind("static")
+    -- clipper.cpp is deliberately absent: ClipperLib is compiled as part of
+    -- libslic3r using Slic3r::Point as its base type (see deps_src/clipper)
+    add_files("deps_src/clipper/clipper_z.cpp")
+    add_sysincludedirs("deps_src/clipper", {public = true})
+    -- clipper_z.cpp pulls in clipper.cpp, which includes libslic3r/Int128.hpp
+    add_includedirs("src")
+    add_rules("pnp.conan")
+    set_values("pnp.conan.packages", "eigen", "onetbb")
+target_end()
+
+target("Clipper2")
+    set_kind("static")
+    add_files("deps_src/clipper2/Clipper2Lib/src/*.cpp")
+    add_sysincludedirs("deps_src/clipper2/Clipper2Lib/include", {public = true})
+target_end()
+
+target("glu-libtess")
+    set_kind("static")
+    add_files("deps_src/glu-libtess/src/*.c")
+    add_includedirs("deps_src/glu-libtess/src")
+    add_sysincludedirs("deps_src/glu-libtess/include", {public = true})
+target_end()
+
+target("mcut")
+    set_kind("static")
+    add_files("deps_src/mcut/source/*.cpp", "deps_src/mcut/source/*.c")
+    add_sysincludedirs("deps_src/mcut/include", {public = true})
+    add_defines("MCUT_WITH_COMPUTE_HELPER_THREADPOOL=1")
+    if is_plat("windows") then
+        add_defines("_CRT_SECURE_NO_WARNINGS")
+        add_cxxflags("/bigobj")
+    end
+target_end()
+
+target("miniz")
+    set_kind("static")
+    add_files("deps_src/miniz/miniz.c")
+    add_sysincludedirs("deps_src/miniz", {public = true})
+target_end()
+
+target("qoi")
+    set_kind("static")
+    add_files("deps_src/qoi/qoilib.c")
+    add_sysincludedirs("deps_src/qoi", {public = true})
+target_end()
+
+target("semver")
+    set_kind("static")
+    add_files("deps_src/semver/semver.c")
+    add_sysincludedirs("deps_src/semver", {public = true})
+target_end()
+
+-- ------------------------------------------------------- libslic3r_cgal
+-- CGAL-using compilation units isolated so CGAL's rounding-math requirements
+-- do not propagate to the rest of libslic3r (mirrors src/libslic3r/CMakeLists
+-- lines 343-371).
+
+target("libslic3r_cgal")
+    set_kind("static")
+    add_files(
+        "src/libslic3r/CutSurface.cpp",
+        "src/libslic3r/IntersectionPoints.cpp",
+        "src/libslic3r/MeshBoolean.cpp",
+        "src/libslic3r/TryCatchSignal.cpp",
+        "src/libslic3r/Triangulation.cpp")
+    add_includedirs("src", "src/libslic3r")
+    add_includedirs("$(builddir)/config")
+    add_sysincludedirs("deps_src", "deps_src/libigl", "deps_src/mcut/include")
+    add_defines("USE_TBB", "TBB_USE_CAPTURED_EXCEPTION=0", "NOMINMAX")
+    add_rules("pnp.conan")
+    -- same package surface as libslic3r: its headers (EmbossShape, Point, ...)
+    -- pull cereal/nanosvg/etc. transitively
+    set_values("pnp.conan.packages",
+        "cgal", "boost", "eigen", "cereal", "onetbb", "nanosvg",
+        "zlib", "libpng", "opencascade", "opencv", "nlopt", "openssl")
+    if not is_plat("windows") then
+        add_cxxflags("-frounding-math")
+    end
+    -- NOTE (divergence from upstream): CGAL_DO_NOT_USE_MPZF is NOT defined on
+    -- MSVC. With it, CGAL's exact type becomes Quotient<Gmpzf>, whose
+    -- boost::operators mixed comparisons hit the cl>=19.40 C2666 regression
+    -- (boost 1.84). Without it CGAL uses Mpzf, which compiles fine on
+    -- VS 18 2026. Behavior gate: exact-arithmetic results identical by
+    -- construction; watch mesh-boolean tests.
+target_end()
+
 -- ------------------------------------------------------------- libslic3r
 
 target("libslic3r")
@@ -270,8 +396,27 @@ target("libslic3r")
         -- OpenVDB is not provisioned: its only consumer (VoxelizeCSGMesh.hpp,
         -- SLA-era) has no callers in this fork; CMake compiles OpenVDBUtils.cpp
         -- only `if (TARGET OpenVDB::openvdb)`.
-        "src/libslic3r/OpenVDBUtils.cpp")
+        "src/libslic3r/OpenVDBUtils.cpp",
+        -- commented out in src/libslic3r/CMakeLists.txt (pre-boost-1.70 asio)
+        "src/libslic3r/GCodeSender.cpp",
+        -- compiled in libslic3r_cgal instead (rounding-math isolation)
+        "src/libslic3r/CutSurface.cpp",
+        "src/libslic3r/IntersectionPoints.cpp",
+        "src/libslic3r/MeshBoolean.cpp",
+        "src/libslic3r/TryCatchSignal.cpp",
+        "src/libslic3r/Triangulation.cpp")
+    -- libnest2d is a single translation unit whose CMake target links back to
+    -- libslic3r (cyclic for xmake add_deps); compile it into libslic3r instead
+    add_files("deps_src/libnest2d/src/libnest2d.cpp")
+    add_sysincludedirs("deps_src/libnest2d/include", {public = true})
+    add_defines("LIBNEST2D_THREADING_tbb", "LIBNEST2D_STATIC",
+        "LIBNEST2D_OPTIMIZER_nlopt", "LIBNEST2D_GEOMETRIES_libslic3r", {public = true})
     add_includedirs("src", "src/libslic3r", {public = true})
+    -- header-only vendored interfaces (libigl exports NOMINMAX on MSVC)
+    add_sysincludedirs("deps_src/libigl", {public = true})
+    if is_plat("windows") then
+        add_defines("NOMINMAX", {public = true})
+    end
     set_configdir("$(builddir)/config")
     add_configfiles("src/libslic3r/libslic3r_version.h.in",
         {filename = "libslic3r_version.h", pattern = "@(.-)@", variables = version_vars})
@@ -279,12 +424,16 @@ target("libslic3r")
     add_defines("USE_TBB", "TBB_USE_CAPTURED_EXCEPTION=0", {public = true})
     add_defines("SLIC3R_VERSION_IS_FORK", "PNP_FORK")
 
+    -- vendored static deps (public include dirs propagate from each target)
+    add_deps("admesh", "clipper", "Clipper2", "glu-libtess", "mcut",
+        "miniz", "qoi", "semver", "libslic3r_cgal")
+
     -- direct conan deps (mirrors src/libslic3r/CMakeLists.txt link list;
     -- freetype/tcl arrive via the opencascade closure)
     add_rules("pnp.conan")
     set_values("pnp.conan.packages",
         "boost", "eigen", "cereal", "draco", "qhull", "cgal", "libnoise",
-        "zlib", "libpng", "libjpeg", "expat", "nanosvg",
+        "zlib", "libpng", "libjpeg-turbo", "expat", "nanosvg",
         "opencascade", "opencv", "onetbb", "nlopt", "openssl")
 
     if is_plat("windows") then
