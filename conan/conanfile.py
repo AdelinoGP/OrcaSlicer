@@ -50,8 +50,12 @@ class OrcaPnpDeps(ConanFile):
         # must agree on the jpeg provider too.
         "wxwidgets/*:jpeg": "libjpeg-turbo",
         "libtiff/*:jpeg": "libjpeg-turbo",
+        # NOTE: custom_enables is overridden per-OS in configure() — the
+        # defaults here are the Windows set. wxUSE_WEBVIEW_EDGE is a
+        # WebView2/Windows backend and wxUSE_GLCANVAS_EGL is X11/Wayland-only,
+        # so neither belongs in a portable default.
         "wxwidgets/*:custom_enables":
-            "wxUSE_PRIVATE_FONTS, wxUSE_GLCANVAS_EGL, wxUSE_WEBREQUEST, wxUSE_WEBVIEW_EDGE",
+            "wxUSE_PRIVATE_FONTS, wxUSE_WEBREQUEST, wxUSE_WEBVIEW_EDGE",
         "wxwidgets/*:custom_disables":
             "wxUSE_DETECT_SM, wxUSE_WEBVIEW_IE, wxUSE_LIBSDL, wxUSE_XTEST, "
             "wxUSE_LIBTIFF, wxUSE_NANOSVG, wxUSE_LIBWEBP",
@@ -116,6 +120,33 @@ class OrcaPnpDeps(ConanFile):
         "freetype/*:shared": False,
         "expat/*:shared": False,
     }
+
+    def configure(self):
+        # ------------------------------------------------------------------
+        # UNVERIFIED on macOS and Linux. Everything below the Windows branch
+        # has never been resolved or built — this project has only ever been
+        # provisioned on Windows x64. Treat the non-Windows settings as a
+        # starting point derived from the CMake/deps build, not as known-good.
+        # ------------------------------------------------------------------
+        wx_enables = ["wxUSE_PRIVATE_FONTS", "wxUSE_WEBREQUEST"]
+        if self.settings.os == "Windows":
+            # WebView2-backed wxWebView; Windows-only by construction
+            wx_enables.append("wxUSE_WEBVIEW_EDGE")
+        elif self.settings.os == "Linux":
+            # EGL GLCanvas is the X11/Wayland path; meaningless elsewhere
+            wx_enables.append("wxUSE_GLCANVAS_EGL")
+        self.options["wxwidgets/*"].custom_enables = ", ".join(wx_enables)
+
+        if self.settings.os == "Linux":
+            # GTK3 is wxWidgets' Linux toolkit; the recipe pulls it plus
+            # fontconfig/dbus/xkbcommon as system requirements. Shared linkage
+            # for the system-provided pieces matches how deps/ built them.
+            self.options["wxwidgets/*"].secretstore = False
+            self.options["fontconfig/*"].shared = False
+        elif self.settings.os == "Macos":
+            # Cocoa backend; no GTK, no EGL. OpenGL/IOKit/AVFoundation come
+            # from frameworks declared on the OrcaSlicer target in xmake.lua.
+            pass
 
     def requirements(self):
         self.requires("wxwidgets/3.3.2")
