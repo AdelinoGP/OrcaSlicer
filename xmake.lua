@@ -724,6 +724,91 @@ task("pnp")
     }
 task_end()
 
+-- ------------------------------------------------------------- packaging
+
+-- xmake package -> self-contained portable directory (ADR-0001 step 5:
+-- portable dir first, installers after). Mirrors the Windows install layout
+-- in CMakeLists.txt:934-975 and src/CMakeLists.txt:295-302:
+--   .           orca-slicer.exe, OrcaSlicer.dll, runtime DLLs, pnp_cli, LICENSE
+--   ./resources contents of resources/
+--   ./modules   contents of the pnp dist modules/
+task("package")
+    on_run(function ()
+        import("core.project.config")
+        import("core.project.project")
+        config.load()
+
+        local bin_dir = path.join(config.builddir(), config.plat(), config.arch(),
+            config.mode() or "release")
+        assert(os.isdir(bin_dir), "package: %s not found — run `xmake` first", bin_dir)
+
+        local name = "OrcaSlicer_2.5.0-pnp_" .. config.plat() .. "_" .. config.arch()
+        local dest = path.join(config.builddir(), "package", name)
+        os.tryrm(dest)
+        os.mkdir(dest)
+
+        -- Runtime libraries, then the two shipped executables by name.
+        -- Deliberately NOT a *.exe glob: the build dir also holds the test
+        -- suites and can hold stale artifacts (e.g. an OrcaSlicer.exe left
+        -- over from before OrcaSlicer became a shared library).
+        local libpat = config.plat() == "windows" and "*.dll"
+            or (config.plat() == "macosx" and "*.dylib" or "*.so*")
+        for _, file in ipairs(os.files(path.join(bin_dir, libpat))) do
+            os.vcp(file, path.join(dest, path.filename(file)))
+        end
+        local exe = config.plat() == "windows" and ".exe" or ""
+        for _, name in ipairs({"orca-slicer" .. exe, "pnp_cli" .. exe}) do
+            local src = path.join(bin_dir, name)
+            if os.isfile(src) then
+                os.vcp(src, path.join(dest, name))
+            elseif name:startswith("orca-slicer") then
+                raise("package: %s not found — run `xmake` first", src)
+            end
+        end
+
+        -- resources: copy the real tree, not the build tree's symlink
+        os.vcp(path.join(os.projectdir(), "resources"), path.join(dest, "resources"))
+
+        -- pnp backend modules (the CLI itself is already covered by *.exe)
+        local modules = path.join(bin_dir, "modules")
+        if os.isdir(modules) then
+            os.vcp(modules, path.join(dest, "modules"))
+        end
+
+        os.vcp(path.join(os.projectdir(), "LICENSE.txt"), path.join(dest, "LICENSE.txt"))
+
+        -- MSVC runtime: the app is built /MD, so a clean machine needs the
+        -- CRT beside the exe (CMake does this via
+        -- InstallRequiredSystemLibraries, CMakeLists.txt:936-938)
+        if config.plat() == "windows" then
+            local msvc = import("core.tool.toolchain").load("msvc",
+                {plat = config.plat(), arch = config.arch()})
+            local vcvars = msvc and msvc:config("vcvars")
+            local redist_root = vcvars and vcvars.VCToolsRedistDir
+            local copied = 0
+            if redist_root then
+                local arch = config.arch() == "x64" and "x64" or config.arch()
+                for _, dir in ipairs(os.dirs(path.join(redist_root, arch, "Microsoft.VC*.CRT"))) do
+                    for _, dll in ipairs(os.files(path.join(dir, "*.dll"))) do
+                        os.vcp(dll, path.join(dest, path.filename(dll)))
+                        copied = copied + 1
+                    end
+                end
+            end
+            if copied == 0 then
+                wprint("package: MSVC redistributable DLLs not found; the portable " ..
+                       "directory will only run where the VC++ runtime is installed")
+            end
+        end
+
+        print("package: %s", dest)
+    end)
+    set_menu {
+        usage = "xmake package",
+        description = "Assemble a self-contained portable directory"
+    }
+task_end()
+
 -- ------------------------------------------------------------------- tests
 -- Catch2 suites ported from tests/CMakeLists.txt. Each suite is a binary;
 -- `xmake test` runs them all (xmake's built-in test runner via add_tests).
