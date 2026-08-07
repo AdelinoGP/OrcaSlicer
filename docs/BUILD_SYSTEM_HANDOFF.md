@@ -304,7 +304,8 @@ Everything below was authored without a Mac or a Linux host. None of it has been
 - Per-platform lockfiles: `conan/conan-<plat>.lock`. Neither exists; those platforms resolve unlocked with a warning.
 - `--fhs=y` / `--prefix=` now drive `unix/fhs.hpp` (the old code hardcoded the portable layout).
 - `xmake/modules/pnp/layout.lua` grows a macOS `.app` bundle and Linux portable/FHS layouts; `xmake appimage` and `xmake dmg` exist.
-- **flatpak was NOT ported** — blocked on flatpak-builder's offline constraint; `build_flatpak.sh` is left in place but broken.
+- **flatpak was ported (2026-08-07), local/CI only.** `scripts/flatpak/com.orcaslicer.OrcaSlicer.yml` drops the `wxWidgets` and `orca_deps` modules and their ~15 vendored archives (237 lines) and builds with `xmake f --fhs=y --prefix=/app` so the Linux FHS staging *is* the installed tree. It sets `build-args: [--share=network]` for Conan, which makes it **Flathub-incompatible by construction** — that was the agreed trade. `build_flatpak.sh` → `scripts/flatpak/build.sh`, so the repo root has no build scripts at all.
+- **macOS CI leg added (2026-08-07)**, arm64 on `macos-latest`, `verified: false`, with `xmake dmg`. Unsigned — no Apple Developer identity — and single-arch; the upstream universal binary came from the deleted `build_release_macos.sh -a universal`.
 
 ### Step 7 — CMake cutover — DONE 2026-08-07
 Tag `pre-xmake-cutover` marks the last commit with CMake intact. Removed across four commits: `deps/` (113 files; `deps/WebView2` first relocated to `deps_src/`), 16 project CMakeLists + `cmake/`, 51 vendored CMakeLists/`.cmake` under `deps_src/` and `tests/catch2/`, and 7 build driver scripts. Verified after removal: build ok, 7/7 tests, `xmake package`, `xmake pack -f nsis`.
@@ -358,7 +359,8 @@ PATH="/c/Program Files (x86)/NSIS:$PATH" \
 8. **CGAL exact-arithmetic kernel:** `CGAL_DO_NOT_USE_MPZF` had to be dropped (it triggers a `boost::operators` C2666 on cl >= 19.40), so the build uses `Mpzf` where `deps/` used `Quotient<Gmpzf>`. Gate at mesh-boolean validation.
 9. **Debug builds:** `conan/profile_host.txt` builds Release deps; an xmake debug build would link a debug app against them and fail on MSVC. `pnp.conan` warns. Needs a debug host profile.
 10. **macOS/Linux, everything.** Dependency resolution (no lockfiles; GTK/fontconfig/dbus untested), compilation, `.app` bundle, FHS layout, AppImage, dmg. Start with `xmake f -y -m release && xmake -j2` and expect to fix things.
-11. **flatpak:** needs an offline-Conan provisioning strategy (seeded cache or vendored package sources declared as flatpak sources) before the manifest can be rebuilt.
+11. **flatpak on Flathub:** the ported manifest builds with `--share=network`, which Flathub forbids. Publishing there needs the 30 transitive Conan package sources vendored as flatpak sources, an offline Conan strategy, and a fork-specific app-id.
+12. **Version mirror:** `version.inc` is authoritative and `xmake/modules/pnp/layout.lua` reads it directly, but `xmake.lua` must carry a literal mirror — description scope has NO file I/O (`io` is nil; `os` has only `isfile`/`mtime`/`filesize`) while `add_configfiles` needs the values there. The `version_guard` rule fails the build if they drift. Bump `version.inc`, then update the `version_inc` table near the top of `xmake.lua`; the guard names the offending key.
 
 ## 9. Where the CMake build went
 

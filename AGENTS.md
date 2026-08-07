@@ -41,14 +41,24 @@ Useful options: `--fhs=y` (Linux FHS layout instead of portable), `--prefix=`,
 ## Packaging
 
 ```bash
-xmake package          # portable directory (all platforms)
-xmake pack -f nsis     # Windows installer  — needs NSIS *with the UAC plugin*
-xmake appimage         # Linux AppImage     — UNVERIFIED, needs appimagetool
-xmake dmg              # macOS disk image   — UNVERIFIED, needs hdiutil
+xmake package                 # portable directory (all platforms)
+xmake pack -f nsis            # Windows installer — needs NSIS *with the UAC plugin*
+xmake appimage                # Linux AppImage    — UNVERIFIED, needs appimagetool
+xmake dmg                     # macOS .dmg        — UNVERIFIED, needs hdiutil
+scripts/flatpak/build.sh      # Linux flatpak     — UNVERIFIED, local/CI only
 ```
 
-The shipping layout is defined once in `xmake/modules/pnp/layout.lua`; the portable
-directory and the installer payload both come from it.
+Staged trees land in `build/package/`; finished artifacts in `build/dist/` (and
+`build/xpack/` for NSIS). The shipping layout is defined once in
+`xmake/modules/pnp/layout.lua` — the portable directory, the installer payload, the
+`.app` bundle, the AppImage and the flatpak `/app` tree all come from it.
+
+The flatpak manifest builds with `--share=network` so Conan can resolve the dependency
+graph, which makes it **unsuitable for Flathub submission** — it is for local and CI
+builds only.
+
+macOS dmgs are **unsigned** (no Apple Developer identity for this fork), so first launch
+needs a right-click → Open. Single-arch, not universal.
 
 xmake's makensis probe compiles a script that `!include`s `UAC.nsh`, so a stock NSIS
 install is rejected even though `installer/OrcaSlicer.nsi` deliberately does not use UAC.
@@ -86,6 +96,11 @@ Catch2 v3 (vendored in `tests/catch2/`), driven by `xmake test`. Seven suites:
   `conan/conan.lock` (Windows). Other platforms need their own `conan/conan-<plat>.lock`;
   without one they resolve unlocked and are not reproducible.
 - In-tree third-party sources live in `deps_src/` and are compiled by targets in `xmake.lua`
+- **Version bumps: edit `version.inc`, then the `version_inc` table near the top of
+  `xmake.lua`.** `version.inc` is the source of truth (the flatpak and msix scripts grep it,
+  and `layout.lua` reads it), but xmake's description scope has no file I/O, so `xmake.lua`
+  keeps a literal mirror. The `version_guard` rule fails the build on drift and names the
+  offending key — you cannot ship a half-bumped version.
 
 ## Code review focus areas
 

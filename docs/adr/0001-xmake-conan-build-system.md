@@ -23,16 +23,26 @@ only available host (Windows), so holding CMake for it meant holding it
 indefinitely. The cost is explicit — those platforms have no working build and
 no fallback until someone with that hardware finishes the port.
 
+**flatpak — ported, but local/CI only (2026-08-07).** The manifest now builds
+with xmake + Conan; the `wxWidgets` and `orca_deps` modules and their ~15
+vendored dependency archives are gone. It declares
+`build-args: [--share=network]` so Conan can resolve the graph, which makes it
+**Flathub-incompatible** — Flathub forbids build-time network. That was an
+explicit decision: this fork builds flatpaks locally and in CI and does not
+publish to Flathub (the `app-id` in the manifest is upstream's). Restoring
+Flathub support means vendoring the sources of all 30 transitive Conan packages
+plus an offline Conan strategy, and a distinct app-id. `build_flatpak.sh` moved
+to `scripts/flatpak/build.sh`. None of it has been executed.
+
 **Not carried over:**
-- **flatpak.** `scripts/flatpak/com.orcaslicer.OrcaSlicer.yml` builds `deps/`
-  and the app with cmake and declares `cmake/` as a flatpak source. Porting it
-  is blocked on flatpak-builder's offline build constraint, which the manifest
-  currently satisfies by pre-downloading dependency archives as flatpak
-  sources; the Conan equivalent needs a seeded offline cache. `build_flatpak.sh`
-  is left in the tree but is broken as of the cutover.
 - **macOS signing, notarization, universal binaries, and release deploy** from
   the old CI. Secret- and Apple-tooling-dependent, orthogonal to the build
-  system, and unexercisable here.
+  system, and unexercisable here. The fork has no Apple Developer identity, so
+  dmgs are unsigned and need a right-click-Open on first launch; note the
+  upstream signing step was gated on `github.repository == 'OrcaSlicer/OrcaSlicer'`
+  and so never ran in this fork even before the cutover. Universal binaries
+  came from `build_release_macos.sh -a universal`; CI now ships a single arm64
+  artifact.
 
 **Superseded proof-stage note:** Proposed (proof stage: Windows x64 wxWidgets
 3.3.2 static build passes).
@@ -132,5 +142,14 @@ Grilling session constraints agreed: (1) all three platforms must build from a c
 4. **macOS/Linux.** Everything: dependency resolution (no lockfiles, GTK/
    fontconfig/dbus untested), compilation, the `.app` bundle, the FHS layout,
    AppImage and dmg. All written, none run.
-5. **flatpak.** Needs an offline-Conan provisioning strategy before the
-   manifest can be rebuilt.
+5. **flatpak on Flathub.** The manifest builds with network access, which
+   Flathub forbids. Publishing there again needs the 30 transitive Conan
+   package sources vendored as flatpak sources, an offline Conan strategy, and
+   a fork-specific app-id.
+6. **Version mirror.** `version.inc` is the source of truth, but xmake's
+   description scope has no file I/O at all (`io` is nil; `os` exposes only
+   `isfile`/`mtime`/`filesize`) while `add_configfiles` needs the values there.
+   `xmake.lua` therefore carries a literal mirror guarded by the
+   `version_guard` rule, which fails the build on drift. A cleaner fix would be
+   a Lua version file that xmake can `includes()`, at the cost of changing what
+   the flatpak/msix scripts grep.
