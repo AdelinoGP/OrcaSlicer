@@ -32,8 +32,28 @@ includes("@builtin/xpack")
 -- and the installer
 add_moduledirs("xmake/modules")
 
-set_project("OrcaSlicer")
-set_version("2.5.0-pnp")
+-- version.inc is the single source of truth for the version. It is grepped by
+-- scripts/flatpak/build.sh, scripts/build_flatpak_with_docker.sh and
+-- scripts/msix/build_msix.ps1, and read directly (script scope) by
+-- xmake/modules/pnp/layout.lua for every packaging path.
+--
+-- These literals are a MIRROR, not a second source. Description scope has no
+-- file I/O whatsoever — `io` is nil and `os` exposes only isfile/mtime/filesize
+-- — so version.inc cannot be parsed here, yet add_configfiles below needs the
+-- values at description scope. The `version_guard` rule re-reads version.inc at
+-- build time and fails loudly if these drift from it, so a missed bump cannot
+-- ship silently. Bump version.inc; the guard will tell you to update these.
+local version_inc = {
+    SLIC3R_APP_NAME      = "OrcaSlicer",
+    SLIC3R_APP_KEY       = "OrcaSlicer",
+    SLIC3R_VERSION       = "02.06.00.51",
+    ["SoftFever_VERSION"] = "2.5.0-pnp",
+    BBL_INTERNAL_TESTING = "0"
+}
+local orca_version = version_inc["SoftFever_VERSION"]
+
+set_project(version_inc["SLIC3R_APP_KEY"])
+set_version(orca_version)
 -- NOTE: not c99 — xmake compiles .c files as C++ (-TP) on MSVC for c99
 -- (no /std:c99 exists), which breaks K&R sources like mcut's shewchuk.c.
 set_languages("c11", "c++17")
@@ -294,14 +314,41 @@ rule_end()
 
 -- libslic3r_version.h (mirrors src/libslic3r/CMakeLists.txt configure_file)
 local version_vars = {
-    SLIC3R_APP_NAME      = "OrcaSlicer",
-    SLIC3R_APP_KEY       = "OrcaSlicer",
-    SLIC3R_VERSION       = "02.06.00.51",
-    ["SoftFever_VERSION"] = "2.5.0-pnp",
+    SLIC3R_APP_NAME      = version_inc["SLIC3R_APP_NAME"],
+    SLIC3R_APP_KEY       = version_inc["SLIC3R_APP_KEY"],
+    SLIC3R_VERSION       = version_inc["SLIC3R_VERSION"],
+    ["SoftFever_VERSION"] = version_inc["SoftFever_VERSION"],
     SLIC3R_BUILD_ID      = os.getenv("SLIC3R_BUILD_ID") or "0",
-    BBL_INTERNAL_TESTING = "0",
+    BBL_INTERNAL_TESTING = version_inc["BBL_INTERNAL_TESTING"],
     ORCA_CHECK_GCODE_PLACEHOLDERS = "0"
 }
+
+-- Fails the build if the description-scope mirror above drifts from
+-- version.inc. Script scope, because that is the only place with file I/O.
+rule("version_guard")
+    on_load(function (target)
+        local expected = {
+            SLIC3R_APP_NAME      = "OrcaSlicer",
+            SLIC3R_APP_KEY       = "OrcaSlicer",
+            SLIC3R_VERSION       = "02.06.00.51",
+            SoftFever_VERSION    = "2.5.0-pnp",
+            BBL_INTERNAL_TESTING = "0"
+        }
+        local file = path.join(os.projectdir(), "version.inc")
+        local content = assert(io.readfile(file),
+            "version.inc not found — it is the source of truth for the version")
+        for name, want in pairs(expected) do
+            local got = content:match('set%s*%(%s*' .. name .. '%s+"([^"]*)"')
+            assert(got, "version.inc: %s not found", name)
+            assert(got == want,
+                "version.inc has %s=\"%s\" but xmake.lua's version_inc mirror says " ..
+                "\"%s\".\nUpdate the version_inc table near the top of xmake.lua " ..
+                "(description scope cannot read files, so it cannot self-sync).",
+                name, got, want)
+        end
+    end)
+rule_end()
+add_rules("version_guard")
 
 -- GeneratedConfig.hpp (mirrors src/slic3r/CMakeLists.txt configure_file)
 local generated_config_vars = {
@@ -915,7 +962,7 @@ task_end()
 -- divergences are enumerated at the top of installer/OrcaSlicer.nsi.
 xpack("OrcaSlicer")
     set_formats("nsis")
-    set_title("OrcaSlicer")
+    set_title(version_inc["SLIC3R_APP_NAME"] or "OrcaSlicer")
     set_description("Orca Slicer is an open source slicer for FDM printers")
     set_homepage("https://github.com/OrcaSlicer/OrcaSlicer")
     -- CPACK_PACKAGE_VENDOR; the specfile writes this as the registry Publisher
@@ -923,7 +970,8 @@ xpack("OrcaSlicer")
     -- Split version: xpack feeds PACKAGE_VERSION_{MAJOR,MINOR,ALTER} to the
     -- numeric NSIS version resources and PACKAGE_VERSION_BUILD ("pnp") to the
     -- display string. set_version("2.5.0-pnp") would not parse as semver here.
-    set_version("2.5.0", {build = "pnp"})
+    set_version(orca_version:match("^%d+%.%d+%.%d+"),
+        {build = (orca_version:gsub("^%d+%.%d+%.%d+%-?", ""))})
     set_specfile("installer/OrcaSlicer.nsi")
     set_iconfile("resources/images/OrcaSlicer.ico")
     set_licensefile("LICENSE.txt")

@@ -18,10 +18,27 @@
 
 import("core.project.config")
 
--- full fork version, including the -pnp suffix (matches set_version in
--- xmake.lua and SoftFever_VERSION in the rc/plist vars)
+-- Full fork version including the -pnp suffix, read from version.inc — the
+-- single source of version truth shared with xmake.lua and the flatpak/msix
+-- scripts. Parsed textually; version.inc is CMake syntax but is never executed.
 function version_full()
-    return "2.5.0-pnp"
+    local content = io.readfile(path.join(os.projectdir(), "version.inc"))
+    assert(content, "version.inc not found — it is the single source of version truth")
+    local version = content:match('set%s*%(%s*SoftFever_VERSION%s+"([^"]*)"')
+    return assert(version, "version.inc: SoftFever_VERSION not found")
+end
+
+-- major, minor, patch with the fork suffix stripped. NSIS version resources
+-- and CFBundleVersion-adjacent fields must be strictly numeric.
+function version_triple()
+    local major, minor, patch = version_full():match("^(%d+)%.(%d+)%.(%d+)")
+    return assert(major, "version.inc: SoftFever_VERSION is not major.minor.patch"),
+        minor, patch
+end
+
+-- the part after major.minor.patch, e.g. "pnp" from "2.5.0-pnp" ("" if none)
+function version_build()
+    return (version_full():gsub("^%d+%.%d+%.%d+%-?", ""))
 end
 
 -- directory holding freshly built binaries
