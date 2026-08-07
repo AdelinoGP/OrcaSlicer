@@ -62,6 +62,11 @@ class OrcaPnpDeps(ConanFile):
         # build everything except graph_parallel/mpi/python.
         "boost/*:header_only": False,
         "boost/*:shared": False,
+        # Boost.Test ships libboost_test_exec_monitor, which references an
+        # undefined test_main(); the pnp.conan rule links a package's whole lib
+        # list, so it would break every executable. The project tests with
+        # Catch2, never Boost.Test.
+        "boost/*:without_test": True,
         "zlib/*:shared": False,
         "libpng/*:shared": False,
         "libjpeg-turbo/*:shared": False,

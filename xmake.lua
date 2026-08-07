@@ -723,11 +723,140 @@ task("pnp")
     }
 task_end()
 
--- ---------------------------------------------------------------- test task
+-- ------------------------------------------------------------------- tests
+-- Catch2 suites ported from tests/CMakeLists.txt. Each suite is a binary;
+-- `xmake test` runs them all (xmake's built-in test runner via add_tests).
 
--- xmake test -> ctest against the CMake test tree (until the Xmake test port lands)
-task("test")
-    on_run(function ()
-        os.exec("ctest --output-on-failure")
+-- Bundled Catch2 v3 (tests/catch2). Its catch_user_config.hpp is normally
+-- produced by CMake configure_file from a #cmakedefine template; every option
+-- defaults to off, so we render it by dropping the #cmakedefine lines and
+-- substituting the two real values (CatchConfigOptions.cmake:83-84).
+target("Catch2WithMain")
+    set_kind("static")
+    add_files("tests/catch2/src/catch2/**.cpp")
+    add_includedirs("tests/catch2/src", "$(builddir)/catch2/generated-includes", {public = true})
+    on_load(function (target)
+        import("core.project.config")
+        local outdir = path.join(config.builddir(), "catch2", "generated-includes", "catch2")
+        os.mkdir(outdir)
+        local text = io.readfile(path.join(os.projectdir(),
+            "tests/catch2/src/catch2/catch_user_config.hpp.in"))
+        local out = {}
+        for _, line in ipairs(text:split("\n", {strict = true})) do
+            if not line:startswith("#cmakedefine") then
+                line = line:gsub("@CATCH_CONFIG_DEFAULT_REPORTER@", "console")
+                line = line:gsub("@CATCH_CONFIG_CONSOLE_WIDTH@", "80")
+                table.insert(out, line)
+            end
+        end
+        io.writefile(path.join(outdir, "catch_user_config.hpp"), table.concat(out, "\n"))
     end)
-task_end()
+    if is_plat("windows") then
+        -- The project defines _UNICODE globally, which makes Catch2's bundled
+        -- main emit wmain; the test exes use the default console entry point
+        -- (mainCRTStartup -> main). Mirrors tests/CMakeLists.txt:9-11.
+        add_defines("DO_NOT_USE_WMAIN")
+    end
+target_end()
+
+-- Shared test settings (CMake's test_common INTERFACE target).
+rule("pnp.test")
+    on_load(function (target)
+        local projectdir = os.projectdir()
+        target:add("defines",
+            "TEST_DATA_DIR=R\"(" .. path.join(projectdir, "tests", "data") .. ")\"",
+            "PROFILES_DIR=R\"(" .. path.join(projectdir, "resources", "profiles") .. ")\"",
+            "CATCH_CONFIG_FAST_COMPILE")
+        target:add("includedirs", path.join(projectdir, "tests"))
+        if target:is_plat("windows") then
+            -- Catch2's main() lives in Catch2WithMain.lib. Without an explicit
+            -- subsystem MSVC infers the entry point from object files only,
+            -- never scans libs, and fails with LNK1561. CMake always passes
+            -- /subsystem:console for executables, which makes the linker use
+            -- mainCRTStartup and resolve main from the library.
+            target:add("ldflags", "/SUBSYSTEM:CONSOLE", {force = true})
+        end
+    end)
+rule_end()
+
+-- suite -> extra source files beyond <suite>_tests.cpp (from each
+-- tests/<suite>/CMakeLists.txt)
+local test_suites = {
+    -- libslic3r's suite also compiles ../libnest2d/printer_parts.cpp
+    -- (tests/libslic3r/CMakeLists.txt:31) for PRINTER_PART_POLYGONS
+    libslic3r = {"tests/libslic3r/*.cpp", "tests/libnest2d/printer_parts.cpp"},
+    fff_print = {"tests/fff_print/*.cpp"},
+    libnest2d = {"tests/libnest2d/*.cpp"},
+    filament_group = {"tests/filament_group/*.cpp"}
+}
+
+for suite, files in pairs(test_suites) do
+target(suite .. "_tests")
+    set_kind("binary")
+    set_group("tests")
+    set_default(false)
+    add_files(files)
+    if suite == "libslic3r" then
+        -- commented out in tests/libslic3r/CMakeLists.txt:29 — it exercises
+        -- sla::RasterBase, and SLA is removed from this fork
+        remove_files("tests/libslic3r/test_png_io.cpp")
+    end
+    add_rules("pnp.test", "pnp.conan.dlls")
+    add_deps("libslic3r", "Catch2WithMain")
+    add_includedirs("src", "deps_src")
+    add_tests("default")
+    if suite == "filament_group" then
+        add_defines("FG_TEST_GOLDEN_DIR=R\"(" ..
+            path.join(os.projectdir(), "tests", "filament_group", "golden") .. ")\"")
+    end
+target_end()
+end
+
+-- slic3rutils additionally needs the GUI library
+target("slic3rutils_tests")
+    set_kind("binary")
+    set_group("tests")
+    set_default(false)
+    add_files("tests/slic3rutils/*.cpp")
+    add_rules("pnp.test", "pnp.conan.dlls")
+    add_deps("libslic3r", "libslic3r_gui", "Catch2WithMain")
+    add_includedirs("src")
+    add_tests("default")
+    if is_plat("windows") then
+        add_syslinks("Setupapi")
+    end
+target_end()
+
+-- PNP fork suites: GUI-free units compiled straight into the test binary
+-- (tests/pnp/CMakeLists.txt). Kept as two targets because the warnings-log
+-- cases redirect the global data_dir().
+target("pnp_config_translator_tests")
+    set_kind("binary")
+    set_group("tests")
+    set_default(false)
+    add_files("tests/pnp/test_pnp_config_translator.cpp",
+              "src/slic3r/GUI/PnpConfigTranslator.cpp")
+    add_rules("pnp.test", "pnp.conan.dlls")
+    add_deps("libslic3r", "Catch2WithMain")
+    add_includedirs("src", "src/slic3r/GUI", "deps_src")
+    add_tests("default")
+target_end()
+
+target("pnp_runtime_tests")
+    set_kind("binary")
+    set_group("tests")
+    set_default(false)
+    add_files("tests/pnp/test_pnp_progress.cpp",
+              "tests/pnp/test_pnp_config_warnings_log.cpp",
+              "tests/pnp/test_pnp_support_preview.cpp",
+              "src/slic3r/GUI/PnpProgress.cpp",
+              "src/slic3r/GUI/PnpConfigWarningsLog.cpp",
+              -- document half only; PnpSupportPreview.cpp (the pnp_cli runner)
+              -- needs the GUI backend and is deliberately not linked here
+              "src/slic3r/GUI/PnpSupportPreviewDoc.cpp")
+    add_rules("pnp.test", "pnp.conan.dlls")
+    add_deps("libslic3r", "Catch2WithMain")
+    add_includedirs("src", "src/slic3r/GUI", "deps_src")
+    add_tests("default")
+target_end()
+
