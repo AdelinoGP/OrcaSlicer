@@ -1,7 +1,7 @@
 # Technical Handoff: Xmake + Conan Build System Migration
 
 **Date:** 2026-08-06, updated 2026-08-07
-**Status:** Windows x64 **builds, launches, passes its test suite, and packages** — `xmake` produces `orca-slicer.exe` + `OrcaSlicer.dll` with resources and the PNP backend staged, the GUI comes up, and `xmake test` runs all 7 Catch2 suites green. Packaging and macOS/Linux pending. See §6 Steps 1-3.
+**Status: MIGRATION COMPLETE ON WINDOWS; CMAKE REMOVED.** `xmake` produces `orca-slicer.exe` + `OrcaSlicer.dll` with resources and the PNP backend staged, the GUI comes up, `xmake test` runs all 7 Catch2 suites green, `xmake package` yields a standalone portable tree, and `xmake pack -f nsis` yields a verified installer. `CMakeLists.txt`, `cmake/` and `deps/` no longer exist — the last commit with them intact is tagged **`pre-xmake-cutover`**. macOS and Linux support is written but **has never been built or run**.
 **Read first:** `docs/adr/0001-xmake-conan-build-system.md` (the decision, incl. its amendment) and `conan/README.md` (dependency provisioning). `build-system-research.md` is the original cited comparison.
 
 > **Sections 2-4 below are the original 2026-08-06 proof record and have NOT been rewritten.** Several of their conclusions were overturned by later work — most importantly the §3.4 "needs a custom recipe" table (ten entries; the real answer is one) and §4's "nothing has been committed". Where §6 (Next steps) and §5 (Pitfalls) disagree with §2-4, **§5/§6 win** — they were corrected against actual build and link failures.
@@ -19,8 +19,31 @@ Cargo  -> pinch_n_print_cli backend, UNCHANGED (xmake invokes `cargo xtask dist`
 ```
 
 - **Pure Xmake/Xrepo was tried and FAILED the core proof** (see §3.1) — this decision is proven, not theoretical.
-- CMake and `deps/` remain in-tree and authoritative until cross-platform build/test/package parity is reached. **Do not delete them.**
-- Migration is Windows-x64-first, then macOS and Linux.
+- ~~CMake and `deps/` remain in-tree and authoritative until cross-platform build/test/package parity is reached. **Do not delete them.**~~ **Superseded 2026-08-07:** both were removed. The parity gate was waived deliberately — macOS/Linux parity cannot be demonstrated from the only available host, so honouring the gate meant keeping CMake forever. Recovery: `git checkout pre-xmake-cutover -- <path>`.
+- Migration was Windows-x64-first; macOS and Linux remain unfinished.
+
+### What a newcomer needs to know first
+
+| Want to… | Command |
+|---|---|
+| configure | `xmake f -y -m release` |
+| build | `xmake -j2` (low job count: the dep graph is memory-hungry) |
+| test | `xmake test` |
+| portable tree | `xmake package` |
+| Windows installer | `xmake pack -f nsis` (needs NSIS **with the UAC plugin**, see §5.9) |
+| build the Rust backend | `xmake pnp` |
+
+Layout of the build system:
+
+```
+xmake.lua                     target graph, rules, tasks, xpack
+xmake/modules/pnp/layout.lua  the shipping layout, shared by package + installer
+installer/OrcaSlicer.nsi      project-owned NSIS spec (CPack parity)
+conan/conanfile.py            the single consolidated dependency graph
+conan/conan.lock              Windows lock; other platforms need conan-<plat>.lock
+conan/recipes/                the two repo-owned recipes (opencascade, wxwidgets)
+deps_src/                     vendored third-party sources, compiled by xmake targets
+```
 
 ---
 
@@ -185,6 +208,11 @@ Key CMake sources to port from (already read):
 8. **Conan profile defaults are wrong for this project:** `compiler.cppstd=14` (need 17) and `compiler.runtime=dynamic` (need static if preserving `SLIC3R_STATIC=1` semantics). Fix via xmake configs `settings = {"compiler.cppstd=17", "compiler.runtime=static"}` or a checked-in `conan/profile_host.txt` (see §6 step 1). NOTE: static MSVC runtime + static libs is the historical default (`SLIC3R_STATIC_INITIAL 1`) but the full app has never been linked static-only via this path — expect link-time discovery of which deps must be dynamic.
 9. **Conan install of wxWidgets first build is ~30-60 min** (gettext/iconv/pcre2 autotools on MSVC is the bulk). It is cached now; never re-run `conan remove` on the cache.
 10. **`xmake f` with conan requires interactive `-y`** to auto-confirm package installs (it also prompts on version mismatch, e.g. wxwidgets 3.2.5→3.2.4). Always pass `-y`.
+11. **NSIS: xmake's makensis probe demands the UAC plugin.** `plugins/pack/nsis/main.lua:31-56` compiles a test script that `!include "UAC.nsh"`, which stock NSIS does not ship, so a perfectly good NSIS install is rejected — and xmake then tries to provision its own NSIS, which fails on this machine because `os.subhost()` reports `msys` (baked into the xmake binary; survives `env -i`, running `xmake.exe` directly, and launching from `cmd.exe`). Fix: install the official UAC plugin (`UAC.nsh` → `NSIS/Include/`, `UAC.dll` → `NSIS/Plugins/x86-{unicode,ansi}/`). `installer/OrcaSlicer.nsi` does **not** use UAC; this is purely to satisfy the probe. CI does it in `build_orca.yml`.
+12. **The NSIS specfile substitution is a blind text scan.** `main.lua:283-305` replaces `${PACKAGE_*}` with no awareness of NSIS syntax — including inside `;` comments. Writing `${PACKAGE_UNINSTALLCMDS}` in a comment expands ~30 uninstall commands into the middle of that comment and yields a baffling `Invalid command: "unRMFileIfExists"`. Never name a live `PACKAGE_*` variable in braces in prose.
+13. **The generated `.nsi` is only written when absent** (`main.lua:272-275`), so a stale substituted copy silently wins over an edited template. `before_package` in the xpack removes it.
+14. **makensis emits a 32-bit installer.** Plain `HKLM` writes therefore land under `WOW6432Node`. Use `SetRegView 64` for a 64-bit payload, and note `InstallDirRegKey` runs *before* `.onInit`, i.e. before the view switch — do the lookup in `.onInit` instead.
+15. **Concurrent `xmake` invocations block on the project lock** and produce no output while waiting. If a build or test run appears hung, check for multiple `xmake` processes before assuming a real hang.
 
 ---
 
@@ -267,7 +295,19 @@ Measured (2026-08-07): 7/7 passed in 43.2s; libslic3r 48717 assertions / 139 cas
 - **5a — portable dir: DONE 2026-08-07 (commit `c73f417659`).** `xmake package` assembles `build/package/OrcaSlicer_<version>_<plat>_<arch>/` mirroring the Windows install layout (`CMakeLists.txt:934-975`, `src/CMakeLists.txt:295-302`): binaries + runtime DLLs + MSVC CRT + `LICENSE.txt` at the root, `resources/` and `modules/` beside them. Measured: 353 MB, 2 exes + 16 DLLs; the packaged tree launches standalone.
   - Ship an **explicit** exe list, never a `*.exe` glob — the build dir also holds the 7 test suites, and stale artifacts survive there (an `OrcaSlicer.exe` from before `OrcaSlicer` became a shared library was picked up on the first attempt).
   - The MSVC CRT must be copied from `VCToolsRedistDir` (CMake uses `InstallRequiredSystemLibraries`): the app is built `/MD`, so without it the portable tree only runs where the VC++ runtime is already installed. The task warns if it cannot find them.
-- **Remaining:** NSIS installer (Windows), mac/linux packages, then delete CMake only after parity.
+- **5b — NSIS installer: DONE 2026-08-07.** `xmake pack -f nsis` → `OrcaSlicer_Windows_Installer_V2.5.0-pnp_x64.exe` (115 MB) + `.sha256`, at parity with `CMakeLists.txt:978-1012`. Driven by xmake's nsis backend over a **project-owned** specfile (`installer/OrcaSlicer.nsi`) because the stock template cannot express this installer — see pitfalls 11-14 and the file's own header for the full divergence list.
+  - Verified: silent install to a scratch dir; payload identical to `xmake package` output; uninstall entry in the 64-bit registry view; installed app launches; upgrade-in-place fires uninstall-before-install (a file planted under `modules/` is wiped) and retains the previous install location; uninstall removes tree, registry key and both shortcuts while leaving unrelated Start Menu entries alone.
+
+### Step 6 — macOS/Linux support — WRITTEN, UNVERIFIED (2026-08-07)
+Everything below was authored without a Mac or a Linux host. None of it has been compiled or run.
+- `conan/conanfile.py` `configure()` selects wxWidgets options per OS (`wxUSE_WEBVIEW_EDGE` Windows-only, `wxUSE_GLCANVAS_EGL` Linux-only). Confirmed not to change the Windows package_id.
+- Per-platform lockfiles: `conan/conan-<plat>.lock`. Neither exists; those platforms resolve unlocked with a warning.
+- `--fhs=y` / `--prefix=` now drive `unix/fhs.hpp` (the old code hardcoded the portable layout).
+- `xmake/modules/pnp/layout.lua` grows a macOS `.app` bundle and Linux portable/FHS layouts; `xmake appimage` and `xmake dmg` exist.
+- **flatpak was NOT ported** — blocked on flatpak-builder's offline constraint; `build_flatpak.sh` is left in place but broken.
+
+### Step 7 — CMake cutover — DONE 2026-08-07
+Tag `pre-xmake-cutover` marks the last commit with CMake intact. Removed across four commits: `deps/` (113 files; `deps/WebView2` first relocated to `deps_src/`), 16 project CMakeLists + `cmake/`, 51 vendored CMakeLists/`.cmake` under `deps_src/` and `tests/catch2/`, and 7 build driver scripts. Verified after removal: build ok, 7/7 tests, `xmake package`, `xmake pack -f nsis`.
 
 ---
 
@@ -293,14 +333,43 @@ conan lock create conan/conanfile.py -pr:h=conan/profile_host.txt \
 conan list "*:*"
 ```
 
+Full post-cutover smoke test (what was run to validate Step 7):
+
+```bash
+xmake f -y -m release
+xmake -j2
+xmake test                                  # expect 7/7
+xmake package                               # portable tree
+PATH="/c/Program Files (x86)/NSIS:$PATH" \
+  xmake pack -f nsis                        # installer + .sha256
+```
+
 ---
 
 ## 8. Open questions for the next session
 
-1. **Fork-patch equivalence:** does the app need the 12 SoftFever wxWidgets commits (dark theme etc.) or does vanilla 3.3.2 + the custom flags suffice? Decide via a GUI smoke test (launch, dark theme, dialogs). If patches are needed, add a repo recipe under `conan/recipes/` with conandata patches rather than a fork.
+1. ~~**Fork-patch equivalence**~~ — **RESOLVED 2026-08-07.** The packaged application was compared against the previous CMake build and reported as looking "exactly the same". Vanilla wxWidgets 3.3.2 plus the custom flag set suffices; no SoftFever patches are needed.
 2. ~~Static vs dynamic runtime~~ — RESOLVED: /MD everywhere (the CMake build never set /MT; see Step 2.5). Boost is compiled (not header-only) and static — see Step 3.
 3. ~~TBB version~~ — RESOLVED: onetbb/2021.7.0 shared, behavior gate at runtime.
 4. **libnoise:** SoftFever fork vs center 1.0.0 — behavior gate.
 5. **OCCT static-on-Windows divergence:** deps/ built OCCT Shared on Windows; conan builds it static everywhere. Gate at STEP/3MF import smoke test.
 6. **Nearest-upstream behavior gates** pending target port: libcurl 7.86.0, opencv 4.5.5, nlopt 2.9.1, cereal 1.3.0 (was 1.3.2 in scaffold), onetbb 2021.7.0.
 7. **vcpkg as fallback** (documented in research) only if a specific Conan recipe fails irreparably.
+8. **CGAL exact-arithmetic kernel:** `CGAL_DO_NOT_USE_MPZF` had to be dropped (it triggers a `boost::operators` C2666 on cl >= 19.40), so the build uses `Mpzf` where `deps/` used `Quotient<Gmpzf>`. Gate at mesh-boolean validation.
+9. **Debug builds:** `conan/profile_host.txt` builds Release deps; an xmake debug build would link a debug app against them and fail on MSVC. `pnp.conan` warns. Needs a debug host profile.
+10. **macOS/Linux, everything.** Dependency resolution (no lockfiles; GTK/fontconfig/dbus untested), compilation, `.app` bundle, FHS layout, AppImage, dmg. Start with `xmake f -y -m release && xmake -j2` and expect to fix things.
+11. **flatpak:** needs an offline-Conan provisioning strategy (seeded cache or vendored package sources declared as flatpak sources) before the manifest can be rebuilt.
+
+## 9. Where the CMake build went
+
+Nothing is lost — it is one command away:
+
+```bash
+git checkout pre-xmake-cutover -- CMakeLists.txt cmake/ deps/ src/CMakeLists.txt
+git show pre-xmake-cutover:CMakeLists.txt        # just read it
+git diff pre-xmake-cutover --stat                # everything the cutover changed
+```
+
+Useful when porting macOS/Linux: the CMake rules are the specification the
+xmake code was written against, and `xmake.lua` cites them by line number
+throughout (e.g. `CMakeLists.txt:939-950` for the FHS install layout).

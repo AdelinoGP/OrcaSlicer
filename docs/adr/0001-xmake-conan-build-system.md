@@ -4,7 +4,38 @@ The fork replaces its CMake build (`CMakeLists.txt` + `deps/` ExternalProject tr
 
 ## Status
 
-Proposed (proof stage: Windows x64 wxWidgets 3.3.2 static build passes).
+**Accepted and executed (2026-08-07).** CMake and `deps/` are removed from the
+repository; xmake + Conan is the only build system.
+
+Cutover state:
+
+| Platform | Build | Tests | Portable | Installer |
+|---|---|---|---|---|
+| Windows x64 | verified | 7/7 | verified | NSIS, verified |
+| macOS | **unverified** | — | written, unrun | dmg written, unrun |
+| Linux | **unverified** | — | written, unrun | AppImage written, unrun |
+
+The last commit with the CMake build intact is tagged **`pre-xmake-cutover`**.
+
+The original plan gated deletion on cross-platform parity. That gate was
+**waived deliberately**: parity on macOS/Linux cannot be demonstrated from the
+only available host (Windows), so holding CMake for it meant holding it
+indefinitely. The cost is explicit — those platforms have no working build and
+no fallback until someone with that hardware finishes the port.
+
+**Not carried over:**
+- **flatpak.** `scripts/flatpak/com.orcaslicer.OrcaSlicer.yml` builds `deps/`
+  and the app with cmake and declares `cmake/` as a flatpak source. Porting it
+  is blocked on flatpak-builder's offline build constraint, which the manifest
+  currently satisfies by pre-downloading dependency archives as flatpak
+  sources; the Conan equivalent needs a seeded offline cache. `build_flatpak.sh`
+  is left in the tree but is broken as of the cutover.
+- **macOS signing, notarization, universal binaries, and release deploy** from
+  the old CI. Secret- and Apple-tooling-dependent, orthogonal to the build
+  system, and unexercisable here.
+
+**Superseded proof-stage note:** Proposed (proof stage: Windows x64 wxWidgets
+3.3.2 static build passes).
 
 **Amended 2026-08-06 — consolidated dependency graph.** Decision 2 originally
 wired Conan through xmake's stock `add_requires("conan::...")`. That integration
@@ -77,3 +108,29 @@ Grilling session constraints agreed: (1) all three platforms must build from a c
 - **Long first builds** (wxWidgets from source on MSVC is ~30+ min; its gettext/iconv/pcre2 transitive build is the bulk). Mitigated by Conan binary cache and CI-published binaries.
 - **License/ABI drift risk** when accepting nearest-upstream versions (OCCT 7.9.1 vs 7.6.0, OpenCV 4.14 vs 4.6.0, OpenVDB 12 vs fork 6.2.1). Each must pass the behavior-and-tests gate before replacing the pinned dep.
 - **Custom recipes needed** for: wxWidgets fork patches (if ConanCenter's vanilla 3.3.2 proves insufficient — proof passed with vanilla + custom flags, fork-patch equivalence still TBD), OCCT 7.6.0, OpenCV 4.6.0, OpenVDB 6.2.1 fork, TBB 2021.5 (or adopt onetbb), OpenSSL 1.1.1w, curl 7.75, OpenCSG (no recipe), freetype 2.12.1, libnoise fork, OpenEXR 2.5.5.
+  - *Resolved (2026-08-06):* only two repo recipes were needed — see the amendment above.
+
+## Open questions
+
+1. **~~wxWidgets fork-patch equivalence~~ — CLOSED (2026-08-07).** Vanilla
+   wxWidgets 3.3.2 plus the custom flag set is visually indistinguishable from
+   the SoftFever fork build: the packaged application was compared against the
+   previous CMake build and reported as looking "exactly the same". No fork
+   patches are required.
+2. **Behavior gates still open.** These deps diverge from the `deps/` pins and
+   have not been exercised beyond "builds and the test suites pass":
+   - CGAL exact-arithmetic kernel: `Mpzf` instead of `Quotient<Gmpzf>`
+     (`CGAL_DO_NOT_USE_MPZF` had to be dropped to avoid a `boost::operators`
+     C2666 on cl >= 19.40). Needs mesh-boolean validation.
+   - Nearest-upstream picks: libcurl 7.86.0, opencv 4.5.5, nlopt 2.9.1,
+     onetbb 2021.7.0, cereal 1.3.0.
+   - OCCT built static on Windows where `deps/` built it shared.
+   - libnoise from center rather than the fork.
+3. **Debug builds.** `conan/profile_host.txt` builds Release dependencies; an
+   xmake debug build would link a debug app against release deps and fail on
+   MSVC. `pnp.conan` warns. Needs a debug host profile.
+4. **macOS/Linux.** Everything: dependency resolution (no lockfiles, GTK/
+   fontconfig/dbus untested), compilation, the `.app` bundle, the FHS layout,
+   AppImage and dmg. All written, none run.
+5. **flatpak.** Needs an offline-Conan provisioning strategy before the
+   manifest can be rebuilt.

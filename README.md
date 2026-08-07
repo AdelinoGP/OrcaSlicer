@@ -28,18 +28,15 @@ cd pinch_n_print_cli
 cargo xtask dist
 ```
 
-This produces `pinch_n_print_cli/target/dist/` containing `pnp_cli` and `modules/`. CMake picks
-this up automatically: `PNP_DIST_DIR` defaults to
-`<checkout>/pinch_n_print_cli/target/dist`. Alternatively, copy `pnp_cli` and `modules/` next to
+This produces `pinch_n_print_cli/target/dist/` containing `pnp_cli` and `modules/`. The build
+picks it up automatically: `--pnp_dist_dir` defaults to `pinch_n_print_cli/target/dist`.
+`xmake pnp` runs the cargo step for you. Alternatively, copy `pnp_cli` and `modules/` next to
 `orca-slicer.exe` by hand.
-
-If the dist directory is missing at configure time, CMake warns and skips bundling; it does not
-fail the build. Check the configure output for `PNP backend:` to see which way it went.
 
 Configure options:
 
-- `-DPNP_DIST_DIR=<path>` — bundle from a different dist tree.
-- `-DPNP_BUNDLE_CLI=OFF` — skip bundling entirely.
+- `xmake f --pnp_dist_dir=<path>` — bundle from a different dist tree.
+- `xmake f --pnp_bundle_cli=n` — skip bundling entirely.
 
 For backend iteration you can also set **PNP CLI directory** under *Preferences → General* to the
 folder holding `pnp_cli`. That override wins over the bundled copy whenever it actually contains
@@ -48,10 +45,23 @@ directory. **Clear** resets it to the bundled copy.
 
 ## Building
 
-Windows-first fork. Follow the upstream
-[OrcaSlicer Wiki — How to build](https://www.orcaslicer.com/wiki/how_to_build) procedure; the
-build system, dependencies (`deps_src/`), and platform scripts (`.devcontainer/`, `scripts/`,
-`flatpak/`, `msix/`) are unchanged from upstream.
+Windows-first fork. **The upstream build instructions do not apply**: this fork builds with
+[xmake](https://xmake.io) + [Conan 2](https://conan.io), not CMake (see
+[ADR-0001](docs/adr/0001-xmake-conan-build-system.md)). Install both, then:
+
+```bash
+xmake f -y -m release   # configure
+xmake -j2               # build  (first run compiles the whole dependency graph)
+xmake test              # run the Catch2 suites
+xmake package           # portable directory
+xmake pack -f nsis      # Windows installer
+```
+
+Only **Windows x64** is verified. The macOS and Linux code paths exist but have never been
+configured or built — expect to fix things there. The last commit with the CMake build system
+intact is tagged `pre-xmake-cutover`.
+
+In-tree third-party sources remain in `deps_src/`; everything else comes from Conan.
 
 ## License
 

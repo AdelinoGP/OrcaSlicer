@@ -2,7 +2,13 @@
 
 Orca(pnp_gui) — a fork of OrcaSlicer used as the **GUI frontend** for the
 [pinch_n_print_cli](https://github.com/AdelinoGP/pinch_n_print_cli) (PNP) backend. C++17
-wxWidgets GUI, CMake build system. Windows-first fork.
+wxWidgets GUI, **xmake + Conan 2** build system. Windows-first fork.
+
+> **Build system:** CMake was removed (ADR-0001). `xmake.lua` defines the target graph;
+> `conan/conanfile.py` provisions every third-party dependency as one lockfile-enforced
+> graph. The last commit with CMake intact is tagged `pre-xmake-cutover`.
+> **Only Windows x64 is verified** — the macOS and Linux paths exist but have never been
+> configured or built.
 
 ## Fork reality (differs from upstream OrcaSlicer)
 
@@ -11,33 +17,48 @@ wxWidgets GUI, CMake build system. Windows-first fork.
 - **SLA fully removed** — SLA 3MF files are refused.
 - **Calibration generators removed** — the calibration UI is a mock (not implemented).
 - **Backend staging:** the `pinch_n_print_cli/` submodule holds the Rust backend. `cargo xtask
-  dist` stages `pinch_n_print_cli/target/dist/` (`pnp_cli` + `modules/`), which CMake bundles
-  beside the executable. `PNP_DIST_DIR` defaults to the submodule dist path; `PNP_BUNDLE_CLI=OFF`
-  skips bundling. The backend resolves relative to the running binary, so build tree and install
-  tree must reproduce the flat layout.
+  dist` stages `pinch_n_print_cli/target/dist/` (`pnp_cli` + `modules/`), which xmake bundles
+  beside the executable (`xmake pnp` runs the cargo step). `--pnp_dist_dir=` defaults to the
+  submodule dist path; `--pnp_bundle_cli=n` skips bundling. The backend resolves relative to
+  the running binary, so build tree and shipped tree must reproduce the flat layout.
 
 ## Build Commands
 
+Requires [xmake](https://xmake.io) and Conan 2.31+ on PATH. The first build resolves and
+compiles the whole dependency graph from source, which is long and memory-hungry — keep the
+job count low.
+
 ```bash
-# macOS
-cmake --build build/arm64 --config RelWithDebInfo --target all --
-
-# Linux
-cmake --build build --config RelWithDebInfo --target all --
-
-# Windows (replace %build_type% with Debug/Release/RelWithDebInfo)
-cmake --build . --config %build_type% --target ALL_BUILD -- -m
+xmake f -y -m release        # configure (add -a arm64 to cross-target)
+xmake -j2                    # build
+xmake test                   # all Catch2 suites
+xmake test libslic3r_tests   # one suite
 ```
+
+Useful options: `--fhs=y` (Linux FHS layout instead of portable), `--prefix=`,
+`--slic3r_gui=n`, `--pnp_bundle_cli=n`.
+
+## Packaging
+
+```bash
+xmake package          # portable directory (all platforms)
+xmake pack -f nsis     # Windows installer  — needs NSIS *with the UAC plugin*
+xmake appimage         # Linux AppImage     — UNVERIFIED, needs appimagetool
+xmake dmg              # macOS disk image   — UNVERIFIED, needs hdiutil
+```
+
+The shipping layout is defined once in `xmake/modules/pnp/layout.lua`; the portable
+directory and the installer payload both come from it.
+
+xmake's makensis probe compiles a script that `!include`s `UAC.nsh`, so a stock NSIS
+install is rejected even though `installer/OrcaSlicer.nsi` deliberately does not use UAC.
+Install the UAC plugin alongside NSIS (CI does this in `build_orca.yml`).
 
 ## Testing
 
-Catch2 framework. Tests in `tests/` directory.
-
-```bash
-cd build && ctest --output-on-failure           # all tests
-ctest --test-dir ./tests/libslic3r              # individual suite
-ctest --test-dir ./tests/fff_print
-```
+Catch2 v3 (vendored in `tests/catch2/`), driven by `xmake test`. Seven suites:
+`libslic3r`, `fff_print`, `libnest2d`, `filament_group`, `slic3rutils`,
+`pnp_config_translator`, `pnp_runtime`.
 
 ## Code Style
 
@@ -57,9 +78,14 @@ ctest --test-dir ./tests/fff_print
 ## Critical Constraints
 
 - **Backward compatibility required** for .3mf project files and printer profiles
-- **Cross-platform** — all changes must work on Windows, macOS, and Linux
+- **Cross-platform** — all changes must work on Windows, macOS, and Linux. Note the macOS
+  and Linux builds are currently **unverified** under xmake; treat breakage there as
+  expected until someone with those hosts confirms otherwise.
 - Profile/format changes need version migration handling
-- Dependencies built separately in `deps/build/`, then linked to main app
+- Dependencies come from Conan (`conan/conanfile.py`), resolved as one graph and pinned by
+  `conan/conan.lock` (Windows). Other platforms need their own `conan/conan-<plat>.lock`;
+  without one they resolve unlocked and are not reproducible.
+- In-tree third-party sources live in `deps_src/` and are compiled by targets in `xmake.lua`
 
 ## Code review focus areas
 
