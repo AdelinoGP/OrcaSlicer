@@ -1,56 +1,92 @@
 # Conan provisioning (`conan/`)
 
 Repo-owned Conan 2 configuration for the Xmake+Conan build
-(ADR: `docs/adr/0001-xmake-conan-build-system.md`, state: `docs/BUILD_SYSTEM_HANDOFF.md`).
+(ADR: `docs/adr/0001-xmake-conan-build-system.md` incl. its amendment,
+state: `docs/BUILD_SYSTEM_HANDOFF.md`).
 
-## Files
+## Architecture: one consolidated graph
 
-| File | Role |
-|---|---|
-| `profile_host.txt` | Settings every dependency must be built with: `compiler.cppstd=17`, static MSVC runtime on Windows (`SLIC3R_STATIC=1` semantics), Ninja generator (VS 2026 workaround), `[replace_requires]` steering recipe pins (boost, eigen) to the project versions. |
-| `profile_build.txt` | Build-context (tools) profile — platform defaults, Ninja conf. |
-| `conanfile.txt` | Consolidated require list mirroring `xmake.lua`, used for lockfile generation and direct `conan install` (CI cache warming). |
-| `conan.lock` | Pinned versions + recipe revisions for the whole dependency graph. |
-| `recipes/` | (Pending) repo-owned recipes for version-pinned/fork deps ConanCenter cannot reproduce — see handoff §6 Step 2. |
+All third-party C/C++ dependencies are resolved by **one** `conan install` of
+`conan/conanfile.py` — a single coherent graph, enforced by `conan/conan.lock`
+and the checked-in profiles. The xmake rule `pnp.conan` (in `xmake.lua`) runs
+the install when its inputs change and injects per-package flags into targets
+from the generated `pnp_deps.lua`.
 
-## Contract with xmake.lua
+This replaces xmake's stock per-package `add_requires("conan::...")`
+integration (ADR-0001 amendment). The stock flow runs one *isolated* conan
+install per package, so separate graphs resolved conflicting transitive
+versions — opencascade pulling freetype/2.13.2 beside the project's 2.12.1,
+cgal pulling boost/1.83.0 + eigen/3.4.0, libcurl free to pick openssl 3.x —
+and neither the lockfile nor `[replace_requires]` could take effect.
 
-xmake's Conan integration generates its **own** per-package profiles and conanfiles
-(one isolated `conan install` per `add_requires`); it cannot consume these profile
-files or the lockfile. The same settings therefore ride along as CLI overrides via
-the shared `conan_configs()` helper in `xmake.lua`. **Any settings change must be
-made in both places** (`profile_host.txt` + `conan_base` in `xmake.lua`).
+```
+conan/conanfile.py    requires + options + generate() -> pnp_deps.lua
+conan/profile_host.txt settings contract: cppstd=17, /MD on Windows,
+                       Ninja generator, [replace_requires] steering
+conan/profile_build.txt tool context (defaults)
+conan/conan.lock       pinned versions + recipe revisions (enforced)
+xmake.lua rule pnp.conan  runs install when stale, injects flags per target
+                          via set_values("pnp.conan.packages", ...)
+```
 
-Consequences of the per-package isolation:
+## Version policy (ADR-0001)
 
-- `[replace_requires]` does not apply inside xmake's installs — e.g. cgal's own
-  graph still resolves its pinned boost/1.83.0 + eigen/3.4.0 (header-only; the
-  duplicate include-path hazard is tracked for the target-port step).
-- The lockfile is **not enforced** by xmake builds. It pins the graph for direct
-  conan workflows, CI, and drift detection (regenerate and diff after changing
-  requires).
+ConanCenter still *serves* many versions absent from its "latest" listing —
+probe with `conan download <ref> -r conancenter --only-recipe` before assuming
+a custom recipe is needed.
+
+| Dependency | deps/ pin | Provisioned | Note |
+|---|---|---|---|
+| wxWidgets | 3.3.2 fork | 3.3.2 exact | vanilla + custom wxUSE flags; fork-patch equivalence pending GUI smoke test |
+| boost | 1.84.0 | exact | header_only |
+| eigen | 5.0.1 | exact | |
+| cereal | 1.3.0 | exact | |
+| draco / qhull / glfw / cgal / libnoise | — | exact | |
+| opencascade | 7.6.0 | exact, **repo recipe** | `recipes/opencascade/` — center 7.6.0 recipe with tcl/tk removed + `BUILD_MODULE_Draw=OFF` (tcl cannot build under VS 2026 and only serves Draw; deps/ likewise built Draw-less without tcl). Static everywhere (deps/ built Shared on Windows — deliberate divergence, behavior-gated) |
+| freetype | 2.12.1 | exact | via `[replace_requires]` (occt's recipe pins 2.13.2) |
+| openssl | 1.1.1w | exact | |
+| expat | (vendored) | 2.8.2 | wxwidgets' transitive version, kept single |
+| libcurl | 7.75.0 | 7.86.0 | nearest served; behavior gate |
+| onetbb | 2021.5.0 | 2021.7.0 | nearest served; behavior gate |
+| opencv | 4.6.0 | 4.5.5 | nearest served; core+imgproc only; behavior gate |
+| nlopt | 2.5.0 | 2.9.1 | 2.7.1 served but its CMakeLists is rejected by CMake 4; behavior gate |
+| openvdb / opencsg / openexr / glew | (deps/ built) | **dropped** | only served SLA-era code that is dead in this fork |
+
+One repo recipe (`recipes/opencascade/`, header documents the delta from
+center). Repo recipes pin `version` in-recipe and are auto-exported by the
+`pnp.conan` rule before each install; after changing one, regenerate the
+lockfile with `--lockfile=""` (the stale lock beside the conanfile is
+auto-loaded otherwise and pins the old recipe revision).
 
 ## Regenerating the lockfile
 
-After any change to `conanfile.txt` / `xmake.lua` requires:
+After changing requires/options in `conanfile.py`:
 
 ```bash
-conan lock create conan/conanfile.txt \
+conan lock create conan/conanfile.py \
     --profile:host=conan/profile_host.txt \
     --profile:build=conan/profile_build.txt \
     --lockfile-out=conan/conan.lock
 ```
 
+## Settings contract
+
+- `compiler.cppstd=17` — the app is C++17. (Conan's compatibility plugin may
+  reuse cppstd=14-built binaries where ABI-compatible; that is expected.)
+- **Dynamic MSVC runtime (/MD)** — parity with the authoritative CMake build,
+  which never overrides the runtime (`SLIC3R_STATIC` means static *libraries*,
+  not static CRT). `xmake.lua` sets `set_runtimes("MD"/"MDd")` to match.
+- Debug builds: the checked-in host profile is Release; a debug graph needs a
+  debug host profile (MDd deps) — not set up yet, `pnp.conan` warns.
+- Ninja generator conf — recipes pinning cmake<4 cannot drive the
+  "Visual Studio 18 2026" generator.
+
 ## Binary cache story
 
-- **Local developer cache** (`~/.conan2`) is the primary cache. First build compiles
-  everything from source (wxWidgets + its autotools transitive chain is the bulk —
-  historically ~30–60 min on this class of machine, handoff §5.9). Never
-  `conan remove` the cache to "clean up".
-- **CI**: GitHub Actions cache is evictable and must be treated as an optimization
-  only. `--build=missing` (xmake's default, `configs.build = "missing"`) always
-  falls back to source builds, so an evicted cache costs time, not correctness.
-- A Conan remote (Artifactory/`conan server`) for published binaries is the durable
-  option if CI rebuild times become a problem; not set up yet.
-- Settings changes (`cppstd`, `compiler.runtime`) change package IDs and trigger
-  full host-package rebuilds — expected, the old binaries stay cached alongside.
+- **Local cache** (`~/.conan2`) is primary. Never `conan remove` it to "clean
+  up". Settings changes reuse compatible binaries where possible; the rest
+  rebuild once.
+- **CI**: GitHub Actions cache is an evictable optimization only;
+  `--build=missing` is the correctness fallback (source builds always work).
+- A Conan remote (Artifactory/`conan server`) for published binaries is the
+  durable option if CI rebuild times become a problem; not set up yet.

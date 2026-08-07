@@ -1,0 +1,14 @@
+patches:
+  7.6.0:
+  - patch_description: Fix compilation error with C++17
+    patch_file: patches/7.5.0-0001-fix-compile-error-cxx17.patch
+    patch_source: https://git.dev.opencascade.org/gitweb/?p=occt.git;a=commitdiff;h=7021de2fe7a69d4c788ccf43b8b096dbcc8597c8
+    patch_type: portability
+  - patch_description: Fix compilation error with C++20
+    patch_file: patches/7.5.0-0002-fix-compile-error-cxx20.patch
+    patch_source: https://git.dev.opencascade.org/gitweb/?p=occt.git;a=commitdiff;h=73035770f6fced4ec7dc7e6a0276ee894daa479a
+    patch_type: portability
+sources:
+  7.6.0:
+    sha256: 73f8f71be02c1d9a977e854bcc9202502184d339f1f212c19797a5f23baefabe
+    url: https://github.com/Open-Cascade-SAS/OCCT/archive/refs/tags/V7_6_0.tar.gz

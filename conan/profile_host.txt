@@ -10,12 +10,12 @@ include(default)
 # The app is C++17; xmake's generated MSVC profile hardcodes cppstd=14, overridden there.
 compiler.cppstd=17
 {% if platform.system() == "Windows" %}
-# SLIC3R_STATIC=1 semantics: static MSVC runtime (/MT). Debug builds use /MTd
-# (runtime_type=Debug) — xmake maps this from its `runtimes = "MTd"` config.
-# NOTE: the full-app static link is unproven (handoff §8.2); revisit after the
-# libslic3r link test.
-compiler.runtime=static
-compiler.runtime_type=Release
+# DYNAMIC MSVC runtime (/MD) — parity with the authoritative CMake build, which
+# never overrides CMAKE_MSVC_RUNTIME_LIBRARY (SLIC3R_STATIC means static
+# *libraries*, not static CRT). /MT was tried and reverted: onetbb's recipe
+# rejects it (Invalid binary), and shared TBB/OCCT beside a /MT app is a
+# cross-heap hazard.
+compiler.runtime=dynamic
 {% endif %}
 
 [conf]
@@ -24,10 +24,11 @@ compiler.runtime_type=Release
 tools.cmake.cmaketoolchain:generator=Ninja
 
 [replace_requires]
-# cgal/5.6.3's recipe pins boost/1.83.0 and eigen/3.4.0; the project pins 1.84.0
-# and 5.0.1 (deps/ exact matches). Steer every graph to the single project-wide
-# versions. NOTE: xmake's isolated per-package installs do NOT see these replaces —
-# cgal's own graph still resolves the older pins there (header-only; the duplicate
-# include-path hazard is tracked in the handoff for the target-port step).
+# Steer every recipe's pinned transitives to the single project-wide versions
+# (deps/ exact matches). Effective because the whole graph is resolved by ONE
+# conan install of conan/conanfile.py (see ADR-0001 amendment):
+#   cgal/5.6.3 pins boost/1.83.0 + eigen/3.4.0
+#   opencascade/7.6.0 pins freetype/2.13.2
 boost/*: boost/1.84.0
 eigen/*: eigen/5.0.1
+freetype/*: freetype/2.12.1

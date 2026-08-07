@@ -6,6 +6,35 @@ The fork replaces its CMake build (`CMakeLists.txt` + `deps/` ExternalProject tr
 
 Proposed (proof stage: Windows x64 wxWidgets 3.3.2 static build passes).
 
+**Amended 2026-08-06 — consolidated dependency graph.** Decision 2 originally
+wired Conan through xmake's stock `add_requires("conan::...")`. That integration
+runs one *isolated* `conan install` per package, which proved structurally
+unsound: separate graphs resolve conflicting transitive versions (opencascade
+pulling freetype/2.13.2 beside the project's pinned 2.12.1; cgal pulling
+boost/1.83.0 + eigen/3.4.0; libcurl free to resolve openssl 3.x), and neither
+the lockfile nor profile `[replace_requires]` can take effect across graphs.
+Replaced by ONE `conan install` of the repo-owned `conan/conanfile.py`
+(lockfile-enforced, checked-in profiles), whose `generate()` emits per-package
+cpp_info + direct-dependency names (`pnp_deps.lua`); the xmake rule `pnp.conan`
+runs the install when stale and injects flags into targets. See
+`conan/README.md`.
+
+**Findings that shrank the custom-recipe list from ten to one** (2026-08-06):
+ConanCenter still *serves* recipe versions absent from its listing — exact
+pins found for opencascade/7.6.0, openssl/1.1.1w, freetype/2.12.1,
+openexr/2.5.5, cereal/1.3.0. The remaining gaps (openvdb fork, opencsg,
+openexr, glew) turned out to provision only SLA-era code that is dead in this
+fork and were dropped. Nearest-upstream (behavior-gated): libcurl 7.86.0,
+onetbb 2021.7.0, opencv 4.5.5, nlopt 2.9.1. The one repo recipe
+(`conan/recipes/opencascade/`) is the center 7.6.0 recipe minus tcl/tk with
+`BUILD_MODULE_Draw=OFF`: tcl cannot be built under VS 18 2026 and exists only
+for OCCT's Draw test harness (deps/ likewise built OCCT Draw-less, tcl-free).
+
+**MSVC runtime correction:** the Consequences section below assumed
+`SLIC3R_STATIC=1` implies a static CRT. The authoritative CMake build never
+overrides the MSVC runtime (defaults to /MD); `SLIC3R_STATIC` means static
+*libraries*. Profiles use `compiler.runtime=dynamic`.
+
 ## Context
 
 The GUI shell-out fork (`Orca(pnp_gui)`) inherits OrcaSlicer's CMake build: ~1,110 C++ files in a manually maintained 700-file source list, ~30 dependencies built from source by `ExternalProject_Add` into a staged prefix, per-platform shell scripts, and a two-language orchestration problem (CMake + `cargo xtask dist` + staging). The goal is one developer-facing command, declarative dependency management, automatic source discovery, and no hand-maintained build scripts.

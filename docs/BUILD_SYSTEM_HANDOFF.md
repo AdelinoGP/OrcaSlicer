@@ -136,7 +136,7 @@ Untracked (uncommitted — nothing has been committed):
 ?? docs/adr/0001-xmake-conan-build-system.md   (50 lines — the ADR)
 ?? docs/BUILD_SYSTEM_HANDOFF.md  (this file)
 ?? xmake.lua                     (the scaffold + Step-1 conan wiring)
-?? conan/                        (profile_host.txt, profile_build.txt, conanfile.txt, conan.lock, README.md)
+?? conan/                        (profile_host.txt, profile_build.txt, conanfile.py, conan.lock, README.md)
 ```
 
 `xmake.lua` structure (validated: parses, configures, resolves all deps):
@@ -190,14 +190,15 @@ Key CMake sources to port from (already read):
   - global `set_pcxxheader("src/slic3r/pchheader.hpp")` would have applied the GUI pch to libslic3r — now per-target (`src/libslic3r/pchheader.hpp` vs `src/slic3r/pchheader.hpp`);
   - the `.rc.in` was also passed to `add_files` (unknown source type) — dropped; compiling the generated `.rc` is a Step-3 TODO.
 
-### Step 2 — Custom recipes (priority order = risk order)
-Directory convention: `conan/recipes/<pkg>/<version>/conanfile.py` + `test_package/`. Reference the SoftFever fork sources (from `deps/*.cmake`):
-1. **opencascade/7.6.0** — biggest risk; the app links 24 TK libs; base the recipe on the ConanCenter 7.9.1 recipe and pin the 7.6.0 URL (`Open-Cascade-SAS/OCCT` tag `V7_6_0`).
-2. **openvdb/6.2.1** — fork commit `a68fd58d0e2b85f01adeb8b13d7555183ab10aa5` from `tamasmeszaros/openvdb`; copy the ConanCenter 12.1.1 recipe shape but expect patches.
-3. **opencv/4.6.0** — app uses `opencv_world` core only; trim features hard.
-4. **tbb/2021.5** (or adopt `onetbb/2023.1.0` and verify `TBB::tbb`/`TBB::tbbmalloc` target names).
-5. **openssl/1.1.1w**, **libcurl/7.75.0** (center's recipe is `libcurl`, verify target names `libcurl`/`OpenSSL::SSL`/`OpenSSL::Crypto` match `find_package` usage), **freetype/2.12.1**, **opencsg/1.4.2**, **openexr/2.5.5**, **nlopt/2.5.0**.
-- Each recipe must pass a link+runtime smoke test before being accepted (the "behavior and tests" gate).
+### Step 2 — Full dependency set — DONE 2026-08-06 (one repo recipe; §3.4 was too pessimistic)
+Key discoveries that rewrote this step (details in `conan/README.md` + ADR amendment):
+1. **ConanCenter still SERVES versions absent from its listing.** `conan download <ref> -r conancenter --only-recipe` found exact pins: **opencascade/7.6.0** (conan2-ready recipe incl. the C++17 portability patch), **openssl/1.1.1w**, **freetype/2.12.1**, **openexr/2.5.5**, **cereal/1.3.0**. Always probe before writing a recipe.
+2. **The remaining "custom recipe" deps are dead code in this fork:** OpenVDB's only consumer (`VoxelizeCSGMesh.hpp`) has no callers; OpenCSG appears solely in a comment; OpenEXR and GLEW existed only as openvdb/opencsg deps. All dropped (SLA removal fallout). `OpenVDBUtils.cpp` is excluded from the libslic3r glob (CMake compiles it only `if (TARGET OpenVDB::openvdb)`).
+3. **Nearest-upstream picks (behavior-gated):** libcurl/7.86.0 (pin 7.75.0), onetbb/2021.7.0 (pin 2021.5.0, shared — its recipe also demands `hwloc/*:shared=True`), opencv/4.5.5 (pin 4.6.0; core+imgproc only — sole users are SkipPartCanvas + ObjColorUtils), nlopt/2.9.1 (pin 2.5.0; center serves 2.7.1 but its CMakeLists is rejected by CMake 4).
+4. **Architecture change (ADR amendment):** per-package `add_requires("conan::...")` proved structurally unsound — isolated installs resolve conflicting transitive versions (occt→freetype/2.13.2, cgal→boost/1.83.0+eigen/3.4.0, libcurl→openssl/3.x) and ignore the lockfile. Replaced by ONE `conan install` of `conan/conanfile.py`; its `generate()` emits `pnp_deps.lua` (per-package cpp_info + direct dep names) consumed by the xmake rule **`pnp.conan`** (targets declare `set_values("pnp.conan.packages", ...)`, flags injected public so they propagate to the binary). Rule `pnp.conan.dlls` stages shared-package DLLs (onetbb, hwloc) beside the exe.
+5. **MSVC runtime corrected to /MD (dynamic):** the authoritative CMake build never overrides the runtime; `SLIC3R_STATIC` means static *libraries*, not static CRT. The Step-1 `/MT` reading is reverted (profiles + `set_runtimes("MD"/"MDd")`); the /MT-built binaries stay orphaned in the conan cache. Bonus: the original dynamic-runtime cache became reusable again via Conan's cppstd compatibility fallback.
+6. Debug builds need a debug host profile (MDd deps) — not yet set up; `pnp.conan` warns in debug mode.
+7. **tcl is unbuildable under VS 2026** (its `nmakehlp`/`rules.vc` bootstrap fails for 8.6.10 AND 8.6.13; no center binaries exist for compiler.version=195). tcl only served OCCT's Draw test harness → repo recipe `conan/recipes/opencascade/` = center 7.6.0 recipe with tcl/tk removed + `BUILD_MODULE_Draw=OFF` (deps/OCCT likewise built Draw-less without tcl). Repo recipes pin `version` in-recipe; `pnp.conan` auto-exports them before installing. GOTCHA: `conan lock create` auto-loads the stale `conan.lock` sitting beside the conanfile — pass `--lockfile=""` after changing a repo recipe or the old recipe revision stays pinned.
 
 ### Step 3 — Port the full target graph
 - `libslic3r`: already scaffolded; compile it (the long pole, ~141 files, heavy templates). Expect `libslic3r_cgal` frounding-math handling, `-DUSE_TBB`, OCCT/OpenCV/OpenVDB link adjustments, MSVC `Psapi.lib`/`bcrypt.lib`.
@@ -217,26 +218,33 @@ Directory convention: `conan/recipes/<pkg>/<version>/conanfile.py` + `test_packa
 ## 7. Validation commands
 
 ```bash
-# scratch proof still works (if scratch dir preserved)
-cd C:/Users/agpen/AppData/Local/Temp/opencode/pnp-build-proof/conan-hybrid
-xmake f -c -y -p windows -a x64 -m release && xmake && ./build/windows/x64/release/wxproof.exe
+# consolidated dependency graph resolves + builds (what rule pnp.conan runs)
+conan install conan/conanfile.py \
+    --profile:host=conan/profile_host.txt --profile:build=conan/profile_build.txt \
+    --lockfile=conan/conan.lock --build=missing -of build/conan/windows_x64_release
 
-# scaffold configures (repo root; full dep resolution ~cached now)
+# scaffold configures (triggers pnp.conan automatically when stale)
 xmake f -c -y -p windows -a x64 -m release
+
+# flags reach the compiler (runtime, cppstd, conan includes, GIT_COMMIT_HASH)
+xmake show -t libslic3r
+
+# lockfile still matches conanfile.py (should print no changes)
+conan lock create conan/conanfile.py -pr:h=conan/profile_host.txt \
+    -pr:b=conan/profile_build.txt --lockfile-out=/tmp/check.lock && diff conan/conan.lock /tmp/check.lock
 
 # conan cache health
 conan list "*:*"
-
-# git-hash define works
-grep -rn "GIT_COMMIT_HASH" build/.gens 2>/dev/null | head -2   # or inspect a compile command
 ```
 
 ---
 
 ## 8. Open questions for the next session
 
-1. **Fork-patch equivalence:** does the app need the 12 SoftFever wxWidgets commits (dark theme etc.) or does vanilla 3.3.2 + the custom flags suffice? Decide via a GUI smoke test (launch, dark theme, dialogs). If patches are needed, add a Conan recipe with `conan-data` patches rather than a fork.
-2. **Static vs dynamic runtime:** confirm `SLIC3R_STATIC` semantics with an actual link of `libslic3r` (the wx static proof linked, but the full app is unproven).
-3. **TBB version:** adopt `onetbb/2023.1.0` (center) or write a 2021.5 recipe — depends on whether `TBB::tbbmalloc` name and ABI hold.
+1. **Fork-patch equivalence:** does the app need the 12 SoftFever wxWidgets commits (dark theme etc.) or does vanilla 3.3.2 + the custom flags suffice? Decide via a GUI smoke test (launch, dark theme, dialogs). If patches are needed, add a repo recipe under `conan/recipes/` with conandata patches rather than a fork.
+2. ~~Static vs dynamic runtime~~ — RESOLVED: /MD everywhere (the CMake build never set /MT; see Step 2.5).
+3. ~~TBB version~~ — RESOLVED: onetbb/2021.7.0 shared, behavior gate at runtime.
 4. **libnoise:** SoftFever fork vs center 1.0.0 — behavior gate.
-5. **vcpkg as fallback** (documented in research) only if a specific Conan recipe fails irreparably.
+5. **OCCT static-on-Windows divergence:** deps/ built OCCT Shared on Windows; conan builds it static everywhere. Gate at STEP/3MF import smoke test.
+6. **Nearest-upstream behavior gates** pending target port: libcurl 7.86.0, opencv 4.5.5, nlopt 2.9.1, cereal 1.3.0 (was 1.3.2 in scaffold), onetbb 2021.7.0.
+7. **vcpkg as fallback** (documented in research) only if a specific Conan recipe fails irreparably.

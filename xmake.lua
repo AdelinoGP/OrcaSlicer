@@ -1,13 +1,16 @@
 -- OrcaSlicer (pnp_gui) — Xmake build (see docs/adr/0001-xmake-conan-build-system.md)
 -- Architecture:
 --   Xmake  -> C++ target graph, source discovery, tests, staging, packaging
---   Conan  -> third-party C/C++ dependencies (add_requires("conan::..."))
+--   Conan  -> third-party C/C++ deps, ONE consolidated lockfile-enforced graph
+--             (conan/conanfile.py + rule "pnp.conan" below; ADR-0001 amendment)
 --   Cargo  -> pinch_n_print_cli backend (invoked via on_build / task)
 --
 -- Migration status (per ADR-0001):
 --   [x] wxWidgets 3.3.2 static proof (Windows x64, VS 2026, MSVC)
---   [x] repo conan profiles (C++17, static MSVC runtime) + lockfile (conan/)
---   [ ] remaining heavy deps via ConanCenter or repo recipes
+--   [x] repo conan profiles (C++17, /MD parity) + enforced lockfile (conan/)
+--   [x] full dependency set: ConanCenter + one repo recipe (opencascade
+--       minus tcl/Draw); dead SLA-era deps dropped (openvdb, opencsg,
+--       openexr, glew)
 --   [ ] full target graph port (libslic3r, libslic3r_gui, exe, shim, tests)
 --   [ ] packaging parity (installers, portable dir)
 -- CMake and deps/ remain authoritative until parity.
@@ -19,10 +22,11 @@ set_default("libslic3r", "libslic3r_gui", "OrcaSlicer")
 
 add_rules("mode.debug", "mode.release", "mode.releasedbg")
 
--- SLIC3R_STATIC=1 semantics on Windows: app and all deps share the static MSVC
--- runtime (/MT, /MTd in debug). Pending the full-app link test (handoff §8.2).
+-- Dynamic MSVC runtime (/MD, /MDd in debug) — parity with the authoritative
+-- CMake build (it never overrides the runtime; SLIC3R_STATIC means static
+-- *libraries*, not static CRT). Keep in sync with conan/profile_host.txt.
 if is_plat("windows") then
-    set_runtimes(is_mode("debug") and "MTd" or "MT")
+    set_runtimes(is_mode("debug") and "MDd" or "MD")
 end
 
 -- ---------------------------------------------------------------- options
@@ -48,105 +52,159 @@ option("pnp_dist_dir")
 option_end()
 
 -- ------------------------------------------------------------ dependencies
+--
+-- All third-party C/C++ dependencies come from ONE consolidated conan install
+-- of conan/conanfile.py (single coherent graph, lockfile-enforced, profile
+-- settings from conan/profile_host.txt). This replaces xmake's stock
+-- per-package `add_requires("conan::...")` integration, whose isolated graphs
+-- resolved conflicting transitive versions (occt→freetype/2.13.2 beside the
+-- project's 2.12.1, cgal→boost/1.83.0+eigen/3.4.0, libcurl→openssl/3.x) and
+-- could not consume the lockfile. See ADR-0001 amendment + conan/README.md.
+--
+-- Targets declare their direct conan packages via
+--     set_values("pnp.conan.packages", "boost", "wxwidgets", ...)
+-- and the rule injects flags for the transitive closure (public, so they
+-- propagate through add_deps to the final binary).
 
--- ConanCenter-provided (proven or version-exact):
---   wxwidgets/3.3.2  -> proven end-to-end (static, webview, mediactrl, opengl, aui, html)
---   boost/1.84.0     -> exact match with deps/Boost
---   eigen/5.0.1      -> exact match with deps/Eigen
---   cereal/1.3.2     -> deps uses 1.3.0; 1.3.2 is the nearest upstream (accept per behavior gate)
---   draco/1.5.7      -> exact match with deps/Draco
---   qhull/8.0.2      -> exact match with deps/Qhull
---   glfw/3.4         -> exact match with deps/GLFW
---   cgal/5.6.3       -> exact match with deps/CGAL
---   libnoise/1.0.0   -> SoftFever fork tags 1.0; nearest upstream 1.0.0 (verify against fork)
---   zlib, libpng, libjpeg, expat -> transitively pulled by wxwidgets; explicit pins below
+rule("pnp.conan")
+    on_load(function (target)
+        import("core.project.config")
 
--- Custom recipes still required (in-repo, under conan/recipes/):
---   opencascade 7.6.0   (center has 7.9.1 only)
---   opencv 4.6.0        (center has 4.14.0 only)
---   openvdb 6.2.1-fork  (center has 12.1.1 only; project uses tamasmeszaros fork)
---   tbb 2021.5          (center tbb tops at 2020.3; onetbb has 2023.1.0)
---   openssl 1.1.1w      (center has 3.x only)
---   curl 7.75 / libcurl (center has 8.21.0)
---   freetype 2.12.1     (center has 2.13.2+)
---   opencsg 1.4.2       (no recipe)
---   openexr 2.5.5       (center has 2.5.7+)
---   nlopt 2.5.0         (center has 2.10.1+)
+        local projectdir = os.projectdir()
+        local key = (config.plat() or os.host()) .. "_" .. (config.arch() or os.arch())
+            .. "_" .. (config.mode() or "release")
+        local outdir = path.join(config.builddir(), "conan", key)
+        local deps_file = path.join(outdir, "pnp_deps.lua")
 
--- Shared Conan provisioning — KEEP IN SYNC with conan/profile_host.txt (that
--- profile is the same contract for direct conan workflows: lockfile, CI cache).
--- xmake generates its own per-package conan profiles (hardcoding cppstd=14 on
--- MSVC) and cannot consume external profiles/lockfiles, so the settings ride
--- along as CLI overrides on every require:
---   * compiler.cppstd=17       — the app is C++17; deps must match.
---   * runtimes MT/MTd (win)    — static MSVC runtime, SLIC3R_STATIC=1 semantics
---                                (xmake maps this to compiler.runtime=static).
---   * Ninja generator conf     — recipes pinning cmake<4 cannot drive the
---                                "Visual Studio 18 2026" generator (handoff §5.1).
-local conan_base = {
-    settings = {"compiler.cppstd=17"},
-    conf = {"tools.cmake.cmaketoolchain:generator=Ninja"}
-}
-if is_plat("windows") then
-    conan_base.runtimes = is_mode("debug") and "MTd" or "MT"
-end
+        -- The checked-in profiles are Release; a debug dependency graph needs
+        -- its own host profile (MDd deps) before xmake debug mode is usable.
+        if config.mode() == "debug" then
+            wprint("pnp.conan: conan/profile_host.txt builds Release deps; " ..
+                   "debug app + release deps will fail to link on MSVC (TODO: debug profile)")
+        end
 
-local function conan_configs(extra)
-    local configs = {}
-    for k, v in pairs(conan_base) do configs[k] = v end
-    for k, v in pairs(extra or {}) do configs[k] = v end
-    return configs
-end
+        -- rerun the install when its inputs changed (cheap no-op otherwise)
+        local inputs = {
+            path.join(projectdir, "conan", "conanfile.py"),
+            path.join(projectdir, "conan", "profile_host.txt"),
+            path.join(projectdir, "conan", "profile_build.txt"),
+            path.join(projectdir, "conan", "conan.lock")
+        }
+        local recipe_dirs = os.dirs(path.join(projectdir, "conan", "recipes", "*"))
+        for _, dir in ipairs(recipe_dirs) do
+            table.insert(inputs, path.join(dir, "conanfile.py"))
+        end
+        local stale = not os.isfile(deps_file)
+        if not stale then
+            local outmtime = os.mtime(deps_file)
+            for _, f in ipairs(inputs) do
+                if os.isfile(f) and os.mtime(f) > outmtime then
+                    stale = true
+                    break
+                end
+            end
+        end
+        if stale and not _g.pnp_conan_installed then
+            _g.pnp_conan_installed = true
+            -- repo-owned recipes (versions pinned in-recipe) must be exported
+            -- into the conan cache before the graph resolves
+            for _, dir in ipairs(recipe_dirs) do
+                print("pnp.conan: conan export %s ...", path.filename(dir))
+                os.vrunv("conan", {"export", dir})
+            end
+            print("pnp.conan: conan install (consolidated graph, --build=missing) ...")
+            os.vrunv("conan", {"install", path.join(projectdir, "conan", "conanfile.py"),
+                "--profile:host=" .. path.join(projectdir, "conan", "profile_host.txt"),
+                "--profile:build=" .. path.join(projectdir, "conan", "profile_build.txt"),
+                "--lockfile=" .. path.join(projectdir, "conan", "conan.lock"),
+                "--build=missing",
+                "-of", outdir})
+        end
 
-if is_plat("windows") then
-    add_requires("conan::wxwidgets/3.3.2", {
-        configs = conan_configs({
-            options = {
-                "shared=False",
-                "webview=True", "mediactrl=True", "opengl=True",
-                "aui=True", "html=True",
-                "stc=False", "cairo=False",
-                "custom_enables=wxUSE_PRIVATE_FONTS, wxUSE_GLCANVAS_EGL, wxUSE_WEBREQUEST, wxUSE_WEBVIEW_EDGE",
-                "custom_disables=wxUSE_DETECT_SM, wxUSE_WEBVIEW_IE, wxUSE_LIBSDL, wxUSE_XTEST, wxUSE_LIBTIFF, wxUSE_NANOSVG, wxUSE_LIBWEBP"
-            }
-        })
-    })
-else
-    add_requires("conan::wxwidgets/3.3.2", {
-        configs = conan_configs({
-            options = {
-                "shared=False", "webview=True", "mediactrl=True", "opengl=True",
-                "aui=True", "html=True", "stc=False"
-            }
-        })
-    })
-end
+        local wanted = target:values("pnp.conan.packages")
+        if wanted == nil then
+            return
+        end
+        local graph = assert(io.load(deps_file), "pnp.conan: cannot load %s", deps_file)
 
-add_requires("conan::boost/1.84.0", {configs = conan_configs({options = {"header_only=True"}})})
-add_requires("conan::eigen/5.0.1", {configs = conan_configs()})
-add_requires("conan::cereal/1.3.2", {configs = conan_configs()})
-add_requires("conan::draco/1.5.7", {configs = conan_configs()})
-add_requires("conan::qhull/8.0.2", {configs = conan_configs()})
-add_requires("conan::glfw/3.4", {configs = conan_configs()})
-add_requires("conan::cgal/5.6.3", {configs = conan_configs()})
-add_requires("conan::libnoise/1.0.0", {configs = conan_configs()})
-add_requires("conan::zlib/1.3.1", {configs = conan_configs({options = {"shared=False"}})})
-add_requires("conan::libpng/1.6.47", {configs = conan_configs({options = {"shared=False"}})})
-add_requires("conan::libjpeg/9f", {configs = conan_configs({options = {"shared=False"}})})
+        -- transitive closure, deps-first; injected in reverse (dependents
+        -- before dependencies) for GNU-ld-friendly link order
+        local visited, order = {}, {}
+        local function visit(name)
+            if visited[name] then
+                return
+            end
+            visited[name] = true
+            local pkg = graph[name]
+            assert(pkg, "pnp.conan: package '%s' not in the conan graph (%s)", name, deps_file)
+            for _, dep in ipairs(pkg.deps or {}) do
+                visit(dep)
+            end
+            table.insert(order, name)
+        end
+        for _, name in ipairs(table.wrap(wanted)) do
+            visit(name)
+        end
+        for i = #order, 1, -1 do
+            local pkg = graph[order[i]]
+            for _, dir in ipairs(pkg.includedirs) do
+                target:add("sysincludedirs", dir, {public = true})
+            end
+            for _, dir in ipairs(pkg.linkdirs) do
+                target:add("linkdirs", dir, {public = true})
+            end
+            for _, lib in ipairs(pkg.links) do
+                target:add("links", lib, {public = true})
+            end
+            for _, lib in ipairs(pkg.syslinks) do
+                target:add("syslinks", lib, {public = true})
+            end
+            for _, def in ipairs(pkg.defines) do
+                target:add("defines", def, {public = true})
+            end
+            for _, flag in ipairs(pkg.cxxflags) do
+                target:add("cxxflags", flag)
+            end
+            for _, flag in ipairs(pkg.ldflags) do
+                target:add("ldflags", flag, {public = true})
+            end
+            if target:is_plat("macosx") then
+                for _, dir in ipairs(pkg.frameworkdirs) do
+                    target:add("frameworkdirs", dir, {public = true})
+                end
+                for _, fw in ipairs(pkg.frameworks) do
+                    target:add("frameworks", fw, {public = true})
+                end
+            end
+        end
+    end)
+rule_end()
 
--- TODO(custom recipes): opencascade/7.6.0, opencv/4.6.0, openvdb/6.2.1,
---   tbb/2021.5, openssl/1.1.1w, libcurl/7.75, freetype/2.12.1,
---   opencsg/1.4.2, openexr/2.5.5, nlopt/2.5.0
--- add_requires("conan::opencascade/7.6.0", {configs = {options = {"shared=False"}}})
--- add_requires("conan::opencv/4.6.0", {configs = {options = {"shared=False"}}})
--- add_requires("conan::openvdb/6.2.1", {configs = {options = {"shared=False"}}})
--- add_requires("conan::tbb/2021.5", {configs = {options = {"shared=False"}}})
--- add_requires("conan::openssl/1.1.1w", {configs = {options = {"shared=False"}}})
--- add_requires("conan::libcurl/7.75.0", {configs = {options = {"shared=False"}}})
--- add_requires("conan::freetype/2.12.1", {configs = {options = {"shared=False"}}})
--- add_requires("conan::opencsg/1.4.2", {configs = {options = {"shared=False"}}})
--- add_requires("conan::openexr/2.5.5", {configs = {options = {"shared=False"}}})
--- add_requires("conan::nlopt/2.5.0", {configs = {options = {"shared=False"}}})
+-- copies runtime DLLs of shared conan packages (onetbb, hwloc) beside the exe
+rule("pnp.conan.dlls")
+    after_build(function (target)
+        import("core.project.config")
+        if not target:is_plat("windows") then
+            return
+        end
+        local key = config.plat() .. "_" .. config.arch() .. "_" .. (config.mode() or "release")
+        local deps_file = path.join(config.builddir(), "conan", key, "pnp_deps.lua")
+        local graph = io.load(deps_file)
+        if not graph then
+            return
+        end
+        local bin_dir = path.directory(target:targetfile())
+        for name, pkg in pairs(graph) do
+            if not name:startswith("__") then
+                for _, dir in ipairs(pkg.bindirs or {}) do
+                    for _, dll in ipairs(os.files(path.join(dir, "*.dll"))) do
+                        os.cp(dll, path.join(bin_dir, path.filename(dll)))
+                    end
+                end
+            end
+        end
+    end)
+rule_end()
 
 -- ------------------------------------------------------- generated headers
 
@@ -208,7 +266,11 @@ target("libslic3r")
         "src/libslic3r/Circle.cpp",
         "src/libslic3r/ExPolygonCollection.cpp",
         "src/libslic3r/JumpPointSearch.cpp",
-        "src/libslic3r/TryCatchSignalSEH.cpp")
+        "src/libslic3r/TryCatchSignalSEH.cpp",
+        -- OpenVDB is not provisioned: its only consumer (VoxelizeCSGMesh.hpp,
+        -- SLA-era) has no callers in this fork; CMake compiles OpenVDBUtils.cpp
+        -- only `if (TARGET OpenVDB::openvdb)`.
+        "src/libslic3r/OpenVDBUtils.cpp")
     add_includedirs("src", "src/libslic3r", {public = true})
     set_configdir("$(builddir)/config")
     add_configfiles("src/libslic3r/libslic3r_version.h.in",
@@ -217,13 +279,13 @@ target("libslic3r")
     add_defines("USE_TBB", "TBB_USE_CAPTURED_EXCEPTION=0", {public = true})
     add_defines("SLIC3R_VERSION_IS_FORK", "PNP_FORK")
 
-    -- heavy deps (custom recipes pending — see TODO above)
-    add_packages("conan::boost/1.84.0", "conan::eigen/5.0.1", "conan::cereal/1.3.2",
-        "conan::draco/1.5.7", "conan::qhull/8.0.2", "conan::cgal/5.6.3",
-        "conan::zlib/1.3.1", "conan::libpng/1.6.47", "conan::libjpeg/9f")
-
-    -- TODO: add_packages for opencascade, opencv, openvdb, tbb, openssl, libcurl,
-    -- opencsg, openexr, nlopt once custom recipes land.
+    -- direct conan deps (mirrors src/libslic3r/CMakeLists.txt link list;
+    -- freetype/tcl arrive via the opencascade closure)
+    add_rules("pnp.conan")
+    set_values("pnp.conan.packages",
+        "boost", "eigen", "cereal", "draco", "qhull", "cgal", "libnoise",
+        "zlib", "libpng", "libjpeg", "expat", "nanosvg",
+        "opencascade", "opencv", "onetbb", "nlopt", "openssl")
 
     if is_plat("windows") then
         add_syslinks("Psapi", "bcrypt", "ws2_32")
@@ -252,7 +314,10 @@ target("libslic3r_gui")
     add_includedirs("$(builddir)/config")
     add_defines("SLIC3R_CURRENTLY_COMPILING_GUI_MODULE", {private = true})
     add_defines("wxDEBUG_LEVEL=0", {public = true})
-    add_packages("conan::wxwidgets/3.3.2", "conan::glfw/3.4")
+    -- direct conan deps (libslic3r's public set propagates via add_deps)
+    add_rules("pnp.conan")
+    set_values("pnp.conan.packages",
+        "wxwidgets", "glfw", "libcurl", "opencv", "onetbb", "boost", "expat", "nanosvg")
     add_deps("libslic3r")
     if is_plat("windows") then
         add_includedirs("deps/WebView2/include", {public = true})
@@ -266,6 +331,7 @@ target("OrcaSlicer")
     set_kind("binary")
     add_files("src/OrcaSlicer.cpp")
     add_deps("libslic3r", "libslic3r_gui")
+    add_rules("pnp.conan", "pnp.conan.dlls")
     if is_plat("windows") then
         add_syslinks("ws2_32", "user32", "Setupapi")
         -- TODO(step 3): compile the generated OrcaSlicer.rc (icon/version
