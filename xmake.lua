@@ -620,7 +620,10 @@ target("libslic3r_gui")
     add_deps("glad", "libvgcode", "imgui", "imguizmo", "hidapi", "mdns",
         "minilzo", "md4c")
     if is_plat("windows") then
-        add_includedirs("deps/WebView2/include", {public = true})
+        -- WebView2 SDK headers. Vendored under deps_src/ (with every other
+        -- in-tree third-party source) rather than deps/, which held the CMake
+        -- dependency superbuild and is removed by the xmake cutover.
+        add_includedirs("deps_src/WebView2/include", {public = true})
         add_syslinks("Advapi32", "Setupapi", "opengl32")
     end
 target_end()
