@@ -13,7 +13,8 @@
 --       (openvdb, opencsg, openexr, glew)
 --   [x] target graph port: libslic3r, libslic3r_gui, OrcaSlicer.dll +
 --       orca-slicer.exe launcher — GUI launches on Windows x64
---   [ ] tests port (tests/ Catch2 -> xmake test), macOS/Linux
+--   [x] tests: 7 Catch2 suites via `xmake test` (all passing)
+--   [ ] macOS/Linux ports
 --   [ ] packaging parity (installers, portable dir)
 -- CMake and deps/ remain authoritative until parity.
 

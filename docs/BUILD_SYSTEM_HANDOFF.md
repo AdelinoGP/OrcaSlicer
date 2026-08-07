@@ -1,7 +1,7 @@
 # Technical Handoff: Xmake + Conan Build System Migration
 
 **Date:** 2026-08-06, updated 2026-08-07
-**Status:** Windows x64 **builds, links and launches** — `xmake` produces `orca-slicer.exe` + `OrcaSlicer.dll` with resources and the PNP backend staged, and the GUI comes up. Packaging, tests, and macOS/Linux pending. See §6 Steps 1-3.
+**Status:** Windows x64 **builds, launches, and passes its test suite** — `xmake` produces `orca-slicer.exe` + `OrcaSlicer.dll` with resources and the PNP backend staged, the GUI comes up, and `xmake test` runs all 7 Catch2 suites green. Packaging and macOS/Linux pending. See §6 Steps 1-3.
 **Read first:** `docs/adr/0001-xmake-conan-build-system.md` (the decision, incl. its amendment) and `conan/README.md` (dependency provisioning). `build-system-research.md` is the original cited comparison.
 
 > **Sections 2-4 below are the original 2026-08-06 proof record and have NOT been rewritten.** Several of their conclusions were overturned by later work — most importantly the §3.4 "needs a custom recipe" table (ten entries; the real answer is one) and §4's "nothing has been committed". Where §6 (Next steps) and §5 (Pitfalls) disagree with §2-4, **§5/§6 win** — they were corrected against actual build and link failures.
@@ -243,11 +243,19 @@ Key discoveries that rewrote this step (details in `conan/README.md` + ADR amend
 Three traps in the `.rc`/manifest path, all silent:
 - `add_files()` resolves at **load time**, so a generated file that does not exist yet is skipped without a warning — the exe then links with no manifest (wx pops a "Common Controls v6" warning dialog at startup) and no icon. Render generated sources in `on_load` and register them with `target:add("files", ...)`. `on_load` also has `os.mkdir`, which description scope lacks.
 - `set_values` stores a flat string list, **not** a Lua map — passing `version_vars` through it yields empty substitutions and `RC2127` on an empty `FILEVERSION`. Pass `KEY=VALUE` strings and reassemble.
-- The RC compiler treats a backslash in a string literal as an escape, so a native Windows path in the icon line silently becomes garbage (`esources` → CR + `esources`). Use forward slashes, as CMake's `SLIC3R_RESOURCES_DIR` does.
+- The RC compiler treats a backslash in a string literal as an escape, so a native Windows path in the icon line silently becomes garbage (`
+esources` → CR + `esources`). Use forward slashes, as CMake's `SLIC3R_RESOURCES_DIR` does.
+
+**3e — Catch2 test suites (commit `af98c78186`).** All 7 suites ported and green via `xmake test` (xmake's native `add_tests` runner; the old ctest shim is gone). Catch2 builds from the bundled `tests/catch2` source, with `catch_user_config.hpp` rendered in `on_load` — CMake normally `configure_file`s it from a `#cmakedefine` template where every option defaults off, so only `DEFAULT_REPORTER=console` / `CONSOLE_WIDTH=80` need substituting (`CatchConfigOptions.cmake:83-84`). The `pnp.test` rule carries CMake's `test_common` interface (`TEST_DATA_DIR`, `PROFILES_DIR`, `CATCH_CONFIG_FAST_COMPILE`, `tests/` on the include path).
+
+Two link traps:
+- **`/SUBSYSTEM:CONSOLE` is mandatory on the test exes.** Catch2's `main()` lives in a static lib; without an explicit subsystem MSVC infers the entry point from object files only, never scans libraries, and dies with `LNK1561`. CMake always passes `/subsystem:console` for executables, which is why this never surfaces there.
+- **`boost/*:without_test=True`.** `libboost_test_exec_monitor` references an undefined `test_main()`, and `pnp.conan` links a package's *whole* lib list — so Boost.Test broke every executable. The project tests with Catch2.
+
+Measured (2026-08-07): 7/7 passed in 43.2s; libslic3r 48717 assertions / 139 cases, libnest2d 638/21, filament_group 353/3 (43s, the slow one), fff_print 193/17, pnp_runtime 134/16, pnp_config_translator 43/2. `slic3rutils` uses a custom miniLZO `main` and reports via exit code.
 
 **Remaining in Step 3:**
 - macOS `Info.plist`; Linux `orca-slicer` naming/FHS.
-- Tests: port `tests/` Catch2 to `xmake test` (keep ctest working in parallel).
 - Deeper runtime verification: the GUI boots, but slicing/PNP handoff, dark theme and dialog rendering are unexercised (ADR open question 1 — wx fork-patch equivalence — needs human visual inspection).
 - `unix/fhs.hpp` is generated with the portable layout on all platforms; Linux packaging will need the real FHS values (CMake uses `#cmakedefine`, which `add_configfiles` cannot render).
 
