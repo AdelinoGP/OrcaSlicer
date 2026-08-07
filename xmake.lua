@@ -20,7 +20,12 @@ set_version("2.5.0-pnp")
 -- NOTE: not c99 — xmake compiles .c files as C++ (-TP) on MSVC for c99
 -- (no /std:c99 exists), which breaks K&R sources like mcut's shewchuk.c.
 set_languages("c11", "c++17")
-set_default("libslic3r", "libslic3r_gui", "OrcaSlicer")
+-- Windows builds the launcher (which pulls OrcaSlicer.dll via add_deps)
+if is_plat("windows") then
+    set_default("OrcaSlicer_app_gui")
+else
+    set_default("libslic3r", "libslic3r_gui", "OrcaSlicer")
+end
 
 add_rules("mode.debug", "mode.release", "mode.releasedbg")
 
@@ -566,8 +571,13 @@ target_end()
 
 -- --------------------------------------------------------------- OrcaSlicer
 
+-- On Windows the app is split exactly as src/CMakeLists.txt does it:
+--   OrcaSlicer        -> OrcaSlicer.dll (SHARED), exports slic3r_main
+--   OrcaSlicer_app_gui-> orca-slicer.exe (WIN32 subsystem), LoadLibrary's the
+--                        dll after an OpenGL version probe
+-- Everywhere else OrcaSlicer is the executable itself.
 target("OrcaSlicer")
-    set_kind("binary")
+    set_kind(is_plat("windows") and "shared" or "binary")
     add_files("src/OrcaSlicer.cpp")
     add_deps("libslic3r", "libslic3r_gui")
     add_rules("pnp.conan", "pnp.conan.dlls")
@@ -586,14 +596,7 @@ target("OrcaSlicer")
     end)
     if is_plat("windows") then
         add_syslinks("ws2_32", "user32", "Setupapi")
-        -- TODO(step 3): compile the generated OrcaSlicer.rc (icon/version
-        -- resource) — add_files on the configfile output, not the .rc.in.
-        set_configdir("$(builddir)/config")
-        add_configfiles("src/dev-utils/platform/msw/OrcaSlicer.rc.in",
-            {filename = "OrcaSlicer.rc", pattern = "@(.-)@",
-             variables = table.join(version_vars,
-                {SLIC3R_RESOURCES_DIR = path.join(os.projectdir(), "resources")})})
-        add_ldflags("/MANIFEST:NO")
+        add_ldflags("/MANIFEST:NO")  -- the manifest ships via OrcaSlicer.rc
     elseif is_plat("macosx") then
         set_filename("OrcaSlicer")
         add_frameworks("OpenGL", "IOKit", "CoreFoundation", "AVFoundation", "AVKit", "CoreMedia", "VideoToolbox")
@@ -611,7 +614,91 @@ target("OrcaSlicer")
             os.cp(path.join(dist_dir, "modules"), path.join(bin_dir, "modules"))
         end)
     end
+
+    -- The GUI resolves resources/ relative to the executable, so the build
+    -- tree must reproduce it (CMake makes a junction/symlink;
+    -- src/CMakeLists.txt:180-260). A directory symlink needs no elevation
+    -- when Developer Mode is on; fall back to a copy.
+    after_build(function (target)
+        local bin_dir = path.directory(target:targetfile())
+        local dest = path.join(bin_dir, "resources")
+        if os.exists(dest) then
+            return
+        end
+        local src = path.join(os.projectdir(), "resources")
+        local ok = try {function () os.ln(src, dest); return true end}
+        if not ok then
+            os.cp(src, dest)
+        end
+    end)
 target_end()
+
+-- ------------------------------------------------- OrcaSlicer_app_gui (win)
+
+-- WIN32 launcher: probes the OpenGL version, then LoadLibrary's OrcaSlicer.dll
+-- and calls slic3r_main (mirrors src/CMakeLists.txt:161-178).
+if is_plat("windows") then
+target("OrcaSlicer_app_gui")
+    set_kind("binary")
+    set_basename("orca-slicer")
+    add_files("src/OrcaSlicer_app_msvc.cpp")
+    add_deps("OrcaSlicer")
+    add_rules("pnp.conan")
+    set_values("pnp.conan.packages", "boost")
+    -- set_values keeps a flat string list, not a map, so pass KEY=VALUE
+    -- pairs and reassemble them in on_load
+    for k, v in pairs(version_vars) do
+        add_values("pnp.rc.vars", k .. "=" .. tostring(v))
+    end
+    -- The .rc carries the version block, icon and the manifest reference
+    -- (`1 24 "OrcaSlicer.manifest"`), so both must land in the same directory.
+    --
+    -- Rendered in on_load (script scope) rather than with add_configfiles
+    -- because add_files() resolves at load time: a generated file that does
+    -- not exist yet is silently skipped, and the exe then links with no
+    -- manifest (wx pops a "Common Controls v6" warning at startup) and no
+    -- icon. Script scope also gives us os.mkdir, which description scope
+    -- lacks. target:add("files", ...) registers the .rc after rendering it.
+    on_load(function (target)
+        import("core.project.config")
+        local rc_dir = path.join(config.builddir(), "config")
+        os.mkdir(rc_dir)
+        local vars = {
+            -- forward slashes: the RC compiler treats a backslash in a string
+            -- literal as an escape, so a native path silently corrupts it
+            -- (CMake's SLIC3R_RESOURCES_DIR is slash-separated for the same reason)
+            SLIC3R_RESOURCES_DIR = (path.join(os.projectdir(), "resources"):gsub("\\", "/"))
+        }
+        for _, kv in ipairs(table.wrap(target:values("pnp.rc.vars"))) do
+            local k, v = kv:match("^([^=]+)=(.*)$")
+            if k then
+                vars[k] = v
+            end
+        end
+        local function render(src, dst)
+            local text = io.readfile(path.join(os.projectdir(), src))
+            if text then
+                io.writefile(dst, (text:gsub("@(.-)@", function (k) return vars[k] or "" end)))
+            end
+        end
+        render("src/dev-utils/platform/msw/OrcaSlicer.manifest.in",
+               path.join(rc_dir, "OrcaSlicer.manifest"))
+        local rc_file = path.join(rc_dir, "OrcaSlicer.rc")
+        render("src/dev-utils/platform/msw/OrcaSlicer.rc.in", rc_file)
+        target:add("files", rc_file)
+    end)
+    -- releasedbg keeps a console (CMake: WIN32_EXECUTABLE off for RelWithDebInfo)
+    if not is_mode("releasedbg") then
+        add_defines("SLIC3R_WRAPPER_NOCONSOLE")
+        add_ldflags("/SUBSYSTEM:WINDOWS")
+    end
+    if is_mode("release") then
+        add_ldflags("/DEBUG")  -- debug symbols even in release
+    end
+    add_ldflags("/MANIFEST:NO")
+    add_syslinks("user32", "opengl32", "shell32")
+target_end()
+end
 
 -- ---------------------------------------------------------- pnp backend task
 
