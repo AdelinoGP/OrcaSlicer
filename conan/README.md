@@ -37,8 +37,8 @@ a custom recipe is needed.
 
 | Dependency | deps/ pin | Provisioned | Note |
 |---|---|---|---|
-| wxWidgets | 3.3.2 fork | 3.3.2 exact | vanilla + custom wxUSE flags; fork-patch equivalence pending GUI smoke test |
-| boost | 1.84.0 | exact | header_only |
+| wxWidgets | 3.3.2 fork | 3.3.2 exact, **repo recipe** | `recipes/wxwidgets/` (see below); vanilla source + custom wxUSE flags — fork-patch equivalence pending GUI smoke test |
+| boost | 1.84.0 | exact | **compiled** (not header-only) + static — the app links 13 components, `CMakeLists.txt:618` |
 | eigen | 5.0.1 | exact | |
 | cereal | 1.3.0 | exact | |
 | draco / qhull / glfw / cgal / libnoise | — | exact | |
@@ -48,12 +48,25 @@ a custom recipe is needed.
 | expat | (vendored) | 2.8.2 | wxwidgets' transitive version, kept single |
 | libcurl | 7.75.0 | 7.86.0 | nearest served; behavior gate |
 | onetbb | 2021.5.0 | 2021.7.0 | nearest served; behavior gate |
-| opencv | 4.6.0 | 4.5.5 | nearest served; core+imgproc only; behavior gate |
+| opencv | 4.6.0 | 4.5.5 | nearest served; core+imgproc+imgcodecs only; behavior gate |
 | nlopt | 2.5.0 | 2.9.1 | 2.7.1 served but its CMakeLists is rejected by CMake 4; behavior gate |
+| libjpeg-turbo | 3.0.1 | 3.0.2 | NOT vanilla libjpeg — `Thumbnails.cpp` needs `JCS_EXT_RGBA`. wx/libtiff/opencv must all agree or conan raises a `provides` conflict |
+| nanosvg | SoftFever fork | **vendored** | `deps_src/nanosvg`; center's package lacks `nsvgRasterizeXY` |
 | openvdb / opencsg / openexr / glew | (deps/ built) | **dropped** | only served SLA-era code that is dead in this fork |
 
-One repo recipe (`recipes/opencascade/`, header documents the delta from
-center). Repo recipes pin `version` in-recipe and are auto-exported by the
+Two repo recipes, each a thin documented delta over the ConanCenter recipe
+(the header of each `conanfile.py` states exactly what changed and why):
+
+- **`recipes/opencascade/`** — center 7.6.0 minus tcl/tk, `BUILD_MODULE_Draw=OFF`.
+  tcl cannot be built under VS 2026 and only serves OCCT's Draw test harness.
+- **`recipes/wxwidgets/`** — center 3.3.2 plus: private headers installed
+  (`wx/generic/private` etc., as `deps/wxWidgets/wxWidgets.cmake:60-80` did);
+  `wxUSE_SECRETSTORE` enabled on Windows/macOS native backends (center gates it
+  on libsecret and drops the option off-Linux); `wxBUILD_DEBUG_LEVEL=0` to match
+  the app's `-DwxDEBUG_LEVEL=0`; `libsoup` required only on Linux/FreeBSD (it
+  backs the GTK/WebKit webview, not Edge/WebView2).
+
+Repo recipes pin `version` in-recipe and are auto-exported by the
 `pnp.conan` rule before each install; after changing one, regenerate the
 lockfile with `--lockfile=""` (the stale lock beside the conanfile is
 auto-loaded otherwise and pins the old recipe revision).
@@ -63,11 +76,15 @@ auto-loaded otherwise and pins the old recipe revision).
 After changing requires/options in `conanfile.py`:
 
 ```bash
-conan lock create conan/conanfile.py \
+conan lock create conan/conanfile.py --lockfile="" \
     --profile:host=conan/profile_host.txt \
     --profile:build=conan/profile_build.txt \
     --lockfile-out=conan/conan.lock
 ```
+
+`--lockfile=""` is required: `conan lock create` silently auto-loads the
+existing `conan.lock` sitting beside the conanfile, which pins the old recipe
+revisions and makes recipe edits appear to have no effect.
 
 ## Settings contract
 

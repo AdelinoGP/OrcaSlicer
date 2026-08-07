@@ -1,8 +1,10 @@
 # Technical Handoff: Xmake + Conan Build System Migration
 
-**Date:** 2026-08-06
-**Status:** Proof complete, migration scaffolding in place, custom recipes + full target port pending.
-**Read first:** `docs/adr/0001-xmake-conan-build-system.md` (the decision) and `build-system-research.md` (the cited comparison).
+**Date:** 2026-08-06, updated 2026-08-07
+**Status:** Windows x64 **builds and links end-to-end** — `xmake build OrcaSlicer` produces `OrcaSlicer.exe` with the PNP backend staged. Runtime/GUI launch unverified; packaging, tests, macOS/Linux pending. See §6 Steps 1-3.
+**Read first:** `docs/adr/0001-xmake-conan-build-system.md` (the decision, incl. its amendment) and `conan/README.md` (dependency provisioning). `build-system-research.md` is the original cited comparison.
+
+> **Sections 2-4 below are the original 2026-08-06 proof record and have NOT been rewritten.** Several of their conclusions were overturned by later work — most importantly the §3.4 "needs a custom recipe" table (ten entries; the real answer is one) and §4's "nothing has been committed". Where §6 (Next steps) and §5 (Pitfalls) disagree with §2-4, **§5/§6 win** — they were corrected against actual build and link failures.
 
 ---
 
@@ -102,6 +104,8 @@ The scaffold's full `add_requires` set resolved on the first pass: boost/1.84.0,
 
 ### 3.4 ConanCenter version coverage vs project pins (what needs custom recipes)
 
+> **SUPERSEDED — this table is wrong.** It was built from ConanCenter's *listed* versions, but the registry still serves delisted ones: `opencascade/7.6.0`, `openssl/1.1.1w`, `freetype/2.12.1`, `openexr/2.5.5` and `cereal/1.3.0` are all exact hits. Four of the "custom recipe" entries (OpenVDB, OpenCSG, OpenEXR, GLEW) turned out to serve only dead SLA-era code and were dropped entirely. Actual outcome: **two repo recipes**, both thin deltas over center (`opencascade` minus tcl/Draw; `wxwidgets` plus private headers, secretstore, debug-level 0, libsoup gating). See §6 Step 2 and `conan/README.md` for the real table. Always probe with `conan download <ref> -r conancenter --only-recipe` before writing a recipe.
+
 | Project dep (deps/*.cmake) | ConanCenter has | Action |
 |---|---|---|
 | wxWidgets 3.3.2 fork | 3.3.2 vanilla | **Passed with vanilla + custom flags**; fork-patch equivalence still unproven |
@@ -129,7 +133,12 @@ The scaffold's full `add_requires` set resolved on the first pass: boost/1.84.0,
 
 ## 4. Current repo state
 
-Untracked (uncommitted — nothing has been committed):
+> **SUPERSEDED.** Everything below is committed on `pnp/main`:
+> `2f43521169` (step 1: profiles + lockfile), `52b616d69d` (step 2: consolidated graph),
+> `85507d9c1e` (3a: libslic3r), `c419a2ff8c` (3b: libslic3r_gui), `fb46ce5729` (3c: exe links).
+> Current layout: `xmake.lua`, `conan/{conanfile.py,conan.lock,profile_host.txt,profile_build.txt,README.md,recipes/{opencascade,wxwidgets}}`, `docs/{BUILD_SYSTEM_HANDOFF.md,adr/0001-*.md}`, `build-system-research.md`.
+
+Original 2026-08-06 record:
 
 ```
 ?? build-system-research.md      (306 lines — cited research report)
@@ -152,8 +161,15 @@ Key CMake sources to port from (already read):
 - `src/slic3r/CMakeLists.txt` — ~700-file `SLIC3R_GUI_SOURCES` list (replace with glob), `SLIC3R_CURRENTLY_COMPILING_GUI_MODULE`, `wxDEBUG_LEVEL=0`, `GeneratedConfig.hpp`; links wx, glfw, libcurl, OpenSSL, hidapi, mdns, imgui, imguizmo, minilzo, libvgcode, md4c-html, glad, OpenGL; Windows: `Advapi32`, `Setupapi`, WebView2 include (`deps/WebView2/include`).
 - `src/CMakeLists.txt` — exe `OrcaSlicer` (SHARED on Windows, the shim `OrcaSlicer_app_gui` WIN32 + `.rc`), resources junction/symlink, DLL copying, PNP POST_BUILD staging, install rules.
 
-**Orphan files the glob MUST exclude** (dead upstream code, in tree but not in CMake):
-`src/libslic3r/Circle.cpp` (top-level; `Geometry/Circle.cpp` is live), `src/libslic3r/ExPolygonCollection.cpp`, `src/libslic3r/JumpPointSearch.cpp`, `src/libslic3r/TryCatchSignalSEH.cpp` (it's `#include`d from `TryCatchSignal.cpp` under `_MSC_VER`). Already handled in the scaffold's `libslic3r_sources()`.
+**Orphan files the glob MUST exclude** (dead upstream code, in tree but in no CMakeLists) — verified 2026-08-07 by link errors, not by inspection:
+
+- `src/libslic3r/`: `ExPolygonCollection.cpp`, `JumpPointSearch.cpp`, `TryCatchSignalSEH.cpp` (`#include`d from `TryCatchSignal.cpp` under `_MSC_VER`), `GCodeSender.cpp` (commented out upstream — pre-1.70 boost::asio), `OpenVDBUtils.cpp` (CMake compiles it only `if (TARGET OpenVDB::openvdb)`; OpenVDB is not provisioned).
+- `src/slic3r/GUI/`: `Gizmos/GLGizmoAdvancedCut.cpp`, `Gizmos/GLGizmoFaceDetector.cpp` (commented out, CMakeLists:141), `Gizmos/GLGizmoText.cpp` (commented out, CMakeLists:179), `SysInfoDialog.cpp`, `WebUpdatePlugin.cpp`.
+
+**Two claims in earlier revisions of this doc were WRONG — do not reintroduce them:**
+
+1. `src/libslic3r/Circle.cpp` is **LIVE** (`src/libslic3r/CMakeLists.txt:52`). It defines `Slic3r::ArcSegment`. `Geometry/Circle.cpp` (line 148) is a *separate* live file, not a replacement. Excluding it costs 5 unresolved externals at exe link.
+2. `src/slic3r/GUI/DeviceCore/**` (30 files) and `GUI/DeviceTab/**` (7 files) are **LIVE**. They look absent from `src/slic3r/CMakeLists.txt` because their own CMakeLists `list(APPEND SLIC3R_GUI_SOURCES ...)` and are pulled in by `add_subdirectory` (lines 699-700). Any "is this file in the CMake list?" audit must resolve `add_subdirectory` recursively, or it will report ~37 false orphans.
 
 ---
 
@@ -200,11 +216,34 @@ Key discoveries that rewrote this step (details in `conan/README.md` + ADR amend
 6. Debug builds need a debug host profile (MDd deps) — not yet set up; `pnp.conan` warns in debug mode.
 7. **tcl is unbuildable under VS 2026** (its `nmakehlp`/`rules.vc` bootstrap fails for 8.6.10 AND 8.6.13; no center binaries exist for compiler.version=195). tcl only served OCCT's Draw test harness → repo recipe `conan/recipes/opencascade/` = center 7.6.0 recipe with tcl/tk removed + `BUILD_MODULE_Draw=OFF` (deps/OCCT likewise built Draw-less without tcl). Repo recipes pin `version` in-recipe; `pnp.conan` auto-exports them before installing. GOTCHA: `conan lock create` auto-loads the stale `conan.lock` sitting beside the conanfile — pass `--lockfile=""` after changing a repo recipe or the old recipe revision stays pinned.
 
-### Step 3 — Port the full target graph
-- `libslic3r`: already scaffolded; compile it (the long pole, ~141 files, heavy templates). Expect `libslic3r_cgal` frounding-math handling, `-DUSE_TBB`, OCCT/OpenCV/OpenVDB link adjustments, MSVC `Psapi.lib`/`bcrypt.lib`.
-- `libslic3r_gui`: replace the 700-file list with the GUI glob (already scaffolded); WebView2 include dir exists at `deps/WebView2/include`.
-- `OrcaSlicer` exe + `OrcaSlicer_app_gui` shim: `.rc`/`.manifest`/`Info.plist` configfiles, `/MANIFEST:NO`, `/DEBUG` in release, DLL copying.
+### Step 3 — Port the full target graph — BUILD+LINK DONE 2026-08-07 (runtime unverified)
+
+`xmake build OrcaSlicer` exits 0 on Windows x64: `libslic3r` (3a, commit `85507d9c1e`), `libslic3r_gui` (3b, `c419a2ff8c`), `OrcaSlicer.exe` (3c, `fb46ce5729`), with `pnp_cli.exe` + `modules/` and the TBB/hwloc DLLs staged beside it.
+
+**Vendored in-tree targets ported** (from `deps_src/*/CMakeLists.txt` and `src/*/CMakeLists.txt`): admesh, clipper, Clipper2, glu-libtess, mcut, miniz, qoi, semver, glad, libvgcode, imgui, imguizmo, hidapi, mdns, minilzo, md4c, plus `libslic3r_cgal`. `libnest2d` is folded into `libslic3r` (its CMake target links back to libslic3r — cyclic for xmake `add_deps`).
+
+**Dependency-config bugs the link exposed** (all fixed; CMake build was ground truth):
+- `boost/*:header_only=True` was wrong — the app links 13 compiled components (`CMakeLists.txt:618`). This settles ADR open question 2's sibling.
+- wx must be built with `wxBUILD_DEBUG_LEVEL=0` to match the app's `-DwxDEBUG_LEVEL=0` (`src/slic3r/CMakeLists.txt:815`), else `LNK2005` on `wxFormatString::Validate`.
+- ConanCenter's wx recipe requires `libsoup` for *any* `webview=True`; it only backs the GTK/WebKit backend, so Windows got `soup-3.0` in its link line (`LNK1181`). Gated to Linux/FreeBSD in the repo recipe.
+- `Synchronization.lib` must be linked: boost::log's `atomic_based_event` uses `WaitOnAddress`/`WakeByAddressSingle` under `BOOST_USE_WINAPI_VERSION=0x602`; conan's boost recipe omits it from `system_libs`.
+
+**MSVC/toolchain gotchas** (each cost a build cycle):
+- `set_languages("c99", ...)` makes xmake compile `.c` as C++ (`-TP`) on MSVC — breaks K&R sources (mcut's `shewchuk.c`). Use `c11`.
+- CMake's MSVC defaults define `WIN32`/`_WINDOWS`; xmake does not. Sources use `#if WIN32` → `C1017`.
+- `deps_src/agg` must NOT be on the include path: its `VERSION` file shadows the C++20 `<version>` header on case-insensitive filesystems. Its only user is removed SLA code.
+- `CGAL_DO_NOT_USE_MPZF` (upstream's MSVC define) is deliberately NOT set: it selects `Quotient<Gmpzf>`, whose boost-1.84 mixed comparisons hit a `cl >= 19.40` `C2666` regression. The default `Mpzf` path compiles. **Behavior gate: mesh-boolean tests.**
+- `/bigobj` is required (MeshBoolean, GUI TUs); set globally.
+- nanosvg comes from `deps_src/nanosvg` (SoftFever fork — needs `nsvgRasterizeXY`), not ConanCenter.
+- opencv needs `imgcodecs` (`cv::imread` in `SkipPartCanvas`), and every jpeg consumer in the graph (wx, libtiff, opencv) must agree on `libjpeg-turbo` or conan raises a `provides` conflict.
+- **Parallelism**: `-j` default OOM-killed this machine mid-build repeatedly; `-j2`/`-j4` are stable. Builds are incremental, so a killed run resumes.
+
+**Remaining in Step 3:**
+- Runtime smoke test — **not done**. The exe launches but does not exit: it is built as a console binary, while CMake builds `OrcaSlicer` as a SHARED lib plus a WIN32 `OrcaSlicer_app_gui` shim (`src/CMakeLists.txt`). Port the shim, then verify GUI launch (and the wx fork-patch question, ADR open question 1).
+- `.rc` compilation (generated at `build/config/OrcaSlicer.rc`, not yet fed to `add_files`), `.manifest`, `Info.plist`, `/DEBUG` in release.
+- `resources/` staging beside the exe (CMake makes a junction/symlink).
 - Tests: port `tests/` Catch2 to `xmake test` (keep ctest working in parallel).
+- `unix/fhs.hpp` is generated with the portable layout on all platforms; Linux packaging will need the real FHS values (CMake uses `#cmakedefine`, which `add_configfiles` cannot render).
 
 ### Step 4 — PNP integration (already scaffolded, dist verified present)
 - `xmake pnp` → `cargo xtask dist`; `after_build` on `OrcaSlicer` copies `pnp_cli` + `modules/` beside the exe (mirrors `src/CMakeLists.txt:263-278`).
@@ -242,7 +281,7 @@ conan list "*:*"
 ## 8. Open questions for the next session
 
 1. **Fork-patch equivalence:** does the app need the 12 SoftFever wxWidgets commits (dark theme etc.) or does vanilla 3.3.2 + the custom flags suffice? Decide via a GUI smoke test (launch, dark theme, dialogs). If patches are needed, add a repo recipe under `conan/recipes/` with conandata patches rather than a fork.
-2. ~~Static vs dynamic runtime~~ — RESOLVED: /MD everywhere (the CMake build never set /MT; see Step 2.5).
+2. ~~Static vs dynamic runtime~~ — RESOLVED: /MD everywhere (the CMake build never set /MT; see Step 2.5). Boost is compiled (not header-only) and static — see Step 3.
 3. ~~TBB version~~ — RESOLVED: onetbb/2021.7.0 shared, behavior gate at runtime.
 4. **libnoise:** SoftFever fork vs center 1.0.0 — behavior gate.
 5. **OCCT static-on-Windows divergence:** deps/ built OCCT Shared on Windows; conan builds it static everywhere. Gate at STEP/3MF import smoke test.
