@@ -15,7 +15,8 @@
 --       orca-slicer.exe launcher — GUI launches on Windows x64
 --   [x] tests: 7 Catch2 suites via `xmake test` (all passing)
 --   [ ] macOS/Linux ports
---   [ ] packaging parity (installers, portable dir)
+--   [x] portable package dir (`xmake package`)
+--   [ ] installers (NSIS/mac/linux), then CMake cutover
 -- CMake and deps/ remain authoritative until parity.
 
 set_project("OrcaSlicer")

@@ -1,7 +1,7 @@
 # Technical Handoff: Xmake + Conan Build System Migration
 
 **Date:** 2026-08-06, updated 2026-08-07
-**Status:** Windows x64 **builds, launches, and passes its test suite** — `xmake` produces `orca-slicer.exe` + `OrcaSlicer.dll` with resources and the PNP backend staged, the GUI comes up, and `xmake test` runs all 7 Catch2 suites green. Packaging and macOS/Linux pending. See §6 Steps 1-3.
+**Status:** Windows x64 **builds, launches, passes its test suite, and packages** — `xmake` produces `orca-slicer.exe` + `OrcaSlicer.dll` with resources and the PNP backend staged, the GUI comes up, and `xmake test` runs all 7 Catch2 suites green. Packaging and macOS/Linux pending. See §6 Steps 1-3.
 **Read first:** `docs/adr/0001-xmake-conan-build-system.md` (the decision, incl. its amendment) and `conan/README.md` (dependency provisioning). `build-system-research.md` is the original cited comparison.
 
 > **Sections 2-4 below are the original 2026-08-06 proof record and have NOT been rewritten.** Several of their conclusions were overturned by later work — most importantly the §3.4 "needs a custom recipe" table (ten entries; the real answer is one) and §4's "nothing has been committed". Where §6 (Next steps) and §5 (Pitfalls) disagree with §2-4, **§5/§6 win** — they were corrected against actual build and link failures.
@@ -264,7 +264,10 @@ Measured (2026-08-07): 7/7 passed in 43.2s; libslic3r 48717 assertions / 139 cas
 - **Verified:** `pinch_n_print_cli/target/dist/` already contains `pnp_cli.exe` + `modules/`, so the `after_build` staging can be tested immediately.
 
 ### Step 5 — Packaging parity, then cutover
-- Portable dir first (exe + resources + dlls + pnp_cli + modules), then NSIS (Windows) and mac/linux packages, then delete CMake only after parity.
+- **5a — portable dir: DONE 2026-08-07 (commit `c73f417659`).** `xmake package` assembles `build/package/OrcaSlicer_<version>_<plat>_<arch>/` mirroring the Windows install layout (`CMakeLists.txt:934-975`, `src/CMakeLists.txt:295-302`): binaries + runtime DLLs + MSVC CRT + `LICENSE.txt` at the root, `resources/` and `modules/` beside them. Measured: 353 MB, 2 exes + 16 DLLs; the packaged tree launches standalone.
+  - Ship an **explicit** exe list, never a `*.exe` glob — the build dir also holds the 7 test suites, and stale artifacts survive there (an `OrcaSlicer.exe` from before `OrcaSlicer` became a shared library was picked up on the first attempt).
+  - The MSVC CRT must be copied from `VCToolsRedistDir` (CMake uses `InstallRequiredSystemLibraries`): the app is built `/MD`, so without it the portable tree only runs where the VC++ runtime is already installed. The task warns if it cannot find them.
+- **Remaining:** NSIS installer (Windows), mac/linux packages, then delete CMake only after parity.
 
 ---
 
