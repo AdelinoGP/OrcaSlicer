@@ -56,7 +56,12 @@ class OrcaPnpDeps(ConanFile):
             "wxUSE_DETECT_SM, wxUSE_WEBVIEW_IE, wxUSE_LIBSDL, wxUSE_XTEST, "
             "wxUSE_LIBTIFF, wxUSE_NANOSVG, wxUSE_LIBWEBP",
 
-        "boost/*:header_only": True,
+        # NOT header_only: the app links compiled boost (CMakeLists.txt:618 —
+        # system filesystem thread log log_setup locale regex chrono atomic
+        # date_time iostreams program_options nowide). The recipe's defaults
+        # build everything except graph_parallel/mpi/python.
+        "boost/*:header_only": False,
+        "boost/*:shared": False,
         "zlib/*:shared": False,
         "libpng/*:shared": False,
         "libjpeg-turbo/*:shared": False,

@@ -82,6 +82,12 @@ class wxWidgetsConan(ConanFile):
                "custom_disables": ""
     }
 
+    @property
+    def _webview_needs_libsoup(self):
+        # GTK/WebKit webview backend only; Windows uses Edge/WebView2 and
+        # macOS uses WKWebView.
+        return str(self.settings.os) in ("Linux", "FreeBSD")
+
     def export_sources(self):
         export_conandata_patches(self)
 
@@ -142,7 +148,11 @@ class wxWidgetsConan(ConanFile):
         self.requires("nanosvg/cci.20231025")
         if Version(self.version) >= "3.3.0":
             self.requires("libwebp/[>=1.6.0 <2]")
-        if self.options.webview:
+        # pnp repo recipe: libsoup backs the GTK/WebKit webview only. The
+        # center recipe requires it for any `webview=True`, so a Windows build
+        # (Edge/WebView2 backend) inherits `soup-3.0` in its link line and
+        # fails with LNK1181. Gate it on the platforms that actually use it.
+        if self.options.webview and self._webview_needs_libsoup:
             self.requires("libsoup/3.6.6")
 
     def validate(self):
@@ -195,6 +205,13 @@ class wxWidgetsConan(ConanFile):
         if Version(self.version) >= "3.3.0":
             tc.cache_variables["wxUSE_LIBWEBP"] = "sys"
 
+        # pnp repo recipe: build wx with assertions compiled out, matching the
+        # app's -DwxDEBUG_LEVEL=0 (src/slic3r/CMakeLists.txt:815) and what
+        # deps/wxWidgets/wxWidgets.cmake:34 passed. Without this the header
+        # emits out-of-line copies of functions wxbase already exports
+        # (wxFormatString::Validate -> LNK2005).
+        tc.cache_variables["wxBUILD_DEBUG_LEVEL"] = "0"
+
         # wxWidgets features
         # pnp repo recipe: the center recipe gates secretstore on libsecret and
         # removes the option off-Linux, silently disabling it on Windows/macOS
@@ -246,7 +263,7 @@ class wxWidgetsConan(ConanFile):
             deps.set_property("xkbcommon", "cmake_additional_variables_prefixes", ["XKBCOMMON",])
         if self.options.get_safe("secretstore"):
             deps.set_property("libsecret", "cmake_file_name", "LIBSECRET")
-        if self.options.webview:
+        if self.options.webview and self._webview_needs_libsoup:
             deps.set_property("libsoup", "cmake_file_name", "LIBSOUP")
         deps.generate()
 
