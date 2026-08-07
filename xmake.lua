@@ -16,8 +16,21 @@
 --   [x] tests: 7 Catch2 suites via `xmake test` (all passing)
 --   [ ] macOS/Linux ports
 --   [x] portable package dir (`xmake package`)
---   [ ] installers (NSIS/mac/linux), then CMake cutover
+--   [x] Windows NSIS installer (`xmake pack -f nsis`) — verified: silent
+--       install, 64-bit registry view, launch, upgrade-in-place, uninstall
+--   [ ] macOS/Linux installers, then CMake cutover
 -- CMake and deps/ remain authoritative until parity.
+--
+-- Build prerequisite for `xmake pack -f nsis`: NSIS *with the UAC plugin*.
+-- xmake's makensis probe (plugins/pack/nsis/main.lua:31-56) compiles a script
+-- that !includes UAC.nsh, so a stock NSIS install is rejected even though the
+-- specfile here deliberately does not use UAC. See docs/BUILD_SYSTEM_HANDOFF.md.
+
+-- xpack() (installer packaging) is a builtin include, not a core interface
+includes("@builtin/xpack")
+-- shared shipping-layout module, imported as pnp.layout by the package task
+-- and the installer
+add_moduledirs("xmake/modules")
 
 set_project("OrcaSlicer")
 set_version("2.5.0-pnp")
@@ -727,88 +740,99 @@ task_end()
 
 -- ------------------------------------------------------------- packaging
 
--- xmake package -> self-contained portable directory (ADR-0001 step 5:
--- portable dir first, installers after). Mirrors the Windows install layout
--- in CMakeLists.txt:934-975 and src/CMakeLists.txt:295-302:
---   .           orca-slicer.exe, OrcaSlicer.dll, runtime DLLs, pnp_cli, LICENSE
---   ./resources contents of resources/
---   ./modules   contents of the pnp dist modules/
+-- xmake package -> self-contained portable directory (ADR-0001 step 5).
+-- The layout itself lives in xmake/modules/pnp/layout.lua so the installer
+-- ships exactly the same tree; see that file for the CMake parity mapping.
 task("package")
     on_run(function ()
-        import("core.project.config")
-        import("core.project.project")
-        config.load()
-
-        local bin_dir = path.join(config.builddir(), config.plat(), config.arch(),
-            config.mode() or "release")
-        assert(os.isdir(bin_dir), "package: %s not found — run `xmake` first", bin_dir)
-
-        local name = "OrcaSlicer_2.5.0-pnp_" .. config.plat() .. "_" .. config.arch()
-        local dest = path.join(config.builddir(), "package", name)
-        os.tryrm(dest)
-        os.mkdir(dest)
-
-        -- Runtime libraries, then the two shipped executables by name.
-        -- Deliberately NOT a *.exe glob: the build dir also holds the test
-        -- suites and can hold stale artifacts (e.g. an OrcaSlicer.exe left
-        -- over from before OrcaSlicer became a shared library).
-        local libpat = config.plat() == "windows" and "*.dll"
-            or (config.plat() == "macosx" and "*.dylib" or "*.so*")
-        for _, file in ipairs(os.files(path.join(bin_dir, libpat))) do
-            os.vcp(file, path.join(dest, path.filename(file)))
-        end
-        local exe = config.plat() == "windows" and ".exe" or ""
-        for _, name in ipairs({"orca-slicer" .. exe, "pnp_cli" .. exe}) do
-            local src = path.join(bin_dir, name)
-            if os.isfile(src) then
-                os.vcp(src, path.join(dest, name))
-            elseif name:startswith("orca-slicer") then
-                raise("package: %s not found — run `xmake` first", src)
-            end
-        end
-
-        -- resources: copy the real tree, not the build tree's symlink
-        os.vcp(path.join(os.projectdir(), "resources"), path.join(dest, "resources"))
-
-        -- pnp backend modules (the CLI itself is already covered by *.exe)
-        local modules = path.join(bin_dir, "modules")
-        if os.isdir(modules) then
-            os.vcp(modules, path.join(dest, "modules"))
-        end
-
-        os.vcp(path.join(os.projectdir(), "LICENSE.txt"), path.join(dest, "LICENSE.txt"))
-
-        -- MSVC runtime: the app is built /MD, so a clean machine needs the
-        -- CRT beside the exe (CMake does this via
-        -- InstallRequiredSystemLibraries, CMakeLists.txt:936-938)
-        if config.plat() == "windows" then
-            local msvc = import("core.tool.toolchain").load("msvc",
-                {plat = config.plat(), arch = config.arch()})
-            local vcvars = msvc and msvc:config("vcvars")
-            local redist_root = vcvars and vcvars.VCToolsRedistDir
-            local copied = 0
-            if redist_root then
-                local arch = config.arch() == "x64" and "x64" or config.arch()
-                for _, dir in ipairs(os.dirs(path.join(redist_root, arch, "Microsoft.VC*.CRT"))) do
-                    for _, dll in ipairs(os.files(path.join(dir, "*.dll"))) do
-                        os.vcp(dll, path.join(dest, path.filename(dll)))
-                        copied = copied + 1
-                    end
-                end
-            end
-            if copied == 0 then
-                wprint("package: MSVC redistributable DLLs not found; the portable " ..
-                       "directory will only run where the VC++ runtime is installed")
-            end
-        end
-
-        print("package: %s", dest)
+        import("pnp.layout")
+        print("package: %s", layout.assemble())
     end)
     set_menu {
         usage = "xmake package",
         description = "Assemble a self-contained portable directory"
     }
 task_end()
+
+-- xmake pack -f nsis -> Windows installer, at parity with the CPack/NSIS
+-- installer that CMakeLists.txt:978-1012 produced.
+--
+-- Driven through xmake's nsis backend but with a PROJECT-OWNED specfile: the
+-- stock template (xmake/scripts/xpack/nsis/makensis.nsi) cannot express this
+-- installer — no shortcuts, an unconditional PATH section CPack deliberately
+-- disabled, per-user UAC via a plugin stock NSIS does not ship, and a
+-- VIProductVersion that makensis rejects for a non-numeric version. The
+-- divergences are enumerated at the top of installer/OrcaSlicer.nsi.
+xpack("OrcaSlicer")
+    set_formats("nsis")
+    set_title("OrcaSlicer")
+    set_description("Orca Slicer is an open source slicer for FDM printers")
+    set_homepage("https://github.com/OrcaSlicer/OrcaSlicer")
+    -- CPACK_PACKAGE_VENDOR; the specfile writes this as the registry Publisher
+    set_company("SoftFever")
+    -- Split version: xpack feeds PACKAGE_VERSION_{MAJOR,MINOR,ALTER} to the
+    -- numeric NSIS version resources and PACKAGE_VERSION_BUILD ("pnp") to the
+    -- display string. set_version("2.5.0-pnp") would not parse as semver here.
+    set_version("2.5.0", {build = "pnp"})
+    set_specfile("installer/OrcaSlicer.nsi")
+    set_iconfile("resources/images/OrcaSlicer.ico")
+    set_licensefile("LICENSE.txt")
+    -- CPACK_NSIS_INSTALLED_ICON_NAME "$INSTDIR\orca-slicer.exe"
+    set_nsis_displayicon("orca-slicer.exe")
+
+    on_load(function (package)
+        import("pnp.layout")
+        -- CPACK_PACKAGE_FILE_NAME + the _x64/_arm64 suffix from
+        -- CMakeLists.txt:987-993
+        package:set("basename", "OrcaSlicer_Windows_Installer_V" ..
+            layout.version_full() .. "_" .. package:arch())
+    end)
+
+    before_package(function (package)
+        import("pnp.layout")
+        -- Stage the same tree `xmake package` produces, so the portable
+        -- directory and the installed directory cannot diverge.
+        layout.assemble()
+        -- The nsis backend only copies the template when the generated .nsi is
+        -- absent (plugins/pack/nsis/main.lua:272-275), so a stale substituted
+        -- copy from a previous run would silently win. Drop it.
+        os.tryrm(path.join(package:builddir(), package:basename() .. ".nsi"))
+    end)
+
+    -- Emit directory-level File /r commands rather than one File per staged
+    -- file: add_installfiles would expand resources/ into thousands of
+    -- individual File/Delete lines in the .nsi.
+    on_installcmd(function (package, batchcmds)
+        import("pnp.layout")
+        batchcmds:cp(path.join(layout.staging_dir(), "*"), package:installdir(),
+            {rootdir = layout.staging_dir()})
+    end)
+
+    on_uninstallcmd(function (package, batchcmds)
+        import("pnp.layout")
+        for _, item in ipairs(os.filedirs(path.join(layout.staging_dir(), "*"))) do
+            local dst = path.join(package:installdir(), path.filename(item))
+            if os.isdir(item) then
+                batchcmds:rmdir(dst)
+            else
+                batchcmds:rm(dst)
+            end
+        end
+    end)
+
+    after_package(function (package)
+        -- CPACK_PACKAGE_CHECKSUM SHA256: CPack emitted a sidecar digest next to
+        -- the installer; xmake's nsis backend does not.
+        -- `hash` is a sandbox global here, not an importable module.
+        local outputfile = package:outputfile()
+        if os.isfile(outputfile) then
+            local digest = hash.sha256(outputfile)
+            io.writefile(outputfile .. ".sha256",
+                digest .. " *" .. path.filename(outputfile) .. "\n")
+            print("checksum: %s.sha256", path.filename(outputfile))
+        end
+    end)
+xpack_end()
 
 -- ------------------------------------------------------------------- tests
 -- Catch2 suites ported from tests/CMakeLists.txt. Each suite is a binary;
