@@ -117,6 +117,17 @@ jobs:
         shell: bash
         run: xmake pack -f nsis
 
+      # Unsigned: this fork has no Apple Developer identity, so there is no
+      # codesign / notarytool / stapler step. macOS will require a
+      # right-click-Open on first launch. Single-arch by design — the upstream
+      # universal binary came from build_release_macos.sh -a universal, which
+      # the cutover removed; a lipo combine is a later addition, not a
+      # prerequisite for getting one arch to compile.
+      - name: Package (dmg)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: xmake dmg
+
       - name: Upload portable package
         uses: actions/upload-artifact@v4
         with:
@@ -132,4 +143,12 @@ jobs:
           path: |
             build/xpack/OrcaSlicer/*.exe
             build/xpack/OrcaSlicer/*.sha256
+          if-no-files-found: error
+
+      - name: Upload dmg
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: OrcaSlicer-macOS-${{ inputs.arch }}-dmg
+          path: build/dist/*.dmg
           if-no-files-found: error

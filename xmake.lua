@@ -911,8 +911,11 @@ MimeType=model/stl;application/vnd.ms-3mfdocument;application/prs.wavefront-obj;
             os.vcp(metainfo, path.join(dst, "com.orcaslicer.OrcaSlicer.appdata.xml"))
         end
 
-        local out = path.join(config.builddir(), "package",
+        -- final artifacts go to build/dist, never build/package: the latter
+        -- holds staged trees, and CI uploads those by glob
+        local out = path.join(config.builddir(), "dist",
             "OrcaSlicer_Linux_V" .. layout.version_full() .. ".AppImage")
+        os.mkdir(path.directory(out))
         os.vrunv(appimagetool.program, {appdir, out}, {envs = {ARCH = os.arch()}})
         print("appimage: %s", out)
     end)
@@ -938,12 +941,25 @@ task("dmg")
         assert(hdiutil, "dmg: hdiutil not found")
 
         local staged = layout.assemble()
-        local out = path.join(config.builddir(), "package",
+
+        -- drag-to-install affordance: the old CI made the same symlink before
+        -- calling hdiutil (build_orca.yml "Create DMG without notary")
+        local applications = path.join(staged, "Applications")
+        if not os.exists(applications) then
+            os.ln("/Applications", applications)
+        end
+
+        -- final artifacts go to build/dist, never build/package: the latter
+        -- holds staged trees, and CI uploads those by glob
+        local out = path.join(config.builddir(), "dist",
             "OrcaSlicer_Mac_" .. config.arch() .. "_V" .. layout.version_full() .. ".dmg")
+        os.mkdir(path.directory(out))
         os.tryrm(out)
         os.vrunv(hdiutil.program, {"create", "-volname", "OrcaSlicer",
             "-srcfolder", staged, "-ov", "-format", "UDZO", out})
         print("dmg: %s", out)
+        -- NOT signed or notarized: this fork has no Apple Developer identity,
+        -- so macOS will require a right-click-Open on first launch.
     end)
     set_menu {
         usage = "xmake dmg",
