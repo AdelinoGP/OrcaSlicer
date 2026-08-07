@@ -1,11 +1,23 @@
 #!/bin/bash
 
 # OrcaSlicer Flatpak Build Script
-# This script builds and packages OrcaSlicer as a Flatpak package locally
-# Based on the GitHub Actions workflow in .github/workflows/build_all.yml
+# Builds and packages OrcaSlicer as a Flatpak locally.
+#
+# UNVERIFIED: never run since the xmake migration. flatpak-builder was not
+# available on the machine the cutover was done on.
+#
+# The heavy lifting is in scripts/flatpak/com.orcaslicer.OrcaSlicer.yml, which
+# builds with xmake + Conan and therefore needs build-time network access —
+# see the warning at the top of that file. This script only drives
+# flatpak-builder and bundles the result.
 
 set -e
 SECONDS=0
+
+# Every path below is relative to the repository root (the manifest, version.inc,
+# the build dirs). This script used to live there; keep that contract now that it
+# sits in scripts/flatpak/.
+cd "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # Colors for output
 RED='\033[0;31m'
@@ -175,10 +187,9 @@ fi
 echo -e "${YELLOW}Checking build dependencies...${NC}"
 MISSING_DEPS=()
 
-if ! command -v cmake &> /dev/null; then
-    MISSING_DEPS+=("cmake")
-fi
-
+# NOTE: xmake and Conan are NOT checked here — unlike cmake under the old
+# build, they are not host tools. The manifest installs both inside the
+# flatpak sandbox, because that is where the build actually runs.
 if ! command -v ninja &> /dev/null && ! command -v make &> /dev/null; then
     MISSING_DEPS+=("ninja or make")
 fi
@@ -189,8 +200,8 @@ fi
 
 if [ ${#MISSING_DEPS[@]} -ne 0 ]; then
     echo -e "${RED}Error: Missing required build dependencies: ${MISSING_DEPS[*]}${NC}"
-    echo "On Ubuntu/Debian: sudo apt install cmake ninja-build pkg-config"
-    echo "On Fedora: sudo dnf install cmake ninja-build pkgconfig"
+    echo "On Ubuntu/Debian: sudo apt install ninja-build pkg-config"
+    echo "On Fedora: sudo dnf install ninja-build pkgconfig"
     exit 1
 fi
 
@@ -234,7 +245,9 @@ fi
 # Cleanup build directory if requested
 if [[ "$CLEANUP" == true ]]; then
     echo -e "${YELLOW}Cleaning up flatpak-specific build directories...${NC}"
-    rm -rf deps/build_flatpak build_flatpak
+    # deps/build_flatpak is gone with the CMake superbuild; the xmake build
+    # happens inside the sandbox, so there is no host-side build dir to clear.
+    rm -rf build_flatpak
 
     echo -e "${YELLOW}Cleaning up flatpak build directories...${NC}"
     rm -rf "$BUILD_DIR"
@@ -247,7 +260,7 @@ if [[ "$CLEANUP" == true ]]; then
         echo -e "${BLUE}Preserving build cache at: $CACHE_DIR${NC}"
     fi
     
-    echo -e "${BLUE}Note: Host build directories (deps/build, build) are preserved${NC}"
+    echo -e "${BLUE}Note: the host xmake build directory (build/) is preserved${NC}"
 fi
 
 # Create build directory
