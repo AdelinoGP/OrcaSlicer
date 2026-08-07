@@ -1,0 +1,46 @@
+# Entry point for CI. The previous caller was dropped along with the other
+# non-build workflows (commit 485dabddae), which left build_orca.yml
+# unreachable; this restores a trigger.
+#
+# Only the Windows leg is verified. macOS and Linux run with
+# continue-on-error so the gap is visible without permanently reporting a
+# failed pipeline — they have never been built with xmake, and their Conan
+# lockfiles (conan/conan-macosx.lock, conan/conan-linux.lock) do not exist
+# yet, so those legs resolve dependencies unlocked.
+
+name: Build All
+
+on:
+  push:
+    branches: [pnp/main, main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows_x64:
+    name: Windows x64
+    uses: ./.github/workflows/build_orca.yml
+    with:
+      os: windows-latest
+      arch: x64
+      verified: true
+
+  linux_x64:
+    name: Linux x64 (unverified)
+    uses: ./.github/workflows/build_orca.yml
+    with:
+      os: ubuntu-latest
+      arch: x64
+      verified: false
+
+  macos_arm64:
+    name: macOS arm64 (unverified)
+    uses: ./.github/workflows/build_orca.yml
+    with:
+      os: macos-latest
+      arch: arm64
+      verified: false
