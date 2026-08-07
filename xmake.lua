@@ -8,9 +8,9 @@
 -- Migration status (per ADR-0001):
 --   [x] wxWidgets 3.3.2 static proof (Windows x64, VS 2026, MSVC)
 --   [x] repo conan profiles (C++17, /MD parity) + enforced lockfile (conan/)
---   [x] full dependency set: ConanCenter + one repo recipe (opencascade
---       minus tcl/Draw); dead SLA-era deps dropped (openvdb, opencsg,
---       openexr, glew)
+--   [x] full dependency set: ConanCenter + two repo recipes (opencascade
+--       minus tcl/Draw, wxwidgets deltas); dead SLA-era deps dropped
+--       (openvdb, opencsg, openexr, glew)
 --   [x] target graph port: libslic3r, libslic3r_gui, OrcaSlicer.dll +
 --       orca-slicer.exe launcher — GUI launches on Windows x64
 --   [ ] tests port (tests/ Catch2 -> xmake test), macOS/Linux
