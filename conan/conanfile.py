@@ -67,16 +67,26 @@ class OrcaPnpDeps(ConanFile):
         "opencascade/*:shared": False,
         "opencascade/*:with_tk": False,
 
-        # OpenCV: app uses core + imgproc only (SkipPartCanvas, ObjColorUtils)
+        # OpenCV: app uses core + imgproc + imgcodecs (SkipPartCanvas uses
+        # cv::imread; ObjColorUtils uses core/imgproc)
         "opencv/*:shared": False,
         "opencv/*:imgproc": True,
+        "opencv/*:imgcodecs": True,
+        "opencv/*:with_png": True,
+        "opencv/*:with_jpeg": "libjpeg-turbo",  # align with the graph-wide jpeg
+        "opencv/*:with_tiff": False,
+        "opencv/*:with_webp": False,
+        "opencv/*:with_openexr": False,
+        "opencv/*:with_jpeg2000": False,
+        "opencv/*:with_avif": False,
+        "opencv/*:with_gdal": False,
+        "opencv/*:with_gdcm": False,
         "opencv/*:calib3d": False,
         "opencv/*:dnn": False,
         "opencv/*:features2d": False,
         "opencv/*:flann": False,
         "opencv/*:gapi": False,
         "opencv/*:highgui": False,
-        "opencv/*:imgcodecs": False,
         "opencv/*:ml": False,
         "opencv/*:objdetect": False,
         "opencv/*:photo": False,
@@ -114,7 +124,8 @@ class OrcaPnpDeps(ConanFile):
         # jpeg_mem_dest (turbo API)
         self.requires("libjpeg-turbo/3.0.2")
         self.requires("expat/2.8.2")
-        self.requires("nanosvg/cci.20231025")
+        # nanosvg: NOT from center — the code needs nsvgRasterizeXY() from the
+        # SoftFever fork, vendored at deps_src/nanosvg (header-only)
         self.requires("opencascade/7.6.0")
         self.requires("freetype/2.12.1")
         self.requires("openssl/1.1.1w")
@@ -142,12 +153,17 @@ class OrcaPnpDeps(ConanFile):
         import os
         from conan.tools.files import save
 
+        # two passes: dep-name lists may reference requirements whose binaries
+        # conan skipped (e.g. wx's nanosvg with wxUSE_NANOSVG disabled) — they
+        # have no graph entry and must be filtered out
+        emitted = {require.ref.name for require, _ in self.dependencies.host.items()}
         entries = []
         for require, dep in self.dependencies.host.items():
             name = require.ref.name
             info = dep.cpp_info.aggregated_components()
             try:
-                direct = [r.ref.name for r, _ in dep.dependencies.direct_host.items()]
+                direct = [r.ref.name for r, _ in dep.dependencies.direct_host.items()
+                          if r.ref.name in emitted]
             except Exception:
                 direct = []
             fields = [

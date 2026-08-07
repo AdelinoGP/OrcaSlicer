@@ -1,0 +1,7 @@
+patches:
+  3.3.2:
+  - patch_file: patches/0001-fix-wxgtk-without-wayland.patch
+sources:
+  3.3.2:
+    sha256: 50a28cb668de47b0e006cd6ebed8cf4f76c1cac6116fb3c978c44478219103f2
+    url: https://github.com/wxWidgets/wxWidgets/releases/download/v3.3.2/wxWidgets-3.3.2.tar.bz2

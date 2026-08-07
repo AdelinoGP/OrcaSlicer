@@ -347,6 +347,70 @@ target("semver")
     add_sysincludedirs("deps_src/semver", {public = true})
 target_end()
 
+target("glad")
+    set_kind("static")
+    add_files("src/glad/src/gl.c")
+    add_sysincludedirs("src/glad/include", {public = true})
+target_end()
+
+target("libvgcode")
+    set_kind("static")
+    add_files("src/libvgcode/src/**.cpp")
+    add_includedirs("src/libvgcode/src")
+    add_sysincludedirs("src/libvgcode/include", "src/libvgcode", "src", {public = true})
+    add_deps("glad")
+target_end()
+
+target("imgui")
+    set_kind("static")
+    add_files("deps_src/imgui/*.cpp")
+    -- both "imgui.h" and "imgui/imgui.h" include styles are used
+    add_sysincludedirs("deps_src/imgui", "deps_src", {public = true})
+    add_rules("pnp.conan")
+    set_values("pnp.conan.packages", "boost")
+target_end()
+
+target("imguizmo")
+    set_kind("static")
+    add_files("deps_src/imguizmo/ImGuizmo.cpp")
+    add_sysincludedirs("deps_src/imguizmo", {public = true})
+    add_deps("imgui")
+target_end()
+
+target("hidapi")
+    set_kind("static")
+    if is_plat("windows") then
+        add_files("deps_src/hidapi/win/hid.c")
+    elseif is_plat("macosx") then
+        add_files("deps_src/hidapi/mac/hid.c")
+    else
+        add_files("deps_src/hidapi/linux/hid.c")
+    end
+    add_includedirs("deps_src/hidapi")
+    add_sysincludedirs("deps_src/hidapi/include", {public = true})
+target_end()
+
+target("mdns")
+    set_kind("static")
+    add_files("deps_src/mdns/mdns.c", "deps_src/mdns/cxmdns.cpp")
+    add_sysincludedirs("deps_src/mdns", {public = true})
+    if is_plat("windows") then
+        add_syslinks("Iphlpapi", "Ws2_32", {public = true})
+    end
+target_end()
+
+target("minilzo")
+    set_kind("static")
+    add_files("deps_src/minilzo/*.c")
+    add_sysincludedirs("deps_src/minilzo", {public = true})
+target_end()
+
+target("md4c")
+    set_kind("static")
+    add_files("deps_src/md4c/src/*.c")
+    add_sysincludedirs("deps_src/md4c/src", {public = true})
+target_end()
+
 -- ------------------------------------------------------- libslic3r_cgal
 -- CGAL-using compilation units isolated so CGAL's rounding-math requirements
 -- do not propagate to the rest of libslic3r (mirrors src/libslic3r/CMakeLists
@@ -366,9 +430,9 @@ target("libslic3r_cgal")
     add_defines("USE_TBB", "TBB_USE_CAPTURED_EXCEPTION=0", "NOMINMAX")
     add_rules("pnp.conan")
     -- same package surface as libslic3r: its headers (EmbossShape, Point, ...)
-    -- pull cereal/nanosvg/etc. transitively
+    -- pull cereal etc. transitively
     set_values("pnp.conan.packages",
-        "cgal", "boost", "eigen", "cereal", "onetbb", "nanosvg",
+        "cgal", "boost", "eigen", "cereal", "onetbb",
         "zlib", "libpng", "opencascade", "opencv", "nlopt", "openssl")
     if not is_plat("windows") then
         add_cxxflags("-frounding-math")
@@ -433,7 +497,7 @@ target("libslic3r")
     add_rules("pnp.conan")
     set_values("pnp.conan.packages",
         "boost", "eigen", "cereal", "draco", "qhull", "cgal", "libnoise",
-        "zlib", "libpng", "libjpeg-turbo", "expat", "nanosvg",
+        "zlib", "libpng", "libjpeg-turbo", "expat",
         "opencascade", "opencv", "onetbb", "nlopt", "openssl")
 
     if is_plat("windows") then
@@ -456,21 +520,47 @@ target("libslic3r_gui")
         "src/slic3r/Utils/**.cpp",
         "src/dev-utils/BaseException.cpp",
         "src/dev-utils/StackWalker.cpp")
+    -- dead upstream code present in the tree but absent from the CMake
+    -- source list (keep in sync with src/slic3r/CMakeLists.txt; the full
+    -- 42-file diff was produced by comparing the glob against that list)
+    remove_files(
+        "src/slic3r/GUI/DeviceCore/**.cpp",
+        "src/slic3r/GUI/DeviceTab/uiAmsHumidityPopup.cpp",
+        "src/slic3r/GUI/DeviceTab/uiDeviceUpdateVersion.cpp",
+        "src/slic3r/GUI/DeviceTab/wgtDeviceNozzleRack.cpp",
+        "src/slic3r/GUI/DeviceTab/wgtDeviceNozzleRackNozzleItem.cpp",
+        "src/slic3r/GUI/DeviceTab/wgtDeviceNozzleRackUpdate.cpp",
+        "src/slic3r/GUI/DeviceTab/wgtDeviceNozzleSelect.cpp",
+        "src/slic3r/GUI/DeviceTab/wgtMsgBox.cpp",
+        "src/slic3r/GUI/Gizmos/GLGizmoAdvancedCut.cpp",
+        "src/slic3r/GUI/Gizmos/GLGizmoFaceDetector.cpp",
+        "src/slic3r/GUI/Gizmos/GLGizmoText.cpp",
+        "src/slic3r/GUI/SysInfoDialog.cpp",
+        "src/slic3r/GUI/WebUpdatePlugin.cpp")
     add_includedirs("src", "src/slic3r", "src/slic3r/GUI", {public = true})
+    add_includedirs("src/slic3r/Utils")  -- CMake: target_include_directories(... PRIVATE Utils)
     set_configdir("$(builddir)/config")
     add_configfiles("src/slic3r/GeneratedConfig.hpp.in",
         {filename = "GeneratedConfig.hpp", pattern = "@(.-)@", variables = generated_config_vars})
     add_includedirs("$(builddir)/config")
     add_defines("SLIC3R_CURRENTLY_COMPILING_GUI_MODULE", {private = true})
     add_defines("wxDEBUG_LEVEL=0", {public = true})
+    -- header-only vendored interfaces (deps_src root comes via libslic3r).
+    -- NOT deps_src/agg: its VERSION file shadows the C++20 <version> header
+    -- on case-insensitive filesystems, and agg's only user is removed SLA code.
+    add_sysincludedirs("deps_src/nlohmann", "deps_src/earcut",
+        "deps_src/fast_float", "deps_src/ankerl", "deps_src/stb_dxt",
+        "deps_src/hints")
     -- direct conan deps (libslic3r's public set propagates via add_deps)
     add_rules("pnp.conan")
     set_values("pnp.conan.packages",
-        "wxwidgets", "glfw", "libcurl", "opencv", "onetbb", "boost", "expat", "nanosvg")
+        "wxwidgets", "glfw", "libcurl", "opencv", "onetbb", "boost", "expat")
     add_deps("libslic3r")
+    add_deps("glad", "libvgcode", "imgui", "imguizmo", "hidapi", "mdns",
+        "minilzo", "md4c")
     if is_plat("windows") then
         add_includedirs("deps/WebView2/include", {public = true})
-        add_syslinks("Advapi32", "Setupapi")
+        add_syslinks("Advapi32", "Setupapi", "opengl32")
     end
 target_end()
 
