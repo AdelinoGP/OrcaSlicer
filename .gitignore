@@ -49,3 +49,6 @@ internal_docs/
 # Python bytecode
 __pycache__/
 *.pyc
+
+# xmake local config cache
+.xmake/

@@ -1,0 +1,8 @@
+# Build-context profile (tool_requires: cmake, ninja, msys2 autotools chain, ...).
+# Tools do not need the app's C++ standard or runtime; platform defaults suffice.
+# Keeping this at `include(default)` preserves the already-built tool packages in
+# the conan cache when host settings change.
+include(default)
+
+[conf]
+tools.cmake.cmaketoolchain:generator=Ninja

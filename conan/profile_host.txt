@@ -1,0 +1,33 @@
+# Host profile for Orca(pnp_gui) — the settings every dependency must be built with.
+# KEEP IN SYNC with the `conan_base` configs in xmake.lua: xmake generates its own
+# per-package profiles and applies these same settings as `-s` / `-c` CLI overrides
+# (xmake's conan integration cannot consume external profile files or lockfiles).
+# This file is for direct conan workflows: `conan lock create`, CI cache warming,
+# recipe development under conan/recipes/.
+include(default)
+
+[settings]
+# The app is C++17; xmake's generated MSVC profile hardcodes cppstd=14, overridden there.
+compiler.cppstd=17
+{% if platform.system() == "Windows" %}
+# SLIC3R_STATIC=1 semantics: static MSVC runtime (/MT). Debug builds use /MTd
+# (runtime_type=Debug) — xmake maps this from its `runtimes = "MTd"` config.
+# NOTE: the full-app static link is unproven (handoff §8.2); revisit after the
+# libslic3r link test.
+compiler.runtime=static
+compiler.runtime_type=Release
+{% endif %}
+
+[conf]
+# VS 18 2026 generator is unknown to cmake < 4 (pinned by e.g. the wxWidgets recipe);
+# Ninja works on every cmake version and platform. See handoff §5.1.
+tools.cmake.cmaketoolchain:generator=Ninja
+
+[replace_requires]
+# cgal/5.6.3's recipe pins boost/1.83.0 and eigen/3.4.0; the project pins 1.84.0
+# and 5.0.1 (deps/ exact matches). Steer every graph to the single project-wide
+# versions. NOTE: xmake's isolated per-package installs do NOT see these replaces —
+# cgal's own graph still resolves the older pins there (header-only; the duplicate
+# include-path hazard is tracked in the handoff for the target-port step).
+boost/*: boost/1.84.0
+eigen/*: eigen/5.0.1
