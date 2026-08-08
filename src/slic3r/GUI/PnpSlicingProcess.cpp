@@ -28,6 +28,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <exception>
 #include <map>
 #include <string>
@@ -208,6 +209,8 @@ bool PnpSlicingProcess::start()
 	job.plate_idx             = m_current_plate->get_index();
 	job.output_path           = m_current_plate->get_tmp_gcode_path();
 	job.estimated_layer_count = this->estimate_layer_count();
+	// ADR-0002: plate-absolute Z range for the per-layer status LUT.
+	job.plate_z_max           = static_cast<float>(m_current_plate->get_objects_bounding_box().max.z());
 
 	// Already-sliced reuse: skip the subprocess and go straight to finalize.
 	job.reuse = m_current_plate->is_slice_result_valid()
@@ -536,6 +539,40 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 		m_print->set_status(std::min(percent, 99), text);
 	});
 
+	// ADR-0002: per-layer status events for the live slice-progress
+	// visualization. Posted from this worker thread; the Plater forwards them
+	// to the 3D canvas, which re-uploads its LUT at most once per rendered
+	// frame. A degenerate plate (no objects) has no Z range to map onto and
+	// posts nothing.
+	auto post_layer_status = [this, &parser, &job](LayerStatusSnapshot::Result result) {
+		if (job.plate_z_max <= 0.f)
+			return;
+		LayerStatusSnapshot snap;
+		snap.active      = (result == LayerStatusSnapshot::Running);
+		snap.result      = result;
+		snap.plate_idx   = job.plate_idx;
+		snap.layer_count = parser.layer_count();
+		snap.z_min       = 0.f;
+		snap.z_max       = job.plate_z_max;
+		snap.status.reserve(parser.layer_status().size());
+		for (LayerStatus s : parser.layer_status())
+			snap.status.push_back(static_cast<uint8_t>(s));
+		wxQueueEvent(wxGetApp().mainframe->m_plater,
+		             new SlicingLayerStatusEvent(EVT_SLICING_LAYER_STATUS, 0, std::move(snap)));
+	};
+	// Coalesce live updates to at most one event per 50 ms; the canvas caps the
+	// actual cost at one texture re-upload per rendered frame.
+	auto last_status_post = std::chrono::steady_clock::now() - std::chrono::milliseconds(100);
+	parser.set_layer_status_callback([this, &post_layer_status, &last_status_post]() {
+		if (m_canceled)
+			return;
+		const auto now = std::chrono::steady_clock::now();
+		if (now - last_status_post < std::chrono::milliseconds(50))
+			return;
+		last_status_post = now;
+		post_layer_status(LayerStatusSnapshot::Running);
+	});
+
 	std::string stderr_tail;
 	int         exit_code = -1;
 	try {
@@ -600,9 +637,12 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 		                                          backend.cli_path().string(), ex.what()));
 	}
 
-	if (m_canceled)
+	if (m_canceled) {
 		// Terminated by stop()/stop_internal(); the caller handles cleanup.
+		// ADR-0002: freeze the visualization with the remainder marked failed.
+		post_layer_status(LayerStatusSnapshot::Canceled);
 		return;
+	}
 
 	// F08: the raw stderr tail goes to Orca's log only, never into the dialog.
 	const bool failed = exit_code != 0 || parser.has_fatal_error() || !fs::exists(fs::path(job.output_path));
@@ -611,16 +651,21 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 	// Exit code decides success (never parser fidelity); the parsed fatal
 	// error, when present, only improves the message shown.
 	if (exit_code != 0) {
+		post_layer_status(LayerStatusSnapshot::Failed);
 		std::string msg = parser.has_fatal_error()
 			? parser.fatal_error_message()
 			: Slic3r::format(_u8L("The PNP slicer exited with code %1%. See the log for details."), exit_code);
 		throw Slic3r::SlicingError(std::move(msg));
 	}
-	if (parser.has_fatal_error())
+	if (parser.has_fatal_error()) {
+		post_layer_status(LayerStatusSnapshot::Failed);
 		throw Slic3r::SlicingError(parser.fatal_error_message());
-	if (!fs::exists(fs::path(job.output_path)))
+	}
+	if (!fs::exists(fs::path(job.output_path))) {
+		post_layer_status(LayerStatusSnapshot::Failed);
 		throw Slic3r::SlicingError(
 			Slic3r::format(_u8L("The PNP slicer reported success but produced no G-code at %1%."), job.output_path));
+	}
 
 	// F10: keep the raw slice_stats event (empty until pnp ships it) for
 	// worker_main's apply_slice_stats().
@@ -652,6 +697,9 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 					NotificationManager::NotificationLevel::WarningNotificationLevel, text);
 		});
 	}
+
+	// ADR-0002: success — the visualization reverts to normal shading.
+	post_layer_status(LayerStatusSnapshot::Success);
 }
 
 // F10: fill Print::PrintStatistics from the pnp `slice_stats` event (schema

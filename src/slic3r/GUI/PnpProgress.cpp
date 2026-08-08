@@ -132,6 +132,11 @@ void PnpProgressParser::feed_line(const std::string& line)
     const int layer_total = m_stream_layer_count > 0 ? m_stream_layer_count : m_estimated_layer_count;
 
     const std::string phase = get_string(j, "phase");
+    // ADR-0002: the per-layer status array is sized when the per-layer phase
+    // begins (the visualization deliberately waits for phase_start(per_layer)
+    // and its real layer_count); layer events below grow it defensively.
+    if (event == "phase_start" && phase == "per_layer")
+        ensure_layer_status(layer_total);
 
     if (event == "phase_start") {
         if (phase == "validation")
@@ -164,6 +169,13 @@ void PnpProgressParser::feed_line(const std::string& line)
             m_percent = std::max(m_percent, per_layer_percent(idx, layer_total));
             emit_update("Slicing layer " + std::to_string(std::min(idx + 1, layer_total)) + "/" +
                         std::to_string(layer_total));
+            // ADR-0002: layers complete out of order across the parallel tier,
+            // so in-progress is a distinct state, not a monotonic frontier.
+            ensure_layer_status(std::max(layer_total, idx + 1));
+            if (idx < static_cast<int>(m_layer_status.size()) && m_layer_status[idx] != LayerStatus::InProgress) {
+                m_layer_status[idx] = LayerStatus::InProgress;
+                notify_layer_status();
+            }
         }
     } else if (event == "layer_complete") {
         const int idx = get_int(j, "layer_index", -1);
@@ -171,6 +183,14 @@ void PnpProgressParser::feed_line(const std::string& line)
             m_percent = std::max(m_percent, per_layer_percent(idx + 1, layer_total));
             emit_update("Slicing layer " + std::to_string(std::min(idx + 1, layer_total)) + "/" +
                         std::to_string(layer_total));
+            ensure_layer_status(std::max(layer_total, idx + 1));
+            if (idx < static_cast<int>(m_layer_status.size())) {
+                const LayerStatus new_status = get_bool(j, "degraded", false) ? LayerStatus::Degraded : LayerStatus::Complete;
+                if (m_layer_status[idx] != new_status) {
+                    m_layer_status[idx] = new_status;
+                    notify_layer_status();
+                }
+            }
         }
         // degraded=true carries no message of its own; the matching
         // module_error event is what gets collected as a warning.
@@ -265,6 +285,26 @@ void PnpProgressParser::emit_update(const std::string& text)
     m_last_emitted = { m_percent, full };
     if (m_on_update)
         m_on_update(m_percent, full);
+}
+
+void PnpProgressParser::notify_layer_status()
+{
+    if (m_on_layer_status)
+        m_on_layer_status();
+}
+
+void PnpProgressParser::ensure_layer_status(int count)
+{
+    if (count <= 0)
+        return;
+    if (m_layer_count != count) {
+        m_layer_count = count;
+        m_layer_status.assign(static_cast<size_t>(count), LayerStatus::Pending);
+        notify_layer_status();
+    } else if (m_layer_status.size() < static_cast<size_t>(count)) {
+        m_layer_status.resize(static_cast<size_t>(count), LayerStatus::Pending);
+        notify_layer_status();
+    }
 }
 
 } // namespace GUI

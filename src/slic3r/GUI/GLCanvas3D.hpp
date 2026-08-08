@@ -13,6 +13,7 @@
 #include "GUI_ObjectLayers.hpp"
 #include "GLSelectionRectangle.hpp"
 #include "MeshUtils.hpp"
+#include "SlicingProcessEvents.hpp"
 #include "libslic3r/GCode/GCodeProcessor.hpp"
 #include "GCodeViewer.hpp"
 #include "Camera.hpp"
@@ -737,6 +738,28 @@ public:
     unsigned int m_shadow_map_size{ 0 };
     Transform3d  m_shadow_light_vp{ Transform3d::Identity() };
     bool         m_shadow_map_valid{ false };
+    // PNP fork (ADR-0002): live per-layer slice progress coloring. The status
+    // LUT texture (one texel per layer, colored by LayerStatus) is rebuilt on
+    // the UI thread when texture_dirty; the shader samples it by plate-absolute
+    // Z. On slice failure/cancel the status array is recolored in place
+    // (pending/in-progress -> failed) and the mode stays frozen until the next
+    // slice or scene reload.
+    struct SliceProgressState
+    {
+        bool active { false };
+        LayerStatusSnapshot::Result result { LayerStatusSnapshot::Running };
+        int  plate_idx { -1 };
+        int  layer_count { 0 };
+        float z_min { 0.f };
+        float z_max { 0.f };
+        std::vector<uint8_t> status;
+        unsigned int texture_id { 0 };
+        bool texture_dirty { false };
+    };
+    SliceProgressState m_slice_progress;
+    // The last snapshot received, retained so a failure/cancel freeze can be
+    // re-applied after a scene reload (which clears m_slice_progress).
+    LayerStatusSnapshot m_slice_progress_last;
 public:
     explicit GLCanvas3D(wxGLCanvas* canvas, Bed3D &bed);
     ~GLCanvas3D();
@@ -1129,6 +1152,22 @@ public:
 
     void request_extra_frame() { m_extra_frame_requested = true; }
 
+    // PNP fork (ADR-0002): live per-layer slice progress coloring. The Plater
+    // forwards LayerStatusSnapshot events from the slicing worker thread here;
+    // the canvas owns the status LUT texture and re-uploads it at most once
+    // per rendered frame. A snapshot with active==false and result==Success
+    // reverts to normal shading; Failed/Canceled freezes the coloring with
+    // pending/in-progress layers marked failed.
+    void set_slice_progress(const LayerStatusSnapshot& snapshot);
+    // Drop any slice-progress state (called when a new slice begins).
+    void reset_slice_progress();
+    // PNP fork (ADR-0002): re-apply a failure/cancel freeze from the retained
+    // snapshot. The Plater calls this after the completion handler's scene
+    // reload (which clears the state), so the frozen coloring stays visible
+    // after a failed/canceled slice. No-op unless the last snapshot was
+    // Failed/Canceled.
+    void reapply_slice_progress_freeze();
+
     void schedule_extra_frame(int milliseconds);
 
     int get_main_toolbar_item_id(const std::string& name) const { return m_main_toolbar.get_item_id(name); }
@@ -1261,6 +1300,10 @@ private:
     //BBS: add outline drawing logic
     void _render_objects(GLVolumeCollection::ERenderType type, bool with_outline = true);
     void _render_wireframe_overlay();
+    // PNP fork (ADR-0002): rebuild the per-layer status LUT texture from
+    // m_slice_progress when dirty (called from the Opaque render pass, so at
+    // most once per rendered frame).
+    void upload_slice_progress_texture();
     //BBS: GUI refactor: add canvas size as parameters
     void _render_gcode(int canvas_width, int canvas_height);
     //BBS: render a plane for assemble

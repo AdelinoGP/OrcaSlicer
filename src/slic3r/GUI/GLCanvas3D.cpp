@@ -1,6 +1,8 @@
 #include "libslic3r/libslic3r.h"
 #include "GLCanvas3D.hpp"
 
+#include "PnpProgress.hpp"
+
 #include <igl/unproject.h>
 
 #include "libslic3r/BuildVolume.hpp"
@@ -164,6 +166,29 @@ static std::string format_number(float value)
 }
 
 wxString filament_printable_error_msg;
+
+// PNP fork (ADR-0002): per-layer status colors for the slice-progress LUT.
+// Indexed by LayerStatus (PnpProgress.hpp); slice_progress_status_failed is a
+// UI-only state applied to pending/in-progress layers when a slice fails or is
+// canceled. RGBA8.
+constexpr uint8_t slice_progress_status_failed = 4;
+constexpr unsigned char slice_progress_colors[][4] = {
+    {  89,  89,  89, 255 }, // Pending    — dim gray
+    { 255, 140,  26, 255 }, // InProgress — accent orange
+    {  51, 191,  89, 255 }, // Complete   — green
+    { 255, 204,  26, 255 }, // Degraded   — amber
+    { 217,  38,  38, 255 }, // Failed     — red (UI-only)
+};
+
+// PNP fork (ADR-0002): recolor pending/in-progress layers to the UI-only
+// "failed" state (failure/cancel freeze). Completed and degraded layers keep
+// their colors.
+void mark_slice_progress_failed(std::vector<uint8_t>& status)
+{
+    for (uint8_t& s : status)
+        if (s == static_cast<uint8_t>(LayerStatus::Pending) || s == static_cast<uint8_t>(LayerStatus::InProgress))
+            s = slice_progress_status_failed;
+}
 
 GLCanvas3D::LayersEditing::~LayersEditing()
 {
@@ -1239,6 +1264,10 @@ GLCanvas3D::~GLCanvas3D()
             glsafe(::glDeleteFramebuffers(1, &m_shadow_map_fbo));
             m_shadow_map_fbo = 0;
         }
+        if (m_slice_progress.texture_id != 0) {
+            glsafe(::glDeleteTextures(1, &m_slice_progress.texture_id));
+            m_slice_progress.texture_id = 0;
+        }
         m_plate_shadow_mask.reset();
     }
     m_plate_shadow_mask_key.clear();
@@ -1290,6 +1319,15 @@ bool GLCanvas3D::init()
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": before m_layers_editing init";
     if (m_main_toolbar.is_enabled())
         m_layers_editing.init();
+
+    // PNP fork (ADR-0002): 1D status LUT for the live slice-progress
+    // visualization; contents are (re)uploaded per status change.
+    glsafe(::glGenTextures(1, (GLuint*)&m_slice_progress.texture_id));
+    glsafe(::glBindTexture(GL_TEXTURE_1D, m_slice_progress.texture_id));
+    glsafe(::glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
+    glsafe(::glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
+    glsafe(::glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
+    glsafe(::glBindTexture(GL_TEXTURE_1D, 0));
 
     BOOST_LOG_TRIVIAL(info) <<__FUNCTION__<< ": before gizmo init";
     if (m_gizmos.is_enabled() && !m_gizmos.init())
@@ -2465,6 +2503,10 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
     }
 
     m_hover_volume_idxs.clear();
+    // PNP fork (ADR-0002): the volumes are rebuilt from the model below; a
+    // frozen slice-progress state (failed/canceled slice) would paint stale
+    // status colors over new geometry. Drop it here.
+    reset_slice_progress();
 
     struct ModelVolumeState {
         ModelVolumeState(const GLVolume* volume) :
@@ -8017,6 +8059,89 @@ void GLCanvas3D::_render_plane() const
     ;//TODO render assemble plane
 }
 
+// PNP fork (ADR-0002): live per-layer slice progress coloring.
+void GLCanvas3D::set_slice_progress(const LayerStatusSnapshot& snapshot)
+{
+    m_slice_progress_last = snapshot;
+    if (snapshot.active) {
+        m_slice_progress.active        = true;
+        m_slice_progress.result        = LayerStatusSnapshot::Running;
+        m_slice_progress.plate_idx     = snapshot.plate_idx;
+        m_slice_progress.layer_count   = snapshot.layer_count;
+        m_slice_progress.z_min         = snapshot.z_min;
+        m_slice_progress.z_max         = snapshot.z_max;
+        m_slice_progress.status        = snapshot.status;
+        m_slice_progress.texture_dirty = true;
+        request_extra_frame();
+    } else if (m_slice_progress.active) {
+        if (snapshot.result == LayerStatusSnapshot::Success) {
+            // Slice finished: revert to normal shading.
+            m_slice_progress.active        = false;
+            m_slice_progress.status.clear();
+            m_slice_progress.texture_dirty = false;
+            request_extra_frame();
+        } else {
+            // Failed/canceled: freeze the coloring, marking everything that was
+            // not completed as failed (shows how far the slice got).
+            m_slice_progress.result = snapshot.result;
+            mark_slice_progress_failed(m_slice_progress.status);
+            m_slice_progress.texture_dirty = true;
+            request_extra_frame();
+        }
+    }
+}
+
+void GLCanvas3D::reset_slice_progress()
+{
+    m_slice_progress.active        = false;
+    m_slice_progress.result        = LayerStatusSnapshot::Running;
+    m_slice_progress.plate_idx     = -1;
+    m_slice_progress.layer_count   = 0;
+    m_slice_progress.status.clear();
+    m_slice_progress.texture_dirty = false;
+}
+
+void GLCanvas3D::reapply_slice_progress_freeze()
+{
+    const LayerStatusSnapshot& s = m_slice_progress_last;
+    if (s.result == LayerStatusSnapshot::Success || s.result == LayerStatusSnapshot::Running)
+        return;
+    // Rebuild the frozen state from the retained snapshot (which holds the
+    // parser's raw statuses): completed layers stay green, everything else
+    // turns failed/red.
+    m_slice_progress.active        = true;
+    m_slice_progress.result        = s.result;
+    m_slice_progress.plate_idx     = s.plate_idx;
+    m_slice_progress.layer_count   = s.layer_count;
+    m_slice_progress.z_min         = s.z_min;
+    m_slice_progress.z_max         = s.z_max;
+    m_slice_progress.status        = s.status;
+    mark_slice_progress_failed(m_slice_progress.status);
+    m_slice_progress.texture_dirty = true;
+    request_extra_frame();
+}
+
+void GLCanvas3D::upload_slice_progress_texture()
+{
+    if (!m_slice_progress.texture_dirty || m_slice_progress.texture_id == 0)
+        return;
+    const int n = std::max(1, m_slice_progress.layer_count);
+    std::vector<unsigned char> texels(static_cast<size_t>(n) * 4);
+    for (int i = 0; i < n; ++i) {
+        const uint8_t s = (i < static_cast<int>(m_slice_progress.status.size()))
+            ? m_slice_progress.status[i] : static_cast<uint8_t>(LayerStatus::Pending);
+        const unsigned char* c = slice_progress_colors[std::min<size_t>(s, slice_progress_status_failed)];
+        texels[static_cast<size_t>(i) * 4 + 0] = c[0];
+        texels[static_cast<size_t>(i) * 4 + 1] = c[1];
+        texels[static_cast<size_t>(i) * 4 + 2] = c[2];
+        texels[static_cast<size_t>(i) * 4 + 3] = 255;
+    }
+    glsafe(::glBindTexture(GL_TEXTURE_1D, m_slice_progress.texture_id));
+    glsafe(::glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA8, n, 0, GL_RGBA, GL_UNSIGNED_BYTE, texels.data()));
+    glsafe(::glBindTexture(GL_TEXTURE_1D, 0));
+    m_slice_progress.texture_dirty = false;
+}
+
 //BBS: add outline drawing logic
 void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type, bool with_outline)
 {
@@ -8148,15 +8273,62 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type, bool with
                     //BBS:add assemble view related logic
                     // do not cull backfaces to show broken geometry, if any
                 const Camera& camera = wxGetApp().plater()->get_camera();
-                    m_volumes.render(type, m_picking_enabled, camera.get_view_matrix(), camera.get_projection_matrix(), cvn_size, [this, canvas_type](const GLVolume& volume) {
+                    auto base_filter = [this, canvas_type](const GLVolume& volume) {
                         if (canvas_type == ECanvasType::CanvasAssembleView) {
                             return !volume.is_modifier && !volume.is_wipe_tower;
                         }
                         else {
                             return (m_render_sla_auxiliaries || volume.composite_id.volume_id >= 0);
                         }
-                        },
-                        partly_inside_enable, printable_heights);
+                    };
+                    // PNP fork (ADR-0002): live per-layer slice progress. The
+                    // slice_progress shader colors each fragment by its
+                    // plate-absolute Z against the status LUT. Only volumes on
+                    // the plate being sliced get it (slice-all shows every plate
+                    // at once); the rest render with the normal shader.
+                    // Modifiers/negative volumes keep normal shading (they
+                    // render in the Transparent pass, untouched here).
+                    GLShaderProgram* normal_shader = shader;
+                    GLShaderProgram* slice_shader = nullptr;
+                    if (m_slice_progress.active && m_slice_progress.layer_count > 0 &&
+                        m_slice_progress.z_max > m_slice_progress.z_min &&
+                        (slice_shader = wxGetApp().get_shader("slice_progress")) != nullptr) {
+                        auto on_slicing_plate = [this](const GLVolume& volume) {
+                            if (m_slice_progress.plate_idx < 0)
+                                return true;
+                            PartPlate* plate = wxGetApp().plater()->get_partplate_list().get_plate(m_slice_progress.plate_idx);
+                            return plate != nullptr && plate->contain_instance(volume.composite_id.object_id, volume.composite_id.instance_id);
+                        };
+                        normal_shader->stop_using();
+                        slice_shader->start_using();
+                        shader = slice_shader;
+                        upload_slice_progress_texture();
+                        glsafe(::glActiveTexture(GL_TEXTURE5));
+                        glsafe(::glBindTexture(GL_TEXTURE_1D, m_slice_progress.texture_id));
+                        glsafe(::glActiveTexture(GL_TEXTURE0));
+                        shader->set_uniform("lut", 5);
+                        shader->set_uniform("z_min", m_slice_progress.z_min);
+                        shader->set_uniform("z_inv_range", 1.0f / (m_slice_progress.z_max - m_slice_progress.z_min));
+                        shader->set_uniform("layer_count", static_cast<float>(m_slice_progress.layer_count));
+                        m_volumes.render(type, m_picking_enabled, camera.get_view_matrix(), camera.get_projection_matrix(), cvn_size,
+                            [base_filter, on_slicing_plate](const GLVolume& volume) {
+                                return base_filter(volume) && on_slicing_plate(volume);
+                            },
+                            partly_inside_enable, printable_heights);
+                        // Remaining volumes (other plates) with the normal shader.
+                        slice_shader->stop_using();
+                        normal_shader->start_using();
+                        shader = normal_shader;
+                        m_volumes.render(type, m_picking_enabled, camera.get_view_matrix(), camera.get_projection_matrix(), cvn_size,
+                            [base_filter, on_slicing_plate](const GLVolume& volume) {
+                                return base_filter(volume) && !on_slicing_plate(volume);
+                            },
+                            partly_inside_enable, printable_heights);
+                    }
+                    else {
+                        m_volumes.render(type, m_picking_enabled, camera.get_view_matrix(), camera.get_projection_matrix(), cvn_size,
+                            base_filter, partly_inside_enable, printable_heights);
+                    }
                 }
             }
             else {

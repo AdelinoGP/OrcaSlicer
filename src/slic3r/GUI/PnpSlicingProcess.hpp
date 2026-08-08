@@ -161,6 +161,9 @@ private:
 		boost::filesystem::path thumbnail_path; // F14: PNG rendered on the UI thread; empty = no thumbnail
 		int                     plate_idx { -1 };
 		int                     estimated_layer_count { 1 };
+		// ADR-0002: top Z of the plate's objects; the per-layer status LUT maps
+		// plate-absolute Z in [0, plate_z_max] onto layer indices.
+		float                   plate_z_max { 0.f };
 		bool                    reuse { false }; // skip the subprocess, straight to finalize
 	};
 

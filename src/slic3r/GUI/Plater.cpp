@@ -190,6 +190,7 @@ namespace GUI {
 
 wxDEFINE_EVENT(EVT_SCHEDULE_BACKGROUND_PROCESS,     SimpleEvent);
 wxDEFINE_EVENT(EVT_SLICING_UPDATE,                  SlicingStatusEvent);
+wxDEFINE_EVENT(EVT_SLICING_LAYER_STATUS,            SlicingLayerStatusEvent);
 wxDEFINE_EVENT(EVT_SLICING_COMPLETED,               wxCommandEvent);
 wxDEFINE_EVENT(EVT_PROCESS_COMPLETED,               SlicingProcessCompletedEvent);
 wxDEFINE_EVENT(EVT_EXPORT_BEGAN,                    wxCommandEvent);
@@ -5531,6 +5532,7 @@ struct Plater::priv
     void on_select_bed_type(wxCommandEvent&);
     void on_select_preset(wxCommandEvent&);
     void on_slicing_update(SlicingStatusEvent&);
+    void on_slicing_layer_status(SlicingLayerStatusEvent&);
     void on_slicing_completed(wxCommandEvent&);
     void on_process_completed(SlicingProcessCompletedEvent&);
     void on_export_began(wxCommandEvent&);
@@ -5829,6 +5831,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     background_process.set_export_began_event(EVT_EXPORT_BEGAN);
     background_process.set_export_finished_event(EVT_EXPORT_FINISHED);
     this->q->Bind(EVT_SLICING_UPDATE, &priv::on_slicing_update, this);
+    this->q->Bind(EVT_SLICING_LAYER_STATUS, &priv::on_slicing_layer_status, this);
     this->q->Bind(EVT_PUBLISH, &priv::on_action_publish, this);
     this->q->Bind(EVT_REPAIR_MODEL, &priv::on_repair_model, this);
     this->q->Bind(EVT_FILAMENT_COLOR_CHANGED, &priv::on_filament_color_changed, this);
@@ -10625,6 +10628,13 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
     BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format("exit.");
 }
 
+// PNP fork (ADR-0002): forward the per-layer slice progress snapshot to the
+// 3D canvas, which owns the status LUT and repaints on demand.
+void Plater::priv::on_slicing_layer_status(SlicingLayerStatusEvent &evt)
+{
+    view3D->get_canvas3d()->set_slice_progress(evt.snapshot);
+}
+
 void Plater::priv::on_slicing_completed(wxCommandEvent & evt)
 {
     BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(": event_type %1%, string %2%") % evt.GetEventType() % evt.GetString();
@@ -10668,6 +10678,9 @@ void Plater::priv::on_slicing_began()
     clear_warnings();
     notification_manager->close_notification_of_type(NotificationType::SignDetected);
     notification_manager->close_notification_of_type(NotificationType::ExportFinished);
+    // PNP fork (ADR-0002): drop any frozen slice-progress state from a previous
+    // (failed/canceled) slice before the new one's first status event arrives.
+    view3D->get_canvas3d()->reset_slice_progress();
     bool is_first_plate = m_cur_slice_plate == 0;
     bool slice_all = q->m_only_gcode ? m_slice_all_only_has_gcode : m_slice_all;
     bool need_change_dailytips = !(slice_all && !is_first_plate);
@@ -10837,6 +10850,11 @@ void Plater::priv::on_process_completed(SlicingProcessCompletedEvent &evt)
         // PNP fork (F12): SLA removed, always FFF.
         if (is_finished)
             this->update_fff_scene();
+        // PNP fork (ADR-0002): the scene reload above cleared the frozen
+        // slice-progress state; re-apply it for failed/canceled slices so the
+        // freeze (completed = green, rest = red) stays visible.
+        if (evt.error() || evt.cancelled())
+            view3D->get_canvas3d()->reapply_slice_progress_freeze();
     }
 
     //BBS: add slice&&print status update logic
@@ -11503,6 +11521,9 @@ void Plater::priv::on_3dcanvas_mouse_dragging_finished(SimpleEvent&)
         delayed_scene_refresh = false;
         // PNP fork (F12): SLA removed — refresh the FFF scene.
         update_fff_scene();
+        // PNP fork (ADR-0002): no-op unless the last slice failed/canceled —
+        // re-apply the frozen slice-progress state the reload just cleared.
+        view3D->get_canvas3d()->reapply_slice_progress_freeze();
     }
 
     //partplate_list.reload_all_objects();

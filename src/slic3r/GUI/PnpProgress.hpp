@@ -20,6 +20,7 @@
 // updates to the UI thread.
 
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <utility>
@@ -27,6 +28,17 @@
 
 namespace Slic3r {
 namespace GUI {
+
+// PNP fork (ADR-0002): per-global-plate-layer slice state, derived from the
+// layer_start / layer_complete events. Values are stable wire-agnostic states;
+// the UI maps them to colors (plus a UI-only "failed" state on slice failure).
+enum class LayerStatus : uint8_t
+{
+    Pending    = 0,
+    InProgress = 1,
+    Complete   = 2,
+    Degraded   = 3,
+};
 
 class PnpProgressParser
 {
@@ -42,6 +54,10 @@ public:
     // Called (on the feeding thread) whenever percent or status text advances.
     // percent is 0..100, monotonic non-decreasing per parser instance.
     using UpdateCallback = std::function<void(int percent, const std::string& text)>;
+    // Called (on the feeding thread) whenever the per-layer status array
+    // changes (resized or a layer changed state). The consumer decides how to
+    // coalesce; the parser itself never posts events.
+    using LayerStatusCallback = std::function<void()>;
 
     // `estimated_layer_count` is the GUI-side fallback layer total (model
     // height / layer height, >= 1); used until/unless the stream provides a
@@ -50,6 +66,7 @@ public:
     explicit PnpProgressParser(int estimated_layer_count, std::string plate_label = std::string());
 
     void set_update_callback(UpdateCallback cb) { m_on_update = std::move(cb); }
+    void set_layer_status_callback(LayerStatusCallback cb) { m_on_layer_status = std::move(cb); }
 
     // Feed a raw chunk from the async stderr pipe; the parser splits it into
     // lines internally and processes every complete line.
@@ -95,13 +112,30 @@ public:
     // Number of lines that failed to parse and were skipped.
     int skipped_line_count() const { return m_skipped_lines; }
 
+    // --- per-layer status (ADR-0002), valid on the feeding thread ---
+
+    // Best-known total of global plate layers: the stream-provided layer_count
+    // once phase_start(per_layer) delivers it, else the GUI estimate. 0 until
+    // the per-layer phase begins.
+    int layer_count() const { return m_layer_count; }
+    // One LayerStatus per layer, sized to layer_count(). Empty until the
+    // per-layer phase begins.
+    const std::vector<LayerStatus>& layer_status() const { return m_layer_status; }
+
 private:
     // Evaluates m_schema_version against the supported progress-schema major.
     // Called once, when the first schema_version in the stream is captured.
     void check_schema_version();
     void emit_update(const std::string& text);
+    // Fire m_on_layer_status (if set).
+    void notify_layer_status();
+    // Grow m_layer_status to at least `count` entries (Pending), adopting
+    // `count` as the best-known layer total. Fires notify_layer_status() when
+    // the array actually changed.
+    void ensure_layer_status(int count);
 
     UpdateCallback       m_on_update;
+    LayerStatusCallback  m_on_layer_status;
     std::string          m_line_buffer;
     std::string          m_plate_label;
     int                  m_estimated_layer_count { 1 };
@@ -115,6 +149,9 @@ private:
     int                  m_skipped_lines { 0 };
     // Last (percent, text) forwarded to m_on_update; updates fire only on change.
     std::pair<int, std::string> m_last_emitted { -1, std::string() };
+    // ADR-0002 per-layer status; see accessors above.
+    std::vector<LayerStatus> m_layer_status;
+    int                      m_layer_count { 0 };
 };
 
 } // namespace GUI

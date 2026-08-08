@@ -49,6 +49,8 @@ class Print;
 //BBS: add partplatelist and SlicingStatusEvent
 class PartPlateList;
 class SlicingStatusEvent;
+// PNP fork (ADR-0002): per-layer slice progress event (see EVT_SLICING_LAYER_STATUS).
+class SlicingLayerStatusEvent;
 // PNP fork (F09): Plater now slices through PnpSlicingProcess (pnp_cli subprocess seam).
 namespace GUI { class PnpSlicingProcess; }
 enum class ConversionType : int;
@@ -90,6 +92,8 @@ enum class ActionButtonType : int;
 
 //BBS: add EVT_SLICING_UPDATE declare here
 wxDECLARE_EVENT(EVT_SLICING_UPDATE, Slic3r::SlicingStatusEvent);
+// PNP fork (ADR-0002): per-layer slice progress for the live visualization.
+wxDECLARE_EVENT(EVT_SLICING_LAYER_STATUS, Slic3r::SlicingLayerStatusEvent);
 wxDECLARE_EVENT(EVT_PUBLISH,        wxCommandEvent);
 wxDECLARE_EVENT(EVT_OPEN_PLATESETTINGSDIALOG,        wxCommandEvent);
 

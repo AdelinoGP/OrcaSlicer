@@ -323,3 +323,85 @@ TEST_CASE("progress parser flushes a final line with no trailing newline", "[pnp
     parser.finish();
     REQUIRE(parser.current_percent() == 100);
 }
+
+// PNP fork (ADR-0002): per-layer status tracking for the live slice-progress
+// visualization.
+TEST_CASE("progress parser tracks per-layer status (ADR-0002)", "[pnp][progress][layer_status]")
+{
+    SECTION("the array stays empty until the per-layer phase begins")
+    {
+        PnpProgressParser parser(/*estimated_layer_count=*/10);
+        parser.feed_line(event_line(R"("event":"phase_complete","phase":"validation","status":"ok")"));
+        parser.feed_line(event_line(R"("event":"phase_complete","phase":"prepass","status":"ok")"));
+        REQUIRE(parser.layer_count() == 0);
+        REQUIRE(parser.layer_status().empty());
+    }
+
+    SECTION("phase_start(per_layer) adopts the real layer_count, all pending")
+    {
+        PnpProgressParser parser(/*estimated_layer_count=*/100); // deliberately wrong
+        parser.feed_line(event_line(R"("event":"phase_start","phase":"per_layer","layer_count":10)"));
+        REQUIRE(parser.layer_count() == 10);
+        REQUIRE(parser.layer_status().size() == 10);
+        for (LayerStatus s : parser.layer_status())
+            REQUIRE(s == LayerStatus::Pending);
+    }
+
+    SECTION("layer events drive the state machine")
+    {
+        PnpProgressParser parser(/*estimated_layer_count=*/4);
+        parser.feed_line(event_line(R"("event":"phase_start","phase":"per_layer","layer_count":4)"));
+        parser.feed_line(event_line(R"("event":"layer_start","phase":"per_layer","layer_index":1)"));
+        REQUIRE(parser.layer_status()[1] == LayerStatus::InProgress);
+        parser.feed_line(event_line(R"("event":"layer_complete","phase":"per_layer","layer_index":1,"degraded":false)"));
+        REQUIRE(parser.layer_status()[1] == LayerStatus::Complete);
+        REQUIRE(parser.layer_status()[0] == LayerStatus::Pending);
+    }
+
+    SECTION("degraded completions are marked, not lost")
+    {
+        PnpProgressParser parser(/*estimated_layer_count=*/4);
+        parser.feed_line(event_line(R"("event":"phase_start","phase":"per_layer","layer_count":4)"));
+        parser.feed_line(event_line(R"("event":"layer_complete","phase":"per_layer","layer_index":2,"degraded":true)"));
+        REQUIRE(parser.layer_status()[2] == LayerStatus::Degraded);
+    }
+
+    SECTION("out-of-order completion across the parallel tier stays correct")
+    {
+        // The whole point of the 4-state model: layers complete out of order,
+        // so a monotonic frontier cannot represent the state.
+        PnpProgressParser parser(/*estimated_layer_count=*/8);
+        parser.feed_line(event_line(R"("event":"phase_start","phase":"per_layer","layer_count":8)"));
+        parser.feed_line(event_line(R"("event":"layer_complete","phase":"per_layer","layer_index":7)"));
+        parser.feed_line(event_line(R"("event":"layer_start","phase":"per_layer","layer_index":3)"));
+        parser.feed_line(event_line(R"("event":"layer_complete","phase":"per_layer","layer_index":0)"));
+        REQUIRE(parser.layer_status()[7] == LayerStatus::Complete);
+        REQUIRE(parser.layer_status()[3] == LayerStatus::InProgress);
+        REQUIRE(parser.layer_status()[0] == LayerStatus::Complete);
+        REQUIRE(parser.layer_status()[1] == LayerStatus::Pending);
+    }
+
+    SECTION("without stream layer_count, per-layer events fall back to the estimate")
+    {
+        PnpProgressParser parser(/*estimated_layer_count=*/5);
+        parser.feed_line(event_line(R"("event":"layer_complete","phase":"per_layer","layer_index":2)"));
+        REQUIRE(parser.layer_count() == 5);
+        REQUIRE(parser.layer_status().size() == 5);
+        REQUIRE(parser.layer_status()[2] == LayerStatus::Complete);
+    }
+
+    SECTION("the status callback fires once per change")
+    {
+        PnpProgressParser parser(/*estimated_layer_count=*/4);
+        int fires = 0;
+        parser.set_layer_status_callback([&fires]() { ++fires; });
+        parser.feed_line(event_line(R"("event":"phase_start","phase":"per_layer","layer_count":4)"));
+        REQUIRE(fires == 1); // array sized
+        parser.feed_line(event_line(R"("event":"layer_start","phase":"per_layer","layer_index":0)"));
+        parser.feed_line(event_line(R"("event":"layer_complete","phase":"per_layer","layer_index":0)"));
+        REQUIRE(fires == 3);
+        // An unchanged state does not re-fire.
+        parser.feed_line(event_line(R"("event":"layer_complete","phase":"per_layer","layer_index":0)"));
+        REQUIRE(fires == 3);
+    }
+}

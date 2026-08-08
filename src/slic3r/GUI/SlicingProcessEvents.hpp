@@ -18,6 +18,32 @@
 
 namespace Slic3r {
 
+// PNP fork (ADR-0002): one snapshot of the per-layer slice progress, posted
+// from the slicing worker thread to the Plater (and forwarded to the 3D
+// canvas). `status` holds one LayerStatus (PnpProgress.hpp) per layer; the
+// canvas maps them to colors and, on failure/cancel, recolors pending and
+// in-progress layers to its UI-only "failed" state.
+struct LayerStatusSnapshot
+{
+    enum Result : int
+    {
+        Running  = 0, // slice in progress; active == true
+        Success  = 1, // slice finished; visualization reverts
+        Failed   = 2, // slice failed; visualization freezes with failed layers
+        Canceled = 3, // slice canceled; visualization freezes with failed layers
+    };
+
+    bool   active { false };
+    Result result { Running };
+    // Plate being sliced; the canvas colors only volumes on it (slice-all
+    // shows every plate at once). -1 = unknown (color everything).
+    int    plate_idx { -1 };
+    int    layer_count { 0 };
+    float  z_min { 0.f };
+    float  z_max { 0.f };
+    std::vector<uint8_t> status;
+};
+
 class SlicingStatusEvent : public wxEvent
 {
 public:
@@ -26,6 +52,16 @@ public:
 	virtual wxEvent *Clone() const { return new SlicingStatusEvent(*this); }
 
 	PrintBase::SlicingStatus status;
+};
+
+class SlicingLayerStatusEvent : public wxEvent
+{
+public:
+	SlicingLayerStatusEvent(wxEventType eventType, int winid, LayerStatusSnapshot snapshot) :
+		wxEvent(winid, eventType), snapshot(std::move(snapshot)) {}
+	virtual wxEvent *Clone() const { return new SlicingLayerStatusEvent(*this); }
+
+	LayerStatusSnapshot snapshot;
 };
 
 class SlicingProcessCompletedEvent : public wxEvent

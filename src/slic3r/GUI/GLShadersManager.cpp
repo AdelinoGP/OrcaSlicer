@@ -92,6 +92,8 @@ std::pair<bool, std::string> GLShadersManager::init()
         );
     // used to render variable layers heights in 3d editor
     valid &= append_shader("variable_layer_height", { prefix + "variable_layer_height.vs", prefix + "variable_layer_height.fs" });
+    // PNP fork (ADR-0002): live per-layer slice progress coloring on the plater
+    valid &= append_shader("slice_progress", { prefix + "slice_progress.vs", prefix + "slice_progress.fs" });
     // used to render highlight contour around selected triangles inside the multi-material gizmo
     valid &= append_shader("mm_contour", { prefix + "mm_contour.vs", prefix + "mm_contour.fs" });
     // Used to render painted triangles inside the multi-material gizmo. Triangle normals are computed inside fragment shader.
