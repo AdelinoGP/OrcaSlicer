@@ -10689,8 +10689,8 @@ void Plater::priv::on_slicing_began()
     if (preview != nullptr)
     {
         preview->get_canvas3d()->reset_slice_progress();
-        if (background_process.fff_print() != nullptr)
-            preview->load_shells(*background_process.fff_print(), true);
+        preview->reset_shells();
+        preview->load_shells(partplate_list.get_current_fff_print(), true);
     }
     bool is_first_plate = m_cur_slice_plate == 0;
     bool slice_all = q->m_only_gcode ? m_slice_all_only_has_gcode : m_slice_all;
