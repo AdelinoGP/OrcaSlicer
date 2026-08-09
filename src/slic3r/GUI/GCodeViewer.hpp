@@ -178,6 +178,11 @@ public:
     GCodeCheckResult  m_gcode_check_result;
     FilamentPrintableResult filament_printable_reuslt;
     Shells            m_shells;
+    bool              m_slice_progress_active { false };
+    unsigned int      m_slice_progress_texture_id { 0 };
+    int               m_slice_progress_layer_count { 0 };
+    float             m_slice_progress_z_min { 0.f };
+    float             m_slice_progress_z_max { 0.f };
 
 private:
     std::vector<int> m_plater_extruder;
@@ -264,6 +269,9 @@ public:
     void load_as_preview(libvgcode::GCodeInputData&& data);
     void update_shells_color_by_extruder(const DynamicPrintConfig* config);
     void set_shell_transparency(float alpha = 0.15f);
+    // PNP fork (ADR-0002): use the per-layer status texture when rendering
+    // model shells in the Preview canvas during an active slice.
+    void set_slice_progress(bool active, unsigned int texture_id, int layer_count, float z_min, float z_max);
 
     void reset();
     //BBS: always load shell at preview
@@ -369,4 +377,3 @@ private:
 } // namespace Slic3r
 
 #endif // slic3r_GCodeViewer_hpp_
-

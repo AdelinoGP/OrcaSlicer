@@ -10632,7 +10632,12 @@ void Plater::priv::on_slicing_update(SlicingStatusEvent &evt)
 // 3D canvas, which owns the status LUT and repaints on demand.
 void Plater::priv::on_slicing_layer_status(SlicingLayerStatusEvent &evt)
 {
+    BOOST_LOG_TRIVIAL(warning) << "PNP layer-status event received: result=" << evt.snapshot.result
+                            << ", active=" << evt.snapshot.active << ", plate=" << evt.snapshot.plate_idx
+                            << ", layers=" << evt.snapshot.layer_count;
     view3D->get_canvas3d()->set_slice_progress(evt.snapshot);
+    if (preview != nullptr)
+        preview->get_canvas3d()->set_slice_progress(evt.snapshot);
 }
 
 void Plater::priv::on_slicing_completed(wxCommandEvent & evt)
@@ -10681,6 +10686,12 @@ void Plater::priv::on_slicing_began()
     // PNP fork (ADR-0002): drop any frozen slice-progress state from a previous
     // (failed/canceled) slice before the new one's first status event arrives.
     view3D->get_canvas3d()->reset_slice_progress();
+    if (preview != nullptr)
+    {
+        preview->get_canvas3d()->reset_slice_progress();
+        if (background_process.fff_print() != nullptr)
+            preview->load_shells(*background_process.fff_print(), true);
+    }
     bool is_first_plate = m_cur_slice_plate == 0;
     bool slice_all = q->m_only_gcode ? m_slice_all_only_has_gcode : m_slice_all;
     bool need_change_dailytips = !(slice_all && !is_first_plate);
@@ -10853,8 +10864,11 @@ void Plater::priv::on_process_completed(SlicingProcessCompletedEvent &evt)
         // PNP fork (ADR-0002): the scene reload above cleared the frozen
         // slice-progress state; re-apply it for failed/canceled slices so the
         // freeze (completed = green, rest = red) stays visible.
-        if (evt.error() || evt.cancelled())
+        if (evt.error() || evt.cancelled()) {
             view3D->get_canvas3d()->reapply_slice_progress_freeze();
+            if (preview != nullptr)
+                preview->get_canvas3d()->reapply_slice_progress_freeze();
+        }
     }
 
     //BBS: add slice&&print status update logic
@@ -11029,7 +11043,8 @@ void Plater::priv::on_action_slice_plate(SimpleEvent&)
         Model::setPrintSpeedTable(config, print_config);
         m_slice_all = false;
         q->reslice();
-        q->select_view_3D("Preview");
+        // PNP fork (ADR-0002): keep the model canvas visible while pnp_cli is
+        // slicing so the per-layer visualization has model volumes to render.
     }
 }
 
@@ -11052,8 +11067,8 @@ void Plater::priv::on_action_slice_all(SimpleEvent&)
         //select plate
         q->select_plate(m_cur_slice_plate);
         q->reslice();
-        if (!m_is_publishing)
-            q->select_view_3D("Preview");
+        // PNP fork (ADR-0002): keep the model canvas visible while pnp_cli is
+        // slicing; Preview remains unchanged and is available after slicing.
         //BBS: wish to select all plates stats item
         preview->get_canvas3d()->_update_select_plate_toolbar_stats_item(true);
     }
@@ -11524,6 +11539,8 @@ void Plater::priv::on_3dcanvas_mouse_dragging_finished(SimpleEvent&)
         // PNP fork (ADR-0002): no-op unless the last slice failed/canceled —
         // re-apply the frozen slice-progress state the reload just cleared.
         view3D->get_canvas3d()->reapply_slice_progress_freeze();
+        if (preview != nullptr)
+            preview->get_canvas3d()->reapply_slice_progress_freeze();
     }
 
     //partplate_list.reload_all_objects();

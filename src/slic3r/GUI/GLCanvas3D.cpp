@@ -2000,6 +2000,16 @@ void GLCanvas3D::render(bool only_init)
     if (!is_initialized() && !init())
         return;
 
+    // Preview renders model shells through GCodeViewer rather than m_volumes.
+    // Keep its slice-progress shader state synchronized on every frame.
+    if (m_slice_progress.active) {
+        upload_slice_progress_texture();
+        m_gcode_viewer.set_slice_progress(true, m_slice_progress.texture_id,
+            m_slice_progress.layer_count, m_slice_progress.z_min, m_slice_progress.z_max);
+    } else {
+        m_gcode_viewer.set_slice_progress(false, 0, 0, 0.f, 0.f);
+    }
+
     // If a scene reload was postponed while the canvas was hidden, consume it on first visible render.
     if (m_reload_delayed) {
         reload_scene(true);
@@ -8062,6 +8072,14 @@ void GLCanvas3D::_render_plane() const
 // PNP fork (ADR-0002): live per-layer slice progress coloring.
 void GLCanvas3D::set_slice_progress(const LayerStatusSnapshot& snapshot)
 {
+    if (snapshot.active && !m_slice_progress.active)
+        BOOST_LOG_TRIVIAL(warning) << "PNP slice-progress visualization activated: plate=" << snapshot.plate_idx
+                                << ", layers=" << snapshot.layer_count;
+    if (snapshot.active && !m_slice_progress.active) {
+        m_slice_progress_gate_logged = false;
+        m_slice_progress_render_logged = false;
+        m_slice_progress_shader_missing_logged = false;
+    }
     m_slice_progress_last = snapshot;
     if (snapshot.active) {
         m_slice_progress.active        = true;
@@ -8072,6 +8090,9 @@ void GLCanvas3D::set_slice_progress(const LayerStatusSnapshot& snapshot)
         m_slice_progress.z_max         = snapshot.z_max;
         m_slice_progress.status        = snapshot.status;
         m_slice_progress.texture_dirty = true;
+        set_as_dirty();
+        if (m_canvas != nullptr)
+            m_canvas->Refresh(false);
         request_extra_frame();
     } else if (m_slice_progress.active) {
         if (snapshot.result == LayerStatusSnapshot::Success) {
@@ -8079,6 +8100,9 @@ void GLCanvas3D::set_slice_progress(const LayerStatusSnapshot& snapshot)
             m_slice_progress.active        = false;
             m_slice_progress.status.clear();
             m_slice_progress.texture_dirty = false;
+            set_as_dirty();
+            if (m_canvas != nullptr)
+                m_canvas->Refresh(false);
             request_extra_frame();
         } else {
             // Failed/canceled: freeze the coloring, marking everything that was
@@ -8086,6 +8110,9 @@ void GLCanvas3D::set_slice_progress(const LayerStatusSnapshot& snapshot)
             m_slice_progress.result = snapshot.result;
             mark_slice_progress_failed(m_slice_progress.status);
             m_slice_progress.texture_dirty = true;
+            set_as_dirty();
+            if (m_canvas != nullptr)
+                m_canvas->Refresh(false);
             request_extra_frame();
         }
     }
@@ -8099,6 +8126,9 @@ void GLCanvas3D::reset_slice_progress()
     m_slice_progress.layer_count   = 0;
     m_slice_progress.status.clear();
     m_slice_progress.texture_dirty = false;
+    m_slice_progress_gate_logged = false;
+    m_slice_progress_render_logged = false;
+    m_slice_progress_shader_missing_logged = false;
 }
 
 void GLCanvas3D::reapply_slice_progress_freeze()
@@ -8118,6 +8148,9 @@ void GLCanvas3D::reapply_slice_progress_freeze()
     m_slice_progress.status        = s.status;
     mark_slice_progress_failed(m_slice_progress.status);
     m_slice_progress.texture_dirty = true;
+    set_as_dirty();
+    if (m_canvas != nullptr)
+        m_canvas->Refresh(false);
     request_extra_frame();
 }
 
@@ -8145,6 +8178,17 @@ void GLCanvas3D::upload_slice_progress_texture()
 //BBS: add outline drawing logic
 void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type, bool with_outline)
 {
+    if (m_slice_progress.active && !m_slice_progress_gate_logged) {
+        BOOST_LOG_TRIVIAL(warning) << "PNP slice-progress render gate: canvas_ptr=" << this
+                                   << ", volumes_empty=" << m_volumes.empty()
+                                   << ", type=" << static_cast<int>(type)
+                                   << ", canvas=" << static_cast<int>(m_canvas_type)
+                                   << ", layers=" << m_slice_progress.layer_count
+                                   << ", z_min=" << m_slice_progress.z_min
+                                   << ", z_max=" << m_slice_progress.z_max;
+        m_slice_progress_gate_logged = true;
+    }
+
     if (m_volumes.empty())
         return;
 
@@ -8310,11 +8354,21 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type, bool with
                         shader->set_uniform("z_min", m_slice_progress.z_min);
                         shader->set_uniform("z_inv_range", 1.0f / (m_slice_progress.z_max - m_slice_progress.z_min));
                         shader->set_uniform("layer_count", static_cast<float>(m_slice_progress.layer_count));
+                        int slice_progress_volume_count = 0;
                         m_volumes.render(type, m_picking_enabled, camera.get_view_matrix(), camera.get_projection_matrix(), cvn_size,
-                            [base_filter, on_slicing_plate](const GLVolume& volume) {
-                                return base_filter(volume) && on_slicing_plate(volume);
+                            [base_filter, on_slicing_plate, &slice_progress_volume_count](const GLVolume& volume) {
+                                const bool matched = base_filter(volume) && on_slicing_plate(volume);
+                                if (matched)
+                                    ++slice_progress_volume_count;
+                                return matched;
                             },
                             partly_inside_enable, printable_heights);
+                        if (!m_slice_progress_render_logged) {
+                            BOOST_LOG_TRIVIAL(warning) << "PNP slice-progress opaque render: matched volumes="
+                                                       << slice_progress_volume_count << ", plate="
+                                                       << m_slice_progress.plate_idx;
+                            m_slice_progress_render_logged = true;
+                        }
                         // Remaining volumes (other plates) with the normal shader.
                         slice_shader->stop_using();
                         normal_shader->start_using();
@@ -8328,6 +8382,10 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type, bool with
                     else {
                         m_volumes.render(type, m_picking_enabled, camera.get_view_matrix(), camera.get_projection_matrix(), cvn_size,
                             base_filter, partly_inside_enable, printable_heights);
+                        if (m_slice_progress.active && !m_slice_progress_shader_missing_logged) {
+                            BOOST_LOG_TRIVIAL(error) << "PNP slice-progress visualization is active, but shader program 'slice_progress' is unavailable";
+                            m_slice_progress_shader_missing_logged = true;
+                        }
                     }
                 }
             }

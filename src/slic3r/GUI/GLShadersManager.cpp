@@ -10,6 +10,7 @@
 using namespace std::literals;
 
 #include <glad/gl.h>
+#include <boost/log/trivial.hpp>
 
 namespace Slic3r {
 
@@ -21,6 +22,7 @@ std::pair<bool, std::string> GLShadersManager::init()
         const std::initializer_list<std::string_view> &defines = {}) {
         m_shaders.push_back(std::make_unique<GLShaderProgram>());
         if (!m_shaders.back()->init_from_files(name, filenames, defines)) {
+            BOOST_LOG_TRIVIAL(error) << "Failed to initialize shader program '" << name << "'";
             error += name + "\n";
             // if any error happens while initializating the shader, we remove it from the list
             m_shaders.pop_back();
@@ -133,4 +135,3 @@ GLShaderProgram* GLShadersManager::get_current_shader()
 }
 
 } // namespace Slic3r
-

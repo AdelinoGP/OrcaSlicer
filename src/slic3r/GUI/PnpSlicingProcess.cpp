@@ -557,6 +557,9 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 		snap.status.reserve(parser.layer_status().size());
 		for (LayerStatus s : parser.layer_status())
 			snap.status.push_back(static_cast<uint8_t>(s));
+		BOOST_LOG_TRIVIAL(warning) << "PNP layer-status event: result=" << result
+		                        << ", active=" << snap.active << ", plate=" << snap.plate_idx
+		                        << ", layers=" << snap.layer_count << ", statuses=" << snap.status.size();
 		wxQueueEvent(wxGetApp().mainframe->m_plater,
 		             new SlicingLayerStatusEvent(EVT_SLICING_LAYER_STATUS, 0, std::move(snap)));
 	};

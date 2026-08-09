@@ -757,6 +757,9 @@ public:
         bool texture_dirty { false };
     };
     SliceProgressState m_slice_progress;
+    bool m_slice_progress_shader_missing_logged { false };
+    bool m_slice_progress_render_logged { false };
+    bool m_slice_progress_gate_logged { false };
     // The last snapshot received, retained so a failure/cancel freeze can be
     // re-applied after a scene reload (which clears m_slice_progress).
     LayerStatusSnapshot m_slice_progress_last;

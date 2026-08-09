@@ -2484,22 +2484,52 @@ void GCodeViewer::render_shells(int canvas_width, int canvas_height)
         //if (!m_shells.visible || m_shells.volumes.empty())
         return;
 
-    GLShaderProgram* shader = wxGetApp().get_shader("gouraud_light");
+    const bool use_slice_progress = m_slice_progress_active &&
+        m_slice_progress_texture_id != 0 && m_slice_progress_layer_count > 0 &&
+        m_slice_progress_z_max > m_slice_progress_z_min;
+    GLShaderProgram* shader = wxGetApp().get_shader(use_slice_progress ? "slice_progress" : "gouraud_light");
     if (shader == nullptr)
         return;
 
-    glsafe(::glDepthMask(GL_FALSE));
+    glsafe(::glDepthMask(use_slice_progress ? GL_TRUE : GL_FALSE));
 
     shader->start_using();
-    shader->set_uniform("emission_factor", 0.1f);
+    if (use_slice_progress) {
+        glsafe(::glActiveTexture(GL_TEXTURE5));
+        glsafe(::glBindTexture(GL_TEXTURE_1D, m_slice_progress_texture_id));
+        glsafe(::glActiveTexture(GL_TEXTURE0));
+        shader->set_uniform("lut", 5);
+        shader->set_uniform("z_min", m_slice_progress_z_min);
+        shader->set_uniform("z_inv_range", 1.0f / (m_slice_progress_z_max - m_slice_progress_z_min));
+        shader->set_uniform("layer_count", static_cast<float>(m_slice_progress_layer_count));
+    } else {
+        shader->set_uniform("emission_factor", 0.1f);
+    }
     const Camera& camera = wxGetApp().plater()->get_camera();
     shader->set_uniform("z_far", camera.get_far_z());
     shader->set_uniform("z_near", camera.get_near_z());
-    m_shells.volumes.render(GLVolumeCollection::ERenderType::Transparent, false, camera.get_view_matrix(), camera.get_projection_matrix(), {canvas_width, canvas_height});
-    shader->set_uniform("emission_factor", 0.0f);
+    m_shells.volumes.render(GLVolumeCollection::ERenderType::Transparent, false,
+        camera.get_view_matrix(), camera.get_projection_matrix(), {canvas_width, canvas_height});
+    if (!use_slice_progress)
+        shader->set_uniform("emission_factor", 0.0f);
     shader->stop_using();
 
+    if (use_slice_progress) {
+        glsafe(::glActiveTexture(GL_TEXTURE5));
+        glsafe(::glBindTexture(GL_TEXTURE_1D, 0));
+        glsafe(::glActiveTexture(GL_TEXTURE0));
+    }
+
     glsafe(::glDepthMask(GL_TRUE));
+}
+
+void GCodeViewer::set_slice_progress(bool active, unsigned int texture_id, int layer_count, float z_min, float z_max)
+{
+    m_slice_progress_active = active;
+    m_slice_progress_texture_id = texture_id;
+    m_slice_progress_layer_count = layer_count;
+    m_slice_progress_z_min = z_min;
+    m_slice_progress_z_max = z_max;
 }
 
 //BBS
@@ -4747,4 +4777,3 @@ void GCodeViewer::render_slider(int canvas_width, int canvas_height) {
 
 } // namespace GUI
 } // namespace Slic3r
-
