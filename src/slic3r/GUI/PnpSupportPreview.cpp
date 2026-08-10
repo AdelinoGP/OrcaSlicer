@@ -27,7 +27,6 @@ namespace bp = boost::process;
 namespace Slic3r { namespace GUI {
 
 PnpSupportPreviewRun run_support_preview(const boost::filesystem::path &model_3mf,
-                                         const boost::filesystem::path &config_json,
                                          double                         fallback_layer_height_mm,
                                          const std::atomic<bool>       &cancel)
 {
@@ -44,13 +43,11 @@ PnpSupportPreviewRun run_support_preview(const boost::filesystem::path &model_3m
 	const std::vector<std::string> args {
 		"support-preview",
 		"--input",      model_3mf.string(),
-		"--config",     config_json.string(),
 		"--module-dir", backend.module_dir().string(),
 		"--output",     out_path.string(),
 	};
 	BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": " << backend.cli_path().string()
 	                        << " support-preview --input " << model_3mf.string()
-	                        << " --config " << config_json.string()
 	                        << " --module-dir " << backend.module_dir().string()
 	                        << " --output " << out_path.string();
 

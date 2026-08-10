@@ -88,14 +88,15 @@ struct PnpSupportPreviewRun
 	size_t expolygon_count = 0;
 };
 
-// Run `pnp_cli support-preview` over an already-exported 3MF and config, then
-// parse and build the mesh. Blocking: call it from a worker thread.
+// Run `pnp_cli support-preview` over an already-exported 3MF (the translated
+// config rides in the 3MF's project_settings.config sidecar — no separate
+// config file), then parse and build the mesh. Blocking: call it from a
+// worker thread.
 //
 // `cancel` is polled while waiting; when it turns true the child is terminated
 // and the result comes back not-ok with an empty error (a cancel is not a
 // failure and must not raise a notification).
 PnpSupportPreviewRun run_support_preview(const boost::filesystem::path& model_3mf,
-                                         const boost::filesystem::path& config_json,
                                          double                         fallback_layer_height_mm,
                                          const std::atomic<bool>&       cancel);
 

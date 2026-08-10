@@ -1175,6 +1175,7 @@ target("pnp_runtime_tests")
               "tests/pnp/test_pnp_config_warnings_log.cpp",
               "tests/pnp/test_pnp_support_preview.cpp",
               "tests/pnp/test_pnp_model_sidecar.cpp",
+              "tests/pnp/test_pnp_backup_path.cpp",
               "src/slic3r/GUI/PnpProgress.cpp",
               "src/slic3r/GUI/PnpConfigWarningsLog.cpp",
               "src/slic3r/GUI/PnpModelSidecar.cpp",

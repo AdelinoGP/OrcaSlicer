@@ -12,7 +12,8 @@
 //
 // Threading model: no persistent worker thread, no condition-variable state
 // machine. start() prepares the pnp_cli inputs synchronously on the UI thread
-// (per-slice temp subdir with the exported plate 3MF + config.json), then
+// (per-slice temp subdir with the exported plate 3MF carrying the translated
+// config in its project_settings.config sidecar), then
 // spawns one worker thread per slice which launches pnp_cli, pumps its stderr
 // JSONL progress stream through PnpProgressParser, waits, and posts the same
 // wx events BSP posts (SlicingStatusEvent via the Print status callback,
@@ -99,8 +100,9 @@ public:
 	// macro processor and save it next to the project file. Empty project_path = plain output_filepath().
 	std::string         output_filepath_for_project(const boost::filesystem::path &project_path);
 
-	// Start slicing the current plate through pnp_cli. Exports the plate 3MF +
-	// config.json synchronously on the UI thread, then spawns the worker.
+	// Start slicing the current plate through pnp_cli. Exports the plate 3MF
+	// (translated config merged into its project_settings.config sidecar)
+	// synchronously on the UI thread, then spawns the worker.
 	// Returns false if a slice is already running or there is nothing to slice.
 	bool start();
 	// Cancel the running slice (terminate pnp_cli, delete partial output) and

@@ -860,12 +860,13 @@ void GLGizmoFdmSupports::request_support_preview()
     }
 
     const boost::filesystem::path model_path  = dir / "model.3mf";
-    const boost::filesystem::path config_path = dir / "config.json";
 
     const DynamicPrintConfig full_config = wxGetApp().preset_bundle->full_config();
     PnpTranslationResult     translated  = PnpConfigTranslator::translate(full_config);
     // The overlay is only meaningful with supports on; the user is standing in
     // the support-painting gizmo, so force it rather than inherit the preset.
+    // export_plate_3mf_for_pnp merges this into the 3MF sidecar, which
+    // pnp_cli support-preview reads (no separate --config file).
     translated.json["enable_support"] = true;
 
     std::string export_error;
@@ -873,13 +874,6 @@ void GLGizmoFdmSupports::request_support_preview()
         BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": 3MF export failed: " << export_error;
         boost::filesystem::remove_all(dir, ec);
         return;
-    }
-
-    // pnp_cli support-preview does not read the 3MF sidecar yet, so the
-    // preview keeps the separate --config file (the slice path does not).
-    {
-        boost::nowide::ofstream out(config_path.string().c_str(), std::ios::binary);
-        out << translated.json.dump(2);
     }
 
     double layer_height = 0.2;
@@ -899,8 +893,8 @@ void GLGizmoFdmSupports::request_support_preview()
         m_preview_error.clear();
     }
 
-    m_thread = boost::thread([this, dir, model_path, config_path, layer_height]() {
-        PnpSupportPreviewRun run = run_support_preview(model_path, config_path, layer_height, m_preview_cancel);
+    m_thread = boost::thread([this, dir, model_path, layer_height]() {
+        PnpSupportPreviewRun run = run_support_preview(model_path, layer_height, m_preview_cancel);
         {
             std::unique_lock<std::mutex> lck(m_mutex);
             m_preview_mesh            = std::move(run.mesh);

@@ -2,7 +2,8 @@
 
 // PNP fork (wayfinder ticket F01): pure translator from an Orca
 // DynamicPrintConfig (preset_bundle->full_config(), ~925 keys) to the flat-key
-// PNP JSON that `pnp_cli slice --config` consumes, plus a classified warning
+// PNP JSON that rides in the 3MF's project_settings.config sidecar (read by
+// `pnp_cli slice` and `pnp_cli support-preview`), plus a classified warning
 // vector. Mapping table and tier semantics: .wayfinder/assets/005-preset-to-pnp-config-mapping.md.
 //
 // This is a pure function: no file IO, no logging, no UI. Every Tier-B/C/D

@@ -259,6 +259,15 @@ void set_temporary_dir(const std::string &dir)
 
 const std::string& temporary_dir()
 {
+    // Never return empty: an empty parent makes Model::get_backup_path() build
+    // "/orcaslicer_model/..." which Windows resolves to the root of the current
+    // drive. Consumers that never call set_temporary_dir() (test binaries,
+    // headless tools) fall back to the system temp dir instead.
+    // Callers that set it (the GUI, via CLI::run) are unaffected; the fallback
+    // only ever runs while g_temporary_dir is still unset, i.e. before any
+    // worker threads exist in those consumers.
+    if (g_temporary_dir.empty())
+        g_temporary_dir = boost::filesystem::temp_directory_path().string();
     return g_temporary_dir;
 }
 
