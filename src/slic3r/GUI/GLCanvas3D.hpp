@@ -557,6 +557,10 @@ private:
 
     GLVolumeCollection m_volumes;
     GCodeViewer m_gcode_viewer;
+    // Preview may request shells before its first OpenGL frame. Retain the
+    // request until init() creates the context-backed viewer resources.
+    const Print* m_pending_shell_print { nullptr };
+    bool m_pending_shell_force_previewing { false };
 
     RenderTimer m_render_timer;
 

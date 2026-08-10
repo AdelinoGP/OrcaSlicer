@@ -1355,6 +1355,15 @@ bool GLCanvas3D::init()
     //    wxGetApp().plater()->enable_wireframe(false);
     m_initialized = true;
 
+    if (m_pending_shell_print != nullptr) {
+        const Print* print = m_pending_shell_print;
+        const bool force_previewing = m_pending_shell_force_previewing;
+        m_pending_shell_print = nullptr;
+        m_pending_shell_force_previewing = false;
+        m_gcode_viewer.load_shells(*print, true, force_previewing);
+        m_gcode_viewer.update_shells_color_by_extruder(m_config);
+    }
+
     return true;
 }
 
@@ -2995,11 +3004,14 @@ void GLCanvas3D::reload_scene(bool refresh_immediately, bool force_full_scene_re
 
 void GLCanvas3D::load_shells(const Print& print, bool force_previewing)
 {
-    if (m_initialized)
-    {
-        m_gcode_viewer.load_shells(print, m_initialized, force_previewing);
-        m_gcode_viewer.update_shells_color_by_extruder(m_config);
+    if (!m_initialized) {
+        m_pending_shell_print = &print;
+        m_pending_shell_force_previewing = force_previewing;
+        return;
     }
+
+    m_gcode_viewer.load_shells(print, true, force_previewing);
+    m_gcode_viewer.update_shells_color_by_extruder(m_config);
 }
 
 void GLCanvas3D::set_shell_transparence(float alpha){
