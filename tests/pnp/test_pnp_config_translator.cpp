@@ -13,6 +13,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include <set>
+
 #include "libslic3r/PrintConfig.hpp"
 #include "slic3r/GUI/PnpConfigTranslator.hpp"
 
@@ -309,5 +311,45 @@ TEST_CASE("schema guard drops keys the pnp schema would reject", "[pnp][translat
         PnpConfigTranslator::apply_schema_guard(cfg, real_schema, warnings);
         REQUIRE(!cfg.contains("ironing_flow"));
         REQUIRE(warnings.size() == 1);
+    }
+}
+
+TEST_CASE("pnp_key_is_unimplemented matches the Tier-D warning set", "[pnp][translator]")
+{
+    // Tier-A identity keys are implemented.
+    REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("layer_height"));
+    REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("wall_loops"));
+    REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("nozzle_diameter"));
+    // Tier-B transform rows are implemented (possibly lossy).
+    REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("seam_position"));
+    REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("sparse_infill_density"));
+    REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("fuzzy_skin"));
+    REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("raft_layers"));
+    // Tier-D keys are not.
+    REQUIRE(PnpConfigTranslator::pnp_key_is_unimplemented("gcode_flavor"));
+    REQUIRE(PnpConfigTranslator::pnp_key_is_unimplemented("gcode_comments"));
+    REQUIRE(PnpConfigTranslator::pnp_key_is_unimplemented("independent_support_layer_height"));
+    // Unknown keys are not implemented either.
+    REQUIRE(PnpConfigTranslator::pnp_key_is_unimplemented("no_such_key"));
+}
+
+TEST_CASE("pnp_key_is_unimplemented agrees with translate()'s warnings", "[pnp][translator]")
+{
+    // Every key translate() warns about as Tier D (not-yet-mapped or
+    // unsupported-feature) must read as unimplemented, and every key it does
+    // not warn about that way must read as implemented. Lossy-fallback
+    // warnings are excluded: those keys ARE sent (with a substituted value).
+    DynamicPrintConfig cfg = DynamicPrintConfig::full_print_config();
+    const auto         res = PnpConfigTranslator::translate(cfg);
+
+    std::set<std::string> tier_d_warned;
+    for (const PnpConfigWarning& w : res.warnings)
+        if (w.warn_class == PnpWarningClass::NotYetMapped ||
+            w.warn_class == PnpWarningClass::UnsupportedFeature)
+            tier_d_warned.insert(w.key);
+
+    for (const std::string& key : cfg.keys()) {
+        const bool unimplemented = PnpConfigTranslator::pnp_key_is_unimplemented(key);
+        REQUIRE(unimplemented == (tier_d_warned.count(key) != 0));
     }
 }

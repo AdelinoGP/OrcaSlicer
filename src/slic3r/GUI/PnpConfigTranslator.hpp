@@ -42,6 +42,11 @@ void apply_schema_guard(nlohmann::json& config, const nlohmann::json& schema_doc
 
 PnpTranslationResult translate(const DynamicPrintConfig& full_config);
 
+// True when `orca_key` has no PNP equivalent: it is consumed by no Tier-A/B
+// row, so translate() emits a Tier-D warning for it (ticket 013). Drives the
+// yellow label tint on unimplemented options in the settings tabs.
+bool pnp_key_is_unimplemented(const std::string& orca_key);
+
 } // namespace PnpConfigTranslator
 
 }} // namespace Slic3r::GUI

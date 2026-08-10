@@ -84,6 +84,19 @@ void ingest_pnp_gcode(GCodeProcessorResult &dst, const std::string &gcode_path, 
 	dst = std::move(processor.extract_result());
 }
 
+// F03 UI surface (ticket 013, reopened past v1): translated labels for the
+// config-warning notification. The formatter itself is wx-free so the
+// GUI-free test binary can exercise it; translation happens here.
+PnpConfigWarningLabels pnp_warning_labels()
+{
+    PnpConfigWarningLabels labels;
+    labels.title       = _u8L("PNP config warnings:");
+    labels.unsupported = _u8L("not supported by PNP");
+    labels.lossy       = _u8L("sent with substituted value");
+    labels.unmapped    = _u8L("not mapped to PNP");
+    return labels;
+}
+
 } // anonymous namespace
 
 // pnp handoff item 11: how long a cancelled pnp_cli gets to unwind after its
@@ -282,8 +295,20 @@ bool PnpSlicingProcess::start()
 				BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": schema guard skipped: " << ex.what();
 			}
 		}
-		// F03: dev-instrument sink for unmapped/lossy keys.
+		// F03: dev-instrument sink for unmapped/lossy keys, plus the
+		// user-facing notification (ticket 013, reopened past v1): settings
+		// PNP cannot honor are surfaced as a warning, not just logged. The UI
+		// filter drops no-op records and not-yet-mapped keys at their default;
+		// the log keeps both.
+		const std::vector<PnpConfigWarning> user_warnings =
+			filter_pnp_config_warnings(full_config, translated.warnings, /*include_no_op=*/false);
 		log_pnp_config_warnings(full_config, std::move(translated.warnings), job.plate_idx);
+		if (!user_warnings.empty()) {
+			wxGetApp().plater()->get_notification_manager()->push_notification(
+				NotificationType::CustomNotification,
+				NotificationManager::NotificationLevel::WarningNotificationLevel,
+				format_pnp_config_warning_message(user_warnings, pnp_warning_labels()));
+		}
 		// F14: hand pnp the requested thumbnail sizes/formats via the
 		// `thumbnails` passthrough key (Orca coString "XxY/EXT,..."; legacy
 		// thumbnails_format is already folded into the /EXT suffix at config

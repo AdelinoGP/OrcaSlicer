@@ -11,6 +11,13 @@ files: [src/slic3r/GUI/PnpConfigWarningsLog.hpp, src/slic3r/GUI/PnpConfigWarning
 The write side of [ticket 013](../../tickets/013-config-warning-ux.md): take F01's warning vector,
 filter, and persist. **No UI, ever** — warnings are a dev instrument.
 
+> **Reopened past v1 (2026-08-10):** the "no UI" half of this ticket is reversed.
+> `filter_pnp_config_warnings()` (this TU) now also feeds a
+> `WarningNotificationLevel` notification pushed by `PnpSlicingProcess` at slice
+> start, listing the affected keys via `format_pnp_config_warning_message()`.
+> The jsonl sink below is unchanged and remains the full record; the
+> notification is a summary. `no-op` records remain log-only.
+
 ## Decisions (do not re-open)
 
 - Filter: **Tier-D (`not-yet-mapped`) records are dropped when the key sits at its default** —

@@ -109,6 +109,40 @@ const char* const TIER_A_KEYS[] = {
     "use_relative_e_distances",
 };
 
+// Orca keys consumed by a Tier-A or Tier-B row (they get no Tier-D warning).
+// Single source of truth for translate() and pnp_key_is_unimplemented().
+const std::set<std::string>& pnp_handled_keys()
+{
+    static const std::set<std::string> handled = [] {
+        std::set<std::string> s;
+        for (const char* key : TIER_A_KEYS)
+            s.insert(key);
+        // Tier-B rows (renames / transforms) — keep in sync with translate().
+        s.insert("printable_area");
+        s.insert({"curr_bed_type",
+                  "supertack_plate_temp_initial_layer", "cool_plate_temp_initial_layer",
+                  "textured_cool_plate_temp_initial_layer", "eng_plate_temp_initial_layer",
+                  "hot_plate_temp_initial_layer", "textured_plate_temp_initial_layer"});
+        s.insert({"close_fan_the_first_x_layers", "enable_overhang_bridge_fan",
+                  "fan_max_speed", "fan_min_speed", "initial_layer_print_height",
+                  "infill_direction"});
+        s.insert({"sparse_infill_density", "sparse_infill_speed", "ironing_type"});
+        s.insert({"sparse_infill_line_width", "internal_solid_infill_line_width",
+                  "top_surface_line_width", "bridge_line_width"});
+        s.insert("seam_position");
+        s.insert("brim_type"); // skirt_loops is Tier A above
+        s.insert({"spiral_mode", "enable_support", "raft_layers",
+                  "support_top_z_distance"});
+        s.insert({"wall_generator", "wall_sequence", "support_base_pattern_spacing",
+                  "support_interface_spacing"});
+        s.insert({"fuzzy_skin", "fuzzy_skin_thickness", "fuzzy_skin_point_distance"});
+        s.insert({"z_hop", "retraction_length", "retraction_speed", "wall_loops",
+                  "enable_prime_tower", "prime_tower_width", "prime_volume"});
+        return s;
+    }();
+    return handled;
+}
+
 // Known Tier-D warning-class overrides. Per ticket 013 there is no up-front
 // classification pass: keys default to NotYetMapped and a class is written
 // here only when there is a concrete reason (dogfooding hit or known gap).
@@ -204,7 +238,7 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     json& out   = result.json;
 
     // Orca keys consumed by a Tier-A or Tier-B row (they get no Tier-D warning).
-    std::set<std::string> handled;
+    const std::set<std::string>& handled = pnp_handled_keys();
 
     const auto put = [&](const char* pnp_key, json value) {
         if (!value.is_null())
@@ -214,9 +248,9 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
                           std::string orca_value, std::string sent_value = std::string()) {
         result.warnings.push_back({key, cls, std::move(orca_value), std::move(sent_value)});
     };
-    // Copy an orca option to a (possibly renamed) pnp key and claim the source.
+    // Copy an orca option to a (possibly renamed) pnp key. The source key is
+    // already in pnp_handled_keys().
     const auto copy_as = [&](const char* orca_key, const char* pnp_key) {
-        handled.insert(orca_key);
         put(pnp_key, option_to_json(cfg.option(orca_key)));
     };
 
@@ -232,7 +266,6 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
 
     // printable_area -> bed_shape: points list -> flat [x0, y0, x1, y1, ...]
     // in mm (pnp types it float-list; nested pairs fail config resolution).
-    handled.insert("printable_area");
     if (auto* pts = cfg.option<ConfigOptionPoints>("printable_area"); pts != nullptr) {
         json shape = json::array();
         for (const Vec2d& p : pts->values) {
@@ -243,10 +276,6 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     }
 
     // <active bed type>_plate_temp_initial_layer -> bed_temperature_initial_layer_single.
-    handled.insert({"curr_bed_type",
-                    "supertack_plate_temp_initial_layer", "cool_plate_temp_initial_layer",
-                    "textured_cool_plate_temp_initial_layer", "eng_plate_temp_initial_layer",
-                    "hot_plate_temp_initial_layer", "textured_plate_temp_initial_layer"});
     if (cfg.option("curr_bed_type") != nullptr) {
         const auto        bed_type = cfg.opt_enum<BedType>("curr_bed_type");
         const std::string temp_key = get_bed_temp_1st_layer_key(bed_type);
@@ -267,20 +296,17 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     // arachne/classic perimeter modules consume the sparse_infill_density
     // sink as a percent > 0 gate. Sending the raw percent to infill_density
     // made pnp slice at 2500% density (clamped to 100% infill).
-    handled.insert("sparse_infill_density");
     if (json v = option_to_json(cfg.option("sparse_infill_density")); v.is_number()) {
         out["infill_density"]        = v.get<double>() / 100.;
         out["sparse_infill_density"] = v;
     }
     // sparse_infill_speed: one source, two sinks (module key + host speed).
-    handled.insert("sparse_infill_speed");
     if (json v = option_to_json(cfg.option("sparse_infill_speed")); !v.is_null()) {
         out["infill_speed"]        = v;
         out["sparse_infill_speed"] = v;
     }
 
     // ironing_type -> ironing_enabled (bool).
-    handled.insert("ironing_type");
     if (cfg.option("ironing_type") != nullptr)
         out["ironing_enabled"] = serialize_or_empty(cfg, "ironing_type") != "no ironing";
     // ironing_flow / ironing_spacing additionally feed PNP variant keys
@@ -308,8 +334,6 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     // back to pnp's line_width / 1.125*nozzle defaults). Unlike the four Tier-A
     // widths above, these keys have no identity copy, so absolute values must
     // be emitted here too, not only percent fix-ups.
-    handled.insert({"sparse_infill_line_width", "internal_solid_infill_line_width",
-                    "top_surface_line_width", "bridge_line_width"});
     for (const char* key :
          {"line_width", "initial_layer_line_width", "inner_wall_line_width", "outer_wall_line_width",
           "sparse_infill_line_width", "internal_solid_infill_line_width", "top_surface_line_width",
@@ -367,7 +391,6 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
 
     // seam_position -> seam_mode. nearest/back/random map; Orca "aligned"
     // (and "aligned_back") have no PNP equivalent -> "nearest" + lossy warning.
-    handled.insert("seam_position");
     if (cfg.option("seam_position") != nullptr) {
         const std::string seam = serialize_or_empty(cfg, "seam_position");
         if (seam == "nearest" || seam == "random") {
@@ -381,7 +404,7 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     }
 
     // skirt_loops > 0 OR brim_type != no_brim -> skirt_brim_enabled.
-    handled.insert("brim_type"); // skirt_loops is Tier A above
+    // (skirt_loops is Tier A above.)
     {
         const ConfigOption* loops = cfg.option("skirt_loops");
         const bool skirt_on = loops != nullptr && loops->getInt() > 0;
@@ -407,13 +430,11 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     copy_as("support_top_z_distance", "support_top_z_distance_mm");
 
     // wall_generator: identity name, but coEnum -> PNP string ("classic"/"arachne").
-    handled.insert("wall_generator");
     if (cfg.option("wall_generator") != nullptr)
         out["wall_generator"] = serialize_or_empty(cfg, "wall_generator");
 
     // wall_sequence: Orca serializes "inner wall/outer wall"-style; PNP expects
     // "InnerOuter"-style (mapping asset, Tier-A caveats).
-    handled.insert("wall_sequence");
     if (cfg.option("wall_sequence") != nullptr) {
         const std::string seq = serialize_or_empty(cfg, "wall_sequence");
         if (seq == "inner wall/outer wall")
@@ -431,7 +452,6 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     // support_base_pattern_spacing -> support_density: spacing<->density
     // inversion formula unverified (mapping asset open point; ticket 013 lists
     // this as a lossy-fallback member). Not sent; PNP default rules.
-    handled.insert("support_base_pattern_spacing");
     if (cfg.option("support_base_pattern_spacing") != nullptr)
         warn("support_base_pattern_spacing", PnpWarningClass::LossyFallback,
              serialize_or_empty(cfg, "support_base_pattern_spacing"), std::string());
@@ -439,7 +459,6 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     copy_as("support_interface_spacing", "tree_support_interface_spacing_mm");
 
     // fuzzy_skin group: enum gates whether the module keys are emitted at all.
-    handled.insert({"fuzzy_skin", "fuzzy_skin_thickness", "fuzzy_skin_point_distance"});
     {
         const std::string fuzzy = serialize_or_empty(cfg, "fuzzy_skin");
         bool emit_fuzzy = true;
@@ -486,6 +505,11 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
             warn(key, tier_d_class(key), cfg.opt_serialize(key));
 
     return result;
+}
+
+bool pnp_key_is_unimplemented(const std::string& orca_key)
+{
+    return pnp_handled_keys().count(orca_key) == 0;
 }
 
 namespace {

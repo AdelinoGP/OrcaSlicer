@@ -1,8 +1,8 @@
 #pragma once
 
 // PNP fork: shared warning record emitted by PnpConfigTranslator (F01) and
-// consumed by the config-warnings sink (F03). Warnings are a dev instrument
-// only — they are never surfaced in the UI (wayfinder ticket 013).
+// consumed by the config-warnings sink (F03) and the GUI warning notification
+// (wayfinder ticket 013, reopened past v1).
 
 #include <string>
 

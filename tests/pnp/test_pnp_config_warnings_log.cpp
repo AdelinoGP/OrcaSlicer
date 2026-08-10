@@ -207,3 +207,88 @@ TEST_CASE("config-warnings sink writes nothing when every record is filtered", "
 
     REQUIRE(dir.records().empty());
 }
+
+TEST_CASE("config-warnings filter drops not-yet-mapped keys at their default", "[pnp][warnings]")
+{
+    DynamicPrintConfig full = DynamicPrintConfig::full_print_config();
+    full.set_key_value("layer_height", new ConfigOptionFloat(0.42));
+
+    std::vector<PnpConfigWarning> warnings{
+        warning("layer_height", PnpWarningClass::NotYetMapped, "0.42"), // changed -> kept
+        warning("wall_loops", PnpWarningClass::NotYetMapped, "2"),      // at default -> dropped
+    };
+
+    const auto kept = filter_pnp_config_warnings(full, warnings, /*include_no_op=*/true);
+    REQUIRE(kept.size() == 1);
+    REQUIRE(kept[0].key == "layer_height");
+}
+
+TEST_CASE("config-warnings filter never drops the non-Tier-D classes", "[pnp][warnings]")
+{
+    DynamicPrintConfig full = DynamicPrintConfig::full_print_config();
+    full.set_key_value("wall_loops", new ConfigOptionInt(5));
+
+    std::vector<PnpConfigWarning> warnings{
+        warning("spiral_mode", PnpWarningClass::UnsupportedFeature),
+        warning("seam_position", PnpWarningClass::LossyFallback, "aligned", "nearest"),
+        warning("wall_loops", PnpWarningClass::NotYetMapped, "5"), // non-default -> kept
+    };
+
+    const auto kept = filter_pnp_config_warnings(full, warnings, /*include_no_op=*/true);
+    REQUIRE(kept.size() == 3);
+}
+
+TEST_CASE("config-warnings filter drops no-op records for the UI", "[pnp][warnings]")
+{
+    DynamicPrintConfig full = DynamicPrintConfig::full_print_config();
+
+    std::vector<PnpConfigWarning> warnings{
+        warning("gcode_comments", PnpWarningClass::NoOp),
+        warning("spiral_mode", PnpWarningClass::UnsupportedFeature),
+    };
+
+    const auto kept = filter_pnp_config_warnings(full, warnings, /*include_no_op=*/false);
+    REQUIRE(kept.size() == 1);
+    REQUIRE(kept[0].key == "spiral_mode");
+}
+
+TEST_CASE("config-warning message groups by class and shows substituted values", "[pnp][warnings]")
+{
+    PnpConfigWarningLabels labels;
+    labels.title       = "PNP config warnings:";
+    labels.unsupported = "not supported by PNP";
+    labels.lossy       = "sent with substituted value";
+    labels.unmapped    = "not mapped to PNP";
+
+    std::vector<PnpConfigWarning> warnings{
+        warning("raft_layers", PnpWarningClass::UnsupportedFeature, "3"),
+        warning("gcode_flavor", PnpWarningClass::UnsupportedFeature, "klipper"),
+        warning("seam_position", PnpWarningClass::LossyFallback, "aligned", "nearest"),
+        warning("wall_loops", PnpWarningClass::NotYetMapped, "2"),
+    };
+
+    const std::string msg = format_pnp_config_warning_message(warnings, labels);
+    REQUIRE(msg.find("PNP config warnings:") != std::string::npos);
+    REQUIRE(msg.find("not supported by PNP: raft_layers, gcode_flavor") != std::string::npos);
+    REQUIRE(msg.find("seam_position (aligned → nearest)") != std::string::npos);
+    REQUIRE(msg.find("not mapped to PNP: wall_loops") != std::string::npos);
+}
+
+TEST_CASE("config-warning message caps long key lists", "[pnp][warnings]")
+{
+    PnpConfigWarningLabels labels;
+    labels.title       = "PNP config warnings:";
+    labels.unsupported = "not supported by PNP";
+    labels.lossy       = "sent with substituted value";
+    labels.unmapped    = "not mapped to PNP";
+
+    std::vector<PnpConfigWarning> warnings;
+    for (int i = 0; i < 8; ++i)
+        warnings.push_back(warning("key" + std::to_string(i), PnpWarningClass::UnsupportedFeature));
+
+    const std::string msg = format_pnp_config_warning_message(warnings, labels);
+    REQUIRE(msg.find("key0") != std::string::npos);
+    REQUIRE(msg.find("key4") != std::string::npos);
+    REQUIRE(msg.find("key5") == std::string::npos);
+    REQUIRE(msg.find("3 more") != std::string::npos);
+}

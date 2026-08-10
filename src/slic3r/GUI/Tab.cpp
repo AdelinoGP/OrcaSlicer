@@ -57,6 +57,7 @@
 #include "WipeTowerDialog.hpp"
 
 #include "DeviceCore/DevManager.h"
+#include "PnpConfigTranslator.hpp"
 
 #ifdef WIN32
 	#include <commctrl.h>
@@ -79,6 +80,23 @@ int mode_to_selection(ConfigOptionMode mode)
     return mode == comExpert ? 2 :
            mode == comAdvanced ? 1 :
            0;
+}
+
+// PNP fork (ticket 013, reopened past v1): yellow tint for options with no
+// PNP equivalent. The gap signal wins over the modified/system state colors;
+// the undo button still shows the modified state. Preset-metadata lines
+// (compatible_*) are bookkeeping, not features — never tinted. Amber that
+// reads on both light and dark backgrounds; two statics so the pointer stays
+// valid across mode switches (update_label_colours re-runs on mode change).
+const wxColour* pnp_gap_label_color(const wxColour* state_color, const std::string& opt_key)
+{
+    if (opt_key == "compatible_prints" || opt_key == "compatible_printers")
+        return state_color;
+    static const wxColour dark  = wxColour("#E6A800");
+    static const wxColour light = wxColour("#B8860B");
+    return PnpConfigTranslator::pnp_key_is_unimplemented(opt_key)
+               ? (GUI_App::dark_mode() ? &dark : &light)
+               : state_color;
 }
 }
 
@@ -856,13 +874,13 @@ void Tab::update_label_colours()
         if (opt.first == "printable_area"            ||
             opt.first == "compatible_prints"    || opt.first == "compatible_printers"           ) {
             if (Line* line = get_line(opt.first))
-                line->set_label_colour(color);
+                line->set_label_colour(pnp_gap_label_color(color, opt.first));
             continue;
         }
 
         Field* field = get_field(opt.first);
         if (field == nullptr) continue;
-        field->set_label_colour(color);
+        field->set_label_colour(pnp_gap_label_color(color, opt.first));
     }
 
     auto cur_item = m_tabctrl->GetFirstVisibleItem();
@@ -978,7 +996,7 @@ void Tab::decorate()
                 line->set_undo_to_sys_bitmap(sys_icon);
                 line->set_undo_tooltip(tt);
                 line->set_undo_to_sys_tooltip(sys_tt);
-                line->set_label_colour(color);
+                line->set_label_colour(pnp_gap_label_color(color, opt.first));
             }
             continue;
         }
@@ -990,7 +1008,7 @@ void Tab::decorate()
         field->set_undo_to_sys_bitmap(sys_icon);
         field->set_undo_tooltip(tt);
         field->set_undo_to_sys_tooltip(sys_tt);
-        field->set_label_colour(color);
+        field->set_label_colour(pnp_gap_label_color(color, opt.first));
 
         if (field->has_edit_ui())
             field->set_edit_bitmap(&m_bmp_edit_value);
