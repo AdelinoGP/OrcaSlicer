@@ -181,6 +181,9 @@ void AppConfig::set_defaults()
         if (get("toolkit_size").empty())
             set("toolkit_size", "100");
 
+        if (get("show_pnp_slice_progress").empty())
+            set_bool("show_pnp_slice_progress", true);
+
 #if ENABLE_ENVIRONMENT_MAP
         if (get("use_environment_map").empty())
             set("use_environment_map", false);

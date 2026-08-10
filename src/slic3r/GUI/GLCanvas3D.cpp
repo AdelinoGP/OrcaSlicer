@@ -2011,7 +2011,7 @@ void GLCanvas3D::render(bool only_init)
 
     // Preview renders model shells through GCodeViewer rather than m_volumes.
     // Keep its slice-progress shader state synchronized on every frame.
-    if (m_slice_progress.active) {
+    if (m_slice_progress.active && wxGetApp().app_config->get_bool("show_pnp_slice_progress")) {
         upload_slice_progress_texture();
         m_gcode_viewer.set_slice_progress(true, m_slice_progress.texture_id,
             m_slice_progress.layer_count, m_slice_progress.z_min, m_slice_progress.z_max);
@@ -8190,7 +8190,9 @@ void GLCanvas3D::upload_slice_progress_texture()
 //BBS: add outline drawing logic
 void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type, bool with_outline)
 {
-    if (m_slice_progress.active && !m_slice_progress_gate_logged) {
+    const bool show_slice_progress = m_slice_progress.active &&
+        wxGetApp().app_config->get_bool("show_pnp_slice_progress");
+    if (show_slice_progress && !m_slice_progress_gate_logged) {
         BOOST_LOG_TRIVIAL(warning) << "PNP slice-progress render gate: canvas_ptr=" << this
                                    << ", volumes_empty=" << m_volumes.empty()
                                    << ", type=" << static_cast<int>(type)
@@ -8346,7 +8348,7 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type, bool with
                     // render in the Transparent pass, untouched here).
                     GLShaderProgram* normal_shader = shader;
                     GLShaderProgram* slice_shader = nullptr;
-                    if (m_slice_progress.active && m_slice_progress.layer_count > 0 &&
+                    if (show_slice_progress && m_slice_progress.layer_count > 0 &&
                         m_slice_progress.z_max > m_slice_progress.z_min &&
                         (slice_shader = wxGetApp().get_shader("slice_progress")) != nullptr) {
                         auto on_slicing_plate = [this](const GLVolume& volume) {
@@ -8394,7 +8396,7 @@ void GLCanvas3D::_render_objects(GLVolumeCollection::ERenderType type, bool with
                     else {
                         m_volumes.render(type, m_picking_enabled, camera.get_view_matrix(), camera.get_projection_matrix(), cvn_size,
                             base_filter, partly_inside_enable, printable_heights);
-                        if (m_slice_progress.active && !m_slice_progress_shader_missing_logged) {
+                        if (show_slice_progress && !m_slice_progress_shader_missing_logged) {
                             BOOST_LOG_TRIVIAL(error) << "PNP slice-progress visualization is active, but shader program 'slice_progress' is unavailable";
                             m_slice_progress_shader_missing_logged = true;
                         }

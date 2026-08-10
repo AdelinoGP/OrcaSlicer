@@ -1049,6 +1049,12 @@ wxBoxSizer *PreferencesDialog::create_item_checkbox(wxString title, wxString too
                 wxGetApp().mainframe->m_webview->SendCloudProvidersInfo();
             }
         }
+        else if (param == "show_pnp_slice_progress") {
+            if (GLCanvas3D* canvas = wxGetApp().plater()->get_current_canvas3D()) {
+                canvas->set_as_dirty();
+                canvas->request_extra_frame();
+            }
+        }
 
 #ifdef __WXMSW__
         if (param == "associate_3mf") {
@@ -1857,6 +1863,13 @@ void PreferencesDialog::create_items()
         SETTING_OPENGL_PHONG_SMOOTH_NORMALS
     );
     g_sizer->Add(smooth_normals);
+
+    auto item_pnp_slice_progress = create_item_checkbox(
+        _L("Show live slicing progress"),
+        _L("Colors the model by per-layer PNP slicing status in the Preview tab."),
+        "show_pnp_slice_progress"
+    );
+    g_sizer->Add(item_pnp_slice_progress);
 
     //// GRAPHICS > Realistic view
     g_sizer->Add(create_item_title(_L("Realistic View")), 1, wxEXPAND);
