@@ -262,9 +262,14 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     copy_as("infill_direction", "infill_angle");
 
     // sparse_infill_density feeds both PNP keys (infill modules + arachne).
+    // Unit split: pnp's infill_density is a fraction (0.0-1.0, default 0.2),
+    // while Orca's sparse_infill_density is a percent (25 = 25%) and the
+    // arachne/classic perimeter modules consume the sparse_infill_density
+    // sink as a percent > 0 gate. Sending the raw percent to infill_density
+    // made pnp slice at 2500% density (clamped to 100% infill).
     handled.insert("sparse_infill_density");
-    if (json v = option_to_json(cfg.option("sparse_infill_density")); !v.is_null()) {
-        out["infill_density"]        = v;
+    if (json v = option_to_json(cfg.option("sparse_infill_density")); v.is_number()) {
+        out["infill_density"]        = v.get<double>() / 100.;
         out["sparse_infill_density"] = v;
     }
     // sparse_infill_speed: one source, two sinks (module key + host speed).
@@ -297,12 +302,40 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     // untyped in pnp's extensions map, where a "105%" string is harmless. Both
     // must be resolved here. The wall widths below are not pnp-declared, but
     // resolving them costs nothing and keeps the set of widths consistent.
+    // The role-specific infill/top/bridge widths are declared float (mm) in the
+    // infill modules' schemas and consumed via get_float, so they must also be
+    // resolved to absolute mm here (they were Tier D before, silently falling
+    // back to pnp's line_width / 1.125*nozzle defaults). Unlike the four Tier-A
+    // widths above, these keys have no identity copy, so absolute values must
+    // be emitted here too, not only percent fix-ups.
+    handled.insert({"sparse_infill_line_width", "internal_solid_infill_line_width",
+                    "top_surface_line_width", "bridge_line_width"});
     for (const char* key :
-         {"line_width", "initial_layer_line_width", "inner_wall_line_width", "outer_wall_line_width"}) {
+         {"line_width", "initial_layer_line_width", "inner_wall_line_width", "outer_wall_line_width",
+          "sparse_infill_line_width", "internal_solid_infill_line_width", "top_surface_line_width",
+          "bridge_line_width"}) {
         auto* fop = dynamic_cast<const ConfigOptionFloatOrPercent*>(cfg.option(key));
-        if (fop != nullptr && fop->percent && nozzle_d > 0.)
+        if (fop == nullptr)
+            continue;
+        if (fop->percent && nozzle_d > 0.)
             out[key] = fop->get_abs_value(nozzle_d);
+        else if (!fop->percent)
+            out[key] = fop->value;
     }
+    // Orca coPercent keys that pnp's arachne module resolves via
+    // get_abs_value against the nozzle: a plain number would be treated as an
+    // absolute mm value (15 mm feature size, 100 mm transition length), so
+    // resolve the percent to absolute mm here.
+    for (const char* key : {"min_feature_size", "wall_transition_length"}) {
+        const ConfigOption* opt = cfg.option(key);
+        if (opt != nullptr && nozzle_d > 0.)
+            out[key] = opt->getFloat() / 100. * nozzle_d;
+    }
+    // wall_transition_filter_deviation is consumed by arachne via units_to_mm
+    // (1 unit = 100 nm), so the percent-of-nozzle value must arrive in units.
+    if (const ConfigOption* opt = cfg.option("wall_transition_filter_deviation");
+        opt != nullptr && nozzle_d > 0.)
+        out["wall_transition_filter_deviation"] = std::round(opt->getFloat() / 100. * nozzle_d * 10000.);
     // overhang_1_4_speed percent resolves over outer_wall_speed (its Orca
     // ratio_over); pnp types it float.
     if (auto* v = cfg.option<ConfigOptionFloatsOrPercents>("overhang_1_4_speed");

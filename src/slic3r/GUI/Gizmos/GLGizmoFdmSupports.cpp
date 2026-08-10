@@ -862,18 +862,21 @@ void GLGizmoFdmSupports::request_support_preview()
     const boost::filesystem::path model_path  = dir / "model.3mf";
     const boost::filesystem::path config_path = dir / "config.json";
 
-    std::string export_error;
-    if (!export_plate_3mf_for_pnp(plate_idx, model_path, &export_error)) {
-        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": 3MF export failed: " << export_error;
-        boost::filesystem::remove_all(dir, ec);
-        return;
-    }
-
     const DynamicPrintConfig full_config = wxGetApp().preset_bundle->full_config();
     PnpTranslationResult     translated  = PnpConfigTranslator::translate(full_config);
     // The overlay is only meaningful with supports on; the user is standing in
     // the support-painting gizmo, so force it rather than inherit the preset.
     translated.json["enable_support"] = true;
+
+    std::string export_error;
+    if (!export_plate_3mf_for_pnp(plate_idx, model_path, translated.json, &export_error)) {
+        BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": 3MF export failed: " << export_error;
+        boost::filesystem::remove_all(dir, ec);
+        return;
+    }
+
+    // pnp_cli support-preview does not read the 3MF sidecar yet, so the
+    // preview keeps the separate --config file (the slice path does not).
     {
         boost::nowide::ofstream out(config_path.string().c_str(), std::ios::binary);
         out << translated.json.dump(2);

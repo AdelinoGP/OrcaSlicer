@@ -1174,8 +1174,10 @@ target("pnp_runtime_tests")
     add_files("tests/pnp/test_pnp_progress.cpp",
               "tests/pnp/test_pnp_config_warnings_log.cpp",
               "tests/pnp/test_pnp_support_preview.cpp",
+              "tests/pnp/test_pnp_model_sidecar.cpp",
               "src/slic3r/GUI/PnpProgress.cpp",
               "src/slic3r/GUI/PnpConfigWarningsLog.cpp",
+              "src/slic3r/GUI/PnpModelSidecar.cpp",
               -- document half only; PnpSupportPreview.cpp (the pnp_cli runner)
               -- needs the GUI backend and is deliberately not linked here
               "src/slic3r/GUI/PnpSupportPreviewDoc.cpp")

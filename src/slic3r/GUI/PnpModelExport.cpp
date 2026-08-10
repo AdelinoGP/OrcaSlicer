@@ -2,6 +2,7 @@
 // See PnpModelExport.hpp for the contract.
 
 #include "PnpModelExport.hpp"
+#include "PnpModelSidecar.hpp"
 
 #include <set>
 #include <utility>
@@ -9,6 +10,8 @@
 
 #include <boost/format.hpp>
 #include <boost/log/trivial.hpp>
+
+#include <nlohmann/json.hpp>
 
 #include "libslic3r/Model.hpp"
 #include "libslic3r/PresetBundle.hpp"
@@ -34,7 +37,8 @@ bool pnp_export_fail(std::string* error, const std::string& reason)
 
 } // anonymous namespace
 
-bool export_plate_3mf_for_pnp(int plate_idx, const boost::filesystem::path& path, std::string* error)
+bool export_plate_3mf_for_pnp(int plate_idx, const boost::filesystem::path& path,
+                              const nlohmann::json& translated_config, std::string* error)
 {
     Plater* plater = wxGetApp().plater();
     if (plater == nullptr)
@@ -131,6 +135,12 @@ bool export_plate_3mf_for_pnp(int plate_idx, const boost::filesystem::path& path
     if (!store_result)
         return pnp_export_fail(error, (boost::format("failed to write 3MF for plate %1% to %2%")
                                        % plate_idx % path.string()).str());
+
+    // Merge the translated config over the raw Orca config in the 3MF sidecar:
+    // pnp_cli slice reads its config from the 3MF itself, so the translated
+    // (typed) values must win over the raw string values store_bbs_3mf wrote.
+    if (!merge_translated_config_into_3mf(path, translated_config))
+        return pnp_export_fail(error, "failed to merge the translated config into the 3MF sidecar");
 
     BOOST_LOG_TRIVIAL(info) << "export_plate_3mf_for_pnp: wrote plate " << plate_idx
                             << " (" << plate_model.objects.size() << " objects) to " << store_params.path;

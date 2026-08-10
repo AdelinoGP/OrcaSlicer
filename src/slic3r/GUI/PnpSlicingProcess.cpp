@@ -232,14 +232,6 @@ bool PnpSlicingProcess::start()
 			return false;
 		}
 		job.model_path  = job.input_dir / "model.3mf";
-		job.config_path = job.input_dir / "config.json";
-
-		std::string export_error;
-		if (!export_plate_3mf_for_pnp(job.plate_idx, job.model_path, &export_error)) {
-			BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": plate 3MF export failed: " << export_error;
-			boost::filesystem::remove_all(job.input_dir, ec);
-			return false;
-		}
 
 		// F14: render the plate thumbnail here, on the UI thread, before the
 		// worker is spawned — GL rendering is main-thread only. Reuse Orca's
@@ -274,6 +266,10 @@ bool PnpSlicingProcess::start()
 			}
 		}
 
+		// Translate the preset config and run the schema guard BEFORE the 3MF
+		// export: the translated (typed) values are merged into the 3MF's
+		// project_settings.config sidecar, which is the only config channel
+		// pnp_cli slice reads (no separate --config file).
 		const DynamicPrintConfig &full_config = m_print->full_print_config();
 		PnpTranslationResult      translated  = PnpConfigTranslator::translate(full_config);
 		// Schema guard: drop any key the pnp config-schema would reject so a
@@ -299,14 +295,10 @@ bool PnpSlicingProcess::start()
 			if (!thumbs.empty())
 				translated.json["thumbnails"] = thumbs;
 		}
-		try {
-			boost::nowide::ofstream config_file(job.config_path.string().c_str(), std::ios::binary | std::ios::trunc);
-			config_file << translated.json.dump(2);
-			config_file.close();
-			if (!config_file)
-				throw std::runtime_error("write failed");
-		} catch (const std::exception &ex) {
-			BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": failed to write " << job.config_path.string() << ": " << ex.what();
+
+		std::string export_error;
+		if (!export_plate_3mf_for_pnp(job.plate_idx, job.model_path, translated.json, &export_error)) {
+			BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": plate 3MF export failed: " << export_error;
 			boost::filesystem::remove_all(job.input_dir, ec);
 			return false;
 		}
@@ -505,7 +497,6 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 	std::vector<std::string> args {
 		"slice",
 		"--model",      job.model_path.string(),
-		"--config",     job.config_path.string(),
 		"--module-dir", backend.module_dir().string(),
 		"--output",     job.output_path,
 		"--instrument-stderr",
@@ -523,7 +514,6 @@ void PnpSlicingProcess::run_pnp_cli(const SliceJob &job)
 	}
 	BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": " << backend.cli_path().string()
 	                        << " slice --model " << job.model_path.string()
-	                        << " --config " << job.config_path.string()
 	                        << " --module-dir " << backend.module_dir().string()
 	                        << " --output " << job.output_path
 	                        << " --instrument-stderr"

@@ -154,9 +154,8 @@ private:
 	// Everything the worker thread needs, captured on the UI thread in start().
 	struct SliceJob
 	{
-		boost::filesystem::path input_dir;    // per-slice temp subdir (model + config.json)
-		boost::filesystem::path model_path;   // exported plate 3MF
-		boost::filesystem::path config_path;  // translated flat PNP config
+		boost::filesystem::path input_dir;    // per-slice temp subdir (model + thumbnail)
+		boost::filesystem::path model_path;   // exported plate 3MF (translated config in its sidecar)
 		std::string             output_path;  // PartPlate::get_tmp_gcode_path()
 		boost::filesystem::path thumbnail_path; // F14: PNG rendered on the UI thread; empty = no thumbnail
 		int                     plate_idx { -1 };

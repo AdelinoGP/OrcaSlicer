@@ -156,6 +156,87 @@ TEST_CASE("translator regressions from first GUI slices", "[pnp][translator]")
     }
 }
 
+// PNP fork: unit-mismatch regressions found by visual-debugging real slices.
+// pnp's ResolvedConfig/module consumers type these keys differently than
+// Orca's presets, so the raw percent values produced 100% infill and
+// mm-scale Arachne widths on the sliced G-code.
+TEST_CASE("translator unit fixes for pnp consumers", "[pnp][translator][units]")
+{
+    SECTION("sparse_infill_density percent becomes a pnp fraction for infill_density")
+    {
+        // pnp's infill_density is a fraction (0.0-1.0, default 0.2); Orca's
+        // sparse_infill_density is a percent (25 = 25%). Sending 25 raw made
+        // pnp slice at 2500% density -> clamped to 100% infill.
+        auto res = PnpConfigTranslator::translate(make_config({{"sparse_infill_density", "25"}}));
+        REQUIRE(res.json.at("infill_density").get<double>() == Approx(0.25));
+        // The sparse_infill_density sink stays percent: the perimeter modules
+        // use it only as a > 0 gate (alternate_extra_wall).
+        REQUIRE(res.json.at("sparse_infill_density").get<double>() == Approx(25.0));
+    }
+
+    SECTION("min_feature_size percent resolves against the nozzle diameter")
+    {
+        // pnp's arachne module resolves min_feature_size via get_abs_value
+        // against the nozzle; a plain number is treated as absolute mm, so the
+        // raw Orca percent (15 = 15% of 0.5 mm) became a 15 mm feature size.
+        auto res = PnpConfigTranslator::translate(make_config({
+            {"nozzle_diameter", "0.5"},
+            {"min_feature_size", "15"},
+        }));
+        REQUIRE(res.json.at("min_feature_size").get<double>() == Approx(0.075));
+    }
+
+    SECTION("wall_transition_length percent resolves against the nozzle diameter")
+    {
+        // Same class: 100% of 0.5 mm must reach pnp as 0.5 mm, not 100 mm.
+        auto res = PnpConfigTranslator::translate(make_config({
+            {"nozzle_diameter", "0.5"},
+            {"wall_transition_length", "100"},
+        }));
+        REQUIRE(res.json.at("wall_transition_length").get<double>() == Approx(0.5));
+    }
+
+    SECTION("wall_transition_filter_deviation percent converts to pnp units (1 unit = 100 nm)")
+    {
+        // pnp's arachne module consumes this key via units_to_mm; the raw
+        // Orca percent (25 = 25% of 0.5 mm = 0.125 mm) must arrive as 1250
+        // units, not 25 (which units_to_mm reads as 0.0025 mm).
+        auto res = PnpConfigTranslator::translate(make_config({
+            {"nozzle_diameter", "0.5"},
+            {"wall_transition_filter_deviation", "25"},
+        }));
+        REQUIRE(res.json.at("wall_transition_filter_deviation").get<double>() == Approx(1250));
+    }
+
+    SECTION("role-specific infill/top/bridge line widths reach pnp as absolute mm")
+    {
+        // These four keys were Tier D (never sent), so pnp fell back to
+        // line_width / 1.125*nozzle instead of the user's widths.
+        auto res = PnpConfigTranslator::translate(make_config({
+            {"nozzle_diameter", "0.5"},
+            {"sparse_infill_line_width", "100%"},
+            {"internal_solid_infill_line_width", "100%"},
+            {"top_surface_line_width", "100%"},
+            {"bridge_line_width", "100%"},
+        }));
+        REQUIRE(res.json.at("sparse_infill_line_width").get<double>() == Approx(0.5));
+        REQUIRE(res.json.at("internal_solid_infill_line_width").get<double>() == Approx(0.5));
+        REQUIRE(res.json.at("top_surface_line_width").get<double>() == Approx(0.5));
+        REQUIRE(res.json.at("bridge_line_width").get<double>() == Approx(0.5));
+    }
+
+    SECTION("absolute role-specific line widths pass through unchanged")
+    {
+        auto res = PnpConfigTranslator::translate(make_config({
+            {"nozzle_diameter", "0.4"},
+            {"sparse_infill_line_width", "0.45"},
+            {"bridge_line_width", "0.4"},
+        }));
+        REQUIRE(res.json.at("sparse_infill_line_width").get<double>() == Approx(0.45));
+        REQUIRE(res.json.at("bridge_line_width").get<double>() == Approx(0.4));
+    }
+}
+
 TEST_CASE("schema guard drops keys the pnp schema would reject", "[pnp][translator][schema-guard]")
 {
     // Synthetic schema mirroring the real `pnp_cli module config-schema` shape.
