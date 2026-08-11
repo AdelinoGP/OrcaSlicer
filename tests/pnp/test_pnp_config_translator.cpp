@@ -426,6 +426,20 @@ TEST_CASE("infill_shift_step is an identity Tier-A key", "[pnp][translator]")
     REQUIRE_FALSE(has_warning_for(res.warnings, "infill_shift_step"));
 }
 
+TEST_CASE("support_type is an identity Tier-A key", "[pnp][translator]")
+{
+    // The pnp claim dedup resolves the support-generator claim holder from
+    // the raw sidecar `support_type` value (like the raw `enable_support`
+    // key), so this row is a plain identity copy: every Orca spelling must
+    // pass through verbatim and the amber "not yet mapped" tint must clear.
+    for (const char* value : {"normal(auto)", "tree(auto)", "normal(manual)", "tree(manual)"}) {
+        auto res = PnpConfigTranslator::translate(make_config({{"support_type", value}}));
+        REQUIRE(res.json.at("support_type").get<std::string>() == value);
+        REQUIRE_FALSE(has_warning_for(res.warnings, "support_type"));
+    }
+    REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("support_type"));
+}
+
 TEST_CASE("pnp_pattern_value_supported reflects the module tables", "[pnp][translator]")
 {
     REQUIRE(PnpConfigTranslator::pnp_pattern_value_supported("sparse_infill_pattern", "gyroid"));

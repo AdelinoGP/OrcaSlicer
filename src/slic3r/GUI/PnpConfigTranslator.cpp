@@ -78,6 +78,7 @@ const char* const TIER_A_KEYS[] = {
     "support_interface_bottom_layers",
     "support_interface_top_layers",
     "support_speed",
+    "support_type",
     "thick_bridges",
     "tree_support_branch_angle",
     "tree_support_branch_diameter",
