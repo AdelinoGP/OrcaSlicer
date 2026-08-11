@@ -47,6 +47,17 @@ PnpTranslationResult translate(const DynamicPrintConfig& full_config);
 // yellow label tint on unimplemented options in the settings tabs.
 bool pnp_key_is_unimplemented(const std::string& orca_key);
 
+// True when `orca_value` of a pattern key maps to a real pnp infill module
+// (i.e. the module holds the fill-role claim the key translates to). False
+// for the fallback values and for keys with no pattern mapping at all.
+// Drives the per-item yellow tint in the pattern dropdowns.
+bool pnp_pattern_value_supported(const std::string& orca_key, const std::string& orca_value);
+
+// True when `orca_key` is an infill-pattern enum key whose values are
+// per-value checked against pnp support (sparse/top/bottom/internal solid).
+// Gates the per-item dropdown tint: only these dropdowns get tinted items.
+bool pnp_pattern_key(const std::string& orca_key);
+
 } // namespace PnpConfigTranslator
 
 }} // namespace Slic3r::GUI

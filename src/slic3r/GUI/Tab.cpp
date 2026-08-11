@@ -2761,6 +2761,8 @@ void TabPrint::build()
         optgroup->append_single_option_line("enable_extra_bridge_layer", "quality_settings_bridging#extra-bridge-layers");
         optgroup->append_single_option_line("dont_filter_internal_bridges", "quality_settings_bridging#filter-out-small-internal-bridges");
         optgroup->append_single_option_line("counterbore_hole_bridging", "quality_settings_bridging#bridge-counterbore-hole");
+        // PNP fork (ticket 013, reopened past v1): bridge infill module picker.
+        optgroup->append_single_option_line("pnp_bridge_fill_holder", "quality_settings_bridging#bridge-counterbore-hole");
 
         optgroup = page->new_optgroup(L("Overhangs"), L"param_overhang");
         optgroup->append_single_option_line("detect_overhang_wall", "quality_settings_overhangs#detect-overhang-wall");

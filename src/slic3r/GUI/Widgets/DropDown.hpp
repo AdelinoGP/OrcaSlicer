@@ -32,6 +32,10 @@ public:
         wxString tip{};
         int      flag{0};
         int      style{ 0 };// the style of item
+        // PNP fork: per-item text color (invalid wxColour = use the
+        // dropdown's text_color). Drives the amber tint on unsupported
+        // infill-pattern choices.
+        wxColour text_color_override{};
     };
 
 private:

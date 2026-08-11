@@ -353,3 +353,91 @@ TEST_CASE("pnp_key_is_unimplemented agrees with translate()'s warnings", "[pnp][
         REQUIRE(unimplemented == (tier_d_warned.count(key) != 0));
     }
 }
+
+TEST_CASE("infill pattern keys remap to pnp fill-role holders", "[pnp][translator]")
+{
+    SECTION("sparse gyroid maps to the gyroid module, no warning")
+    {
+        auto res = PnpConfigTranslator::translate(make_config({{"sparse_infill_pattern", "gyroid"}}));
+        REQUIRE(res.json.at("sparse_fill_holder").get<std::string>() == "gyroid-infill");
+        REQUIRE_FALSE(has_warning_for(res.warnings, "sparse_infill_pattern"));
+    }
+    SECTION("sparse lightning maps to the lightning module")
+    {
+        auto res = PnpConfigTranslator::translate(make_config({{"sparse_infill_pattern", "lightning"}}));
+        REQUIRE(res.json.at("sparse_fill_holder").get<std::string>() == "lightning-infill");
+        REQUIRE_FALSE(has_warning_for(res.warnings, "sparse_infill_pattern"));
+    }
+    SECTION("sparse rectilinear maps to the rectilinear module")
+    {
+        auto res = PnpConfigTranslator::translate(make_config({{"sparse_infill_pattern", "rectilinear"}}));
+        REQUIRE(res.json.at("sparse_fill_holder").get<std::string>() == "rectilinear-infill");
+        REQUIRE_FALSE(has_warning_for(res.warnings, "sparse_infill_pattern"));
+    }
+    SECTION("sparse crosshatch (Orca default) falls back with a lossy warning")
+    {
+        auto res = PnpConfigTranslator::translate(make_config({{"sparse_infill_pattern", "crosshatch"}}));
+        REQUIRE(res.json.at("sparse_fill_holder").get<std::string>() == "rectilinear-infill");
+        REQUIRE(has_warning_for(res.warnings, "sparse_infill_pattern"));
+    }
+    SECTION("sparse honeycomb falls back with a lossy warning")
+    {
+        auto res = PnpConfigTranslator::translate(make_config({{"sparse_infill_pattern", "honeycomb"}}));
+        REQUIRE(res.json.at("sparse_fill_holder").get<std::string>() == "rectilinear-infill");
+        REQUIRE(has_warning_for(res.warnings, "sparse_infill_pattern"));
+    }
+    SECTION("top monotonic (Orca default) falls back with a lossy warning")
+    {
+        auto res = PnpConfigTranslator::translate(make_config({{"top_surface_pattern", "monotonic"}}));
+        REQUIRE(res.json.at("top_fill_holder").get<std::string>() == "rectilinear-infill");
+        REQUIRE(has_warning_for(res.warnings, "top_surface_pattern"));
+    }
+    SECTION("top rectilinear maps without a warning")
+    {
+        auto res = PnpConfigTranslator::translate(make_config({{"top_surface_pattern", "rectilinear"}}));
+        REQUIRE(res.json.at("top_fill_holder").get<std::string>() == "rectilinear-infill");
+        REQUIRE_FALSE(has_warning_for(res.warnings, "top_surface_pattern"));
+    }
+    SECTION("top gyroid is not offered (gyroid holds no top-fill claim) and falls back")
+    {
+        auto res = PnpConfigTranslator::translate(make_config({{"top_surface_pattern", "gyroid"}}));
+        REQUIRE(res.json.at("top_fill_holder").get<std::string>() == "rectilinear-infill");
+        REQUIRE(has_warning_for(res.warnings, "top_surface_pattern"));
+    }
+    SECTION("bottom monotonic falls back with a lossy warning")
+    {
+        auto res = PnpConfigTranslator::translate(make_config({{"bottom_surface_pattern", "monotonic"}}));
+        REQUIRE(res.json.at("bottom_fill_holder").get<std::string>() == "rectilinear-infill");
+        REQUIRE(has_warning_for(res.warnings, "bottom_surface_pattern"));
+    }
+}
+
+TEST_CASE("pnp_bridge_fill_holder renames to bridge_fill_holder", "[pnp][translator]")
+{
+    auto res = PnpConfigTranslator::translate(make_config({{"pnp_bridge_fill_holder", "rectilinear-infill"}}));
+    REQUIRE(res.json.at("bridge_fill_holder").get<std::string>() == "rectilinear-infill");
+    REQUIRE_FALSE(has_warning_for(res.warnings, "pnp_bridge_fill_holder"));
+}
+
+TEST_CASE("infill_shift_step is an identity Tier-A key", "[pnp][translator]")
+{
+    auto res = PnpConfigTranslator::translate(make_config({{"infill_shift_step", "0.4"}}));
+    REQUIRE(res.json.at("infill_shift_step").get<double>() == Approx(0.4));
+    REQUIRE_FALSE(has_warning_for(res.warnings, "infill_shift_step"));
+}
+
+TEST_CASE("pnp_pattern_value_supported reflects the module tables", "[pnp][translator]")
+{
+    REQUIRE(PnpConfigTranslator::pnp_pattern_value_supported("sparse_infill_pattern", "gyroid"));
+    REQUIRE(PnpConfigTranslator::pnp_pattern_value_supported("sparse_infill_pattern", "lightning"));
+    REQUIRE(PnpConfigTranslator::pnp_pattern_value_supported("sparse_infill_pattern", "rectilinear"));
+    REQUIRE_FALSE(PnpConfigTranslator::pnp_pattern_value_supported("sparse_infill_pattern", "crosshatch"));
+    REQUIRE_FALSE(PnpConfigTranslator::pnp_pattern_value_supported("sparse_infill_pattern", "honeycomb"));
+    REQUIRE(PnpConfigTranslator::pnp_pattern_value_supported("top_surface_pattern", "rectilinear"));
+    REQUIRE_FALSE(PnpConfigTranslator::pnp_pattern_value_supported("top_surface_pattern", "monotonic"));
+    REQUIRE_FALSE(PnpConfigTranslator::pnp_pattern_value_supported("top_surface_pattern", "gyroid"));
+    REQUIRE_FALSE(PnpConfigTranslator::pnp_pattern_value_supported("bottom_surface_pattern", "monotonic"));
+    // Keys with no pattern mapping at all are fully unsupported.
+    REQUIRE_FALSE(PnpConfigTranslator::pnp_pattern_value_supported("internal_solid_infill_pattern", "monotonic"));
+    REQUIRE_FALSE(PnpConfigTranslator::pnp_pattern_value_supported("no_such_key", "whatever"));
+}

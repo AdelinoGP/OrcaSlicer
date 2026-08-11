@@ -300,6 +300,12 @@ void ComboBox::SetItemTooltip(unsigned int n, wxString const &value) {
     if (n == drop.GetSelection()) drop.SetToolTip(value);
 }
 
+void ComboBox::SetItemTextColor(unsigned int n, wxColour const &color) {
+    if (n >= items.size()) return;
+    items[n].text_color_override = color;
+    drop.Invalidate();
+}
+
 wxString ComboBox::GetItemAlias(unsigned int n) const
 {
     if (n >= items.size()) return wxString();

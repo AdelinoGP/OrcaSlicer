@@ -2122,6 +2122,21 @@ void PrintConfigDef::init_fff_params()
                        "If disabled, internal bridges may look better but can be less reliable over sparse infill.");
     def->mode = comAdvanced;
     def->set_default_value(new ConfigOptionBool(true));
+
+    // PNP fork (ticket 013, reopened past v1): bridge infill module picker.
+    // pnp selects the bridge-fill module per claim via bridge_fill_holder;
+    // this Orca-side key carries the module id (renamed by the translator).
+    // Only modules holding claim:bridge-fill are offered — today that is
+    // rectilinear-infill alone; the list grows as pnp modules claim it.
+    def = this->add("pnp_bridge_fill_holder", coString);
+    def->label = L("Bridge infill module (PNP)");
+    def->category = L("Quality");
+    def->tooltip = L("PNP module that renders bridge infill (claim:bridge-fill). "
+                     "Only modules holding the claim are offered.");
+    def->enum_values.push_back("rectilinear-infill");
+    def->enum_labels.push_back(L("Rectilinear infill (PNP)"));
+    def->mode = comAdvanced;
+    def->set_default_value(new ConfigOptionString("rectilinear-infill"));
     
     def = this->add("enable_extra_bridge_layer", coEnum);
     def->label = L("Extra bridge layers (beta)");

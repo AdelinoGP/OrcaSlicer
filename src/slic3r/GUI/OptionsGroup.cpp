@@ -8,6 +8,8 @@
 #include "format.hpp"
 #include "Widgets/StaticLine.hpp"
 #include "Widgets/LabeledStaticBox.hpp"
+#include "Widgets/ComboBox.hpp"
+#include "PnpConfigTranslator.hpp"
 
 #include <utility>
 #include <wx/bookctrl.h>
@@ -21,6 +23,35 @@
 #include <locale>
 
 namespace Slic3r { namespace GUI {
+
+namespace {
+
+// PNP fork (ticket 013, reopened past v1): amber for unsupported infill
+// pattern choices in the dropdown popup — same colors as the label tint in
+// Tab.cpp. Two statics so the pointer stays valid across mode switches.
+const wxColour& pnp_choice_amber()
+{
+    static const wxColour dark  = wxColour("#E6A800");
+    static const wxColour light = wxColour("#B8860B");
+    return GUI_App::dark_mode() ? dark : light;
+}
+
+// Tint the unsupported choices of an infill-pattern dropdown. The ComboBox
+// items were appended 1:1 from the option's enum_values (Choice::BUILD), so
+// item i corresponds to enum_values[i].
+void pnp_tint_pattern_dropdown(Field* field, const t_config_option_key& id, const ConfigOptionDef& opt)
+{
+    if (!PnpConfigTranslator::pnp_pattern_key(id))
+        return;
+    auto* combo = dynamic_cast<::ComboBox*>(field->getWindow());
+    if (combo == nullptr)
+        return;
+    for (size_t i = 0; i < opt.enum_values.size() && i < combo->GetCount(); ++i)
+        if (!PnpConfigTranslator::pnp_pattern_value_supported(id, opt.enum_values[i]))
+            combo->SetItemTextColor(i, pnp_choice_amber());
+}
+
+} // namespace
 
 // BBS: new layout
 constexpr int titleWidth = 20;
@@ -91,7 +122,9 @@ const t_field& OptionsGroup::build_field(const t_config_option_key& id, const Co
     }
     // Grab a reference to fields for convenience
     const t_field& field = m_fields[id];
-	field->m_on_change = [this](const std::string& opt_id, const boost::any& value) {
+    // PNP fork: tint the unsupported choices of infill-pattern dropdowns.
+    pnp_tint_pattern_dropdown(field.get(), id, opt);
+    field->m_on_change = [this](const std::string& opt_id, const boost::any& value) {
 			//! This function will be called from Field.
 			//! Call OptionGroup._on_change(...)
 			if (!m_disabled)

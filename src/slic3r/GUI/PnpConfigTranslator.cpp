@@ -36,6 +36,7 @@ const char* const TIER_A_KEYS[] = {
     "extra_perimeters_on_overhangs",
     "filter_out_gap_fill",
     "gap_infill_speed",
+    "infill_shift_step",
     "initial_layer_line_width",
     "initial_layer_min_bead_width",
     "inner_wall_line_width",
@@ -129,6 +130,10 @@ const std::set<std::string>& pnp_handled_keys()
         s.insert({"sparse_infill_density", "sparse_infill_speed", "ironing_type"});
         s.insert({"sparse_infill_line_width", "internal_solid_infill_line_width",
                   "top_surface_line_width", "bridge_line_width"});
+        // Pattern → fill-role holder rows (PATTERN_ROWS) + the fork's bridge
+        // module picker.
+        s.insert({"sparse_infill_pattern", "top_surface_pattern", "bottom_surface_pattern",
+                  "pnp_bridge_fill_holder"});
         s.insert("seam_position");
         s.insert("brim_type"); // skirt_loops is Tier A above
         s.insert({"spiral_mode", "enable_support", "raft_layers",
@@ -152,6 +157,63 @@ PnpWarningClass tier_d_class(const std::string& key)
     if (key == "gcode_flavor")
         return PnpWarningClass::UnsupportedFeature;
     return PnpWarningClass::NotYetMapped;
+}
+
+// Pattern → fill-role holder remap (ticket 013, reopened past v1). pnp
+// selects the infill module per fill-role claim via the ResolvedConfig
+// {top,bottom,bridge,sparse}_fill_holder keys; Orca's pattern enums have no
+// pnp equivalent, so each value is remapped to the module id that holds the
+// claim. Only modules that actually hold the claim are offered — gyroid and
+// lightning hold claim:sparse-fill only, so top/bottom never map to them
+// (an unknown holder makes the module emit nothing for that role, a silent
+// loss). Everything else falls back to rectilinear-infill, the only module
+// holding all four claims, with a lossy-fallback warning.
+struct PatternValue
+{
+    const char* orca_value;
+    const char* module;
+};
+
+struct PatternRow
+{
+    const char*        orca_key;
+    const char*        pnp_key;   // holder key in the pnp config
+    const char*        fallback;  // module id for values with no pnp module
+    const PatternValue* supported;
+    size_t             supported_count;
+};
+
+const PatternValue SPARSE_PATTERNS[] = {
+    {"rectilinear", "rectilinear-infill"},
+    {"gyroid",      "gyroid-infill"},
+    {"lightning",   "lightning-infill"},
+};
+const PatternValue SOLID_PATTERNS[] = {
+    {"rectilinear", "rectilinear-infill"},
+};
+
+const PatternRow PATTERN_ROWS[] = {
+    {"sparse_infill_pattern",  "sparse_fill_holder",  "rectilinear-infill", SPARSE_PATTERNS, 3},
+    {"top_surface_pattern",    "top_fill_holder",     "rectilinear-infill", SOLID_PATTERNS,  1},
+    {"bottom_surface_pattern", "bottom_fill_holder",  "rectilinear-infill", SOLID_PATTERNS,  1},
+};
+
+const PatternRow* pattern_row_for(const std::string& orca_key)
+{
+    for (const PatternRow& row : PATTERN_ROWS)
+        if (orca_key == row.orca_key)
+            return &row;
+    return nullptr;
+}
+
+// Module id for an orca pattern value, or nullptr when the value has no pnp
+// module (the caller falls back and warns).
+const char* pattern_module_for(const PatternRow& row, const std::string& value)
+{
+    for (size_t i = 0; i < row.supported_count; ++i)
+        if (value == row.supported[i].orca_value)
+            return row.supported[i].module;
+    return nullptr;
 }
 
 // Convert element 0 of a vector option's vserialize() to a typed JSON value.
@@ -305,6 +367,28 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
         out["infill_speed"]        = v;
         out["sparse_infill_speed"] = v;
     }
+
+    // Pattern → fill-role holder (ticket 013, reopened past v1): pnp selects
+    // the infill module per claim via the *_fill_holder keys. Orca pattern
+    // values are remapped to the module id holding the claim; values with no
+    // pnp module fall back to rectilinear-infill (the only module holding
+    // all four claims) with a lossy-fallback warning.
+    for (const PatternRow& row : PATTERN_ROWS) {
+        if (cfg.option(row.orca_key) == nullptr)
+            continue;
+        const std::string value  = serialize_or_empty(cfg, row.orca_key);
+        const char*       module = pattern_module_for(row, value);
+        if (module == nullptr) {
+            module = row.fallback;
+            warn(row.orca_key, PnpWarningClass::LossyFallback, value, module);
+        }
+        out[row.pnp_key] = module;
+    }
+
+    // Fork-specific bridge module picker (ticket 013, reopened past v1):
+    // pnp_bridge_fill_holder is an Orca-side key whose value is a pnp module
+    // id; rename to pnp's bridge_fill_holder.
+    copy_as("pnp_bridge_fill_holder", "bridge_fill_holder");
 
     // ironing_type -> ironing_enabled (bool).
     if (cfg.option("ironing_type") != nullptr)
@@ -510,6 +594,18 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
 bool pnp_key_is_unimplemented(const std::string& orca_key)
 {
     return pnp_handled_keys().count(orca_key) == 0;
+}
+
+bool pnp_pattern_value_supported(const std::string& orca_key, const std::string& orca_value)
+{
+    const PatternRow* row = pattern_row_for(orca_key);
+    return row != nullptr && pattern_module_for(*row, orca_value) != nullptr;
+}
+
+bool pnp_pattern_key(const std::string& orca_key)
+{
+    return orca_key == "sparse_infill_pattern" || orca_key == "top_surface_pattern"
+        || orca_key == "bottom_surface_pattern" || orca_key == "internal_solid_infill_pattern";
 }
 
 namespace {

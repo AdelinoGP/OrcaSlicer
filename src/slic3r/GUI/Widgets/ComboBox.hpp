@@ -74,6 +74,9 @@ public:
 
     wxString GetItemTooltip(unsigned int n) const;
     void     SetItemTooltip(unsigned int n, wxString const &value);
+    // PNP fork: per-item text color in the dropdown popup (see
+    // DropDown::Item::text_color_override). Pass wxNullColour to clear.
+    void     SetItemTextColor(unsigned int n, wxColour const &color);
 
     wxString GetItemAlias(unsigned int n) const;
     void     SetItemAlias(unsigned int n, wxString const &value);

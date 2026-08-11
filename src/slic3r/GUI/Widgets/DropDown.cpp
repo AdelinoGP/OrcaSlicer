@@ -427,7 +427,9 @@ void DropDown::render(wxDC &dc)
             }
             pt.y += (rcContent.height - textSize.y) / 2;
             dc.SetFont(GetFont());
-            dc.SetTextForeground(text_color.colorForStates(states2));
+            dc.SetTextForeground(item.text_color_override.IsOk()
+                                     ? item.text_color_override
+                                     : text_color.colorForStates(states2));
             dc.DrawText(text, pt);
             if (group.IsEmpty() && !item.group_key.IsEmpty()) {
                 auto szBmp = arrow_bitmap.GetBmpSize();
