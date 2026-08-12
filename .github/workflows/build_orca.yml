@@ -61,24 +61,33 @@ jobs:
           # which Git-bash steps never source (--noprofile --norc), so later
           # steps failed with "xmake: command not found".
           XMAKE_VERSION=3.1.0
+          # GitHub release downloads occasionally 503; retry with backoff.
+          retry() {
+            local n=0
+            until "$@"; do
+              n=$((n + 1))
+              [ "$n" -ge 5 ] && return 1
+              sleep $((n * 5))
+            done
+          }
           case "$RUNNER_OS-$RUNNER_ARCH" in
             Windows-X64)
-              curl -fsSL -o /tmp/xmake.zip "https://github.com/xmake-io/xmake/releases/download/v${XMAKE_VERSION}/xmake-v${XMAKE_VERSION}.win64.zip"
+              retry curl -fsSL -o /tmp/xmake.zip "https://github.com/xmake-io/xmake/releases/download/v${XMAKE_VERSION}/xmake-v${XMAKE_VERSION}.win64.zip"
               unzip -o -q /tmp/xmake.zip -d /tmp/xmake
               echo "/tmp/xmake/xmake" >> "$GITHUB_PATH"
               ;;
             Linux-X64)
-              curl -fsSL -o /tmp/xmake "https://github.com/xmake-io/xmake/releases/download/v${XMAKE_VERSION}/xmake-bundle-v${XMAKE_VERSION}.linux.x86_64"
+              retry curl -fsSL -o /tmp/xmake "https://github.com/xmake-io/xmake/releases/download/v${XMAKE_VERSION}/xmake-bundle-v${XMAKE_VERSION}.linux.x86_64"
               chmod +x /tmp/xmake
               echo "/tmp" >> "$GITHUB_PATH"
               ;;
             macOS-ARM64)
-              curl -fsSL -o /tmp/xmake "https://github.com/xmake-io/xmake/releases/download/v${XMAKE_VERSION}/xmake-bundle-v${XMAKE_VERSION}.macos.arm64"
+              retry curl -fsSL -o /tmp/xmake "https://github.com/xmake-io/xmake/releases/download/v${XMAKE_VERSION}/xmake-bundle-v${XMAKE_VERSION}.macos.arm64"
               chmod +x /tmp/xmake
               echo "/tmp" >> "$GITHUB_PATH"
               ;;
             macOS-X64)
-              curl -fsSL -o /tmp/xmake "https://github.com/xmake-io/xmake/releases/download/v${XMAKE_VERSION}/xmake-bundle-v${XMAKE_VERSION}.macos.x86_64"
+              retry curl -fsSL -o /tmp/xmake "https://github.com/xmake-io/xmake/releases/download/v${XMAKE_VERSION}/xmake-bundle-v${XMAKE_VERSION}.macos.x86_64"
               chmod +x /tmp/xmake
               echo "/tmp" >> "$GITHUB_PATH"
               ;;
@@ -124,7 +133,19 @@ jobs:
 
       - name: Configure
         shell: bash
-        run: xmake f -y -m release -a ${{ inputs.arch }} --ccache=n
+        # -p windows is mandatory: Git's bundled mingw64 sits in PATH on the
+        # Windows runners, and xmake then auto-detects 'mingw' instead of
+        # 'windows' (see docs/BUILD_SYSTEM_HANDOFF.md). That misdetection
+        # drops the WIN32/_USE_MATH_DEFINES defines (opencascade headers fail
+        # on M_PI) and looks for conan-mingw.lock instead of conan.lock.
+        run: |
+          case "$RUNNER_OS" in
+            Windows) PLAT=windows ;;
+            macOS)   PLAT=macosx ;;
+            Linux)   PLAT=linux ;;
+            *)       echo "unsupported runner: $RUNNER_OS" >&2; exit 1 ;;
+          esac
+          xmake f -y -p "$PLAT" -m release -a ${{ inputs.arch }} --ccache=n
 
       # The dependency graph builds from source on a cold cache, which is the
       # memory-hungry part; keep the job count modest so the runner survives it.

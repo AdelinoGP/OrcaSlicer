@@ -34,6 +34,7 @@
 
 #include <stddef.h>
 #include <assert.h>
+#include <limits.h>		/* LONG_MAX */
 #include "priorityq-heap.h"
 #include "memalloc.h"
 
