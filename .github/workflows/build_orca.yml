@@ -55,10 +55,38 @@ jobs:
           set -eu
           pip install --upgrade "conan>=2.31"
           conan profile detect --force || true
-          curl -fsSL https://xmake.io/shget.text | bash || {
-            # the shell installer has no Windows path; use the release archive
-            powershell -Command "irm https://xmake.io/psget.text | iex"
-          }
+          # Pinned prebuilt xmake, placed in a known dir and exported to
+          # $GITHUB_PATH. The old shget/psget installers were unusable on CI:
+          # they build from source on Windows (5+ min) and only touch dotfiles,
+          # which Git-bash steps never source (--noprofile --norc), so later
+          # steps failed with "xmake: command not found".
+          XMAKE_VERSION=3.1.0
+          case "$RUNNER_OS-$RUNNER_ARCH" in
+            Windows-X64)
+              curl -fsSL -o /tmp/xmake.zip "https://github.com/xmake-io/xmake/releases/download/v${XMAKE_VERSION}/xmake-v${XMAKE_VERSION}.win64.zip"
+              unzip -o -q /tmp/xmake.zip -d /tmp/xmake
+              echo "/tmp/xmake/xmake" >> "$GITHUB_PATH"
+              ;;
+            Linux-X64)
+              curl -fsSL -o /tmp/xmake "https://github.com/xmake-io/xmake/releases/download/v${XMAKE_VERSION}/xmake-bundle-v${XMAKE_VERSION}.linux.x86_64"
+              chmod +x /tmp/xmake
+              echo "/tmp" >> "$GITHUB_PATH"
+              ;;
+            macOS-ARM64)
+              curl -fsSL -o /tmp/xmake "https://github.com/xmake-io/xmake/releases/download/v${XMAKE_VERSION}/xmake-bundle-v${XMAKE_VERSION}.macos.arm64"
+              chmod +x /tmp/xmake
+              echo "/tmp" >> "$GITHUB_PATH"
+              ;;
+            macOS-X64)
+              curl -fsSL -o /tmp/xmake "https://github.com/xmake-io/xmake/releases/download/v${XMAKE_VERSION}/xmake-bundle-v${XMAKE_VERSION}.macos.x86_64"
+              chmod +x /tmp/xmake
+              echo "/tmp" >> "$GITHUB_PATH"
+              ;;
+            *)
+              echo "unsupported runner: $RUNNER_OS-$RUNNER_ARCH" >&2
+              exit 1
+              ;;
+          esac
 
       - name: Install Linux system dependencies
         if: runner.os == 'Linux'

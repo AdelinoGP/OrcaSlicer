@@ -221,6 +221,12 @@ rule("pnp.conan")
                 "-of", outdir}
             if have_lock then
                 table.insert(argv, "--lockfile=" .. lockfile)
+            else
+                -- Conan 2 auto-uses a conan.lock found beside the recipe or in
+                -- the cwd; the empty value opts out, so the Windows graph
+                -- (conan.lock) is not forced onto platforms without a
+                -- platform lockfile yet.
+                table.insert(argv, "--lockfile=")
             end
             os.vrunv("conan", argv)
         end
