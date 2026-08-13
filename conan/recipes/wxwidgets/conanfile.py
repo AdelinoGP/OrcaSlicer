@@ -126,9 +126,14 @@ class wxWidgetsConan(ConanFile):
             if self.options.get_safe("opengl", default=False):
                 self.requires("opengl/system")
             self.requires("xkbcommon/[>=1.6.0 <2]")
-            if self.options.mediactrl:
-                self.requires("gstreamer/1.22.3")
-                self.requires("gst-plugins-base/1.19.2")
+            # pnp repo recipe: no conan GStreamer on Linux. The center
+            # gstreamer recipe pins glib/2.78.3, which conflicts with the
+            # GTK3 stack's glib (>= 2.82), and gst-plugins-base has no center
+            # recipe at all. wxWidgets' own build finds GStreamer through
+            # pkg-config (build/cmake/init.cmake), which is exactly how
+            # upstream deps/ + src/slic3r/CMakeLists.txt consumed it
+            # (pkg_check_modules(GSTREAMER ...)). The system GStreamer dev
+            # packages are installed by the CI workflow.
             self.requires("libcurl/[>=7.78.0 <9]")
 
         if self.options.get_safe("secretstore"):

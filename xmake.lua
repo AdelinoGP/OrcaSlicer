@@ -622,6 +622,10 @@ target("libslic3r")
         -- Conan's boost recipe does not declare it in system_libs.
         add_syslinks("Psapi", "bcrypt", "ws2_32", "Synchronization")
     elseif is_plat("macosx") then
+        -- upstream src/libslic3r/CMakeLists.txt APPLE block: MacUtils.mm
+        -- (is_macos_support_boost_add_file_log/is_mac_version_15, called from
+        -- utils.cpp and SwitchButton.cpp) and the ModelIO importer
+        add_files("src/libslic3r/MacUtils.mm", "src/libslic3r/Format/ModelIO.mm")
         add_frameworks("Foundation", "ModelIO")
     end
 target_end()
@@ -651,6 +655,45 @@ target("libslic3r_gui")
         "src/slic3r/GUI/Gizmos/GLGizmoText.cpp",
         "src/slic3r/GUI/SysInfoDialog.cpp",
         "src/slic3r/GUI/WebUpdatePlugin.cpp")
+    if is_plat("macosx") then
+        -- upstream src/slic3r/CMakeLists.txt: APPLE swaps wxMediaCtrl2.cpp
+        -- for the .mm variant (the header selects the wxWindow-based one
+        -- implemented in .mm); dark_mode.cpp is WIN32-only (include of
+        -- <Windows.h> in its hpp). The other .cpp/.mm twins
+        -- (RemovableDriveManager, InstanceCheck, GUI_Utils) are compiled
+        -- together upstream — the .cpp files are platform-guarded internally.
+        remove_files(
+            "src/slic3r/GUI/wxMediaCtrl2.cpp",
+            "src/slic3r/GUI/dark_mode.cpp")
+        add_files(
+            "src/slic3r/GUI/RemovableDriveManagerMM.mm",
+            "src/slic3r/GUI/Mouse3DHandlerMac.mm",
+            "src/slic3r/GUI/InstanceCheckMac.mm",
+            "src/slic3r/GUI/DeepLinkHandlerMac.mm",
+            "src/slic3r/GUI/GUI_UtilsMac.mm",
+            "src/slic3r/GUI/wxMediaCtrl2.mm",
+            "src/slic3r/Utils/MacDarkMode.mm",
+            "src/slic3r/Utils/RetinaHelperImpl.mm")
+        add_frameworks("Cocoa", "Foundation", "IOKit", "CoreServices", "AppKit", "DiskArbitration", "OpenGL", "WebKit", "Security",
+            "AVFoundation", "AVKit", "CoreMedia", "VideoToolbox")
+    elseif is_plat("linux") then
+        -- upstream src/slic3r/CMakeLists.txt `if (UNIX AND NOT APPLE)`:
+        -- gstbambusrc.c + pkg_check_modules(GSTREAMER REQUIRED gstreamer-1.0)
+        add_files("src/slic3r/GUI/Printer/gstbambusrc.c")
+        on_load(function (target)
+            import("lib.detect.find_package")
+            local gst = find_package("gstreamer-1.0", {mode = "pkgconfig"})
+            if gst then
+                target:add("includedirs", gst.includedirs, {public = true})
+                target:add("links", gst.links, {public = true})
+                if gst.syslinks then
+                    target:add("syslinks", gst.syslinks, {public = true})
+                end
+            else
+                raise("gstreamer-1.0 not found via pkg-config; install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev")
+            end
+        end)
+    end
     add_includedirs("src", "src/slic3r", "src/slic3r/GUI", {public = true})
     add_includedirs("src/slic3r/Utils")  -- CMake: target_include_directories(... PRIVATE Utils)
     set_configdir("$(builddir)/config")

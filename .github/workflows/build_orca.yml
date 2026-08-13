@@ -105,7 +105,8 @@ jobs:
             build-essential ninja-build pkg-config \
             libgtk-3-dev libgl1-mesa-dev libglu1-mesa-dev libegl1-mesa-dev \
             libdbus-1-dev libfontconfig1-dev libxkbcommon-dev \
-            libwebkit2gtk-4.1-dev libsecret-1-dev
+            libwebkit2gtk-4.1-dev libsecret-1-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 
       # NSIS with the UAC plugin: xmake's makensis probe compiles a script that
       # !includes UAC.nsh, so a stock NSIS install is rejected even though our

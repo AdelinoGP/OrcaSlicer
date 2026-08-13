@@ -1,2 +1,7 @@
 # Set the default behavior, in case people don't have core.autocrlf set.
 * text=auto
+# Conan recipe revisions hash file content: CI must check out exactly what
+# conan/conan.lock was created from (LF). With only `* text=auto`, Windows
+# runners (core.autocrlf=true) get CRLF recipes, `conan export` produces a
+# different revision, and install fails with "not resolved ... in remotes".
+conan/recipes/** eol=lf
