@@ -1038,6 +1038,10 @@ void Model::load_from(Model& model)
     stl_design_country = model.stl_design_country;
     model_info  = model.model_info;
     profile_info  = model.profile_info;
+    // PNP fork (SchemaBridgeMap ticket 03): the project config keys this build could not
+    // resolve are read into the *importer's* Model; carry them onto the Plater's Model,
+    // which is the one the exporter later writes from.
+    pnp_unknown_config = std::move(model.pnp_unknown_config);
     mk_name = model.mk_name;
     mk_version = model.mk_version;
     md_name = model.md_name;

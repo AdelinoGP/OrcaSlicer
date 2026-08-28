@@ -94,8 +94,13 @@ are true when this map is done:
   `by_serialization_key_ordinal`.
 - The fork-key precedent is `pnp_bridge_fill_holder`: `PrintConfig.cpp:2131` (def) +
   `Preset.cpp:1058` (key list) + `Tab.cpp:2765` (control) + translator row.
-- `load_from_json` fails the **whole** project config on an unknown key (unlike the ini/gcode
-  paths, which ignore per-key) — the trap BootstrapMap ticket 008 hit with SLA.
+- **Corrected by ticket 03:** `load_from_json` does *not* fail the whole project config on an
+  unknown key. `PrintConfigDef::handle_legacy` (`PrintConfig.cpp:8413`) clears any key absent
+  from `print_config_def`, so `set_deserialize_nothrow` records the name in
+  `unrecogized_keys` and returns success — the key is **silently dropped**, not fatal, and
+  `UnknownOptionException` is unreachable on this path. The BootstrapMap ticket 008 comment at
+  `bbs_3mf.cpp:2746` states the same wrong premise; its SLA pre-pass is still correct and
+  still wanted, but for an unverified reason.
 - Submodule bump `1238ef02 -> dbf3449c` brought: tree/traditional support **families**
   (`SupportPlanIR` 2.0.0 -> 2.2.0, `SupportPlanRole::BaseInterface`,
   `ExtrusionRole::SupportBaseInterface` -> `;TYPE:Support interface`), support pattern/threshold
@@ -121,6 +126,16 @@ are true when this map is done:
   `ConfigOptionEnumGeneric`'s runtime keys map. Curated-table targets are excluded by running
   the translator, not by restating the table. Also: `machine_max_jerk_*` are Orca keys, not
   pnp-only — ticket 01's scrape missed loop-built `add()` sites.
+
+- [Preserve unknown pnp keys through preset and 3mf load](tickets/03-unknown-key-preservation.md)
+  — the premise was wrong: `handle_legacy` clears any key absent from `print_config_def`, so an
+  unresolvable key is **silently dropped**, not fatal. Fixed by a document-attached carrier
+  (`Model::pnp_unknown_config`, `Preset::pnp_unknown_config`) holding the raw JSON fragment,
+  filled by an opt-in out-param on `load_from_json` and re-emitted by `save_to_json`. Never
+  enters `DynamicConfig::options`, so `diff()` and the dirty state cannot see it. Both JSON
+  paths only; `.ini` and the G-code CONFIG_BLOCK still drop. New `UnresolvedPreserved` warning
+  class, keys named but never modules — pnp keys are unnamespaced and the formats store no
+  module ids.
 
 ## Not yet specified
 
@@ -156,6 +171,13 @@ are true when this map is done:
   the whole resulting state, since the seam is one-shot per process. What is still unspecified is
   how to test the *rendered* page, and whether anything checks the fork against a real `pnp_cli`
   probe rather than a synthetic document.
+
+- **Whether preserved-but-unresolvable keys get a surface of their own.** Ticket 03 keeps them
+  and round-trips them, and reports them once per load, but nothing lists them and nothing can
+  purge them — a project accumulates them indefinitely and the only way to remove one is to
+  edit the file. Whether the generated PNP page shows them read-only (the shape the locked
+  degradation decision already uses for a missing `pnp_cli`) or they stay log-only depends on
+  what ticket 04 makes the page.
 
 ## Out of scope
 

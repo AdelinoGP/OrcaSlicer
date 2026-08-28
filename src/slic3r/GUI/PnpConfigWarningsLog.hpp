@@ -41,6 +41,7 @@ struct PnpConfigWarningLabels
     std::string unsupported; // e.g. "not supported by PNP"
     std::string lossy;       // e.g. "sent with substituted value"
     std::string unmapped;    // e.g. "not mapped to PNP"
+    std::string unresolved;  // e.g. "kept but not understood by this build"
 };
 
 // One notification message for the surviving warnings, grouped by class:
@@ -60,5 +61,21 @@ std::string format_pnp_config_warning_message(const std::vector<PnpConfigWarning
 void log_pnp_config_warnings(const DynamicPrintConfig&      full,
                              std::vector<PnpConfigWarning>&& warnings,
                              int                             plate = -1);
+
+// SchemaBridgeMap ticket 03: load-time sink for keys this build could not resolve.
+// Appends one unresolved-preserved record per key to the same jsonl, tagged with
+// `source` (the file or preset the keys came from) so the log says where they were
+// found. Separate entry point from log_pnp_config_warnings because a load has no
+// slice and therefore no resolved full config to filter against.
+void log_pnp_unresolved_config_keys(const std::vector<std::string>& keys,
+                                    const std::string&              source);
+
+// One notification message for `keys`, capped the same way the slice-time formatter
+// caps its lists. Named keys only: pnp module keys are not namespaced, the 3mf and
+// preset formats store keys rather than module ids, and an unresolved key may equally
+// be a retired Orca key or another producer's artifact -- so the message cannot
+// honestly name a module, or even claim the keys are pnp's.
+std::string format_pnp_unresolved_keys_message(const std::vector<std::string>& keys,
+                                               const std::string&              title);
 
 }} // namespace Slic3r::GUI

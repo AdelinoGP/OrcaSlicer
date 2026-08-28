@@ -775,3 +775,145 @@ SCENARIO("A CONFIG_BLOCK with an unreadable value still loads", "[Config]") {
         fs::remove(path, ec);
     }
 }
+
+// PNP fork (SchemaBridgeMap ticket 03). A key print_config_def does not have is dropped on
+// load: PrintConfigDef::handle_legacy clears it, set_deserialize_nothrow records the name in
+// ConfigSubstitutionContext::unrecogized_keys and returns success, and no value is stored --
+// so saving the file writes it out no more. For a setting belonging to a pnp module the
+// current install does not have, that is silent data loss on a file the user expects to
+// round-trip. Preservation is opt-in, so the drop-and-record behaviour must survive untouched
+// for the callers (vendor profiles, inherits sub-files) that still want it.
+SCENARIO("load_from_json tolerates and preserves keys this build cannot resolve", "[Config][PNP]") {
+    namespace fs = boost::filesystem;
+
+    GIVEN("a config json mixing a known key with keys no build of this fork defines") {
+        const std::string scalar_key = "pnp_ticket03_scalar";
+        const std::string list_key   = "pnp_ticket03_list";
+        REQUIRE(print_config_def.get(scalar_key) == nullptr);
+        REQUIRE(print_config_def.get(list_key) == nullptr);
+
+        const fs::path path = fs::temp_directory_path() / fs::unique_path("pnp_t03_%%%%%%%%.json");
+        {
+            boost::nowide::ofstream out(path.string());
+            out << "{\n"
+                << "  \"version\": \"2.3.0\",\n"
+                << "  \"name\": \"unit test\",\n"
+                << "  \"layer_height\": \"0.28\",\n"
+                << "  \"" << scalar_key << "\": \"smart\",\n"
+                << "  \"" << list_key << "\": [\"1\", \"2\"]\n"
+                << "}\n";
+        }
+
+        WHEN("loaded with an unknown-key carrier") {
+            DynamicPrintConfig config;
+            std::map<std::string, std::string> key_values;
+            std::string reason;
+            ConfigBase::t_unknown_config_values unknown;
+            config.load_from_json(path.string(), ForwardCompatibilitySubstitutionRule::Enable,
+                                  key_values, reason, &unknown);
+
+            THEN("the known key loads and the unresolvable ones are collected verbatim") {
+                REQUIRE(reason.empty());
+                REQUIRE(config.option<ConfigOptionFloat>("layer_height") != nullptr);
+                REQUIRE_THAT(config.option<ConfigOptionFloat>("layer_height")->value,
+                             Catch::Matchers::WithinAbs(0.28, 1e-9));
+
+                REQUIRE(unknown.size() == 2);
+                // Stored as the JSON fragment as read, so the value round-trips exactly --
+                // including the distinction between a scalar and a list.
+                REQUIRE(unknown.at(scalar_key) == "\"smart\"");
+                REQUIRE(unknown.at(list_key) == "[\"1\",\"2\"]");
+            }
+
+            THEN("they are not in the config, so diff() and the dirty-state cannot see them") {
+                REQUIRE(config.option(scalar_key) == nullptr);
+                REQUIRE(config.option(list_key) == nullptr);
+                const t_config_option_keys keys = config.keys();
+                REQUIRE(std::find(keys.begin(), keys.end(), scalar_key) == keys.end());
+                REQUIRE(std::find(keys.begin(), keys.end(), list_key) == keys.end());
+            }
+
+            THEN("save_to_json re-emits them beside the live keys") {
+                const fs::path out_path = fs::temp_directory_path() / fs::unique_path("pnp_t03_out_%%%%%%%%.json");
+                config.save_to_json(out_path.string(), "unit test", "project", "2.3.0", &unknown);
+
+                DynamicPrintConfig reloaded;
+                std::map<std::string, std::string> kv2;
+                std::string reason2;
+                ConfigBase::t_unknown_config_values unknown2;
+                reloaded.load_from_json(out_path.string(), ForwardCompatibilitySubstitutionRule::Enable,
+                                        kv2, reason2, &unknown2);
+
+                REQUIRE(reason2.empty());
+                REQUIRE(unknown2.at(scalar_key) == "\"smart\"");
+                REQUIRE(unknown2.at(list_key) == "[\"1\",\"2\"]");
+                REQUIRE(reloaded.option<ConfigOptionFloat>("layer_height") != nullptr);
+
+                boost::system::error_code ec;
+                fs::remove(out_path, ec);
+            }
+        }
+
+        WHEN("loaded without a carrier, as the vendor-profile call sites still do") {
+            DynamicPrintConfig config;
+            std::map<std::string, std::string> key_values;
+            std::string reason;
+            ConfigSubstitutionContext ctxt{ ForwardCompatibilitySubstitutionRule::Enable };
+            const int ret = config.load_from_json(path.string(), ctxt, true, key_values, reason);
+
+            THEN("behaviour is exactly as before this ticket: dropped, and named in the context") {
+                REQUIRE(ret == 0);
+                REQUIRE(reason.empty());
+                REQUIRE(config.option<ConfigOptionFloat>("layer_height") != nullptr);
+                REQUIRE(config.option(scalar_key) == nullptr);
+                REQUIRE(config.option(list_key) == nullptr);
+                // The pre-existing signal this ticket hooks: PrintConfigDef::handle_legacy
+                // clears a key print_config_def does not have, and set_deserialize_nothrow
+                // records the original name here. Without a carrier the *value* is still
+                // lost, which is the data loss the opt-in fixes.
+                REQUIRE(std::find(ctxt.unrecogized_keys.begin(), ctxt.unrecogized_keys.end(), scalar_key)
+                        != ctxt.unrecogized_keys.end());
+                REQUIRE(std::find(ctxt.unrecogized_keys.begin(), ctxt.unrecogized_keys.end(), list_key)
+                        != ctxt.unrecogized_keys.end());
+            }
+        }
+
+        boost::system::error_code ec;
+        fs::remove(path, ec);
+    }
+}
+
+// A key that is unresolvable at load time may be defined later -- the module declaring it gets
+// installed, so ticket 02's startup registration puts it in print_config_def and it loads as a
+// normal key. The stale carrier entry must not then overwrite the live value on save.
+SCENARIO("save_to_json prefers the live value over a stale preserved entry", "[Config][PNP]") {
+    namespace fs = boost::filesystem;
+
+    GIVEN("a config holding layer_height and a carrier claiming a different layer_height") {
+        DynamicPrintConfig config;
+        config.set_key_value("layer_height", new ConfigOptionFloat(0.28));
+
+        ConfigBase::t_unknown_config_values stale;
+        stale["layer_height"] = "\"0.10\"";
+
+        WHEN("saved") {
+            const fs::path out_path = fs::temp_directory_path() / fs::unique_path("pnp_t03_stale_%%%%%%%%.json");
+            config.save_to_json(out_path.string(), "unit test", "project", "2.3.0", &stale);
+
+            DynamicPrintConfig reloaded;
+            std::map<std::string, std::string> kv;
+            std::string reason;
+            reloaded.load_from_json(out_path.string(), ForwardCompatibilitySubstitutionRule::Enable, kv, reason);
+
+            THEN("the live value wins and the stale entry is dropped") {
+                REQUIRE(reason.empty());
+                REQUIRE(reloaded.option<ConfigOptionFloat>("layer_height") != nullptr);
+                REQUIRE_THAT(reloaded.option<ConfigOptionFloat>("layer_height")->value,
+                             Catch::Matchers::WithinAbs(0.28, 1e-9));
+            }
+
+            boost::system::error_code ec;
+            fs::remove(out_path, ec);
+        }
+    }
+}

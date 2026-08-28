@@ -2776,9 +2776,16 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                 if (is_sla_project)
                     throw version_error(_(L("SLA projects are not supported by this build.")));
             }
+            // PNP fork (SchemaBridgeMap ticket 03): opt into tolerate-and-preserve. Before
+            // this, a project carrying a key this build cannot resolve -- e.g. a setting
+            // belonging to a pnp module the current install does not have -- lost its
+            // *entire* config, because load_from_json aborts on the first unknown key. Now
+            // the rest of the config loads and the unknown keys ride on the Model until
+            // _add_project_config_file_to_archive writes them back verbatim.
             std::map<std::string, std::string> key_values;
             std::string reason;
-            int ret = config.load_from_json(dest_file, config_substitutions, true, key_values, reason);
+            model.pnp_unknown_config.clear();
+            int ret = config.load_from_json(dest_file, config_substitutions, true, key_values, reason, &model.pnp_unknown_config);
             if (ret) {
                 add_error("Error load config from json:"+reason);
                 return;
@@ -2810,7 +2817,12 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
             //ConfigSubstitutions config_substitutions = config.load_from_ini(dest_file, Enable);
             std::map<std::string, std::string> key_values;
             std::string reason;
-            ConfigSubstitutions config_substitutions = use_json? config.load_from_json(dest_file, Enable, key_values, reason) : config.load_from_ini(dest_file, Enable);
+            // PNP fork (SchemaBridgeMap ticket 03): same tolerate-and-preserve as the project
+            // config above; the carrier moves onto the Preset built below. The .ini branch is
+            // untouched -- load_from_ini has always ignored unknown keys per key, and .ini is
+            // a legacy import path this fork never writes back.
+            ConfigBase::t_unknown_config_values unknown_config;
+            ConfigSubstitutions config_substitutions = use_json? config.load_from_json(dest_file, Enable, key_values, reason, &unknown_config) : config.load_from_ini(dest_file, Enable);
             if (!reason.empty()) {
                 BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << boost::format(", load project embedded config from  %1% failed\n") % dest_file;
                 //skip this file
@@ -2855,6 +2867,7 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
             Preset *preset = new Preset(type, preset_name, false);
             preset->file = dest_file;
             preset->config = std::move(config);
+            preset->pnp_unknown_config = std::move(unknown_config);
             preset->loaded = true;
             preset->is_project_embedded = true;
             preset->is_external = true;
@@ -7985,7 +7998,11 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
     {
         const std::string& temp_path = model.get_backup_path();
         std::string temp_file = temp_path + std::string("/") + "_temp_1.config";
-        config.save_to_json(temp_file, std::string("project_settings"), std::string("project"), std::string(SLIC3R_VERSION));
+        // PNP fork (SchemaBridgeMap ticket 03): write back the keys the importer could not
+        // resolve. They are written unconditionally, whatever presets the user has since
+        // selected -- the keys belong to the document, and we cannot attribute a key to a
+        // module, so there is nothing a "has it gone stale" heuristic could work from.
+        config.save_to_json(temp_file, std::string("project_settings"), std::string("project"), std::string(SLIC3R_VERSION), &model.pnp_unknown_config);
         return _add_file_to_archive(archive, BBS_PROJECT_CONFIG_FILE, temp_file);
     }
 
@@ -8006,7 +8023,10 @@ void PlateData::parse_filament_info(GCodeProcessorResult *result)
                 preset->file = temp_path + std::string("/") + "_temp_1.config";
                 DynamicPrintConfig& config = preset->config;
                 //config.save(preset->file);
-                config.save_to_json(preset->file, preset->name, std::string("project"), preset->version.to_string());
+                // PNP fork (SchemaBridgeMap ticket 03): project-embedded presets take the
+                // Preset::save path via this exporter (Preset::save returns early for them),
+                // so the carrier has to be merged here too.
+                config.save_to_json(preset->file, preset->name, std::string("project"), preset->version.to_string(), &preset->pnp_unknown_config);
 
                 std::string dest_file;
                 if (preset->type == Preset::TYPE_PRINT) {

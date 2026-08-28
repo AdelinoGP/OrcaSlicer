@@ -105,6 +105,7 @@
 // (SlicingStatusEvent, SlicingProcessCompletedEvent), which PnpSlicingProcess reuses.
 #include "PnpSlicingProcess.hpp"
 #include "PnpBackend.hpp"
+#include "PnpConfigWarningsLog.hpp"
 #include "SelectMachine.hpp"
 #include "SendMultiMachinePage.hpp"
 #include "SendToPrinter.hpp"
@@ -7656,6 +7657,27 @@ std::vector<size_t> Plater::priv::load_files(const std::vector<fs::path>& input_
             if (load_aux) {
                 q->model().load_from(model);
                 load_auxiliary_files();
+                // PNP fork (SchemaBridgeMap ticket 03): the project carried config keys this
+                // build cannot resolve. They have been kept verbatim and will be written back
+                // on save; tell the user once, naming the keys. Not the modules -- pnp module
+                // keys are not namespaced and the 3mf stores keys rather than module ids, so
+                // an unresolved key may equally be a retired Orca key or another producer's
+                // artifact and we cannot honestly attribute it.
+                if (!q->model().pnp_unknown_config.empty()) {
+                    std::vector<std::string> unresolved;
+                    unresolved.reserve(q->model().pnp_unknown_config.size());
+                    for (const auto &kv : q->model().pnp_unknown_config)
+                        unresolved.push_back(kv.first);
+                    log_pnp_unresolved_config_keys(unresolved, filename.string());
+                    NotificationManager *notify_manager = q->get_notification_manager();
+                    if (notify_manager != nullptr)
+                        notify_manager->push_notification(
+                            NotificationType::CustomNotification,
+                            NotificationManager::NotificationLevel::WarningNotificationLevel,
+                            format_pnp_unresolved_keys_message(
+                                unresolved,
+                                _u8L("Settings this build cannot resolve were kept unchanged and will be saved back intact:")));
+                }
             }
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ":" << __LINE__ << boost::format(", before load_model_objects, count %1%")%model.objects.size();
             auto loaded_idxs = load_model_objects(model.objects, is_project_file);

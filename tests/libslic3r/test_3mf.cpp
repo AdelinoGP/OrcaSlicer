@@ -537,6 +537,114 @@ SCENARIO("A project .3mf may carry no printable_height", "[3mf]") {
     }
 }
 
+// PNP fork (SchemaBridgeMap ticket 03). load_from_json fails the *whole* project config on
+// the first key it cannot resolve -- unlike the .ini and G-code paths, which ignore unknown
+// keys per key. A project carrying settings for a pnp module the current install does not
+// have therefore lost every setting it had, not just the unresolvable ones. The importer now
+// opts into tolerate-and-preserve: unknown keys are kept verbatim on the Model and written
+// back on save, and the rest of the config loads normally.
+SCENARIO("Unresolvable project config keys survive a .3mf round-trip", "[3mf][PNP]") {
+    GIVEN("a project .3mf carrying a config key no build of this fork defines") {
+        Model model;
+        std::string src_file = std::string(TEST_DATA_DIR) + "/test_3mf/Prusa.stl";
+        REQUIRE(load_stl(src_file.c_str(), &model));
+        model.add_default_instances();
+
+        std::string backup_dir =
+            (boost::filesystem::temp_directory_path() / boost::filesystem::unique_path("orca_pnpunk_%%%%%%%%")).string();
+        boost::filesystem::create_directories(backup_dir);
+        model.set_backup_path(backup_dir);
+
+        // A scalar and a list, so both branches of load_from_json's parse loop are covered.
+        // Neither is defined by print_config_def, in this build or any other.
+        const std::string scalar_key = "pnp_ticket03_absent_module_scalar";
+        const std::string list_key   = "pnp_ticket03_absent_module_list";
+        REQUIRE(print_config_def.get(scalar_key) == nullptr);
+        REQUIRE(print_config_def.get(list_key) == nullptr);
+
+        // A real key written alongside them: this is what a pre-fix load lost entirely.
+        DynamicPrintConfig config;
+        config.set_key_value("layer_height", new ConfigOptionFloat(0.28));
+
+        model.pnp_unknown_config[scalar_key] = "\"smart\"";
+        model.pnp_unknown_config[list_key]   = "[\"1\",\"2\"]";
+
+        WHEN("stored and reloaded through the BBS importer") {
+            std::string test_file = std::string(TEST_DATA_DIR) + "/test_3mf/pnp_unknown_keys.3mf";
+
+            StoreParams store_params;
+            store_params.path     = test_file.c_str();
+            store_params.model    = &model;
+            store_params.config   = &config;
+            store_params.strategy = SaveStrategy::Zip64 | SaveStrategy::Silence;
+            REQUIRE(store_bbs_3mf(store_params));
+
+            Model dst_model;
+            DynamicPrintConfig dst_config;
+            ConfigSubstitutionContext ctxt{ ForwardCompatibilitySubstitutionRule::Enable };
+            PlateDataPtrs        dst_plates;
+            std::vector<Preset*> project_presets;
+            bool   is_bbl_3mf = false, is_orca_3mf = false;
+            Semver file_version;
+            bool loaded = load_bbs_3mf(test_file.c_str(), &dst_config, &ctxt, &dst_model, &dst_plates,
+                                       &project_presets, &is_bbl_3mf, &is_orca_3mf, &file_version, nullptr,
+                                       LoadStrategy::LoadModel | LoadStrategy::LoadConfig);
+
+            THEN("the project loads, the known key survives, and the unresolvable keys are kept verbatim") {
+                REQUIRE(loaded);
+                // The regression this ticket exists to prevent: before the fix the whole
+                // config was discarded, so layer_height came back absent.
+                REQUIRE(dst_config.option<ConfigOptionFloat>("layer_height") != nullptr);
+                REQUIRE_THAT(dst_config.option<ConfigOptionFloat>("layer_height")->value,
+                             Catch::Matchers::WithinAbs(0.28, 1e-9));
+
+                // Held on the document, never in the config -- so they cannot reach diff()
+                // or the dirty-state colouring.
+                REQUIRE(dst_config.option(scalar_key) == nullptr);
+                REQUIRE(dst_config.option(list_key) == nullptr);
+                REQUIRE(dst_model.pnp_unknown_config.count(scalar_key) == 1);
+                REQUIRE(dst_model.pnp_unknown_config.count(list_key) == 1);
+                REQUIRE(dst_model.pnp_unknown_config.at(scalar_key) == "\"smart\"");
+                REQUIRE(dst_model.pnp_unknown_config.at(list_key) == "[\"1\",\"2\"]");
+            }
+
+            THEN("re-saving the reloaded project writes them out again, unchanged") {
+                REQUIRE(loaded);
+                std::string second_file = std::string(TEST_DATA_DIR) + "/test_3mf/pnp_unknown_keys_2.3mf";
+                dst_model.set_backup_path(backup_dir);
+
+                StoreParams again;
+                again.path     = second_file.c_str();
+                again.model    = &dst_model;
+                again.config   = &dst_config;
+                again.strategy = SaveStrategy::Zip64 | SaveStrategy::Silence;
+                REQUIRE(store_bbs_3mf(again));
+
+                Model third_model;
+                DynamicPrintConfig third_config;
+                ConfigSubstitutionContext ctxt2{ ForwardCompatibilitySubstitutionRule::Enable };
+                PlateDataPtrs        third_plates;
+                std::vector<Preset*> third_presets;
+                bool   is_bbl = false, is_orca = false;
+                Semver ver;
+                REQUIRE(load_bbs_3mf(second_file.c_str(), &third_config, &ctxt2, &third_model, &third_plates,
+                                     &third_presets, &is_bbl, &is_orca, &ver, nullptr,
+                                     LoadStrategy::LoadModel | LoadStrategy::LoadConfig));
+                boost::filesystem::remove(second_file);
+
+                REQUIRE(third_model.pnp_unknown_config.at(scalar_key) == "\"smart\"");
+                REQUIRE(third_model.pnp_unknown_config.at(list_key) == "[\"1\",\"2\"]");
+                release_PlateData_list(third_plates);
+            }
+
+            boost::filesystem::remove(test_file);
+            release_PlateData_list(dst_plates);
+        }
+
+        boost::filesystem::remove_all(backup_dir);
+    }
+}
+
 // Device-side nozzle-grouping serialization surface.
 // Direct unit coverage for the pure serialize/deserialize + StaticNozzleGroupResult helpers that the
 // gcode.3mf writer/reader lean on.

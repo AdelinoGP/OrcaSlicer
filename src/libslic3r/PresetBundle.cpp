@@ -1488,7 +1488,11 @@ bool PresetBundle::import_json_presets(PresetsConfigSubstitutions &            s
         // ConfigSubstitutions config_substitutions = config.load_from_ini(preset.file, substitution_rule);
         std::map<std::string, std::string> key_values;
         std::string                        reason;
-        ConfigSubstitutions                config_substitutions = config.load_from_json(file, rule, key_values, reason);
+        // PNP fork (SchemaBridgeMap ticket 03): opt into tolerate-and-preserve. The carrier
+        // is moved onto the Preset below, just before the preset.save() at the end of this
+        // function writes it back out.
+        ConfigBase::t_unknown_config_values unknown_config;
+        ConfigSubstitutions                config_substitutions = config.load_from_json(file, rule, key_values, reason, &unknown_config);
         std::string                        name                 = key_values[BBL_JSON_KEY_NAME];
         std::string                        version_str          = key_values[BBL_JSON_KEY_VERSION];
         boost::optional<Semver>            version              = Semver::parse(version_str);
@@ -1559,6 +1563,7 @@ bool PresetBundle::import_json_presets(PresetsConfigSubstitutions &            s
         }
 
         Preset &preset     = collection->load_preset(collection->path_from_name(name, inherit_preset == nullptr), preset_name, std::move(new_config), false);
+        preset.pnp_unknown_config = std::move(unknown_config);
         preset.bundle_id = load_origin.bundle_id;
         if (key_values.find(BBL_JSON_KEY_FILAMENT_ID) != key_values.end())
             preset.filament_id = key_values[BBL_JSON_KEY_FILAMENT_ID];

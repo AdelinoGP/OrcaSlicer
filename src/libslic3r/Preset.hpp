@@ -264,6 +264,18 @@ public:
     // Configuration data, loaded from a file, or set from the defaults.
     DynamicPrintConfig  config;
 
+    // PNP fork (SchemaBridgeMap ticket 03): keys this build could not resolve when the
+    // preset was read, held verbatim so that Preset::save writes them back untouched.
+    // Deliberately *not* inside `config`: they would otherwise show up in
+    // ConfigBase::diff and mark a pristine preset modified. Being a plain member they
+    // are copied with the Preset, so "Save preset as..." carries them to the copy.
+    //
+    // These are merged into the written document unconditionally, never through
+    // config.diff(parent) -- see Preset::save. A derived preset only writes its diff
+    // against its parent, and a preserved key is in neither config, so it would
+    // otherwise be dropped on every save of an inheriting preset.
+    ConfigBase::t_unknown_config_values pnp_unknown_config;
+
     // Alias of the preset
     std::string         alias;
     // List of profile names, from which this profile was renamed at some point of time.

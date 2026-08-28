@@ -66,7 +66,7 @@ std::vector<PnpConfigWarning> filter_pnp_config_warnings(const DynamicPrintConfi
 std::string format_pnp_config_warning_message(const std::vector<PnpConfigWarning>& warnings,
                                               const PnpConfigWarningLabels&        labels)
 {
-    std::vector<std::string> unsupported, lossy, unmapped;
+    std::vector<std::string> unsupported, lossy, unmapped, unresolved;
     for (const PnpConfigWarning& w : warnings) {
         switch (w.warn_class) {
         case PnpWarningClass::UnsupportedFeature: unsupported.push_back(w.key); break;
@@ -74,6 +74,7 @@ std::string format_pnp_config_warning_message(const std::vector<PnpConfigWarning
             lossy.push_back(w.key + " (" + w.orca_value + " → " + w.sent_value + ")");
             break;
         case PnpWarningClass::NotYetMapped: unmapped.push_back(w.key); break;
+        case PnpWarningClass::UnresolvedPreserved: unresolved.push_back(w.key); break;
         case PnpWarningClass::NoOp: break; // never passed in by the UI path
         }
     }
@@ -85,7 +86,45 @@ std::string format_pnp_config_warning_message(const std::vector<PnpConfigWarning
         msg += "- " + labels.lossy + ": " + join_keys(lossy) + "\n";
     if (!unmapped.empty())
         msg += "- " + labels.unmapped + ": " + join_keys(unmapped) + "\n";
+    if (!unresolved.empty())
+        msg += "- " + labels.unresolved + ": " + join_keys(unresolved) + "\n";
     return msg;
+}
+
+std::string format_pnp_unresolved_keys_message(const std::vector<std::string>& keys,
+                                               const std::string&              title)
+{
+    if (keys.empty())
+        return std::string();
+    return title + "\n" + join_keys(keys) + "\n";
+}
+
+void log_pnp_unresolved_config_keys(const std::vector<std::string>& keys, const std::string& source)
+{
+    if (keys.empty())
+        return;
+
+    const std::string ts   = Utils::utc_timestamp();
+    const std::string path = data_dir() + "/pnp-config-warnings.jsonl";
+    std::ofstream     out(path, std::ios::app);
+    if (!out) {
+        BOOST_LOG_TRIVIAL(error) << "pnp-config-warnings: cannot open " << path << " for append";
+        return;
+    }
+
+    for (const std::string& key : keys) {
+        nlohmann::json rec;
+        rec["ts"]     = ts;
+        rec["plate"]  = -1;
+        rec["key"]    = key;
+        rec["class"]  = to_string(PnpWarningClass::UnresolvedPreserved);
+        rec["source"] = source;
+        out << rec.dump() << "\n";
+    }
+
+    BOOST_LOG_TRIVIAL(info) << "pnp-config-warnings: " << keys.size()
+                            << " unresolved-preserved key(s) from " << source
+                            << "; appended to " << path;
 }
 
 void log_pnp_config_warnings(const DynamicPrintConfig&      full,
@@ -112,6 +151,8 @@ void log_pnp_config_warnings(const DynamicPrintConfig&      full,
         case PnpWarningClass::NotYetMapped:       ++count_not_mapped;  break;
         case PnpWarningClass::NoOp:               ++count_no_op;       break;
         case PnpWarningClass::LossyFallback:      ++count_lossy;       break;
+        // Load-time only; log_pnp_unresolved_config_keys is its sink, never this one.
+        case PnpWarningClass::UnresolvedPreserved: break;
         }
 
         nlohmann::json rec;

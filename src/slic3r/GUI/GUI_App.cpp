@@ -31,6 +31,7 @@
 #include <regex>
 #include <thread>
 #include <string_view>
+#include <set>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
@@ -108,6 +109,7 @@
 #endif
 #include "NotificationManager.hpp"
 #include "PnpBackend.hpp"
+#include "PnpConfigWarningsLog.hpp"
 #include "PnpConfigKeys.hpp"
 #include "UnsavedChangesDialog.hpp"
 #include "SavePresetDialog.hpp"
@@ -760,6 +762,51 @@ std::vector<std::string> GUI_App::split_str(std::string src, std::string separat
     return result;
 }
 
+// PNP fork (SchemaBridgeMap ticket 03): report preset keys this build could not resolve.
+// Presets are read in on_init_inner(), before the notification manager exists, so this runs
+// deferred from post_init() -- the same reason PnpBackend::show_failure_notification() is
+// deferred (ticket 02). Walks the loaded presets rather than queueing during the load,
+// which keeps the plumbing out of libslic3r: the carrier is already on each Preset.
+static void report_pnp_unresolved_preset_keys()
+{
+    PresetBundle *bundle = wxGetApp().preset_bundle;
+    if (bundle == nullptr)
+        return;
+
+    // One notification for the whole bundle, keys deduplicated: the same unresolvable key
+    // typically appears in every preset inheriting from the one that introduced it, and a
+    // per-preset notification would bury the user at every startup.
+    std::set<std::string>    unique_keys;
+    std::vector<std::string> sources;
+    auto collect = [&unique_keys, &sources](const PresetCollection &collection) {
+        for (const Preset &preset : collection.get_presets()) {
+            if (preset.pnp_unknown_config.empty())
+                continue;
+            sources.push_back(preset.name);
+            for (const auto &kv : preset.pnp_unknown_config)
+                unique_keys.insert(kv.first);
+        }
+    };
+    collect(bundle->prints);
+    collect(bundle->filaments);
+    collect(bundle->printers);
+
+    if (unique_keys.empty())
+        return;
+
+    const std::vector<std::string> keys(unique_keys.begin(), unique_keys.end());
+    log_pnp_unresolved_config_keys(keys, "presets: " + boost::algorithm::join(sources, ", "));
+
+    Plater *plater = wxGetApp().plater();
+    if (plater == nullptr || plater->get_notification_manager() == nullptr)
+        return;
+    plater->get_notification_manager()->push_notification(
+        NotificationType::CustomNotification,
+        NotificationManager::NotificationLevel::WarningNotificationLevel,
+        format_pnp_unresolved_keys_message(
+            keys, _u8L("Preset settings this build cannot resolve were kept unchanged and will be saved back intact:")));
+}
+
 void GUI_App::post_init()
 {
     assert(initialized());
@@ -931,8 +978,10 @@ void GUI_App::post_init()
     // reports have to be registered before any preset is built (SchemaBridgeMap
     // ticket 02); only the notification needs the notification manager, which does
     // not exist that early.
-    if (is_editor())
+    if (is_editor()) {
         PnpBackend::get().show_failure_notification();
+        report_pnp_unresolved_preset_keys();
+    }
 
     hms_query = new HMSQuery();
 

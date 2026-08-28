@@ -834,16 +834,16 @@ ConfigSubstitutions ConfigBase::load(const std::string &file, ForwardCompatibili
 }
 
 //BBS: add json support
-ConfigSubstitutions ConfigBase::load_from_json(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule, std::map<std::string, std::string>& key_values, std::string& reason)
+ConfigSubstitutions ConfigBase::load_from_json(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule, std::map<std::string, std::string>& key_values, std::string& reason, t_unknown_config_values *unknown_out)
 {
     int ret = 0;
     ConfigSubstitutionContext substitutions_ctxt(compatibility_rule);
 
-    ret = load_from_json(file, substitutions_ctxt, true, key_values, reason);
+    ret = load_from_json(file, substitutions_ctxt, true, key_values, reason, unknown_out);
     return std::move(substitutions_ctxt.substitutions);
 }
 
-int ConfigBase::load_from_json(const std::string &file, ConfigSubstitutionContext& substitution_context, bool load_inherits_to_config, std::map<std::string, std::string>& key_values, std::string& reason)
+int ConfigBase::load_from_json(const std::string &file, ConfigSubstitutionContext& substitution_context, bool load_inherits_to_config, std::map<std::string, std::string>& key_values, std::string& reason, t_unknown_config_values *unknown_out)
 {
     json j;
     std::list<std::string> different_settings_append;
@@ -908,6 +908,38 @@ int ConfigBase::load_from_json(const std::string &file, ConfigSubstitutionContex
             BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": no config defs!";
             return -1;
         }
+        // PNP fork (SchemaBridgeMap ticket 03): keep the keys this build cannot resolve.
+        //
+        // A key absent from print_config_def is already *tolerated* here, but silently, and
+        // it is dropped: PrintConfigDef::handle_legacy (PrintConfig.cpp, its closing
+        // "if (! print_config_def.has(opt_key)) opt_key = empty") clears any key it does
+        // not recognise, so set_deserialize_nothrow records the name in
+        // substitution_context.unrecogized_keys and returns success without storing a value.
+        // The value is gone, and saving the project or preset writes it out no more. For a
+        // setting belonging to a pnp module the current install does not have, that is
+        // silent data loss on a file the user expects to round-trip.
+        //
+        // So the hook is the cleared-key signal, not an exception: after ticket 02 registers
+        // the live schema keys into print_config_def, a cleared key means precisely that no
+        // module and no Orca definition claims it. Reusing that signal rather than
+        // re-deriving it leaves the legacy renames, aliases and shortcuts in charge of
+        // deciding what is unknown, so this cannot condemn a key the normal path would have
+        // rescued.
+        //
+        // The UnknownOptionException catches below cover the other route into
+        // set_deserialize_raw throwing, for a ConfigDef whose handle_legacy does not clear.
+        // Unreachable for a PrintConfigDef-backed config, cheap, and it means this function
+        // no longer has a path that discards the whole document over one key.
+        //
+        // Preservation is opt-in: with unknown_out null nothing below changes behaviour,
+        // which is what the vendor-profile and inherits call sites still want.
+        auto preserve_unknown = [unknown_out](const std::string &key, const json &value) {
+            if (unknown_out == nullptr)
+                return;
+            (*unknown_out)[key] = value.dump();
+            BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": key \"" << key << "\" is not defined by this build; preserved verbatim";
+        };
+
         //parse the json elements
         for (auto it = j.begin(); it != j.end(); it++) {
             if (boost::iequals(it.key(),BBL_JSON_KEY_VERSION)) {
@@ -952,7 +984,21 @@ int ConfigBase::load_from_json(const std::string &file, ConfigSubstitutionContex
 
                 if (it.value().is_string()) {
                     //bool test1 = (it.key() == std::string("end_gcode"));
-                    this->set_deserialize(opt_key, it.value(), substitution_context);
+                    // PNP fork: set_deserialize_nothrow appends the *original* key to
+                    // unrecogized_keys exactly when handle_legacy cleared it, so a growth
+                    // here is the "nothing defines this key" signal. The deduplication
+                    // inside that push cannot hide it: JSON object keys are unique.
+                    const size_t unrecognized_before = substitution_context.unrecogized_keys.size();
+                    try {
+                        this->set_deserialize(opt_key, it.value(), substitution_context);
+                    } catch (UnknownOptionException & /* e */) {
+                        preserve_unknown(it.key(), it.value());
+                        continue;
+                    }
+                    if (substitution_context.unrecogized_keys.size() > unrecognized_before) {
+                        preserve_unknown(it.key(), it.value());
+                        continue;
+                    }
                     //some logic for special values
                     if (opt_key == "support_type") {
                         //std::string new_value = dynamic_cast<ConfigOptionString*>(this->option(opt_key))->value;
@@ -979,6 +1025,10 @@ int ConfigBase::load_from_json(const std::string &file, ConfigSubstitutionContex
                     if (opt_key.empty()) {
                         //BBS: record these options
                         substitution_context.unrecogized_keys.push_back(opt_key_src);
+                        // PNP fork: the list-valued half of the same signal as the string
+                        // branch above -- this branch calls handle_legacy itself, so the
+                        // cleared key is already in hand.
+                        preserve_unknown(opt_key_src, it.value());
                         continue;
                     }
                     bool valid = true, first = true;
@@ -1022,8 +1072,15 @@ int ConfigBase::load_from_json(const std::string &file, ConfigSubstitutionContex
                         BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": parse " << file << " error, invalid json array for " << it.key();
                         break;
                     }
-                    if (valid)
-                        this->set_deserialize(opt_key, value_str, substitution_context);
+                    if (valid) {
+                        try {
+                            this->set_deserialize(opt_key, value_str, substitution_context);
+                        } catch (UnknownOptionException & /* e */) {
+                            // PNP fork: see the string branch above.
+                            preserve_unknown(it.key(), it.value());
+                            continue;
+                        }
+                    }
                 }
                 else {
                     //should not happen
@@ -1504,7 +1561,7 @@ ConfigSubstitutions ConfigBase::load_from_gcode_file(const std::string &file, Fo
 }
 
 //BBS: add json support
-void ConfigBase::save_to_json(const std::string &file, const std::string &name, const std::string &from, const std::string &version) const
+void ConfigBase::save_to_json(const std::string &file, const std::string &name, const std::string &from, const std::string &version, const t_unknown_config_values *extra) const
 {
     json j;
     //record the headers
@@ -1536,6 +1593,30 @@ void ConfigBase::save_to_json(const std::string &file, const std::string &name, 
 
             json j_array(string_values);
             j[opt_key] = j_array;
+        }
+    }
+
+    // PNP fork (SchemaBridgeMap ticket 03): re-emit the keys a tolerant load_from_json
+    // could not resolve. They never enter ConfigBase::options -- so they stay invisible to
+    // keys(), diff() and the dirty-state colouring -- which is exactly why they have to be
+    // merged back in here rather than falling out of the loop above. The stored value is
+    // the JSON fragment as it was read, so this is a verbatim round-trip.
+    if (extra != nullptr) {
+        for (const auto &kv : *extra) {
+            if (j.find(kv.first) != j.end()) {
+                // A key that was unknown at load time and is defined now (e.g. the module
+                // that declares it has since been installed) has already been written from
+                // the live config above. The live value wins; the stale carrier is dropped.
+                BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": preserved key \"" << kv.first
+                                        << "\" is now defined; writing the live value instead";
+                continue;
+            }
+            try {
+                j[kv.first] = json::parse(kv.second);
+            } catch (const std::exception &err) {
+                BOOST_LOG_TRIVIAL(error) << __FUNCTION__ << ": cannot re-emit preserved key \""
+                                         << kv.first << "\": " << err.what();
+            }
         }
     }
 

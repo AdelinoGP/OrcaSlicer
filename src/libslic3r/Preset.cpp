@@ -728,13 +728,17 @@ void Preset::save(DynamicPrintConfig* parent_config)
                     opt_dst->set(opt_src);
             }
         }
-        temp_config.save_to_json(this->file, bare_name, from_str, this->version.to_string());
+        // PNP fork (SchemaBridgeMap ticket 03): pnp_unknown_config is merged into every
+        // branch, including this diff-against-parent one. A preserved key is in neither
+        // config, so config.diff(*parent_config) above can never surface it; without the
+        // explicit merge an inheriting preset would silently drop it on every save.
+        temp_config.save_to_json(this->file, bare_name, from_str, this->version.to_string(), &this->pnp_unknown_config);
     } else if (!filament_id.empty() && inherits().empty()) {
         DynamicPrintConfig temp_config = config;
         temp_config.set_key_value(BBL_JSON_KEY_FILAMENT_ID, new ConfigOptionString(filament_id));
-        temp_config.save_to_json(this->file, bare_name, from_str, this->version.to_string());
+        temp_config.save_to_json(this->file, bare_name, from_str, this->version.to_string(), &this->pnp_unknown_config);
     } else {
-        this->config.save_to_json(this->file, bare_name, from_str, this->version.to_string());
+        this->config.save_to_json(this->file, bare_name, from_str, this->version.to_string(), &this->pnp_unknown_config);
     }
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << " save config for: " << this->name << " and filament_id: " << filament_id << " and base_id: " << this->base_id;
 
@@ -755,7 +759,10 @@ void Preset::reload(Preset const &parent)
     std::string                        reason;
     ForwardCompatibilitySubstitutionRule substitution_rule    = ForwardCompatibilitySubstitutionRule::Disable;
     try {
-        ConfigSubstitutions                config_substitutions = config.load_from_json(file, substitution_rule, key_values, reason);
+        // PNP fork (SchemaBridgeMap ticket 03): opt into tolerate-and-preserve. Reload
+        // replaces the carrier wholesale, matching the file it just read.
+        this->pnp_unknown_config.clear();
+        ConfigSubstitutions                config_substitutions = config.load_from_json(file, substitution_rule, key_values, reason, &this->pnp_unknown_config);
         this->config = parent.config;
         this->config.apply(std::move(config));
     } catch (const std::exception &err) {
@@ -1691,7 +1698,10 @@ void PresetCollection::load_presets(
                     //ConfigSubstitutions config_substitutions = config.load_from_ini(preset.file, substitution_rule);
                     std::map<std::string, std::string> key_values;
                     std::string reason;
-                    ConfigSubstitutions config_substitutions = config.load_from_json(preset.file, substitution_rule, key_values, reason);
+                    // PNP fork (SchemaBridgeMap ticket 03): opt into tolerate-and-preserve, so a
+                    // user preset carrying keys for a pnp module this install lacks still loads
+                    // and re-saves those keys intact instead of being deleted below.
+                    ConfigSubstitutions config_substitutions = config.load_from_json(preset.file, substitution_rule, key_values, reason, &preset.pnp_unknown_config);
                     if (! config_substitutions.empty())
                         substitutions.push_back({ preset.name, m_type, PresetConfigSubstitutions::Source::UserFile, preset.file, std::move(config_substitutions) });
                     if (!reason.empty()) {

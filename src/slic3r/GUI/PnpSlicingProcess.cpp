@@ -94,6 +94,7 @@ PnpConfigWarningLabels pnp_warning_labels()
     labels.unsupported = _u8L("not supported by PNP");
     labels.lossy       = _u8L("sent with substituted value");
     labels.unmapped    = _u8L("not mapped to PNP");
+    labels.unresolved  = _u8L("kept but not understood by this build");
     return labels;
 }
 

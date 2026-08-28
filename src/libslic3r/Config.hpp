@@ -2767,9 +2767,22 @@ public:
     ConfigSubstitutions load(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule);
     //BBS support load from ini string
     ConfigSubstitutions load_string_map(std::map<std::string, std::string> &key_values, ForwardCompatibilitySubstitutionRule compatibility_rule);
+    // PNP fork (SchemaBridgeMap ticket 03): opaque carrier for config keys this build
+    // cannot resolve. Maps the key to the *serialized JSON fragment* of its value
+    // (nlohmann's dump()), not to a parsed json object, so that Config.hpp -- and the
+    // Model/Preset headers that hold one of these -- stay free of the nlohmann include.
+    // dump() -> parse() -> dump() is stable, so the value round-trips byte-equivalent.
+    using t_unknown_config_values = std::map<std::string, std::string>;
+
     //BBS: add json support
-    int load_from_json(const std::string &file, ConfigSubstitutionContext& substitutions, bool load_inherits_in_config, std::map<std::string, std::string>& key_values, std::string& reason);
-    ConfigSubstitutions load_from_json(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule, std::map<std::string, std::string>& key_values, std::string& reason);
+    // PNP fork: `unknown_out` opts a caller into tolerate-and-preserve. Left null (the
+    // default) load_from_json keeps its historical behaviour of failing the *whole*
+    // config on the first unknown key. Passed non-null, an unknown key is instead
+    // collected here and the rest of the config still loads -- which is what the other
+    // three load paths (load(ptree), load_from_gcode_string_legacy, load_from_gcode_file)
+    // have always done, except that they drop the value instead of keeping it.
+    int load_from_json(const std::string &file, ConfigSubstitutionContext& substitutions, bool load_inherits_in_config, std::map<std::string, std::string>& key_values, std::string& reason, t_unknown_config_values *unknown_out = nullptr);
+    ConfigSubstitutions load_from_json(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule, std::map<std::string, std::string>& key_values, std::string& reason, t_unknown_config_values *unknown_out = nullptr);
 
     ConfigSubstitutions load_from_ini(const std::string &file, ForwardCompatibilitySubstitutionRule compatibility_rule);
     ConfigSubstitutions load_from_ini_string(const std::string &data, ForwardCompatibilitySubstitutionRule compatibility_rule);
@@ -2781,7 +2794,10 @@ public:
     void save(const std::string &file) const;
 
     //BBS: add json support
-    void save_to_json(const std::string &file, const std::string &name, const std::string &from, const std::string &version) const;
+    // PNP fork: `extra` is the carrier filled by a tolerant load_from_json. Its entries are
+    // re-parsed and merged into the written document, so a key this build cannot resolve
+    // survives a load/save cycle intact.
+    void save_to_json(const std::string &file, const std::string &name, const std::string &from, const std::string &version, const t_unknown_config_values *extra = nullptr) const;
 
 	// Set all the nullable values to nils.
     void null_nullables();

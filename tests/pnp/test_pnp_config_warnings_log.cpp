@@ -292,3 +292,76 @@ TEST_CASE("config-warning message caps long key lists", "[pnp][warnings]")
     REQUIRE(msg.find("key5") == std::string::npos);
     REQUIRE(msg.find("3 more") != std::string::npos);
 }
+
+// SchemaBridgeMap ticket 03: the load-time sink. Separate entry point from
+// log_pnp_config_warnings because a load has no slice and therefore no resolved full
+// config for filter_pnp_config_warnings to work against.
+TEST_CASE("unresolved-preserved keys reach the sink with their source", "[pnp][warnings]")
+{
+    ScopedDataDir dir;
+
+    log_pnp_unresolved_config_keys({"wave_overhang_pattern", "nonplanar_amplitude"},
+                                   "project.3mf");
+
+    const std::vector<json> recs = dir.records();
+    REQUIRE(recs.size() == 2);
+    for (const json& r : recs) {
+        REQUIRE(r["class"] == "unresolved-preserved");
+        REQUIRE(r["source"] == "project.3mf");
+        REQUIRE(r["plate"] == -1);
+        REQUIRE(r.contains("ts"));
+        // A load-time record has no slice value to report, so unlike the four slice-time
+        // classes it deliberately carries no orca_value/sent_value.
+        REQUIRE_FALSE(r.contains("orca_value"));
+        REQUIRE_FALSE(r.contains("sent_value"));
+    }
+}
+
+TEST_CASE("an empty unresolved-key list writes nothing", "[pnp][warnings]")
+{
+    ScopedDataDir dir;
+    log_pnp_unresolved_config_keys({}, "project.3mf");
+    REQUIRE(dir.records().empty());
+}
+
+TEST_CASE("the unresolved-key message names keys and caps the list", "[pnp][warnings]")
+{
+    REQUIRE(format_pnp_unresolved_keys_message({}, "kept:").empty());
+
+    const std::string one = format_pnp_unresolved_keys_message({"wave_overhang_pattern"}, "kept:");
+    REQUIRE(one.find("kept:") != std::string::npos);
+    REQUIRE(one.find("wave_overhang_pattern") != std::string::npos);
+    // Keys only: pnp module keys are not namespaced and the 3mf stores keys rather than
+    // module ids, so the message cannot honestly name a module.
+    REQUIRE(one.find("module") == std::string::npos);
+
+    const std::string many = format_pnp_unresolved_keys_message(
+        {"a", "b", "c", "d", "e", "f", "g"}, "kept:");
+    REQUIRE(many.find("a, b, c, d, e") != std::string::npos);
+    REQUIRE(many.find("and 2 more") != std::string::npos);
+    REQUIRE(many.find("f") == std::string::npos);
+}
+
+// The slice-time formatter gained a fourth section. The existing three must be unaffected,
+// and a mixed vector must group correctly.
+TEST_CASE("the slice-time formatter renders the unresolved-preserved class", "[pnp][warnings]")
+{
+    PnpConfigWarningLabels labels;
+    labels.title       = "PNP config warnings:";
+    labels.unsupported = "not supported by PNP";
+    labels.lossy       = "sent with substituted value";
+    labels.unmapped    = "not mapped to PNP";
+    labels.unresolved  = "kept but not understood by this build";
+
+    const std::string msg = format_pnp_config_warning_message(
+        {
+            warning("spiral_mode", PnpWarningClass::UnsupportedFeature),
+            warning("wall_loops", PnpWarningClass::NotYetMapped),
+            warning("wave_overhang_pattern", PnpWarningClass::UnresolvedPreserved),
+        },
+        labels);
+
+    REQUIRE(msg.find("not supported by PNP: spiral_mode") != std::string::npos);
+    REQUIRE(msg.find("not mapped to PNP: wall_loops") != std::string::npos);
+    REQUIRE(msg.find("kept but not understood by this build: wave_overhang_pattern") != std::string::npos);
+}

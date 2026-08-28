@@ -1532,6 +1532,14 @@ public:
     std::shared_ptr<ModelInfo> model_info = nullptr;
     std::shared_ptr<ModelProfileInfo> profile_info = nullptr;
 
+    // PNP fork (SchemaBridgeMap ticket 03): project-config keys this build could not
+    // resolve when the .3mf was opened, held verbatim so that saving the project writes
+    // them back untouched. Attached to the *document* rather than to the config: they
+    // never enter DynamicPrintConfig::options, so ConfigBase::diff and the dirty-state
+    // colouring cannot see them, and there is no copy/apply/merge site that has to
+    // remember to carry them.
+    ConfigBase::t_unknown_config_values pnp_unknown_config;
+
     //makerlab information
     std::string mk_name;
     std::string mk_version;
