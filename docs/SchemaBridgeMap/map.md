@@ -137,18 +137,21 @@ are true when this map is done:
   class, keys named but never modules — pnp keys are unnamespaced and the formats store no
   module ids.
 
+- [PNP settings page layout and control generation](tickets/04-pnp-settings-page-layout.md)
+  — one page in Print Settings, optgroups from the schema `group` with no merging into Orca's
+  own pages; control generation is free because ticket 02's registry already fills the
+  `ConfigOptionDef` and `append_single_option_line` reads it. `advanced` maps false ->
+  `comAdvanced` / true -> `comExpert`, so nothing generated reaches Simple mode; runtime labels
+  are untranslated by construction. Host-key metadata gets declared in pnp's DSL beside `@scope`
+  (`host-keys.toml` mirrors only 11 of 20). The locked degraded state could not be implemented as
+  written — with no probe there are no options to render — so the page gains a second path that
+  reads ticket 03's carrier read-only under a banner. 54 registered / 53 rendered; section F is
+  20, not 28, because `machine_max_speed_*` are loop-built Orca keys; every page key is
+  print-scoped. Two bugs: `handle_legacy` erases `support_sharp_tails` before it ever checks the
+  def, and `slice_has_paint` must be skipped via a fork-side list the wire cannot yet express.
+
 ## Not yet specified
 
-- **Whether host keys get controls at all, and where their metadata comes from.** Ticket 02
-  settled the universe — host keys now arrive with type, default and preset scope, and are
-  registered and persisted — but still with no display name, group or range. Whether they get a
-  control, and where that metadata comes from (`host-keys.toml`, new DSL attributes, or the key
-  name), is ticket 04's. Fewer candidates than section F says: any Orca key built in a loop
-  (`machine_max_jerk_*`) is identity-routed.
-- **Implementation tickets for the PNP page itself** — the control-building code, the page's
-  wiring into `Tab`/`TabPrint`, mode gating. Registration exists (ticket 02) and parks every
-  generated key at `comExpert` as a placeholder; the page still cannot be sliced until ticket 04
-  fixes the layout.
 - **Migration of the curated table's existing rows** to whatever the derived layer makes of
   them — how many of BootstrapMap ticket 005's four tiers survive as concepts once "handled"
   is answered by the live schema. Depends on ticket 01's inventory and ticket 05's shape.
@@ -156,9 +159,6 @@ are true when this map is done:
   config; whether a generated pnp key participates is unexamined. Ticket 02 registered keys into
   `print_config_def` and the preset lists but touched no per-object option list, so today they
   do not participate.
-- **Which tab a filament- or printer-scoped pnp key is edited on.** Ticket 02 settled the
-  *preset* a key persists into (pnp declares `scope` on the wire; 12 host keys are non-print).
-  Where its control lives in the tab layout is still open, and depends on ticket 04.
 - **Whether pnp should declare its Orca correspondence in the manifest.** The rejected
   alternative to name-matching (an `orca_key` field on the wire). Ticket 02 established the
   pnp-side handoff channel, so this is now cheap if ticket 04 or 05 finds name-matching wanting
@@ -170,14 +170,21 @@ are true when this map is done:
   a synthetic schema document driving the pure parser, plus one case that registers and asserts
   the whole resulting state, since the seam is one-shot per process. What is still unspecified is
   how to test the *rendered* page, and whether anything checks the fork against a real `pnp_cli`
-  probe rather than a synthetic document.
+  probe rather than a synthetic document. Ticket 04 designed the page but wrote no code, so this
+  stays open and now has a concrete subject: tickets 11 and 12 both end in "manual smoke", which
+  is the gap.
 
-- **Whether preserved-but-unresolvable keys get a surface of their own.** Ticket 03 keeps them
-  and round-trips them, and reports them once per load, but nothing lists them and nothing can
-  purge them — a project accumulates them indefinitely and the only way to remove one is to
-  edit the file. Whether the generated PNP page shows them read-only (the shape the locked
-  degradation decision already uses for a missing `pnp_cli`) or they stay log-only depends on
-  what ticket 04 makes the page.
+- **Whether pnp should declare host-injected fields on the wire.** Ticket 04 needed to keep
+  `slice_has_paint` off the page and found the wire cannot say a field is host-injected — no tag,
+  no flag, only the words "(host-injected)" inside its `display` string. Resolved for now with a
+  fork-side skip list, knowingly the curated table this map exists to delete. A per-field
+  `internal = true`, following ticket 02's `scope` precedent, is the pnp-side answer; take it if a
+  second host-injected field appears.
+
+- **Whether the settings page needs a purge affordance for preserved keys.** Ticket 04 gives
+  preserved-but-unresolvable keys a read-only surface, but only in the degraded state (ticket 12).
+  In the normal state they remain invisible and unremovable, so a project still accumulates them
+  with no way out but editing the file.
 
 ## Out of scope
 
