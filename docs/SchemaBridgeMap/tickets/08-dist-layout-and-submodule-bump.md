@@ -30,3 +30,20 @@ Work:
 
 Deliverable: bundling works from a clean `cargo xtask dist`, verified by checking that the
 bundled `pnp_cli module config-schema` reports 23 modules.
+
+## Amended by ticket 02 (2026-08-28)
+
+**The submodule bump is landed.** Ticket 02 needed a pnp-side commit
+(`config-schema` wire 1.1.0: the `host` array and per-field `scope`), so the
+superproject now records `1343489f` — which is `dbf3449c` plus that commit —
+instead of `1238ef02`. The "land the submodule bump" half of this ticket is done.
+
+What is **not** done, and is still the whole point of this ticket: the dist layout.
+`cargo xtask dist` still stages to `target/dist/<edition>/`, and the fork's
+`--pnp_dist_dir=` default and the xmake bundling step still point at the flat
+`target/dist/`. Nothing in ticket 02 touched either, and ticket 02's verification
+used a hand-built dist rather than the bundled one — so a built GUI still cannot
+find `pnp_cli`, and the schema probe it now depends on at startup will fail on a
+clean build. That failure is non-fatal by design (the GUI runs with the stock key
+set and raises a notification), but it means **no registered pnp key reaches a real
+build until this ticket lands**.
