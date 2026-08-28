@@ -39,6 +39,17 @@ struct PnpTranslationResult
     std::map<std::string, std::vector<std::string>> routed;
 };
 
+// SchemaBridgeMap ticket 06: one curated-table row whose pnp-side target the
+// live backend no longer declares. The row still runs and still writes the
+// name; pnp ignores a key it does not declare, so the Orca setting silently
+// stops arriving. This bump produced one — `support_density`, retired for
+// `support_base_pattern_spacing`.
+struct PnpDeadTarget
+{
+    std::string orca_key; // the Orca setting the row reads
+    std::string pnp_key;  // the pnp key it writes, which the backend no longer declares
+};
+
 namespace PnpConfigTranslator {
 
 // The set of config keys the live pnp backend actually reads (SchemaBridgeMap
@@ -64,6 +75,31 @@ void apply_schema_guard(nlohmann::json& config, const nlohmann::json& schema_doc
 // 1.1.0 (ticket 02). Pure. An older document with no `host` array yields the
 // module half only, which is what those backends could describe.
 PnpKeyUniverse pnp_key_universe_from_schema(const nlohmann::json& schema_doc);
+
+// True when `schema_doc` came from a backend whose wire reports host keys (the
+// `host` array added by wire 1.1.0, ticket 02). Gates the drift reconciliation
+// below: against a 1.0.0 document the universe is the module half only, and
+// ticket 01 measured 14 live curated rows that resolve through host keys — a
+// diff there would call all 14 dead. Absence of evidence, not evidence of drift.
+bool pnp_schema_reports_host_keys(const nlohmann::json& schema_doc);
+
+// Drift reconciliation (ticket 06). Every non-identity edge in `routed` — the
+// rename/remap rows — whose target `universe` does not declare. Identity edges
+// (target == source) are excluded: those are the identity pass, which is
+// derived from `universe` itself when probed and is the TIER_A_KEYS fallback
+// when not, so neither can drift against it in a way this diff would explain.
+// A row that deliberately sends nothing has no target and cannot be dead.
+// Sorted by orca_key then pnp_key so the log and the notification are stable.
+std::vector<PnpDeadTarget> dead_curated_targets(
+    const std::map<std::string, std::vector<std::string>>& routed,
+    const PnpKeyUniverse&                                  universe);
+
+// The same diff against the curated table as it actually stands: runs the
+// *unprobed* translator over a stock default config to harvest `routed`, so
+// the rows are read out of the code that routes them rather than restated
+// (the same derivation PnpConfigKeys::register_from_schema uses). Unprobed
+// because a probed translate()'s identity pass would emit the whole universe.
+std::vector<PnpDeadTarget> dead_curated_targets(const PnpKeyUniverse& universe);
 
 // Install the universe for the process. Called once at startup after the probe,
 // beside the ticket-02 key registration. Unlike that registry this is not

@@ -13,6 +13,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cstdlib>
+#include <fstream>
 #include <set>
 
 #include "libslic3r/PrintConfig.hpp"
@@ -598,3 +600,114 @@ TEST_CASE("pnp_pattern_value_supported reflects the module tables", "[pnp][trans
     REQUIRE_FALSE(PnpConfigTranslator::pnp_pattern_value_supported("no_such_key", "whatever"));
 }
 
+
+// ---------------------------------------------------------------------------
+// SchemaBridgeMap ticket 06 — drift reconciliation.
+//
+// A curated rename/remap row keeps running after pnp retires the key it writes.
+// pnp ignores a key it does not declare, so the Orca setting silently stops
+// arriving. The bump produced exactly that: support_density, retired for
+// support_base_pattern_spacing.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("host-key reporting gates the drift diff", "[pnp][translator][ticket06]")
+{
+    REQUIRE(PnpConfigTranslator::pnp_schema_reports_host_keys(
+        json::parse(R"({"schema": [], "host": []})")));
+    // Wire 1.0.0: the module half only. Ticket 01 measured 14 live rows that
+    // resolve through host keys, so a diff here would report all 14 dead.
+    REQUIRE_FALSE(PnpConfigTranslator::pnp_schema_reports_host_keys(
+        json::parse(R"({"schema": []})")));
+    REQUIRE_FALSE(PnpConfigTranslator::pnp_schema_reports_host_keys(json("nonsense")));
+}
+
+TEST_CASE("dead curated targets are the rename rows the backend dropped", "[pnp][translator][ticket06]")
+{
+    const std::map<std::string, std::vector<std::string>> routed {
+        {"identity_key",  {"identity_key"}},          // identity pass, not a curated row
+        {"live_row",      {"live_target"}},           // rename row the backend still declares
+        {"deliberate_noop", {}},                      // row that sends nothing by design
+        {"dead_row",      {"retired_target"}},        // the drift this ticket exists to catch
+        {"fan_out_row",   {"live_target", "also_gone"}},
+    };
+    const auto universe = universe_of({"identity_key", "live_target"});
+
+    const auto dead = PnpConfigTranslator::dead_curated_targets(routed, universe);
+    REQUIRE(dead.size() == 2);
+    // Sorted by orca_key, then pnp_key.
+    REQUIRE(dead[0].orca_key == "dead_row");
+    REQUIRE(dead[0].pnp_key == "retired_target");
+    REQUIRE(dead[1].orca_key == "fan_out_row");
+    REQUIRE(dead[1].pnp_key == "also_gone");
+
+    SECTION("an identity key the universe lacks is not reported as a dead row")
+    {
+        // The identity pass is derived from the universe when probed and is the
+        // TIER_A_KEYS fallback when not, so it cannot drift against the universe
+        // in a way this diff would explain -- and pnp_key_is_unimplemented
+        // already tints such a key amber.
+        const auto only_identity = PnpConfigTranslator::dead_curated_targets(
+            {{"identity_key", {"identity_key"}}}, universe_of({"something_else"}));
+        REQUIRE(only_identity.empty());
+    }
+
+    SECTION("no probe means no evidence, not universal drift")
+    {
+        REQUIRE(PnpConfigTranslator::dead_curated_targets(routed, {}).empty());
+    }
+}
+
+TEST_CASE("the real curated table is diffed against the live universe", "[pnp][translator][ticket06]")
+{
+    // Harvest the table's own targets by running the unprobed translator, the
+    // same derivation PnpConfigKeys::register_from_schema uses, then take one
+    // known rename target away: wall_loops -> wall_count.
+    const DynamicPrintConfig defaults = DynamicPrintConfig::full_print_config();
+    const auto               routed   = PnpConfigTranslator::translate(defaults, nullptr).routed;
+
+    PnpConfigTranslator::PnpKeyUniverse universe;
+    for (const auto& [orca_key, targets] : routed)
+        for (const std::string& target : targets)
+            universe.insert(target);
+    REQUIRE(universe.count("wall_count") == 1); // guards the fixture against a table edit
+    universe.erase("wall_count");
+
+    const auto dead = PnpConfigTranslator::dead_curated_targets(routed, universe);
+    REQUIRE(dead.size() == 1);
+    REQUIRE(dead[0].orca_key == "wall_loops");
+    REQUIRE(dead[0].pnp_key == "wall_count");
+}
+
+// Opt-in live check (ticket 06). Hidden by the leading `.` tag so `xmake test`
+// never runs it: it needs a real `pnp_cli module config-schema` document, which
+// only exists after `cargo xtask dist`, and the fork's test suite must not
+// depend on a cargo step that may not have run. Point it at one and run
+// explicitly:
+//
+//     pnp_config_translator_tests "[live-schema]" \
+//         --  (with PNP_LIVE_SCHEMA=<path to the config-schema JSON>)
+//
+// The expectation is the drift ticket 09 owns. Repairing those rows must empty
+// this list; anything else appearing here is new drift a submodule bump
+// introduced, which is the whole point of the reconciliation.
+TEST_CASE("the pinned backend's own schema leaves only the known dead rows",
+          "[.][pnp][translator][ticket06][live-schema]")
+{
+    const char* path = std::getenv("PNP_LIVE_SCHEMA");
+    if (path == nullptr) {
+        WARN("PNP_LIVE_SCHEMA is unset; skipping");
+        return;
+    }
+
+    std::ifstream in(path);
+    REQUIRE(in.good());
+    const json doc = json::parse(in, nullptr, false);
+    REQUIRE_FALSE(doc.is_discarded());
+    REQUIRE(PnpConfigTranslator::pnp_schema_reports_host_keys(doc));
+
+    const auto dead = PnpConfigTranslator::dead_curated_targets(
+        PnpConfigTranslator::pnp_key_universe_from_schema(doc));
+    for (const PnpDeadTarget& d : dead)
+        WARN("dead curated row: " << d.orca_key << " -> " << d.pnp_key);
+    REQUIRE(dead.size() == 0);
+}

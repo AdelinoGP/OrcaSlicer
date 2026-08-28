@@ -99,5 +99,12 @@ private:
     bool                    m_notification_shown { false };
 };
 
+// SchemaBridgeMap ticket 06: reconcile the curated translator table against the
+// live config-schema and report every row whose pnp-side target the backend no
+// longer declares. Call after each successful probe, once a notification manager
+// exists -- from post_init() at startup, and again after a Preferences re-probe.
+// Silent when there is nothing to report.
+void report_pnp_schema_drift();
+
 } // namespace GUI
 } // namespace Slic3r

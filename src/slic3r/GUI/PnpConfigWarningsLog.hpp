@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "PnpConfigWarning.hpp"
+#include "PnpConfigTranslator.hpp"
 
 namespace Slic3r {
 
@@ -77,5 +78,19 @@ void log_pnp_unresolved_config_keys(const std::vector<std::string>& keys,
 // honestly name a module, or even claim the keys are pnp's.
 std::string format_pnp_unresolved_keys_message(const std::vector<std::string>& keys,
                                                const std::string&              title);
+
+// SchemaBridgeMap ticket 06: probe-time sink for curated-table rows whose pnp-side
+// target the live backend no longer declares. Its own record shape -- this is a
+// fork-health event ("this build's translation table is out of date"), not a
+// per-slice config warning, so it carries no warning class and no value, and it
+// is keyed on `event` rather than `class` so a reader can tell the two apart in
+// the one jsonl. Also emits one boost-log line.
+void log_pnp_dead_curated_targets(const std::vector<PnpDeadTarget>& dead);
+
+// One notification message for `dead`, capped the same way the other formatters
+// cap their lists. Names the Orca setting -- the thing a reader can find in the
+// UI -- with the dead pnp target in parentheses.
+std::string format_pnp_dead_targets_message(const std::vector<PnpDeadTarget>& dead,
+                                            const std::string& title);
 
 }} // namespace Slic3r::GUI

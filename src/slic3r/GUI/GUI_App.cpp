@@ -982,6 +982,7 @@ void GUI_App::post_init()
     if (is_editor()) {
         PnpBackend::get().show_failure_notification();
         report_pnp_unresolved_preset_keys();
+        report_pnp_schema_drift();
     }
 
     hms_query = new HMSQuery();

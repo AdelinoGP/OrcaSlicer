@@ -47,3 +47,13 @@ find `pnp_cli`, and the schema probe it now depends on at startup will fail on a
 clean build. That failure is non-fatal by design (the GUI runs with the stock key
 set and raises a notification), but it means **no registered pnp key reaches a real
 build until this ticket lands**.
+
+## Amended by ticket 06
+
+`pinch_n_print_cli/target/dist/pnp_cli.exe` **and** `target/dist/developer/pnp_cli.exe` both answer
+`module config-schema` with `schema_version 1.0.0` and no `host` array, while the submodule working
+tree is at `a50bfc28`, which emits wire 1.1.0 (93 host entries). The staged binaries predated
+ticket 02's pnp-side commit; `cargo xtask dist` fixed it locally in that session, but nothing in the
+fork noticed. Whatever this ticket does about the layout must also leave the dist actually restaged —
+a correct `--pnp_dist_dir` pointing at a stale binary silently drops 65 host keys from the fork's
+key universe and disables ticket 06's drift reconciliation.

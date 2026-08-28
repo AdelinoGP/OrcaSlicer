@@ -127,6 +127,51 @@ void log_pnp_unresolved_config_keys(const std::vector<std::string>& keys, const 
                             << "; appended to " << path;
 }
 
+void log_pnp_dead_curated_targets(const std::vector<PnpDeadTarget>& dead)
+{
+    if (dead.empty())
+        return;
+
+    const std::string ts   = Utils::utc_timestamp();
+    const std::string path = data_dir() + "/pnp-config-warnings.jsonl";
+    std::ofstream     out(path, std::ios::app);
+    if (!out) {
+        BOOST_LOG_TRIVIAL(error) << "pnp-config-warnings: cannot open " << path << " for append";
+        return;
+    }
+
+    for (const PnpDeadTarget& d : dead) {
+        nlohmann::json rec;
+        rec["ts"]       = ts;
+        rec["event"]    = "dead-curated-target";
+        rec["orca_key"] = d.orca_key;
+        rec["pnp_key"]  = d.pnp_key;
+        out << rec.dump() << "\n";
+    }
+
+    std::string listing;
+    for (const PnpDeadTarget& d : dead) {
+        if (!listing.empty())
+            listing += ", ";
+        listing += d.orca_key + "->" + d.pnp_key;
+    }
+    BOOST_LOG_TRIVIAL(warning) << "pnp-config-warnings: " << dead.size()
+                               << " curated translator row(s) write a key the backend no longer declares ("
+                               << listing << "); appended to " << path;
+}
+
+std::string format_pnp_dead_targets_message(const std::vector<PnpDeadTarget>& dead,
+                                            const std::string& title)
+{
+    if (dead.empty())
+        return std::string();
+    std::vector<std::string> items;
+    items.reserve(dead.size());
+    for (const PnpDeadTarget& d : dead)
+        items.push_back(d.orca_key + " (" + d.pnp_key + ")");
+    return title + "\n" + join_keys(items) + "\n";
+}
+
 void log_pnp_config_warnings(const DynamicPrintConfig&      full,
                              std::vector<PnpConfigWarning>&& warnings,
                              int                             plate)

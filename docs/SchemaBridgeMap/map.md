@@ -165,6 +165,21 @@ are true when this map is done:
   reports them. Measured 117 -> 176 handled of 665, 115 -> 180 keys sent, 0 lost. No probe ->
   tint everything. `TIER_A_KEYS` demoted to the unprobed fallback.
 
+- [Startup drift reconciliation against the live schema](tickets/06-startup-drift-reconciliation.md)
+  — the fork now diffs the curated table's rename/remap targets against the live universe after
+  every probe (and after a Preferences re-probe), writing a `"event": "dead-curated-target"` record
+  per dead row to `pnp-config-warnings.jsonl` plus one `ImportantNotificationLevel` notification
+  naming the Orca setting. Identity edges, no-target rows and an empty universe are excluded; the
+  inverse direction is silent by construction because only table targets are walked. Ticket 05's
+  "ticket 01's 14-false-positive warning is discharged" holds only against a wire-1.1.0 backend, so
+  the whole diff is gated on the document carrying a `host` array. The build-time gate was rejected
+  as a build dependency (no real schema without `cargo xtask dist`) and taken as a hidden
+  `[live-schema]` Catch2 case driven by `PNP_LIVE_SCHEMA`. Measured against a freshly staged
+  `pnp_cli` (wire 1.1.0, 93 host entries): **exactly ticket 01's six dead rows, zero false
+  positives** — the four part-cooling renames, `support_interface_spacing`, and `enable_support`;
+  `support_density`'s row routes to nothing and so cannot be dead. Also found the tree's staged
+  dist predated the wire-1.1.0 commit.
+
 ## Not yet specified
 
 - **Migration of the curated table's existing rows.** Ticket 05 answered the tier question:
@@ -211,7 +226,12 @@ are true when this map is done:
   how to test the *rendered* page, and whether anything checks the fork against a real `pnp_cli`
   probe rather than a synthetic document. Ticket 04 designed the page but wrote no code, so this
   stays open and now has a concrete subject: tickets 11 and 12 both end in "manual smoke", which
-  is the gap.
+  is the gap. Ticket 06 sharpened the second half: it left a hidden `[live-schema]` Catch2 case that
+  runs the drift diff against a real document from `PNP_LIVE_SCHEMA`, so the piece still missing is
+  a **CI** job that stages `pnp_cli` and runs it — which cannot be phrased sharply until ticket 08
+  settles where `cargo xtask dist` puts things and whether CI runs it at all. Ticket 06 also found
+  the staged `target/dist` binaries are older than the submodule working tree, which is itself an
+  argument for the fork checking the wire it actually got rather than the wire it expects.
 
 - **Whether pnp should declare host-injected fields on the wire.** Ticket 04 needed to keep
   `slice_has_paint` off the page and found the wire cannot say a field is host-injected — no tag,
@@ -224,6 +244,15 @@ are true when this map is done:
   preserved-but-unresolvable keys a read-only surface, but only in the degraded state (ticket 12).
   In the normal state they remain invisible and unremovable, so a project still accumulates them
   with no way out but editing the file.
+
+- **What the fork should do about a `pnp_cli` older than the wire it needs.** Ticket 06 found the
+  staged dist answering `config-schema` at wire 1.0.0 while the submodule tree emits 1.1.0, and had
+  to gate its diff on the `host` array to avoid 14 false dead rows. But the same old wire silently
+  degrades more than drift reporting: 65 host keys drop out of the key universe (so they tint amber
+  and never register), and the generated PNP page loses its host-key controls. Today that is
+  indistinguishable from a backend that genuinely declares less. Whether the fork should detect the
+  old wire and say so — and whether that is the degraded state ticket 12 renders or a third case —
+  is unexamined; ticket 02's grilling may already have taken a position worth re-reading first.
 
 ## Out of scope
 

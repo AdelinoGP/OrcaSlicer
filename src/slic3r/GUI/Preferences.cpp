@@ -1648,6 +1648,9 @@ void PreferencesDialog::create_items()
             PnpBackend &pnp = PnpBackend::get();
             pnp.probe();
             pnp.show_failure_notification();
+            // show_failure_notification() may close the CustomNotification slot on a
+            // successful re-probe, so the drift report has to run after it.
+            report_pnp_schema_drift();
         };
 
         auto pnp_button_browse = new Button(m_parent, _L("Browse") + dots);

@@ -730,6 +730,44 @@ PnpKeyUniverse pnp_key_universe_from_schema(const json& schema_doc)
     return universe;
 }
 
+bool pnp_schema_reports_host_keys(const json& schema_doc)
+{
+    if (!schema_doc.is_object())
+        return false;
+    auto host = schema_doc.find("host");
+    return host != schema_doc.end() && host->is_array();
+}
+
+std::vector<PnpDeadTarget> dead_curated_targets(
+    const std::map<std::string, std::vector<std::string>>& routed,
+    const PnpKeyUniverse&                                  universe)
+{
+    std::vector<PnpDeadTarget> dead;
+    if (universe.empty())
+        return dead; // no probe, no evidence — see the header.
+
+    for (const auto& [orca_key, targets] : routed)
+        for (const std::string& target : targets) {
+            if (target == orca_key)
+                continue; // identity edge, not a curated rename/remap row
+            if (universe.count(target) == 0)
+                dead.push_back({orca_key, target});
+        }
+
+    // `routed` is a std::map so orca_key is already ordered; targets keep their
+    // routing order, which is not meaningful, so sort the pair.
+    std::sort(dead.begin(), dead.end(), [](const PnpDeadTarget& a, const PnpDeadTarget& b) {
+        return a.orca_key != b.orca_key ? a.orca_key < b.orca_key : a.pnp_key < b.pnp_key;
+    });
+    return dead;
+}
+
+std::vector<PnpDeadTarget> dead_curated_targets(const PnpKeyUniverse& universe)
+{
+    const DynamicPrintConfig defaults = DynamicPrintConfig::full_print_config();
+    return dead_curated_targets(translate(defaults, nullptr).routed, universe);
+}
+
 void set_pnp_key_universe(PnpKeyUniverse universe)
 {
     s_universe       = std::move(universe);

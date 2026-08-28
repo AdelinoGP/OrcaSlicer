@@ -44,3 +44,22 @@ This ticket is therefore no longer a correctness fix; it is **cleanup**. The dea
 fire and still write target names pnp does not declare. pnp ignores them, so the cost is
 noise in the emitted config and six rows that mislead the next reader. Verify against the
 live universe rather than the inventory before deleting each row.
+
+## Amended by ticket 06
+
+The mechanism that catches these rows now exists, and with it a way to check the repair:
+
+- `PnpConfigTranslator::dead_curated_targets()` names every row whose target the live backend does
+  not declare, and `report_pnp_schema_drift()` reports them to `pnp-config-warnings.jsonl` and one
+  notification at every startup.
+- The hidden Catch2 case `[.][live-schema]` in `tests/pnp/test_pnp_config_translator.cpp` requires
+  that set to be **empty** against a real document passed in `PNP_LIVE_SCHEMA`. It fails today; this
+  ticket is done when it passes. Run it after `cargo xtask dist` — ticket 06 found the currently
+  staged `pnp_cli` predates the wire-1.1.0 commit, so it must be restaged first (ticket 08).
+- Ticket 01's "six real dead rows" figure **is** confirmed, measured against a freshly staged
+  wire-1.1.0 `pnp_cli`: `close_fan_the_first_x_layers -> disable_fan_first_layers`,
+  `enable_overhang_bridge_fan -> enable_overhang_fan`, `enable_support -> support_enabled`,
+  `fan_max_speed -> fan_speed_max`, `fan_min_speed -> fan_speed_min`,
+  `support_interface_spacing -> tree_support_interface_spacing_mm`. `support_density` is not in the
+  list — its row routes to nothing rather than to a dead name, so it is the seventh row this ticket
+  names ("one row that deliberately sends nothing") and the diff cannot see it.

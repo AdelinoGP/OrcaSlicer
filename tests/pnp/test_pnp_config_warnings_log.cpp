@@ -365,3 +365,58 @@ TEST_CASE("the slice-time formatter renders the unresolved-preserved class", "[p
     REQUIRE(msg.find("not mapped to PNP: wall_loops") != std::string::npos);
     REQUIRE(msg.find("kept but not understood by this build: wave_overhang_pattern") != std::string::npos);
 }
+
+// ---------------------------------------------------------------------------
+// SchemaBridgeMap ticket 06 — the fork-health record for a dead curated row.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("dead curated targets get their own record shape", "[pnp][warnings-log][ticket06]")
+{
+    ScopedDataDir dir;
+
+    log_pnp_dead_curated_targets({{"enable_support", "support_enabled"},
+                                  {"support_base_pattern_spacing", "support_density"}});
+
+    const std::vector<json> records = dir.records();
+    REQUIRE(records.size() == 2);
+    for (const json& rec : records) {
+        // Keyed on `event`, not `class`: a reader must be able to tell a
+        // fork-health event from a per-slice config warning in the one jsonl.
+        REQUIRE(rec.at("event") == "dead-curated-target");
+        REQUIRE(rec.contains("orca_key"));
+        REQUIRE(rec.contains("pnp_key"));
+        REQUIRE_FALSE(rec.contains("class"));
+        REQUIRE_FALSE(rec.contains("orca_value"));
+    }
+    REQUIRE(records[0].at("orca_key") == "enable_support");
+    REQUIRE(records[0].at("pnp_key") == "support_enabled");
+
+    SECTION("nothing dead writes nothing")
+    {
+        const size_t before = dir.records().size();
+        log_pnp_dead_curated_targets({});
+        REQUIRE(dir.records().size() == before);
+    }
+}
+
+TEST_CASE("the dead-target notification names the Orca setting", "[pnp][warnings-log][ticket06]")
+{
+    // The Orca key is what a reader can find in the UI; the dead pnp target is
+    // the detail that makes the report actionable for a developer.
+    const std::string msg = format_pnp_dead_targets_message(
+        {{"enable_support", "support_enabled"}}, "Out of date:");
+    REQUIRE(msg == "Out of date:\nenable_support (support_enabled)\n");
+
+    REQUIRE(format_pnp_dead_targets_message({}, "Out of date:").empty());
+
+    SECTION("long lists are capped like the other formatters")
+    {
+        std::vector<PnpDeadTarget> dead;
+        for (int i = 0; i < 8; ++i)
+            dead.push_back({"orca" + std::to_string(i), "pnp" + std::to_string(i)});
+        const std::string capped = format_pnp_dead_targets_message(dead, "t");
+        REQUIRE(capped.find("orca4 (pnp4)") != std::string::npos);
+        REQUIRE(capped.find("orca5") == std::string::npos);
+        REQUIRE(capped.find("and 3 more") != std::string::npos);
+    }
+}

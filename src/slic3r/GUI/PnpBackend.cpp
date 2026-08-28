@@ -4,6 +4,8 @@
 #include "Plater.hpp"
 #include "NotificationManager.hpp"
 #include "I18N.hpp"
+#include "PnpConfigTranslator.hpp"
+#include "PnpConfigWarningsLog.hpp"
 
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/Semver.hpp"
@@ -160,6 +162,63 @@ bool PnpBackend::run_probe()
         return false;
     }
     return true;
+}
+
+// PNP fork (SchemaBridgeMap ticket 06): reconcile the curated translator table
+// against the live schema and report the rows that no longer land.
+//
+// A curated rename/remap row keeps running after pnp retires the key it writes;
+// pnp ignores a key it does not declare, so the Orca setting silently stops
+// arriving and nothing says so. The submodule bump produced exactly that with
+// `support_density`, retired for `support_base_pattern_spacing`.
+//
+// Called after each successful probe once a notification manager exists: from
+// GUI_App::post_init() at startup (the probe itself runs far earlier, before the
+// PresetBundle) and again from the Preferences re-probe. The diff is recomputed
+// from the raw document each time rather than stashed at probe time, so pointing
+// the fork at a different pnp_cli re-answers the question.
+//
+// Only the curated rows are diffed. A schema key that is neither an Orca key by
+// name nor a table target is, by the map's routing rule, a PNP-page key -- the
+// expected case, not drift -- so the inverse direction is deliberately silent.
+void report_pnp_schema_drift()
+{
+    const std::string &schema_json = PnpBackend::get().schema_json();
+    if (schema_json.empty())
+        return; // no probe: nothing to reconcile against.
+
+    const nlohmann::json doc = nlohmann::json::parse(schema_json, nullptr, false);
+    if (doc.is_discarded())
+        return;
+
+    // Against a wire-1.0.0 backend the universe is the module half only, and
+    // ticket 01 measured 14 live rows that resolve through host keys. Diffing
+    // there would report all 14 dead, so it is not a diff worth running.
+    if (!PnpConfigTranslator::pnp_schema_reports_host_keys(doc)) {
+        BOOST_LOG_TRIVIAL(info)
+            << "pnp: config-schema reports no host keys (wire < 1.1.0); skipping drift reconciliation";
+        return;
+    }
+
+    const std::vector<PnpDeadTarget> dead =
+        PnpConfigTranslator::dead_curated_targets(PnpConfigTranslator::pnp_key_universe_from_schema(doc));
+    if (dead.empty())
+        return;
+
+    log_pnp_dead_curated_targets(dead);
+
+    Plater *plater = wxGetApp().plater();
+    if (plater == nullptr || plater->get_notification_manager() == nullptr)
+        return;
+    // Developer-facing: the user cannot fix a stale translation table, but the
+    // consequence is theirs -- these settings do not reach the backend. Important
+    // rather than Warning: it stays up long enough to be read without claiming the
+    // print is unsafe.
+    plater->get_notification_manager()->push_notification(
+        NotificationType::CustomNotification,
+        NotificationManager::NotificationLevel::ImportantNotificationLevel,
+        format_pnp_dead_targets_message(
+            dead, _u8L("This build's PNP translation table is out of date with pnp_cli: these settings no longer reach the backend:")));
 }
 
 void PnpBackend::show_failure_notification()
