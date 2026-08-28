@@ -671,6 +671,14 @@ public:
     static void handle_legacy(t_config_option_key &opt_key, std::string &value);
     static void handle_legacy_composite(DynamicPrintConfig &config);
 
+    // PNP fork (SchemaBridgeMap ticket 02): the one sanctioned way to extend
+    // this definition after construction. ConfigDef::add() is protected because
+    // the definition is meant to be built once in the constructor; the pnp
+    // backend's key set is only known after its startup probe. The only caller
+    // is pnp_register_config_keys(), which seals the definition afterwards.
+    ConfigOptionDef* add_pnp_key(const t_config_option_key &opt_key, ConfigOptionType type)
+        { return this->add(opt_key, type); }
+
     // Array options growing with the number of extruders
     const std::vector<std::string>& extruder_option_keys() const { return m_extruder_option_keys; }
     // Options defining the extruder retract properties. These keys are sorted lexicographically.
@@ -698,8 +706,70 @@ private:
 };
 
 // The one and only global definition of SLic3r configuration options.
-// This definition is constant.
-extern const PrintConfigDef print_config_def;
+//
+// PNP fork (SchemaBridgeMap ticket 02): no longer `const`. The pnp backend
+// declares its own config keys at runtime (`pnp_cli module config-schema`), and
+// those keys must become first-class Orca keys so preset save/load, project
+// 3mf, diff and undo work for them without a per-key fork edit. That requires
+// appending to this definition after the probe.
+//
+// The mutation is a *one-shot sealed seam*, not general mutability:
+// pnp_register_config_keys() may run exactly once, before the first
+// PresetBundle exists, and pnp_config_keys_sealed() is true forever after. The
+// key set is therefore fixed for the life of the process, which is what
+// by_serialization_key_ordinal (used by the in-memory undo/redo stack) and the
+// preset option lists assume. Nothing else may write to it.
+extern PrintConfigDef print_config_def;
+
+// Preset a pnp-declared key is persisted into. Getting this wrong round-trips
+// the key into the wrong preset file, so pnp declares it on the wire
+// (config-schema `scope`) rather than the fork guessing from the key name.
+enum class PnpPresetScope { Print, Filament, Printer };
+
+// One pnp config key, as parsed from the `module config-schema` reply. Carries
+// only what registration needs; richer UI metadata (group, tooltip, ranges) is
+// applied when present but is not required.
+struct PnpConfigKeyDef
+{
+    std::string                 key;
+    ConfigOptionType            type { coFloat };
+    PnpPresetScope              scope { PnpPresetScope::Print };
+    // Serialized default, in the same textual form Orca's own deserializer
+    // accepts. Empty means "no default declared"; the option's zero value is
+    // used, which is not the same thing as a declared default of zero.
+    std::string                 default_value;
+    std::string                 label;
+    std::string                 category;
+    std::string                 tooltip;
+    std::string                 sidetext;
+    // coEnum only. Registration owns a stable enum_keys_map built from these;
+    // it must outlive the def, which the seal guarantees.
+    std::vector<std::string>    enum_values;
+    bool                        has_min { false };
+    bool                        has_max { false };
+    double                      min { 0. };
+    double                      max { 0. };
+};
+
+// Append `keys` to print_config_def and to the matching preset option lists,
+// then seal the definition.
+//
+// Must be called before the first PresetBundle is constructed: PresetBundle
+// materialises its default presets from print_config_def, and a key added
+// afterwards would exist in the definition but not in any preset.
+//
+// Returns the number of keys registered. Keys whose name already exists are
+// skipped (an Orca key of the same name is the identity-routing case and wins);
+// keys whose type could not be mapped are skipped. Calling this twice is a
+// programming error: it asserts in debug, and no-ops in release.
+size_t pnp_register_config_keys(const std::vector<PnpConfigKeyDef> &keys);
+
+// True once pnp_register_config_keys() has run. Paths that never probe (CLI
+// entry, headless 3mf load) leave this false and see the stock key set.
+bool   pnp_config_keys_sealed();
+
+// The keys pnp_register_config_keys() actually added, in registration order.
+const std::vector<std::string>& pnp_registered_config_keys();
 
 class StaticPrintConfig;
 

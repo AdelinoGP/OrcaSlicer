@@ -1209,7 +1209,9 @@ target("pnp_config_translator_tests")
     set_group("tests")
     set_default(false)
     add_files("tests/pnp/test_pnp_config_translator.cpp",
-              "src/slic3r/GUI/PnpConfigTranslator.cpp")
+              "tests/pnp/test_pnp_config_keys.cpp",
+              "src/slic3r/GUI/PnpConfigTranslator.cpp",
+              "src/slic3r/GUI/PnpConfigKeys.cpp")
     add_rules("pnp.test", "pnp.conan.dlls")
     add_deps("libslic3r", "Catch2WithMain")
     add_includedirs("src", "src/slic3r/GUI", "deps_src")

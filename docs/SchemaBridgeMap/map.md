@@ -113,30 +113,49 @@ are true when this map is done:
   host keys with no metadata; 6 dead curated rows including `enable_support` (supports never
   enable); `schema_version` static across the bump. Baseline 116/845 Orca keys reach pnp.
 
+- [Runtime registration of pnp module keys into print_config_def](tickets/02-runtime-config-def-registration.md)
+  — pnp now emits the whole key universe (`config-schema` wire 1.0.0 -> 1.1.0 adds a `host`
+  array and per-field `scope`), so the fork holds no key table; `print_config_def` is de-const'd
+  behind a one-shot sealed seam called before the PresetBundle, ordinals are safe because only
+  the in-memory undo stack reads them, and the type mapping is total via
+  `ConfigOptionEnumGeneric`'s runtime keys map. Curated-table targets are excluded by running
+  the translator, not by restating the table. Also: `machine_max_jerk_*` are Orca keys, not
+  pnp-only — ticket 01's scrape missed loop-built `add()` sites.
+
 ## Not yet specified
 
-- **Whether host keys get controls at all, and where their metadata comes from.** 28 of the 62
-  PNP-page candidates are host keys with no type tag, display name, group or range. Sharpens once
-  ticket 02 chooses the key universe.
+- **Whether host keys get controls at all, and where their metadata comes from.** Ticket 02
+  settled the universe — host keys now arrive with type, default and preset scope, and are
+  registered and persisted — but still with no display name, group or range. Whether they get a
+  control, and where that metadata comes from (`host-keys.toml`, new DSL attributes, or the key
+  name), is ticket 04's. Fewer candidates than section F says: any Orca key built in a loop
+  (`machine_max_jerk_*`) is identity-routed.
 - **Implementation tickets for the PNP page itself** — the control-building code, the page's
-  wiring into `Tab`/`TabPrint`, mode (simple/advanced/expert) gating. Cannot be sliced until
-  ticket 04 fixes the layout and ticket 02 fixes the registration mechanism.
+  wiring into `Tab`/`TabPrint`, mode gating. Registration exists (ticket 02) and parks every
+  generated key at `comExpert` as a placeholder; the page still cannot be sliced until ticket 04
+  fixes the layout.
 - **Migration of the curated table's existing rows** to whatever the derived layer makes of
   them — how many of BootstrapMap ticket 005's four tiers survive as concepts once "handled"
   is answered by the live schema. Depends on ticket 01's inventory and ticket 05's shape.
 - **Per-object / modifier-volume overrides for pnp module keys.** Orca supports per-object
-  config; whether a generated pnp key participates is unexamined. Revisit after ticket 02.
-- **Filament- and printer-scoped pnp keys.** The schema's `group`/`tags` may imply a key belongs
-  on the filament or printer tab rather than print settings; the preset *type* a generated key
-  belongs to is undecided. Depends on ticket 04.
+  config; whether a generated pnp key participates is unexamined. Ticket 02 registered keys into
+  `print_config_def` and the preset lists but touched no per-object option list, so today they
+  do not participate.
+- **Which tab a filament- or printer-scoped pnp key is edited on.** Ticket 02 settled the
+  *preset* a key persists into (pnp declares `scope` on the wire; 12 host keys are non-print).
+  Where its control lives in the tab layout is still open, and depends on ticket 04.
 - **Whether pnp should declare its Orca correspondence in the manifest.** The rejected
-  alternative to name-matching (an `orca_key` tag on the wire). May return as a pnp-side handoff
-  if name collisions or false-positive identity rows show up in ticket 01's inventory.
+  alternative to name-matching (an `orca_key` field on the wire). Ticket 02 established the
+  pnp-side handoff channel, so this is now cheap if ticket 04 or 05 finds name-matching wanting
+  — section B's 86 mismatched identity rows are the place that would show up.
 - **What the bump's support-family work needs from the settings UI beyond key routing** — e.g.
   whether tree-support's own knobs deserve deliberate placement on Orca's Support page rather
   than falling to the PNP page. Depends on tickets 01 and 07.
-- **Verification story for a schema-derived UI.** Testing a UI whose key set comes from an
-  external binary at runtime is not the fork's existing test shape. Depends on ticket 02.
+- **Verification story for a schema-derived UI.** Ticket 02 established the unit-test shape —
+  a synthetic schema document driving the pure parser, plus one case that registers and asserts
+  the whole resulting state, since the seam is one-shot per process. What is still unspecified is
+  how to test the *rendered* page, and whether anything checks the fork against a real `pnp_cli`
+  probe rather than a synthetic document.
 
 ## Out of scope
 

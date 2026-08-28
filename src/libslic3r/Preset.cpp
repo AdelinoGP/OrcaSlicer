@@ -1527,6 +1527,18 @@ const std::vector<std::string>& Preset::sla_print_options()      { return s_Pres
 const std::vector<std::string>& Preset::sla_material_options()   { return s_Preset_sla_material_options; }
 const std::vector<std::string>& Preset::sla_printer_options()    { return s_Preset_sla_printer_options; }
 
+void Preset::append_pnp_options(PnpPresetScope scope, const std::vector<std::string> &keys)
+{
+    if (keys.empty())
+        return;
+    switch (scope) {
+    case PnpPresetScope::Filament: append(s_Preset_filament_options, keys); break;
+    case PnpPresetScope::Printer:  append(s_Preset_printer_options,  keys); break;
+    case PnpPresetScope::Print:
+    default:                       append(s_Preset_print_options,    keys); break;
+    }
+}
+
 const std::vector<std::string>& Preset::printer_options()
 {
     static std::vector<std::string> s_opts = [](){

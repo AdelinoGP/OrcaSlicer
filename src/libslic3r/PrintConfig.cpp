@@ -8470,7 +8470,7 @@ void PrintConfigDef::handle_legacy_composite(DynamicPrintConfig &config)
     }
 }
 
-const PrintConfigDef print_config_def;
+PrintConfigDef print_config_def;
 
 //todo
 std::set<std::string> print_options_with_variant = {

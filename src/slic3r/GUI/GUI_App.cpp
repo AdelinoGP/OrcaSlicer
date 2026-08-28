@@ -108,6 +108,7 @@
 #endif
 #include "NotificationManager.hpp"
 #include "PnpBackend.hpp"
+#include "PnpConfigKeys.hpp"
 #include "UnsavedChangesDialog.hpp"
 #include "SavePresetDialog.hpp"
 #include "PrintHostDialogs.hpp"
@@ -925,14 +926,13 @@ void GUI_App::post_init()
     }
 #endif
 
-    // PNP: locate pnp_cli and run the config-schema version handshake. On failure the
-    // GUI stays fully usable, but slicing is disabled (PnpBackend::available() == false)
-    // and a persistent notification points at the failing path.
-    if (is_editor()) {
-        PnpBackend &pnp = PnpBackend::get();
-        pnp.probe();
-        pnp.show_failure_notification();
-    }
+    // PNP: report a failed pnp_cli handshake. The probe itself runs much earlier,
+    // in on_init_inner() before the PresetBundle exists, because the config keys it
+    // reports have to be registered before any preset is built (SchemaBridgeMap
+    // ticket 02); only the notification needs the notification manager, which does
+    // not exist that early.
+    if (is_editor())
+        PnpBackend::get().show_failure_notification();
 
     hms_query = new HMSQuery();
 
@@ -2919,6 +2919,21 @@ bool GUI_App::on_init_inner()
         scrn = new SplashScreen(splashscreen_pos);
         wxYield();
         scrn->SetText(_L("Loading configuration") + dots, 5);
+    }
+
+    // PNP: locate pnp_cli and run the config-schema handshake, then register the
+    // backend's own config keys into print_config_def (SchemaBridgeMap ticket 02).
+    //
+    // Both must happen here, before the PresetBundle: the bundle materialises its
+    // default presets from print_config_def, so a key registered afterwards would
+    // exist in the definition but in no preset. On failure the GUI stays fully
+    // usable — slicing is disabled and post_init() raises the notification — and
+    // the stock Orca key set is all that exists.
+    if (is_editor()) {
+        PnpBackend &pnp = PnpBackend::get();
+        pnp.probe();
+        const size_t registered = PnpConfigKeys::register_from_schema(pnp.schema_json());
+        BOOST_LOG_TRIVIAL(info) << "pnp: " << registered << " backend config keys registered before preset load";
     }
 
     BOOST_LOG_TRIVIAL(info) << "loading systen presets...";

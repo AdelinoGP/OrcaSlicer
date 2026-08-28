@@ -411,6 +411,13 @@ public:
     static const std::vector<std::string>&  sla_material_options();
     static const std::vector<std::string>&  sla_print_options();
 
+    // PNP fork (SchemaBridgeMap ticket 02): append backend-declared config keys
+    // to the option list for `scope`, so they persist through presets like any
+    // Orca key. Called once, from pnp_register_config_keys(), before the first
+    // PresetBundle exists — printer_options() memoises its list on first call,
+    // so a later append would not be seen.
+    static void                             append_pnp_options(PnpPresetScope scope, const std::vector<std::string> &keys);
+
 	static void                             update_suffix_modified(const std::string& new_suffix_modified);
     static const std::string&               suffix_modified();
     static std::string                      remove_suffix_modified(const std::string& name);
