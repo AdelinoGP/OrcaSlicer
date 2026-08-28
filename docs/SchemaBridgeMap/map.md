@@ -86,9 +86,12 @@ are true when this map is done:
   min_list_length/max_list_length/validate/tags`. Wildcard entries (`<prefix>:*`) are excluded.
   The fork currently reads only `schema_version` from it (`PnpBackend`), and uses the raw doc
   as a drop-bad-keys guard (`PnpConfigTranslator::apply_schema_guard`).
-- The handled-key set today is the **static** `TIER_A_KEYS` array plus hand-written rows in
-  `src/slic3r/GUI/PnpConfigTranslator.cpp` (~700 lines); `pnp_key_is_unimplemented()` drives the
-  amber label tint in `Tab::update_label_colours()`/`Tab::decorate()`.
+- **Superseded by ticket 05:** the handled-key set was the static `TIER_A_KEYS` array plus
+  hand-written rows in `src/slic3r/GUI/PnpConfigTranslator.cpp`. It is now derived from the live
+  key universe plus `translate()`'s own `routed` provenance map; `TIER_A_KEYS` survives only as
+  the unprobed fallback. `pnp_key_is_unimplemented()` still drives the amber label tint in
+  `Tab::update_label_colours()`/`Tab::decorate()`, and returns true for every key when no probe
+  has run.
 - `print_config_def` is `extern const PrintConfigDef` (`src/libslic3r/PrintConfig.hpp:702`);
   preset key lists are static (`src/libslic3r/Preset.cpp`); serialization uses
   `by_serialization_key_ordinal`.
@@ -150,11 +153,47 @@ are true when this map is done:
   print-scoped. Two bugs: `handle_legacy` erases `support_sharp_tails` before it ever checks the
   def, and `slice_has_paint` must be skipped via a fork-side list the wire cannot yet express.
 
+- [Derive the handled-key set from the live schema](tickets/05-derived-handled-set.md)
+  — "handled" is now derived, not listed: `k` is handled if the backend declares `k` itself
+  (identity) or `translate()` routed `k` to a key it declares. `PnpTranslationResult` gains a
+  `routed` provenance map so both halves and `translate()` read one source and cannot drift.
+  The Tier-A pass is derived too — every declared key is copied under its own name, running
+  before the Tier-B rows so unit fixes still win — which is what makes "zero fork edits" true
+  and which repairs, for free, ticket 01's five bump-regressed keys **plus `enable_support`**,
+  whose row wrote a non-existent key since it was authored, so supports never switched on in
+  pnp. Ticket 01's "the probe does not report host keys" amendment is discharged: wire 1.1.0
+  reports them. Measured 117 -> 176 handled of 665, 115 -> 180 keys sent, 0 lost. No probe ->
+  tint everything. `TIER_A_KEYS` demoted to the unprobed fallback.
+
 ## Not yet specified
 
-- **Migration of the curated table's existing rows** to whatever the derived layer makes of
-  them — how many of BootstrapMap ticket 005's four tiers survive as concepts once "handled"
-  is answered by the live schema. Depends on ticket 01's inventory and ticket 05's shape.
+- **Migration of the curated table's existing rows.** Ticket 05 answered the tier question:
+  Tier A is gone as a concept (derived from the universe), Tier D is derived, and Tier B
+  survives as the only hand-written layer — the rows that fix a unit, respell an enum, or
+  fan one Orca key out to several pnp keys. What is still unspecified is how far *that*
+  layer can shrink, which is the same question as the 86 mismatched identity rows below.
+
+- **A value-semantics audit of the identity rows.** Ticket 05 widened `translate()` to send
+  every declared key by name — 65 more than before — while ticket 01 §B found 86 of 113
+  identity rows carry a type, unit or range mismatch against Orca's definition.
+  `apply_schema_guard()` contains this (a rejected value is dropped and logged rather than
+  slicing wrong), but its coverage is not total: host keys reach the wire with no `min`/`max`,
+  so range errors on those pass through until ticket 10 lands the metadata. Nobody has walked
+  the 86 rows to say which are real losses.
+
+- **pnp should declare the keys it reads outside the manifest.** `support_type`,
+  `support_family` (read from `resolved_config.extensions`) and `infill_shift_step` (a bare
+  `config.get()`) are read but declared through no channel the wire can express, so ticket 05
+  carries them in a three-entry `UNDECLARED_LIVE_KEYS` array — knowingly the curated table this
+  map exists to delete. Same shape as the `internal = true` handoff below; a pnp-side commit
+  deletes the array.
+
+- **pnp should declare module role claims on the wire.** Ticket 05 checked whether
+  `pnp_pattern_value_supported()` could be derived and found it cannot: a `schema` entry
+  carries only `module` and `fields`, and which module holds `claim:sparse-fill` appears
+  nowhere. So the pattern → fill-role-holder tables stay hand-written, and the per-item
+  dropdown tint stays a fork-side guess. Declaring claims per module would make the last
+  value-level piece of the curated table derivable.
 - **Per-object / modifier-volume overrides for pnp module keys.** Orca supports per-object
   config; whether a generated pnp key participates is unexamined. Ticket 02 registered keys into
   `print_config_def` and the preset lists but touched no per-object option list, so today they

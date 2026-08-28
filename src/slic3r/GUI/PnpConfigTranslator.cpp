@@ -26,6 +26,15 @@ using nlohmann::json;
 // `sparse_infill_density` and `wall_sequence` from the asset's Tier-A list are
 // handled as Tier-B transform rows below (fan-out / enum respelling), so they
 // are intentionally absent here.
+//
+// SchemaBridgeMap ticket 05 demoted this list: it is no longer the authority on
+// which keys route by name identity. When a universe is installed the identity
+// pass asks the live backend instead, so a key pnp starts declaring is copied
+// with no fork edit. This array survives only as the unprobed fallback, so that
+// a translate() with no schema behaves exactly as it did before ticket 05.
+// It is deliberately NOT kept in sync with the backend any more; two entries
+// (`support_type`, `infill_shift_step`) are keys pnp reads through channels the
+// wire cannot describe — see UNDECLARED_LIVE_KEYS.
 // ---------------------------------------------------------------------------
 const char* const TIER_A_KEYS[] = {
     "alternate_extra_wall",
@@ -111,43 +120,59 @@ const char* const TIER_A_KEYS[] = {
     "use_relative_e_distances",
 };
 
-// Orca keys consumed by a Tier-A or Tier-B row (they get no Tier-D warning).
-// Single source of truth for translate() and pnp_key_is_unimplemented().
-const std::set<std::string>& pnp_handled_keys()
+// Keys the backend genuinely reads but declares through no channel the
+// `module config-schema` wire can express (ticket 01, finding 7):
+// `support_type` and `support_family` are read out of
+// `resolved_config.extensions` by the support-generator claim selector, and
+// `infill_shift_step` via a bare `config.get()` inside rectilinear-infill.
+// Without this they would read as unimplemented and, worse, drift (ticket 06)
+// would call them dead. The honest fix is pnp-side — declare them, as ticket 10
+// does for host-key metadata — at which point this array goes away.
+const char* const UNDECLARED_LIVE_KEYS[] = {
+    "support_type",
+    "support_family",
+    "infill_shift_step",
+};
+
+// Derive the handled set from what translate() actually routed.
+//
+//     handled(k) = k is itself a key the backend declares       (identity)
+//               or k was routed to at least one such key        (curated table)
+//
+// A curated row pointing at a target the backend no longer declares therefore
+// stops counting: its source goes amber instead of silently claiming to work.
+std::set<std::string> handled_from_routes(
+    const std::map<std::string, std::vector<std::string>>& routed,
+    const PnpKeyUniverse*                                  universe)
 {
-    static const std::set<std::string> handled = [] {
-        std::set<std::string> s;
-        for (const char* key : TIER_A_KEYS)
-            s.insert(key);
-        // Tier-B rows (renames / transforms) — keep in sync with translate().
-        s.insert("printable_area");
-        s.insert({"curr_bed_type",
-                  "supertack_plate_temp_initial_layer", "cool_plate_temp_initial_layer",
-                  "textured_cool_plate_temp_initial_layer", "eng_plate_temp_initial_layer",
-                  "hot_plate_temp_initial_layer", "textured_plate_temp_initial_layer"});
-        s.insert({"close_fan_the_first_x_layers", "enable_overhang_bridge_fan",
-                  "fan_max_speed", "fan_min_speed", "initial_layer_print_height",
-                  "infill_direction"});
-        s.insert({"sparse_infill_density", "sparse_infill_speed", "ironing_type"});
-        s.insert({"sparse_infill_line_width", "internal_solid_infill_line_width",
-                  "top_surface_line_width", "bridge_line_width"});
-        // Pattern → fill-role holder rows (PATTERN_ROWS) + the fork's bridge
-        // module picker.
-        s.insert({"sparse_infill_pattern", "top_surface_pattern", "bottom_surface_pattern",
-                  "pnp_bridge_fill_holder"});
-        s.insert("seam_position");
-        s.insert("brim_type"); // skirt_loops is Tier A above
-        s.insert({"spiral_mode", "enable_support", "raft_layers",
-                  "support_top_z_distance"});
-        s.insert({"wall_generator", "wall_sequence", "support_base_pattern_spacing",
-                  "support_interface_spacing"});
-        s.insert({"fuzzy_skin", "fuzzy_skin_thickness", "fuzzy_skin_point_distance"});
-        s.insert({"z_hop", "retraction_length", "retraction_speed", "wall_loops",
-                  "enable_prime_tower", "prime_tower_width", "prime_volume"});
-        return s;
-    }();
+    std::set<std::string> handled;
+    if (universe == nullptr) {
+        // Unprobed: no evidence about targets, so every key the table consumed
+        // counts — the pre-ticket-05 answer.
+        for (const auto& entry : routed)
+            handled.insert(entry.first);
+        return handled;
+    }
+    for (const auto& entry : routed) {
+        if (universe->count(entry.first) != 0) {
+            handled.insert(entry.first);
+            continue;
+        }
+        for (const std::string& target : entry.second)
+            if (universe->count(target) != 0) {
+                handled.insert(entry.first);
+                break;
+            }
+    }
     return handled;
 }
+
+// Process-wide installed universe. Not sealed (unlike ticket 02's key
+// registry): read-only data with no ordinal or preset consequences.
+// `s_universe_generation` invalidates the derived-handled-set cache below.
+bool          s_universe_known      = false;
+PnpKeyUniverse s_universe;
+unsigned      s_universe_generation = 0;
 
 // Known Tier-D warning-class overrides. Per ticket 013 there is no up-front
 // classification pass: keys default to NotYetMapped and a class is written
@@ -294,16 +319,13 @@ std::string serialize_or_empty(const DynamicPrintConfig& cfg, const std::string&
 
 } // anonymous namespace
 
-PnpTranslationResult translate(const DynamicPrintConfig& cfg)
+PnpTranslationResult translate(const DynamicPrintConfig& cfg, const PnpKeyUniverse* universe)
 {
     PnpTranslationResult result;
     result.json = json::object();
     json& out   = result.json;
 
-    // Orca keys consumed by a Tier-A or Tier-B row (they get no Tier-D warning).
-    const std::set<std::string>& handled = pnp_handled_keys();
-
-    const auto put = [&](const char* pnp_key, json value) {
+    const auto put = [&](const std::string& pnp_key, json value) {
         if (!value.is_null())
             out[pnp_key] = std::move(value);
     };
@@ -311,17 +333,54 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
                           std::string orca_value, std::string sent_value = std::string()) {
         result.warnings.push_back({key, cls, std::move(orca_value), std::move(sent_value)});
     };
-    // Copy an orca option to a (possibly renamed) pnp key. The source key is
-    // already in pnp_handled_keys().
-    const auto copy_as = [&](const char* orca_key, const char* pnp_key) {
+    // Record that `orca_key` was consumed, and (unless pnp_key is empty) which
+    // pnp key it was written to. Called by every routing site so the handled
+    // set can be derived from the routing itself — ticket 05.
+    const auto route = [&](const std::string& orca_key, const std::string& pnp_key) {
+        std::vector<std::string>& targets = result.routed[orca_key];
+        if (!pnp_key.empty() &&
+            std::find(targets.begin(), targets.end(), pnp_key) == targets.end())
+            targets.push_back(pnp_key);
+    };
+    // Copy an orca option to a (possibly renamed) pnp key.
+    const auto copy_as = [&](const std::string& orca_key, const std::string& pnp_key) {
+        route(orca_key, pnp_key);
         put(pnp_key, option_to_json(cfg.option(orca_key)));
     };
 
     // -----------------------------------------------------------------------
-    // Tier A — identity copies.
+    // Identity pass (ticket 05) — copy every Orca key the backend also
+    // declares, under its own name. This is the map's primary integration
+    // mechanism: pnp renames its keys to Orca's, so name identity is the
+    // contract, and asking the live schema rather than a static list is what
+    // lets a newly-declared pnp key reach the GUI with no fork edit.
+    //
+    // It runs FIRST so the Tier-B rows below can overwrite the keys whose
+    // value still needs a unit fix or an enum respelling (ironing_flow, the
+    // line widths, wall_generator, wall_sequence, the bead widths). Running it
+    // last would clobber those fixes with the raw Orca value.
+    //
+    // Running it first also repairs, at no cost, the five settings ticket 01
+    // found had silently stopped reaching pnp at the submodule bump: the four
+    // part-cooling keys and support_interface_spacing, whose curated rows now
+    // write dead target names, plus enable_support — whose row has written the
+    // non-existent `support_enabled` since it was first authored, so turning
+    // supports on in the GUI never turned them on in pnp. The dead rows below
+    // still fire and still write their dead targets (repairing them is ticket
+    // 09's job); pnp ignores keys it does not declare, and the live identity
+    // copy is what it now reads.
+    //
+    // With no universe the fork has no evidence, so it falls back to the
+    // compiled-in TIER_A_KEYS list and behaves exactly as it did before.
     // -----------------------------------------------------------------------
-    for (const char* key : TIER_A_KEYS)
-        copy_as(key, key);
+    if (universe != nullptr) {
+        for (const std::string& key : cfg.keys())
+            if (universe->count(key) != 0)
+                copy_as(key, key);
+    } else {
+        for (const char* key : TIER_A_KEYS)
+            copy_as(key, key);
+    }
 
     // -----------------------------------------------------------------------
     // Tier B — renames / transforms (mapping asset, Tier-B table).
@@ -330,6 +389,7 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     // printable_area -> bed_shape: points list -> flat [x0, y0, x1, y1, ...]
     // in mm (pnp types it float-list; nested pairs fail config resolution).
     if (auto* pts = cfg.option<ConfigOptionPoints>("printable_area"); pts != nullptr) {
+        route("printable_area", "bed_shape");
         json shape = json::array();
         for (const Vec2d& p : pts->values) {
             shape.push_back(p.x());
@@ -342,8 +402,11 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     if (cfg.option("curr_bed_type") != nullptr) {
         const auto        bed_type = cfg.opt_enum<BedType>("curr_bed_type");
         const std::string temp_key = get_bed_temp_1st_layer_key(bed_type);
-        if (!temp_key.empty())
+        route("curr_bed_type", "bed_temperature_initial_layer_single");
+        if (!temp_key.empty()) {
+            route(temp_key, "bed_temperature_initial_layer_single");
             put("bed_temperature_initial_layer_single", option_to_json(cfg.option(temp_key)));
+        }
     }
 
     copy_as("close_fan_the_first_x_layers", "disable_fan_first_layers");
@@ -360,11 +423,15 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     // sink as a percent > 0 gate. Sending the raw percent to infill_density
     // made pnp slice at 2500% density (clamped to 100% infill).
     if (json v = option_to_json(cfg.option("sparse_infill_density")); v.is_number()) {
+        route("sparse_infill_density", "infill_density");
+        route("sparse_infill_density", "sparse_infill_density");
         out["infill_density"]        = v.get<double>() / 100.;
         out["sparse_infill_density"] = v;
     }
     // sparse_infill_speed: one source, two sinks (module key + host speed).
     if (json v = option_to_json(cfg.option("sparse_infill_speed")); !v.is_null()) {
+        route("sparse_infill_speed", "infill_speed");
+        route("sparse_infill_speed", "sparse_infill_speed");
         out["infill_speed"]        = v;
         out["sparse_infill_speed"] = v;
     }
@@ -377,6 +444,7 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     for (const PatternRow& row : PATTERN_ROWS) {
         if (cfg.option(row.orca_key) == nullptr)
             continue;
+        route(row.orca_key, row.pnp_key);
         const std::string value  = serialize_or_empty(cfg, row.orca_key);
         const char*       module = pattern_module_for(row, value);
         if (module == nullptr) {
@@ -392,17 +460,23 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     copy_as("pnp_bridge_fill_holder", "bridge_fill_holder");
 
     // ironing_type -> ironing_enabled (bool).
-    if (cfg.option("ironing_type") != nullptr)
+    if (cfg.option("ironing_type") != nullptr) {
+        route("ironing_type", "ironing_enabled");
         out["ironing_enabled"] = serialize_or_empty(cfg, "ironing_type") != "no ironing";
+    }
     // ironing_flow / ironing_spacing additionally feed PNP variant keys
     // (their identity copies are Tier A above).
+    route("ironing_flow", "ironing_flow_rate");
+    route("ironing_spacing", "ironing_spacing_mm");
     put("ironing_flow_rate", option_to_json(cfg.option("ironing_flow")));
     put("ironing_spacing_mm", option_to_json(cfg.option("ironing_spacing")));
     // Unit fix over the Tier-A copy: Orca ironing_flow is a percent (e.g. 10),
     // pnp ironing_flow is a fraction in [0.01, 1] (ironing_flow_rate above is
     // the percent-style variant and passes through raw).
-    if (const ConfigOption* opt = cfg.option("ironing_flow"); opt != nullptr)
+    if (const ConfigOption* opt = cfg.option("ironing_flow"); opt != nullptr) {
+        route("ironing_flow", "ironing_flow");
         out["ironing_flow"] = std::clamp(opt->getFloat() / 100., 0.01, 1.0);
+    }
 
     // Unit fixes over Tier-A copies: pnp types these keys as plain floats (mm),
     // so Orca float-or-percent widths must be resolved against the nozzle
@@ -426,6 +500,7 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
         auto* fop = dynamic_cast<const ConfigOptionFloatOrPercent*>(cfg.option(key));
         if (fop == nullptr)
             continue;
+        route(key, key);
         if (fop->percent && nozzle_d > 0.)
             out[key] = fop->get_abs_value(nozzle_d);
         else if (!fop->percent)
@@ -437,18 +512,23 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     // resolve the percent to absolute mm here.
     for (const char* key : {"min_feature_size", "wall_transition_length"}) {
         const ConfigOption* opt = cfg.option(key);
-        if (opt != nullptr && nozzle_d > 0.)
+        if (opt != nullptr && nozzle_d > 0.) {
+            route(key, key);
             out[key] = opt->getFloat() / 100. * nozzle_d;
+        }
     }
     // wall_transition_filter_deviation is consumed by arachne via units_to_mm
     // (1 unit = 100 nm), so the percent-of-nozzle value must arrive in units.
     if (const ConfigOption* opt = cfg.option("wall_transition_filter_deviation");
-        opt != nullptr && nozzle_d > 0.)
+        opt != nullptr && nozzle_d > 0.) {
+        route("wall_transition_filter_deviation", "wall_transition_filter_deviation");
         out["wall_transition_filter_deviation"] = std::round(opt->getFloat() / 100. * nozzle_d * 10000.);
+    }
     // overhang_1_4_speed percent resolves over outer_wall_speed (its Orca
     // ratio_over); pnp types it float.
     if (auto* v = cfg.option<ConfigOptionFloatsOrPercents>("overhang_1_4_speed");
         v != nullptr && !v->values.empty() && v->values.front().percent) {
+        route("overhang_1_4_speed", "overhang_1_4_speed");
         // The base key can be absent (partial configs); never deref a missing
         // option — drop the key instead so pnp's default applies.
         // outer_wall_speed is coFloats (vector) — getFloat() on it throws.
@@ -461,14 +541,17 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     // values in its internal units (1 unit = 100 nm, i.e. mm * 10000).
     for (const char* key : {"min_bead_width", "initial_layer_min_bead_width"}) {
         const ConfigOption* opt = cfg.option(key);
-        if (opt != nullptr && nozzle_d > 0.)
+        if (opt != nullptr && nozzle_d > 0.) {
+            route(key, key);
             out[key] = std::round(opt->getFloat() / 100. * nozzle_d * 10000.);
+        }
     }
 
     // Orca tree_support_wall_count 0 means "auto"; pnp requires [1, 10] with no
     // auto mode. Drop the key so pnp's default applies, and log the fallback.
     if (const ConfigOption* opt = cfg.option("tree_support_wall_count");
         opt != nullptr && opt->getInt() < 1) {
+        route("tree_support_wall_count", "tree_support_wall_count");
         out.erase("tree_support_wall_count");
         warn("tree_support_wall_count", PnpWarningClass::LossyFallback,
              opt->serialize(), "(omitted; pnp default)");
@@ -477,6 +560,7 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     // seam_position -> seam_mode. nearest/back/random map; Orca "aligned"
     // (and "aligned_back") have no PNP equivalent -> "nearest" + lossy warning.
     if (cfg.option("seam_position") != nullptr) {
+        route("seam_position", "seam_mode");
         const std::string seam = serialize_or_empty(cfg, "seam_position");
         if (seam == "nearest" || seam == "random") {
             out["seam_mode"] = seam;
@@ -491,6 +575,8 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     // skirt_loops > 0 OR brim_type != no_brim -> skirt_brim_enabled.
     // (skirt_loops is Tier A above.)
     {
+        route("skirt_loops", "skirt_brim_enabled");
+        route("brim_type", "skirt_brim_enabled");
         const ConfigOption* loops = cfg.option("skirt_loops");
         const bool skirt_on = loops != nullptr && loops->getInt() > 0;
         const bool brim_on  = cfg.option("brim_type") != nullptr &&
@@ -515,12 +601,15 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     copy_as("support_top_z_distance", "support_top_z_distance_mm");
 
     // wall_generator: identity name, but coEnum -> PNP string ("classic"/"arachne").
-    if (cfg.option("wall_generator") != nullptr)
+    if (cfg.option("wall_generator") != nullptr) {
+        route("wall_generator", "wall_generator");
         out["wall_generator"] = serialize_or_empty(cfg, "wall_generator");
+    }
 
     // wall_sequence: Orca serializes "inner wall/outer wall"-style; PNP expects
     // "InnerOuter"-style (mapping asset, Tier-A caveats).
     if (cfg.option("wall_sequence") != nullptr) {
+        route("wall_sequence", "wall_sequence");
         const std::string seq = serialize_or_empty(cfg, "wall_sequence");
         if (seq == "inner wall/outer wall")
             out["wall_sequence"] = "InnerOuter";
@@ -537,14 +626,20 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     // support_base_pattern_spacing -> support_density: spacing<->density
     // inversion formula unverified (mapping asset open point; ticket 013 lists
     // this as a lossy-fallback member). Not sent; PNP default rules.
-    if (cfg.option("support_base_pattern_spacing") != nullptr)
+    if (cfg.option("support_base_pattern_spacing") != nullptr) {
+        // Sends nothing, so it is recorded as a consumed key with no target: it
+        // counts as handled only when the identity pass has covered it, which
+        // at dbf3449c it does (traditional-support now declares the key).
+        route("support_base_pattern_spacing", std::string());
         warn("support_base_pattern_spacing", PnpWarningClass::LossyFallback,
              serialize_or_empty(cfg, "support_base_pattern_spacing"), std::string());
+    }
 
     copy_as("support_interface_spacing", "tree_support_interface_spacing_mm");
 
     // fuzzy_skin group: enum gates whether the module keys are emitted at all.
     {
+        route("fuzzy_skin", "apply_to_all");
         const std::string fuzzy = serialize_or_empty(cfg, "fuzzy_skin");
         bool emit_fuzzy = true;
         if (fuzzy == "all") {
@@ -560,6 +655,8 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
         } else { // "none", "disabled_fuzzy", missing -> omit fuzzy keys entirely
             emit_fuzzy = false;
         }
+        route("fuzzy_skin_thickness", "thickness");
+        route("fuzzy_skin_point_distance", "point_distance");
         if (emit_fuzzy) {
             put("thickness", option_to_json(cfg.option("fuzzy_skin_thickness")));
             put("point_distance", option_to_json(cfg.option("fuzzy_skin_point_distance")));
@@ -585,6 +682,7 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     // Tier D — every remaining Orca key: not sent, one warning each. Emitted
     // unconditionally; diffing against defaults is the caller's job (F03).
     // -----------------------------------------------------------------------
+    const std::set<std::string> handled = handled_from_routes(result.routed, universe);
     for (const std::string& key : cfg.keys())
         if (handled.count(key) == 0)
             warn(key, tier_d_class(key), cfg.opt_serialize(key));
@@ -592,9 +690,95 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg)
     return result;
 }
 
+PnpKeyUniverse pnp_key_universe_from_schema(const json& schema_doc)
+{
+    PnpKeyUniverse universe;
+    if (!schema_doc.is_object())
+        return universe;
+
+    const auto collect = [&universe](const json& field) {
+        if (!field.is_object())
+            return;
+        auto key = field.find("key");
+        if (key != field.end() && key->is_string())
+            universe.insert(key->get<std::string>());
+    };
+
+    // Per-module manifest fields.
+    if (auto schema = schema_doc.find("schema"); schema != schema_doc.end() && schema->is_array())
+        for (const json& module : *schema)
+            if (auto fields = module.find("fields"); fields != module.end() && fields->is_array())
+                for (const json& field : *fields)
+                    collect(field);
+
+    // Host keys — the config pnp's own built-ins read, which no module manifest
+    // declares. Added by wire 1.1.0 (ticket 02); absent from older backends, and
+    // ticket 01 measured 62 keys that live only here, 14 of them curated-table
+    // targets. Without this half a schema-derived handled set would call every
+    // one of those rows dead.
+    if (auto host = schema_doc.find("host"); host != schema_doc.end() && host->is_array())
+        for (const json& field : *host)
+            collect(field);
+
+    // Only extend a universe the document actually described: an empty or
+    // malformed reply must stay empty so callers can tell "no evidence" from
+    // "a backend that declares only these".
+    if (!universe.empty())
+        for (const char* key : UNDECLARED_LIVE_KEYS)
+            universe.insert(key);
+
+    return universe;
+}
+
+void set_pnp_key_universe(PnpKeyUniverse universe)
+{
+    s_universe       = std::move(universe);
+    s_universe_known = true;
+    ++ s_universe_generation;
+}
+
+bool pnp_key_universe_known() { return s_universe_known; }
+
+void reset_pnp_key_universe()
+{
+    s_universe.clear();
+    s_universe_known = false;
+    ++ s_universe_generation;
+}
+
+PnpTranslationResult translate(const DynamicPrintConfig& cfg)
+{
+    return translate(cfg, s_universe_known ? &s_universe : nullptr);
+}
+
+std::set<std::string> pnp_handled_keys(const PnpKeyUniverse* universe)
+{
+    // Derived by running the translator over the stock key set and reading its
+    // provenance back, so the answer can never disagree with what translate()
+    // does — the agreement the old static array had to be unit-tested for.
+    const DynamicPrintConfig cfg = DynamicPrintConfig::full_print_config();
+    return handled_from_routes(translate(cfg, universe).routed, universe);
+}
+
 bool pnp_key_is_unimplemented(const std::string& orca_key)
 {
-    return pnp_handled_keys().count(orca_key) == 0;
+    // No probe, no backend, so nothing reaches pnp: every key is unimplemented
+    // and the broken install shows on every settings tab, not only on the PNP
+    // page's error banner.
+    if (!s_universe_known)
+        return true;
+
+    // One translate() per installed universe; the tint is queried per label on
+    // every tab rebuild, so this must not re-run the translator each time.
+    static std::set<std::string> cached;
+    static unsigned              cached_generation = 0;
+    static bool                  cached_valid      = false;
+    if (!cached_valid || cached_generation != s_universe_generation) {
+        cached            = pnp_handled_keys(&s_universe);
+        cached_generation = s_universe_generation;
+        cached_valid      = true;
+    }
+    return cached.count(orca_key) == 0;
 }
 
 bool pnp_pattern_value_supported(const std::string& orca_key, const std::string& orca_value)

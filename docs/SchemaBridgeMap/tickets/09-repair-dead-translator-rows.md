@@ -31,3 +31,16 @@ vectors or percents.
 
 Deliverable: one commit on `pnp/main`, `pnp_config_translator` suite extended with a case per
 row asserting the emitted pnp key name, and a manual smoke confirming supports actually generate.
+
+## Amended by ticket 05
+
+Ticket 05 made the identity pass derive from the live key universe and run **before** the
+curated rows, so every one of these settings now reaches pnp under its own name regardless
+of the dead row below it — including `enable_support`, whose row wrote the non-existent
+`support_enabled` since it was authored (supports never switched on in pnp), and
+`support_base_pattern_spacing`, which was warn-only.
+
+This ticket is therefore no longer a correctness fix; it is **cleanup**. The dead rows still
+fire and still write target names pnp does not declare. pnp ignores them, so the cost is
+noise in the emitted config and six rows that mislead the next reader. Verify against the
+live universe rather than the inventory before deleting each row.

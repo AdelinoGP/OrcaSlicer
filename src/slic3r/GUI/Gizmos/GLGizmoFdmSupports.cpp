@@ -18,6 +18,7 @@
 // PNP fork (pnp handoff item 13): support-preview overlay via pnp_cli.
 #include "slic3r/GUI/PnpSupportPreview.hpp"
 #include "slic3r/GUI/PnpModelExport.hpp"
+#include "slic3r/GUI/PnpBackend.hpp"
 #include "slic3r/GUI/PnpConfigTranslator.hpp"
 #include "slic3r/GUI/NotificationManager.hpp"
 
@@ -863,6 +864,17 @@ void GLGizmoFdmSupports::request_support_preview()
 
     const DynamicPrintConfig full_config = wxGetApp().preset_bundle->full_config();
     PnpTranslationResult     translated  = PnpConfigTranslator::translate(full_config);
+    // Same schema guard the slice path applies (PnpSlicingProcess): ticket 05's
+    // identity pass widened what translate() emits to every key the backend
+    // declares, and ticket 01 found 86 of those identity rows carry a type,
+    // unit or range mismatch against Orca's definition. The guard drops the
+    // values pnp would reject so a mismatch degrades to a logged warning
+    // instead of a rejected support preview.
+    if (const std::string& schema = PnpBackend::get().schema_json(); !schema.empty()) {
+        const nlohmann::json doc = nlohmann::json::parse(schema, nullptr, false);
+        if (!doc.is_discarded())
+            PnpConfigTranslator::apply_schema_guard(translated.json, doc, translated.warnings);
+    }
     // The overlay is only meaningful with supports on; the user is standing in
     // the support-painting gizmo, so force it rather than inherit the preset.
     // export_plate_3mf_for_pnp merges this into the 3MF sidecar, which

@@ -49,3 +49,20 @@ Two corrections from the inventory
 
 The six real dead rows are ticket 09's to repair; this ticket is the mechanism that would have
 caught them.
+
+## Amended by ticket 05
+
+The input this ticket needs now exists and is unblocked:
+
+- `PnpConfigTranslator::pnp_key_universe_from_schema()` builds the live key universe from
+  both halves of the wire, so a drift check no longer has to work around the probe's blind
+  spot — ticket 01's warning that a schema-only check would call 14 working rows dead is
+  discharged.
+- `PnpTranslationResult::routed` gives every curated source→target edge as data, so "which
+  targets does the table still write, and does the backend still declare them?" is a set
+  difference rather than a re-reading of `translate()`.
+- `UNDECLARED_LIVE_KEYS` (`support_type`, `support_family`, `infill_shift_step`) is already
+  folded into the universe, so ticket 01's finding-7 false positives cannot be reported dead.
+
+What is left for this ticket is the *reporting*: diffing on each probe, writing dead targets
+to the `pnp-config-warnings.jsonl` sink, and raising the one notification.

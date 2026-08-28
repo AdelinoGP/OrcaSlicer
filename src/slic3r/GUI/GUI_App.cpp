@@ -111,6 +111,7 @@
 #include "PnpBackend.hpp"
 #include "PnpConfigWarningsLog.hpp"
 #include "PnpConfigKeys.hpp"
+#include "PnpConfigTranslator.hpp"
 #include "UnsavedChangesDialog.hpp"
 #include "SavePresetDialog.hpp"
 #include "PrintHostDialogs.hpp"
@@ -2983,6 +2984,22 @@ bool GUI_App::on_init_inner()
         pnp.probe();
         const size_t registered = PnpConfigKeys::register_from_schema(pnp.schema_json());
         BOOST_LOG_TRIVIAL(info) << "pnp: " << registered << " backend config keys registered before preset load";
+
+        // Install the key universe the settings tabs' amber "pnp does not bind
+        // this" tint is derived from (SchemaBridgeMap ticket 05). Must follow
+        // register_from_schema, which needs the *unprobed* curated-table
+        // targets to decide what to register. If the probe failed this stays
+        // uninstalled and every key reads unimplemented, which is true: with no
+        // backend nothing reaches pnp.
+        if (!pnp.schema_json().empty()) {
+            const nlohmann::json doc = nlohmann::json::parse(pnp.schema_json(), nullptr, false);
+            if (!doc.is_discarded()) {
+                PnpConfigTranslator::PnpKeyUniverse universe =
+                    PnpConfigTranslator::pnp_key_universe_from_schema(doc);
+                BOOST_LOG_TRIVIAL(info) << "pnp: config key universe has " << universe.size() << " keys";
+                PnpConfigTranslator::set_pnp_key_universe(std::move(universe));
+            }
+        }
     }
 
     BOOST_LOG_TRIVIAL(info) << "loading systen presets...";

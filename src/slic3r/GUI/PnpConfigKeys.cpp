@@ -172,7 +172,11 @@ size_t register_from_schema(const std::string& schema_json)
     std::set<std::string> curated_targets;
     {
         const DynamicPrintConfig defaults = DynamicPrintConfig::full_print_config();
-        const PnpTranslationResult routed = PnpConfigTranslator::translate(defaults);
+        // Explicitly the *unprobed* translation (ticket 05): with a universe
+        // installed the identity pass copies every declared key under its own
+        // name, so the output would be the whole universe and nothing would be
+        // left to register. What this needs is the curated table's own targets.
+        const PnpTranslationResult routed = PnpConfigTranslator::translate(defaults, nullptr);
         if (routed.json.is_object())
             for (auto it = routed.json.begin(); it != routed.json.end(); ++ it)
                 curated_targets.insert(it.key());

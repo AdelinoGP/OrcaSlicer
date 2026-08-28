@@ -34,6 +34,26 @@ DynamicPrintConfig make_config(const std::initializer_list<std::pair<std::string
     return cfg;
 }
 
+// SchemaBridgeMap ticket 05: the handled set is derived from an installed key
+// universe, so these tests drive a fixture one instead of a static array. RAII
+// so a failing REQUIRE cannot leak the universe into the next test.
+PnpConfigTranslator::PnpKeyUniverse universe_of(std::initializer_list<const char*> keys)
+{
+    PnpConfigTranslator::PnpKeyUniverse u;
+    for (const char* k : keys)
+        u.insert(k);
+    return u;
+}
+
+struct ScopedUniverse
+{
+    explicit ScopedUniverse(PnpConfigTranslator::PnpKeyUniverse u)
+    {
+        PnpConfigTranslator::set_pnp_key_universe(std::move(u));
+    }
+    ~ScopedUniverse() { PnpConfigTranslator::reset_pnp_key_universe(); }
+};
+
 bool has_warning_for(const std::vector<PnpConfigWarning>& warnings, const std::string& key)
 {
     for (const PnpConfigWarning& w : warnings)
@@ -314,23 +334,131 @@ TEST_CASE("schema guard drops keys the pnp schema would reject", "[pnp][translat
     }
 }
 
-TEST_CASE("pnp_key_is_unimplemented matches the Tier-D warning set", "[pnp][translator]")
+TEST_CASE("the key universe is read from both wire halves", "[pnp][translator][ticket05]")
 {
-    // Tier-A identity keys are implemented.
-    REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("layer_height"));
-    REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("wall_loops"));
-    REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("nozzle_diameter"));
-    // Tier-B transform rows are implemented (possibly lossy).
-    REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("seam_position"));
-    REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("sparse_infill_density"));
-    REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("fuzzy_skin"));
-    REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("raft_layers"));
-    // Tier-D keys are not.
-    REQUIRE(PnpConfigTranslator::pnp_key_is_unimplemented("gcode_flavor"));
-    REQUIRE(PnpConfigTranslator::pnp_key_is_unimplemented("gcode_comments"));
-    REQUIRE(PnpConfigTranslator::pnp_key_is_unimplemented("independent_support_layer_height"));
-    // Unknown keys are not implemented either.
-    REQUIRE(PnpConfigTranslator::pnp_key_is_unimplemented("no_such_key"));
+    const json doc = json::parse(R"({
+        "schema_version": "1.1.0",
+        "schema": [
+            {"module": "com.core.a", "fields": [{"key": "layer_height", "type": "float"},
+                                                {"key": "wall_count",   "type": "int"}]},
+            {"module": "com.core.b", "fields": [{"key": "layer_height", "type": "float"}]}
+        ],
+        "host": [{"key": "travel_speed", "type": "float", "scope": "print"}]
+    })");
+
+    const auto universe = PnpConfigTranslator::pnp_key_universe_from_schema(doc);
+    REQUIRE(universe.count("layer_height") == 1); // declared twice, one key
+    REQUIRE(universe.count("wall_count") == 1);
+    // Host keys count: ticket 01 measured 62 keys that live only in this half,
+    // 14 of them curated-table targets that a schema-only view calls dead.
+    REQUIRE(universe.count("travel_speed") == 1);
+    // Keys pnp reads through channels the wire cannot describe (ticket 01
+    // finding 7) are added so they neither tint amber nor read as dead.
+    REQUIRE(universe.count("support_type") == 1);
+    REQUIRE(universe.count("infill_shift_step") == 1);
+
+    SECTION("a wire with no host array yields the module half only")
+    {
+        const json old_wire = json::parse(R"({"schema_version": "1.0.0",
+            "schema": [{"module": "m", "fields": [{"key": "layer_height", "type": "float"}]}]})");
+        const auto u = PnpConfigTranslator::pnp_key_universe_from_schema(old_wire);
+        REQUIRE(u.count("layer_height") == 1);
+        REQUIRE(u.count("travel_speed") == 0);
+    }
+
+    SECTION("an empty or malformed document yields no universe, not a bare allowlist")
+    {
+        // Callers must be able to tell "no evidence" from "a backend that
+        // declares only these three keys".
+        REQUIRE(PnpConfigTranslator::pnp_key_universe_from_schema(json::object()).empty());
+        REQUIRE(PnpConfigTranslator::pnp_key_universe_from_schema(json("nonsense")).empty());
+    }
+}
+
+TEST_CASE("the handled set is derived from the live universe", "[pnp][translator][ticket05]")
+{
+    SECTION("a key the backend declares is handled by name identity")
+    {
+        // gcode_comments has no curated row at all; declaring it is enough.
+        ScopedUniverse u{universe_of({"gcode_comments"})};
+        REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("gcode_comments"));
+        REQUIRE(PnpConfigTranslator::pnp_key_is_unimplemented("gcode_flavor"));
+    }
+
+    SECTION("a curated row counts only while its target is live")
+    {
+        // seam_position reaches pnp solely through the rename to seam_mode.
+        ScopedUniverse live{universe_of({"seam_mode"})};
+        REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("seam_position"));
+    }
+
+    SECTION("a curated row whose target the backend dropped goes amber")
+    {
+        // This is the drift the static handled set could not see: the row still
+        // fires, but nothing reads what it writes.
+        ScopedUniverse dead{universe_of({"some_unrelated_key"})};
+        REQUIRE(PnpConfigTranslator::pnp_key_is_unimplemented("seam_position"));
+    }
+
+    SECTION("with no probe every key is unimplemented")
+    {
+        PnpConfigTranslator::reset_pnp_key_universe();
+        REQUIRE(PnpConfigTranslator::pnp_key_universe_known() == false);
+        // Nothing reaches pnp without a backend, so the tint says so on every
+        // tab rather than only on the PNP page's banner.
+        REQUIRE(PnpConfigTranslator::pnp_key_is_unimplemented("layer_height"));
+        REQUIRE(PnpConfigTranslator::pnp_key_is_unimplemented("gcode_flavor"));
+    }
+}
+
+TEST_CASE("the identity pass sends every declared key under its own name", "[pnp][translator][ticket05]")
+{
+    // Ticket 01 found five settings that silently stopped reaching pnp at the
+    // submodule bump, because pnp renamed its keys to Orca's and the curated
+    // rows kept writing the old names. Deriving the identity pass from the live
+    // universe repairs them without touching the rows.
+    DynamicPrintConfig cfg = make_config({{"fan_max_speed", "80"},
+                                          {"enable_support", "1"},
+                                          {"support_interface_spacing", "0.3"}});
+    PnpConfigTranslator::PnpKeyUniverse universe = universe_of({"fan_max_speed", "enable_support",
+                                                                "support_interface_spacing"});
+    const auto res = PnpConfigTranslator::translate(cfg, &universe);
+
+    REQUIRE(res.json.contains("fan_max_speed"));
+    // enable_support is the one pnp actually reads; the curated row has written
+    // the non-existent support_enabled since it was authored, so supports never
+    // switched on (ticket 01, finding 2).
+    REQUIRE(res.json.contains("enable_support"));
+    REQUIRE(res.json["enable_support"] == true);
+    REQUIRE(res.json.contains("support_interface_spacing"));
+    // The dead rows still fire — repairing them is ticket 09 — and pnp ignores
+    // the keys it does not declare.
+    REQUIRE(res.json.contains("support_enabled"));
+
+    SECTION("a key the backend does not declare is not sent")
+    {
+        PnpConfigTranslator::PnpKeyUniverse empty;
+        const auto none = PnpConfigTranslator::translate(cfg, &empty);
+        REQUIRE_FALSE(none.json.contains("fan_max_speed"));
+    }
+}
+
+TEST_CASE("the identity pass never clobbers a Tier-B unit fix", "[pnp][translator][ticket05]")
+{
+    // ironing_flow is declared by pnp AND needs a percent->fraction fix, so the
+    // identity copy must run first and the curated row must win.
+    DynamicPrintConfig cfg = make_config({{"ironing_flow", "10"}, {"nozzle_diameter", "0.4"}});
+    PnpConfigTranslator::PnpKeyUniverse universe = universe_of({"ironing_flow", "line_width"});
+    const auto res = PnpConfigTranslator::translate(cfg, &universe);
+    REQUIRE(res.json["ironing_flow"].get<double>() == Approx(0.10));
+
+    SECTION("float-or-percent widths still arrive resolved, never as \"105%\"")
+    {
+        DynamicPrintConfig wcfg = make_config({{"line_width", "105%"}, {"nozzle_diameter", "0.4"}});
+        const auto wres = PnpConfigTranslator::translate(wcfg, &universe);
+        REQUIRE(wres.json["line_width"].is_number());
+        REQUIRE(wres.json["line_width"].get<double>() == Approx(0.42));
+    }
 }
 
 TEST_CASE("pnp_key_is_unimplemented agrees with translate()'s warnings", "[pnp][translator]")
@@ -339,6 +467,12 @@ TEST_CASE("pnp_key_is_unimplemented agrees with translate()'s warnings", "[pnp][
     // unsupported-feature) must read as unimplemented, and every key it does
     // not warn about that way must read as implemented. Lossy-fallback
     // warnings are excluded: those keys ARE sent (with a substituted value).
+    //
+    // Ticket 05 made both sides derive from the same provenance, so this can no
+    // longer drift; it stays as the assertion that they really are one source.
+    ScopedUniverse u{universe_of({"layer_height", "seam_mode", "wall_count", "infill_density",
+                                  "travel_speed", "gcode_comments"})};
+
     DynamicPrintConfig cfg = DynamicPrintConfig::full_print_config();
     const auto         res = PnpConfigTranslator::translate(cfg);
 
@@ -437,7 +571,15 @@ TEST_CASE("support_type is an identity Tier-A key", "[pnp][translator]")
         REQUIRE(res.json.at("support_type").get<std::string>() == value);
         REQUIRE_FALSE(has_warning_for(res.warnings, "support_type"));
     }
-    REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("support_type"));
+    // support_type is declared by no channel the wire can describe, so it is
+    // carried by UNDECLARED_LIVE_KEYS and only reads implemented once a real
+    // universe has been built from a schema document (ticket 01, finding 7).
+    {
+        const json doc = json::parse(R"({"schema": [{"module": "m",
+            "fields": [{"key": "layer_height", "type": "float"}]}]})");
+        ScopedUniverse u{PnpConfigTranslator::pnp_key_universe_from_schema(doc)};
+        REQUIRE_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented("support_type"));
+    }
 }
 
 TEST_CASE("pnp_pattern_value_supported reflects the module tables", "[pnp][translator]")
@@ -455,3 +597,4 @@ TEST_CASE("pnp_pattern_value_supported reflects the module tables", "[pnp][trans
     REQUIRE_FALSE(PnpConfigTranslator::pnp_pattern_value_supported("internal_solid_infill_pattern", "monotonic"));
     REQUIRE_FALSE(PnpConfigTranslator::pnp_pattern_value_supported("no_such_key", "whatever"));
 }
+
