@@ -17,10 +17,12 @@ wxWidgets GUI, **xmake + Conan 2** build system. Windows-first fork.
 - **SLA fully removed** — SLA 3MF files are refused.
 - **Calibration generators removed** — the calibration UI is a mock (not implemented).
 - **Backend staging:** the `pinch_n_print_cli/` submodule holds the Rust backend. `cargo xtask
-  dist` stages `pinch_n_print_cli/target/dist/` (`pnp_cli` + `modules/`), which xmake bundles
-  beside the executable (`xmake pnp` runs the cargo step). `--pnp_dist_dir=` defaults to the
-  submodule dist path; `--pnp_bundle_cli=n` skips bundling. The backend resolves relative to
-  the running binary, so build tree and shipped tree must reproduce the flat layout.
+  dist` stages `pinch_n_print_cli/target/dist/<edition>/` (`pnp_cli` + `modules/`; editions per
+  pnp packet 205), which xmake bundles beside the executable (`xmake pnp` runs the cargo step).
+  `--pnp_dist_dir=` defaults to the dist root and `--pnp_dist_edition=` (default `developer`) to
+  the edition; `--pnp_bundle_cli=n` skips bundling. The bundling step fails loudly when no dist
+  is staged. The backend resolves relative to the running binary, so build tree and shipped tree
+  must reproduce the flat layout.
 
 ## Build Commands
 

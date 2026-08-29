@@ -124,6 +124,35 @@ jobs:
           cp /tmp/uac/Plugins/x86-unicode/UAC.dll "$NSIS/Plugins/x86-unicode/"
           cp /tmp/uac/Plugins/x86-ansi/UAC.dll "$NSIS/Plugins/x86-ansi/"
 
+      # Build the PNP backend: since the layout changed, the bundle step fails
+      # the build loudly when no dist exists, so CI must stage one itself. Rust
+      # is only needed for this step — the C++ toolchain comes with the runner.
+      - name: Install Rust (for pnp_cli)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust build (pnp backend)
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: pinch_n_print_cli
+
+      # `cargo xtask dist` (default: developer edition, target/dist/developer/)
+      # builds guest WASMs + pnp_cli. wasm-tools must be installed before it
+      # runs — the guest freshness gate fails without it.
+      - name: Install wasm-tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-tools
+
+      - name: Stage PNP backend (cargo xtask dist)
+        shell: bash
+        run: |
+          set -eu
+          cd pinch_n_print_cli
+          cargo xtask dist
+          test -f target/dist/developer/pnp_cli.exe || test -f target/dist/developer/pnp_cli
+
       - name: Cache Conan packages
         uses: actions/cache@v4
         with:

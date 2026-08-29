@@ -193,6 +193,19 @@ are true when this map is done:
   unchanged: one anonymous role-free overlay; the visibility question (family tint, interface
   band) graduated into ticket 14. Full findings in [the impact asset](assets/07-support-preview-impact.md).
 
+- [Restore pnp_cli bundling after the dist layout change, and land the submodule bump](tickets/08-dist-layout-and-submodule-bump.md)
+  — xmake bundles `<pnp_dist_dir>/<pnp_dist_edition>/` (new option, default `developer`), fails
+  the build loudly when no dist is staged, warns loudly on the legacy flat layout, wipes
+  `modules/` before copying (mirror, not merge), and `xmake pnp` passes the edition through to
+  `cargo xtask dist`. Load-bearing discovery: **xmake keeps only the last `after_build` closure
+  registered on a target** (3.0.9, measured) — the bundling rule had been silently dead under the
+  resources rule's closure, so no build ever bundled a backend; the two stages now share one
+  closure, doing its work in the action sandbox (the description scope's `os` has no destructive
+  verbs). CI stages its own backend (Rust toolchain + wasm-tools + dist step — previously every
+  CI artifact shipped **no backend at all**); the submodule pointer moved to `a50bfc28` (its
+  predecessor sat on no branch and was unfetchable by CI), and the stale flat dist (wire 1.0.0,
+  21 modules) is gone. Probe evidence in [the restage asset](assets/08-restaged-dist.md).
+
 ## Not yet specified
 
 - **Migration of the curated table's existing rows.** Ticket 05 answered the tier question:
@@ -244,12 +257,16 @@ are true when this map is done:
   how to test the *rendered* page, and whether anything checks the fork against a real `pnp_cli`
   probe rather than a synthetic document. Ticket 04 designed the page but wrote no code, so this
   stays open and now has a concrete subject: tickets 11 and 12 both end in "manual smoke", which
-  is the gap. Ticket 06 sharpened the second half: it left a hidden `[live-schema]` Catch2 case that
-  runs the drift diff against a real document from `PNP_LIVE_SCHEMA`, so the piece still missing is
-  a **CI** job that stages `pnp_cli` and runs it — which cannot be phrased sharply until ticket 08
-  settles where `cargo xtask dist` puts things and whether CI runs it at all. Ticket 06 also found
-  the staged `target/dist` binaries are older than the submodule working tree, which is itself an
-  argument for the fork checking the wire it actually got rather than the wire it expects.
+  is the gap. ~~Ticket 06 sharpened the second half: it left a hidden `[live-schema]` Catch2
+  case that runs the drift diff against a real document from `PNP_LIVE_SCHEMA`, so the piece
+  still missing is a **CI** job that stages `pnp_cli` and runs it — which cannot be phrased
+  sharply until ticket 08 settles where `cargo xtask dist` puts things and whether CI runs it at
+  all.~~ **Discharged 2026-08-28 (ticket 08):** CI now stages `pnp_cli` itself (Rust toolchain +
+  `cargo xtask dist` into `target/dist/developer/`), so the CI-job question is phrased and
+  ticketed as [15 — live-schema gate in CI](tickets/15-live-schema-gate-in-ci.md); the
+  rendered-page half remains open. Ticket 06 also found the staged `target/dist` binaries are
+  older than the submodule working tree, which is itself an argument for the fork checking the
+  wire it actually got rather than the wire it expects.
 
 - **Whether pnp should declare host-injected fields on the wire.** Ticket 04 needed to keep
   `slice_has_paint` off the page and found the wire cannot say a field is host-injected — no tag,
@@ -267,10 +284,12 @@ are true when this map is done:
   staged dist answering `config-schema` at wire 1.0.0 while the submodule tree emits 1.1.0, and had
   to gate its diff on the `host` array to avoid 14 false dead rows. But the same old wire silently
   degrades more than drift reporting: 65 host keys drop out of the key universe (so they tint amber
-  and never register), and the generated PNP page loses its host-key controls. Today that is
-  indistinguishable from a backend that genuinely declares less. Whether the fork should detect the
-  old wire and say so — and whether that is the degraded state ticket 12 renders or a third case —
-  is unexamined; ticket 02's grilling may already have taken a position worth re-reading first.
+  and never register), and the generated PNP page loses its host-key controls. Ticket 08 removed
+  the local trap (stale flat dist deleted; CI stages fresh; xmake fails loudly when nothing is
+  staged) but deliberately did **not** decide the detection question — that graduated as
+  [ticket 16 (restage-on-bump guard)](tickets/16-restage-on-bump-guard.md). Until it lands, an old
+  wire remains indistinguishable from a backend that genuinely declares less. Ticket 02's grilling
+  may already have taken a position worth re-reading first; ticket 16 names that in its body.
 
 ## Out of scope
 

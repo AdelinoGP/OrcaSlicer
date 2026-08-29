@@ -28,15 +28,21 @@ cd pinch_n_print_cli
 cargo xtask dist
 ```
 
-This produces `pinch_n_print_cli/target/dist/` containing `pnp_cli` and `modules/`. The build
-picks it up automatically: `--pnp_dist_dir` defaults to `pinch_n_print_cli/target/dist`.
-`xmake pnp` runs the cargo step for you. Alternatively, copy `pnp_cli` and `modules/` next to
-`orca-slicer.exe` by hand.
+This produces `pinch_n_print_cli/target/dist/developer/` (the default edition) containing
+`pnp_cli` and `modules/`. The build picks it up automatically: `--pnp_dist_dir` defaults to the
+dist root `pinch_n_print_cli/target/dist` and `--pnp_dist_edition` to `developer`, so the bundle
+step reads `target/dist/developer/`. `xmake pnp` runs the cargo step for you. Alternatively, copy
+`pnp_cli` and `modules/` next to `orca-slicer.exe` by hand.
 
 Configure options:
 
-- `xmake f --pnp_dist_dir=<path>` — bundle from a different dist tree.
+- `xmake f --pnp_dist_dir=<path>` — bundle from a different dist root.
+- `xmake f --pnp_dist_edition=<name>` — bundle a different edition (`developer|hybrid|integrated`).
 - `xmake f --pnp_bundle_cli=n` — skip bundling entirely.
+
+The build fails loudly when the configured edition has no dist staged — run `xmake pnp` (or
+`cargo xtask dist` in `pinch_n_print_cli`) first. A `--pnp_dist_dir` that is itself one edition
+(flat tree, no edition layer) still works but logs a warning.
 
 For backend iteration you can also set **PNP CLI directory** under *Preferences → General* to the
 folder holding `pnp_cli`. That override wins over the bundled copy whenever it actually contains

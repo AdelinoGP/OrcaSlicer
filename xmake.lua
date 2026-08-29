@@ -109,7 +109,16 @@ option_end()
 
 option("pnp_dist_dir")
     set_default("pinch_n_print_cli/target/dist")
-    set_description("Staging directory produced by 'cargo xtask dist' (holds pnp_cli and modules/)")
+    set_description("Dist root produced by 'cargo xtask dist' (bundles <dir>/<pnp_dist_edition>, or <dir> itself if it directly holds pnp_cli)")
+option_end()
+
+-- Editions are a pnp concept (pnp packet 205): cargo xtask dist stages
+-- pnp_cli + modules/ into target/dist/<edition>/. developer (the default)
+-- integrates nothing and stages every core module externally, which is the
+-- flat layout the fork's backend discovery expects.
+option("pnp_dist_edition")
+    set_default("developer")
+    set_description("Which cargo xtask dist edition to bundle (developer|hybrid|integrated)")
 option_end()
 
 -- CMakeLists.txt:122 — SLIC3R_FHS. Off means the portable layout (resources
@@ -774,21 +783,64 @@ target("OrcaSlicer")
         set_filename("orca-slicer")
         add_ldflags("-ldl")
     end
+    -- Backend staging. xmake keeps only the LAST after_build closure
+    -- registered on a target (measured on 3.0.9: an earlier closure is
+    -- silently dropped, no warning), so the backend copy and the resources
+    -- link further down must share ONE closure whenever bundling is on.
+    -- Only option VALUES are read here (description scope); the copies run
+    -- inside after_build's action sandbox — the description scope's os has
+    -- no destructive verbs (os.rm/os.tryrm are nil there, both measured).
+    local pnp_bundle = nil
     if has_config("pnp_bundle_cli") then
-        local dist_dir = get_config("pnp_dist_dir") or "pinch_n_print_cli/target/dist"
-        local cli_name = is_plat("windows") and "pnp_cli.exe" or "pnp_cli"
-        after_build(function (target)
-            local bin_dir = path.directory(target:targetfile())
-            os.cp(path.join(dist_dir, cli_name), path.join(bin_dir, cli_name))
-            os.cp(path.join(dist_dir, "modules"), path.join(bin_dir, "modules"))
-        end)
+        pnp_bundle = {
+            dist_root = get_config("pnp_dist_dir") or "pinch_n_print_cli/target/dist",
+            cli_name = is_plat("windows") and "pnp_cli.exe" or "pnp_cli"
+        }
     end
-
     -- The GUI resolves resources/ relative to the executable, so the build
     -- tree must reproduce it (CMake makes a junction/symlink;
     -- src/CMakeLists.txt:180-260). A directory symlink needs no elevation
-    -- when Developer Mode is on; fall back to a copy.
+    -- when Developer Mode is on; fall back to a copy. Shares the single
+    -- after_build closure with backend staging above (xmake keeps only the
+    -- last after_build registered on a target).
     after_build(function (target)
+        if pnp_bundle then
+            local edition = get_config("pnp_dist_edition") or "developer"
+            local under_edition = path.join(pnp_bundle.dist_root, edition)
+            -- Editions (pnp packet 205): cargo xtask dist stages into
+            -- <dist_root>/<edition>/. A --pnp_dist_dir that is itself one
+            -- edition (flat, no edition layer) is still honoured, loudly, for
+            -- a checkout-external tree.
+            local dist_dir = nil
+            if os.isfile(path.join(under_edition, pnp_bundle.cli_name)) then
+                dist_dir = under_edition
+            elseif os.isfile(path.join(pnp_bundle.dist_root, pnp_bundle.cli_name)) then
+                print(string.format("pnp bundling: warning: '%s' is a flat dist tree -- prefer \
+'xmake pnp' with no --pnp_dist_dir, which bundles <dist_root>/%s",
+                    pnp_bundle.dist_root, edition))
+                dist_dir = pnp_bundle.dist_root
+            end
+            if dist_dir == nil then
+                local found = os.dirs(path.join(pnp_bundle.dist_root, "*"))
+                local hint = ""
+                if #found > 0 then
+                    hint = string.format(" (dist editions found: %s)",
+                        table.concat(found, ", "))
+                end
+                os.raise("pnp bundling: no pnp_cli in '%s' or '%s'%s -- run 'xmake pnp' \
+(or 'cargo xtask dist' in pinch_n_print_cli) first, or configure \
+--pnp_dist_dir=<dir> --pnp_dist_edition=<name>",
+                    pnp_bundle.dist_root, under_edition, hint)
+            end
+            local bin_dir = path.directory(target:targetfile())
+            -- Mirror, not merge: wiping modules/ first stops a module deleted
+            -- upstream from lingering beside the exe after a rebuild.
+            os.tryrm(path.join(bin_dir, "modules"))
+            os.cp(path.join(dist_dir, pnp_bundle.cli_name),
+                  path.join(bin_dir, pnp_bundle.cli_name))
+            os.cp(path.join(dist_dir, "modules"), path.join(bin_dir, "modules"))
+            print(string.format("pnp bundling: staged backend from %s", dist_dir))
+        end
         local bin_dir = path.directory(target:targetfile())
         local dest = path.join(bin_dir, "resources")
         if os.exists(dest) then
@@ -877,8 +929,12 @@ task("pnp")
         import("core.base.option")
         local workdir = "pinch_n_print_cli"
         local debug = option.get("debug") and " --debug" or ""
+        -- Keep the dist stage and the bundle step on the same edition: the
+        -- after_build rule resolves <pnp_dist_dir>/<pnp_dist_edition>.
+        local edition = get_config("pnp_dist_edition") or "developer"
+        local edition_flag = " --edition " .. edition
         os.cd(workdir)
-        os.exec("cargo xtask dist" .. debug)
+        os.exec("cargo xtask dist" .. edition_flag .. debug)
         os.cd("-")
     end)
     set_menu {
