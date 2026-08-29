@@ -7,6 +7,7 @@
 #include "format.hpp"
 
 #include "GCode/Thumbnails.hpp"
+#include <algorithm>
 #include <set>
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -8406,6 +8407,27 @@ void PrintConfigDef::handle_legacy(t_config_option_key &opt_key, std::string &va
     };
 
     if (ignore.find(opt_key) != ignore.end()) {
+        // PNP fork (SchemaBridgeMap ticket 13): a key pnp registered at startup
+        // is live by this build's lights, whatever Orca's obsolete-key history
+        // says. `support_sharp_tails` is the collision today: it sits in this
+        // ignore set, while pnp's host runtime reads it as a live key
+        // (host-keys.toml [resolved_config], default true) and ticket 02's
+        // registration gives it a def, a preset list and a serialization
+        // ordinal. Leave it for the print_config_def.has() test below, which
+        // now passes and lets the value deserialize. Without this, the key
+        // saves into presets and projects and is then silently cleared to its
+        // default on every load -- escaping ticket 03's carrier, which records
+        // only keys absent from print_config_def.
+        //
+        // Deliberately not a reorder of the tests ("has() wins"): silent_mode
+        // and tree_support_with_infill sit in this ignore set yet still have
+        // live Orca defs, and those must keep dropping exactly as upstream
+        // does. Only keys this fork itself registered are exempt.
+        if (pnp_config_keys_sealed()) {
+            const std::vector<std::string>& registered = pnp_registered_config_keys();
+            if (std::find(registered.begin(), registered.end(), opt_key) != registered.end())
+                return;
+        }
         opt_key = "";
         return;
     }

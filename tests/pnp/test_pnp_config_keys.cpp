@@ -8,6 +8,7 @@
 //     registered state at once.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -16,8 +17,13 @@
 #include <string>
 #include <vector>
 
+#include <boost/filesystem.hpp>
+
+#include "libslic3r/Model.hpp"
 #include "libslic3r/Preset.hpp"
 #include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/Format/bbs_3mf.hpp"
+#include "libslic3r/Format/STL.hpp"
 #include "slic3r/GUI/PnpConfigKeys.hpp"
 
 using namespace Slic3r;
@@ -64,6 +70,11 @@ nlohmann::json synthetic_schema()
         {"key": "fill_authored_coloring", "type": "string-list", "default": "", "scope": "filament"},
         {"key": "nonplanar_shell_count", "type": "int", "default": "0", "scope": "print"},
         {"key": "machine_max_jerk_x", "type": "float", "default": "20", "scope": "printer"},
+        {
+          "key": "support_sharp_tails", "type": "bool", "default": true, "scope": "print",
+          "display": "Support Sharp Tails", "group": "Support",
+          "description": "Orca-obsolete name that pnp's host runtime reads (ticket 13)"
+        },
         {"key": "wave_overhang_line_spacing", "type": "float", "default": "9.9", "scope": "print"}
       ]
     })JSON");
@@ -326,10 +337,153 @@ TEST_CASE("registered pnp keys become first-class Orca keys", "[pnp][config_keys
         CHECK(cfg.opt_serialize("wave_overhang_line_spacing") == "1.25");
     }
 
+    // SchemaBridgeMap ticket 13. `support_sharp_tails` names a key Orca
+    // declares obsolete -- it sits in the ignore set that handle_legacy tests
+    // BEFORE the print_config_def.has() test -- while pnp's host runtime reads
+    // it as a live key (host-keys.toml [resolved_config], default true).
+    // Registration must win over Orca's obsolete history: after registration
+    // the key has a def, saves into presets and projects, and then has to load
+    // back, which today's ordering silently prevents by clearing the key to ""
+    // before the def is ever consulted. The value falls to its default -- in
+    // pnp's case true -- so a user's false arrives as true on every load.
+    SECTION("a registered key whose name Orca ignores still deserializes") {
+        DynamicPrintConfig cfg;
+        ConfigSubstitutionContext ctx(ForwardCompatibilitySubstitutionRule::Disable);
+        cfg.set_deserialize("support_sharp_tails", "0", ctx);
+        // Presence first: on the broken ordering the key is silently dropped
+        // here, and dereferencing a missing option would crash the binary
+        // instead of reporting the regression.
+        const ConfigOptionBool *opt = cfg.option<ConfigOptionBool>("support_sharp_tails");
+        REQUIRE(opt != nullptr);
+        CHECK(opt->value == 0);
+
+        // The ignore set must not push this registered key into the
+        // unknown-key carrier either: it IS defined by this build.
+        CHECK(std::find(ctx.unrecogized_keys.begin(), ctx.unrecogized_keys.end(),
+                        "support_sharp_tails") == ctx.unrecogized_keys.end());
+    }
+
+    // Same seam, the negative direction: without a probe nothing is
+    // registered, so Orca's obsolete-key handling must still apply unchanged
+    // (the GUI-free CLI and headless 3mf paths never register). This is what
+    // forbids the tempting fix of simply moving the has() test above the
+    // ignore set -- silent_mode and tree_support_with_infill have live stock
+    // defs yet must keep dropping.
+    SECTION("an unregistered name Orca ignores is still dropped") {
+        REQUIRE_FALSE(print_config_def.has("support_remove_small_overhangs"));
+        DynamicPrintConfig cfg;
+        ConfigSubstitutionContext ctx(ForwardCompatibilitySubstitutionRule::Disable);
+        cfg.set_deserialize("support_remove_small_overhangs", "true", ctx);
+        CHECK(cfg.option("support_remove_small_overhangs") == nullptr);
+        CHECK(std::find(ctx.unrecogized_keys.begin(), ctx.unrecogized_keys.end(),
+                        "support_remove_small_overhangs") != ctx.unrecogized_keys.end());
+    }
+
     SECTION("the seal rejects a second registration") {
         // Re-registering would hand the undo/redo stack an inconsistent
         // ordinal space and leave presets built from the older key set.
         CHECK(pnp_register_config_keys(reg.defs) == 0);
         CHECK(pnp_registered_config_keys().size() == reg.count);
     }
+}
+
+// SchemaBridgeMap ticket 13. The seam-level case above proves the deserializer
+// accepts an ignore-set name once pnp has registered it; these two prove the
+// storage surfaces the bug actually bites -- a user preset and a project 3mf
+// -- round-trip the value. Both must run in the process that registered, so
+// they live in this file rather than the libslic3r suites: registration is
+// one-shot and only this binary calls it.
+TEST_CASE("an ignore-set pnp key round-trips through a user preset file", "[pnp][config_keys]")
+{
+    const Registration &reg = registered_once();
+    REQUIRE(pnp_config_keys_sealed());
+
+    namespace fs = boost::filesystem;
+    const fs::path dir = fs::temp_directory_path() / fs::unique_path("pnp_t13_preset_%%%%%%%%");
+    fs::create_directories(dir);
+
+    // Save through the real Preset writer: the key's saved form is what a
+    // user's file carries (Orca booleans serialize as 1/0).
+    {
+        Preset preset(Preset::TYPE_PRINT, "Ticket13");
+        preset.config.set_key_value("support_sharp_tails", new ConfigOptionBool(false));
+        preset.file = (dir / "Ticket13.json").string();
+        preset.save(nullptr);
+    }
+
+    // Load it back the way PresetCollection::load_presets does -- the path
+    // that handle_legacy's ignore branch today silently drops the key on.
+    Preset loaded(Preset::TYPE_PRINT, "Ticket13");
+    loaded.file = (dir / "Ticket13.json").string();
+    DynamicPrintConfig config;
+    std::map<std::string, std::string> key_values;
+    std::string reason;
+    ConfigBase::t_unknown_config_values unknown;
+    config.load_from_json(loaded.file, ForwardCompatibilitySubstitutionRule::Disable, key_values, reason, &unknown);
+    loaded.config.apply(std::move(config));
+
+    const ConfigOptionBool *opt = loaded.config.option<ConfigOptionBool>("support_sharp_tails");
+    REQUIRE(opt != nullptr);
+    CHECK(opt->value == 0);
+    // Escaped the unknown-key carrier too: the key IS defined by this build.
+    CHECK(unknown.empty());
+
+    fs::remove_all(dir);
+}
+
+TEST_CASE("an ignore-set pnp key round-trips through a project 3mf", "[pnp][config_keys]")
+{
+    const Registration &reg = registered_once();
+    REQUIRE(pnp_config_keys_sealed());
+
+    namespace fs = boost::filesystem;
+
+    Model model;
+    const std::string src_file = std::string(TEST_DATA_DIR) + "/test_3mf/Prusa.stl";
+    REQUIRE(load_stl(src_file.c_str(), &model));
+    model.add_default_instances();
+
+    const fs::path backup_dir = fs::temp_directory_path() / fs::unique_path("pnp_t13_3mf_%%%%%%%%");
+    fs::create_directories(backup_dir);
+    model.set_backup_path(backup_dir.string());
+
+    DynamicPrintConfig config;
+    config.set_key_value("support_sharp_tails", new ConfigOptionBool(false));
+    config.set_key_value("layer_height", new ConfigOptionFloat(0.28));
+
+    const std::string test_file = (fs::temp_directory_path() / fs::unique_path("pnp_t13_%%%%%%%%.3mf")).string();
+    StoreParams store_params;
+    store_params.path     = test_file.c_str();
+    store_params.model    = &model;
+    store_params.config   = &config;
+    store_params.strategy = SaveStrategy::Zip64 | SaveStrategy::Silence;
+    REQUIRE(store_bbs_3mf(store_params));
+
+    Model                     dst_model;
+    DynamicPrintConfig        dst_config;
+    ConfigSubstitutionContext ctxt{ ForwardCompatibilitySubstitutionRule::Enable };
+    PlateDataPtrs             dst_plates;
+    std::vector<Preset *>     project_presets;
+    bool  is_bbl_3mf = false, is_orca_3mf = false;
+    Semver file_version;
+    const bool loaded = load_bbs_3mf(test_file.c_str(), &dst_config, &ctxt, &dst_model, &dst_plates,
+                                     &project_presets, &is_bbl_3mf, &is_orca_3mf, &file_version, nullptr,
+                                     LoadStrategy::LoadModel | LoadStrategy::LoadConfig);
+    REQUIRE(loaded);
+
+    // The key is a live registered key, not a carrier case: it must come back
+    // as a config option holding the stored false, not verbatim in the
+    // unknown-key carrier.
+    const ConfigOptionBool *opt = dst_config.option<ConfigOptionBool>("support_sharp_tails");
+    REQUIRE(opt != nullptr);
+    CHECK(opt->value == 0);
+    CHECK(dst_model.pnp_unknown_config.count("support_sharp_tails") == 0);
+    const ConfigOptionFloat *lh = dst_config.option<ConfigOptionFloat>("layer_height");
+    REQUIRE(lh != nullptr);
+    CHECK_THAT(lh->value, Catch::Matchers::WithinAbs(0.28, 1e-9));
+
+    boost::system::error_code ec;
+    fs::remove(test_file, ec);
+    fs::remove_all(backup_dir, ec);
+    release_PlateData_list(dst_plates);
 }

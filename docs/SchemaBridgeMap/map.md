@@ -227,6 +227,17 @@ are true when this map is done:
   `wave_overhang_pattern` are now real enums. **Zero fork code changes** — `field_to_def`
   already parsed these fields; the submodule bump alone labels the PNP page's host controls.
 
+- [Stop handle_legacy erasing registered pnp keys](tickets/13-handle-legacy-ignores-registered-keys.md)
+  — fixed inside the obsolete-key branch: a key ticket 02 registered returns to the caller
+  untouched, and the existing `print_config_def.has()` test (now passing) admits the value.
+  A bare reorder was rejected: the ignore set is not disjoint from the config definition —
+  `silent_mode` and `tree_support_with_infill` carry live stock defs yet must keep dropping,
+  an inherited upstream quirk — so the exemption is keyed on this fork's registration, not
+  def-presence. `support_sharp_tails` remains the only collision at submodule `263b81d3`;
+  without a probe stock behaviour is unchanged. Three positive regression cases (seam, preset
+  round-trip, 3mf round-trip) each proven to fail as a clean `nullptr` on the old ordering,
+  one negative pins the never-registered drop.
+
 ## Not yet specified
 
 - **Migration of the curated table's existing rows.** Ticket 05 answered the tier question:

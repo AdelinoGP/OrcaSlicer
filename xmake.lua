@@ -1266,6 +1266,7 @@ target("pnp_config_translator_tests")
     set_default(false)
     add_files("tests/pnp/test_pnp_config_translator.cpp",
               "tests/pnp/test_pnp_config_keys.cpp",
+              "tests/pnp/pnp_test_nanosvg_impl.cpp",
               "src/slic3r/GUI/PnpConfigTranslator.cpp",
               "src/slic3r/GUI/PnpConfigKeys.cpp")
     add_rules("pnp.test", "pnp.conan.dlls")
