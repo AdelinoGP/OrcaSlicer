@@ -180,6 +180,19 @@ are true when this map is done:
   `support_density`'s row routes to nothing and so cannot be dead. Also found the tree's staged
   dist predated the wire-1.1.0 commit.
 
+- [Support-families impact on the support-preview and gizmo path](tickets/07-support-families-preview-impact.md)
+  — the path is **unbroken and was never exposed to the bump**: the ticket's "2.2.0 document"
+  premise was wrong — the preview consumes the `SupportGeometryIR`-derived *document* (still
+  schema 1.0.0, shape unchanged, live-measured), while the families and
+  `SupportPlanRole::BaseInterface` live in Tier 2 documents (`SupportPlanIR`,
+  `RegionSupportConfig`) the prepass-only verb never runs. `pnp_cli support-preview` takes the
+  same arguments and still works end-to-end; `support_type` reaches pnp identity-routed and maps
+  through `canonical_support_family` correctly (all four Orca enum values land on the intended
+  family). Decision: the fork does **not** send `support_family` (`support_type` would override
+  it or double-set it; Orca has no family concept to expose). What the preview *shows* is
+  unchanged: one anonymous role-free overlay; the visibility question (family tint, interface
+  band) graduated into ticket 14. Full findings in [the impact asset](assets/07-support-preview-impact.md).
+
 ## Not yet specified
 
 - **Migration of the curated table's existing rows.** Ticket 05 answered the tier question:
@@ -217,9 +230,14 @@ are true when this map is done:
   alternative to name-matching (an `orca_key` field on the wire). Ticket 02 established the
   pnp-side handoff channel, so this is now cheap if ticket 04 or 05 finds name-matching wanting
   — section B's 86 mismatched identity rows are the place that would show up.
-- **What the bump's support-family work needs from the settings UI beyond key routing** — e.g.
-  whether tree-support's own knobs deserve deliberate placement on Orca's Support page rather
-  than falling to the PNP page. Depends on tickets 01 and 07.
+- **What the bump's support-family work needs from the settings UI beyond key routing** —
+  *(discharged by ticket 07, 2026-08-28)*: the support-*preview* side needs nothing — its
+  document never carried roles (that question graduated into
+  [ticket 14](tickets/14-support-preview-role-visibility.md) instead). What remains open in
+  this patch is only the settings-UI half, which still depends on the settings-UI tickets
+  (10/11) landing and is narrowed by 07's finding that the ~11 family/tree keys are declared by
+  pnp already, so they reach the PNP page by the normal routing.
+
 - **Verification story for a schema-derived UI.** Ticket 02 established the unit-test shape —
   a synthetic schema document driving the pure parser, plus one case that registers and asserts
   the whole resulting state, since the seam is one-shot per process. What is still unspecified is
