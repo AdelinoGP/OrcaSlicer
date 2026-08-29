@@ -427,21 +427,108 @@ TEST_CASE("the identity pass sends every declared key under its own name", "[pnp
     const auto res = PnpConfigTranslator::translate(cfg, &universe);
 
     REQUIRE(res.json.contains("fan_max_speed"));
-    // enable_support is the one pnp actually reads; the curated row has written
+    // enable_support is the one pnp actually reads; the curated row had written
     // the non-existent support_enabled since it was authored, so supports never
-    // switched on (ticket 01, finding 2).
+    // switched on (ticket 01, finding 2). Ticket 09 deleted that row and the
+    // other five dead renames — the live identity pass is the only writer left,
+    // so no dead name may appear in the emitted config (ticket 09).
     REQUIRE(res.json.contains("enable_support"));
     REQUIRE(res.json["enable_support"] == true);
     REQUIRE(res.json.contains("support_interface_spacing"));
-    // The dead rows still fire — repairing them is ticket 09 — and pnp ignores
-    // the keys it does not declare.
-    REQUIRE(res.json.contains("support_enabled"));
+    REQUIRE_FALSE(res.json.contains("support_enabled"));
 
     SECTION("a key the backend does not declare is not sent")
     {
         PnpConfigTranslator::PnpKeyUniverse empty;
         const auto none = PnpConfigTranslator::translate(cfg, &empty);
         REQUIRE_FALSE(none.json.contains("fan_max_speed"));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SchemaBridgeMap ticket 09 — the six dead curated rows are gone.
+//
+// Ticket 01 found six rename rows still writing pnp key names the backend does
+// not declare (plus `support_density`'s warn-only row). Ticket 05's identity
+// pass had made each setting reach pnp under its own name anyway, so the rows
+// only added dead names to the emitted config; ticket 09 deleted them. Each
+// SECTION pins one setting: sent under its own name, and the dead name it
+// used to write is gone — probed (the live path) and unprobed (the
+// TIER_A_KEYS fallback, which now carries the six names itself).
+// ---------------------------------------------------------------------------
+
+TEST_CASE("the dead curated rows are deleted, the settings still reach pnp", "[pnp][translator][ticket09]")
+{
+    // probed: every setting's target is its own name, from the universe.
+    DynamicPrintConfig cfg                       = make_config({{"close_fan_the_first_x_layers", "3"},
+                                                                {"enable_overhang_bridge_fan", "1"},
+                                                                {"enable_support", "1"},
+                                                                {"fan_max_speed", "80"},
+                                                                {"fan_min_speed", "10"},
+                                                                {"support_interface_spacing", "0.25"},
+                                                                {"support_base_pattern_spacing", "2.5"},
+                                                                {"raft_layers", "3"}});
+    PnpConfigTranslator::PnpKeyUniverse universe = universe_of(
+        {"close_fan_the_first_x_layers", "enable_overhang_bridge_fan", "enable_support", "fan_max_speed", "fan_min_speed",
+         "support_interface_spacing", "support_base_pattern_spacing", "support_raft_layers"});
+
+    const auto res = PnpConfigTranslator::translate(cfg, &universe);
+
+    SECTION("close_fan_the_first_x_layers is identity-routed, not disable_fan_first_layers")
+    {
+        REQUIRE(res.json.at("close_fan_the_first_x_layers").get<int>() == 3);
+        REQUIRE_FALSE(res.json.contains("disable_fan_first_layers"));
+    }
+    SECTION("enable_overhang_bridge_fan is identity-routed, not enable_overhang_fan")
+    {
+        REQUIRE(res.json.at("enable_overhang_bridge_fan") == true);
+        REQUIRE_FALSE(res.json.contains("enable_overhang_fan"));
+    }
+    SECTION("enable_support is identity-routed, never support_enabled")
+    {
+        REQUIRE(res.json.at("enable_support") == true);
+        REQUIRE_FALSE(res.json.contains("support_enabled"));
+    }
+    SECTION("fan_max_speed / fan_min_speed are identity-routed, not fan_speed_max/min")
+    {
+        REQUIRE(res.json.at("fan_max_speed").get<int>() == 80);
+        REQUIRE(res.json.at("fan_min_speed").get<int>() == 10);
+        REQUIRE_FALSE(res.json.contains("fan_speed_max"));
+        REQUIRE_FALSE(res.json.contains("fan_speed_min"));
+    }
+    SECTION("support_interface_spacing is identity-routed, not tree_support_interface_spacing_mm")
+    {
+        REQUIRE(res.json.at("support_interface_spacing").get<double>() == Approx(0.25));
+        REQUIRE_FALSE(res.json.contains("tree_support_interface_spacing_mm"));
+    }
+    SECTION("support_base_pattern_spacing is identity-routed and no longer warns")
+    {
+        REQUIRE(res.json.at("support_base_pattern_spacing").get<double>() == Approx(2.5));
+        REQUIRE_FALSE(has_warning_for(res.warnings, "support_base_pattern_spacing"));
+    }
+    SECTION("raft_layers still warns when supports are off, routed via enable_support")
+    {
+        auto r = PnpConfigTranslator::translate(make_config({{"raft_layers", "2"}}), &universe);
+        REQUIRE(r.json.contains("support_raft_layers"));
+        REQUIRE(has_warning_for(r.warnings, "raft_layers"));
+        // The enable_support -> support_raft_layers edge sits inside the
+        // raft>0 branch, so with the raft off it is not recorded and the
+        // warning set cannot consume enable_support.
+        auto quiet = PnpConfigTranslator::translate(make_config({{"raft_layers", "0"}}), &universe);
+        // The unconditional copy_as still sends the raft layer count (only the
+        // warning is conditional) — its Tier-D record must name raft_layers,
+        // not enable_support.
+        REQUIRE(quiet.json.contains("support_raft_layers"));
+        REQUIRE_FALSE(has_warning_for(quiet.warnings, "enable_support"));
+    }
+    SECTION("unprobed, the fallback list now carries the six Orca names")
+    {
+        const auto unprobed = PnpConfigTranslator::translate(cfg, nullptr);
+        for (const char* key : {"close_fan_the_first_x_layers", "enable_overhang_bridge_fan", "enable_support", "fan_max_speed",
+                                "fan_min_speed", "support_interface_spacing", "support_base_pattern_spacing"})
+            REQUIRE(unprobed.json.contains(key));
+        REQUIRE_FALSE(unprobed.json.contains("support_enabled"));
+        REQUIRE_FALSE(unprobed.json.contains("tree_support_interface_spacing_mm"));
     }
 }
 

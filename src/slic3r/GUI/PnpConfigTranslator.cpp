@@ -35,14 +35,27 @@ using nlohmann::json;
 // It is deliberately NOT kept in sync with the backend any more; two entries
 // (`support_type`, `infill_shift_step`) are keys pnp reads through channels the
 // wire cannot describe — see UNDECLARED_LIVE_KEYS.
+//
+// Ticket 09 added `close_fan_the_first_x_layers`, `enable_overhang_bridge_fan`,
+// `enable_support`, `fan_max_speed`, `fan_min_speed` and
+// `support_interface_spacing`: pnp binds them under these Orca names (it
+// renamed its keys to Orca's at the `1238ef02 -> dbf3449c` bump), so without
+// them an unprobed translate() would silently stop sending six settings whose
+// curated rename rows ticket 09 deleted. `support_base_pattern_spacing` was
+// covered by the same list when its warn-only row went away.
 // ---------------------------------------------------------------------------
 const char* const TIER_A_KEYS[] = {
     "alternate_extra_wall",
     "bridge_flow",
     "brim_width",
+    "close_fan_the_first_x_layers",
     "detect_overhang_wall",
     "detect_thin_wall",
+    "enable_overhang_bridge_fan",
+    "enable_support",
     "extra_perimeters_on_overhangs",
+    "fan_max_speed",
+    "fan_min_speed",
     "filter_out_gap_fill",
     "gap_infill_speed",
     "infill_shift_step",
@@ -84,7 +97,9 @@ const char* const TIER_A_KEYS[] = {
     "slow_down_layer_time",
     "slow_down_min_speed",
     "support_angle",
+    "support_base_pattern_spacing",
     "support_interface_bottom_layers",
+    "support_interface_spacing",
     "support_interface_top_layers",
     "support_speed",
     "support_type",
@@ -362,13 +377,12 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg, const PnpKeyUniver
     //
     // Running it first also repairs, at no cost, the five settings ticket 01
     // found had silently stopped reaching pnp at the submodule bump: the four
-    // part-cooling keys and support_interface_spacing, whose curated rows now
-    // write dead target names, plus enable_support — whose row has written the
-    // non-existent `support_enabled` since it was first authored, so turning
-    // supports on in the GUI never turned them on in pnp. The dead rows below
-    // still fire and still write their dead targets (repairing them is ticket
-    // 09's job); pnp ignores keys it does not declare, and the live identity
-    // copy is what it now reads.
+    // part-cooling keys and support_interface_spacing, plus enable_support —
+    // whose row had written the non-existent `support_enabled` since it was
+    // first authored, so turning supports on in the GUI never turned them on
+    // in pnp. (Ticket 09 deleted those dead rows; this pass is what actually
+    // carries the settings — probed from the universe, or via TIER_A_KEYS
+    // when no probe has run.)
     //
     // With no universe the fork has no evidence, so it falls back to the
     // compiled-in TIER_A_KEYS list and behaves exactly as it did before.
@@ -409,10 +423,13 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg, const PnpKeyUniver
         }
     }
 
-    copy_as("close_fan_the_first_x_layers", "disable_fan_first_layers");
-    copy_as("enable_overhang_bridge_fan", "enable_overhang_fan");
-    copy_as("fan_max_speed", "fan_speed_max");
-    copy_as("fan_min_speed", "fan_speed_min");
+    // The part-cooling keys are identity rows now (ticket 09): they exist in
+    // print_config_def under Orca's names and pnp declares the same names, so
+    // the probed identity pass above copies them live and the TIER_A_KEYS
+    // fallback does below. The old rename rows here
+    // (`disable_fan_first_layers`, `enable_overhang_fan`, `fan_speed_max`,
+    // `fan_speed_min`) were retired at the `1238ef02 -> dbf3449c` bump and
+    // deleted by ticket 09.
     copy_as("initial_layer_print_height", "first_layer_height");
     copy_as("infill_direction", "infill_angle");
 
@@ -585,17 +602,28 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg, const PnpKeyUniver
     }
 
     copy_as("spiral_mode", "spiral_vase");
-    copy_as("enable_support", "support_enabled");
+
+    // enable_support (ticket 09): the row `copy_as("enable_support",
+    // "support_enabled")` is gone. It wrote the non-existent `support_enabled`
+    // since it was first authored, so turning supports on in the GUI never
+    // switched them on in pnp until ticket 05's live identity pass began
+    // sending `enable_support` itself. Pnp declares `enable_support`; the dead
+    // row only added noise to the emitted config.
 
     // raft_layers -> support_raft_layers. PNP has no standalone raft: >0 with
     // supports off is an unsupported-feature warning (mapping asset + 013).
+    // The support gate reads `enable_support` directly: pnp binds it under its
+    // own name (ticket 09 deleted the row that renamed it).
     copy_as("raft_layers", "support_raft_layers");
     {
         const ConfigOption* raft = cfg.option("raft_layers");
         const ConfigOption* sup  = cfg.option("enable_support");
-        if (raft != nullptr && raft->getInt() > 0 && (sup == nullptr || !sup->getBool()))
-            warn("raft_layers", PnpWarningClass::UnsupportedFeature,
-                 raft->serialize(), raft->serialize());
+        if (raft != nullptr && raft->getInt() > 0) {
+            if (sup == nullptr || !sup->getBool())
+                warn("raft_layers", PnpWarningClass::UnsupportedFeature,
+                     raft->serialize(), raft->serialize());
+            route("enable_support", "support_raft_layers");
+        }
     }
 
     copy_as("support_top_z_distance", "support_top_z_distance_mm");
@@ -623,19 +651,16 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg, const PnpKeyUniver
         }
     }
 
-    // support_base_pattern_spacing -> support_density: spacing<->density
-    // inversion formula unverified (mapping asset open point; ticket 013 lists
-    // this as a lossy-fallback member). Not sent; PNP default rules.
-    if (cfg.option("support_base_pattern_spacing") != nullptr) {
-        // Sends nothing, so it is recorded as a consumed key with no target: it
-        // counts as handled only when the identity pass has covered it, which
-        // at dbf3449c it does (traditional-support now declares the key).
-        route("support_base_pattern_spacing", std::string());
-        warn("support_base_pattern_spacing", PnpWarningClass::LossyFallback,
-             serialize_or_empty(cfg, "support_base_pattern_spacing"), std::string());
-    }
+    // support_base_pattern_spacing (ticket 09): the lossy-fallback warning row
+    // is gone. Pnp retired `support_density` for `support_base_pattern_spacing`;
+    // the space key is identity-copied by the passes above, so nothing is lost
+    // and the warning was pure noise (the spacing<->density inversion formula
+    // from the mapping asset is obsolete with the density key retired).
 
-    copy_as("support_interface_spacing", "tree_support_interface_spacing_mm");
+    // support_interface_spacing (ticket 09): the rename row
+    // `tree_support_interface_spacing_mm` is gone — pnp renamed its key to the
+    // Orca name at the bump, the live identity pass has covered it since
+    // ticket 05, and the TIER_A_KEYS fallback covers it unprobed.
 
     // fuzzy_skin group: enum gates whether the module keys are emitted at all.
     {

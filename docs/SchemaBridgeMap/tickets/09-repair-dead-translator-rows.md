@@ -1,8 +1,8 @@
 ---
 title: Repair the six dead curated-table rows the bump and history left behind
-status: open
+status: closed
 type: task
-assignee:
+assignee: Adelino Penedo
 blocked-by: [01]
 ---
 
@@ -63,3 +63,47 @@ The mechanism that catches these rows now exists, and with it a way to check the
   `support_interface_spacing -> tree_support_interface_spacing_mm`. `support_density` is not in the
   list — its row routes to nothing rather than to a dead name, so it is the seventh row this ticket
   names ("one row that deliberately sends nothing") and the diff cannot see it.
+
+## Resolution (2026-08-28)
+
+The rows were deleted, not repaired: ticket 05's identity pass had already made each setting
+reach pnp under its own name, so the six rename rows wrote only dead targets onto the wire.
+Verified against the live wire-1.1.0 schema (93 host entries, 23 modules, freshly probed from
+the staged `pnp_cli` at submodule `a50bfc28`) before deleting: every Orca source above is
+declared by pnp under its own name, every old rename target is absent. Because a
+correctness fix was already delivered by ticket 05, this ticket skipped the per-row unit
+audit the deliverable table warned about — the live identity copy carries whatever value shape
+Orca holds, exactly as it has since ticket 05, and the schema guard still drops anything pnp's
+resolution would reject.
+
+### What changed
+
+- `PnpConfigTranslator::translate()`: the six `copy_as` rename rows and the
+  `support_base_pattern_spacing` warn-only row are gone (replaced with comments stating why).
+- The raft-warning block now records `enable_support -> support_raft_layers` inside the
+  `raft > 0` branch. That edge is not a routing change — `routed` feeds the warning-key
+  derivation, and without it a raft-plus-supports-off slice would double-warn `enable_support`
+  as not-yet-mapped after the row that consumed it disappeared.
+- `TIER_A_KEYS` (the unprobed fallback only) gains the six Orca names plus
+  `support_base_pattern_spacing`. Without this, an unprobed `translate()` would have silently
+  stopped sending these seven settings — the fallback's contract is to behave as before, and
+  the deleted rows were its only carrier for them. The probed path needed no list change.
+- Tests: the ticket-05 case's `REQUIRE(json.contains("support_enabled"))` is inverted to
+  `REQUIRE_FALSE`, and a new `[ticket09]` case pins each of the seven rows — one SECTION per
+  setting asserting the emitted name, probed and unprobed, plus the dead-name absence and the
+  raft/`enable_support` routing.
+
+### Verification
+
+- `pnp_config_translator_tests`: 944 assertions in 21 cases, all passing.
+- The hidden `[live-schema]` gate against the real probed document: **zero dead curated rows**
+  — the case ticket 06 left failing by design is green, which is this ticket's definition of
+  done on that axis.
+- `pnp_runtime_tests` (the other suite sharing touched sources and the dead-target logger
+  fixture): 282 assertions in 31 cases, all passing.
+- Manual smoke (the deliverable's "supports actually generate"): `pnp_cli slice` on
+  `calicat.stl` with a config carrying only the fork's post-repair emission names —
+  `enable_support: true` produced 93 `;TYPE:Support` and 4 `;TYPE:Support interface` blocks;
+  the control config identical except `enable_support: false` produced none. Both slices
+  exited 0. (The pre-existing `machine-gcode-emit` layer-marker warnings appear in both runs
+  and are unrelated.)

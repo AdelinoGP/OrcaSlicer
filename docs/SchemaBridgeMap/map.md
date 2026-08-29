@@ -180,6 +180,16 @@ are true when this map is done:
   `support_density`'s row routes to nothing and so cannot be dead. Also found the tree's staged
   dist predated the wire-1.1.0 commit.
 
+- [Repair the six dead curated-table rows the bump and history left behind](tickets/09-repair-dead-translator-rows.md)
+  — the rows were deleted, not repaired: ticket 05's identity pass already carried every
+  setting under its own name, so the six renames and `support_density`'s warn-only row wrote
+  only dead targets or noise. The unprobed fallback (`TIER_A_KEYS`) gained the six Orca names
+  plus `support_base_pattern_spacing` so a no-probe translate() keeps sending them, and the
+  raft warning block records `enable_support -> support_raft_layers` inside the `raft > 0`
+  branch so the warning-key derivation consumes it. The `[live-schema]` gate ticket 06 left
+  failing by design now reports **zero dead rows** against the real backend, and a `pnp_cli`
+  smoke confirmed supports generate only when `enable_support` is true.
+
 - [Support-families impact on the support-preview and gizmo path](tickets/07-support-families-preview-impact.md)
   — the path is **unbroken and was never exposed to the bump**: the ticket's "2.2.0 document"
   premise was wrong — the preview consumes the `SupportGeometryIR`-derived *document* (still
@@ -213,6 +223,8 @@ are true when this map is done:
   survives as the only hand-written layer — the rows that fix a unit, respell an enum, or
   fan one Orca key out to several pnp keys. What is still unspecified is how far *that*
   layer can shrink, which is the same question as the 86 mismatched identity rows below.
+  *(Narrowed by ticket 09: the six dead rows it deleted were Tier-B rename rows, so the
+  remaining hand-written set is smaller by them; nothing else about the question changed.)*
 
 - **A value-semantics audit of the identity rows.** Ticket 05 widened `translate()` to send
   every declared key by name — 65 more than before — while ticket 01 §B found 86 of 113

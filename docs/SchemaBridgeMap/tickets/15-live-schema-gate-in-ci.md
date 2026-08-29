@@ -21,11 +21,14 @@ layout. Wire the gate to follow it:
   `PNP_LIVE_SCHEMA=<that file>`, and runs
   `pnp_config_translator_tests "[live-schema]"` explicitly (the leading-dot
   tag keeps it invisible to `xmake test`'s default selection).
-- Today the case **fails by design**: it reports exactly ticket 09's six dead
+- ~~Today the case **fails by design**: it reports exactly ticket 09's six dead
   curated rows. Decide the sequencing — land it as a hard gate in the same
   change as ticket 09's row repairs, so it starts green and holds the line
   (ticket 08's session recommendation), or run it reporting-only until 09
-  closes.
+  closes.~~ *(Closed by ticket 09, 2026-08-28: the dead rows are deleted and
+  the case passes against a real wire-1.1.0 document, so there is no
+  sequencing question left — land the gate as a hard, already-green check;
+  it breaks only on genuinely new drift, which is its job.)*
 - The non-Windows legs are `continue-on-error` already; the only per-platform
   wrinkle is the `pnp_cli` binary name (no `.exe` outside Windows).
 - Decide whether a runtime smoke (launching the GUI against the staged dist)
