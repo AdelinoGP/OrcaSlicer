@@ -216,6 +216,17 @@ are true when this map is done:
   predecessor sat on no branch and was unfetchable by CI), and the stale flat dist (wire 1.0.0,
   21 modules) is gone. Probe evidence in [the restage asset](assets/08-restaged-dist.md).
 
+- [Declare host-key display metadata in pnp's config DSL](tickets/10-host-key-metadata-declaration.md)
+  — wire 1.1.0 → 1.2.0 (additive): every `config-schema` `host` entry carries optional
+  `display`/`group`/`unit`/`description`/`min`/`max`/`values`/`advanced`, `null` where
+  un-annotated, declared at the declaration site (`HostKeyMeta` with FRU splicing, so a
+  misspelled annotation is a compile error; absence is fine). 21 of 93 host keys annotated —
+  only those the fork would otherwise render as a bare key name; identity-routed and
+  curated-target keys stay bare so no annotation goes dead. Groups reuse the module manifests'
+  strings, so both wire halves bucket into the same optgroups. `flat_bridge_closing_join` and
+  `wave_overhang_pattern` are now real enums. **Zero fork code changes** — `field_to_def`
+  already parsed these fields; the submodule bump alone labels the PNP page's host controls.
+
 ## Not yet specified
 
 - **Migration of the curated table's existing rows.** Ticket 05 answered the tier question:
@@ -227,12 +238,15 @@ are true when this map is done:
   remaining hand-written set is smaller by them; nothing else about the question changed.)*
 
 - **A value-semantics audit of the identity rows.** Ticket 05 widened `translate()` to send
-  every declared key by name — 65 more than before — while ticket 01 §B found 86 of 113
-  identity rows carry a type, unit or range mismatch against Orca's definition.
-  `apply_schema_guard()` contains this (a rejected value is dropped and logged rather than
-  slicing wrong), but its coverage is not total: host keys reach the wire with no `min`/`max`,
-  so range errors on those pass through until ticket 10 lands the metadata. Nobody has walked
-  the 86 rows to say which are real losses.
+   every declared key by name — 65 more than before — while ticket 01 §B found 86 of 113
+   identity rows carry a type, unit or range mismatch against Orca's definition.
+   `apply_schema_guard()` contains this (a rejected value is dropped and logged rather than
+   slicing wrong), but its coverage is not total: host keys reach the wire with no `min`/`max`,
+   so range errors on those pass through until ticket 10 lands the metadata. Nobody has walked
+   the 86 rows to say which are real losses. *(Narrowed by ticket 10: the host half now carries
+   machine-readable `min`/`max` on the 21 annotated keys, so the schema guard can reject
+   out-of-range values there; the un-annotated host keys and the module-half mismatches are the
+   remaining audit surface.)*
 
 - **pnp should declare the keys it reads outside the manifest.** `support_type`,
   `support_family` (read from `resolved_config.extensions`) and `infill_shift_step` (a bare
@@ -291,6 +305,13 @@ are true when this map is done:
   preserved-but-unresolvable keys a read-only surface, but only in the degraded state (ticket 12).
   In the normal state they remain invisible and unremovable, so a project still accumulates them
   with no way out but editing the file.
+
+- **Enum display labels on the wire.** Ticket 10 promoted the two prose-domain string fields to
+  real enums (`values`), but the wire still has no `value_labels` parallel to `values` — the
+  prototype noted dropdowns then render raw identifiers (`miter`, `square`, `round`, `smart`,
+  `monotonic`, `zigzag`, `gcode`, `firmware`). A seventh declaration channel change (a per-value
+  label array, following ticket 02's `scope` and ticket 10's meta precedents) would present
+  proper dropdown text; take it when a domain reaches user-hostile identifiers.
 
 - **What the fork should do about a `pnp_cli` older than the wire it needs.** Ticket 06 found the
   staged dist answering `config-schema` at wire 1.0.0 while the submodule tree emits 1.1.0, and had
