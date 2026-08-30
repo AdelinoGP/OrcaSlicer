@@ -238,6 +238,20 @@ are true when this map is done:
   round-trip, 3mf round-trip) each proven to fail as a clean `nullptr` on the old ordering,
   one negative pins the never-registered drop.
 
+- [Build the generated PNP settings page](tickets/11-generate-the-pnp-page.md)
+  — built and verified (restored from a lost session, minus its formatter churn): the wire
+  `advanced` flag turns into `def->mode`, `pnp_page_groups()` derives the optgroups
+  (descending count, alphabetical ties, hosts into one empty-category group), `TabPrint::build()`
+  appends the **PNP Backend** page with verbatim labels, and `slice_has_paint` is skipped by
+  `pnp_host_injected_skip_keys()`. Live-probe smoke shape against wire 1.2.0: **58 page keys →
+  57 controls + 1 skipped, 18 optgroups**. Seam for ticket 12 decided: the registry seal is the
+  boundary; ticket 12 owns the no-probe branch (carrier-driven read-only page under a banner),
+  reusing the page's title and group titles so a flapping probe flips content, not structure.
+  Load-bearing pnp fix (submodule `263b81d3 -> ffa0302c`): manifest string/array defaults
+  reached the wire quoted/bracketed through `toml::Value::to_string()`, so every enum/string/
+  percent control opened at the zero value; `toml_default_to_wire()` + regression test. The
+  app-level manual smoke is the one residual, deferred to ticket 12's landing (same page).
+
 ## Not yet specified
 
 - **Migration of the curated table's existing rows.** Ticket 05 answered the tier question:
@@ -304,6 +318,14 @@ are true when this map is done:
   rendered-page half remains open. Ticket 06 also found the staged `target/dist` binaries are
   older than the submodule working tree, which is itself an argument for the fork checking the
   wire it actually got rather than the wire it expects.
+  *(Narrowed by ticket 11 (2026-08-30): the derivable page now has a live half — the same
+  hidden `[live-schema]` binary carries a page-layout case asserting the real document's
+  groups, order, render/skip accounting against `PNP_LIVE_SCHEMA`, verified green against a
+  wire-1.2.0 dist. What remains here is only the app-level manual smoke of the *rendered*
+  controls, which ticket 11 deferred to ticket 12's landing (both touch the same page), plus
+  ticket 15's CI plumbing. One operation note for whoever writes ticket 15: the probe must be
+  invoked with `--module-dir <modules root>` — invoked without it, module manifests vanish
+  from the reply and the page silently shrinks; the gate should fail loudly on that shape.)*
 
 - **Whether pnp should declare host-injected fields on the wire.** Ticket 04 needed to keep
   `slice_has_paint` off the page and found the wire cannot say a field is host-injected — no tag,
@@ -315,14 +337,22 @@ are true when this map is done:
 - **Whether the settings page needs a purge affordance for preserved keys.** Ticket 04 gives
   preserved-but-unresolvable keys a read-only surface, but only in the degraded state (ticket 12).
   In the normal state they remain invisible and unremovable, so a project still accumulates them
-  with no way out but editing the file.
+  with no way out but editing the file. *(Ticket 11 refined the shape: the normal path renders
+  whenever the seal holds and any generated control exists, regardless of the carrier — the two
+  states are independent, so a successful probe plus surviving orphans is a real, reachable
+  state; ticket 12 owns both rendering it and answering the purge question with that case in
+  hand.)*
 
 - **Enum display labels on the wire.** Ticket 10 promoted the two prose-domain string fields to
   real enums (`values`), but the wire still has no `value_labels` parallel to `values` — the
   prototype noted dropdowns then render raw identifiers (`miter`, `square`, `round`, `smart`,
   `monotonic`, `zigzag`, `gcode`, `firmware`). A seventh declaration channel change (a per-value
   label array, following ticket 02's `scope` and ticket 10's meta precedents) would present
-  proper dropdown text; take it when a domain reaches user-hostile identifiers.
+  proper dropdown text; take it when a domain reaches user-hostile identifiers. *(Sharpened by
+  ticket 11: the live probe shows the raw-identifier dropdowns are now user-visible on the PNP
+  Backend page — but no manifest currently uses hostile identifiers outside the generic
+  speed/boolean families; take it when a module ships an enum whose raw values a user must not
+  have to parse.)*
 
 - **What the fork should do about a `pnp_cli` older than the wire it needs.** Ticket 06 found the
   staged dist answering `config-schema` at wire 1.0.0 while the submodule tree emits 1.1.0, and had
