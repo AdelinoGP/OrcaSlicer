@@ -1,8 +1,8 @@
 ---
 title: Build the generated PNP settings page
-status: open
+status: in_progress
 type: task
-assignee:
+assignee: Adelino Penedo
 blocked-by: [04, 10]
 ---
 

@@ -37,9 +37,9 @@ struct SkippedKey
 // already writes: an Orca key of the same name (the identity-routing case) or
 // a curated-table target. Those keep their existing route and get no generated
 // control — name match, then curated table, then PNP page, in that order.
-std::vector<PnpConfigKeyDef> parse_schema(const nlohmann::json&                            schema_doc,
-                                          const std::function<bool(const std::string&)>&   already_bound,
-                                          std::vector<SkippedKey>*                         skipped = nullptr);
+std::vector<PnpConfigKeyDef> parse_schema(const nlohmann::json& schema_doc,
+                                          const std::function<bool(const std::string&)>& already_bound,
+                                          std::vector<SkippedKey>* skipped = nullptr);
 
 // Maps a pnp wire type string onto an Orca ConfigOptionType. Returns false for
 // a type this fork does not know how to build a control or a default for; the
@@ -50,5 +50,15 @@ bool map_wire_type(const std::string& wire_type, ConfigOptionType& out);
 // every key the curated translator already routes. Returns the number of keys
 // registered. A malformed or empty document registers nothing.
 size_t register_from_schema(const std::string& schema_json);
+
+// Keys pnp declares on the wire but the host injects at slice time, so they
+// must never render as a user-editable control on the generated PNP page
+// (ticket 04; the prototype's skip list).
+//
+//   slice_has_paint — classic-perimeters.toml declares it; the host writes it
+//   into every module config, so the def is real but the value is never the
+//   user's to set. Pnp's `internal` wire flag is the delete-this answer (see
+//   the map's fog entry); keep this aligned with pnp if a second name appears.
+const std::vector<std::string>& pnp_host_injected_skip_keys();
 
 }}} // namespace Slic3r::GUI::PnpConfigKeys

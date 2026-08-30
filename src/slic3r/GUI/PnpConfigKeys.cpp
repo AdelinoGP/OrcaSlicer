@@ -22,7 +22,7 @@ std::string json_string(const nlohmann::json& obj, const char* field)
 bool json_number(const nlohmann::json& obj, const char* field, double& out)
 {
     auto it = obj.find(field);
-    if (it == obj.end() || ! it->is_number())
+    if (it == obj.end() || !it->is_number())
         return false;
     out = it->get<double>();
     return true;
@@ -49,7 +49,7 @@ bool field_to_def(const nlohmann::json& field, PnpConfigKeyDef& out, std::string
     }
 
     const std::string wire_type = json_string(field, "type");
-    if (! map_wire_type(wire_type, out.type)) {
+    if (!map_wire_type(wire_type, out.type)) {
         reason = "unmapped wire type '" + wire_type + "'";
         return false;
     }
@@ -58,16 +58,24 @@ bool field_to_def(const nlohmann::json& field, PnpConfigKeyDef& out, std::string
     out.default_value = json_string(field, "default");
     if (out.type == coBool || out.type == coBools) {
         // pnp renders bools as JSON literals; Orca's deserializer wants 1/0.
-        if (out.default_value == "true")  out.default_value = "1";
-        if (out.default_value == "false") out.default_value = "0";
+        if (out.default_value == "true")
+            out.default_value = "1";
+        if (out.default_value == "false")
+            out.default_value = "0";
     }
-    out.label         = json_string(field, "display");
-    out.category      = json_string(field, "group");
-    out.tooltip       = json_string(field, "description");
-    out.sidetext      = json_string(field, "unit");
+    out.label    = json_string(field, "display");
+    out.category = json_string(field, "group");
+    out.tooltip  = json_string(field, "description");
+    out.sidetext = json_string(field, "unit");
 
     out.has_min = json_number(field, "min", out.min);
     out.has_max = json_number(field, "max", out.max);
+
+    // Schema `advanced` flag (wire 1.1.0+): tier of the generated PNP page.
+    // Absent (older wire, unannotated host key) means non-advanced, matching
+    // pnp's own unwrap_or(false) at the declaration site.
+    if (auto adv = field.find("advanced"); adv != field.end() && adv->is_boolean())
+        out.advanced = adv->get<bool>();
 
     if (out.type == coEnum) {
         auto values = field.find("values");
@@ -91,34 +99,61 @@ bool map_wire_type(const std::string& wire_type, ConfigOptionType& out)
 {
     // pnp's vocabulary is documented on ConfigFieldEntry::field_type
     // (crates/slicer-scheduler/src/manifest.rs).
-    if (wire_type == "bool")             { out = coBool;           return true; }
-    if (wire_type == "int")              { out = coInt;            return true; }
-    if (wire_type == "float")            { out = coFloat;          return true; }
-    if (wire_type == "string")           { out = coString;         return true; }
-    if (wire_type == "enum")             { out = coEnum;           return true; }
-    if (wire_type == "percent")          { out = coPercent;        return true; }
-    if (wire_type == "float_or_percent") { out = coFloatOrPercent; return true; }
-    if (wire_type == "float-list")       { out = coFloats;         return true; }
-    if (wire_type == "string-list")      { out = coStrings;        return true; }
+    if (wire_type == "bool") {
+        out = coBool;
+        return true;
+    }
+    if (wire_type == "int") {
+        out = coInt;
+        return true;
+    }
+    if (wire_type == "float") {
+        out = coFloat;
+        return true;
+    }
+    if (wire_type == "string") {
+        out = coString;
+        return true;
+    }
+    if (wire_type == "enum") {
+        out = coEnum;
+        return true;
+    }
+    if (wire_type == "percent") {
+        out = coPercent;
+        return true;
+    }
+    if (wire_type == "float_or_percent") {
+        out = coFloatOrPercent;
+        return true;
+    }
+    if (wire_type == "float-list") {
+        out = coFloats;
+        return true;
+    }
+    if (wire_type == "string-list") {
+        out = coStrings;
+        return true;
+    }
     return false;
 }
 
-std::vector<PnpConfigKeyDef> parse_schema(const nlohmann::json&                          schema_doc,
+std::vector<PnpConfigKeyDef> parse_schema(const nlohmann::json& schema_doc,
                                           const std::function<bool(const std::string&)>& already_bound,
-                                          std::vector<SkippedKey>*                       skipped)
+                                          std::vector<SkippedKey>* skipped)
 {
     std::vector<PnpConfigKeyDef> out;
-    if (! schema_doc.is_object())
+    if (!schema_doc.is_object())
         return out;
 
     std::set<std::string> seen;
     auto consider = [&](const nlohmann::json& field) {
         PnpConfigKeyDef def;
-        std::string     reason;
-        if (! field.is_object())
+        std::string reason;
+        if (!field.is_object())
             return;
         const std::string key = json_string(field, "key");
-        if (key.empty() || ! seen.insert(key).second)
+        if (key.empty() || !seen.insert(key).second)
             // A key declared by several modules is one key; first wins.
             return;
         if (already_bound && already_bound(key)) {
@@ -126,7 +161,7 @@ std::vector<PnpConfigKeyDef> parse_schema(const nlohmann::json&                 
                 skipped->push_back({key, "already routed by name identity or the curated table"});
             return;
         }
-        if (! field_to_def(field, def, reason)) {
+        if (!field_to_def(field, def, reason)) {
             if (skipped)
                 skipped->push_back({key, reason});
             return;
@@ -151,6 +186,12 @@ std::vector<PnpConfigKeyDef> parse_schema(const nlohmann::json&                 
             consider(field);
 
     return out;
+}
+
+const std::vector<std::string>& pnp_host_injected_skip_keys()
+{
+    static const std::vector<std::string> keys = {"slice_has_paint"};
+    return keys;
 }
 
 size_t register_from_schema(const std::string& schema_json)
@@ -178,7 +219,7 @@ size_t register_from_schema(const std::string& schema_json)
         // left to register. What this needs is the curated table's own targets.
         const PnpTranslationResult routed = PnpConfigTranslator::translate(defaults, nullptr);
         if (routed.json.is_object())
-            for (auto it = routed.json.begin(); it != routed.json.end(); ++ it)
+            for (auto it = routed.json.begin(); it != routed.json.end(); ++it)
                 curated_targets.insert(it.key());
     }
 
