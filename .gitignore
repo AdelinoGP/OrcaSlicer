@@ -52,3 +52,4 @@ __pycache__/
 
 # xmake local config cache
 .xmake/
+/opencode.json
