@@ -40,6 +40,30 @@ silently dropped from `OrcaSlicer.dll` ever since the xmake cutover — the DLL 
 CODEVIEW debug entry and crash dumps could not be symbolicated. Fixed with `add_shflags` too
 (commit above); the resulting `OrcaSlicer.pdb` is what made this diagnosis possible.
 
+## Addendum 2 — the all-amber PNP page, found and fixed (2026-08-31)
+
+After the crash fix, the PNP Backend page rendered but **every control was tinted amber** — the
+fork's "pnp does not bind this" gap color (`pnp_gap_label_color`, ticket 013), not the
+modified-from-default yellow. Root cause: `pnp_key_is_unimplemented()` derives the handled set
+from `pnp_handled_keys()`, which runs the translator over `DynamicPrintConfig::full_print_config()`
+— a config built from the **static** `FullPrintConfig::defaults()`. Runtime-registered pnp keys
+are not part of that static class, so the identity pass (`translate()`'s universe branch iterates
+`cfg.keys()`) never routed them; `handled_from_routes()` then reported every registered key as an
+unimplemented gap and the whole page tinted amber. Measured: with the schema universe installed,
+all 7 registered print-scoped keys reported `unimplemented=1` (diagnostic test, since removed).
+
+**Fix:** `pnp_handled_keys()` materializes the registered keys into the derivation config
+(`cfg.option(key, true)` per `pnp_registered_config_keys()`) before translating, so the handled
+set matches what a real preset carries. The gap tint now reports only genuine gaps.
+
+**Regression tests** (in `test_pnp_config_keys.cpp`, at the registration seam):
+- "the default print preset carries every registered print-scoped key" — pins the startup
+  invariant (registration before `PresetBundle`) and that nothing is dirty at startup;
+- "registered pnp keys are not reported unimplemented" — goes red without the fix (7/8
+  assertions fail), green with it.
+
+`pnp_config_translator_tests` 1052/27 and `pnp_runtime_tests` 282/31 green; app rebuilt.
+
 ## Question
 
 Implement the state a user on a broken install hits first.

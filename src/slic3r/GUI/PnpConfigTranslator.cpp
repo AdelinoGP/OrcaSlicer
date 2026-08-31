@@ -819,7 +819,15 @@ std::set<std::string> pnp_handled_keys(const PnpKeyUniverse* universe)
     // Derived by running the translator over the stock key set and reading its
     // provenance back, so the answer can never disagree with what translate()
     // does — the agreement the old static array had to be unit-tested for.
-    const DynamicPrintConfig cfg = DynamicPrintConfig::full_print_config();
+    DynamicPrintConfig cfg = DynamicPrintConfig::full_print_config();
+    // Runtime-registered pnp keys are not part of the static defaults
+    // (FullPrintConfig::defaults() is compiled in), so the identity pass
+    // cannot see them in cfg.keys() and every one of them would read as an
+    // unimplemented gap — the all-amber PNP page (ticket 12 follow-up).
+    // Materialize them from their defs so the handled set matches what a
+    // real preset carries.
+    for (const std::string& key : pnp_registered_config_keys())
+        cfg.option(key, true);
     return handled_from_routes(translate(cfg, universe).routed, universe);
 }
 

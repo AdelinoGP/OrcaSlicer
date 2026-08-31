@@ -27,6 +27,7 @@
 #include "libslic3r/Format/bbs_3mf.hpp"
 #include "libslic3r/Format/STL.hpp"
 #include "slic3r/GUI/PnpConfigKeys.hpp"
+#include "slic3r/GUI/PnpConfigTranslator.hpp"
 
 using namespace Slic3r;
 using namespace Slic3r::GUI;
@@ -611,6 +612,67 @@ TEST_CASE("an ignore-set pnp key round-trips through a project 3mf", "[pnp][conf
     fs::remove(test_file, ec);
     fs::remove_all(backup_dir, ec);
     release_PlateData_list(dst_plates);
+}
+
+// Ticket 12 follow-up (all-amber PNP page). Two startup-path invariants the
+// yellow tint depends on, pinned at the seams that broke:
+//   * registration runs before the PresetBundle, so the default print preset's
+//     config carries every registered print-scoped key (else the page's
+//     reload_config would read nullptr options — the ticket 12 crash);
+//   * the handled set the gap tint is derived from must include those keys
+//     (else pnp_key_is_unimplemented() reports them all as gaps and the whole
+//     page renders amber).
+TEST_CASE("the default print preset carries every registered print-scoped key", "[pnp][config_keys]")
+{
+    const Registration &reg = registered_once();
+    REQUIRE(pnp_config_keys_sealed());
+
+    // Mirror PresetBundle's print collection construction (PresetBundle.cpp:367).
+    PresetCollection prints(Preset::TYPE_PRINT, Preset::print_options(),
+                           static_cast<const PrintRegionConfig &>(FullPrintConfig::defaults()));
+
+    const Preset &def_preset = prints.default_preset();
+    for (const std::string &key : pnp_registered_config_keys()) {
+        if (pnp_registered_key_scope(key) != PnpPresetScope::Print)
+            continue;
+        INFO("key " << key);
+        CHECK(def_preset.config.has(key));
+    }
+
+    // And nothing is dirty against the selected preset at startup: the tab's
+    // decorate() paints "modified" yellow when osInitValue is cleared, which
+    // current_dirty_options() does for every differing key.
+    const auto dirty = prints.current_dirty_options(true);
+    for (const std::string &key : pnp_registered_config_keys()) {
+        if (pnp_registered_key_scope(key) != PnpPresetScope::Print)
+            continue;
+        INFO("key " << key);
+        CHECK(std::find(dirty.begin(), dirty.end(), key) == dirty.end());
+    }
+}
+
+TEST_CASE("registered pnp keys are not reported unimplemented", "[pnp][config_keys]")
+{
+    const Registration &reg = registered_once();
+    REQUIRE(pnp_config_keys_sealed());
+
+    // The universe the app installs from the same wire (GUI_App.cpp).
+    PnpConfigTranslator::PnpKeyUniverse universe =
+        PnpConfigTranslator::pnp_key_universe_from_schema(synthetic_schema());
+    PnpConfigTranslator::set_pnp_key_universe(std::move(universe));
+
+    // Every registered print-scoped key is declared by the backend and carried
+    // by the config, so the gap tint must not claim it is unimplemented. Before
+    // the fix the handled set was derived from the static defaults, which
+    // cannot contain runtime-registered keys, and the whole PNP page rendered
+    // amber (ticket 12 follow-up).
+    for (const std::string &key : pnp_registered_config_keys()) {
+        if (pnp_registered_key_scope(key) != PnpPresetScope::Print)
+            continue;
+        INFO("key " << key);
+        CHECK_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented(key));
+    }
+    PnpConfigTranslator::reset_pnp_key_universe();
 }
 
 // Opt-in live check (ticket 11). Hidden by the leading `.` tag, same shape as
