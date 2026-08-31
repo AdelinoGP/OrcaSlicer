@@ -41,6 +41,19 @@ PnpPresetScope parse_scope(const std::string& scope)
     return PnpPresetScope::Print;
 }
 
+// Legacy config-key spellings the backend accepts but treats as aliases of a
+// canonical key — mirror of CONFIG_KEY_ALIASES in
+// pinch_n_print_cli/crates/slicer-scheduler/src/config_resolution.rs. The
+// backend REJECTS a config carrying both spellings (deterministic resolution
+// over a HashMap source), so an alias must never be registered or sent: the
+// canonical key carries the value. The wire cannot express the relationship
+// (the manifest documents it in a comment only), so the fork keeps the table,
+// like UNDECLARED_LIVE_KEYS.
+const std::pair<const char*, const char*> PNP_LEGACY_ALIASES[] = {
+    {"first_layer_line_width", "initial_layer_line_width"},
+    {"support_overhang_angle",  "support_threshold_angle"},
+};
+
 // Build one def from a schema field object. `field` must carry at least "key".
 bool field_to_def(const nlohmann::json& field, PnpConfigKeyDef& out, std::string& reason)
 {
@@ -157,6 +170,27 @@ std::vector<PnpConfigKeyDef> parse_schema(const nlohmann::json&                 
     if (host != schema_doc.end() && host->is_array())
         for (const auto& field : *host)
             consider(field);
+
+    // Drop legacy aliases whose canonical key is declared — by this schema or
+    // by Orca itself. The backend rejects both spellings in one config, and
+    // the canonical carries the value; registering the alias would put it in
+    // every print preset and the identity pass would send both, failing the
+    // slice with "expected one config key value, got both" (measured on the
+    // live wire: support_overhang_angle). An alias whose canonical is absent
+    // stays registered (fail-open: a future backend may declare the alias
+    // alone).
+    out.erase(std::remove_if(out.begin(), out.end(), [&](const PnpConfigKeyDef& def) {
+        for (const auto& [legacy, canonical] : PNP_LEGACY_ALIASES) {
+            if (def.key != legacy)
+                continue;
+            if (seen.count(canonical) != 0 || (already_bound && already_bound(canonical))) {
+                if (skipped)
+                    skipped->push_back({def.key, "legacy alias of " + std::string(canonical) + "; the canonical key carries the value"});
+                return true;
+            }
+        }
+        return false;
+    }), out.end());
 
     return out;
 }

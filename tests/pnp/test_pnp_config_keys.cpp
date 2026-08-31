@@ -67,7 +67,11 @@ nlohmann::json synthetic_schema()
              "display": "Slice contains painted regions (host-injected)", "group": "Quality",
              "scope": "print"},
             {"key": "wave_overhang_future_type", "type": "quaternion", "default": "0",
-             "display": "From a newer backend", "group": "Wave Overhangs"}
+             "display": "From a newer backend", "group": "Wave Overhangs"},
+            {"key": "support_threshold_angle", "type": "float", "default": "30",
+             "display": "Support Threshold Angle", "group": "Support", "scope": "print"},
+            {"key": "support_overhang_angle", "type": "float", "default": "30",
+             "display": "Support Overhang Angle", "group": "Support", "scope": "print"}
           ]
         }
       ],
@@ -96,7 +100,7 @@ nlohmann::json synthetic_schema()
 // Orca's.
 const std::set<std::string>& identity_keys()
 {
-    static const std::set<std::string> keys = {"layer_height", "machine_max_jerk_x"};
+    static const std::set<std::string> keys = {"layer_height", "machine_max_jerk_x", "support_threshold_angle"};
     return keys;
 }
 
@@ -235,6 +239,22 @@ TEST_CASE("parse_schema turns a config-schema reply into registerable defs", "[p
         // An enum with an empty domain cannot be deserialized or presented.
         CHECK(find(defs, "wave_overhang_broken_enum") == nullptr);
         CHECK(was_skipped("wave_overhang_broken_enum"));
+    }
+
+    SECTION("a legacy alias of a declared canonical key is skipped, not registered") {
+        // The backend rejects a config carrying both spellings of an aliased
+        // key ("expected one config key value, got both"), so the alias must
+        // never become a first-class key: the canonical carries the value.
+        // support_threshold_angle is an Orca key (identity-routed), so its
+        // legacy alias support_overhang_angle must be dropped here.
+        CHECK(find(defs, "support_overhang_angle") == nullptr);
+        const auto alias_skip = std::find_if(skipped.begin(), skipped.end(),
+            [](const PnpConfigKeys::SkippedKey &s) { return s.key == "support_overhang_angle"; });
+        REQUIRE(alias_skip != skipped.end());
+        CHECK(alias_skip->reason.find("legacy alias of support_threshold_angle") != std::string::npos);
+        // The canonical itself is an Orca key: no generated control either.
+        CHECK(find(defs, "support_threshold_angle") == nullptr);
+        CHECK(was_skipped("support_threshold_angle"));
     }
 
     SECTION("a key declared in both halves is registered once") {
@@ -672,6 +692,34 @@ TEST_CASE("registered pnp keys are not reported unimplemented", "[pnp][config_ke
         INFO("key " << key);
         CHECK_FALSE(PnpConfigTranslator::pnp_key_is_unimplemented(key));
     }
+    PnpConfigTranslator::reset_pnp_key_universe();
+}
+
+TEST_CASE("the legacy alias of a canonical key is never registered or sent", "[pnp][config_keys]")
+{
+    const Registration &reg = registered_once();
+    REQUIRE(pnp_config_keys_sealed());
+
+    // The alias must not be registered at all: registration would put it in
+    // every print preset, and the identity pass would then send both
+    // spellings, failing the backend's alias-conflict rejection ("expected one
+    // config key value, got both") — the slice error the user hit.
+    CHECK(std::find(pnp_registered_config_keys().begin(), pnp_registered_config_keys().end(),
+                    "support_overhang_angle") == pnp_registered_config_keys().end());
+
+    // Install the universe from the same wire and translate a config carrying
+    // the canonical key: the emitted JSON must contain the canonical spelling
+    // only.
+    PnpConfigTranslator::PnpKeyUniverse universe =
+        PnpConfigTranslator::pnp_key_universe_from_schema(synthetic_schema());
+    PnpConfigTranslator::set_pnp_key_universe(std::move(universe));
+
+    DynamicPrintConfig cfg;
+    cfg.set_key_value("support_threshold_angle", new ConfigOptionInt(45));
+    const PnpTranslationResult translated = PnpConfigTranslator::translate(cfg);
+    CHECK(translated.json.contains("support_threshold_angle"));
+    CHECK_FALSE(translated.json.contains("support_overhang_angle"));
+
     PnpConfigTranslator::reset_pnp_key_universe();
 }
 
