@@ -1,10 +1,44 @@
----
-title: Render the degraded read-only PNP page from the unknown-key carrier
-status: closed
-type: task
-assignee: Adelino Penedo (wayfinder session ses_fadef6460ffelOFfRyK1RyuN0U)
-blocked-by: [04, 11]
----
+- The `advanced`-mode decision and ticket 11's verbatim-label rule carried over unchanged: the
+  degraded page's strings are fork-authored and *do* go through `_L()`/translatable strings
+  (unlike the live page's schema-supplied ones) — banner copy is translatable, per the map's
+  localization glossary rules.
+
+## Addendum — the PNP Backend tab crash, found and fixed (2026-08-31, commit `e646f4f14b`)
+
+Opening the PNP Backend tab crashed the app (`orca-slicer.exe.4676.dmp`, access violation in
+`Slic3r::GUI::from_u8` at `OrcaSlicer.dll+0x3d8f46`, reading address `0x20` with `rdx=0x8`).
+Symbolicated against a freshly linked `OrcaSlicer.pdb` (symbolicating the dump was only
+possible after an unrelated build fix — see below), the true fault chain was:
+
+> TabCtrl::buttonClicked → tree_sel_change_delayed → activate_selected_page → Page::activate →
+> reload_config → get_config_value(coString) → `config.opt_string(key)` → from_u8(nullptr str)
+
+The root cause sits in **ticket 11's page builder, not this ticket's degraded branch**:
+`pnp_page_groups()` bucketed every registered key by schema `group` regardless of preset
+scope. `thumbnail_path` is declared `coString` **scope=printer** on the wire, so its value
+lives in the printer preset's config, but the Process tab's page added it to a field list
+reloaded against the *print* preset's `DynamicPrintConfig`. `option<ConfigOptionString>()`
+returned `nullptr` for the missing key; `opt_string()`'s `->value` on `nullptr` produced the
+string reference at `nullptr+0x8`, and `from_u8`'s capacity test read `0x8+0x18 = 0x20` —
+the exact fault address in the dump (measured, exception parameters `[read, 0x20]`).
+
+Audit of the whole live wire: of 14 non-print-scoped keys, 12 are Orca identity rows present
+in every print config; `filament_density`/`filament_diameter` are Orca rows too. `thumbnail_path`
+was the single registered-key-without-print-preset-membership — the one crasher.
+
+**Fix:** the key registry now keeps each key's scope (`pnp_registered_key_scope`), and
+`pnp_page_groups()` buckets only `Print`-scoped keys into the generated page.
+Printer/filament-scoped pnp keys stay registered — preset round-trip and the translator
+still carry them — they render on no tab until a page exists on their own (fog).
+Page-layout tests re-pinned: non-print keys assert **absent** from the Process page, the
+key-accounting equation gains the non-print term, `pnp_registered_key_scope` covered.
+`pnp_config_translator_tests` 1029/25 and `pnp_runtime_tests` 282/31 green; full app rebuilt.
+
+**Incidental, load-bearing for this triage:** `add_ldflags` feeds the *binary* link's flag
+table; the shared-library link reads `shflags`, so `/MANIFEST:NO` and `/DEBUG` had been
+silently dropped from `OrcaSlicer.dll` ever since the xmake cutover — the DLL shipped with no
+CODEVIEW debug entry and crash dumps could not be symbolicated. Fixed with `add_shflags` too
+(commit above); the resulting `OrcaSlicer.pdb` is what made this diagnosis possible.
 
 ## Question
 
