@@ -1,6 +1,8 @@
 #include "PnpConfigKeys.hpp"
 
+#include <map>
 #include <set>
+#include <boost/algorithm/string/join.hpp>
 
 #include "PnpConfigTranslator.hpp"
 #include "libslic3r/Config.hpp"
@@ -199,6 +201,67 @@ size_t register_from_schema(const std::string& schema_json)
     };
 
     return pnp_register_config_keys(parse_schema(doc, already_bound));
+}
+
+std::vector<PnpPreservedKey> pnp_preserved_key_rows(const ConfigBase::t_unknown_config_values& preset_carrier,
+                                                    const ConfigBase::t_unknown_config_values& project_carrier)
+{
+    // One row per (key, carrier) pair: the two carriers are written back
+    // independently by ticket 03's save paths, so the list shows every entry
+    // and tags its store. Sorted by key (both carriers are std::maps); the
+    // preset copy precedes the project copy when a key sits in both.
+    std::set<std::string> keys;
+    for (const auto& kv : preset_carrier)
+        keys.insert(kv.first);
+    for (const auto& kv : project_carrier)
+        keys.insert(kv.first);
+
+    std::vector<PnpPreservedKey> rows;
+    rows.reserve(keys.size() * 2);
+    auto push_row = [&rows](const std::string& key, const std::string& fragment, PnpPreservedSource source) {
+        // Each entry is the key's serialized JSON fragment (ticket 03's
+        // dump()-store). Parse it back and render it the way the user would
+        // have typed it; a fragment that will not parse is shown raw, so
+        // nothing the file holds is ever invisible.
+        nlohmann::json parsed = nlohmann::json::parse(fragment, nullptr, false);
+        if (parsed.is_discarded() || parsed.is_string()) {
+            rows.push_back({key, parsed.is_discarded() ? fragment : parsed.get<std::string>(), source});
+        } else if (parsed.is_array()) {
+            std::vector<std::string> parts;
+            for (const auto& v : parsed)
+                parts.push_back(v.is_string() ? v.get<std::string>() : v.dump());
+            rows.push_back({key, boost::algorithm::join(parts, ", "), source});
+        } else {
+            // numbers / bools: the JSON text is close enough to typed text.
+            rows.push_back({key, parsed.dump(), source});
+        }
+    };
+    for (const std::string& key : keys) {
+        if (auto it = preset_carrier.find(key); it != preset_carrier.end())
+            push_row(key, it->second, PnpPreservedSource::PrintPreset);
+        if (auto it = project_carrier.find(key); it != project_carrier.end())
+            push_row(key, it->second, PnpPreservedSource::Project);
+    }
+    return rows;
+}
+
+std::string pnp_preserved_value_text(const ConfigBase::t_unknown_config_values& carrier, const std::string& key)
+{
+    auto it = carrier.find(key);
+    if (it == carrier.end())
+        return {};
+    nlohmann::json parsed = nlohmann::json::parse(it->second, nullptr, false);
+    if (parsed.is_discarded())
+        return it->second;
+    if (parsed.is_string())
+        return parsed.get<std::string>();
+    if (parsed.is_array()) {
+        std::vector<std::string> parts;
+        for (const auto& v : parsed)
+            parts.push_back(v.is_string() ? v.get<std::string>() : v.dump());
+        return boost::algorithm::join(parts, ", ");
+    }
+    return parsed.dump();
 }
 
 }}} // namespace Slic3r::GUI::PnpConfigKeys

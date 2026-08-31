@@ -2633,6 +2633,104 @@ void Tab::update_frequently_changed_parameters()
 }
 
 //BBS: BBS new parameter list
+
+// PNP fork (SchemaBridgeMap ticket 12) -------------------------------
+//
+// The degraded PNP Backend page: a read-only key/value list of the preserved
+// pnp keys (ticket 03's unknown-key carriers) under an explanatory banner.
+//
+// The page is built once with one optgroup; its row lines are appended by
+// rebuild_pnp_preserved_rows() and refreshed on every page activation by
+// refresh_pnp_preserved_page(), so a key that resolves (its module shipped
+// and a re-probe registered it) drops off without a restart, and a newly
+// loaded project or preset shows up on the next tab visit.
+//
+// Every line is full_width with a widget and no option: OG_CustomCtrl's
+// init_ctrl_lines() dereferences option_set.front() otherwise, and these
+// lines deliberately carry no ConfigOptionDef.
+namespace {
+
+ConfigBase::t_unknown_config_values pnp_preset_carrier()
+{
+    // The edited print preset's carrier. The tabs share the app's
+    // PresetBundle, so reaching it through the app is correct however many
+    // TabPrint instances exist (TabPrintModel has none of its own).
+    PresetBundle* bundle = wxGetApp().preset_bundle;
+    return bundle == nullptr ? ConfigBase::t_unknown_config_values{}
+                             : bundle->prints.get_edited_preset().pnp_unknown_config;
+}
+
+ConfigBase::t_unknown_config_values pnp_project_carrier()
+{
+    // The project carrier lives on the Plater's Model (ticket 03 moves it
+    // there on import), regardless of which tab renders the page.
+    Plater* plater = wxGetApp().plater();
+    return plater == nullptr ? ConfigBase::t_unknown_config_values{} : plater->model().pnp_unknown_config;
+}
+
+std::vector<PnpConfigKeys::PnpPreservedKey> pnp_active_preserved_rows()
+{
+    return PnpConfigKeys::pnp_preserved_key_rows(pnp_preset_carrier(), pnp_project_carrier());
+}
+
+Line pnp_banner_line(bool backend_missing)
+{
+    // Line's default ctor builds a *separator* line, which activate_line()
+    // skips -- the banner and every row must use the two-argument ctor.
+    Line line(wxEmptyString, wxEmptyString);
+    line.full_width = 1;
+    line.widget     = [backend_missing](wxWindow* parent) {
+        ogStaticText* text = new ogStaticText(parent, backend_missing ? _L(
+            "pnp_cli was not found or is incompatible with this build. Settings preserved from files "
+            "saved by an installation with backend modules this build does not have are shown "
+            "read-only; they are written back unchanged on save.") : _L(
+            "Settings preserved from files saved by an installation with backend modules this build "
+            "does not have. They are shown read-only and written back unchanged on save."));
+        text->SetForegroundColour(wxColour(158, 158, 158));
+        auto sizer = new wxBoxSizer(wxHORIZONTAL);
+        sizer->Add(text, 1, wxEXPAND | wxALL, 5);
+        return sizer;
+    };
+    return line;
+}
+
+Line pnp_preserved_row_line(TabPrint* tab, const PnpConfigKeys::PnpPreservedKey& row)
+{
+    Line line(wxEmptyString, wxEmptyString);
+    line.label         = from_u8(row.key);
+    line.label_tooltip =
+        _L("Preserved from the ") +
+        (row.source == PnpConfigKeys::PnpPreservedSource::PrintPreset ? _L("active print preset") : _L("open project")) +
+        _L("; kept until removed here or its module is installed.");
+    line.full_width    = 1;
+    line.widget        = [tab, row](wxWindow* parent) {
+        auto* sizer = new wxBoxSizer(wxHORIZONTAL);
+        auto* value = new wxStaticText(parent, wxID_ANY, from_u8(row.value));
+        value->Wrap(parent->GetClientSize().GetWidth() - 160 * wxGetApp().em_unit());
+        sizer->Add(value, 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, 10 * wxGetApp().em_unit());
+        auto* btn = new Button(parent, _L("Remove"));
+        btn->SetStyle(ButtonStyle::Regular, ButtonType::Parameter);
+        btn->SetToolTip(_L("Remove this preserved setting; the file stops carrying it after the next save."));
+        btn->Bind(wxEVT_BUTTON, [tab, row](wxCommandEvent&) {
+            tab->purge_pnp_preserved_key(row.key, row.source == PnpConfigKeys::PnpPreservedSource::PrintPreset);
+        });
+        wxGetApp().UpdateDarkUI(btn);
+        sizer->Add(btn, 0, wxALIGN_CENTER_VERTICAL);
+        return sizer;
+    };
+    return line;
+}
+
+void pnp_rebuild_optgroup_lines(ConfigOptionsGroup* og, TabPrint* tab, bool backend_missing)
+{
+    og->clear();
+    og->append_line(pnp_banner_line(backend_missing));
+    for (const PnpConfigKeys::PnpPreservedKey& row : pnp_active_preserved_rows())
+        og->append_line(pnp_preserved_row_line(tab, row));
+}
+
+} // namespace
+
 void TabPrint::build()
 {
     if (m_presets == nullptr)
@@ -3143,6 +3241,15 @@ void TabPrint::build()
     // sidetexts and group names arrive from the pnp_cli binary at runtime --
     // the .po catalogs cannot carry them, so they are deliberately NOT passed
     // through L()/_() and the page renders in English under any UI language.
+    //
+    // Ticket 12: the degraded path. When the probe failed, the registry seal
+    // never set, no ConfigOptionDefs exist and the branch above adds no page
+    // -- so the same page falls back to a read-only renderer driven by
+    // ticket 03's unknown-key carriers. The two paths are independent:
+    // live = probe OK and at least one generated control; degraded = probe
+    // failed AND a carrier is non-empty. A key resolves the moment its
+    // module ships, so the row list rebuilds on every activation (see
+    // TabPrint::refresh_pnp_preserved_page).
     if (pnp_config_keys_sealed() && !pnp_registered_config_keys().empty()) {
         const std::vector<PnpPageGroup> groups = pnp_page_groups(PnpConfigKeys::pnp_host_injected_skip_keys());
         if (!groups.empty()) {
@@ -3155,7 +3262,104 @@ void TabPrint::build()
             BOOST_LOG_TRIVIAL(info) << "pnp: generated settings page with " << groups.size() << " groups, "
                                     << pnp_registered_config_keys().size() << " options";
         }
+    } else if (pnp_config_keys_sealed()) {
+        // Degraded and healthy-but-nothing-to-render both mean no page;
+        // only a failed probe (seal never set) falls back to the read-only
+        // preserved-key page. It is added unconditionally: build() runs
+        // before any project has loaded, so a page gated on the carriers
+        // would appear only after a restart; the banner itself is the
+        // state's honest signal, and the rows are (re)appended at
+        // activation from whatever the carriers hold then.
+        auto pnp_page = add_options_page(L("PNP Backend"), "custom-gcode_other");
+        build_pnp_preserved_page(pnp_page.get());
     }
+}
+
+// PNP fork (SchemaBridgeMap ticket 12): the degraded PNP page's TabPrint
+// side. The GUI-free helpers (carriers, row list, banner, row lines) are
+// defined above build(); these members own the page lifecycle.
+void TabPrint::build_pnp_preserved_page(Page* pnp_page)
+{
+    auto og = pnp_page->new_optgroup(L("Preserved settings"), L"param_gcode");
+    og->append_line(pnp_banner_line(true));
+}
+
+ConfigOptionsGroup* TabPrint::pnp_preserved_optgroup()
+{
+    for (const PageShp& page : m_pages)
+        if (page->title() == L("PNP Backend"))
+            for (const ConfigOptionsGroupShp& og : page->m_optgroups)
+                if (og->title == L("Preserved settings"))
+                    return og.get();
+    return nullptr;
+}
+
+void TabPrint::refresh_pnp_preserved_page()
+{
+    // Not degraded any more (the live branch ran instead): nothing to do.
+    if (pnp_config_keys_sealed())
+        return;
+    ConfigOptionsGroup* og = pnp_preserved_optgroup();
+    if (og == nullptr)
+        return;
+
+    const std::vector<PnpConfigKeys::PnpPreservedKey> rows = pnp_active_preserved_rows();
+    const std::vector<Line>&           lines = og->get_lines();
+    // Line 0 is the banner; every further line is one preserved row.
+    const size_t listed_rows = lines.empty() ? 0 : lines.size() - 1;
+    if (listed_rows == rows.size())
+        // Same row set: the widget lambdas render the current values when the
+        // group activates, so a value-only change needs no rebuild.
+        return;
+
+    // Row set changed. The group may be active (its controls built) or not;
+    // clear() deactivates either way and the page activation that follows
+    // this call rebuilds the controls from the new line list.
+    pnp_rebuild_optgroup_lines(og, this, true);
+}
+
+void TabPrint::purge_pnp_preserved_key(const std::string& key, bool from_preset)
+{
+    ConfigBase::t_unknown_config_values* carrier = nullptr;
+    const char* where = "";
+    if (from_preset) {
+        PresetBundle* bundle = wxGetApp().preset_bundle;
+        if (bundle != nullptr) {
+            // The edited preset is the working copy; its carrier is the one
+            // the next "Save preset" writes (Preset::save merges it
+            // unconditionally, ticket 03), so removing the entry here is
+            // exactly the user-visible act and needs no file IO.
+            carrier = &bundle->prints.get_edited_preset().pnp_unknown_config;
+            where   = "the active print preset";
+        }
+    } else if (wxGetApp().plater() != nullptr) {
+        carrier = &wxGetApp().plater()->model().pnp_unknown_config;
+        where   = "the open project";
+    }
+    if (carrier == nullptr || carrier->erase(key) == 0)
+        return;
+
+    // Re-render the list. OptionsGroup::clear() keeps m_lines (it only
+    // destroys the built controls), so the line list is replaced with the
+    // fresh set here and the controls are rebuilt by the same sequence a
+    // page switch runs: clear_pages() + activate_selected_page() -- which
+    // is also what guarantees the destroyed widgets come back correctly.
+    if (ConfigOptionsGroup* og = pnp_preserved_optgroup())
+        pnp_rebuild_optgroup_lines(og, this, true);
+    clear_pages();
+    activate_selected_page([]() {});
+
+    // A preset-carrier erase changes what the next preset save writes, so the
+    // preset reads as modified; a project-carrier erase changes the next 3mf.
+    if (from_preset) {
+        update_dirty();
+        if (wxGetApp().plater() != nullptr)
+            wxGetApp().plater()->update_project_dirty_from_presets();
+    } else if (wxGetApp().plater() != nullptr) {
+        wxGetApp().plater()->set_plater_dirty(true);
+    }
+
+    BOOST_LOG_TRIVIAL(info) << "pnp: purged preserved key \"" << key << "\" from " << where;
 }
 
 // Reload current config (aka presets->edited_preset->config) into the UI fields.
@@ -7029,6 +7233,12 @@ void Tab::activate_selected_page(std::function<void()> throw_if_canceled)
 {
     if (!m_active_page)
         return;
+
+    // PNP fork (SchemaBridgeMap ticket 12): the degraded PNP Backend page's
+    // row list tracks the current carriers, so it is refreshed before the
+    // groups activate and build their controls.
+    if (TabPrint* print_tab = dynamic_cast<TabPrint*>(this))
+        print_tab->refresh_pnp_preserved_page();
 
     m_active_page->activate(m_mode, throw_if_canceled);
     update_changed_ui();

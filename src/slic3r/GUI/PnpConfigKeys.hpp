@@ -61,4 +61,42 @@ size_t register_from_schema(const std::string& schema_json);
 //   the map's fog entry); keep this aligned with pnp if a second name appears.
 const std::vector<std::string>& pnp_host_injected_skip_keys();
 
+// One row of the read-only preserved-key list on the generated PNP Backend
+enum class PnpPreservedSource
+{
+    // The edited print preset's carrier (Preset::pnp_unknown_config).
+    PrintPreset,
+    // The project 3mf's carrier (Model::pnp_unknown_config).
+    Project,
+};
+
+struct PnpPreservedKey
+{
+    // The pnp key, as stored in the carrier.
+    std::string        key;
+    // Human-readable value. The carrier stores the key's serialized JSON
+    // fragment (ticket 03), so "smart" arrives as "\"smart\"" and a list as
+    // a JSON array; rows render it the way the user would have typed it.
+    // A fragment that does not parse is shown raw, so nothing the file holds
+    // is ever invisible.
+    std::string        value;
+    // Which carrier the row came from. One row per (key, carrier) pair: a
+    // key present in both stores appears twice, because ticket 03 writes the
+    // two carriers back independently (the preset merge and the project
+    // merge) and a purge must remove exactly the store that is shown.
+    PnpPreservedSource source { PnpPreservedSource::Project };
+};
+
+// Render both unknown-key carriers (ticket 03) into the rows the PNP page
+// shows: every carrier entry, tagged with its store, sorted by key with the
+// preset store first on ties. Empty carriers -> empty rows: the caller
+// decides what to render then. GUI-free so the render stays unit-testable;
+// the caller decides what a row renders as.
+std::vector<PnpPreservedKey> pnp_preserved_key_rows(const ConfigBase::t_unknown_config_values& preset_carrier,
+                                                    const ConfigBase::t_unknown_config_values& project_carrier);
+
+// Display text of one carrier entry: the same rendering the row list uses.
+// Empty string when the carrier does not hold the key.
+std::string pnp_preserved_value_text(const ConfigBase::t_unknown_config_values& carrier, const std::string& key);
+
 }}} // namespace Slic3r::GUI::PnpConfigKeys

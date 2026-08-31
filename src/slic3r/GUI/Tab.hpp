@@ -491,6 +491,26 @@ public:
 private:
 	ogStaticText*	m_recommended_thin_wall_thickness_description_line = nullptr;
 	ogStaticText*	m_top_bottom_shell_thickness_explanation = nullptr;
+
+// PNP fork (SchemaBridgeMap ticket 12): the degraded PNP Backend page -- a
+// read-only preserved-key list rendered from ticket 03's unknown-key
+// carriers when no probe ran (no pnp_cli). Row values and carriers are
+// resolved in Tab.cpp; the header holds only the lifecycle hooks.
+public:
+	// Re-append the preserved-key rows from the current carriers before the
+	// page activates. Called from Tab::activate_selected_page(); no-op
+	// unless the degraded page exists and its row set changed.
+	void		refresh_pnp_preserved_page();
+	// Remove one preserved key from the carrier it sits in -- the active
+	// print preset's when from_preset, the open project's otherwise --
+	// re-render the list and mark the right surface dirty.
+	void		purge_pnp_preserved_key(const std::string& key, bool from_preset);
+
+private:
+	// Build the degraded page: banner + one optgroup holding the rows.
+	void		build_pnp_preserved_page(Page* pnp_page);
+	// The page's single optgroup, or nullptr when the page does not exist.
+	ConfigOptionsGroup* pnp_preserved_optgroup();
 };
 
 class TabPrintModel : public TabPrint
