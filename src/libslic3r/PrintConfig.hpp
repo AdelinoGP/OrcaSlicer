@@ -796,6 +796,12 @@ struct PnpPageGroup
 // unit-testable; the caller decides what a group renders as.
 std::vector<PnpPageGroup> pnp_page_groups(const std::vector<std::string> &skip_keys = {});
 
+// The preset a registered pnp key persists into, as declared on the wire.
+// Print-scoped keys render on the Process tab's generated page; a key of
+// another scope must NOT: its value lives in another preset's config, and
+// reloading it there reads a nullptr option (SchemaBridgeMap ticket 12 crash).
+PnpPresetScope pnp_registered_key_scope(const std::string &key);
+
 class StaticPrintConfig;
 
 // Minimum object distance for arrangement, based on printer technology.

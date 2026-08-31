@@ -774,7 +774,14 @@ target("OrcaSlicer")
     end)
     if is_plat("windows") then
         add_syslinks("ws2_32", "user32", "Setupapi")
+        -- add_ldflags feeds the *binary* link's flag table; the shared library
+        -- link reads shflags, so every linker flag for the DLL must be added
+        -- to both (measured: /MANIFEST:NO + /DEBUG silently dropped from the
+        -- sh link when given only via add_ldflags -- the DLL shipped with no
+        -- CODEVIEW debug entry and crash dumps could not be symbolicated).
+        add_shflags("/MANIFEST:NO", "/DEBUG")
         add_ldflags("/MANIFEST:NO")  -- the manifest ships via OrcaSlicer.rc
+        add_ldflags("/DEBUG")
     elseif is_plat("macosx") then
         set_filename("OrcaSlicer")
         add_frameworks("OpenGL", "IOKit", "CoreFoundation", "AVFoundation", "AVKit", "CoreMedia", "VideoToolbox")

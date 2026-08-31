@@ -23,6 +23,11 @@ namespace {
 // settings tabs' layout) is built after this flips.
 bool                       s_pnp_keys_sealed = false;
 std::vector<std::string>   s_pnp_registered_keys;
+// Scope per registered key, in registration order (parallel to
+// s_pnp_registered_keys): the page builder must render only Print-scoped keys
+// on the Process tab (ticket 12 crash: a printer-scoped coString whose value
+// lives in the printer preset reads nullptr from the print preset's config).
+std::vector<PnpPresetScope> s_pnp_registered_scopes;
 
 // Enum domains for dynamically-registered coEnum keys.
 //
@@ -37,6 +42,14 @@ std::vector<std::unique_ptr<t_config_enum_values>> s_pnp_enum_maps;
 bool pnp_config_keys_sealed() { return s_pnp_keys_sealed; }
 
 const std::vector<std::string>& pnp_registered_config_keys() { return s_pnp_registered_keys; }
+
+PnpPresetScope pnp_registered_key_scope(const std::string &key)
+{
+    for (size_t i = 0; i < s_pnp_registered_keys.size(); ++ i)
+        if (s_pnp_registered_keys[i] == key)
+            return s_pnp_registered_scopes[i];
+    return PnpPresetScope::Print;
+}
 
 size_t pnp_register_config_keys(const std::vector<PnpConfigKeyDef> &keys)
 {
@@ -95,6 +108,7 @@ size_t pnp_register_config_keys(const std::vector<PnpConfigKeyDef> &keys)
         def->set_default_value(opt.release());
 
         s_pnp_registered_keys.emplace_back(k.key);
+        s_pnp_registered_scopes.emplace_back(k.scope);
         switch (k.scope) {
         case PnpPresetScope::Filament: added_filament.emplace_back(k.key); break;
         case PnpPresetScope::Printer:  added_printer.emplace_back(k.key);  break;
@@ -120,10 +134,18 @@ std::vector<PnpPageGroup> pnp_page_groups(const std::vector<std::string> &skip_k
     std::set<std::string> skipped(skip_keys.begin(), skip_keys.end());
     // Bucket by def->category (the schema `group`), per the ordering the
     // prototype locked: descending key count, ties alphabetical. Stable
-    // without any fork-side group list.
+    // without any fork-side group list. Only Print-scoped keys take part:
+    // the generated page lives on the Process tab whose config is the print
+    // preset's; a printer/filament-scoped key's value is not in that config,
+    // and reloading it reads a nullptr option (ticket 12 crash).
+    // Filament/printer-scoped pnp keys remain registered (preset round-trip
+    // and translation still carry them); they simply render nowhere until a
+    // page on their own tab exists (map fog).
     std::map<std::string, std::vector<std::string>, std::less<>> buckets;
     for (const std::string &key : pnp_registered_config_keys()) {
         if (skipped.count(key) != 0)
+            continue;
+        if (pnp_registered_key_scope(key) != PnpPresetScope::Print)
             continue;
         const ConfigOptionDef *def = print_config_def.get(key);
         if (def == nullptr)

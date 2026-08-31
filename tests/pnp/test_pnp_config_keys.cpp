@@ -423,13 +423,20 @@ TEST_CASE("the generated page layout derives from the registered defs", "[pnp][c
 
     const std::vector<PnpPageGroup> groups = pnp_page_groups(PnpConfigKeys::pnp_host_injected_skip_keys());
 
-    SECTION("every non-skipped registered key renders exactly once") {
+    SECTION("every print-scoped non-skipped registered key renders exactly once") {
         size_t total = 0;
         for (const PnpPageGroup& g : groups)
             total += g.keys.size();
         // Skipped keys are registered (the translator still sends them) but
-        // never rendered; everything else must appear exactly once.
-        CHECK(total + PnpConfigKeys::pnp_host_injected_skip_keys().size() == reg.count);
+        // never rendered; non-print-scoped keys are registered but live in
+        // another preset's config, so they render on no page here either
+        // (ticket 12 crash: reloading a printer-scoped key against the print
+        // preset's config reads a nullptr option).
+        size_t non_print = 0;
+        for (const std::string& key : pnp_registered_config_keys())
+            non_print += pnp_registered_key_scope(key) != PnpPresetScope::Print ? 1 : 0;
+        CHECK(total + PnpConfigKeys::pnp_host_injected_skip_keys().size() + non_print == reg.count);
+        CHECK(non_print > 0); // thumbnail_path (printer) + fill_authored_coloring (filament)
     }
 
     SECTION("keys bucket by the def's category, alphabetical inside") {
@@ -454,16 +461,35 @@ TEST_CASE("the generated page layout derives from the registered defs", "[pnp][c
                 CHECK(groups[i - 1].category < groups[i].category);
     }
 
+    SECTION("non-print-scoped keys never reach the Process tab's page") {
+        // thumbnail_path (printer) and fill_authored_coloring (filament) are
+        // registered — preset round-trip and translation carry them — but their
+        // values live in other presets' configs. Rendering them on the Process
+        // tab made reload_config dereference a nullptr option (the ticket 12
+        // crash the user hit opening the PNP Backend tab).
+        auto page_has = [&groups](const std::string& key) {
+            for (const PnpPageGroup& g : groups)
+                if (std::find(g.keys.begin(), g.keys.end(), key) != g.keys.end())
+                    return true;
+            return false;
+        };
+        CHECK_FALSE(page_has("thumbnail_path"));
+        CHECK_FALSE(page_has("fill_authored_coloring"));
+        CHECK(pnp_registered_key_scope("thumbnail_path") == PnpPresetScope::Printer);
+    }
+
     SECTION("an empty category collapses into one group, not a bare-key bucket") {
-        // Host keys carry no group unless the DSL annotates one; they must all
-        // land in the same (empty-string) optgroup rather than disappear.
+        // Host keys carry no group unless the DSL annotates one; non-print-
+        // scoped hosts are filtered out by scope (above), but a print-scoped
+        // unannotated host key must still land in the same (empty-string)
+        // optgroup rather than disappear.
         bool has_empty = false;
         for (const PnpPageGroup& g : groups)
             has_empty |= g.category.empty();
         CHECK(has_empty);
         for (const PnpPageGroup& g : groups)
             if (g.category.empty())
-                CHECK(std::find(g.keys.begin(), g.keys.end(), "thumbnail_path") != g.keys.end());
+                CHECK(std::find(g.keys.begin(), g.keys.end(), "nonplanar_shell_count") != g.keys.end());
     }
 
     SECTION("the host-injected skip list drops the key from the page entirely") {
