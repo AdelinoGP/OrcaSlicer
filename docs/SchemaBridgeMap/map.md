@@ -252,6 +252,18 @@ are true when this map is done:
   percent control opened at the zero value; `toml_default_to_wire()` + regression test. The
   app-level manual smoke is the one residual, deferred to ticket 12's landing (same page).
 
+- [Render the degraded read-only PNP page from the unknown-key carrier](tickets/12-degraded-state-renderer.md)
+  — built: with the probe failed, the **PNP Backend** page now renders ticket 03's preserved
+  carriers (preset + project, one row per (key, store) pair, values rendered as typed by
+  `pnp_preserved_key_rows()`) read-only under a banner; rows refresh at every page activation, so
+  a resolved key drops off without a restart; each row carries a **Remove** button that purges
+  exactly the store it names and marks the preset or project dirty. The purge fog entry is
+  half-discharged: the degraded surface purges, but whether *surviving orphans* get a surface on
+  the **live** page too (successful probe + non-empty carrier is a real, reachable state) is now
+  a sharp open question with an owner-wanted note — see ticket 12's resolution. The
+  app-level manual smoke of the rendered page (both tickets' residual) is still owed: it needs
+  an interactive desktop session and did not run in this session.
+
 ## Not yet specified
 
 - **Migration of the curated table's existing rows.** Ticket 05 answered the tier question:
@@ -341,7 +353,13 @@ are true when this map is done:
   whenever the seal holds and any generated control exists, regardless of the carrier — the two
   states are independent, so a successful probe plus surviving orphans is a real, reachable
   state; ticket 12 owns both rendering it and answering the purge question with that case in
-  hand.)*
+  hand.)* **Half-discharged by ticket 12 (2026-08-31):** the degraded page now renders the
+  carriers and purges per row. What remains open is only the **live-page** half — whether the
+  *normal* page (probe OK, carrier non-empty) also shows the surviving orphan keys (with the same
+  per-store purge) or stays jsonl-notification-only. Phrased sharply enough to ticket when picked
+  up: the rendering code (row helper, purge path, dirty marking) exists and is carrier-agnostic;
+  the only decision is the live page's surface and where the optgroup sits among the generated
+  groups.
 
 - **Enum display labels on the wire.** Ticket 10 promoted the two prose-domain string fields to
   real enums (`values`), but the wire still has no `value_labels` parallel to `values` — the

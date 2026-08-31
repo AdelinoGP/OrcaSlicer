@@ -1,8 +1,8 @@
 ---
 title: Render the degraded read-only PNP page from the unknown-key carrier
-status: open
+status: closed
 type: task
-assignee:
+assignee: Adelino Penedo (wayfinder session ses_fadef6460ffelOFfRyK1RyuN0U)
 blocked-by: [04, 11]
 ---
 
@@ -29,3 +29,109 @@ Decide and build:
 
 Verification: a Catch2 case driving the renderer from a synthetic carrier, plus a manual smoke
 with `pnp_cli` renamed out of the dist directory.
+
+## Resolution (2026-08-31)
+
+**Built. The page renders read-only from ticket 03's carriers, with a per-row purge, refreshable
+without a restart.**
+
+### The three decisions the ticket posed
+
+**Carrier precedence: both, tagged — not a union.** The key insight that settles the question is
+that the two carriers are *written back independently* by ticket 03's save paths: `Preset::save`
+merges the preset carrier unconditionally, `_add_project_embedded_presets_to_archive`/
+`save_to_json` merge the project carrier, and neither sees the other. A key can legitimately sit
+in both stores with different values, and a purge affordance would have to say which copy it
+removes — so a precedence-merged union (my first implementation) was wrong: removing "the" entry
+would either leave the project's copy stranded behind a purged preset, or vice versa. The list is
+therefore **one row per (key, store) pair**, every row tagged ("Preserved from the active print
+preset / open project"), sorted by key with the preset copy first on ties. Effective-value display
+was rejected with it: showing one row per key at "the effective value" would promise a priority
+the two carriers do not actually have (they are independent write-backs, not a config hierarchy).
+
+**Banner wording.** One message covering both failure shapes: "pnp_cli was not found or is
+incompatible with this build" — the `schema_version`-major-mismatch branch is measured
+(Ticket §Locked-by-grilling notes) near-unreachable, `schema_version` having stayed `1.0.0` across
+a bump that added 39 and removed 6 keys, so branching the copy would implement a distinction the
+backend does not currently make. The banner states the contract: values shown read-only, written
+back unchanged on save.
+
+**Reachable in non-degraded states — yes, and the ticket's premise needed correcting.**
+`TabPrint::build()` runs at fork time, **before any project has loaded**: gating the page on
+non-empty carriers (as ticket 04 sketched it) would leave the page missing exactly when a project
+carrying preserved keys is opened, until restart. So the reachability answer is: the page exists
+whenever the probe failed (an always-present degraded-state signal), and the *rows* are
+(re)appended at activation from whatever the carriers hold then. This also answers the purge
+fog question **yes, partly**: the purge affordance exists on the degraded page — but the map's
+fog asked about a *reachable normal state with surviving orphans*, and the normal/live page does
+not render the carrier (ticket 11's page has no preserved-key surface). Purging there stays
+fog (see below), not silently dropped.
+
+### What shipped
+
+- **`PnpConfigKeys.hpp/.cpp` (GUI-free, unit-tested):** `PnpPreservedKey {key, value, source}`
+  and `pnp_preserved_key_rows(preset_carrier, project_carrier)` — renders both carriers into
+  display rows: one row per (key, store) pair (a key in both stores appears twice; the stores are
+  written back independently, so a purge must remove exactly the store shown), preset store
+  first on ties, fragments rendered as the user would have typed them (`"smart"` → `smart`,
+  `[1,2]` → `1, 2`), unparsable fragments shown raw so nothing the file holds is invisible.
+- **`Tab.cpp`/`Tab.hpp`:**
+  - `TabPrint::build()` gains the degraded branch: probe failed (seal never set) ⇒ the **PNP
+    Backend** page is added with one **Preserved settings** optgroup holding the banner. Same
+    page title as the live path, so a flapping probe flips content, not structure (ticket 11's
+    seam, held).
+  - `Tab::activate_selected_page()` calls the new `TabPrint::refresh_pnp_preserved_page()` —
+    the row list re-derives from the current carriers on every activation, so a key that
+    resolves (module installed, re-probe from Preferences) drops off without a restart, and a
+    newly loaded project's or preset's keys appear on the next tab visit.
+  - Every row line is a **full-width widget line with no option** — load-bearing: both
+    `OG_CustomCtrl::init_ctrl_lines()` and the non-BBS branch of `activate_line()` dereference
+    `option_set.front()` for widget lines without `full_width`. `Line`'s default ctor is a
+    *separator* (which `activate_line()` skips), so banner and rows use the two-argument ctor.
+  - Per row: label = raw pnp key (unresolved keys are not namespaced, so the key is the only
+    honest label), value rendered by the shared helper, source named in the tooltip, and a
+    **Remove** button purging exactly that (key, store) pair: erase from
+    `bundle->prints.get_edited_preset().pnp_unknown_config` (the working copy the next Save
+    preset writes — `Preset::save` merges it unconditionally, so no file IO is needed) or from
+    `plater->model().pnp_unknown_config`; then re-render via the same `clear_pages()` +
+    `activate_selected_page()` sequence a page switch runs, and mark the right surface dirty
+    (`Tab::update_dirty()` + `Plater::update_project_dirty_from_presets()` for the preset,
+    `Plater::set_plater_dirty(true)` for the project).
+- **Purge is a data change, not a file write.** Removing a project carrier entry only guarantees
+  the key is gone from the next 3mf save (ticket 03 writes the carrier back unconditionally);
+  nothing is written to disk at click time — the dirty flag carries the consequences, same as
+  every other settings change in Orca.
+
+### Corrected premise in the ticket body
+
+The banner text lives on the page even with an empty carrier, and the page exists whenever the
+probe failed — not "when the carrier is non-empty" as the ticket's rendering-path sketch had it.
+The `schema_version`-mismatch branch is implemented only as text, per the second bullet's
+suspicion: there is no measured state in which pnp reports a different config-schema major, so
+"not found or incompatible" is the honest copy.
+
+### Verification
+
+- New GUI-free cases: `tests/pnp/test_pnp_preserved_rows.cpp` ([preserved] tag, in
+  `pnp_config_translator_tests`) — every (key, store) pair exactly once, sorted, preset store
+  first on ties, list/bool/number/string fragments rendered as typed, corrupt fragment shown raw,
+  both-carriers-empty gives no rows.
+- `pnp_config_translator_tests`: **1023 assertions / 25 cases, all passing**
+  (was 1006/24; the new `[preserved]` case adds 17 assertions).
+- `pnp_runtime_tests`: 282 assertions / 31 cases, all passing (unchanged).
+- Full app + libslic3r_gui + orca-slicer launcher build clean (MSVC release, `xmake -j2`).
+- **Not done (manual, deferred):** launching the app with `pnp_cli` renamed out of the dist and
+  eyeballing the degraded page — needs an interactive desktop session. Same residual ticket 11
+  recorded; the two together are the manual smoke. Everything derivable without a desktop is
+  verified.
+
+### What this ticket's answers graduate / sharpen in the map
+
+- The fog entry "purge affordance for preserved keys" is **half-discharged**: the degraded page
+  purges; the reachable-normal-state surface (successful probe + surviving orphans, ticket 11's
+  seam note) is a question that now has a concrete owner but no ticket yet — it needs deciding
+  whether orphans get a visible surface on the *live* page too or remain jsonl-only.
+- The `advanced`-mode decision and ticket 11's verbatim-label rule carried over unchanged: the
+  degraded page's strings are fork-authored and *do* go through `_L()`/translatable strings
+  (unlike the live page's schema-supplied ones) — banner copy is translatable, per the map's
+  localization glossary rules.
