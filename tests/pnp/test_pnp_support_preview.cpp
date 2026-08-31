@@ -112,6 +112,48 @@ TEST_CASE("support-preview document parsing", "[pnp][support_preview]")
         REQUIRE(parsed.ok);
         REQUIRE(parsed.doc.expolygon_count() == 0);
     }
+
+    SECTION("schema 1.1.0 support_body wins over the coarse support field")
+    {
+        // The 1.1.0 `support_body` field carries the actual support
+        // structures; the 1.0.0 `support` field carries the model's own
+        // cross-sections. The overlay must be built from support_body.
+        const PnpSupportPreviewParse parsed = parse_support_preview(
+            R"({"schema_version":"1.1.0","units":"mm","layer_count":1,"layers":[
+                 {"layer_index":0,"z_mm":0.2,
+                  "support":[{"contour":[[0,0],[100,0],[100,100],[0,100]],"holes":[]}],
+                  "support_body":[{"contour":[[40,40],[60,40],[60,60],[40,60]],"holes":[]}]}
+               ]})");
+        REQUIRE(parsed.ok);
+        REQUIRE(parsed.doc.layers.size() == 1);
+        REQUIRE(parsed.doc.layers[0].support.size() == 1);
+        const BoundingBox bb = get_extents(parsed.doc.layers[0].support.front().contour);
+        // 20 mm body, not the 100 mm coarse outline.
+        REQUIRE(bb.max.x() - bb.min.x() == coord_t(scale_(20.)));
+    }
+
+    SECTION("an empty support_body is authoritative, not a fallback trigger")
+    {
+        // A 1.1.0 document with an empty support_body means "no supports";
+        // falling back to the coarse `support` field would re-show the model.
+        const PnpSupportPreviewParse parsed = parse_support_preview(
+            R"({"schema_version":"1.1.0","units":"mm","layer_count":1,"layers":[
+                 {"layer_index":0,"z_mm":0.2,
+                  "support":[{"contour":[[0,0],[100,0],[100,100],[0,100]],"holes":[]}],
+                  "support_body":[]}
+               ]})");
+        REQUIRE(parsed.ok);
+        REQUIRE(parsed.doc.expolygon_count() == 0);
+    }
+
+    SECTION("a 1.0.0 document without support_body falls back to support")
+    {
+        const PnpSupportPreviewParse parsed = parse_support_preview(two_layer_doc());
+        REQUIRE(parsed.ok);
+        REQUIRE(parsed.doc.layers[0].support.size() == 1);
+        const BoundingBox bb = get_extents(parsed.doc.layers[0].support.front().contour);
+        REQUIRE(bb.max.x() - bb.min.x() == coord_t(scale_(10.)));
+    }
 }
 
 TEST_CASE("support-preview mesh building", "[pnp][support_preview]")

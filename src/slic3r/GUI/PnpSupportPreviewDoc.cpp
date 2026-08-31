@@ -112,12 +112,24 @@ PnpSupportPreviewParse parse_support_preview(const std::string &json_text)
 			layer.layer_index = layer_node.value("layer_index", 0);
 			layer.z_mm        = layer_node.value("z_mm", 0.);
 
-			const auto support_it = layer_node.find("support");
-			if (support_it == layer_node.end() || !support_it->is_array()) {
+			// Schema 1.1.0 adds `support_body` — the actual support
+			// structures (SupportPlanIR SupportBody role regions). Prefer it
+			// over the 1.0.0 `support` field, which carries the model's own
+			// cross-sections at support layers and renders as a green copy
+			// of the model. An empty `support_body` is authoritative (no
+			// supports); only a document without the field falls back.
+			const json* support_src = nullptr;
+			if (const auto body_it = layer_node.find("support_body");
+			    body_it != layer_node.end() && body_it->is_array())
+				support_src = &*body_it;
+			else if (const auto support_it = layer_node.find("support");
+			         support_it != layer_node.end() && support_it->is_array())
+				support_src = &*support_it;
+			if (support_src == nullptr) {
 				result.doc.layers.push_back(std::move(layer));
 				continue;
 			}
-			for (const json &poly_node : *support_it) {
+			for (const json &poly_node : *support_src) {
 				if (!poly_node.is_object())
 					continue;
 				ExPolygon ex;

@@ -146,9 +146,38 @@ void GLGizmoFdmSupports::render_painter_gizmo()
     //BBS: draw support volumes
     if (m_volume_ready && m_support_volume && (m_edit_state != state_generating))
     {
-        // TODO: FIXME
-        m_support_volume->set_render_color({0.f, 0.7f, 0.f, 0.7f});
-        m_support_volume->render();
+        // PNP fork: render_triangles() stops mm_gouraud on exit, and
+        // GLVolume::render() bails out when no program is current — the
+        // overlay was silently invisible. Bind the object shader and feed it
+        // the same uniforms GLVolumeCollection::render sets, with an identity
+        // volume transform (the mesh is already in plate coordinates).
+        GLShaderProgram* shader = wxGetApp().get_shader("gouraud");
+        if (shader != nullptr) {
+            shader->start_using();
+            const Camera& camera = wxGetApp().plater()->get_camera();
+            const Transform3d& view_matrix = camera.get_view_matrix();
+            const ClippingPlaneDataWrapper clp_data = this->get_clipping_plane_data();
+            shader->set_uniform("view_model_matrix", view_matrix);
+            shader->set_uniform("projection_matrix", camera.get_projection_matrix());
+            shader->set_uniform("view_normal_matrix", (Matrix3d)view_matrix.matrix().block(0, 0, 3, 3));
+            shader->set_uniform("volume_world_matrix", Transform3d::Identity());
+            shader->set_uniform("slope.actived", false);
+            shader->set_uniform("slope.normal_z", 0.f);
+            const Matrix3f identity3 = Matrix3f::Identity();
+            shader->set_uniform("slope.volume_world_normal_matrix", identity3);
+            shader->set_uniform("z_range", clp_data.z_range);
+            shader->set_uniform("clipping_plane", clp_data.clp_dataf);
+            shader->set_uniform("use_color_clip_plane", false);
+            shader->set_uniform("is_outline", false);
+            shader->set_uniform("print_volume.type", -1);
+            shader->set_uniform("extruder_printable_heights", std::array<float, 3>{0.f, 0.f, 0.f});
+            m_support_volume->set_render_color({0.f, 0.7f, 0.f, 0.7f});
+            // simple_render() draws with the GLModel's own color, not
+            // GLVolume::render_color; without this the overlay comes out black.
+            m_support_volume->model.set_color(m_support_volume->render_color);
+            m_support_volume->render();
+            shader->stop_using();
+        }
     }
 
     m_c->object_clipper()->render_cut();
