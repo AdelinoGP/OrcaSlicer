@@ -543,6 +543,10 @@ protected:
 
 	virtual void	update_custom_dirty(std::vector<std::string> &dirty_options, std::vector<std::string> &nonsys_options) override;
 
+	// PNP fork (ticket 17): true when the current selection is exactly one
+	// parameter modifier (the only volume type that may carry `support_type`).
+	bool selection_is_parameter_modifier() const;
+
 protected:
 	std::vector<std::string> m_keys;
 	PresetCollection m_prints;
@@ -551,6 +555,12 @@ protected:
 	std::vector<std::string> m_all_keys;
 	std::vector<std::string> m_null_keys;
 	bool m_back_to_sys = false;
+	// PNP fork (ticket 17): when true, the `support_type` field may only be
+	// saved onto parameter-modifier volumes — per-region support type. On
+	// any other volume type pnp would drop the value (model-part metadata is
+	// not routed into region configs) or skip it (support enforcer/blocker
+	// subtypes are excluded from region-config merging), so the UI refuses.
+	bool m_support_type_restricted = false;
 };
 
 

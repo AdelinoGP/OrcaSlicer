@@ -3699,6 +3699,19 @@ bool TabPrintModel::has_key(std::string const& key)
     return std::find(m_keys.begin(), m_keys.end(), key) != m_keys.end();
 }
 
+// PNP fork (ticket 17): is the current selection exactly one parameter
+// modifier? The part tab's keys include `support_type`, but it may only be
+// saved onto modifier volumes — other object types are ModelObjects, and
+// other volume types (model parts, negative parts, support enforcers/
+// blockers) either drop or skip the value on the pnp side.
+bool TabPrintModel::selection_is_parameter_modifier() const
+{
+    if (m_object_configs.size() != 1)
+        return false;
+    const ModelVolume* volume = dynamic_cast<const ModelVolume*>(m_object_configs.begin()->first);
+    return volume != nullptr && volume->is_modifier();
+}
+
 void TabPrintModel::activate_selected_page(std::function<void()> throw_if_canceled)
 {
     TabPrint::activate_selected_page(throw_if_canceled);
@@ -3731,6 +3744,14 @@ void TabPrintModel::on_value_change(const std::string& opt_id, const boost::any&
         opt_index = std::atoi(opt_id2.c_str() + n + 1);
     }
     if (!has_key(opt_key))
+        return;
+    // PNP fork (ticket 17): per-region support type is a modifier-volume
+    // surface. On a model part or a support enforcer/blocker the value
+    // would be dropped (pnp does not route normal-part metadata into region
+    // configs) or skipped (support subtypes are excluded from region-config
+    // merging), so refuse to store it on any other volume type.
+    if (m_support_type_restricted && opt_key == "support_type" &&
+        !this->selection_is_parameter_modifier())
         return;
     if (!m_object_configs.empty())
         wxGetApp().plater()->take_snapshot((boost::format("Change Option %s") % opt_id2).str());
@@ -4061,8 +4082,12 @@ void TabPrintObject::notify_changed(ObjectBase * object)
 //BBS: GUI refactor
 
 TabPrintPart::TabPrintPart(ParamsPanel* parent) :
-    TabPrintModel(parent, PrintRegionConfig().keys())
+    TabPrintModel(parent, concat({"support_type"}, PrintRegionConfig().keys()))
 {
+    // PNP fork (ticket 17): per-region support type lives on parameter
+    // modifiers only; the save gate in TabPrintModel::on_value_change
+    // enforces the volume type per selection.
+    m_support_type_restricted = true;
     m_parent_tab = wxGetApp().get_model_tab();
 }
 
