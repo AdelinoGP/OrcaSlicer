@@ -154,6 +154,37 @@ TEST_CASE("support-preview document parsing", "[pnp][support_preview]")
         const BoundingBox bb = get_extents(parsed.doc.layers[0].support.front().contour);
         REQUIRE(bb.max.x() - bb.min.x() == coord_t(scale_(10.)));
     }
+
+    SECTION("schema 1.2.0 support_interface lands in its own bucket")
+    {
+        // The interface band (where the support meets the model and the bed)
+        // must not leak into the body bucket the overlay is built from.
+        const PnpSupportPreviewParse parsed = parse_support_preview(
+            R"({"schema_version":"1.2.0","units":"mm","layer_count":1,"layers":[
+                 {"layer_index":0,"z_mm":0.2,
+                  "support_body":[{"contour":[[0,0],[10,0],[10,10],[0,10]],"holes":[]}],
+                  "support_interface":[{"contour":[[2,2],[8,2],[8,8],[2,8]],"holes":[]}]}
+               ]})");
+        REQUIRE(parsed.ok);
+        REQUIRE(parsed.doc.layers.size() == 1);
+        REQUIRE(parsed.doc.layers[0].support.size() == 1);
+        REQUIRE(parsed.doc.layers[0].support_interface.size() == 1);
+        const BoundingBox bb = get_extents(parsed.doc.layers[0].support_interface.front().contour);
+        REQUIRE(bb.max.x() - bb.min.x() == coord_t(scale_(6.)));
+        REQUIRE(parsed.doc.expolygon_count() == 2);
+    }
+
+    SECTION("a 1.1.0 document without support_interface carries an empty band")
+    {
+        const PnpSupportPreviewParse parsed = parse_support_preview(
+            R"({"schema_version":"1.1.0","units":"mm","layer_count":1,"layers":[
+                 {"layer_index":0,"z_mm":0.2,
+                  "support_body":[{"contour":[[0,0],[10,0],[10,10],[0,10]],"holes":[]}]}
+               ]})");
+        REQUIRE(parsed.ok);
+        REQUIRE(parsed.doc.layers[0].support.size() == 1);
+        REQUIRE(parsed.doc.layers[0].support_interface.empty());
+    }
 }
 
 TEST_CASE("support-preview mesh building", "[pnp][support_preview]")
@@ -162,12 +193,12 @@ TEST_CASE("support-preview mesh building", "[pnp][support_preview]")
     {
         const PnpSupportPreviewParse parsed = parse_support_preview(two_layer_doc());
         REQUIRE(parsed.ok);
-        const TriangleMesh mesh = build_support_preview_mesh(parsed.doc, 0.2);
-        REQUIRE_FALSE(mesh.empty());
+        const PnpSupportPreviewMeshes meshes = build_support_preview_meshes(parsed.doc, 0.2);
+        REQUIRE_FALSE(meshes.body.empty());
 
         // Two stacked 0.2 mm layers of a 10x10 square: the solid must span
         // z 0..0.4 and x/y 0..10.
-        const BoundingBoxf3 bb = mesh.bounding_box();
+        const BoundingBoxf3 bb = meshes.body.bounding_box();
         REQUIRE_THAT(bb.min.z(), Catch::Matchers::WithinAbs(0.0, 1e-5));
         REQUIRE_THAT(bb.max.z(), Catch::Matchers::WithinAbs(0.4, 1e-5));
         REQUIRE_THAT(bb.min.x(), Catch::Matchers::WithinAbs(0.0, 1e-5));
@@ -182,8 +213,8 @@ TEST_CASE("support-preview mesh building", "[pnp][support_preview]")
         doc.replace(doc.find("\"z_mm\": 0.4"), std::string("\"z_mm\": 0.4").size(), "\"z_mm\": 1.2");
         const PnpSupportPreviewParse parsed = parse_support_preview(doc);
         REQUIRE(parsed.ok);
-        const TriangleMesh mesh = build_support_preview_mesh(parsed.doc, 0.2);
-        const BoundingBoxf3 bb  = mesh.bounding_box();
+        const PnpSupportPreviewMeshes meshes = build_support_preview_meshes(parsed.doc, 0.2);
+        const BoundingBoxf3 bb  = meshes.body.bounding_box();
         REQUIRE_THAT(bb.min.z(), Catch::Matchers::WithinAbs(0.0, 1e-5));
         REQUIRE_THAT(bb.max.z(), Catch::Matchers::WithinAbs(1.2, 1e-5));
     }
@@ -193,7 +224,7 @@ TEST_CASE("support-preview mesh building", "[pnp][support_preview]")
         const PnpSupportPreviewParse parsed = parse_support_preview(
             R"({"schema_version":"1.0.0","units":"mm","layer_count":5,"layers":[]})");
         REQUIRE(parsed.ok);
-        REQUIRE(build_support_preview_mesh(parsed.doc, 0.2).empty());
+        REQUIRE(build_support_preview_meshes(parsed.doc, 0.2).empty());
     }
 
     SECTION("holes are carried through into the mesh")
@@ -206,10 +237,66 @@ TEST_CASE("support-preview mesh building", "[pnp][support_preview]")
                  ]}]})");
         REQUIRE(parsed.ok);
         REQUIRE(parsed.doc.layers[0].support.front().holes.size() == 1);
-        const TriangleMesh mesh = build_support_preview_mesh(parsed.doc, 0.2);
-        REQUIRE_FALSE(mesh.empty());
+        const PnpSupportPreviewMeshes meshes = build_support_preview_meshes(parsed.doc, 0.2);
+        REQUIRE_FALSE(meshes.body.empty());
         // A ring wall is generated for the hole as well as the contour, so the
         // hole cannot silently vanish into a solid slab.
-        REQUIRE(mesh.facets_count() > 8);
+        REQUIRE(meshes.body.facets_count() > 8);
+    }
+
+    SECTION("interface polygons build the interface mesh, not the body")
+    {
+        const PnpSupportPreviewParse parsed = parse_support_preview(
+            R"({"schema_version":"1.2.0","units":"mm","layer_count":1,"layers":[
+                 {"layer_index":0,"z_mm":0.2,
+                  "support_body":[{"contour":[[0,0],[10,0],[10,10],[0,10]],"holes":[]}],
+                  "support_interface":[{"contour":[[2,2],[8,2],[8,8],[2,8]],"holes":[]}]}
+               ]})");
+        REQUIRE(parsed.ok);
+        const PnpSupportPreviewMeshes meshes = build_support_preview_meshes(parsed.doc, 0.2);
+        REQUIRE_FALSE(meshes.body.empty());
+        REQUIRE_FALSE(meshes.interface_mesh.empty());
+        // The band is the 6x6 square, not the 10x10 body.
+        const BoundingBoxf3 bb = meshes.interface_mesh.bounding_box();
+        REQUIRE_THAT(bb.min.x(), Catch::Matchers::WithinAbs(2.0, 1e-5));
+        REQUIRE_THAT(bb.max.x(), Catch::Matchers::WithinAbs(8.0, 1e-5));
+    }
+
+    SECTION("an interface-only document leaves the body mesh empty")
+    {
+        const PnpSupportPreviewParse parsed = parse_support_preview(
+            R"({"schema_version":"1.2.0","units":"mm","layer_count":1,"layers":[
+                 {"layer_index":0,"z_mm":0.2,
+                  "support_interface":[{"contour":[[2,2],[8,2],[8,8],[2,8]],"holes":[]}]}
+               ]})");
+        REQUIRE(parsed.ok);
+        const PnpSupportPreviewMeshes meshes = build_support_preview_meshes(parsed.doc, 0.2);
+        REQUIRE(meshes.body.empty());
+        REQUIRE_FALSE(meshes.interface_mesh.empty());
+        REQUIRE_FALSE(meshes.empty());
+    }
+}
+
+TEST_CASE("support-preview family mapping", "[pnp][support_preview]")
+{
+    SECTION("Orca's tree values map to the tree family")
+    {
+        REQUIRE(pnp_support_family_from_type("stTreeAuto") == PnpSupportFamily::Tree);
+        REQUIRE(pnp_support_family_from_type("stTree") == PnpSupportFamily::Tree);
+    }
+
+    SECTION("normal values map to the traditional family")
+    {
+        REQUIRE(pnp_support_family_from_type("stNormalAuto") == PnpSupportFamily::Traditional);
+        REQUIRE(pnp_support_family_from_type("stNormal") == PnpSupportFamily::Traditional);
+    }
+
+    SECTION("an absent or unknown value defaults to traditional, like pnp")
+    {
+        // pnp's canonical_support_family: tree*/hybrid* -> tree, everything
+        // else -> traditional. The fork must not invent a third family.
+        REQUIRE(pnp_support_family_from_type("") == PnpSupportFamily::Traditional);
+        REQUIRE(pnp_support_family_from_type("hybrid") == PnpSupportFamily::Tree);
+        REQUIRE(pnp_support_family_from_type("bogus") == PnpSupportFamily::Traditional);
     }
 }

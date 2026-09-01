@@ -39,7 +39,12 @@ struct PnpSupportPreviewLayer
 	int        layer_index = 0;
 	// Top of the layer, in millimetres, as reported by pnp.
 	double     z_mm        = 0.;
+	// Actual support structures (schema 1.1.0 `support_body`; the 1.0.0
+	// `support` field falls back when the field is absent).
 	ExPolygons support;
+	// Interface role regions (schema 1.2.0 `support_interface`) — where the
+	// support meets the model and the bed. Rendered as a distinct band.
+	ExPolygons support_interface;
 };
 
 struct PnpSupportPreviewDoc
@@ -49,8 +54,9 @@ struct PnpSupportPreviewDoc
 	int                                 layer_count = 0;
 	std::vector<PnpSupportPreviewLayer> layers;
 
-	// Total expolygons across every layer; 0 means "no supports here", which
-	// is a legitimate result (supports disabled, or nothing needs them).
+	// Total expolygons across every layer and both buckets; 0 means "no
+	// supports here", which is a legitimate result (supports disabled, or
+	// nothing needs them).
 	size_t expolygon_count() const;
 };
 
@@ -68,20 +74,41 @@ struct PnpSupportPreviewParse
 PnpSupportPreviewParse parse_support_preview(const std::string& json_text);
 
 // Extrude each layer's expolygons into a prism spanning that layer's
-// thickness, and weld the layers into one mesh.
+// thickness, and weld the layers into one mesh per bucket: `body` from
+// `support` (the actual support structures), `interface` from
+// `support_interface` (the interface band). The gizmo renders them as
+// separate volumes so the band can carry its own colour.
 //
 // Layer thickness is taken from the gap to the previous layer's z, so variable
 // layer height comes out right; the first layer falls back to its own z, and a
 // non-positive gap falls back to `fallback_layer_height_mm` (a layer list that
 // is not strictly ascending would otherwise produce inverted prisms).
-TriangleMesh build_support_preview_mesh(const PnpSupportPreviewDoc& doc,
-                                        double                      fallback_layer_height_mm);
+struct PnpSupportPreviewMeshes
+{
+	TriangleMesh body;
+	// Named `interface_mesh`, not `interface`: MSVC reserves `interface` (COM
+	// extension keyword, active via the PCH's Windows headers).
+	TriangleMesh interface_mesh;
+
+	bool empty() const { return body.empty() && interface_mesh.empty(); }
+};
+
+PnpSupportPreviewMeshes build_support_preview_meshes(const PnpSupportPreviewDoc& doc,
+                                                     double                      fallback_layer_height_mm);
+
+// The support family the overlay's config selects, mirroring pnp's
+// `canonical_support_family` (`tree*`/`hybrid*` -> tree, everything else ->
+// traditional). The fork sends one global `support_type`, so the whole
+// overlay is one family; the gizmo tints the body volume by it.
+enum class PnpSupportFamily { Tree, Traditional };
+
+PnpSupportFamily pnp_support_family_from_type(const std::string& support_type);
 
 struct PnpSupportPreviewRun
 {
 	bool         ok = false;
 	std::string  error;
-	TriangleMesh mesh;
+	PnpSupportPreviewMeshes meshes;
 	// Diagnostics for the log; also what the gizmo reports when the run
 	// succeeds but yields nothing to draw.
 	size_t layer_count     = 0;

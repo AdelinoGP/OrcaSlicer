@@ -7,6 +7,7 @@
 #include "libslic3r/ObjectID.hpp"
 #include "slic3r/GUI/3DScene.hpp"
 #include "slic3r/GUI/I18N.hpp"
+#include "slic3r/GUI/PnpSupportPreview.hpp"
 
 #include <atomic>
 
@@ -85,10 +86,14 @@ private:
 
     std::atomic<bool> m_preview_cancel { false };
     // Worker -> UI handoff, guarded by m_mutex.
-    TriangleMesh      m_preview_mesh;
-    std::string       m_preview_error;
-    bool              m_preview_result_pending = false;
-    size_t            m_preview_expolygon_count = 0;
+    PnpSupportPreviewMeshes m_preview_meshes;
+    std::string            m_preview_error;
+    bool                   m_preview_result_pending = false;
+    size_t                 m_preview_expolygon_count = 0;
+    // The family the overlay's config selected, captured at request time so
+    // the tint matches the mesh even if the user changes support_type while
+    // the run is in flight.
+    PnpSupportFamily m_preview_family = PnpSupportFamily::Traditional;
     // Set while an overlay exists that no longer matches the painted facets.
     bool              m_preview_stale = false;
     float m_angle_threshold_deg = 40.f;
@@ -96,6 +101,9 @@ private:
 
 
     GLVolume *m_support_volume = NULL;
+    // PNP fork: the interface band renders as its own volume so it can carry
+    // a distinct colour; null when the document carried no interface regions.
+    GLVolume *m_support_interface_volume = NULL;
     mutable bool m_volume_ready = false;
     bool m_is_tree_support = false;
     bool m_cancel = false;

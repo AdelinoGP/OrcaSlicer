@@ -22,8 +22,10 @@ namespace Slic3r { namespace GUI {
 size_t PnpSupportPreviewDoc::expolygon_count() const
 {
 	size_t count = 0;
-	for (const PnpSupportPreviewLayer &layer : this->layers)
+	for (const PnpSupportPreviewLayer &layer : this->layers) {
 		count += layer.support.size();
+		count += layer.support_interface.size();
+	}
 	return count;
 }
 
@@ -62,6 +64,83 @@ bool ring_from_json(const json &node, Polygon &out)
 	// A ring with fewer than three points encloses no area; drop it rather
 	// than feed a degenerate contour to the tesselator.
 	return out.points.size() >= 3;
+}
+
+// Parse a wire polygon array (contour + holes, millimetres) into Orca
+// expolygons. Malformed entries are dropped, never fatal.
+void expolygons_from_json(const json &node, ExPolygons &out)
+{
+	if (!node.is_array())
+		return;
+	for (const json &poly_node : node) {
+		if (!poly_node.is_object())
+			continue;
+		ExPolygon ex;
+		const auto contour_it = poly_node.find("contour");
+		if (contour_it == poly_node.end() || !ring_from_json(*contour_it, ex.contour))
+			continue;
+		if (const auto holes_it = poly_node.find("holes");
+		    holes_it != poly_node.end() && holes_it->is_array()) {
+			for (const json &hole_node : *holes_it) {
+				Polygon hole;
+				if (ring_from_json(hole_node, hole))
+					ex.holes.push_back(std::move(hole));
+			}
+		}
+		// The tesselator relies on Orca's orientation convention;
+		// pnp makes no promise about ring winding.
+		ex.contour.make_counter_clockwise();
+		for (Polygon &hole : ex.holes)
+			hole.make_clockwise();
+		out.push_back(std::move(ex));
+	}
+}
+
+// Weld one layer's expolygons into a prism spanning `z_bottom..z_top` and
+// append it to `its`. Shared by the body and interface buckets.
+void append_layer_prism(indexed_triangle_set &its, const ExPolygons &expolygons,
+                        double z_bottom, double z_top)
+{
+	if (expolygons.empty())
+		return;
+
+	// Caps: the tesselator returns loose triangles as vertex triples.
+	const std::vector<Vec3d> top    = triangulate_expolygons_3d(expolygons, z_top, false);
+	const std::vector<Vec3d> bottom = triangulate_expolygons_3d(expolygons, z_bottom, true);
+	for (const std::vector<Vec3d> *cap : {&top, &bottom}) {
+		for (size_t v = 0; v + 2 < cap->size(); v += 3) {
+			const int base = int(its.vertices.size());
+			its.vertices.emplace_back((*cap)[v].cast<float>());
+			its.vertices.emplace_back((*cap)[v + 1].cast<float>());
+			its.vertices.emplace_back((*cap)[v + 2].cast<float>());
+			its.indices.emplace_back(base, base + 1, base + 2);
+		}
+	}
+
+	// Side walls: one quad per ring edge, split into two triangles.
+	for (const ExPolygon &ex : expolygons) {
+		std::vector<const Polygon *> rings { &ex.contour };
+		for (const Polygon &hole : ex.holes)
+			rings.push_back(&hole);
+		for (const Polygon *ring : rings) {
+			const Points &pts = ring->points;
+			for (size_t p = 0; p < pts.size(); ++p) {
+				const Point &a = pts[p];
+				const Point &b = pts[(p + 1) % pts.size()];
+				const auto   ax = float(unscale<double>(a.x()));
+				const auto   ay = float(unscale<double>(a.y()));
+				const auto   bx = float(unscale<double>(b.x()));
+				const auto   by = float(unscale<double>(b.y()));
+				const int    base = int(its.vertices.size());
+				its.vertices.emplace_back(ax, ay, float(z_bottom));
+				its.vertices.emplace_back(bx, by, float(z_bottom));
+				its.vertices.emplace_back(bx, by, float(z_top));
+				its.vertices.emplace_back(ax, ay, float(z_top));
+				its.indices.emplace_back(base, base + 1, base + 2);
+				its.indices.emplace_back(base, base + 2, base + 3);
+			}
+		}
+	}
 }
 
 } // anonymous namespace
@@ -125,32 +204,16 @@ PnpSupportPreviewParse parse_support_preview(const std::string &json_text)
 			else if (const auto support_it = layer_node.find("support");
 			         support_it != layer_node.end() && support_it->is_array())
 				support_src = &*support_it;
-			if (support_src == nullptr) {
-				result.doc.layers.push_back(std::move(layer));
-				continue;
-			}
-			for (const json &poly_node : *support_src) {
-				if (!poly_node.is_object())
-					continue;
-				ExPolygon ex;
-				const auto contour_it = poly_node.find("contour");
-				if (contour_it == poly_node.end() || !ring_from_json(*contour_it, ex.contour))
-					continue;
-				if (const auto holes_it = poly_node.find("holes");
-				    holes_it != poly_node.end() && holes_it->is_array()) {
-					for (const json &hole_node : *holes_it) {
-						Polygon hole;
-						if (ring_from_json(hole_node, hole))
-							ex.holes.push_back(std::move(hole));
-					}
-				}
-				// The tesselator relies on Orca's orientation convention;
-				// pnp makes no promise about ring winding.
-				ex.contour.make_counter_clockwise();
-				for (Polygon &hole : ex.holes)
-					hole.make_clockwise();
-				layer.support.push_back(std::move(ex));
-			}
+			if (support_src != nullptr)
+				expolygons_from_json(*support_src, layer.support);
+
+			// Schema 1.2.0 adds `support_interface` — the interface role
+			// regions (where the support meets the model and the bed),
+			// rendered as a distinct band. Absent in older documents.
+			if (const auto interface_it = layer_node.find("support_interface");
+			    interface_it != layer_node.end())
+				expolygons_from_json(*interface_it, layer.support_interface);
+
 			result.doc.layers.push_back(std::move(layer));
 		}
 	}
@@ -159,13 +222,14 @@ PnpSupportPreviewParse parse_support_preview(const std::string &json_text)
 	return result;
 }
 
-TriangleMesh build_support_preview_mesh(const PnpSupportPreviewDoc &doc,
-                                        double                      fallback_layer_height_mm)
+PnpSupportPreviewMeshes build_support_preview_meshes(const PnpSupportPreviewDoc &doc,
+                                                     double fallback_layer_height_mm)
 {
 	if (fallback_layer_height_mm <= 0.)
 		fallback_layer_height_mm = 0.2;
 
-	indexed_triangle_set its;
+	indexed_triangle_set body_its;
+	indexed_triangle_set interface_its;
 	double               previous_z = 0.;
 
 	for (size_t i = 0; i < doc.layers.size(); ++i) {
@@ -178,52 +242,31 @@ TriangleMesh build_support_preview_mesh(const PnpSupportPreviewDoc &doc,
 			thickness = fallback_layer_height_mm;
 		previous_z = layer.z_mm;
 
-		if (layer.support.empty())
+		if (layer.support.empty() && layer.support_interface.empty())
 			continue;
 
 		const double z_top    = layer.z_mm;
 		const double z_bottom = layer.z_mm - thickness;
 
-		// Caps: the tesselator returns loose triangles as vertex triples.
-		const std::vector<Vec3d> top    = triangulate_expolygons_3d(layer.support, z_top, false);
-		const std::vector<Vec3d> bottom = triangulate_expolygons_3d(layer.support, z_bottom, true);
-		for (const std::vector<Vec3d> *cap : {&top, &bottom}) {
-			for (size_t v = 0; v + 2 < cap->size(); v += 3) {
-				const int base = int(its.vertices.size());
-				its.vertices.emplace_back((*cap)[v].cast<float>());
-				its.vertices.emplace_back((*cap)[v + 1].cast<float>());
-				its.vertices.emplace_back((*cap)[v + 2].cast<float>());
-				its.indices.emplace_back(base, base + 1, base + 2);
-			}
-		}
-
-		// Side walls: one quad per ring edge, split into two triangles.
-		for (const ExPolygon &ex : layer.support) {
-			std::vector<const Polygon *> rings { &ex.contour };
-			for (const Polygon &hole : ex.holes)
-				rings.push_back(&hole);
-			for (const Polygon *ring : rings) {
-				const Points &pts = ring->points;
-				for (size_t p = 0; p < pts.size(); ++p) {
-					const Point &a = pts[p];
-					const Point &b = pts[(p + 1) % pts.size()];
-					const auto   ax = float(unscale<double>(a.x()));
-					const auto   ay = float(unscale<double>(a.y()));
-					const auto   bx = float(unscale<double>(b.x()));
-					const auto   by = float(unscale<double>(b.y()));
-					const int    base = int(its.vertices.size());
-					its.vertices.emplace_back(ax, ay, float(z_bottom));
-					its.vertices.emplace_back(bx, by, float(z_bottom));
-					its.vertices.emplace_back(bx, by, float(z_top));
-					its.vertices.emplace_back(ax, ay, float(z_top));
-					its.indices.emplace_back(base, base + 1, base + 2);
-					its.indices.emplace_back(base, base + 2, base + 3);
-				}
-			}
-		}
+		append_layer_prism(body_its, layer.support, z_bottom, z_top);
+		append_layer_prism(interface_its, layer.support_interface, z_bottom, z_top);
 	}
 
-	return TriangleMesh(std::move(its));
+	PnpSupportPreviewMeshes meshes;
+	meshes.body           = TriangleMesh(std::move(body_its));
+	meshes.interface_mesh = TriangleMesh(std::move(interface_its));
+	return meshes;
+}
+
+PnpSupportFamily pnp_support_family_from_type(const std::string &support_type)
+{
+	// Mirror pnp's `canonical_support_family` (crates/slicer-ir/src/slice_ir.rs):
+	// `tree*`/`hybrid*` -> tree, everything else -> traditional. Orca's four
+	// enum values (stNormalAuto/stTreeAuto/stNormal/stTree) all land on the
+	// intended family.
+	if (support_type.rfind("stTree", 0) == 0 || support_type.rfind("hybrid", 0) == 0)
+		return PnpSupportFamily::Tree;
+	return PnpSupportFamily::Traditional;
 }
 
 } } // namespace Slic3r::GUI

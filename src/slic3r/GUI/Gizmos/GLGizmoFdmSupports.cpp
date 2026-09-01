@@ -144,7 +144,7 @@ void GLGizmoFdmSupports::render_painter_gizmo()
 
     render_triangles(selection);
     //BBS: draw support volumes
-    if (m_volume_ready && m_support_volume && (m_edit_state != state_generating))
+    if (m_volume_ready && (m_support_volume || m_support_interface_volume) && (m_edit_state != state_generating))
     {
         // PNP fork: render_triangles() stops mm_gouraud on exit, and
         // GLVolume::render() bails out when no program is current — the
@@ -171,11 +171,18 @@ void GLGizmoFdmSupports::render_painter_gizmo()
             shader->set_uniform("is_outline", false);
             shader->set_uniform("print_volume.type", -1);
             shader->set_uniform("extruder_printable_heights", std::array<float, 3>{0.f, 0.f, 0.f});
-            m_support_volume->set_render_color({0.f, 0.7f, 0.f, 0.7f});
             // simple_render() draws with the GLModel's own color, not
             // GLVolume::render_color; without this the overlay comes out black.
-            m_support_volume->model.set_color(m_support_volume->render_color);
-            m_support_volume->render();
+            const auto render_volume = [](GLVolume* volume) {
+                if (volume == nullptr)
+                    return;
+                volume->model.set_color(volume->render_color);
+                volume->render();
+            };
+            // Colours are set at consume time: body by family, interface band
+            // constant.
+            render_volume(m_support_volume);
+            render_volume(m_support_interface_volume);
             shader->stop_using();
         }
     }
@@ -806,7 +813,7 @@ void GLGizmoFdmSupports::invalid_support_volumes(bool invalid_step)
 
 bool GLGizmoFdmSupports::need_regenerate_support_volumes()
 {
-    if (!m_support_volume)
+    if (!m_support_volume && !m_support_interface_volume)
         return true;
 
     const ModelObject* mo = m_c->selection_info()->model_object();
@@ -862,7 +869,7 @@ void GLGizmoFdmSupports::update_support_volumes()
     // prepass — so this only records that the overlay on screen is now stale.
     // request_support_preview() is what spawns the worker.
     std::unique_lock<std::mutex> lck(m_mutex);
-    m_preview_stale = (m_support_volume != nullptr);
+    m_preview_stale = (m_support_volume != nullptr || m_support_interface_volume != nullptr);
     m_volume_ready  = true;
     m_volume_valid  = true;
     m_edit_state    = state_ready;
@@ -921,6 +928,15 @@ void GLGizmoFdmSupports::request_support_preview()
     if (full_config.option<ConfigOptionFloat>("layer_height"))
         layer_height = full_config.opt_float("layer_height");
 
+    // Capture the family the overlay's config selects, so the tint matches
+    // the mesh even if the user changes support_type while the run is in
+    // flight. support_type is an enum option, so opt_string() would throw;
+    // serialize() yields the enum key ("stTreeAuto", ...).
+    PnpSupportFamily family = PnpSupportFamily::Traditional;
+    if (const ConfigOption *opt = full_config.option("support_type"); opt != nullptr)
+        family = pnp_support_family_from_type(opt->serialize());
+    m_preview_family = family;
+
     if (m_thread.joinable()) {
         m_preview_cancel = true;
         m_thread.join();
@@ -938,7 +954,7 @@ void GLGizmoFdmSupports::request_support_preview()
         PnpSupportPreviewRun run = run_support_preview(model_path, layer_height, m_preview_cancel);
         {
             std::unique_lock<std::mutex> lck(m_mutex);
-            m_preview_mesh            = std::move(run.mesh);
+            m_preview_meshes          = std::move(run.meshes);
             m_preview_error           = run.error;
             m_preview_expolygon_count = run.expolygon_count;
             m_preview_result_pending  = true;
@@ -952,18 +968,18 @@ void GLGizmoFdmSupports::request_support_preview()
 // PNP fork: pick up a finished worker result. UI thread only (touches GL).
 void GLGizmoFdmSupports::consume_support_preview()
 {
-    TriangleMesh mesh;
-    std::string  error;
-    size_t       expolygons = 0;
+    PnpSupportPreviewMeshes meshes;
+    std::string             error;
+    size_t                  expolygons = 0;
     {
         std::unique_lock<std::mutex> lck(m_mutex);
         if (!m_preview_result_pending)
             return;
         m_preview_result_pending = false;
-        mesh       = std::move(m_preview_mesh);
+        meshes     = std::move(m_preview_meshes);
         error      = m_preview_error;
         expolygons = m_preview_expolygon_count;
-        m_preview_mesh = TriangleMesh();
+        m_preview_meshes = PnpSupportPreviewMeshes();
         m_edit_state   = state_ready;
     }
 
@@ -979,11 +995,15 @@ void GLGizmoFdmSupports::consume_support_preview()
         delete m_support_volume;
         m_support_volume = nullptr;
     }
+    if (m_support_interface_volume) {
+        delete m_support_interface_volume;
+        m_support_interface_volume = nullptr;
+    }
     m_preview_stale = false;
 
     // A run that legitimately finds nothing to support leaves no overlay; say
     // so rather than let the user read an empty screen as a failure.
-    if (expolygons == 0 || mesh.empty()) {
+    if (expolygons == 0 || meshes.empty()) {
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": no support geometry for this object";
         wxGetApp().plater()->get_notification_manager()->push_notification(
             NotificationType::CustomNotification, NotificationManager::NotificationLevel::RegularNotificationLevel,
@@ -996,9 +1016,21 @@ void GLGizmoFdmSupports::consume_support_preview()
     // rendered with identity. pnp's document comes out of the plate-local 3MF
     // export with instance transforms already applied, so it lands in the same
     // space — setting a transform here would apply them twice.
-    m_support_volume = new GLVolume(0.f, 0.7f, 0.f, 0.7f);
-    m_support_volume->force_native_color = true;
-    m_support_volume->model.init_from(mesh);
+    //
+    // Body colour follows the selected family (tree green, traditional blue);
+    // the interface band is a constant orange so it reads as one concept
+    // across families.
+    if (!meshes.body.empty()) {
+        const bool tree = (m_preview_family == PnpSupportFamily::Tree);
+        m_support_volume = new GLVolume(0.f, tree ? 0.7f : 0.5f, tree ? 0.f : 0.8f, 0.7f);
+        m_support_volume->force_native_color = true;
+        m_support_volume->model.init_from(meshes.body);
+    }
+    if (!meshes.interface_mesh.empty()) {
+        m_support_interface_volume = new GLVolume(0.9f, 0.5f, 0.f, 0.8f);
+        m_support_interface_volume->force_native_color = true;
+        m_support_interface_volume->model.init_from(meshes.interface_mesh);
+    }
 
     // Record the facet timestamps this overlay was built from, so
     // need_regenerate_support_volumes() only calls it stale once the user

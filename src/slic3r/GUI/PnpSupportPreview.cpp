@@ -121,12 +121,13 @@ PnpSupportPreviewRun run_support_preview(const boost::filesystem::path &model_3m
 
 	result.layer_count     = parsed.doc.layers.size();
 	result.expolygon_count = parsed.doc.expolygon_count();
-	result.mesh            = build_support_preview_mesh(parsed.doc, fallback_layer_height_mm);
+	result.meshes          = build_support_preview_meshes(parsed.doc, fallback_layer_height_mm);
 	result.ok              = true;
 
 	BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": " << result.layer_count << " layers, "
 	                        << result.expolygon_count << " expolygons, "
-	                        << result.mesh.facets_count() << " facets";
+	                        << result.meshes.body.facets_count() << " body facets, "
+	                        << result.meshes.interface_mesh.facets_count() << " interface facets";
 	return result;
 }
 
