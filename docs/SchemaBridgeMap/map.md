@@ -264,6 +264,35 @@ are true when this map is done:
   app-level manual smoke of the rendered page (both tickets' residual) is still owed: it needs
   an interactive desktop session and did not run in this session.
 
+- [Support-preview role and family visibility](tickets/14-support-preview-role-visibility.md)
+  — **both halves taken.** pnp-side (`588651d0`): document 1.1.0 → 1.2.0, `layers[].support_interface`
+  carries the `TopInterface`/`BaseInterface`/`BottomInterface` role regions the traditional
+  planner actually commits; shape = per-layer split, no role tags (fork renders one interface
+  colour; tags would be dead data — a future per-role colour wants its own additive bump).
+  Fork-side (`d09a6d4a51`): parser buckets `support_interface` additively,
+  `build_support_preview_meshes` returns per-bucket meshes, the gizmo renders two GLVolumes —
+  body tinted by family (`pnp_support_family_from_type` mirrors
+  `canonical_support_family`; `support_type` read via `option()->serialize()` — an enum, so
+  `opt_string()` throws; family captured at request time so mid-run changes can't desync the
+  tint), tree green / traditional blue / interface constant orange. `interface` is a reserved
+  MSVC COM keyword via the PCH's Windows headers, hence `interface_mesh`. Family tint is a
+  constant colour (Orca's `support_type` is global — one family per print) and taken as a
+  verification affordance. Tests 32/32 new cases (1.2.0 bucketing, empty-band fallback,
+  per-bucket mesh build, family mapping). Manual overlay smoke deferred (interactive desktop
+  session, same residual as 11/12). **xmake finding:** the implicit default-target selection
+  silently no-ops (nothing compiles, "build ok"); explicit `xmake -b <target>` always works —
+  use explicit targets.
+  — built: with the probe failed, the **PNP Backend** page now renders ticket 03's preserved
+  carriers (preset + project, one row per (key, store) pair, values rendered as typed by
+  `pnp_preserved_key_rows()`) read-only under a banner; rows refresh at every page activation, so
+  a resolved key drops off without a restart; each row carries a **Remove** button that purges
+  exactly the store it names and marks the preset or project dirty. The purge fog entry is
+  half-discharged: the degraded surface purges, but whether *surviving orphans* get a surface on
+  the **live** page too (successful probe + non-empty carrier is a real, reachable state) is now
+  a sharp open question with an owner-wanted note — see ticket 12's resolution. The
+  app-level manual smoke of the rendered page (both tickets' residual) is still owed: it needs
+  an interactive desktop session and did not run in this session.
+
 ## Not yet specified
 
 - **Migration of the curated table's existing rows.** Ticket 05 answered the tier question:
@@ -307,12 +336,15 @@ are true when this map is done:
   pnp-side handoff channel, so this is now cheap if ticket 04 or 05 finds name-matching wanting
   — section B's 86 mismatched identity rows are the place that would show up.
 - **What the bump's support-family work needs from the settings UI beyond key routing** —
-  *(discharged by ticket 07, 2026-08-28)*: the support-*preview* side needs nothing — its
+  ~~*(discharged by ticket 07, 2026-08-28)*: the support-*preview* side needs nothing — its
   document never carried roles (that question graduated into
   [ticket 14](tickets/14-support-preview-role-visibility.md) instead). What remains open in
   this patch is only the settings-UI half, which still depends on the settings-UI tickets
   (10/11) landing and is narrowed by 07's finding that the ~11 family/tree keys are declared by
-  pnp already, so they reach the PNP page by the normal routing.
+  pnp already, so they reach the PNP page by the normal routing.~~ **Fully discharged
+  2026-09-01 (tickets 10/11/14):** the settings-UI half landed as the generated PNP page with
+  the family/tree keys routed by the normal path, and ticket 14 took the preview half (interface
+  band + family tint — both built). Nothing remains in this patch.
 
 - **Verification story for a schema-derived UI.** Ticket 02 established the unit-test shape —
   a synthetic schema document driving the pure parser, plus one case that registers and asserts
@@ -338,6 +370,9 @@ are true when this map is done:
   ticket 15's CI plumbing. One operation note for whoever writes ticket 15: the probe must be
   invoked with `--module-dir <modules root>` — invoked without it, module manifests vanish
   from the reply and the page silently shrinks; the gate should fail loudly on that shape.)*
+  *(Ticket 14 (2026-09-01) adds a second, separate manual-smoke debt: the support overlay's
+  two-colour rendering (family-tinted body + interface band) — it needs an interactive
+  desktop session to eyeball, same residual as the page's own smoke.)*
 
 - **Whether pnp should declare host-injected fields on the wire.** Ticket 04 needed to keep
   `slice_has_paint` off the page and found the wire cannot say a field is host-injected — no tag,
