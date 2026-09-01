@@ -282,6 +282,39 @@ are true when this map is done:
   session, same residual as 11/12). **xmake finding:** the implicit default-target selection
   silently no-ops (nothing compiles, "build ok"); explicit `xmake -b <target>` always works —
   use explicit targets.
+
+- [Per-region support type on modifier volumes](tickets/17-per-region-support-type-modifiers.md)
+  — fork half landed (`4b5746cac1`): the volume-settings tab admits
+  `support_type`, the save gate restricts it to parameter-modifier volumes
+  (other volume types would be dropped/skipped by pnp). Export link verified
+  (store_bbs_3mf part metadata → pnp `ModifierVolume.config_delta`). pnp
+  half measured, not wired: the per-region consumer exists
+  (`RegionSupportConfig`, `support_analysis_producer::support_family`), but
+  production stamps modifier deltas OBJECT-WIDE — the per-sub-region binding
+  (`stamp_modifier_sub_region_configs`, packet 132) has zero production call
+  sites and staged footprints carry no modifier identity — so the UI half
+  ships with the caveat that a modifier `support_type` currently changes the
+  whole object's family. The per-region application is
+  [ticket 18](tickets/18-bind-modifier-deltas-to-subregions.md).
+
+
+  — **both halves taken.** pnp-side (`588651d0`): document 1.1.0 → 1.2.0, `layers[].support_interface`
+  carries the `TopInterface`/`BaseInterface`/`BottomInterface` role regions the traditional
+  planner actually commits; shape = per-layer split, no role tags (fork renders one interface
+  colour; tags would be dead data — a future per-role colour wants its own additive bump).
+  Fork-side (`d09a6d4a51`): parser buckets `support_interface` additively,
+  `build_support_preview_meshes` returns per-bucket meshes, the gizmo renders two GLVolumes —
+  body tinted by family (`pnp_support_family_from_type` mirrors
+  `canonical_support_family`; `support_type` read via `option()->serialize()` — an enum, so
+  `opt_string()` throws; family captured at request time so mid-run changes can't desync the
+  tint), tree green / traditional blue / interface constant orange. `interface` is a reserved
+  MSVC COM keyword via the PCH's Windows headers, hence `interface_mesh`. Family tint is a
+  constant colour (Orca's `support_type` is global — one family per print) and taken as a
+  verification affordance. Tests 32/32 new cases (1.2.0 bucketing, empty-band fallback,
+  per-bucket mesh build, family mapping). Manual overlay smoke deferred (interactive desktop
+  session, same residual as 11/12). **xmake finding:** the implicit default-target selection
+  silently no-ops (nothing compiles, "build ok"); explicit `xmake -b <target>` always works —
+  use explicit targets.
   — built: with the probe failed, the **PNP Backend** page now renders ticket 03's preserved
   carriers (preset + project, one row per (key, store) pair, values rendered as typed by
   `pnp_preserved_key_rows()`) read-only under a banner; rows refresh at every page activation, so
