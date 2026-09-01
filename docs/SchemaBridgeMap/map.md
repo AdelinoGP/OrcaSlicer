@@ -297,6 +297,32 @@ are true when this map is done:
   whole object's family. The per-region application is
   [ticket 18](tickets/18-bind-modifier-deltas-to-subregions.md).
 
+- [Bind modifier config deltas to their minted sub-regions in production](tickets/18-bind-modifier-deltas-to-subregions.md)
+  — pnp half landed (`11175ae2`): the binding is **re-derived, not carried**
+  (region mapping runs in prepass before the Tier-2 arena mints the
+  sub-regions, so a carried field cannot reach the kernel); the kernel
+  re-slices each modifier mesh at the layer Z and re-hashes the footprint
+  via `slicer_ir::modifier_sub_region_id`, reproducing the Tier-2 ids
+  byte-for-byte. `execute_region_mapping_inner` now mints one RegionMapIR
+  entry per stampable footprint stamped with only the owning modifier's
+  delta; the base region's empty-chain entry keeps the pure base config
+  (object-wide stamping survives for painted chains and volume-less
+  objects). The namespace primitives moved to slicer-ir (previously
+  restated in slicer-runtime and slicer-wasm-host). Verified: kernel unit
+  case (two modifiers, distinct `support_type` deltas → base keeps the
+  global family, each sub-region its own) + model-driven e2e through the
+  production call sites proving `family_assignments` gets
+  base=traditional / sub-region=tree; full slicer-core host-algos suite,
+  all five slicer-runtime binaries (incl. the real `pnp_cli` slice e2e),
+  clippy/check-literals/guest-freshness green. AC-Mod synthetic fixtures
+  gained z-extent modifier meshes; AC-N2 updated to per-region semantics;
+  drive-by fix of a pre-existing stale wire-version pin (1.0.0 → 1.2.0,
+  proven red on stash). Residuals: the fork's bundled dist needs a
+  re-stage to carry the new kernel, and the minted sub-regions still don't
+  reach `LayerPlanIR.active_regions` / the blackboard `SliceIR`, so the
+  support planners don't yet route candidates inside the footprint — that
+  leg is [ticket 19](tickets/19-surface-subregions-to-layer-plan-and-slice.md).
+
 
   — **both halves taken.** pnp-side (`588651d0`): document 1.1.0 → 1.2.0, `layers[].support_interface`
   carries the `TopInterface`/`BaseInterface`/`BottomInterface` role regions the traditional
