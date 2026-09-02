@@ -1,8 +1,8 @@
 ---
 title: Surface minted modifier sub-regions to the layer plan and blackboard slice
-status: open
+status: closed
 type: task
-assignee:
+assignee: opencode-agent
 blocked-by: [18]
 ---
 
@@ -34,13 +34,14 @@ ids are already reproducible at prepass time without touching Tier 2.
 Resolve — surface the minted sub-regions to the prepass consumers:
 
 - **Layer plan.** Add an `ActiveRegion` per minted sub-region (empty
-  `variant_chain`, id in the modifier namespace) to the committed
-  `LayerPlanIR` at a host seam after `PrePass::RegionMapping` (the kernel
-  already knows the ids; the seam must not fight the module-emitted plan or
-  the WIT round-trip). `backfill_active_region_configs` (plan promotion)
-  then copies the per-modifier config onto the sub-region's
-  `resolved_config`, and `module_receives_slice_region` routes it to the
-  right family planner.
+  `variant_chain` for an unpainted parent; the painted parent's chain for a
+  painted parent, with the parent ID encoded in the modifier namespace) to the
+  committed `LayerPlanIR` at a host seam after `PrePass::RegionMapping` (the
+  kernel already knows the ids; the seam must not fight the module-emitted
+  plan or the WIT round-trip). `backfill_active_region_configs` (plan
+  promotion) then copies the per-modifier config onto the sub-region's
+  `resolved_config`, and `module_receives_slice_region` routes it to the right
+  family planner.
 - **Slice.** Mint the sub-region `SlicedRegion`s (id + footprint geometry,
   base polygons reduced by the footprint) into the blackboard `SliceIR` at
   `PrePass::Slice` — the same intersection semantics
@@ -57,3 +58,38 @@ Resolve — surface the minted sub-regions to the prepass consumers:
 Deliverable: a modifier volume's `support_type` changes the support actually
 planned inside its footprint — not just the recorded family — with the
 prepass slice and the Tier-2 arena slice agreeing on sub-region geometry.
+
+## Answer (2026-09-02)
+
+Implemented in the `pinch_n_print_cli` submodule.
+
+- `commit_region_mapping_builtin` adds each modifier-namespace `RegionMapIR`
+  entry to the committed `LayerPlanIR.active_regions`, preserving the base
+  region's effective-layer metadata and assigning the sub-region's resolved
+  config.
+- `split_modifier_sub_regions_for_prepass`, called from the configured prepass
+  after paint segmentation, materializes the same per-layer modifier geometry
+  that Tier 2 uses. It partitions base fill roles by descending modifier
+  priority with stable document-order ties, skips support enforcer/blocker
+  volumes, keeps each painted parent's chain on its child, and leaves every
+  parent pure outside its own modifier child.
+- `execute_prepass_slice_single_layer_impl` skips already-surfaced modifier
+  active regions so they are not re-sliced as full objects. The Tier-2
+  `split_modifier_footprints` path remains a raw-footprint fallback, while
+  `perimeter_source_regions` restores the unsplit base outline for perimeter
+  modules and preserves wall sharing.
+- `modifier_sub_region_id`, `is_modifier_namespace_id`, and
+  `modifier_base_region_id` are shared by the kernel, runtime, and wasm host.
+  Module-authored layer plans reject the host-reserved modifier namespace and
+  raw footprint sentinel.
+
+Coverage includes production support-family routing and structural support
+planning in `modifier_support_type_family_e2e_tdd`, role preservation and
+priority overlap regressions in `modifier_region_split_tdd`, and equal-priority
+identical-footprint config ownership in `algo_region_mapping_tdd`.
+
+Verification: `cargo check --workspace --all-targets`, workspace clippy with
+`-D warnings`, `cargo xtask check-literals`, `cargo xtask build-guests --check`,
+the targeted core/wasm-host/runtime suites, and `git diff --check` pass.
+The repository-wide `cargo fmt --all -- --check` remains blocked by Windows
+path-length error 206; all touched Rust files pass direct rustfmt checking.
