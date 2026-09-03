@@ -351,34 +351,26 @@ are true when this map is done:
   full wall set and matching the modifier-free control. Residual: the
   manual GUI smoke of `SupportTest.3mf` (interactive session).
 
-
-  — **both halves taken.** pnp-side (`588651d0`): document 1.1.0 → 1.2.0, `layers[].support_interface`
-  carries the `TopInterface`/`BaseInterface`/`BottomInterface` role regions the traditional
-  planner actually commits; shape = per-layer split, no role tags (fork renders one interface
-  colour; tags would be dead data — a future per-role colour wants its own additive bump).
-  Fork-side (`d09a6d4a51`): parser buckets `support_interface` additively,
-  `build_support_preview_meshes` returns per-bucket meshes, the gizmo renders two GLVolumes —
-  body tinted by family (`pnp_support_family_from_type` mirrors
-  `canonical_support_family`; `support_type` read via `option()->serialize()` — an enum, so
-  `opt_string()` throws; family captured at request time so mid-run changes can't desync the
-  tint), tree green / traditional blue / interface constant orange. `interface` is a reserved
-  MSVC COM keyword via the PCH's Windows headers, hence `interface_mesh`. Family tint is a
-  constant colour (Orca's `support_type` is global — one family per print) and taken as a
-  verification affordance. Tests 32/32 new cases (1.2.0 bucketing, empty-band fallback,
-  per-bucket mesh build, family mapping). Manual overlay smoke deferred (interactive desktop
-  session, same residual as 11/12). **xmake finding:** the implicit default-target selection
-  silently no-ops (nothing compiles, "build ok"); explicit `xmake -b <target>` always works —
-  use explicit targets.
-  — built: with the probe failed, the **PNP Backend** page now renders ticket 03's preserved
-  carriers (preset + project, one row per (key, store) pair, values rendered as typed by
-  `pnp_preserved_key_rows()`) read-only under a banner; rows refresh at every page activation, so
-  a resolved key drops off without a restart; each row carries a **Remove** button that purges
-  exactly the store it names and marks the preset or project dirty. The purge fog entry is
-  half-discharged: the degraded surface purges, but whether *surviving orphans* get a surface on
-  the **live** page too (successful probe + non-empty carrier is a real, reachable state) is now
-  a sharp open question with an owner-wanted note — see ticket 12's resolution. The
-  app-level manual smoke of the rendered page (both tickets' residual) is still owed: it needs
-  an interactive desktop session and did not run in this session.
+- [Wire the live-schema gate into CI](tickets/15-live-schema-gate-in-ci.md)
+  — landed as a **hard gate** step in `build_orca.yml` between `Test` and
+  packaging: it probes ticket 08's staged dist (`--module-dir <dist>/modules`,
+  parity with `PnpBackend`), uploads the document as an artifact, and runs the
+  already-built `pnp_config_translator_tests` binary with `PNP_LIVE_SCHEMA` and
+  the `[live-schema]` filter — both hidden cases (ticket 06's dead-row diff,
+  ticket 11's page accounting) in one process, which the seal permits because
+  only one of them registers. Green in-session against the bundled wire-1.2.0
+  backend (23 modules / 260 module fields / 93 host entries; 32 assertions).
+  Three decisions: hard gate not reporting-only (09 already emptied the list);
+  **no GUI launch in CI** — the runners are headless and the residual is
+  specifically the rendered wxWidgets controls, so the manual-smoke debt stays
+  manual; and the binary is located by `find`, not `xmake run`, which re-enters
+  the build. The map's "`--module-dir` or the manifests vanish" note is
+  **corrected**: this dist resolves `modules/` relative to its own binary, so
+  the flag changed nothing from any cwd. The real defence is a new shape guard
+  in the page case — a non-empty `schema` array with at least one module field,
+  asserted before registration — both branches proven red against doctored
+  documents, because a manifest-less reply is still a *successful* probe and
+  would otherwise shrink the page to host keys unnoticed.
 
 ## Not yet specified
 
@@ -454,9 +446,14 @@ are true when this map is done:
   groups, order, render/skip accounting against `PNP_LIVE_SCHEMA`, verified green against a
   wire-1.2.0 dist. What remains here is only the app-level manual smoke of the *rendered*
   controls, which ticket 11 deferred to ticket 12's landing (both touch the same page), plus
-  ticket 15's CI plumbing. One operation note for whoever writes ticket 15: the probe must be
-  invoked with `--module-dir <modules root>` — invoked without it, module manifests vanish
-  from the reply and the page silently shrinks; the gate should fail loudly on that shape.)*
+  ticket 15's CI plumbing.)*
+  **CI half discharged 2026-09-03 (ticket 15):** the gate runs both hidden cases on every
+  build against the dist CI stages, and fails loudly on a manifest-less document (a shape
+  guard in the test, since the `--module-dir` note this entry used to carry turned out not to
+  hold — the backend resolves `modules/` relative to its own binary). What is left in this
+  patch is **only** the app-level manual smoke of the rendered controls (tickets 11/12) and
+  the support overlay (ticket 14) — an interactive desktop session, which no CI job can
+  supply.
   *(Ticket 14 (2026-09-01) adds a second, separate manual-smoke debt: the support overlay's
   two-colour rendering (family-tinted body + interface band) — it needs an interactive
   desktop session to eyeball, same residual as the page's own smoke.)*

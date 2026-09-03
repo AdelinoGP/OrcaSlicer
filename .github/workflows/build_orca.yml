@@ -187,6 +187,48 @@ jobs:
         shell: bash
         run: xmake test
 
+      # Ticket 15 — the live-schema gate. The `[.][live-schema]` Catch2 cases
+      # (tests/pnp/test_pnp_config_{translator,keys}.cpp) are the only check
+      # that the fork's curated table and its generated PNP page agree with the
+      # backend *this build actually ships*. The leading-dot tag keeps them out
+      # of `xmake test`'s default selection — they need a real
+      # `pnp_cli module config-schema` document, which only exists after the
+      # staging step above — so CI runs them explicitly, as a hard gate. They
+      # are green as of ticket 09; a failure here is genuine drift a submodule
+      # bump introduced, which is the whole point.
+      #
+      # The GUI itself is not launched: the runners are headless and the
+      # rendered controls stay manual smoke. Everything below the wxWidgets
+      # layer is covered by these cases.
+      - name: Live-schema gate (staged pnp_cli vs the fork's key handling)
+        shell: bash
+        run: |
+          set -eu
+          DIST=pinch_n_print_cli/target/dist/developer
+          CLI="$DIST/pnp_cli.exe"
+          [ -f "$CLI" ] || CLI="$DIST/pnp_cli"
+          test -f "$CLI"
+          # --module-dir mirrors how PnpBackend invokes the probe. The staged
+          # backend also resolves modules relative to its own binary, so this
+          # is parity rather than load-bearing; the document's shape is what
+          # the gate actually asserts (a manifest-less reply still answers with
+          # the host half alone, and the page would silently shrink to it).
+          SCHEMA="$PWD/pnp-live-schema.json"
+          "$CLI" module config-schema --module-dir "$DIST/modules" > "$SCHEMA"
+          BIN=$(find build -type f \
+                  \( -name pnp_config_translator_tests -o -name pnp_config_translator_tests.exe \) \
+                  | head -n 1)
+          test -n "$BIN"
+          PNP_LIVE_SCHEMA="$SCHEMA" "$BIN" "[live-schema]"
+
+      - name: Upload live schema document
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pnp-live-schema-${{ runner.os }}-${{ inputs.arch }}
+          path: pnp-live-schema.json
+          if-no-files-found: warn
+
       - name: Package (portable)
         shell: bash
         run: xmake package

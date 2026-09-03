@@ -746,6 +746,20 @@ TEST_CASE("live backend: the derived page accounts for every registered key", "[
     const nlohmann::json doc = nlohmann::json::parse(in, nullptr, false);
     REQUIRE_FALSE(doc.is_discarded());
 
+    // Shape guard (ticket 15). A probe that cannot see the module manifests
+    // still answers successfully with the host half alone, and the generated
+    // page then silently shrinks to host keys -- a document the GUI never
+    // sees. The gate must fail on that shape rather than pass against it.
+    REQUIRE(doc.contains("schema"));
+    REQUIRE(doc["schema"].is_array());
+    REQUIRE_FALSE(doc["schema"].empty());
+    size_t module_fields = 0;
+    for (const auto& m : doc["schema"])
+        if (m.contains("fields") && m["fields"].is_array())
+            module_fields += m["fields"].size();
+    WARN("live schema: " << doc["schema"].size() << " modules, " << module_fields << " module fields");
+    REQUIRE(module_fields > 0);
+
     const size_t registered = PnpConfigKeys::register_from_schema(doc.dump());
     WARN("registered page keys: " << registered);
     REQUIRE(pnp_config_keys_sealed());
