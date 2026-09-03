@@ -812,32 +812,58 @@ target("OrcaSlicer")
     -- last after_build registered on a target).
     after_build(function (target)
         if pnp_bundle then
+            import("pnp.stage")
             local edition = get_config("pnp_dist_edition") or "developer"
             local under_edition = path.join(pnp_bundle.dist_root, edition)
             -- Editions (pnp packet 205): cargo xtask dist stages into
             -- <dist_root>/<edition>/. A --pnp_dist_dir that is itself one
             -- edition (flat, no edition layer) is still honoured, loudly, for
             -- a checkout-external tree.
-            local dist_dir = nil
-            if os.isfile(path.join(under_edition, pnp_bundle.cli_name)) then
-                dist_dir = under_edition
-            elseif os.isfile(path.join(pnp_bundle.dist_root, pnp_bundle.cli_name)) then
-                print(string.format("pnp bundling: warning: '%s' is a flat dist tree -- prefer \
-'xmake pnp' with no --pnp_dist_dir, which bundles <dist_root>/%s",
-                    pnp_bundle.dist_root, edition))
-                dist_dir = pnp_bundle.dist_root
-            end
-            if dist_dir == nil then
-                local found = os.dirs(path.join(pnp_bundle.dist_root, "*"))
-                local hint = ""
-                if #found > 0 then
-                    hint = string.format(" (dist editions found: %s)",
-                        table.concat(found, ", "))
+            local function resolve_dist()
+                if os.isfile(path.join(under_edition, pnp_bundle.cli_name)) then
+                    return under_edition
+                elseif os.isfile(path.join(pnp_bundle.dist_root, pnp_bundle.cli_name)) then
+                    print(string.format("pnp bundling: warning: '%s' is a flat dist tree -- prefer 'xmake pnp' with no --pnp_dist_dir, which bundles <dist_root>/%s",
+                        pnp_bundle.dist_root, edition))
+                    return pnp_bundle.dist_root
                 end
-                os.raise("pnp bundling: no pnp_cli in '%s' or '%s'%s -- run 'xmake pnp' \
-(or 'cargo xtask dist' in pinch_n_print_cli) first, or configure \
---pnp_dist_dir=<dir> --pnp_dist_edition=<name>",
-                    pnp_bundle.dist_root, under_edition, hint)
+                return nil
+            end
+            local dist_dir = resolve_dist()
+            -- Freshness (SchemaBridgeMap ticket 16). The dist carries no
+            -- provenance of its own, so 'xmake pnp' stamps it with the
+            -- submodule commit it staged from and BOTH the absent and the
+            -- stale case self-heal by restaging -- a stale dist silently
+            -- declaring fewer wire keys is the failure ticket 06 measured and
+            -- ticket 19 debugged around. An unstamped dist (predating this
+            -- guard, or staged by bare 'cargo xtask dist') passes silently:
+            -- its freshness is unknown, not wrong. Building deliberately
+            -- against an older backend means --pnp_bundle_cli=n.
+            local head = stage.submodule_head()
+            local stamp = dist_dir and stage.read_stamp(dist_dir) or nil
+            local restage_reason = nil
+            if dist_dir == nil then
+                restage_reason = string.format("no pnp_cli in '%s' or '%s'",
+                    pnp_bundle.dist_root, under_edition)
+            elseif stamp ~= nil and head ~= nil and stamp ~= head then
+                restage_reason = string.format("staged dist was built from %s, pinch_n_print_cli is at %s", stamp:sub(1, 12), head:sub(1, 12))
+            end
+            if restage_reason ~= nil then
+                print(string.format("pnp bundling: %s -- restaging (cargo xtask dist, edition %s)",
+                    restage_reason, edition))
+                stage.stage(edition, false, get_config("pnp_dist_dir"))
+                dist_dir = resolve_dist()
+                if dist_dir == nil then
+                    os.raise("pnp bundling: restage produced no pnp_cli in '%s' or '%s' -- run 'xmake pnp' by hand, or configure --pnp_dist_dir=<dir> --pnp_dist_edition=<name>",
+                        pnp_bundle.dist_root, under_edition)
+                end
+            end
+            -- HEAD equality cannot see uncommitted pnp work, which is exactly
+            -- what a pnp-side iteration session has. Warn, never fail -- but
+            -- not after a restage: cargo builds the working tree, so a dist
+            -- just staged from a dirty submodule already carries that work.
+            if restage_reason == nil and stage.submodule_dirty() then
+                print("pnp bundling: warning: pinch_n_print_cli has uncommitted changes -- the staged dist may be older than the working tree; run 'xmake pnp' to restage")
             end
             local bin_dir = path.directory(target:targetfile())
             -- Mirror, not merge: wiping modules/ first stops a module deleted
@@ -934,15 +960,12 @@ end
 task("pnp")
     on_run(function ()
         import("core.base.option")
-        local workdir = "pinch_n_print_cli"
-        local debug = option.get("debug") and " --debug" or ""
+        import("pnp.stage")
         -- Keep the dist stage and the bundle step on the same edition: the
         -- after_build rule resolves <pnp_dist_dir>/<pnp_dist_edition>.
         local edition = get_config("pnp_dist_edition") or "developer"
-        local edition_flag = " --edition " .. edition
-        os.cd(workdir)
-        os.exec("cargo xtask dist" .. edition_flag .. debug)
-        os.cd("-")
+        -- stage() also writes the .pnp-stamp the bundle step reads (ticket 16).
+        stage.stage(edition, option.get("debug"), get_config("pnp_dist_dir"))
     end)
     set_menu {
         usage = "xmake pnp [options]",

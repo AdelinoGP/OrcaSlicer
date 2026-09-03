@@ -372,6 +372,27 @@ are true when this map is done:
   documents, because a manifest-less reply is still a *successful* probe and
   would otherwise shrink the page to host keys unnoticed.
 
+- [Keep the staged dist fresh across submodule bumps](tickets/16-restage-on-bump-guard.md)
+  — a fork-only, build-time provenance stamp that **self-heals**. Pnp-side changes were
+  ruled out by the owner, and the startup wire-minor floor was declined on its merits
+  even though `PnpBackend` checks only `SUPPORTED_CONFIG_SCHEMA_MAJOR` while the wire has
+  moved 1.0.0 → 1.2.0 — so every drift tickets 06 and 19 hit was invisible to the existing
+  check, and still is at runtime. Instead: `xmake pnp` writes `<dist>/<edition>/.pnp-stamp`
+  holding the submodule HEAD it staged from (the dist has no provenance of its own —
+  `pnp_cli --version` reports only the crate version `0.1.0`), and the bundle step restages
+  when the stamp disagrees. **This reverses ticket 08's deliberate hard failure**: a missing
+  *or* stale dist now runs `cargo xtask dist` from inside `after_build`, so a C++ build can
+  spawn a Rust build; `--pnp_bundle_cli=n` is the escape valve and the way to build against
+  an older backend deliberately. An unstamped dist passes silently (unknown freshness, not
+  wrong), which makes the guard **inert in CI** — `build_orca.yml:148` runs bare
+  `cargo xtask dist` — acceptable because CI checks out and stages in one job. A dirty
+  submodule warns but never fails, and not after a restage (cargo builds the working tree).
+  New `xmake/modules/pnp/stage.lua` is the single staging path, so the task and the
+  self-heal cannot drift; the stamp lives in the dist, not beside the exe, so `layout.lua`
+  and every shipped tree are untouched. Verified over five build states (fresh / doctored /
+  unstamped / absent-dist / dirty); **no Catch2 coverage is possible** — it is all build-
+  description Lua, so the five states are manual.
+
 ## Not yet specified
 
 - **Migration of the curated table's existing rows.** Ticket 05 answered the tier question:
@@ -491,16 +512,21 @@ are true when this map is done:
   speed/boolean families; take it when a module ships an enum whose raw values a user must not
   have to parse.)*
 
-- **What the fork should do about a `pnp_cli` older than the wire it needs.** Ticket 06 found the
+- **What the fork should do about a `pnp_cli` older than the wire it needs.** ~~Ticket 06 found the
   staged dist answering `config-schema` at wire 1.0.0 while the submodule tree emits 1.1.0, and had
   to gate its diff on the `host` array to avoid 14 false dead rows. But the same old wire silently
   degrades more than drift reporting: 65 host keys drop out of the key universe (so they tint amber
   and never register), and the generated PNP page loses its host-key controls. Ticket 08 removed
   the local trap (stale flat dist deleted; CI stages fresh; xmake fails loudly when nothing is
   staged) but deliberately did **not** decide the detection question — that graduated as
-  [ticket 16 (restage-on-bump guard)](tickets/16-restage-on-bump-guard.md). Until it lands, an old
-  wire remains indistinguishable from a backend that genuinely declares less. Ticket 02's grilling
-  may already have taken a position worth re-reading first; ticket 16 names that in its body.
+  [ticket 16 (restage-on-bump guard)](tickets/16-restage-on-bump-guard.md).~~
+  **Half-discharged 2026-09-03 (ticket 16):** the *build-time* half is taken — a stamped dist
+  restages itself when the submodule moves, so on a dev machine an old wire can no longer
+  reach the GUI unnoticed. The *runtime* half was declined: with pnp-side changes off the
+  table and the wire-minor floor rejected, a `pnp_cli` that is old **at run time** — a
+  shipped install, a CI artifact, or any unstamped dist — still reads as a backend that
+  genuinely declares less. That is now the whole of what remains in this patch, and it is a
+  deliberate accepted risk rather than an unexamined one.
 
 - **Non-prismatic modifiers fan the tree planner's per-layer ids out.** Ticket 19's
   sub-region id hashes the modifier footprint at each layer Z, so a modifier whose
