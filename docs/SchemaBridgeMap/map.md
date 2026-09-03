@@ -322,6 +322,34 @@ are true when this map is done:
   reach `LayerPlanIR.active_regions` / the blackboard `SliceIR`, so the
   support planners don't yet route candidates inside the footprint — that
   leg is [ticket 19](tickets/19-surface-subregions-to-layer-plan-and-slice.md).
+- [Surface minted modifier sub-regions to the layer plan and blackboard slice](tickets/19-surface-subregions-to-layer-plan-and-slice.md)
+  — pnp half landed twice. First close (`04ec7c09`): the region-mapping
+  builtin appends one `ActiveRegion` per modifier-namespace map entry and
+  `split_modifier_sub_regions_for_prepass` materialises the sub-region
+  geometry in the blackboard slice, so contact detection yields candidates
+  inside the footprint and the family planners route them. **Reopened the
+  same day** on the user's model: the closing e2e covered only the inverse
+  direction (traditional base, thin tree band). With base=tree /
+  modifier=normal the two planners both claimed the free air under the
+  overhang and the host's cross-family guard annihilated both (2121
+  rejections, tree stopping at z 4.0), the GUI was running a stale dist on
+  top of that (ticket 16's bit), and the traditional renderer never ran
+  below the overhang because Tier-2 dispatch keys on `active_regions`
+  (geometry-only). Second close: **support territory** (`SupportAnalysisIR`
+  1.3.0, one own/foreign clip rule shared by both planners and aggregation,
+  Info 1205 instead of reject-both; DEV-159 since Orca has no per-region
+  family), **support carrier regions** (a family renderer runs and receives
+  an empty region wherever its plan holds bodies), plus the two top-layer
+  residuals: R1 (guest never received `internal_solid_fill`, so
+  `only_one_wall_top` walled the shell shadow as top and dropped every wall
+  on a second-pass failure; internal-bridge sites emitted as external
+  `Bridge`, half-closing DEV-153 and replacing its AC-6 pin with the
+  canonical-correct expectation plus a conservation check) and R2
+  (`perimeter_source_regions` restored only `polygons`).
+  Measured: 0 rejections, tree interface to z 24.8, traditional support in
+  the modifier half on all 124 support layers, top shell layers with the
+  full wall set and matching the modifier-free control. Residual: the
+  manual GUI smoke of `SupportTest.3mf` (interactive session).
 
 
   — **both halves taken.** pnp-side (`588651d0`): document 1.1.0 → 1.2.0, `layers[].support_interface`
@@ -476,6 +504,28 @@ are true when this map is done:
   [ticket 16 (restage-on-bump guard)](tickets/16-restage-on-bump-guard.md). Until it lands, an old
   wire remains indistinguishable from a backend that genuinely declares less. Ticket 02's grilling
   may already have taken a position worth re-reading first; ticket 16 names that in its body.
+
+- **Non-prismatic modifiers fan the tree planner's per-layer ids out.** Ticket 19's
+  sub-region id hashes the modifier footprint at each layer Z, so a modifier whose
+  cross-section changes with Z mints one region id per layer. The territory map and the
+  clip rule are per layer and unaffected, but the tree planner stamps its per-layer
+  entries onto every same-family region of the object, and the traditional carry is
+  clipped layer by layer — nobody has checked a tapered modifier end to end (ticket 19's
+  fixture is a prism). Owner wanted before a non-prismatic `support_type` modifier ships.
+
+- **Internal bridges have two would-be owners.** The host's InfillPostProcess arm
+  constructs anchored internal-bridge lines from `internal_bridge_areas` after walls
+  exist, and (since ticket 19's R1) the infill module emits the same qualified sites as
+  `InternalBridgeInfill`. On the ticket-19 fixture the host construction produced
+  nothing, so the module is the only emitter in practice; a case where both fire would
+  double-extrude the internal bridge. Decide the single owner (the module already carries
+  every `internal_bridge_*` parameter; the host path exists for anchoring) and delete the
+  other.
+
+- **Ticket 16 bit again.** Ticket 19's reopen was one-third a stale dist: the bundled
+  backend predated the very commit that closed the ticket, and only a symbol probe on
+  the binary told the two apart. The restage-on-bump guard is the missing piece; until
+  it lands, treat "the GUI still shows the old behaviour" as "is the dist fresh?" first.
 
 ## Out of scope
 
