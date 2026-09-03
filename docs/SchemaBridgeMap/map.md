@@ -513,6 +513,15 @@ are true when this map is done:
   clipped layer by layer — nobody has checked a tapered modifier end to end (ticket 19's
   fixture is a prism). Owner wanted before a non-prismatic `support_type` modifier ships.
 
+- **Foreign support territory is barred plate-wide, not per object.** The tree planner's
+  `TreeVolumes` is built once per plate and its `layer_outlines` already ignore `object_id`, so
+  ticket 19's foreign-territory bar followed that convention: one object's modifier territory
+  bars every object's branches. The physical argument agrees (another object's traditional
+  support really does extrude there at that layer), but the host's cross-family guard is scoped
+  per object and would have allowed the overlap, so a tree object sharing XY with a different
+  object's modifier loses branches it could have kept. No multi-object fixture exercises it.
+  Decide which scope is authoritative before a plate mixes families across objects.
+
 - **Internal bridges have two would-be owners.** The host's InfillPostProcess arm
   constructs anchored internal-bridge lines from `internal_bridge_areas` after walls
   exist, and (since ticket 19's R1) the infill module emits the same qualified sites as
