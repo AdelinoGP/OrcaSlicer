@@ -1769,6 +1769,13 @@ TriangleSelector::TriangleSplittingData TriangleSelector::serialize() const {
     return out.data;
 }
 
+// A split code keeps the split side (one split) or the kept side (two splits) in its upper two
+// bits, where 3 is not a side. The value is ignored for a three-side split.
+static bool split_code_valid(int code)
+{
+    return (code & 0b11) == 3 || (code >> 2) != 3;
+}
+
 void TriangleSelector::deserialize(const TriangleSplittingData &data,
                                    bool                         needs_reset,
                                    EnforcerBlockerType          max_ebt,
@@ -1803,11 +1810,12 @@ void TriangleSelector::deserialize(const TriangleSplittingData &data,
 
     for (auto [triangle_id, ibit] : data.triangles_to_split) {
         assert(triangle_id < int(m_triangles.size()));
-        assert(ibit < int(data.bitstream.size()));
-        auto next_nibble = [&data, &ibit = ibit]() {
+        // Set when the bitstream runs out or holds an impossible split before this triangle's tree is complete.
+        bool corrupt = false;
+        auto next_nibble = [&data, &ibit = ibit, &corrupt]() {
             int n = 0;
-            for (int i = 0; i < 4; ++ i)
-                n |= data.bitstream[ibit ++] << i;
+            if (! data.read_nibble(ibit, n))
+                corrupt = true;
             return n;
         };
 
@@ -1820,6 +1828,10 @@ void TriangleSelector::deserialize(const TriangleSplittingData &data,
             bool is_split = num_of_children != 0;
             // Only valid if not is_split. Value of the second nibble was subtracted by 3, so it is added back.
             auto state = is_split ? EnforcerBlockerType::NONE : EnforcerBlockerType((code & 0b1100) == 0b1100 ? next_nibble() + 3 : code >> 2);
+            if (is_split && ! split_code_valid(code))
+                corrupt = true;
+            if (corrupt)
+                break;
 
             // BBS
             if (state == to_delete_filament)
@@ -1834,7 +1846,7 @@ void TriangleSelector::deserialize(const TriangleSplittingData &data,
             }
 
             // Only valid if is_split.
-            int special_side = code >> 2;
+            int special_side = num_of_split_sides == 3 ? 0 : code >> 2;
 
             // Take care of the first iteration separately, so handling of the others is simpler.
             if (parents.empty()) {
@@ -1889,40 +1901,49 @@ void TriangleSelector::deserialize(const TriangleSplittingData &data,
             if (parents.empty())
                 break;
         }
+
+        if (corrupt) {
+            // Every split above allocated all of its children, so the partial tree unwinds cleanly.
+            BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << ": malformed paint data, dropping paint of triangle " << triangle_id;
+            undivide_triangle(triangle_id);
+            m_triangles[triangle_id].set_state(EnforcerBlockerType::NONE);
+        }
     }
 }
 
-void TriangleSelector::TriangleSplittingData::update_used_states(const size_t bitstream_start_idx) {
-    assert(bitstream_start_idx < this->bitstream.size());
-    assert(!this->bitstream.empty() && this->bitstream.size() != bitstream_start_idx);
-    assert((this->bitstream.size() - bitstream_start_idx) % 4 == 0);
+bool TriangleSelector::TriangleSplittingData::update_used_states(const size_t bitstream_start_idx) {
+    int      ibit   = static_cast<int>(bitstream_start_idx);
+    uint64_t states = 0;
+    do {
+        // Walk one triangle's tree depth-first, counting the nodes still to be read; a split node adds its children.
+        for (int pending_nodes = 1; pending_nodes > 0; --pending_nodes) {
+            int code;
+            if (!this->read_nibble(ibit, code))
+                return false;
 
-    if (this->bitstream.empty() || this->bitstream.size() == bitstream_start_idx)
-        return;
+            if (const int num_of_split_sides = code & 0b11; num_of_split_sides != 0) {
+                if (!split_code_valid(code))
+                    return false;
+                pending_nodes += num_of_split_sides + 1;
+                continue;
+            }
 
-    size_t nibble_idx = bitstream_start_idx;
+            int facet_state = code >> 2;
+            if (facet_state == 0b11) {
+                // Leaf behind the "11" prefix: one nibble of (state-3).
+                int nibble;
+                if (!this->read_nibble(ibit, nibble))
+                    return false;
+                facet_state = nibble + 3;
+            }
+            states |= uint64_t(1) << facet_state;
+        }
+    } while (static_cast<size_t>(ibit) < this->bitstream.size());
 
-    auto read_next_nibble = [&data_bitstream = std::as_const(this->bitstream), &nibble_idx]() -> uint8_t {
-        assert(nibble_idx + 3 < data_bitstream.size());
-        uint8_t code = 0;
-        for (size_t bit_idx = 0; bit_idx < 4; ++bit_idx)
-            code |= data_bitstream[nibble_idx++] << bit_idx;
-        return code;
-    };
-
-    while (nibble_idx < this->bitstream.size()) {
-        const uint8_t code = read_next_nibble();
-
-        if (const bool is_split = (code & 0b11) != 0; is_split)
-            continue;
-
-        const uint8_t facet_state = (code & 0b1100) == 0b1100 ? read_next_nibble() + 3 : code >> 2;
-        assert(facet_state < this->used_states.size());
-        if (facet_state >= this->used_states.size())
-            continue;
-
-        this->used_states[facet_state] = true;
-    }
+    for (size_t state_idx = 0; state_idx < std::min<size_t>(this->used_states.size(), 64); ++state_idx)
+        if (states & (uint64_t(1) << state_idx))
+            this->used_states[state_idx] = true;
+    return true;
 }
 
 // Lightweight variant of deserialization, which only tests whether a face of test_state exists.
@@ -1934,11 +1955,12 @@ bool TriangleSelector::has_facets(const TriangleSplittingData &data, const Enfor
 
     for (const TriangleBitStreamMapping &triangle_id_and_ibit : data.triangles_to_split) {
         int ibit = triangle_id_and_ibit.bitstream_start_idx;
-        assert(ibit < int(data.bitstream.size()));
-        auto next_nibble = [&data, &ibit = ibit]() {
+        // Stop reading a triangle whose stream is truncated.
+        bool truncated = false;
+        auto next_nibble = [&data, &ibit = ibit, &truncated]() {
             int n = 0;
-            for (int i = 0; i < 4; ++ i)
-                n |= data.bitstream[ibit ++] << i;
+            if (! data.read_nibble(ibit, n))
+                truncated = true;
             return n;
         };
         // < 0 -> negative of a number of children
@@ -1952,6 +1974,8 @@ bool TriangleSelector::has_facets(const TriangleSplittingData &data, const Enfor
         };
 
         int state = num_children_or_state();
+        if (truncated)
+            continue;
         if (state < 0) {
             // Root is split.
             parents_children.clear();
@@ -1959,6 +1983,8 @@ bool TriangleSelector::has_facets(const TriangleSplittingData &data, const Enfor
             do {
                 if (-- parents_children.back() >= 0) {
                     int state = num_children_or_state();
+                    if (truncated)
+                        break;
                     if (state < 0)
                         // Child is split.
                         parents_children.emplace_back(- state);

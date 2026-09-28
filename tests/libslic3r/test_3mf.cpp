@@ -1035,6 +1035,50 @@ TEST_CASE("An object loads up to the component reference budget and fails past i
     }
 }
 
+TEST_CASE("A project with a plate id below 1 fails to load", "[3mf][Regression]")
+{
+    const int plate_id = GENERATE(0, -1);
+    INFO("plater_id " << plate_id);
+
+    ScopedTemporaryFile temp(".3mf");
+    store_painted_cube(temp.string());
+    {
+        ScopedTemporaryDir backup_dir("orca_plate_dst");
+        Model              model;
+        REQUIRE(load_bbs_project(temp.string(), model, backup_dir));
+    }
+
+    REQUIRE(replace_in_3mf_entry(temp.string(), "model_settings.config", "key=\"plater_id\" value=\"1\"",
+                                 "key=\"plater_id\" value=\"" + std::to_string(plate_id) + "\""));
+    ScopedTemporaryDir backup_dir("orca_plate_dst");
+    Model              model;
+    bool               loaded = true;
+    REQUIRE_NOTHROW(loaded = load_bbs_project(temp.string(), model, backup_dir));
+    REQUIRE_FALSE(loaded);
+}
+
+TEST_CASE("A project with malformed paint data loads without the damaged facet", "[3mf][Regression]")
+{
+    ScopedTemporaryFile temp(".3mf");
+    store_painted_cube(temp.string());
+    // Split codes with no children behind them: the stream runs out mid-tree.
+    REQUIRE(replace_in_3mf_entry(temp.string(), ".model", "paint_color=\"8\"", "paint_color=\"FFFFFFFFFFFFFFFF3\""));
+
+    ScopedTemporaryDir backup_dir("orca_paint_dst");
+    Model              model;
+    REQUIRE(load_bbs_project(temp.string(), model, backup_dir));
+    REQUIRE(model.objects.size() == 1);
+    const ModelVolume& volume = *model.objects.front()->volumes.front();
+    const auto&        data   = volume.mmu_segmentation_facets.get_data();
+    REQUIRE_FALSE(data.used_states[size_t(EnforcerBlockerType::Extruder2)]);
+    REQUIRE(data.used_states[size_t(EnforcerBlockerType::Extruder3)]);
+
+    TriangleSelector selector(volume.mesh());
+    REQUIRE_NOTHROW(selector.deserialize(data));
+    REQUIRE(selector.num_facets(EnforcerBlockerType::Extruder2) == 0);
+    REQUIRE(selector.num_facets(EnforcerBlockerType::Extruder3) == 1);
+}
+
 // Writes a single-entry zip whose central directory carries a zip64 record declaring an
 // uncompressed size beyond what the 32-bit expat buffer API can take, while the deflated
 // payload inflates to only ~64 KiB. Built by hand because miniz never writes a size that
