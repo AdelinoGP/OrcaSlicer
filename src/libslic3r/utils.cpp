@@ -66,6 +66,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/case_conv.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/nowide/fstream.hpp>
@@ -1087,6 +1088,59 @@ bool is_gcode_file(const std::string &path)
 bool is_json_file(const std::string& path)
 {
 	return boost::iends_with(path, ".json");
+}
+
+// True if rel_path is relative, has no ".." component or embedded NUL and, joined to root, still resolves inside it.
+static bool is_path_within_root(const std::string &rel_path, const boost::filesystem::path &root)
+{
+    auto is_separator = [](char c) { return c == '/' || c == '\\'; };
+    if (rel_path.empty() || is_separator(rel_path.front()) || (rel_path.size() > 1 && rel_path[1] == ':'))
+        return false;
+    // The filesystem calls stop at a NUL, so they would act on a shorter path than the one checked here.
+    if (rel_path.find('\0') != std::string::npos)
+        return false;
+    for (size_t start = 0; start <= rel_path.size();) {
+        size_t end = start;
+        while (end < rel_path.size() && !is_separator(rel_path[end]))
+            ++end;
+        if (rel_path.compare(start, end - start, "..") == 0)
+            return false;
+        start = end + 1;
+    }
+    // Resolve against the canonical root so a symlink inside it cannot lead back out.
+    try {
+        std::string root_str = boost::filesystem::weakly_canonical(root).string();
+        // A trailing separator on root would otherwise fail the prefix match below for every path.
+        while (!root_str.empty() && (root_str.back() == '/' || root_str.back() == boost::filesystem::path::preferred_separator))
+            root_str.pop_back();
+        const std::string full_str = boost::filesystem::weakly_canonical(root / rel_path).string();
+        return full_str.compare(0, root_str.size(), root_str) == 0 &&
+               (full_str.size() == root_str.size() || full_str[root_str.size()] == boost::filesystem::path::preferred_separator);
+    } catch (const boost::filesystem::filesystem_error &) {
+        return false;
+    }
+}
+
+bool is_absolute_path_within_root(const boost::filesystem::path &path, const boost::filesystem::path &root)
+{
+    const boost::filesystem::path rel = path.lexically_relative(root);
+    return !rel.empty() && rel != "." && is_path_within_root(rel.string(), root);
+}
+
+bool is_safe_to_open_file_name(const std::string &file_name)
+{
+    // Formats that cannot carry macros or scripts. Legacy and OpenDocument office files, HTML and SVG are left out on purpose.
+    static const std::vector<std::string> safe_extensions = {
+        "jpg", "jpeg", "jfif", "pjpeg", "pjp", "png", "gif", "bmp", "webp", "tif", "tiff",
+        "pdf", "txt", "md", "csv", "docx", "xlsx", "pptx",
+        "stl", "obj", "3mf", "amf", "ply", "step", "stp", "iges", "igs", "dxf",
+        "mp4", "mov", "webm"};
+    // The name must end in the extension itself: Windows drops trailing dots and spaces and reads ':' as a stream separator.
+    const size_t dot = file_name.find_last_of('.');
+    if (dot == std::string::npos || file_name.find_first_of("/\\:") != std::string::npos)
+        return false;
+    const std::string extension = boost::algorithm::to_lower_copy(file_name.substr(dot + 1));
+    return std::find(safe_extensions.begin(), safe_extensions.end(), extension) != safe_extensions.end();
 }
 
 bool is_img_file(const std::string &path)
