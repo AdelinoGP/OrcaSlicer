@@ -3,9 +3,12 @@
 #include <vector>
 #include <thread>
 #include <exception>
+#include <sstream>
 #include <boost/optional.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
 
 #include <wx/string.h>
 #include <wx/app.h>
@@ -110,6 +113,20 @@ std::string PrintHost::get_print_host_webui(DynamicPrintConfig* config)
         webui_url = "http://" + webui_url;
 
     return webui_url;
+}
+
+int PrintHost::get_err_code_from_body(const std::string &body)
+{
+    boost::property_tree::ptree root;
+    std::istringstream iss(body);
+    try {
+        boost::property_tree::read_json(iss, root);
+    } catch (const std::exception &ex) {
+        BOOST_LOG_TRIVIAL(error) << "PrintHost: response is not valid JSON: " << ex.what();
+        return -1;
+    }
+
+    return root.get<int>("err", 0);
 }
 
 wxString PrintHost::format_error(const std::string &body, const std::string &error, unsigned status) const
@@ -358,11 +375,17 @@ void PrintHostJobQueue::priv::perform_job(PrintHostJob the_job)
 {
     emit_progress(0);   // Indicate the upload is starting
 
-    bool success = the_job.printhost->upload(std::move(the_job.upload_data),
-        [this](Http::Progress progress, bool &cancel)   { this->progress_fn(std::move(progress), cancel); },
-        [this](wxString error)                          { this->error_fn(std::move(error)); },
-        [this](wxString tag, wxString host)             { this->info_fn(std::move(tag), std::move(host)); }
-    );
+    bool success = false;
+    // A throwing upload must not stop the worker, or later jobs would stay queued forever.
+    try {
+        success = the_job.printhost->upload(std::move(the_job.upload_data),
+            [this](Http::Progress progress, bool &cancel)   { this->progress_fn(std::move(progress), cancel); },
+            [this](wxString error)                          { this->error_fn(std::move(error)); },
+            [this](wxString tag, wxString host)             { this->info_fn(std::move(tag), std::move(host)); }
+        );
+    } catch (const std::exception &e) {
+        this->error_fn(wxString::FromUTF8(e.what()));
+    }
 
     if (success) {
         emit_progress(100);
