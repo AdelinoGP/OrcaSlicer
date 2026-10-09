@@ -15,10 +15,15 @@
 
 #include "test_utils.hpp"
 #include "libslic3r/miniz_extension.hpp"
+#include "libslic3r/Zipper.hpp"
+#include "libslic3r/TriangleSelector.hpp"
 
 #include <catch2/catch_tostring.hpp>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <boost/algorithm/string/predicate.hpp>
+#include <functional>
+#include <regex>
 #include <type_traits> // for std::enable_if_t
 #include <typeinfo>    // for typeid
 
@@ -869,6 +874,164 @@ SCENARIO("2D convex hull of sinking object", "[3mf][.]") {
                 REQUIRE(res);
             }
         }
+    }
+}
+
+// Rewrites the archive at `path`, letting `edit` change the name or data of each entry; returns
+// whether `edit` reported a change for any of them. miniz cannot edit in place and
+// open_zip_writer truncates, so the entries are held across the switch.
+static bool rewrite_3mf_entries(const std::string& path, const std::function<bool(std::string& name, std::string& data)>& edit)
+{
+    std::vector<std::pair<std::string, std::string>> entries;
+    bool changed = false;
+    {
+        mz_zip_archive zip;
+        mz_zip_zero_struct(&zip);
+        REQUIRE(open_zip_reader(&zip, path));
+        mz_uint n = mz_zip_reader_get_num_files(&zip);
+        for (mz_uint i = 0; i < n; ++i) {
+            mz_zip_archive_file_stat st;
+            REQUIRE(mz_zip_reader_file_stat(&zip, i, &st));
+            if (st.m_is_directory) continue;
+            std::string name(st.m_filename);
+            std::replace(name.begin(), name.end(), '\\', '/');
+            std::string data((size_t) st.m_uncomp_size, '\0');
+            if (st.m_uncomp_size > 0)
+                REQUIRE(mz_zip_reader_extract_to_mem(&zip, i, data.data(), data.size(), 0));
+            changed |= edit(name, data);
+            entries.emplace_back(std::move(name), std::move(data));
+        }
+        close_zip_reader(&zip);
+    }
+
+    Zipper out(path);
+    for (const auto& e : entries)
+        out.add_entry(e.first, e.second.data(), e.second.size());
+    out.finalize();
+    return changed;
+}
+
+// Replaces the first occurrence of `from` in any entry whose name ends with `suffix`.
+static bool replace_in_3mf_entry(const std::string& path, const std::string& suffix, const std::string& from, const std::string& to)
+{
+    bool replaced = false;
+    rewrite_3mf_entries(path, [&](std::string& name, std::string& data) {
+        if (replaced || !boost::algorithm::ends_with(name, suffix))
+            return false;
+        if (const size_t pos = data.find(from); pos != std::string::npos) {
+            data.replace(pos, from.size(), to);
+            replaced = true;
+        }
+        return replaced;
+    });
+    return replaced;
+}
+
+// Stores a one-plate project holding a cube whose first two facets are painted Extruder2 and
+// Extruder3, which the exporter writes as paint_color="8" and paint_color="0C".
+static void store_painted_cube(const std::string& path)
+{
+    Model        model;
+    ModelObject* object = model.add_object();
+    ModelVolume* volume = object->add_volume(make_cube(10., 10., 10.));
+    object->add_instance();
+    {
+        TriangleSelector selector(volume->mesh());
+        selector.set_facet(0, EnforcerBlockerType::Extruder2);
+        selector.set_facet(1, EnforcerBlockerType::Extruder3);
+        REQUIRE(volume->mmu_segmentation_facets.set(selector));
+    }
+    ScopedTemporaryDir backup_dir("orca_paint_src");
+    model.set_backup_path(backup_dir.string());
+
+    DynamicPrintConfig cfg;
+    PlateData          plate;
+    plate.plate_index = 0;
+    StoreParams sp;
+    sp.path     = path.c_str();
+    sp.model    = &model;
+    sp.config   = &cfg;
+    sp.strategy = SaveStrategy::Zip64 | SaveStrategy::Silence;
+    sp.plate_data_list.push_back(&plate);
+    REQUIRE(store_bbs_3mf(sp));
+}
+
+// Loads `path` through the BBS importer into `model`, releasing the plates it returns. The
+// importer stages metadata through `backup_dir`, which has to outlive the model.
+static bool load_bbs_project(const std::string& path, Model& model, const ScopedTemporaryDir& backup_dir)
+{
+    model.set_backup_path(backup_dir.string());
+    DynamicPrintConfig        config;
+    ConfigSubstitutionContext ctxt{ ForwardCompatibilitySubstitutionRule::Enable };
+    PlateDataPtrs             plates;
+    std::vector<Preset*>      project_presets;
+    bool   is_bbl_3mf = false, is_orca_3mf = false;
+    Semver file_version;
+    const bool loaded = load_bbs_3mf(path.c_str(), &config, &ctxt, &model, &plates, &project_presets, &is_bbl_3mf,
+                                     &is_orca_3mf, &file_version, nullptr, LoadStrategy::LoadModel | LoadStrategy::LoadConfig);
+    release_PlateData_list(plates);
+    return loaded;
+}
+
+TEST_CASE("A project whose components reference themselves fails to load", "[3mf][Regression]")
+{
+    // One self-reference keeps the expansion going without ever reaching a mesh. A thousand also make
+    // each expansion queue a thousand more, so the bound has to hold the work list, not just the loop.
+    const int references = GENERATE(1, 1000);
+    INFO("self-references " << references);
+
+    ScopedTemporaryFile temp(".3mf");
+    store_painted_cube(temp.string());
+
+    // Point the component back at the object that holds it, repeated `references` times.
+    REQUIRE(rewrite_3mf_entries(temp.string(), [references](std::string& name, std::string& data) {
+        if (!boost::algorithm::ends_with(name, "3dmodel.model"))
+            return false;
+        std::smatch match;
+        if (!std::regex_search(data, match, std::regex("<object id=\"([0-9]+)\"[^>]*>\\s*<components")))
+            return false;
+        data = std::regex_replace(data, std::regex("objectid=\"[0-9]+\""), "objectid=\"" + match[1].str() + "\"");
+        std::smatch component;
+        if (!std::regex_search(data, component, std::regex("<component [^>]*/>")))
+            return false;
+        std::string repeated;
+        for (int i = 0; i < references; ++i)
+            repeated += component.str();
+        data.replace(component.position(), component.length(), repeated);
+        return true;
+    }));
+
+    ScopedTemporaryDir backup_dir("orca_cycle_dst");
+    Model              model;
+    bool               loaded = true;
+    REQUIRE_NOTHROW(loaded = load_bbs_project(temp.string(), model, backup_dir));
+    REQUIRE_FALSE(loaded);
+}
+
+TEST_CASE("An object loads up to the component reference budget and fails past it", "[3mf][Regression]")
+{
+    // The importer queues at most 100000 component references per object. Every reference besides the
+    // cube's own points at an object the file does not define: it counts toward the budget, then expands
+    // to nothing, so the object stays a single part whatever the count.
+    const auto [references, loads] = GENERATE(table<int, bool>({ { 100000, true }, { 100001, false } }));
+    INFO("component references " << references);
+
+    ScopedTemporaryFile temp(".3mf");
+    store_painted_cube(temp.string());
+
+    std::string dangling;
+    for (int i = 1; i < references; ++i)
+        dangling += "<component objectid=\"999999\"/>";
+    REQUIRE(replace_in_3mf_entry(temp.string(), "3dmodel.model", "</components>", dangling + "</components>"));
+
+    ScopedTemporaryDir backup_dir("orca_budget_dst");
+    Model              model;
+    bool               loaded = !loads;
+    REQUIRE_NOTHROW(loaded = load_bbs_project(temp.string(), model, backup_dir));
+    REQUIRE(loaded == loads);
+    if (loads) {
+        REQUIRE(model.objects.size() == 1);
+        CHECK(model.objects.front()->volumes.size() == 1);
     }
 }
 
