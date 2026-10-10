@@ -577,3 +577,21 @@ TEST_CASE("A project filament storing one value for a per-variant key applies it
     check_double_vector(loaded->config.option<ConfigOptionFloats>("filament_flow_ratio")->values, {0.97, 0.97});
     check_double_vector(loaded->config.option<ConfigOptionFloats>("filament_max_volumetric_speed")->values, {11, 11});
 }
+
+// Upstream 4a20168742. A config loaded over the full defaults already carries a one-entry
+// filament_self_index, so the old "key missing" test never fired and a multi-filament project
+// authored without the key kept the single entry. Size the index against the filament count.
+TEST_CASE("A multi-toolhead project saved without filament self indices loads every filament", "[Preset][Bundle]")
+{
+    const std::vector<std::string> colors = { "#FF0000", "#000000", "#FFFFFF", "#FFFF00" };
+    DynamicPrintConfig config = DynamicPrintConfig::full_print_config();
+    config.opt<ConfigOptionStrings>("filament_colour")->values = colors;
+    config.opt<ConfigOptionFloats>("nozzle_diameter")->values = std::vector<double>(colors.size(), 0.4);
+    config.option<ConfigOptionBool>("single_extruder_multi_material")->value = false;
+    Preset::normalize(config);
+
+    PresetBundle bundle;
+    REQUIRE_NOTHROW(bundle.load_config_model("test.3mf", std::move(config)));
+    CHECK(bundle.filament_presets.size() == colors.size());
+    CHECK(bundle.project_config.opt<ConfigOptionStrings>("filament_colour")->values == colors);
+}
