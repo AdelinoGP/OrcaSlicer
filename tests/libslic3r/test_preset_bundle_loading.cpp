@@ -70,6 +70,15 @@ void set_renamed_from(PresetCollection &coll, const std::string &preset_name, st
             it->renamed_from = std::move(old_names);
 }
 
+// Compare a float vector element-wise with the absolute tolerance upstream uses.
+void check_double_vector(const std::vector<double> &actual, std::initializer_list<double> expected)
+{
+    REQUIRE(actual.size() == expected.size());
+    size_t index = 0;
+    for (double value : expected)
+        REQUIRE_THAT(actual[index++], Catch::Matchers::WithinAbs(value, 1e-6));
+}
+
 // A standalone print preset collection that exposes the protected rename-map builder, so a
 // renamed_from scenario can be set up without the full system-profile load pipeline.
 // (PresetCollection is non-copyable - it holds a mutex - so it is constructed directly with
@@ -533,4 +542,38 @@ TEST_CASE("PresetBundle::get_preset_collection returns null for SLA types", "[Pr
     const PresetBundle& cbundle = bundle;
     REQUIRE(cbundle.get_preset_collection(Preset::TYPE_SLA_MATERIAL) == nullptr);
     REQUIRE(cbundle.get_preset_collection(Preset::TYPE_PRINT)        == &cbundle.prints);
+}
+
+// Upstream 9b2fcaa53a. A 2.4-era project can embed a filament that stores one value for a
+// per-variant key while the parent declares two variants. update_diff_values_to_child_config
+// indexes the child list by variant position, so without padding the config to the parent's
+// length it read past the end and threw "bad allocation" (or worse).
+TEST_CASE("A project filament storing one value for a per-variant key applies it to every variant", "[Preset][Bundle][Regression]")
+{
+    PresetCollection filaments(Preset::TYPE_FILAMENT, Preset::filament_options(),
+                               static_cast<const PrintRegionConfig &>(FullPrintConfig::defaults()));
+    Preset &parent = add_inmemory_preset(filaments, "Parent Filament");
+    parent.config.set_key_value("filament_extruder_variant", new ConfigOptionStrings({"Direct Drive Standard", "Direct Drive High Flow"}));
+    parent.config.set_deserialize_strict("filament_flow_ratio", "0.98,0.95");
+    parent.config.set_deserialize_strict("filament_max_volumetric_speed", "15,12");
+    parent.is_system = true;
+
+    // A filament saved before these keys became per-variant lists both variants but stores each key once.
+    DynamicPrintConfig config;
+    config.set_key_value(BBL_JSON_KEY_INHERITS, new ConfigOptionString("Parent Filament"));
+    config.set_key_value("filament_extruder_variant", new ConfigOptionStrings({"Direct Drive Standard", "Direct Drive High Flow"}));
+    config.set_deserialize_strict("filament_flow_ratio", "0.97");
+    config.set_deserialize_strict("filament_max_volumetric_speed", "11");
+    auto embedded                 = std::make_unique<Preset>(Preset::TYPE_FILAMENT, "Project Filament", false);
+    embedded->config              = std::move(config);
+    embedded->is_project_embedded = true;
+
+    std::vector<Preset *>      project_presets{embedded.get()};
+    PresetsConfigSubstitutions substitutions;
+    filaments.load_project_embedded_presets(project_presets, PRESET_FILAMENT_NAME, substitutions, ForwardCompatibilitySubstitutionRule::Disable);
+
+    const Preset *loaded = filaments.find_preset("Project Filament");
+    REQUIRE(loaded != nullptr);
+    check_double_vector(loaded->config.option<ConfigOptionFloats>("filament_flow_ratio")->values, {0.97, 0.97});
+    check_double_vector(loaded->config.option<ConfigOptionFloats>("filament_max_volumetric_speed")->values, {11, 11});
 }
