@@ -61,12 +61,18 @@ using PnpKeyUniverse = std::set<std::string>;
 
 
 // Schema guard (F01 follow-up): validate a translated config against the
-// parsed `pnp_cli module config-schema` document and drop every key whose
-// value pnp's config resolution would reject — wrong JSON type, out of
-// [min, max] range, or unknown enum value — appending one lossy-fallback
-// warning per dropped key. pnp then falls back to its own default, so a
-// config mismatch degrades to a logged warning instead of a failed slice.
-// Keys the schema does not mention are left untouched (pnp ignores them).
+// parsed `pnp_cli module config-schema` document and repair every key whose
+// wire shape pnp's config resolution would reject — a scalar against a
+// declared `*-list` wraps into a one-element list (the single-filament
+// `filament_cost` shape that failed every slice with `config resolution
+// failed`), and elements are coerced across the number/string line as pnp's
+// own acceptance rules allow. What cannot be repaired is dropped — wrong JSON
+// type, out of [min, range] bounds, or unknown enum value — appending one
+// lossy-fallback warning per dropped key. pnp then falls back to its own
+// default, so a config mismatch degrades to a logged warning instead of a
+// failed slice. Both wire halves are indexed (per-module `schema[].fields`
+// and the `host` array added by wire 1.1.0); keys neither mentions are left
+// untouched (pnp ignores them). Repairs are lossless and emit no warning.
 void apply_schema_guard(nlohmann::json& config, const nlohmann::json& schema_doc,
                         std::vector<PnpConfigWarning>& warnings);
 

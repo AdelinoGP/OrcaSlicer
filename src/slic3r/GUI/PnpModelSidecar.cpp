@@ -13,6 +13,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "PnpConfigTranslator.hpp"
+
 namespace Slic3r {
 namespace GUI {
 
@@ -25,7 +27,8 @@ const char* const PROJECT_SETTINGS_CONFIG_ENTRY = "Metadata/project_settings.con
 
 } // anonymous namespace
 
-bool merge_translated_config_into_3mf(const boost::filesystem::path& path, const nlohmann::json& translated)
+bool merge_translated_config_into_3mf(const boost::filesystem::path& path, const nlohmann::json& translated,
+                                      const nlohmann::json* schema)
 {
     mz_zip_archive reader;
     memset(&reader, 0, sizeof(reader));
@@ -71,6 +74,21 @@ bool merge_translated_config_into_3mf(const boost::filesystem::path& path, const
     }
     for (const auto& [key, value] : translated.items())
         sidecar[key] = value;
+    // Guard the merged result, not just the translated layer: the raw Orca
+    // spellings underneath survive for every key the translator drops or does
+    // not know, and the merge is the only config channel pnp_cli reads.
+    // Lossless shape repairs (a scalar against a declared list, elements
+    // across the number/string line) apply silently; anything pnp's config
+    // resolution would reject and the repair cannot save is dropped and
+    // logged here, so pnp falls back to its own default instead of aborting
+    // the slice with `config resolution failed`.
+    if (schema != nullptr && !schema->is_null() && !schema->empty()) {
+        std::vector<PnpConfigWarning> drops;
+        PnpConfigTranslator::apply_schema_guard(sidecar, *schema, drops);
+        for (const PnpConfigWarning& warning : drops)
+            BOOST_LOG_TRIVIAL(warning) << "merge_translated_config_into_3mf: dropped " << warning.key
+                                       << " (" << warning.orca_value << "): " << warning.sent_value;
+    }
     const std::string merged = sidecar.dump(1, '\t');
 
     // Rewrite the archive: copy every entry except the sidecar, then add the

@@ -159,3 +159,74 @@ TEST_CASE("3MF sidecar merge fails closed on a missing sidecar", "[pnp][sidecar]
     REQUIRE_FALSE(merge_translated_config_into_3mf(path, json::object()));
     boost::filesystem::remove(path);
 }
+
+TEST_CASE("merged sidecar is schema-guarded against pnp config-resolution failures", "[pnp][sidecar][schema-guard]")
+{
+    // Root-cause regression (single-filament GUI slice, 2026-11-25): the
+    // merged sidecar carried `filament_cost` = 20.0 while pnp declares it
+    // `string-list` (host half of `pnp_cli module config-schema`), and
+    // pnp_cli aborted every slice with
+    //   error: config resolution failed: config key 'filament_cost': expected
+    //   List value, got Float
+    // The shape this test asserts (["20.0"], one string element) is the exact
+    // repair that made pnp_cli slice the preserved failing input to G-code.
+    const boost::filesystem::path path = make_minimal_3mf(R"({
+        "version": "1.0",
+        "name": "project_settings",
+        "filament_cost": "20",
+        "unmapped_key": "kept"
+    })");
+
+    const json translated = json::parse(R"({
+        "filament_cost": 20.0
+    })");
+
+    const json schema = json::parse(R"({
+        "schema_version": "1.3.0",
+        "schema": [{"module": "test", "fields": [{"key": "layer_height", "type": "float"}]}],
+        "host": [
+            {"key": "filament_cost",    "type": "string-list"},
+            {"key": "unrepairable_key", "type": "float"}
+        ]
+    })");
+
+    REQUIRE(merge_translated_config_into_3mf(path, translated, &schema));
+    const json sidecar = read_sidecar(path);
+
+    SECTION("the translated scalar is repaired to the declared string-list")
+    {
+        REQUIRE(sidecar.at("filament_cost").is_array());
+        REQUIRE(sidecar.at("filament_cost").size() == 1);
+        REQUIRE(sidecar.at("filament_cost")[0].is_string());
+    }
+
+    SECTION("keys the schema does not declare are preserved verbatim")
+    {
+        REQUIRE(sidecar.at("unmapped_key").get<std::string>() == "kept");
+    }
+
+    SECTION("a raw-layer value the guard cannot repair is really dropped")
+    {
+        // A drop must remove the key from the merged result — the raw layer
+        // under the translated one is what pnp reads, so dropping only the
+        // translated copy would let the raw spelling through unchanged.
+        const boost::filesystem::path bad_path = make_minimal_3mf(R"({
+            "unrepairable_key": ["not", "a", "number"]
+        })");
+        REQUIRE(merge_translated_config_into_3mf(bad_path, json::object(), &schema));
+        const json bad_sidecar = read_sidecar(bad_path);
+        REQUIRE(!bad_sidecar.contains("unrepairable_key"));
+        boost::filesystem::remove(bad_path);
+    }
+
+    SECTION("without a schema the merge behaves exactly as before")
+    {
+        const boost::filesystem::path unguarded = make_minimal_3mf(R"({"filament_cost": "20"})");
+        REQUIRE(merge_translated_config_into_3mf(unguarded, json::parse(R"({"filament_cost": 20.0})")));
+        const json unguarded_sidecar = read_sidecar(unguarded);
+        REQUIRE(unguarded_sidecar.at("filament_cost").is_number());
+        boost::filesystem::remove(unguarded);
+    }
+
+    boost::filesystem::remove(path);
+}

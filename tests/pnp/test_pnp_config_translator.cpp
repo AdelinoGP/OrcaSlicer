@@ -336,6 +336,188 @@ TEST_CASE("schema guard drops keys the pnp schema would reject", "[pnp][translat
     }
 }
 
+TEST_CASE("schema guard repairs the wire shapes the host half declares", "[pnp][translator][schema-guard]")
+{
+    // Root-cause regression (single-filament GUI slice, 2026-11-25): the
+    // identity pass collapses Orca per-extruder vectors (coFloats) to element
+    // 0 and the guard indexed only `schema[].fields`, so `filament_cost` — a
+    // `host` string-list key — reached pnp as the Float 20.0 and every
+    // single-filament slice died with `error: config resolution failed: config
+    // key 'filament_cost': expected List value, got Float` (exit code 1).
+    // Failing input: a one-filament preset whose Orca `filament_cost` held
+    // [20], preserved at %TEMP%/pnp-slice-30992-plate1-affb/model.3mf.
+    const json schema = json::parse(R"({
+        "schema_version": "1.3.0",
+        "schema": [{"module": "test", "fields": [{"key": "layer_height", "type": "float"}]}],
+        "host": [
+            {"key": "filament_cost",    "type": "string-list"},
+            {"key": "filament_density", "type": "float-list"},
+            {"key": "nozzle_diameter",  "type": "float"}
+        ]
+    })");
+
+    std::vector<PnpConfigWarning> warnings;
+
+    SECTION("single-filament filament_cost 20.0 is repaired to the declared string-list")
+    {
+        json cfg = {{"filament_cost", 20.0}};
+        PnpConfigTranslator::apply_schema_guard(cfg, schema, warnings);
+        REQUIRE(cfg.at("filament_cost").is_array());
+        REQUIRE(cfg.at("filament_cost").size() == 1);
+        REQUIRE(cfg.at("filament_cost")[0].is_string());
+        REQUIRE(warnings.empty()); // lossless repair is silent
+    }
+
+    SECTION("host keys are guarded: an uncoercible shape is dropped with a warning")
+    {
+        // Pre-fix the host half was invisible, so this passed straight to pnp.
+        json cfg = {{"filament_cost", json::object({{"bad", 1}})}};
+        PnpConfigTranslator::apply_schema_guard(cfg, schema, warnings);
+        REQUIRE(!cfg.contains("filament_cost"));
+        REQUIRE(warnings.size() == 1);
+    }
+
+    SECTION("float-list elements in Orca's string spelling coerce to numbers")
+    {
+        json cfg = {{"filament_density", json::array({"1.24", "1.240"})}};
+        PnpConfigTranslator::apply_schema_guard(cfg, schema, warnings);
+        REQUIRE(cfg.at("filament_density") == json::array({1.24, 1.24}));
+        REQUIRE(warnings.empty());
+    }
+
+    SECTION("a per-filament envelope is accepted for scalar keys")
+    {
+        json cfg = {{"nozzle_diameter", json::array({"0.4"})}};
+        const json before = cfg;
+        PnpConfigTranslator::apply_schema_guard(cfg, schema, warnings);
+        REQUIRE(cfg == before);
+        REQUIRE(warnings.empty());
+    }
+
+    SECTION("numeric strings survive for float keys (raw Orca scalar spelling)")
+    {
+        json cfg = {{"nozzle_diameter", "0.4"}};
+        const json before = cfg;
+        PnpConfigTranslator::apply_schema_guard(cfg, schema, warnings);
+        REQUIRE(cfg == before);
+        REQUIRE(warnings.empty());
+    }
+}
+
+TEST_CASE("schema guard range-checks enveloped and string-spelled numbers", "[pnp][translator]")
+{
+    // Root-cause regression (GUI slice, 2026-11-25): Orca's per-plate
+    // `wipe_tower_x` is saved as ["-35.6376"] (list, numeric string). The guard
+    // only range-checked bare numbers, so the value reached pnp, which died
+    // with `config key 'wipe_tower_x': value -35.6376 outside allowed range
+    // [0, 300]`. Preserved at %TEMP%/pnp-slice-25344-plate1-c162/model.3mf.
+    const json schema = json::parse(R"({
+        "schema_version": "1.3.0",
+        "schema": [],
+        "host": [
+            {"key": "wipe_tower_x",  "type": "float", "min": 0, "max": 300},
+            {"key": "list_key",      "type": "float-list", "min": 0, "max": 10}
+        ]
+    })");
+    std::vector<PnpConfigWarning> warnings;
+
+    SECTION("enveloped numeric string below min is dropped with a warning")
+    {
+        json cfg = {{"wipe_tower_x", json::array({"-35.6376"})}};
+        PnpConfigTranslator::apply_schema_guard(cfg, schema, warnings);
+        REQUIRE(!cfg.contains("wipe_tower_x"));
+        REQUIRE(warnings.size() == 1);
+    }
+
+    SECTION("in-range envelope is kept")
+    {
+        json cfg = {{"wipe_tower_x", json::array({"15"})}};
+        PnpConfigTranslator::apply_schema_guard(cfg, schema, warnings);
+        REQUIRE(cfg.contains("wipe_tower_x"));
+        REQUIRE(warnings.empty());
+    }
+
+    SECTION("any out-of-range element of a list key drops it")
+    {
+        json cfg = {{"list_key", json::array({1.0, 11.0})}};
+        PnpConfigTranslator::apply_schema_guard(cfg, schema, warnings);
+        REQUIRE(!cfg.contains("list_key"));
+        REQUIRE(warnings.size() == 1);
+    }
+}
+
+TEST_CASE("raw Orca spellings the pnp update stopped accepting", "[pnp][translator]")
+{
+    // GUI slice 2026-11-25: after the pnp schema tightened (typed host keys),
+    // these Orca spellings were dropped with warnings (or, for the percents,
+    // never resolved), so pnp defaults silently replaced the user's values.
+    const json schema = json::parse(R"({
+        "schema_version": "1.3.0",
+        "schema": [],
+        "host": [
+            {"key": "dont_filter_internal_bridges", "type": "bool"},
+            {"key": "enable_extra_bridge_layer",    "type": "bool"},
+            {"key": "filament_ironing_speed",       "type": "float"},
+            {"key": "printable_area",               "type": "float-list"}
+        ]
+    })");
+    std::vector<PnpConfigWarning> warnings;
+
+    SECTION("exact enum->bool spellings convert silently")
+    {
+        json cfg = {{"dont_filter_internal_bridges", "nofilter"},
+                    {"enable_extra_bridge_layer", "disabled"}};
+        PnpConfigTranslator::apply_schema_guard(cfg, schema, warnings);
+        REQUIRE(cfg.at("dont_filter_internal_bridges") == true);
+        REQUIRE(cfg.at("enable_extra_bridge_layer") == false);
+        REQUIRE(warnings.empty());
+    }
+
+    SECTION("enum values with no bool meaning are dropped with a warning, not rounded")
+    {
+        json cfg = {{"dont_filter_internal_bridges", "limited"},
+                    {"enable_extra_bridge_layer", "external_bridge_only"}};
+        PnpConfigTranslator::apply_schema_guard(cfg, schema, warnings);
+        REQUIRE(cfg.empty());
+        REQUIRE(warnings.size() == 2);
+    }
+
+    SECTION("Orca nil is an unset value: dropped without a warning")
+    {
+        json cfg = {{"filament_ironing_speed", json::array({"nil"})}};
+        PnpConfigTranslator::apply_schema_guard(cfg, schema, warnings);
+        REQUIRE(!cfg.contains("filament_ironing_speed"));
+        REQUIRE(warnings.empty());
+    }
+
+    SECTION("printable_area XxY strings flatten to the float-list pnp reads")
+    {
+        json cfg = {{"printable_area", json::array({"0x0", "220x0", "220x200", "0x200"})}};
+        PnpConfigTranslator::apply_schema_guard(cfg, schema, warnings);
+        REQUIRE(cfg.at("printable_area") == json::array({0, 0, 220, 0, 220, 200, 0, 200}));
+        REQUIRE(warnings.empty());
+    }
+
+    SECTION("percent wipe_speed / initial_layer_travel_speed resolve over travel_speed")
+    {
+        auto res = PnpConfigTranslator::translate(make_config({
+            {"travel_speed", "150"},
+            {"wipe_speed", "80%"},
+            {"initial_layer_travel_speed", "50%"},
+        }));
+        REQUIRE_THAT(res.json.at("wipe_speed").get<double>(), Catch::Matchers::WithinAbs(120.0, 1e-9));
+        REQUIRE_THAT(res.json.at("initial_layer_travel_speed").get<double>(), Catch::Matchers::WithinAbs(75.0, 1e-9));
+    }
+
+    SECTION("absolute wipe_speed passes through; percent without travel_speed is dropped")
+    {
+        auto absolute = PnpConfigTranslator::translate(make_config({{"wipe_speed", "90"}}));
+        REQUIRE_THAT(absolute.json.at("wipe_speed").get<double>(), Catch::Matchers::WithinAbs(90.0, 1e-9));
+        auto unresolved = PnpConfigTranslator::translate(make_config({{"wipe_speed", "80%"}}));
+        REQUIRE(!unresolved.json.contains("wipe_speed"));
+    }
+}
+
 TEST_CASE("the key universe is read from both wire halves", "[pnp][translator][ticket05]")
 {
     const json doc = json::parse(R"({

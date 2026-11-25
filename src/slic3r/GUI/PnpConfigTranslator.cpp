@@ -554,6 +554,29 @@ PnpTranslationResult translate(const DynamicPrintConfig& cfg, const PnpKeyUniver
         else
             out.erase("overhang_1_4_speed");
     }
+    // wipe_speed and initial_layer_travel_speed are Orca float-or-percent keys
+    // whose percent resolves over travel_speed (`ratio_over`); pnp declares both
+    // as plain float mm/s, so the identity copy's "80%" / "100%" string fails the
+    // schema. Resolve to absolute mm/s, or drop the key (pnp default) when
+    // travel_speed is absent so a percent is never sent unresolved.
+    {
+        const bool   have_travel = cfg.option("travel_speed") != nullptr;
+        const double travel      = have_travel ? cfg.opt_float("travel_speed", 0) : 0.;
+        const auto   resolve     = [&](const char* key, bool percent, double value) {
+            route(key, key);
+            if (!percent)
+                out[key] = value;
+            else if (have_travel)
+                out[key] = value / 100. * travel;
+            else
+                out.erase(key);
+        };
+        if (auto* fop = dynamic_cast<const ConfigOptionFloatOrPercent*>(cfg.option("wipe_speed")); fop != nullptr)
+            resolve("wipe_speed", fop->percent, fop->value);
+        if (auto* v = dynamic_cast<const ConfigOptionVector<FloatOrPercent>*>(cfg.option("initial_layer_travel_speed"));
+            v != nullptr && !v->values.empty() && !v->is_nil(0))
+            resolve("initial_layer_travel_speed", v->values.front().percent, v->values.front().value);
+    }
     // Orca bead widths are percent-of-nozzle-diameter; pnp expects absolute
     // values in its internal units (1 unit = 100 nm, i.e. mm * 10000).
     for (const char* key : {"min_bead_width", "initial_layer_min_bead_width"}) {
@@ -869,10 +892,25 @@ namespace {
 // True when `v` is acceptable for a schema field of type tag `type`.
 // Unknown/empty type tags validate everything (fail open — the guard's job is
 // to stop known-bad values, not to second-guess new schema features).
+//
+// Mirrors pnp's `validate_extension` (slicer-config/resolution.rs) envelope
+// leniency, which the merged 3MF sidecar is actually validated against: a
+// scalar-typed key may arrive as a list whose first element carries the value
+// (canonical `coFloats` wire), and a float key may arrive as a numeric string
+// (canonical `ConfigOptionFloat::deserialize` spelling). Being stricter than
+// pnp here would drop values pnp resolves fine — which matters because this
+// guard also runs over the merged sidecar, raw Orca spellings included.
 bool value_matches_type(const json& v, const std::string& type)
 {
+    const bool list = type == "float-list" || type == "int-list" || type == "string-list";
+    if (!list && v.is_array()) {
+        if (v.empty())
+            return false; // an empty envelope carries no value; pnp hard-errors
+        return value_matches_type(v.front(), type);
+    }
     if (type == "float" || type == "int" || type == "units")
-        return v.is_number();
+        return v.is_number() || (v.is_string() && !v.get<std::string>().empty()
+                                 && json::accept(v.get<std::string>()) && json::parse(v.get<std::string>()).is_number());
     if (type == "bool")
         return v.is_boolean();
     if (type == "string" || type == "enum")
@@ -898,19 +936,154 @@ bool value_matches_type(const json& v, const std::string& type)
     return true;
 }
 
+// Orca spells "unset / inherit" as the literal string "nil" (alone or as the
+// sole element of a per-extruder vector). pnp has no such value: the faithful
+// equivalent is to leave the key out so its own default applies.
+bool is_orca_nil(const json& v)
+{
+    if (v.is_string())
+        return v.get<std::string>() == "nil";
+    if (v.is_array() && !v.empty()) {
+        for (const json& e : v)
+            if (!(e.is_string() && e.get<std::string>() == "nil"))
+                return false;
+        return true;
+    }
+    return false;
+}
+
+// Orca three/four-value coEnums that pnp declares as bool. Only the values with
+// an exact bool meaning convert (mirrors pnp's own serialize.rs back-mapping:
+// false <-> disabled, true <-> nofilter / apply_to_all). The in-between modes
+// (`limited`, `external_bridge_only`, `internal_bridge_only`) have no bool
+// equivalent and fall through to the guard's drop-with-warning path rather than
+// being rounded to a value that would change the print.
+const json* orca_enum_as_bool(const std::string& key, const json& v)
+{
+    static const json k_true = true, k_false = false;
+    if (!v.is_string())
+        return nullptr;
+    const std::string& s = v.get<std::string>();
+    if (key == "dont_filter_internal_bridges")
+        return s == "disabled" ? &k_false : s == "nofilter" ? &k_true : nullptr;
+    if (key == "enable_extra_bridge_layer")
+        return s == "disabled" ? &k_false : s == "apply_to_all" ? &k_true : nullptr;
+    return nullptr;
+}
+
+// Orca serializes a point list as "XxY" strings (`printable_area`); pnp's
+// float-list spelling is the flattened [x0, y0, x1, y1, ...] (the same shape
+// the translator emits for `bed_shape`). Elements that are not "XxY" pass
+// through untouched.
+json flatten_point_strings(const json& list)
+{
+    json out = json::array();
+    for (const json& e : list) {
+        const std::string s = e.is_string() ? e.get<std::string>() : std::string();
+        const size_t      x = s.find('x');
+        if (x != std::string::npos && x > 0 && x + 1 < s.size()) {
+            const std::string a = s.substr(0, x), b = s.substr(x + 1);
+            if (json::accept(a) && json::accept(b) && json::parse(a).is_number() && json::parse(b).is_number()) {
+                out.push_back(json::parse(a));
+                out.push_back(json::parse(b));
+                continue;
+            }
+        }
+        out.push_back(e);
+    }
+    return out;
+}
+
+// Lossless wire-shape repair for a declared field, per pnp's own acceptance
+// rules. Returns null when the value cannot be repaired and must be dropped.
+//
+// The identity pass collapses Orca per-extruder vectors to element 0 (the
+// mapping spec's v1 rule) and the raw sidecar layer carries Orca's own
+// spellings, so a schema `*-list` key regularly arrives as a scalar — e.g.
+// single-filament `filament_cost` = 20.0 against pnp's `string-list`
+// declaration, the shape whose `config resolution failed: config key
+// 'filament_cost': expected List value, got Float` killed every single-filament
+// slice. Scalars wrap into a one-element list and elements are coerced across
+// the number/string line; anything uncoercible falls through to the drop path.
+json coerce_to_declared_type(const json& v, const std::string& type)
+{
+    if (value_matches_type(v, type))
+        return v;
+
+    const bool list = type == "float-list" || type == "int-list" || type == "string-list";
+    // Scalar-typed keys take the first element of a per-filament envelope.
+    json value = (!list && v.is_array() && !v.empty()) ? v.front() : v;
+    if (list && !value.is_array())
+        value = json::array({value});
+    if (type == "float-list")
+        value = flatten_point_strings(value);
+
+    if (list || type == "float" || type == "int" || type == "units" || type == "string" || type == "enum") {
+        const bool want_number = type == "float-list" || type == "int-list" || type == "float"
+                              || type == "int" || type == "units";
+        const bool want_string = type == "string-list" || type == "string" || type == "enum";
+        const bool want_int    = type == "int-list" || type == "int";
+
+        const auto repair = [&](const json& e) -> json {
+            if (want_number) {
+                if (e.is_number())
+                    return want_int && !e.is_number_integer() ? json() : e;
+                if (e.is_string()) {
+                    try {
+                        const json parsed = json::parse(e.get<std::string>());
+                        if (parsed.is_number() && (!want_int || parsed.is_number_integer()))
+                            return parsed;
+                    } catch (const std::exception&) {}
+                }
+                return json();
+            }
+            if (want_string) {
+                if (e.is_string())
+                    return e;
+                if (e.is_number())
+                    return json(e.dump()); // canonical number spelling, e.g. "20.0"
+                return json();
+            }
+            return json();
+        };
+
+        if (list) {
+            json out = json::array();
+            for (const json& e : value) {
+                json fixed = repair(e);
+                if (fixed.is_null())
+                    return json();
+                out.push_back(std::move(fixed));
+            }
+            return out;
+        }
+        return repair(value);
+    }
+    return json();
+}
+
 } // anonymous namespace
 
 void apply_schema_guard(json& config, const json& schema_doc, std::vector<PnpConfigWarning>& warnings)
 {
     // Index the schema: key -> field descriptor (first definition wins, like
-    // pnp's own module dedup).
+    // pnp's own module dedup). Both wire halves count: `schema[].fields` is
+    // the per-module manifests and `host[]` is the config pnp's own built-ins
+    // read (wire 1.1.0). Indexing only the module half left 62 host keys —
+    // `filament_cost` among them — unvalidated and unguarded.
     std::map<std::string, const json*> fields;
+    const auto collect = [&fields](const json& field) {
+        if (field.is_object() && field.contains("key") && field["key"].is_string())
+            fields.emplace(field["key"].get<std::string>(), &field);
+    };
     if (const auto it = schema_doc.find("schema"); it != schema_doc.end() && it->is_array())
         for (const json& mod : *it)
             if (const auto fit = mod.find("fields"); fit != mod.end() && fit->is_array())
                 for (const json& field : *fit)
-                    if (field.is_object() && field.contains("key") && field["key"].is_string())
-                        fields.emplace(field["key"].get<std::string>(), &field);
+                    collect(field);
+    if (const auto hit = schema_doc.find("host"); hit != schema_doc.end() && hit->is_array())
+        for (const json& field : *hit)
+            collect(field);
 
     for (auto it = config.begin(); it != config.end(); /* increment in body */) {
         const auto found = fields.find(it.key());
@@ -919,18 +1092,69 @@ void apply_schema_guard(json& config, const json& schema_doc, std::vector<PnpCon
             continue;
         }
         const json&       field  = *found->second;
-        const json&       value  = it.value();
         const std::string type   = field.contains("type") && field["type"].is_string() ? field["type"].get<std::string>() : std::string();
         std::string       reason;
 
-        if (!value_matches_type(value, type)) {
-            reason = "schema type '" + type + "' rejects this value";
-        } else if (value.is_number()) {
-            const double v = value.get<double>();
-            if (field.contains("min") && field["min"].is_number() && v < field["min"].get<double>())
-                reason = "below schema min " + field["min"].dump();
-            else if (field.contains("max") && field["max"].is_number() && v > field["max"].get<double>())
-                reason = "above schema max " + field["max"].dump();
+        // Orca "nil" means unset: leave the key out so pnp's default applies.
+        // Not a loss worth warning about, unlike a value pnp would reject.
+        if (type != "string" && type != "string-list" && is_orca_nil(it.value())) {
+            it = config.erase(it);
+            continue;
+        }
+        // Orca coEnum spelling of a pnp bool (see orca_enum_as_bool).
+        if (type == "bool") {
+            if (const json* as_bool = orca_enum_as_bool(it.key(), it.value()))
+                it.value() = *as_bool;
+        }
+
+        // Lossless shape repair first (scalar -> one-element list, elements
+        // across the number/string line); only what cannot be repaired is
+        // dropped, which is the failure mode pnp would otherwise answer with a
+        // fatal `config resolution failed` slice error.
+        if (!value_matches_type(it.value(), type)) {
+            json repaired = coerce_to_declared_type(it.value(), type);
+            if (repaired.is_null())
+                reason = "schema type '" + type + "' rejects this value";
+            else
+                it.value() = std::move(repaired);
+        }
+        const json& value = it.value();
+        // Range check every numeric the wire carries: a bare number, each list
+        // element, or the first element of a scalar key's envelope — which
+        // may be a numeric string (`wipe_tower_x: ["-35.6376"]`, the canonical
+        // per-plate spelling pnp range-checks and hard-errors on).
+        if (reason.empty() && type != "string-list" && type != "string" && type != "enum") {
+            const auto number_of = [](const json& e, double& out) {
+                if (e.is_number()) { out = e.get<double>(); return true; }
+                if (e.is_string() && json::accept(e.get<std::string>())) {
+                    const json p = json::parse(e.get<std::string>());
+                    if (p.is_number()) { out = p.get<double>(); return true; }
+                }
+                return false;
+            };
+            const bool list = type == "float-list" || type == "int-list" || type == "string-list";
+            std::vector<const json*> elems;
+            if (value.is_array()) {
+                if (list)
+                    for (const json& e : value) elems.push_back(&e);
+                else if (!value.empty())
+                    elems.push_back(&value.front());
+            } else {
+                elems.push_back(&value);
+            }
+            for (const json* e : elems) {
+                double v = 0.;
+                if (!number_of(*e, v))
+                    continue;
+                if (field.contains("min") && field["min"].is_number() && v < field["min"].get<double>()) {
+                    reason = "below schema min " + field["min"].dump();
+                    break;
+                }
+                if (field.contains("max") && field["max"].is_number() && v > field["max"].get<double>()) {
+                    reason = "above schema max " + field["max"].dump();
+                    break;
+                }
+            }
         }
         if (reason.empty() && type == "enum" && value.is_string()
             && field.contains("values") && field["values"].is_array() && !field["values"].empty()) {

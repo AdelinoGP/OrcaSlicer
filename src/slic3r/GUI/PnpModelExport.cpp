@@ -19,6 +19,7 @@
 
 #include "GUI.hpp"
 #include "GUI_App.hpp"
+#include "PnpBackend.hpp"
 #include "Plater.hpp"
 #include "PartPlate.hpp"
 
@@ -139,7 +140,13 @@ bool export_plate_3mf_for_pnp(int plate_idx, const boost::filesystem::path& path
     // Merge the translated config over the raw Orca config in the 3MF sidecar:
     // pnp_cli slice reads its config from the 3MF itself, so the translated
     // (typed) values must win over the raw string values store_bbs_3mf wrote.
-    if (!merge_translated_config_into_3mf(path, translated_config))
+    // The live schema document lets the merge guard the merged result too;
+    // an empty or unparseable probe degrades to no guard, never to a failure.
+    nlohmann::json schema_doc;
+    if (const std::string& schema = PnpBackend::get().schema_json(); !schema.empty())
+        schema_doc = nlohmann::json::parse(schema, nullptr, /*allow_exceptions=*/false);
+    const nlohmann::json* schema_ptr = (schema_doc.is_discarded() || schema_doc.is_null()) ? nullptr : &schema_doc;
+    if (!merge_translated_config_into_3mf(path, translated_config, schema_ptr))
         return pnp_export_fail(error, "failed to merge the translated config into the 3MF sidecar");
 
     BOOST_LOG_TRIVIAL(info) << "export_plate_3mf_for_pnp: wrote plate " << plate_idx

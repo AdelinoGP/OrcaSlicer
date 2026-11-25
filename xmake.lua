@@ -1318,6 +1318,10 @@ target("pnp_runtime_tests")
               "src/slic3r/GUI/PnpProgress.cpp",
               "src/slic3r/GUI/PnpConfigWarningsLog.cpp",
               "src/slic3r/GUI/PnpModelSidecar.cpp",
+              -- the sidecar merge guards the merged config through the pure
+              -- translator (schema guard); no GUI code is pulled in by it
+              "src/slic3r/GUI/PnpConfigTranslator.cpp",
+              "src/slic3r/GUI/PnpConfigKeys.cpp",
               -- document half only; PnpSupportPreview.cpp (the pnp_cli runner)
               -- needs the GUI backend and is deliberately not linked here
               "src/slic3r/GUI/PnpSupportPreviewDoc.cpp")
