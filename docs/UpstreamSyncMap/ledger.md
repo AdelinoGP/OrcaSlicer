@@ -38,10 +38,10 @@ Two corrections against the first draft, both material:
 | `d35ea27ea5` | 09-29 | Zip entry sizes validated before parsing 3MF XML | CLEAN | Test half hand-ported by appending to `tests/libslic3r/test_3mf.cpp`; the CMake registration hunk is dropped (xmake globs the suite) | 01 |
 | `8ffd3e514e` | 09-29 | OBJ and DRC import hardened against malformed files | CLEAN | Tests taken whole (new `test_drc.cpp`, `test_obj.cpp`); the `tests/libslic3r/CMakeLists.txt` hunk is dropped (xmake globs the suite) | 01 |
 | `41eeaf3883` | 09-29 | Server-supplied download filenames sanitized (`libslic3r/utils.cpp`, `Utils.hpp`, `DownloaderFileGet.cpp`, `Plater.cpp`) | CLEAN | Test half hand-ported into `tests/libslic3r/test_utils.cpp`; `ScopedTemporaryDir` added to `tests/test_utils.hpp` | 01 |
-| `a124b7d2df` | 10-09 | Cyclic 3MF component graphs rejected before OOM | CONFLICT | `Format/bbs_3mf.cpp` | 02 |
-| `490d134507` | 09-29 | 3MF plate-ID and paint-data hardening | CONFLICT | **Inside `TriangleSelector.cpp`**; `bbs_3mf.cpp` and `Model.cpp` apply cleanly; test half conflicts | 02 |
-| `203bc63f35` | 09-30 | Project metadata escaped before rendering; accessory opening restricted | CONFLICT | `Utils.hpp`, `utils.cpp`; `GUI/Project.cpp` and the web asset clean | 02 |
-| `e40030cf81` | 09-30 | Malformed network JSON no longer crashes (11 source files + 3 test/CMake) | CONFLICT | **`PrintHost.cpp` conflicts**; `Utils/UltiMaker.cpp|hpp` do not exist here and are omitted (ticket 08 owns them) | 02 |
+| `a124b7d2df` | 10-09 | Cyclic 3MF component graphs rejected before OOM | CONFLICT | `Format/bbs_3mf.cpp` — the base predates the guard's precondition `92ab583ecc`, so **both are one port**: bool return + 2 call sites + the queue budget. Test half ported (self-reference ×1/×1000; budget at 100000/100001) | 02 |
+| `490d134507` | 09-29 | 3MF plate-ID and paint-data hardening | CONFLICT | **Inside `TriangleSelector.cpp`**, ported against this base's pre-`42f708bbb6` leaf encoding (no `0b1111` escape): `read_nibble`, `split_code_valid`, corrupt-tree unwind, truncated `has_facets`, structural `update_used_states`; `bbs_3mf.cpp`/`Model.cpp` clean. Two `test_3mf.cpp` cases ported; `test_triangle_selector.cpp` absent → dropped | 02 |
+| `203bc63f35` | 09-30 | Project metadata escaped before rendering; accessory opening restricted | CONFLICT | `Utils.hpp`, `utils.cpp` — `is_path_within_root`/`is_symlink_target_within_root` are not exported here, so `is_path_within_root` is file-static in `utils.cpp`; only `is_absolute_path_within_root` and `is_safe_to_open_file_name` are added. Other C++ and the web asset clean; `test_utils.cpp` cases ported | 02 |
+| `e40030cf81` | 09-30 | Malformed network JSON no longer crashes (11 source files + 3 test/CMake) | CONFLICT | `PrintHost.cpp` — this base predates the plugin lifecycle events, so the try/catch sits in `perform_job` instead of a new `upload_job`; shared `get_err_code_from_body` added, Flashforge `parse_material_slots` ported, ESP3D's unused copy removed, `UltiMaker.*` absent → omitted (ticket 08 owns them). Upstream tests absent → new `tests/slic3rutils/test_network_json.cpp` | 02 |
 
 ## Adopted — crash and format fixes
 
@@ -83,6 +83,11 @@ in a file the fork already owns.
 Ticket 01 subsequently ported the test half of `d35ea27ea5` and `41eeaf3883` by hand and took
 `8ffd3e514e`'s whole new files, so only the CMake registration hunks (which have no xmake target)
 were dropped.
+
+Ticket 02 ported the `a124b7d2df` and `490d134507` 3MF cases by hand around shared archive helpers,
+dropped `test_triangle_selector.cpp` (absent), ported the `203bc63f35` `test_utils.cpp` cases, and
+replaced the absent `test_printhost.cpp` / `test_user_manager.cpp` with
+`tests/slic3rutils/test_network_json.cpp` (shared parser, Flashforge slots, UserManager).
 
 ## Adopted — profile data and config keys
 

@@ -108,7 +108,15 @@ The docs are honest about behaviour changes, not just fixes:
 
 - Downloads are renamed to a free filename (`41eeaf3883`) — a file with a clashing name no longer
   overwrites.
-- Some accessory files stop opening (`203bc63f35`).
+- Some accessory files stop opening (`203bc63f35`). An attachment outside the extracted auxiliary
+  directory is refused, and a file type that can run as a program asks for confirmation first.
+- Project names, authors and descriptions from a 3MF are no longer rendered as live HTML
+  (`203bc63f35`): names are text, descriptions keep only plain formatting, http(s) links and https
+  images.
+- 3MFs with a cyclic component graph, a plate id below 1, or malformed paint data are now refused
+  or repaired instead of crashing or exhausting memory (`a124b7d2df`, `490d134507`).
+- A printer that answers with HTML or truncated JSON no longer takes the app (or the upload queue)
+  down (`e40030cf81`).
 - Malformed OBJ/DRC files that were tolerated are now refused (`8ffd3e514e`).
 - A filament's compatible-printer list survives project load (`38f12b1357`).
 - Auto Drop for 2.4.x projects keeps the project's value instead of re-enabling itself
@@ -178,8 +186,24 @@ Order is the decided one: security → profiles → crashes → features.
 - [Security hardening — clean picks](tickets/01-security-clean-picks.md): four CLEAN picks landed
   as `3c18052abf`, `f8afe3a5aa`, `0d87b1d20f`, `03463e1592`; all three test halves ported (two by
   hand), 7/7 suites green, six walkthrough screenshots. STL/3MF refusals are log-only.
+- [Security hardening — hand-ported](tickets/02-security-hand-ports.md): four CONFLICT picks landed
+  as `77f2c943d6`, `f831718b08`, `7efd6d971d`, `69e6f9ef2d`. The cycle guard needed its in-range
+  precondition `92ab583ecc`, so both are one commit; `TriangleSelector` is ported against the base's
+  pre-`42f708bbb6` leaf encoding; `PrintHost` has no lifecycle events to pair, so the catch sits in
+  `perform_job`. Tests: 149 + 54 + 24 assertions in the ported cases, 7/7 suites green. A harness
+  fix (`14b761f8ca`) makes `slic3rutils_tests` actually run Catch2 instead of minilzo's self-test.
+  Walkthrough found the Project page aborts on projects carrying `Auxiliaries/`, **on the pre-change
+  package too** — pre-existing and ruled out of scope; the accessory-open guard is therefore
+  unit-tested, not click-through.
 
-Ticket 01 is closed. The map otherwise records the grilling of 2026-11-25 and the two review rounds that
-followed: the applicability method (exit codes lie), the `filament_prime_volume` ignore-set trap,
-the rejection of `32f6db87e8` as a defect this fork never had, the partial-port plan for
-`d7534d7fb9`, and the fact that profiles are a pure upstream snapshot.
+Tickets 01 and 02 are closed. The map otherwise records the grilling of 2026-11-25 and the two
+review rounds that followed: the applicability method (exit codes lie), the `filament_prime_volume`
+ignore-set trap, the rejection of `32f6db87e8` as a defect this fork never had, the partial-port
+plan for `d7534d7fb9`, and the fact that profiles are a pure upstream snapshot.
+
+## Out of scope
+
+- The Project page abort (`0xc0000409`, ucrtbase) on any project whose archive carries
+  `Auxiliaries/` — reproduced on the portable package built before [ticket 02](tickets/02-security-hand-ports.md#gaps),
+  so pre-existing and not an upstream pick. It blocks the accessory-open click-through but not the
+  sync; a fork-local bug effort if wanted.
