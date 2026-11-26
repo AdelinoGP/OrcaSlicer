@@ -222,6 +222,15 @@ plan for `d7534d7fb9`, and the fact that profiles are a pure upstream snapshot.
   green; one mirrored-3MF screenshot. Five GUI-only walkthroughs were not click-through and are
   listed as gaps in the ticket.
 
+- [Crash and format fixes — mixed](tickets/05-crash-format-batch-b.md): four of six picks landed as
+  `3950da06c6`, `6d3d692e1f`, `4eb5b9f012`, `0f47117209`. Two were **not** landed because the defect
+  does not exist at this base: `4c2ae6d202` (Auto Drop) repairs `a338f6ca7d`'s move of the flag to the
+  object, and `c9d897b4d0` (Send dialog) patches `update_material_item_pos`, which arrives with the
+  unpicked `5cf7e27c23`; an instance-level pin test (`63cf70cee6`) covers the first. `eda4062d68`
+  was hand-ported into fork-owned `load_files`; `3c72223aaf`'s GL failure is a one-shot error dialog,
+  not a per-frame notification. 7/7 suites green; GUI scenarios 2, 3, 4 observed, 1, 5, 6 not
+  reachable (gaps in the ticket).
+
 ## Out of scope
 
 - The Project page abort (`0xc0000409`, ucrtbase) on any project whose archive carries
