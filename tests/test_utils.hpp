@@ -44,4 +44,23 @@ private:
     boost::filesystem::path m_path;
 };
 
+// A temp directory created on construction and removed recursively on scope exit.
+class ScopedTemporaryDir
+{
+public:
+    explicit ScopedTemporaryDir(const std::string &prefix = "orca")
+        : m_path(boost::filesystem::temp_directory_path()
+                 / boost::filesystem::unique_path(prefix + "-%%%%-%%%%-%%%%"))
+    { boost::filesystem::create_directories(m_path); }
+    ~ScopedTemporaryDir() { boost::system::error_code ec; boost::filesystem::remove_all(m_path, ec); }
+    ScopedTemporaryDir(const ScopedTemporaryDir &) = delete;
+    ScopedTemporaryDir &operator=(const ScopedTemporaryDir &) = delete;
+
+    const boost::filesystem::path &path() const { return m_path; }
+    std::string string() const { return m_path.string(); }
+
+private:
+    boost::filesystem::path m_path;
+};
+
 #endif // SLIC3R_TEST_UTILS
