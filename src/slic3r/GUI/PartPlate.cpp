@@ -9,6 +9,7 @@
 #include <future>
 #include <glad/gl.h>
 #include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
 #include <boost/optional.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -6449,7 +6450,7 @@ int PartPlateList::load_from_3mf_structure(PlateDataPtrs& plate_data_list, int f
                 std::replace(s.begin(), s.end(), ',', ' ');
                 std::istringstream iss(s);
                 std::string tok;
-                while (iss >> tok) { try { out.push_back(std::stod(tok)); } catch (...) {} }
+                while (iss >> tok) { try { out.push_back(boost::lexical_cast<double>(tok)); } catch (...) {} }
                 return out;
             };
 

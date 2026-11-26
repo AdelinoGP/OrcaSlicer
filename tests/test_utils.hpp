@@ -6,6 +6,11 @@
 
 #include <boost/filesystem.hpp>
 
+#include <clocale>
+#ifdef __APPLE__
+#include <xlocale.h>
+#endif
+
 #if defined(WIN32) || defined(_WIN32)
 #define PATH_SEPARATOR R"(\)"
 #else
@@ -61,6 +66,38 @@ public:
 
 private:
     boost::filesystem::path m_path;
+};
+
+// PNP fork (UpstreamSyncMap ticket 06): CommaNumericLocale from upstream's test_utils.hpp, needed by
+// the ported test_locales_utils.cpp.
+struct CommaNumericLocale
+{
+#ifdef _WIN32
+    bool apply()
+    {
+        for (const char* name : { "de-DE", "German_Germany.1252" })
+            if (std::setlocale(LC_NUMERIC, name) != nullptr)
+                return true;
+        return false;
+    }
+#else
+    locale_t locale { (locale_t) 0 };
+    bool apply()
+    {
+        for (const char* name : { "de_DE.UTF-8", "de_DE.utf8", "de_DE" })
+            if ((locale = newlocale(LC_NUMERIC_MASK, name, (locale_t) 0)) != (locale_t) 0) {
+                uselocale(locale);
+                return true;
+            }
+        return false;
+    }
+    // Freed once the setters around apply() have put the thread's own locale back.
+    ~CommaNumericLocale()
+    {
+        if (locale != (locale_t) 0)
+            freelocale(locale);
+    }
+#endif
 };
 
 #endif // SLIC3R_TEST_UTILS
