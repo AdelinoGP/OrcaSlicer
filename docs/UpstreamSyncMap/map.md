@@ -231,6 +231,16 @@ plan for `d7534d7fb9`, and the fact that profiles are a pure upstream snapshot.
   not a per-frame notification. 7/7 suites green; GUI scenarios 2, 3, 4 observed, 1, 5, 6 not
   reachable (gaps in the ticket).
 
+- [Crash fixes — hand-ported](tickets/06-crash-format-hand-ports.md): four of five picks landed as
+  `a816ed8d64` (disjoint per-extruder printable areas fall back to the whole bed instead of indexing
+  an empty intersection), `91fba6e8b3` (object-speed edit with no matching variant falls back to the
+  extruder's first variant), `31e929bda0` (a project load no longer wipes compatible printers) and
+  `c30bb752f2` (decimal-comma nozzle diameters read C-locale). `e56fd1ed44` is **not landed — defect
+  absent**: its import-order read arrives with the unpicked `fa5f7e3db4`. `d7534d7fb9`'s
+  `get_shared_printable_polygon` hunks are omitted (`7c73739e1a`, unpicked), and its validate message
+  needed a minimal equivalent of the unpicked `4303d723a1` check. 7/7 suites green; the disjoint-area
+  fixture rendered the Prepare plate, no before-fix run; the other GUI cases are gaps in the ticket.
+
 ## Out of scope
 
 - The Project page abort (`0xc0000409`, ucrtbase) on any project whose archive carries
