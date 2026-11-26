@@ -201,6 +201,19 @@ review rounds that followed: the applicability method (exit codes lie), the `fil
 ignore-set trap, the rejection of `32f6db87e8` as a defect this fork never had, the partial-port
 plan for `d7534d7fb9`, and the fact that profiles are a pure upstream snapshot.
 
+- [Profile sync, keys, and the ignore set](tickets/03-profile-sync-and-keys.md): the 13,000-path
+  vendor snapshot landed as `0cd2ff3bb9` (byte-identical to upstream `808dd7dff8`), with `72` vendor
+  index versions new or bumped. The key set landed first (`dc90dcf2d6`): **21** keys, not 19 — a scan
+  of literal `this->add()` names misses the two generated `filament_*_toolchange` overrides. The
+  obsolete-key set is now upstream's 56 entries exactly (`filament_prime_volume` out, twelve retired
+  belt keys in), and `scripts/orca_extra_profile_check.py` mirrors it. Renames: 761 of 836 removed
+  preset names carry `renamed_from`; the other 75 are genuine deletions upstream no longer
+  references. A new test walks every shipped preset and fails on a key that is neither defined nor
+  explicitly allowlisted (`ba1f6242fa`); the 234 vendor-only keys and `gcode_remap_x/y/z` (ticket
+  10's) are listed by name. The first GUI load exposed a **third gate**: `remove_invalid_keys` drops
+  any declared key absent from `Preset::*_options()`, so the 21 keys also joined those lists
+  (`3212071996`) and the test now asserts that membership.
+
 ## Out of scope
 
 - The Project page abort (`0xc0000409`, ucrtbase) on any project whose archive carries

@@ -99,23 +99,60 @@ replaced the absent `test_printhost.cpp` / `test_user_manager.cpp` with
 | `3500a1e588` | **Not adopted**: upstream unified the id scripts and deleted `scripts/assign_vendor_setting_ids.py` / `orca_extra_profile_check.py`. The fork's copies agree with the same C++ rule | 03 |
 
 Aggregate: 13,000 files changed (rename-detected), 13,658 paths with renames off (4,285 A /
-7,697 M / 1,676 D), 145 vendor directories, 72 vendor index `version` bumps. **19** config keys
-are referenced by shipped presets and absent here, across 673 files.
+7,697 M / 1,676 D), 65 → 72 vendor directories, 73 root indexes (7 new, 66 modified; 72
+`version` fields new or bumped). **21** config keys are referenced by shipped presets and were
+absent here, across 673 files. Ticket 03's 19-key measurement scanned literal `this->add()` names;
+the two `filament_*_toolchange` overrides are generated from `filament_extruder_override_keys` and
+were missed by that scan.
 
-Corrections the reviews forced:
+Ticket 03 landed as `dc90dcf2d6` (21 keys, their two enums, the ignore set and the script mirror),
+`0cd2ff3bb9` (the 13,000-path snapshot; `git diff 808dd7dff83f HEAD -- resources/profiles` is
+empty), `ba1f6242fa` (the shipped-profile key and rename tests), `f2f3c5bc43` (BOM/support-table fix
+in the profile check script) and `3212071996` (the option-list fix below). Ignore set:
+`filament_prime_volume` removed and the twelve retired belt keys added, so the set is 56 entries and
+equals upstream's exactly. The twelve additions are inert today (none is in `print_config_def` or
+pnp's registry); they were taken so ticket 10 inherits upstream's rule rather than a fork-local
+variant.
 
-- `git diff 33909a51cd HEAD -- resources/profiles` is **empty**; profiles are a pure upstream
+**A third gate the key measurement missed.** `print_config_def` is not enough:
+`Preset::remove_invalid_keys` drops every key absent from the collection's default preset, which is
+built from `Preset::printer_options()` / `print_options()` / `filament_options()`. The first GUI load
+of a Vivedino preset logged `contains incorrect keys: ... is_imex ... which were removed` even
+though the keys were declared. `3212071996` adds all 21 keys to the three lists, and the
+shipped-profile test now asserts that every key found in a preset and in `print_config_def` is also
+in that type's option list. A key addition is therefore complete only when it reaches the def, the
+collection list, and (if formerly ignored) the ignore set.
+
+Renames: of the 836 preset names present at the fork base and absent at upstream head, 761 are
+recorded in a new preset's `renamed_from` and 75 are genuine removals (SeeMeCNC 21, Creality 19,
+Anker 13, OrcaArena 9, ...); upstream references none of the 75. The shipped `renamed_from` data has
+1,858 entries across the three collections, no duplicate old name, no self-rename and no empty
+entry — the invariant `update_map_system_profile_renamed` counts as an error.
+
+Updater: shipped vendor `version` values are metadata only. `PresetUpdater::sync_printer_config`
+compares `SLIC3R_VERSION` against the *OTA printer-config cache* (`data_dir/printers` /
+`data_dir/ota/printers`), not the vendor profile version, and a fresh data dir has no cache to wipe.
+Observed behaviour is recorded in the ticket's Answer.
+
+Review corrections that still hold:
+
+- `git diff 33909a51cd HEAD -- resources/profiles` was **empty**; profiles are a pure upstream
   snapshot and `BBL/cli_config.json` is not fork-specific.
-- `filament_prime_volume` sits in the fork's **obsolete-key ignore set**
+- `filament_prime_volume` sat in the fork's **obsolete-key ignore set**
   (`src/libslic3r/PrintConfig.cpp:8405`; inherited from base, not fork-added), so adding the key
-  alone leaves all 447 affected presets cleared. Ticket 03 removes it and reconciles the whole set:
-  the fork's set equals upstream's **plus `filament_prime_volume`, minus twelve retired belt keys**
+  alone would leave all 447 affected presets cleared. Ticket 03 removed it. The fork's set then
+  equalled upstream's **plus `filament_prime_volume`, minus twelve retired belt keys**
   (`belt_preslice_global`, `belt_slice_rotation_global`, `belt_support_floor_mode`,
   `belt_support_z_offset_mode`, `first_layer_plane`, `first_layer_plane_offset`,
   `first_layer_plane_thickness`, `gcode_back_transform`, `preslice_remap_global`,
-  `preslice_remap_x`, `preslice_remap_y`, `preslice_remap_z`). Adding those twelve back is harmless
-  (pnp-registered keys are exempt at `PrintConfig.cpp:8410-8428`) and is a ticket 03 decision, not
-  a ticket 10 one.
+  `preslice_remap_x`, `preslice_remap_y`, `preslice_remap_z`). All twelve were added back in ticket
+  03: harmless (pnp-registered keys are exempt at `PrintConfig.cpp:8410-8428`) and it keeps the set
+  identical to upstream's.
+- The shipped presets still reference 234 keys that upstream does not declare either (BambuStudio /
+  Creality / Qidi import leftovers such as `include`, `epoxy_resin_plate_temp`, `wall_infill_order`)
+  and three upstream belt keys deferred to ticket 10 (`gcode_remap_x/y/z`). The ticket 03 test
+  allowlists both groups explicitly instead of wildcarding them.
+
 
 ## Adopted — translations
 
