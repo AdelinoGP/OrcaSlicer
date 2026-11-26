@@ -35,6 +35,7 @@
 #include <set>
 #include <string>
 
+#include "libslic3r/Preset.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
 using namespace Slic3r;
@@ -77,9 +78,11 @@ const std::set<std::string>& deferred_upstream_keys()
 }
 
 // Vendor keys that neither this fork nor upstream 808dd7dff8 declares in
-// PrintConfigDef. The loader drops them today and dropped them before the sync;
-// they are recorded here so this test can distinguish "a key the fork is
-// supposed to know" from "a key nobody knows".
+// print_config_def, the set the preset loader applies. The loader drops them today
+// and dropped them before the sync; they are recorded here so this test can
+// distinguish "a key the fork is supposed to know" from "a key nobody knows".
+// filament_extruder_id is a special case: it exists in the placeholder config's
+// own definition, which presets never consult.
 const std::set<std::string>& undeclared_vendor_keys()
 {
     static const std::set<std::string> keys = {
@@ -105,7 +108,7 @@ const std::set<std::string>& undeclared_vendor_keys()
     "fan_min_speed_BRASS", "fan_min_speed_HS", "fan_p2_after_x_layers", "fan_p2_before_x_layers",
     "fan_p2_speed_before_x_layers", "fan_speed_after_x_layers", "filament_bridge_speed",
     "filament_change_lift_type", "filament_color", "filament_contact_safe", "filament_emission_safe",
-    "filament_enable_overhang_speed", "filament_flow_ratio_initial_layer", "filament_ingredients_safe",
+    "filament_enable_overhang_speed", "filament_extruder_id", "filament_flow_ratio_initial_layer", "filament_ingredients_safe",
     "filament_long_retractions_when_ec", "filament_metal_stickiness", "filament_overhang_1_4_speed",
     "filament_overhang_2_4_speed", "filament_overhang_3_4_speed", "filament_overhang_4_4_speed",
     "filament_overhang_totally_speed", "filament_retract_layer_change", "filament_retract_length",
@@ -187,6 +190,11 @@ TEST_CASE("Every shipped preset key is declared or explicitly allowlisted", "[Pr
     size_t presets = 0;
     size_t keys    = 0;
     std::map<std::string, std::string> unknown; // key -> first file that uses it
+    std::map<std::string, std::string> list_missing; // key -> first file (declared but not in the preset list)
+
+    const std::set<std::string> printer_opts(Preset::printer_options().begin(), Preset::printer_options().end());
+    const std::set<std::string> print_opts(Preset::print_options().begin(), Preset::print_options().end());
+    const std::set<std::string> filament_opts(Preset::filament_options().begin(), Preset::filament_options().end());
 
     for (const fs::directory_entry &vendor_dir : fs::directory_iterator(profiles_dir)) {
         if (!fs::is_directory(vendor_dir.path()))
@@ -202,13 +210,23 @@ TEST_CASE("Every shipped preset key is declared or explicitly allowlisted", "[Pr
                 continue;
 
             ++presets;
+            const std::string preset_type = doc["type"].get<std::string>();
             for (const auto &item : doc.items()) {
                 ++keys;
                 const std::string &key = item.key();
-                if (print_config_def.has(key))
-                    continue;
                 if (metadata.find(key) != metadata.end())
                     continue;
+                if (print_config_def.has(key)) {
+                    // A key that is declared but absent from the collection's
+                    // option list is dropped by Preset::remove_invalid_keys at
+                    // load time, before the export ever sees it.
+                    const std::set<std::string> &allowed =
+                        preset_type == "machine"  ? printer_opts :
+                        preset_type == "filament" ? filament_opts : print_opts;
+                    if (allowed.find(key) == allowed.end())
+                        list_missing.emplace(key, fs::relative(entry.path(), profiles_dir).generic_string());
+                    continue;
+                }
                 if (PrintConfigDef::is_ignored_legacy_key(key))
                     continue;
                 if (pnp_set.find(key) != pnp_set.end())
@@ -229,9 +247,14 @@ TEST_CASE("Every shipped preset key is declared or explicitly allowlisted", "[Pr
     std::string report;
     for (const auto &[key, file] : unknown)
         report += "\n  " + key + "  (first seen in " + file + ")";
+    std::string list_report;
+    for (const auto &[key, file] : list_missing)
+        list_report += "\n  " + key + "  (first seen in " + file + ")";
     INFO("pnp key registration sealed: " << pnp_sealed);
     INFO("undeclared keys:" << report);
+    INFO("declared but not in the preset option list:" << list_report);
     CHECK(unknown.empty());
+    CHECK(list_missing.empty());
     CHECK(keys > 0);
 }
 
