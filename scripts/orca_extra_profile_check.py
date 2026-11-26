@@ -77,7 +77,7 @@ def check_filament_compatible_printers(vendor_folder):
             continue
 
         try:
-            with open(file_path, 'r', encoding='UTF-8') as fp:
+            with open(file_path, 'r', encoding='utf-8-sig') as fp:
                 # Use custom hook to detect duplicates.
                 data = json.load(fp, object_pairs_hook=no_duplicates_object_pairs_hook)
         except ValueError as ve:
@@ -87,6 +87,13 @@ def check_filament_compatible_printers(vendor_folder):
         except Exception as e:
             print_error(f"Error processing {file_path}: {e}")
             error += 1
+            continue
+
+        # Support tables under a vendor's filament/ directory (`filament_id_map.json`,
+        # `filament_name_map.json`, `support_recommended_params.json`) carry a "type"
+        # marker for the loader but are not presets and have no "name". Skip them
+        # instead of crashing on the first one.
+        if not isinstance(data, dict) or not isinstance(data.get("name"), str):
             continue
 
         profile_name = data['name']
@@ -154,7 +161,7 @@ def load_available_filament_profiles(profiles_dir, vendor_name):
     
     for file_path in vendor_path.rglob("*.json"):
         try:
-            with open(file_path, 'r', encoding='UTF-8') as fp:
+            with open(file_path, 'r', encoding='utf-8-sig') as fp:
                 data = json.load(fp)
                 if "name" in data:
                     profiles.add(data["name"])
@@ -191,7 +198,7 @@ def check_machine_default_materials(profiles_dir, vendor_name):
     # Check each machine profile
     for file_path in machine_dir.rglob("*.json"):
         try:
-            with open(file_path, 'r', encoding='UTF-8') as fp:
+            with open(file_path, 'r', encoding='utf-8-sig') as fp:
                 data = json.load(fp)
                 
             default_materials = None
@@ -249,7 +256,7 @@ def check_name_consistency(profiles_dir, vendor_name):
         return 0, 1
     
     try:
-        with open(vendor_file, 'r', encoding='UTF-8') as fp:
+        with open(vendor_file, 'r', encoding='utf-8-sig') as fp:
             data = json.load(fp)
     except Exception as e:
         print_error(f"Error loading vendor profile {vendor_file}: {e}")
@@ -270,7 +277,7 @@ def check_name_consistency(profiles_dir, vendor_name):
                 continue
 
             try:
-                with open(sub_file, 'r', encoding='UTF-8') as fp:
+                with open(sub_file, 'r', encoding='utf-8-sig') as fp:
                     sub_data = json.load(fp)
             except Exception as e:
                 print_error(f"Error loading profile {sub_file}: {e}")
@@ -307,7 +314,7 @@ def check_filament_id(vendor, vendor_folder):
     # Use rglob to recursively find .json files.
     for file_path in vendor_path.rglob("*.json"):
         try:
-            with open(file_path, 'r', encoding='UTF-8') as fp:
+            with open(file_path, 'r', encoding='utf-8-sig') as fp:
                 # Use custom hook to detect duplicates.
                 data = json.load(fp, object_pairs_hook=no_duplicates_object_pairs_hook)
         except ValueError as ve:
@@ -350,7 +357,7 @@ def check_obsolete_keys(profiles_dir, vendor_name):
 
     for file_path in vendor_path.rglob("*.json"):
         try:
-            with open(file_path, "r", encoding="UTF-8") as fp:
+            with open(file_path, "r", encoding="utf-8-sig") as fp:
                 data = json.load(fp)
         except Exception as e:
             print_warning(f"Error reading profile {file_path.relative_to(profiles_dir)}: {e}")
@@ -393,7 +400,7 @@ def check_vector_type_keys(profiles_dir, vendor_name):
 
     for file_path in vendor_path.rglob("*.json"):
         try:
-            with open(file_path, "r", encoding="UTF-8") as fp:
+            with open(file_path, "r", encoding="utf-8-sig") as fp:
                 data = json.load(fp)
         except Exception as e:
             print_error(f"Error processing {file_path.relative_to(profiles_dir)}: {e}")
@@ -439,7 +446,7 @@ def check_conflict_keys(profiles_dir, vendor_name):
 
     for file_path in vendor_path.rglob("*.json"):
         try:
-            with open(file_path, 'r', encoding='UTF-8') as fp:
+            with open(file_path, 'r', encoding='utf-8-sig') as fp:
                 # Use custom hook to detect duplicates.
                 data = json.load(fp, object_pairs_hook=no_duplicates_object_pairs_hook)
         except ValueError as ve:
