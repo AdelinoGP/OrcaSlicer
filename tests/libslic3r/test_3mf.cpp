@@ -1086,6 +1086,48 @@ TEST_CASE("A project whose components reference themselves fails to load", "[3mf
     REQUIRE_FALSE(loaded);
 }
 
+TEST_CASE("A project's build item auto drop survives loading", "[3mf][Regression]")
+{
+    // 2.4.x wrote auto_drop on the build item only. Upstream later moved the flag to the object, and
+    // its importer then treated a missing object attribute as "on" (upstream 4c2ae6d202). This base
+    // keeps the flag per instance, read straight from the build item, so the 2.4.x layout loads as
+    // written. Pinned here so the flag cannot start defaulting to on without a failing test.
+    const bool auto_drop = GENERATE(false, true);
+    INFO("auto_drop " << auto_drop);
+
+    ScopedTemporaryFile temp(".3mf");
+    {
+        Model        model;
+        ModelObject* object = model.add_object();
+        object->add_volume(make_cube(10., 10., 10.));
+        object->add_instance()->auto_drop = auto_drop;
+        ScopedTemporaryDir backup_dir("orca_auto_drop_src");
+        model.set_backup_path(backup_dir.string());
+
+        DynamicPrintConfig cfg;
+        PlateData          plate;
+        plate.plate_index = 0;
+        StoreParams sp;
+        sp.path     = temp.string().c_str();
+        sp.model    = &model;
+        sp.config   = &cfg;
+        sp.strategy = SaveStrategy::Zip64 | SaveStrategy::Silence;
+        sp.plate_data_list.push_back(&plate);
+        REQUIRE(store_bbs_3mf(sp));
+    }
+    // Check the file really is in the 2.4.x layout: the build item carries the flag (a same-text
+    // replacement only proves it is there).
+    const std::string item_flag = auto_drop ? "auto_drop=\"1\"" : "auto_drop=\"0\"";
+    REQUIRE(replace_in_3mf_entry(temp.string(), "3dmodel.model", item_flag, item_flag));
+
+    ScopedTemporaryDir backup_dir("orca_auto_drop_dst");
+    Model              model;
+    REQUIRE(load_bbs_project(temp.string(), model, backup_dir));
+    REQUIRE(model.objects.size() == 1);
+    REQUIRE(model.objects.front()->instances.size() == 1);
+    CHECK(model.objects.front()->instances.front()->auto_drop == auto_drop);
+}
+
 TEST_CASE("An object loads up to the component reference budget and fails past it", "[3mf][Regression]")
 {
     // The importer queues at most 100000 component references per object. Every reference besides the
