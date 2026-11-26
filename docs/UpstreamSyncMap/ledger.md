@@ -35,9 +35,9 @@ Two corrections against the first draft, both material:
 | SHA | Date | What it fixes | Source | Conflict site / note | Ticket |
 |---|---|---|---|---|---|
 | `d112a0af29` | 09-09 | Two stack buffer overflows in ADMesh `stl_read` (unbounded `%[^\n]` solid name, MW metadata parse); `deps_src/admesh/stlinit.cpp` 2+/2− | CLEAN | — | 01 |
-| `d35ea27ea5` | 09-29 | Zip entry sizes validated before parsing 3MF XML | CLEAN | Test half conflicts in an existing test file | 01 |
-| `8ffd3e514e` | 09-29 | OBJ and DRC import hardened against malformed files | CLEAN | Tests apply too (new `test_drc.cpp`, `test_obj.cpp`); an earlier draft's `ERROR` was `tests/libslic3r/CMakeLists.txt` only | 01 |
-| `41eeaf3883` | 09-29 | Server-supplied download filenames sanitized (`libslic3r/utils.cpp`, `Utils.hpp`, `DownloaderFileGet.cpp`, `Plater.cpp`) | CLEAN | Test half conflicts | 01 |
+| `d35ea27ea5` | 09-29 | Zip entry sizes validated before parsing 3MF XML | CLEAN | Test half hand-ported by appending to `tests/libslic3r/test_3mf.cpp`; the CMake registration hunk is dropped (xmake globs the suite) | 01 |
+| `8ffd3e514e` | 09-29 | OBJ and DRC import hardened against malformed files | CLEAN | Tests taken whole (new `test_drc.cpp`, `test_obj.cpp`); the `tests/libslic3r/CMakeLists.txt` hunk is dropped (xmake globs the suite) | 01 |
+| `41eeaf3883` | 09-29 | Server-supplied download filenames sanitized (`libslic3r/utils.cpp`, `Utils.hpp`, `DownloaderFileGet.cpp`, `Plater.cpp`) | CLEAN | Test half hand-ported into `tests/libslic3r/test_utils.cpp`; `ScopedTemporaryDir` added to `tests/test_utils.hpp` | 01 |
 | `a124b7d2df` | 10-09 | Cyclic 3MF component graphs rejected before OOM | CONFLICT | `Format/bbs_3mf.cpp` | 02 |
 | `490d134507` | 09-29 | 3MF plate-ID and paint-data hardening | CONFLICT | **Inside `TriangleSelector.cpp`**; `bbs_3mf.cpp` and `Model.cpp` apply cleanly; test half conflicts | 02 |
 | `203bc63f35` | 09-30 | Project metadata escaped before rendering; accessory opening restricted | CONFLICT | `Utils.hpp`, `utils.cpp`; `GUI/Project.cpp` and the web asset clean | 02 |
@@ -79,6 +79,10 @@ Measured with only `CMakeLists.txt` excluded:
 Registration is automatic for `tests/libslic3r/*.cpp` via `xmake.lua:1247`. Porting a test whose
 file is absent means taking the whole upstream file; porting one that conflicts means a hand-port
 in a file the fork already owns.
+
+Ticket 01 subsequently ported the test half of `d35ea27ea5` and `41eeaf3883` by hand and took
+`8ffd3e514e`'s whole new files, so only the CMake registration hunks (which have no xmake target)
+were dropped.
 
 ## Adopted — profile data and config keys
 

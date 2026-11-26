@@ -175,7 +175,11 @@ Order is the decided one: security → profiles → crashes → features.
 
 <!-- one line per closed ticket: [title](tickets/NN-slug.md) — gist -->
 
-Nothing closed yet. The map records the grilling of 2026-11-25 and the two review rounds that
+- [Security hardening — clean picks](tickets/01-security-clean-picks.md): four CLEAN picks landed
+  as `3c18052abf`, `f8afe3a5aa`, `0d87b1d20f`, `03463e1592`; all three test halves ported (two by
+  hand), 7/7 suites green, six walkthrough screenshots. STL/3MF refusals are log-only.
+
+Ticket 01 is closed. The map otherwise records the grilling of 2026-11-25 and the two review rounds that
 followed: the applicability method (exit codes lie), the `filament_prime_volume` ignore-set trap,
 the rejection of `32f6db87e8` as a defect this fork never had, the partial-port plan for
 `d7534d7fb9`, and the fact that profiles are a pure upstream snapshot.
