@@ -5,21 +5,28 @@ from pathlib import Path
 
 from assign_vendor_setting_ids import generate_preset_setting_id
 
+# The obsolete-key ignore set, mirrored from PrintConfigDef::handle_legacy()
+# (src/libslic3r/PrintConfig.cpp). These keys are legal to ship: the loader drops
+# them on purpose. Keys that are not dropped but remapped to a modern name
+# (extruder_type, extruder_clearance_max_radius, ...) belong to handle_legacy's
+# rename branches and to CONFLICT_KEYS below, not to this list.
 OBSOLETE_KEYS = {
-    "acceleration", "scale", "rotate", "duplicate", "duplicate_grid",
-    "bed_size", "print_center", "g0", "wipe_tower_per_color_wipe",
-    "support_sharp_tails", "support_remove_small_overhangs", "support_with_sheath",
-    "tree_support_collision_resolution", "tree_support_with_infill",
-    "max_volumetric_speed", "max_print_speed", "support_closing_radius",
-    "remove_freq_sweep", "remove_bed_leveling", "remove_extrusion_calibration",
-    "support_transition_line_width", "support_transition_speed", "bed_temperature",
-    "bed_temperature_initial_layer", "can_switch_nozzle_type", "can_add_auxiliary_fan",
-    "extra_flush_volume", "spaghetti_detector", "adaptive_layer_height",
-    "z_hop_type", "z_lift_type", "bed_temperature_difference", "long_retraction_when_cut",
-    "retraction_distance_when_cut", "extruder_type", "internal_bridge_support_thickness",
-    "extruder_clearance_max_radius", "top_area_threshold", "reduce_wall_solid_infill",
-    "filament_load_time", "filament_unload_time", "smooth_coefficient",
-    "overhang_totally_speed", "silent_mode", "overhang_speed_classic"
+    "acceleration", "adaptive_layer_height", "anisotropic_surfaces", "bed_size", "bed_temperature",
+    "bed_temperature_difference", "bed_temperature_initial_layer", "belt_preslice_global",
+    "belt_slice_rotation_global", "belt_support_floor_mode", "belt_support_z_offset_mode",
+    "can_add_auxiliary_fan", "can_switch_nozzle_type", "duplicate", "duplicate_grid",
+    "extra_flush_volume", "filament_load_time", "filament_unload_time", "first_layer_plane",
+    "first_layer_plane_offset", "first_layer_plane_thickness", "g0", "gcode_back_transform",
+    "internal_bridge_support_thickness", "long_retraction_when_cut", "max_print_speed",
+    "max_volumetric_speed", "overhang_speed_classic", "overhang_totally_speed",
+    "preslice_remap_global", "preslice_remap_x", "preslice_remap_y", "preslice_remap_z",
+    "print_center", "reduce_wall_solid_infill", "remove_bed_leveling",
+    "remove_extrusion_calibration", "remove_freq_sweep", "retraction_distance_when_cut", "rotate",
+    "scale", "silent_mode", "smooth_coefficient", "spaghetti_detector", "support_closing_radius",
+    "support_remove_small_overhangs", "support_sharp_tails", "support_transition_line_width",
+    "support_transition_speed", "support_with_sheath", "top_area_threshold",
+    "tree_support_collision_resolution", "tree_support_with_infill", "wipe_tower_per_color_wipe",
+    "z_hop_type", "z_lift_type"
 }
 
 # Utility functions for printing messages in different colors.
