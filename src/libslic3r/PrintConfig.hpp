@@ -528,6 +528,12 @@ extern std::string get_extruder_variant_string(ExtruderType extruder_type, Nozzl
 // entry matching the given extruder/volume type and id. Returns 0 when no entry matches.
 extern int get_config_index_base(NozzleVolumeType volume_type, ExtruderType extruder_type, int variant_id_1based, const std::vector<std::string>& variant_list, const std::vector<int>& variant_ids_1based);
 
+// The variant index a value is taken from: in a variant list paired with its 1-based extruder or
+// filament ids, the variant with the same variant string and id, else that id's first variant, else -1.
+// variant_id_1based < 0 or empty variant_ids_1based match any id. A list without variant strings has
+// one variant per id, and one with neither variant strings nor ids has a single variant.
+extern int find_variant_index(const std::string& variant, int variant_id_1based, const std::vector<std::string>& variant_list, const std::vector<int>& variant_ids_1based);
+
 static std::set<NozzleVolumeType> get_valid_nozzle_volume_type() {
     std::set<NozzleVolumeType> type;
     for (int i = 0; i <= nvtMaxNozzleVolumeType; ++i) {
