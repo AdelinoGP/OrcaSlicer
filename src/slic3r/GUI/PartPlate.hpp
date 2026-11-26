@@ -432,6 +432,8 @@ public:
     const BoundingBoxf3& get_bounding_box(bool extended = false) { return extended ? m_extended_bounding_box : m_bounding_box; }
     const BoundingBox get_bounding_box_crd();
     BoundingBoxf3 get_plate_box() {return get_build_volume();}
+    // The volume to place objects in. With use_share it is bounded by the area every extruder
+    // reaches, or by the whole plate when there is none.
     BoundingBoxf3 get_build_volume(bool use_share = false);
 
     const std::vector<BoundingBoxf3>& get_exclude_areas() { return m_exclude_bounding_box; }

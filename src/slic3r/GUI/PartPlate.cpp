@@ -3320,8 +3320,9 @@ BoundingBoxf3 PartPlate::get_build_volume(bool use_share)
     auto  eps=Slic3r::BuildVolume::SceneEpsilon;
 	Vec3d up_point;
 	Vec3d low_point;
-	if (use_share && !m_extruder_areas.empty()) {
-		Polygon bed_poly = get_shared_poly(m_extruder_areas);
+	// Extruder areas that share nothing leave the whole plate to place on.
+	const Polygon bed_poly = use_share && !m_extruder_areas.empty() ? get_shared_poly(m_extruder_areas, m_shape) : Polygon();
+	if (!bed_poly.points.empty()) {
 		BoundingBox bbox = bed_poly.bounding_box();
 
 		up_point = Vec3d(unscale_(bbox.max.x()) + eps,  unscale_(bbox.max.y()) + eps, m_origin.z() + m_height + eps);

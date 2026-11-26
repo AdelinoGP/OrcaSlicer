@@ -1105,6 +1105,23 @@ static StringObjectException layered_print_cleareance_valid(const Print &print, 
     if (print_config.enable_wrapping_detection.value && !intersection({wrapping_poly}, convex_hulls_temp).empty()) {
         return {L("Prime Tower") + L(" is too close to clumping detection area, and collisions will be caused.\n")};
     }
+    // A tower (grown by its brim) past the printable outline fails validation. The outline is the
+    // area every extruder reaches, in plate-local coordinates like get_extruder_shared_printable_polygon().
+    const bool  generated  = print.is_step_done(psWipeTower);
+    const float brim_width = print.wipe_tower_data(filaments_count).brim_width;
+    Polygons    tower_polys = (!generated && config.prime_tower_brim_width.value >= 0) ?
+                                  offset(convex_hulls_temp, float(scale_(brim_width))) :
+                                  convex_hulls_temp;
+    Polygons    printable_polys = print.get_extruder_shared_printable_polygon();
+    const Point plate_shift(scale_(plate_origin.x()), scale_(plate_origin.y()));
+    for (Polygon &p : printable_polys)
+        p.translate(plate_shift);
+    if (!diff(tower_polys, printable_polys).empty()) {
+        // Moving the tower does not help when no area is reached by every extruder.
+        if (printable_polys.empty())
+            return {L("The extruder printable areas share no common area, so the prime tower cannot be printed.\n")};
+        return {L("Prime tower is partially outside the printable area, and it cannot be printed.\n")};
+    }
     return {};
 }
 
