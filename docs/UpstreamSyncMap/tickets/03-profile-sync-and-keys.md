@@ -326,11 +326,17 @@ for 2.5.2, which was skipped.
 
 ### Gaps
 
-- **The 3MF evidence was produced by the CLI exporter, not the GUI Save Project dialog.** The GUI
-  was paused to free the desktop; `--export-3mf` is the same `export_project` writer, and the GUI
-  preset load was checked from the log, but a click-through Save Project remains unrecorded. The
-  inherited values were materialised into the preset copies for the CLI because it does not resolve
-  `inherits`; the GUI loader does.
+- **Closed — GUI Save Project click-through.** Driven through `cua-driver` (mouse clicks on
+  Orca's custom tab bar did not register through the driver; a plain Win32 click and the driver's
+  keyboard path did). With the Vivedino `Xplorer IDEX` printer selected, a cube imported and
+  Ctrl+S → *Save file as*, the GUI-written `Metadata/project_settings.config` holds
+  `extruder_clearance_dist_to_rod = 40`, `is_imex = 1`, `imex_tool_layout = front-left`,
+  `belt_slice_rotation = x`, `belt_printer = 0`, `build_plate_tilt_x = 0` and
+  `filament_prime_volume = ['45','45']`. After relaunch the pre-sync user filament
+  `Ticket03 Pre-Sync PLA` is listed under *User presets*
+  ([screenshot](../assets/03/08-gui-user-preset-after-relaunch.png)). The non-default
+  `belt_printer = 1` / `build_plate_tilt_x = 45` values were verified only through the CLI exporter
+  (IdeaFormer), not a GUI save.
 - **Vivedino is not in the Setup Wizard's printer list.** The wizard's cards need cover art and the
   Vivedino presets have none, so the vendor never appears there. Its `Xplorer IDEX` models were
   added to the app config's `models` list directly; the preset then loaded (log:
