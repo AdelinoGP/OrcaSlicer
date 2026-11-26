@@ -47,12 +47,12 @@ Two corrections against the first draft, both material:
 
 | SHA | Date | What it fixes | Source | Conflict site / note | Ticket |
 |---|---|---|---|---|---|
-| `36228c4755` | 09-02 | Heap corruption repairing a model with auto-backup (`FixModelByCgal.cpp`, 4+/0−) | CLEAN | No tests | 04 |
-| `8390d55127` | 07-21 | Crash opening Object Settings with mixed nullable values (`Field.cpp`) | CLEAN | No tests | 04 |
-| `67a976e002` | 10-04 | Mirrored instances silently dropped on 3MF load | CLEAN | Test half conflicts | 04 |
-| `9b2fcaa53a` | 10-16 | "bad allocation" opening a 2.4 project with a custom filament | CLEAN | Relies on `extend_default_config_length`, present here; test half conflicts | 04 |
-| `4a20168742` | 10-09 | Multi-toolhead 3MF without `filament_self_index` fails to load | CLEAN | Test half conflicts | 04 |
-| `70bc685101` | 11-03 | Crash syncing filaments after a plate is deleted (`SyncAmsInfoDialog.cpp`) | CLEAN | No tests | 04 |
+| `36228c4755` | 09-02 | Heap corruption repairing a model with auto-backup (`FixModelByCgal.cpp`, 4+/0−) | CLEAN | No tests; landed `f2537a1757` | 04 |
+| `8390d55127` | 07-21 | Crash opening Object Settings with mixed nullable values (`Field.cpp`) | CLEAN | No tests; landed `b30138393b` | 04 |
+| `67a976e002` | 10-04 | Mirrored instances silently dropped on 3MF load | CLEAN | Test half conflicts; hand-ported into `test_3mf.cpp`; landed `8eabfd90cd` | 04 |
+| `9b2fcaa53a` | 10-16 | "bad allocation" opening a 2.4 project with a custom filament | CLEAN | Test half hand-ported with this base's per-variant keys; landed `fd7c341c68` | 04 |
+| `4a20168742` | 10-09 | Multi-toolhead 3MF without `filament_self_index` fails to load | CLEAN | Test half hand-ported; landed `29e1a5c703` | 04 |
+| `70bc685101` | 11-03 | Crash syncing filaments after a plate is deleted (`SyncAmsInfoDialog.cpp`) | CLEAN | No tests; landed `176f569503` | 04 |
 | `e410cf3656` | 10-28 | Crash at exit from the preset-sync thread (`GUI_App.cpp`) | CLEAN | — | 05 |
 | `5bf1571bb8` | 11-21 | Move-gizmo crash with object coordinates and multiple instances (`Selection.cpp`) | CLEAN | — | 05 |
 | `4c2ae6d202` | 10-19 | Auto Drop silently re-enabled for 2.4.x projects (`bbs_3mf.cpp`, 4 hunks) | CONFLICT | `bbs_3mf.cpp` | 05 |

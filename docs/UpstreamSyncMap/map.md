@@ -214,6 +214,14 @@ plan for `d7534d7fb9`, and the fact that profiles are a pure upstream snapshot.
   any declared key absent from `Preset::*_options()`, so the 21 keys also joined those lists
   (`3212071996`) and the test now asserts that membership.
 
+- [Crash and format fixes — clean picks](tickets/04-crash-format-batch-a.md): six CLEAN picks landed
+  as `f2537a1757`, `b30138393b`, `8eabfd90cd`, `fd7c341c68`, `29e1a5c703`, `176f569503`. Three test
+  halves were hand-ported into the fork's `test_3mf.cpp` / `test_preset_bundle_loading.cpp`; the
+  `9b2fcaa53a` test switched to this base's per-variant keys (`filament_flow_ratio`,
+  `filament_max_volumetric_speed`), because `pressure_advance` is not in that set here. 7/7 suites
+  green; one mirrored-3MF screenshot. Five GUI-only walkthroughs were not click-through and are
+  listed as gaps in the ticket.
+
 ## Out of scope
 
 - The Project page abort (`0xc0000409`, ucrtbase) on any project whose archive carries
