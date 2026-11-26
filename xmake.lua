@@ -1279,7 +1279,10 @@ target("slic3rutils_tests")
     set_default(false)
     add_files("tests/slic3rutils/*.cpp")
     add_rules("pnp.test", "pnp.conan.dlls")
-    add_deps("libslic3r", "libslic3r_gui", "Catch2WithMain")
+    -- Catch2WithMain first: the minilzo target compiles deps_src/minilzo/testmini.c,
+    -- whose main() otherwise wins over the test runner's. See the harness note in
+    -- docs/UpstreamSyncMap/tickets/02-security-hand-ports.md.
+    add_deps("Catch2WithMain", "libslic3r", "libslic3r_gui")
     add_includedirs("src")
     add_tests("default")
     if is_plat("windows") then
