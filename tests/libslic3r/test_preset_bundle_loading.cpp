@@ -1,6 +1,11 @@
 #include <catch2/catch_all.hpp>
 
+#include <boost/algorithm/string/trim.hpp>
 #include <boost/filesystem.hpp>
+#include <nlohmann/json.hpp>
+
+#include <fstream>
+#include <map>
 
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/AppConfig.hpp"
@@ -391,6 +396,64 @@ TEST_CASE("Renamed names are normalized into a SYSTEM preset's compatible lists"
 
 // PNP fork (F12): removed the "compatible_prints on SLA materials" case — sla_prints/sla_materials
 // collections were deleted with the SLA cut.
+
+TEST_CASE("Shipped renamed_from entries are unambiguous", "[Preset][Rename]")
+{
+    // update_map_system_profile_renamed() builds one old-name -> preset map per collection and
+    // counts an error when two presets claim the same former name: the bundle then reports
+    // "presets have errors" at startup, and find_preset() picks whichever loaded first. The
+    // profile sync (UpstreamSyncMap ticket 03) rewrote every vendor tree, so assert the shipped
+    // data still satisfies that invariant before relying on it to keep user presets attached.
+    const fs::path profiles_dir(PROFILES_DIR);
+    REQUIRE(fs::is_directory(profiles_dir));
+
+    std::map<std::string, std::map<std::string, std::string>> renamed; // type -> old name -> new name
+    size_t entries = 0;
+
+    for (const fs::directory_entry &vendor_dir : fs::directory_iterator(profiles_dir)) {
+        if (!fs::is_directory(vendor_dir.path()))
+            continue;
+        for (const fs::directory_entry &entry : fs::recursive_directory_iterator(vendor_dir.path())) {
+            if (!fs::is_regular_file(entry.path()) || entry.path().extension() != ".json")
+                continue;
+            std::ifstream stream(entry.path().string(), std::ios::binary);
+            REQUIRE(stream.good());
+            const nlohmann::json doc = nlohmann::json::parse(stream);
+            if (!doc.is_object())
+                continue;
+            const auto type = doc.find("type");
+            const auto name = doc.find("name");
+            const auto from = doc.find("renamed_from");
+            if (type == doc.end() || !type->is_string() || name == doc.end() || !name->is_string() ||
+                from == doc.end() || !from->is_string())
+                continue;
+            const std::string &t = type->get_ref<const std::string &>();
+            if (t != "machine" && t != "process" && t != "filament")
+                continue;
+            const std::string preset_name = name->get<std::string>();
+
+            std::string rest = from->get<std::string>();
+            size_t      cut  = 0;
+            while (cut != std::string::npos && !rest.empty()) {
+                cut = rest.find(';');
+                const std::string old_name = boost::algorithm::trim_copy(rest.substr(0, cut));
+                rest = (cut == std::string::npos) ? std::string() : rest.substr(cut + 1);
+                if (old_name.empty())
+                    continue;
+                INFO("preset " << preset_name << " renamed_from " << old_name);
+                CHECK(old_name != preset_name);
+                const auto [it, inserted] =
+                    renamed[t].insert(std::make_pair(old_name, preset_name));
+                if (!inserted)
+                    CHECK(it->second == preset_name);
+                ++entries;
+            }
+        }
+    }
+
+    // Guards against passing vacuously if the tree is not where PROFILES_DIR points.
+    CHECK(entries > 1000);
+}
 
 TEST_CASE("Profile validator flags dangling and renamed preset references", "[Preset][Validate]")
 {
