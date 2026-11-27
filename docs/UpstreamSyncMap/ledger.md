@@ -166,8 +166,33 @@ Review corrections that still hold:
 |---|---|---|
 | 157 commits touching `localization/**` (125 non-merge, 103 `.po`-only), +683,058/−296,957 | Wholesale replacement. Conflict-free: zero fork `.po` edits since the fork base | 07 |
 | `2bd105b0ce` + `210bc927bc` | Thai added then reverted in-range — net zero; taken as part of the head snapshot | 07 |
+| `f894d08881` | "Enable Basque language in preferences (#17052)": `wxLANGUAGE_BASQUE` in the Preferences combobox's hardcoded `supported_languages[]` filter plus the "Euskara" label. CLEAN; landed `575818d4e1`. Needed because the filter, not the catalog set, decides which shipped catalogs the UI offers | 07 |
 
-Upstream ships **23** catalogs; the fork has 22. The extra is `eu` (Basque).
+Ticket 07 landed `7d23195426` (23 catalogs + `.pot`, byte-identical to upstream `808dd7dff8`,
++569,954/−135,000) and `575818d4e1` (`f894d08881`). The extra catalog is `eu`: 9,918 entries, 447
+untranslated (95.5% coverage), 4,370 marked "AI Translated". `localization/i18n/list.txt` stays the
+fork's copy — upstream's drops 9 files that exist here and adds 117 that do not; it is only the
+`--full` regeneration input.
+
+Two measurements that bind future translation syncs:
+
+- **The `.po` files are not compiled by xmake.** `scripts/run_gettext.bat` (Windows) / `.sh`
+  (flatpak) runs `msgfmt --check-format` into `resources/i18n/<lang>/OrcaSlicer.mo`, and `*.mo` is
+  gitignored. A build tree or package only carries a catalog once that script has run; the flatpak
+  manifest calls it, nothing in `xmake.lua` does.
+- **Catalog set = 23, `.pot` = 9,906 msgids, every catalog = 9,906.** A future sync can assert
+  these three numbers instead of re-diffing 570k lines.
+
+Upstream's own catalogs are not fully glossary-clean: de `Extrude` (no context) reads "Extrusion"
+where the glossary prescribes "Extrudieren" (at the base it read "Extrudieren"; the change is
+upstream's, in-range), and ru carries two pre-existing placeholder drifts — `Filament does not match
+the filament in AMS slot. ...` renders two literal `%s`, and `Select connected printers (0/6)` renders
+a literal `%d`. Both ru strings are identical at `33909a51cd`, so the sync neither fixes nor
+introduces them; they are recorded rather than hand-edited, so the snapshot stays byte-identical to
+upstream and the next sync stays conflict-free.
+
+Upstream ships **23** catalogs. The fork shipped 22 before ticket 07; the extra is `eu` (Basque),
+which is now shipped here too, so both sides carry the same 23.
 
 ## Adopted — features (each carries a pnp prerequisite where its effect needs one)
 

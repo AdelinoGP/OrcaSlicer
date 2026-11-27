@@ -126,6 +126,8 @@ The docs are honest about behaviour changes, not just fixes:
   consumes them. Unmapped options are tinted amber per BootstrapMap 013's reopening; whether these
   keys render tinted cannot be verified until tickets 09/10 add their controls, and stock filament
   presets may begin warning once the keys are mapped.
+- A 23rd UI language appears: **Basque (Euskara)**, listed in Preferences → Language. It arrives
+  with the upstream catalog snapshot and upstream's own opt-in (`f894d08881`).
 
 ## Build and packaging consequences
 
@@ -240,6 +242,16 @@ plan for `d7534d7fb9`, and the fact that profiles are a pure upstream snapshot.
   `get_shared_printable_polygon` hunks are omitted (`7c73739e1a`, unpicked), and its validate message
   needed a minimal equivalent of the unpicked `4303d723a1` check. 7/7 suites green; the disjoint-area
   fixture rendered the Prepare plate, no before-fix run; the other GUI cases are gaps in the ticket.
+
+- [Translation catalogs](tickets/07-translations.md): the 23-catalog snapshot landed as
+  `7d23195426` (byte-identical to upstream `808dd7dff8`, +569,954/−135,000) with `f894d08881` as
+  `575818d4e1` (Basque in the Preferences filter, "Euskara"). `eu` ships at 95.5% coverage (447 of
+  9,918 untranslated); `list.txt` stays the fork's copy. `msgfmt --check-format` compiles all 23,
+  but **xmake never runs gettext** — `scripts/run_gettext.bat` does, and the `.mo` files are
+  gitignored, so a package needs the script run first. The de/fr glossary spot-check is 165/185 and
+  170/185 exact, with only context-exempt entries, empty glossary cells and upstream's own de
+  `Extrude` drift; the only placeholder drifts are two `ru` strings that already existed at the
+  base. 7/7 suites green; de/fr/ja/eu captures plus the dropdown listing Euskara are in the ticket.
 
 ## Out of scope
 
