@@ -199,11 +199,16 @@ which is now shipped here too, so both sides carry the same 23.
 | Series | Commits | Volume | Prerequisite | Ticket |
 |---|---|---|---|---|
 | UltiMaker host (`6e4be42a04` + 5 follow-ups) | 6 | +1,184 / 738 code lines, 19 files | none — `PrintHost` subclass | 08 |
-| IMEX / iXex | 45 | +3,528, 12 paths | `pnp_cli` must execute modes and toolchanges; 8 keys are preset-referenced, upstream defines 14 `imex_*`/`is_imex` keys | 09 |
-| Belt printers | 54 | +2,625, 17 files | `pnp_cli` belt kinematics and back-transform; 5 keys preset-referenced, upstream defines 11 belt/tilt keys (plus two SLA tilt times that rule 3 bars) | 10 |
-| Plugin host | 168 | +23,083, 57 files | Python/pybind11 runtime if P3.1 keeps it; `slicingPipeline` cannot fire (`Print::process` stub) and is re-qualified as a Wasm ABI | 11 |
+| IMEX / iXex | 45 | +3,528, 12 paths | `pnp_cli` must execute modes and toolchanges; 8 keys are preset-referenced, upstream defines 14 `imex_*`/`is_imex` keys. Ticket 12 adds the per-plate `imex_parallel_mode`/`imex_head_filament_map` transport and identity mapping only | 09 |
+| Belt printers | 54 | +2,625, 17 files | `pnp_cli` belt kinematics and back-transform; 5 keys preset-referenced, upstream defines 11 belt/tilt keys (plus two SLA tilt times that rule 3 bars). Ticket 12's pnp side adds `gcode_remap_x/y/z` (all three profiles), `printable_height` (the `rev_*` offset) and `printer_extruder_id` (two of three); pnp declares none of them today | 10 |
+| Plugin host | 168 | +23,083, 57 files | **P3.1 chose Wasm-only: no Python/pybind11.** A plugin is an external module at `PostPass::GCodePostProcess`; pages are manifest-declared HTML assets behind a read-only `page-data` bridge. `slicingPipeline` is replaced, not ported | 11 |
 | DeviceCore / printer agent | 110 | +6,931/−1,409, 94 files | none. The fork already ships **56** `GUI/DeviceCore` files and diverges from base on only **3** | 13 |
 | Design / CAD | 265 on CAD paths (~299 in the wider Design series) | +45,608, 35 files | none; needs SLVS built here (Conan recipe first, else `deps_src/`) | 14 |
+
+Ticket 12's prerequisite specification is
+[assets/12/pnp-prerequisites.md](assets/12/pnp-prerequisites.md): it pins the host-key sets, the
+IMEX plate-metadata transport, the belt transform order, the Wasm plugin/page ABI, the acceptance
+fixtures and the merge gates. Order: belt (10) → IMEX (09) → plugin (11).
 
 Ticket 08 landed as `dc370ee79b`. The whole host was taken **at upstream head** rather than at
 `6e4be42a04`, because the five follow-ups are all in-range and the head file also carries

@@ -141,10 +141,10 @@ The docs are honest about behaviour changes, not just fixes:
   ([SchemaBridgeMap ticket 16](../SchemaBridgeMap/tickets/16-restage-on-bump-guard.md)) compares
   against the staged backend; every such commit must be followed by `xmake pnp`, and the build
   fails loudly until it is. That is by design.
-- **No new shipped dependency except possibly three.** Tickets 01–10, 12 and 13 add none.
-  Ticket 11 adds a Python/pybind11 runtime **only if** P3.1 keeps the Python plugin capabilities;
-  if the Wasm ABI replaces them, it adds nothing. Ticket 14 adds SLVS (GPLv3) as a Conan recipe or
-  vendored in `deps_src/`; its licence file must travel with it.
+- **No new shipped dependency except possibly one.** Tickets 01–13 add none. Ticket 11 adds
+  nothing now that P3.1 chose Wasm-only; its HTML pages are host-rendered local assets, not a
+  runtime. Ticket 14 adds SLVS (GPLv3) as a Conan recipe or vendored in `deps_src/`; its licence
+  file must travel with it.
 
 ## Open assumptions
 
@@ -154,7 +154,8 @@ The docs are honest about behaviour changes, not just fixes:
     independently revertable commit; the translation snapshot rides along as its own commit.
   - **C — CAD:** ticket 14, because +45,608 lines needs its own review.
   - **D / E / F — IMEX, belt, plugins:** tickets 09, 10, 11. Each is a feature with a backend
-    half and its own acceptance slice, so each gets its own PR, after ticket 12 closes.
+    half and its own acceptance slice, so each gets its own PR. Ticket 12 closed 2026-11-27; all
+    three are unblocked, in the decided order belt → IMEX → plugin.
   One PR carrying everything would serve none of these reviews.
 - **Runner-ups deferred.** Twelve lower-priority crash fixes named in the ledger are not
   applicability-checked and have no ticket yet. "No ceiling" admits them; they queue behind the
@@ -172,9 +173,9 @@ The docs are honest about behaviour changes, not just fixes:
 | 06 | [Crash fixes — hand-ported](tickets/06-crash-format-hand-ports.md) | 03 | 5 |
 | 07 | [Translation catalogs](tickets/07-translations.md) | — | 23 catalogs |
 | 08 | [UltiMaker host](tickets/08-ultimaker-host.md) | — | 6 commits |
-| 09 | [IMEX / iXex multi-gantry](tickets/09-imex.md) | 03, 12 | 45 |
-| 10 | [Belt printers](tickets/10-belt-printers.md) | 03, 12 | 54 |
-| 11 | [Plugin host](tickets/11-plugin-host.md) | 12 | 168 |
+| 09 | [IMEX / iXex multi-gantry](tickets/09-imex.md) | — | 45 |
+| 10 | [Belt printers](tickets/10-belt-printers.md) | — | 54 |
+| 11 | [Plugin host](tickets/11-plugin-host.md) | — | 168 |
 | 12 | [PNP prerequisites for ported features](tickets/12-pnp-prerequisites.md) | — | — |
 | 13 | [DeviceCore / printer agent](tickets/13-devicecore.md) | — | 110 |
 | 14 | [Design / CAD](tickets/14-design-cad.md) | — | 265 |
@@ -261,6 +262,17 @@ plan for `d7534d7fb9`, and the fact that profiles are a pure upstream snapshot.
   digest GETs (`system/variant`, `auth/check`, `auth/verify`), the API-key POST and a preset
   save/reload round-trip; the upload POST is a recorded gap — the Print button never reached
   `send_gcode_legacy`'s dialog. 7/7 suites green.
+
+- [PNP prerequisites for ported features](tickets/12-pnp-prerequisites.md): the specification is
+  [assets/12/pnp-prerequisites.md](assets/12/pnp-prerequisites.md); no code. Plugin host is
+  **Wasm-only with HTML pages** (no Python): a plugin is an external module at
+  `PostPass::GCodePostProcess`, pages are manifest-declared local assets behind a read-only
+  `pnp_cli plugin page-data` bridge, and bundles are SHA-256-audited. IMEX mode travels as
+  per-plate `imex_parallel_mode`/`imex_head_filament_map` with identity mapping only; belt applies
+  `build_plate_tilt_x` (all three shipped profiles set 45) and must consume `gcode_remap_*`.
+  Order: **belt (10) → IMEX (09) → plugin (11)**. The spec corrects two premises: the schema guard
+  leaves unknown keys alone (`PnpConfigTranslator.cpp:1091`), and `plate_metadata` is parsed but
+  not stamped (`docs/02_ir_schemas.md:446`); the live schema (1.3.0) has none of the new keys.
 
 ## Out of scope
 

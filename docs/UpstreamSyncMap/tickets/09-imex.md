@@ -3,7 +3,7 @@ title: IMEX / iXex multi-gantry support
 status: open
 type: implementation
 assignee: ""
-blocked-by: [03, 12]
+blocked-by: []
 ---
 
 # IMEX / iXex multi-gantry support

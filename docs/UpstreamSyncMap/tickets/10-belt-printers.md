@@ -3,7 +3,7 @@ title: Belt printers
 status: open
 type: implementation
 assignee: ""
-blocked-by: [03, 12]
+blocked-by: []
 ---
 
 # Belt printers

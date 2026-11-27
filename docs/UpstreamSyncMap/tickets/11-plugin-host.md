@@ -3,7 +3,7 @@ title: Plugin host (Wasm re-qualification)
 status: open
 type: implementation
 assignee: ""
-blocked-by: [12]
+blocked-by: []
 ---
 
 # Plugin host (Wasm re-qualification)

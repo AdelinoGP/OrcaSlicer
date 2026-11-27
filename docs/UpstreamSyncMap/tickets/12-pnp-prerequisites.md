@@ -1,8 +1,8 @@
 ---
 title: PNP prerequisites for ported features
-status: open
+status: closed
 type: grilling
-assignee: ""
+assignee: opencode-agent
 blocked-by: []
 ---
 
@@ -110,3 +110,49 @@ Not code. Evidence that each prerequisite is **specified well enough to be demon
 The prerequisite asset exists with per-feature acceptance tests, tickets 09–11 unblock, and every
 requirement is written so it can be demonstrated — with the fixture and the `config-schema` list
 that prove it.
+
+## Answer
+
+Closed 2026-11-27. The specification is
+[assets/12/pnp-prerequisites.md](../assets/12/pnp-prerequisites.md). No backend or GUI code is part
+of this ticket; it closes on the spec, as its sequencing requires.
+
+**Decisions taken** (grilling, 2026-11-27):
+
+- **P3.1** — Wasm-only, with HTML plugin pages. No Python/pybind11 runtime; upstream `pages` as
+  Python, `script`, `printerAgent` and the Python `slicingPipeline` hook are dropped.
+- **P3.2** — a plugin is an existing external pnp module. The v1 stage is
+  `PostPass::GCodePostProcess`: G-code in, G-code out, multiple modules chained. Geometry-in
+  plugins are explicitly out of v1.
+- **P3.5/P3.6** — pages are manifest-declared local assets with a read-only JS bridge
+  (`window.pnpPlugin.pageData`) backed by a new `pnp_cli plugin page-data` verb and a
+  `slicer:plugin-pages@1.0.0` WIT export. Page-only plugins are deferred.
+- **P3.7** — plugin bundles carry a SHA-256 audit; no signatures or permission prompts.
+- **P1.0** — IMEX's active mode travels as upstream's per-plate `imex_parallel_mode` and
+  `imex_head_filament_map`; v1 supports identity physical→logical mapping and refuses a
+  non-identity map loudly. v1 roles are Primary/Copy/Mirror; `Span` (`S`) and the `mc-*` modes are
+  deferred and refused by name.
+- **P2.4** — `build_plate_tilt_x` is applied, not refused. All three shipped belt profiles set it
+  to 45, so a refusal would fail every belt printer the fork ships.
+- **Order** — belt (10), then IMEX (09), then plugin (11).
+- **Fixtures** — live in `pinch_n_print_cli/.../tests/fixtures/`; the pnp suite owns the
+  assertions, the fork walkthrough loads the same files through the submodule.
+
+**Corrections to the ticket's premises**, recorded in the asset:
+
+- `apply_schema_guard` **leaves unknown keys alone** (`PnpConfigTranslator.cpp:1091`). Declaring
+  the keys is needed so pnp consumes and validates them, not so the GUI guard passes them; no guard
+  change is part of the prerequisite.
+- The 8 IMEX keys are insufficient: the active mode is **plate metadata**, and
+  `ParsedSidecar.plate_metadata` is parsed but not stamped today (`docs/02_ir_schemas.md:446`).
+- The 5 belt keys are insufficient: the shipped belt profiles also set `gcode_remap_x/y/z` (all
+  three) and `printer_extruder_id` (two of three). The fork lacks `gcode_remap_*`; it defines
+  `printer_extruder_id` (`PrintConfig.cpp:5945`) but pnp does not declare either family.
+- `printable_height` is needed by the `rev_*` remap offset; the host schema lacks it.
+- The live probe (`config-schema`, wire `1.3.0`) reports 107 host keys + 24 module schemas (131
+  unique names); none of the new keys is among them.
+
+**Unblocks:** tickets 09, 10 and 11 have `blocked-by` cleared. Each implements its GUI half and its
+backend prerequisite in the same ticket under the waiver, and merges only when its acceptance slice
+passes. A prerequisite that proves impossible closes its feature ticket as not portable rather than
+shipping a dead control.
