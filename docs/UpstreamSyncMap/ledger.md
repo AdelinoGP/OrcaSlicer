@@ -205,6 +205,18 @@ which is now shipped here too, so both sides carry the same 23.
 | DeviceCore / printer agent | 110 | +6,931/−1,409, 94 files | none. The fork already ships **56** `GUI/DeviceCore` files and diverges from base on only **3** | 13 |
 | Design / CAD | 265 on CAD paths (~299 in the wider Design series) | +45,608, 35 files | none; needs SLVS built here (Conan recipe first, else `deps_src/`) | 14 |
 
+Ticket 08 landed as `dc370ee79b`. The whole host was taken **at upstream head** rather than at
+`6e4be42a04`, because the five follow-ups are all in-range and the head file also carries
+`e40030cf81`'s hunks (its only `UltiMaker.*` change deletes the host's private
+`get_err_code_from_body` in favour of the shared `PrintHost::get_err_code_from_body` ported by
+ticket 02). The other hunks — `PrintConfig.cpp/.hpp`, `PrintHost.cpp`,
+`PhysicalPrinterDialog.cpp/.hpp` — applied cleanly with `git apply --3way`. Dropped: the
+`src/slic3r/CMakeLists.txt` registration (CMake removed), `OrcaSlicer.pot` and
+`localization/i18n/list.txt` (ticket 07 owns the catalogs and already carries the strings), and the
+profile half (`git diff 808dd7dff8 HEAD -- resources/profiles/UltiMaker` is empty). The host is
+verified against a local stub up to the connection/auth/API-key paths; the upload POST is a gap
+recorded in the ticket, because the GUI's Print action never reached the send dialog.
+
 ## Deferred — named, not applicability-checked, no ticket
 
 `176bb6062f` LAN-printer startup crash · `8d528b2a8f` Device-tab printer switch ·

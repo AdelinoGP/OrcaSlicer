@@ -253,6 +253,15 @@ plan for `d7534d7fb9`, and the fact that profiles are a pure upstream snapshot.
   `Extrude` drift; the only placeholder drifts are two `ru` strings that already existed at the
   base. 7/7 suites green; de/fr/ja/eu captures plus the dropdown listing Euskara are in the ticket.
 
+- [UltiMaker host support](tickets/08-ultimaker-host.md): the host landed as `dc370ee79b`, taken
+  at upstream head `808dd7dff8` so the four include-cleanup follow-ups and `e40030cf81`'s hardening
+  arrive with it. `PrintConfig.cpp/.hpp`, `PrintHost.cpp` and `PhysicalPrinterDialog.cpp/.hpp`
+  applied cleanly; CMake, `.pot`/`list.txt` and the profile half were dropped (ticket 03 already
+  made `resources/profiles` byte-identical to head). Stub walkthrough verified the dialog gate, the
+  digest GETs (`system/variant`, `auth/check`, `auth/verify`), the API-key POST and a preset
+  save/reload round-trip; the upload POST is a recorded gap — the Print button never reached
+  `send_gcode_legacy`'s dialog. 7/7 suites green.
+
 ## Out of scope
 
 - The Project page abort (`0xc0000409`, ucrtbase) on any project whose archive carries
